@@ -126,9 +126,10 @@ async function readAccountBalance(
   const account = subject.type === 'org' ? organizations : kilocode_users;
   const [row] = await db
     .select({
-      balance: sql`${account.total_microdollars_acquired} - ${account.microdollars_used}`.mapWith(
-        Number
-      ),
+      balance:
+        sql`${account.total_microdollars_acquired} - ${account.microdollars_used} - ${account.inference_microdollars_held}`.mapWith(
+          Number
+        ),
     })
     .from(account)
     .where(eq(account.id, subject.id));

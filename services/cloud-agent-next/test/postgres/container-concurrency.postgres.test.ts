@@ -90,11 +90,11 @@ afterEach(async () => {
     .where(eq(container_usage_interval.cloud_billing_sku_id, skuId));
   await writer.db
     .update(kilocode_users)
-    .set({ total_microdollars_acquired: 0, microdollars_used: 0 })
+    .set({ total_microdollars_acquired: 0, microdollars_used: 0, inference_microdollars_held: 0 })
     .where(eq(kilocode_users.id, userId));
   await writer.db
     .update(organizations)
-    .set({ total_microdollars_acquired: 0, microdollars_used: 0 })
+    .set({ total_microdollars_acquired: 0, microdollars_used: 0, inference_microdollars_held: 0 })
     .where(inArray(organizations.id, organizationIds));
 });
 
@@ -121,6 +121,16 @@ describe('container capacity against PostgreSQL', () => {
       .where(eq(kilocode_users.id, userId));
     expect(await readContainerCapacity(reader, request())).toEqual([
       { subject: { type: 'user', id: userId }, live: 0, limit },
+    ]);
+  });
+
+  it('uses the low-balance limit when the remaining balance is fully held', async () => {
+    await writer.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_000_000, inference_microdollars_held: 10_000_000 })
+      .where(eq(kilocode_users.id, userId));
+    expect(await readContainerCapacity(reader, request())).toEqual([
+      { subject: { type: 'user', id: userId }, live: 0, limit: 3 },
     ]);
   });
 

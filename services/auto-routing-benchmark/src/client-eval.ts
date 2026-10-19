@@ -11,6 +11,7 @@ import {
   taxonomyRouteKey,
   type AutoRouter,
   type BenchmarkConfig,
+  type ClientEvalBilling,
   type ClientEvalCaseResponse,
   type ClientEvalPair,
   type ClientEvalPlanItem,
@@ -47,10 +48,11 @@ import {
   resolveCustomRouterEntries,
   type CatalogSource,
 } from './custom-routers';
-import { createDeciderJudge } from './decider-judge';
+import { createDeciderJudge, DECIDER_JUDGE_MODEL, deciderJudgeRequest } from './decider-judge';
 import { buildGraderUsage, writeGraderUsage } from './grader-usage';
 import { gradeDeciderOutput, type DeciderJudge } from './grading';
 import type { HonoEnv } from './hono-env';
+import { admitJudgeInference, type JudgeAdmission } from './judge-admission';
 import { createSystemOneClient } from './openrouter';
 import { currentProfileContextFromConfig } from './profiles';
 import { deciderCasesForRouter } from './run';
@@ -67,6 +69,10 @@ export class ClientEvalError extends Error {
 
 export type ClientEvalDeps = {
   source: CatalogSource;
+  admitJudge: (
+    billing: ClientEvalBilling,
+    request: { model: string; body: unknown }
+  ) => Promise<JudgeAdmission>;
   createJudge: () => Promise<DeciderJudge>;
   writeUsage: (usage: UsageRecordRequest) => Promise<UsageWriteOutcome>;
   now?: () => Date;
@@ -216,6 +222,28 @@ export async function gradeClientEvalResult(
   }
 
   const ran = request.exitCode === 0 && !request.timedOut && request.output.length > 0;
+  if (ran && benchCase.check.kind === 'judged') {
+    const admission = await deps.admitJudge(request.billing, {
+      model: DECIDER_JUDGE_MODEL,
+      body: deciderJudgeRequest(DECIDER_JUDGE_MODEL, {
+        userPrompt: benchCase.userPrompt,
+        output: request.output,
+        rubric: benchCase.check.rubric,
+        ...(benchCase.check.reference !== undefined
+          ? { reference: benchCase.check.reference }
+          : {}),
+      }),
+    });
+    if (admission === 'insufficient') {
+      throw new ClientEvalError('insufficient_balance', 'Insufficient balance');
+    }
+    if (admission === 'unavailable') {
+      throw new ClientEvalError(
+        'internal_error',
+        'Judged grading could not be authorized; retry the upload.'
+      );
+    }
+  }
   const grade = ran
     ? await gradeDeciderOutput(benchCase.check, {
         userPrompt: benchCase.userPrompt,
@@ -342,6 +370,7 @@ export function registerClientEvalRoutes(app: Hono<HonoEnv>): void {
         request,
         {
           source: { catalogEnv: env },
+          admitJudge: (billing, judgeRequest) => admitJudgeInference(env, billing, judgeRequest),
           createJudge: async () => createDeciderJudge(await createSystemOneClient(env)),
           writeUsage: usage => writeGraderUsage(env, usage),
         }

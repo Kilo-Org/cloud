@@ -35,6 +35,7 @@ async function setBalance(organizationId: string, acquired: number, used: number
     .set({
       total_microdollars_acquired: acquired,
       microdollars_used: used,
+      inference_microdollars_held: 0,
       microdollars_balance: acquired - used,
       next_credit_expiration_at: null,
     })
@@ -271,6 +272,24 @@ describe('organization funds router', () => {
       ).rejects.toThrow('exceeds the available balance');
 
       // Nothing should have moved.
+      expect(balanceOf(await getOrg(parentOrg.id))).toBe(5_000_000);
+      expect(balanceOf(await getOrg(childA.id))).toBe(0);
+    });
+
+    it('rejects distributing balance held for in-flight inference', async () => {
+      await db
+        .update(organizations)
+        .set({ inference_microdollars_held: 5_000_000 })
+        .where(eq(organizations.id, parentOrg.id));
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(
+        caller.organizations.funds.distribute({
+          organizationId: parentOrg.id,
+          allocations: [{ childOrganizationId: childA.id, amountMicrodollars: 1_000_000 }],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
       expect(balanceOf(await getOrg(parentOrg.id))).toBe(5_000_000);
       expect(balanceOf(await getOrg(childA.id))).toBe(0);
     });

@@ -443,35 +443,68 @@ describe('auto routing worker', () => {
       }
     );
 
-    it.each([402, 200])(
-      'does not dispatch or bill without reserved admission (status=%s)',
-      async status => {
-        env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = source === 'worker' ? 'true' : 'false';
-        mockedFetch.mockImplementation(async (_url, init) => {
-          const command = JSON.parse(typeof init?.body === 'string' ? init.body : '');
-          return status === 402
-            ? new Response(null, { status })
-            : Response.json({ kind: 'admitted', body: command.body });
+    it('does not dispatch or bill after a rejected admission', async () => {
+      env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = source === 'worker' ? 'true' : 'false';
+      mockedFetch.mockImplementation(async () => new Response(null, { status: 402 }));
+      const dispatch = vi.fn();
+      classifyNormalizedInput.mockImplementation(
+        async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
+          const [, input, model, admission] = args;
+          if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
+          await admission.beforeRequest(buildClassifierRequest(input, model), model);
+          dispatch();
+          return mockClassifierResult;
+        }
+      );
+      await decideRequest(
+        mirrorPayload(),
+        source === 'gateway' ? { 'x-kilo-prepaid-admission': 'required' } : {}
+      );
+      await drainBackgroundTasks();
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(cacheRecordClassifierUsage).not.toHaveBeenCalled();
+    });
+
+    it('dispatches and bills without a reservation when web requires no hold', async () => {
+      env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = source === 'worker' ? 'true' : 'false';
+      const commands: string[] = [];
+      mockedFetch.mockImplementation(async (_url, init) => {
+        const command = JSON.parse(typeof init?.body === 'string' ? init.body : '');
+        if (command.action) {
+          commands.push(command.action);
+          return Response.json({ kind: 'admitted', body: command.body });
+        }
+        const usage = UsageRecordRequestSchema.parse(command);
+        return Response.json({
+          status: 'recorded',
+          result: {
+            usageId: usage.core.id,
+            createdAt: usage.core.created_at,
+            newMicrodollarsUsed: usage.core.cost,
+          },
         });
-        const dispatch = vi.fn();
-        classifyNormalizedInput.mockImplementation(
-          async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
-            const [, input, model, admission] = args;
-            if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
-            await admission.beforeRequest(buildClassifierRequest(input, model), model);
-            dispatch();
-            return mockClassifierResult;
-          }
-        );
-        await decideRequest(
-          mirrorPayload(),
-          source === 'gateway' ? { 'x-kilo-prepaid-admission': 'required' } : {}
-        );
-        await drainBackgroundTasks();
-        expect(dispatch).not.toHaveBeenCalled();
-        expect(cacheRecordClassifierUsage).not.toHaveBeenCalled();
-      }
-    );
+      });
+      const dispatch = vi.fn();
+      classifyNormalizedInput.mockImplementation(
+        async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
+          const [, input, model, admission] = args;
+          if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
+          await admission.beforeRequest(buildClassifierRequest(input, model), model);
+          dispatch();
+          return { ...mockClassifierResult, classifierModel: model };
+        }
+      );
+      await decideRequest(
+        mirrorPayload(),
+        source === 'gateway' ? { 'x-kilo-prepaid-admission': 'required' } : {}
+      );
+      await drainBackgroundTasks();
+      expect(dispatch).toHaveBeenCalledOnce();
+      expect(commands).toEqual(['admit']);
+      expect(cacheRecordClassifierUsage).toHaveBeenCalledOnce();
+      const usage = UsageRecordRequestSchema.parse(cacheRecordClassifierUsage.mock.calls[0]?.[0]);
+      expect(usage.metadata.prepaid_reservation_id).toBeUndefined();
+    });
 
     it('does not dispatch or bill when a primary admission acknowledgement is lost', async () => {
       env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = source === 'worker' ? 'true' : 'false';

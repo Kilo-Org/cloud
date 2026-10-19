@@ -108,6 +108,7 @@ describe('client eval (real SQLite)', () => {
   let sqlite: DatabaseSync;
   let db: D1Database;
   let judge: Mock<DeciderJudge>;
+  let admitJudge: Mock<ClientEvalDeps['admitJudge']>;
   let writeUsage: Mock<ClientEvalDeps['writeUsage']>;
   let deps: ClientEvalDeps;
 
@@ -116,12 +117,14 @@ describe('client eval (real SQLite)', () => {
     applyBenchmarkMigrations(sqlite);
     db = sqliteD1(sqlite);
     judge = vi.fn<DeciderJudge>(async () => ({ probability: 0.75, costUsd: 0.0021 }));
+    admitJudge = vi.fn<ClientEvalDeps['admitJudge']>(async () => 'admitted');
     writeUsage = vi.fn<ClientEvalDeps['writeUsage']>(async usage => ({
       kind: 'recorded',
       result: { usageId: usage.core.id } as never,
     }));
     deps = {
       source: { catalogEnv: { KILO_WEB_API_BASE_URL: 'https://app.test' } },
+      admitJudge,
       createJudge: async () => judge,
       writeUsage,
       now: () => new Date('2026-10-16T12:00:00.000Z'),
@@ -201,6 +204,7 @@ describe('client eval (real SQLite)', () => {
       }),
     ]);
     expect(judge).not.toHaveBeenCalled();
+    expect(admitJudge).not.toHaveBeenCalled();
     expect(writeUsage).not.toHaveBeenCalled();
   });
 
@@ -214,6 +218,7 @@ describe('client eval (real SQLite)', () => {
       )
     ).toEqual({ score: 0 });
     expect(judge).not.toHaveBeenCalled();
+    expect(admitJudge).not.toHaveBeenCalled();
     const [profile] = await listOwnerClientProfiles(db, context, 'efficient');
     expect(profile).toMatchObject({ status: 'pending', errors: 1 });
   });
@@ -231,6 +236,43 @@ describe('client eval (real SQLite)', () => {
       cost: 2100,
     });
     expect(usage.metadata.user_prompt_prefix).toBeNull();
+    expect(admitJudge).toHaveBeenCalledExactlyOnceWith(
+      { userId: 'user-1', organizationId: ORG_ID },
+      {
+        model: 'typesafe/jev-1.13',
+        body: expect.objectContaining({
+          model: 'typesafe/jev-1.13',
+          state: expect.objectContaining({ answer: exactAnswer }),
+        }),
+      }
+    );
+  });
+
+  it.each([
+    ['insufficient', 'insufficient_balance'],
+    ['unavailable', 'internal_error'],
+  ] as const)(
+    'refuses judged grading before dispatch when admission is %s',
+    async (admission, code) => {
+      admitJudge.mockResolvedValueOnce(admission);
+      await expect(
+        gradeClientEvalResult(db, CONFIG, upload({ caseId: judgedCase.id }), deps)
+      ).rejects.toMatchObject({ code });
+      expect(judge).not.toHaveBeenCalled();
+      expect(writeUsage).not.toHaveBeenCalled();
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_results').get()).toEqual({
+        n: 0,
+      });
+    }
+  );
+
+  it('does not ask admission again for a judged case that already ran', async () => {
+    await gradeClientEvalResult(db, CONFIG, upload({ caseId: judgedCase.id }), deps);
+    admitJudge.mockClear();
+    expect(
+      await gradeClientEvalResult(db, CONFIG, upload({ caseId: judgedCase.id }), deps)
+    ).toEqual({ score: 0.75 });
+    expect(admitJudge).not.toHaveBeenCalled();
   });
 
   it('stores nothing when grader usage cannot be recorded', async () => {

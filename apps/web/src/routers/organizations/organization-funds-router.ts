@@ -9,6 +9,7 @@ import {
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { accountBalanceMicrodollars } from '@kilocode/worker-utils/account-access';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import { TRPCError } from '@trpc/server';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
@@ -98,6 +99,7 @@ export const organizationFundsRouter = createTRPCRouter({
           name: organizations.name,
           total_microdollars_acquired: organizations.total_microdollars_acquired,
           microdollars_used: organizations.microdollars_used,
+          inference_microdollars_held: organizations.inference_microdollars_held,
           next_credit_expiration_at: organizations.next_credit_expiration_at,
         })
         .from(organizations)
@@ -133,12 +135,16 @@ export const organizationFundsRouter = createTRPCRouter({
         children.push({
           id: child.id,
           name: child.name,
-          balanceMicrodollars: totalAcquired - child.microdollars_used,
+          balanceMicrodollars: accountBalanceMicrodollars({
+            total_microdollars_acquired: totalAcquired,
+            microdollars_used: child.microdollars_used,
+            inference_microdollars_held: child.inference_microdollars_held,
+          }),
         });
       }
 
       return {
-        parentBalanceMicrodollars: parent.total_microdollars_acquired - parent.microdollars_used,
+        parentBalanceMicrodollars: accountBalanceMicrodollars(parent),
         hasExpiringCredits: parent.next_credit_expiration_at != null,
         children,
       };
@@ -169,6 +175,7 @@ export const organizationFundsRouter = createTRPCRouter({
             name: organizations.name,
             total_microdollars_acquired: organizations.total_microdollars_acquired,
             microdollars_used: organizations.microdollars_used,
+            inference_microdollars_held: organizations.inference_microdollars_held,
             next_credit_expiration_at: organizations.next_credit_expiration_at,
           })
           .from(organizations)
@@ -189,7 +196,7 @@ export const organizationFundsRouter = createTRPCRouter({
           });
         }
 
-        const parentBalance = parent.total_microdollars_acquired - parent.microdollars_used;
+        const parentBalance = accountBalanceMicrodollars(parent);
         if (totalToMoveMicrodollars > parentBalance) {
           throw new TRPCError({
             code: 'BAD_REQUEST',

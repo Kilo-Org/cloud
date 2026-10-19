@@ -6,10 +6,9 @@ type ReservationEnv = {
   KILO_WEB_API_BASE_URL: string;
 };
 
-type ClassifierAdmission = {
-  reservationId: string;
-  body: Record<string, unknown>;
-};
+type ClassifierAdmission =
+  | { kind: 'reserved'; reservationId: string; body: Record<string, unknown> }
+  | { kind: 'not_required'; body: Record<string, unknown> };
 
 const admissionSchema = z.object({
   kind: z.literal('admitted'),
@@ -58,16 +57,14 @@ export async function admitClassifierInference(
       throw new Error('Classifier prepaid admission rejected');
     }
     const admission = admissionSchema.parse(await response.json());
-    if (!admission.reservationId) {
-      throw new Error('Classifier prepaid admission did not reserve credits');
-    }
-    if (admission.reservationId !== input.requestId) {
-      throw new Error('Classifier prepaid admission identity mismatch');
-    }
     if (admission.body.model !== input.model) {
       throw new Error('Classifier prepaid admission model mismatch');
     }
-    return { reservationId: admission.reservationId, body: admission.body };
+    if (!admission.reservationId) return { kind: 'not_required', body: admission.body };
+    if (admission.reservationId !== input.requestId) {
+      throw new Error('Classifier prepaid admission identity mismatch');
+    }
+    return { kind: 'reserved', reservationId: admission.reservationId, body: admission.body };
   } catch (error) {
     if (definitelyNoHold) throw error;
     // No classifier dispatch has happened. The terminal cancellation also fences a late admission.

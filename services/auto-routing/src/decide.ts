@@ -412,6 +412,10 @@ export type DecisionRun = {
   routingTable: RoutingTable | null;
 };
 
+// Public callers never carry the gateway's admission header, so their paid classifier calls
+// always ask web. Gateway traffic asks only when the gateway or worker flag requires it.
+export type ClassifierAdmissionMode = 'always' | 'gateway';
+
 function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTarget {
   const router = payload.router ?? DEFAULT_AUTO_ROUTER;
   return {
@@ -469,7 +473,8 @@ function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTa
 export async function runDecision(
   c: Context<HonoEnv>,
   payload: MirrorPayload,
-  target: DecisionTarget
+  target: DecisionTarget,
+  admissionMode: ClassifierAdmissionMode
 ): Promise<DecisionRun> {
   const generation = Date.now();
   const usageCreatedAt = new Date(generation).toISOString();
@@ -501,6 +506,7 @@ export async function runDecision(
     try {
       let classifier: ClassifierRunResult;
       if (
+        admissionMode === 'always' ||
         c.req.header('x-kilo-prepaid-admission') === 'required' ||
         ('GATEWAY_PREPAID_RESERVATIONS_ENABLED' in c.env &&
           String(c.env.GATEWAY_PREPAID_RESERVATIONS_ENABLED) === 'true')
@@ -517,7 +523,9 @@ export async function runDecision(
               model,
               body,
             });
-            identity.prepaidReservationId = admission.reservationId;
+            if (admission.kind === 'reserved') {
+              identity.prepaidReservationId = admission.reservationId;
+            }
             return admission.body;
           },
         });
@@ -923,7 +931,8 @@ async function decideCustomRouter(
     const run = await runDecision(
       c,
       payload,
-      customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
+      customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing),
+      'gateway'
     );
     return c.json({ ...run.response, decision: customRouterDecision(routing, run) });
   } catch (error) {
@@ -948,6 +957,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
   const payload = parsed.data;
   if (payload.customRouter) return decideCustomRouter(c, payload, payload.customRouter);
-  const { response } = await runDecision(c, payload, platformTarget(c, payload));
+  const { response } = await runDecision(c, payload, platformTarget(c, payload), 'gateway');
   return c.json(response);
 };

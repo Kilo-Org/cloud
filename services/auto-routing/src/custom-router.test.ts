@@ -17,7 +17,10 @@ import type * as DbModule from '@kilocode/db';
 import { signKiloToken, clearSecretCacheForTest } from '@kilocode/worker-utils';
 import type * as AccountAccessModule from '@kilocode/worker-utils/account-access';
 import type { OrganizationMemberBalanceRow } from '@kilocode/worker-utils/account-access';
-import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import {
+  INFERENCE_RESERVATION_STATE_HEADER,
+  type UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 import type * as ClassifierConfigModule from './classifier-config';
 import type * as CustomRouterStoreModule from './custom-router-store';
 import type * as ModelCapabilitiesModule from './model-capabilities';
@@ -701,48 +704,90 @@ describe('public custom router decide', () => {
     expect(cacheIdFromName).toHaveBeenCalledWith(expect.stringMatching(`^custom:${ROUTER_ID}:`));
   });
 
-  it('reserves the classifier usage identity before a public dispatch when enforcement is on', async () => {
-    const unreserved = fetchMock.getMockImplementation();
-    let reservedId: string | undefined;
-    fetchMock.mockImplementation(async (input, init) => {
-      if (requestUrl(input) !== 'https://web.example.test/api/internal/inference/reservations') {
-        return unreserved ? unreserved(input, init) : new Response(null, { status: 404 });
-      }
-      const command = JSON.parse(init?.body as string) as {
-        requestId: string;
-        body: Record<string, unknown>;
-      };
-      reservedId = command.requestId;
-      return Response.json({
-        kind: 'admitted',
-        reservationId: command.requestId,
-        body: command.body,
+  describe('prepaid classifier admission with the worker flag off', () => {
+    type ReservationCommand = { action: string; requestId: string; body?: unknown };
+
+    function routeReservations(admit: (command: ReservationCommand) => Response) {
+      const other = fetchMock.getMockImplementation();
+      const commands: ReservationCommand[] = [];
+      fetchMock.mockImplementation(async (input, init) => {
+        if (requestUrl(input) !== 'https://web.example.test/api/internal/inference/reservations') {
+          return other ? other(input, init) : new Response(null, { status: 404 });
+        }
+        const command = JSON.parse(init?.body as string) as ReservationCommand;
+        commands.push(command);
+        return command.action === 'admit' ? admit(command) : Response.json({ kind: 'released' });
       });
-    });
-    const dispatch = vi.fn();
-    classifyNormalizedInput.mockImplementation(
-      async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
-        const [, input, model, admission] = args;
-        if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
-        dispatch(await admission.beforeRequest(buildClassifierRequest(input, model), model));
-        return { cost: 0.000002, classifierModel: model, classification };
-      }
-    );
-    Object.assign(env, { GATEWAY_PREPAID_RESERVATIONS_ENABLED: 'true' });
-    try {
+      return commands;
+    }
+
+    function dispatchAfterAdmission() {
+      const dispatch = vi.fn();
+      classifyNormalizedInput.mockImplementation(
+        async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
+          const [, input, model, admission] = args;
+          if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
+          dispatch(await admission.beforeRequest(buildClassifierRequest(input, model), model));
+          return { cost: 0.000002, classifierModel: model, classification };
+        }
+      );
+      return dispatch;
+    }
+
+    it('settles the reserved classifier usage under the same identity', async () => {
+      const commands = routeReservations(command =>
+        Response.json({ kind: 'admitted', reservationId: command.requestId, body: command.body })
+      );
+      const dispatch = dispatchAfterAdmission();
       await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
       await drainBackgroundTasks();
-    } finally {
-      Reflect.deleteProperty(env, 'GATEWAY_PREPAID_RESERVATIONS_ENABLED');
-    }
-    expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(reservedId).toBeDefined();
-    expect(recordUsage).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({
-        core: expect.objectContaining({ id: reservedId, requested_model: 'kilo-auto/custom/mine' }),
-        metadata: expect.objectContaining({ prepaid_reservation_id: reservedId }),
-      })
-    );
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      const reservedId = commands[0]?.requestId;
+      expect(commands.map(command => command.action)).toEqual(['admit']);
+      expect(recordUsage).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          core: expect.objectContaining({
+            id: reservedId,
+            requested_model: 'kilo-auto/custom/mine',
+          }),
+          metadata: expect.objectContaining({ prepaid_reservation_id: reservedId }),
+        })
+      );
+    });
+
+    it('dispatches without a prepaid identity when web requires no hold', async () => {
+      const commands = routeReservations(command =>
+        Response.json({ kind: 'admitted', body: command.body })
+      );
+      const dispatch = dispatchAfterAdmission();
+      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+      await drainBackgroundTasks();
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(commands.map(command => command.action)).toEqual(['admit']);
+      expect(recordUsage).toHaveBeenCalledOnce();
+      expect(recordUsage.mock.calls[0]?.[0].metadata.prepaid_reservation_id).toBeUndefined();
+    });
+
+    it('does not classify or bill when web rejects, whatever the caller header says', async () => {
+      const commands = routeReservations(
+        () =>
+          new Response(null, {
+            status: 402,
+            headers: { [INFERENCE_RESERVATION_STATE_HEADER]: 'none' },
+          })
+      );
+      const dispatch = dispatchAfterAdmission();
+      const { decision } = await decisionOf(
+        await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
+          'x-kilo-prepaid-admission': 'disabled',
+        })
+      );
+      await drainBackgroundTasks();
+      expect(commands.map(command => command.action)).toEqual(['admit']);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(recordUsage).not.toHaveBeenCalled();
+      expect(decision).toMatchObject({ model: SONNET, fallback: true });
+    });
   });
 });
 

@@ -22,9 +22,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('classifier prepaid admission', () => {
-  it('rejects worker-enabled admission when web enforcement did not reserve credits', async () => {
+  it('admits without a hold when web enforcement requires none', async () => {
     fetchMock.mockResolvedValue(Response.json({ kind: 'admitted', body: input.body }));
-    await expect(admitClassifierInference(env, input)).rejects.toBeInstanceOf(Error);
+    expect(await admitClassifierInference(env, input)).toEqual({
+      kind: 'not_required',
+      body: input.body,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it.each([402, 503])('rejects provider dispatch after admission status %s', async status => {

@@ -400,7 +400,9 @@ Inference holds no database transaction or connection.
 - Deploy compatible app, gateway, classifier worker, and other balance consumers before activation.
 - Use the shared web environment workflow for deployment configuration.
 - The gateway marks classifier calls that require admission, regardless of the worker's local flag.
-- A worker that requires admission rejects responses without a reservation.
+- Public custom-router decisions ask web before every paid classifier call, regardless of worker flags or request headers.
+- An admission response without a reservation means web requires no hold for that call.
+- Judged client evaluation asks web before the judge call and refuses any reservation.
 - Rollback disables new admission; existing holds still require settlement or confirmed cancellation.
 
 #### Charge ceilings

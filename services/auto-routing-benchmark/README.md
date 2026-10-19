@@ -773,6 +773,9 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
   stored. The usage id derives from the graded case, so a retried upload records it once.
   If usage cannot be recorded the upload fails with `internal_error` and nothing is stored.
   The serving worker checks the paying owner's balance before forwarding.
+- Before a judged grading call, the upload asks web prepaid admission for the payer.
+  A rejection fails the upload with `insufficient_balance` or `internal_error` before the judge runs.
+  A reservation is released and refused because grader usage records under a separate usage id.
 - A case repetition that is already stored returns its stored score without grading again.
 
 Rollout: apply the additive D1 migration (new tables and the `profile_request_events.router`

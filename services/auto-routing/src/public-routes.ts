@@ -168,7 +168,8 @@ export const publicDecideHandler = publicHandler(async c => {
   const run = await runDecision(
     c,
     payload,
-    customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
+    customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing),
+    'always'
   );
   const decision = publicCustomRouterDecision(customRouterDecision(routing, run));
   const decisionId = await signAutoDecision(

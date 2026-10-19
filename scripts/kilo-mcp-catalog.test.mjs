@@ -6,9 +6,16 @@ import { load } from 'js-yaml';
 
 const workflowPath = '.github/workflows/kilo-mcp-catalog.yml';
 const testPath = 'scripts/kilo-mcp-catalog.test.mjs';
+const prepareJobName = 'catalog-prepare';
+const summariesJobName = 'catalog-summaries';
 const prJobName = 'catalog-pr';
 const mergeJobName = 'catalog-merge';
-const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
+const dumpApplyCommand =
+  'pnpm --filter web script src/scripts/mcp-catalog/dump.ts -- --summaries-file /tmp/catalog-summaries/summary-summaries.json';
+const promptsCommand =
+  'pnpm --filter web script src/scripts/mcp-catalog/prompts.ts -- /tmp/catalog-prompts/summary-prompts.json';
+const completeCommand =
+  'node /tmp/catalog-complete.cjs /tmp/catalog-prompts/summary-prompts.json /tmp/catalog-summaries/summary-summaries.json';
 const skillCommand = 'pnpm --filter web script src/scripts/mcp-catalog/skill.ts';
 const skillPath = '.kilo/skills/kilo-mcp/SKILL.md';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
@@ -18,13 +25,13 @@ const mintSecretEnv = '${{ secrets.MCP_CATALOG_TOKEN_SECRET }}';
 const mergeGate = "github.event_name == 'push' && github.ref == 'refs/heads/main'";
 const forkCondition = 'github.event.pull_request.head.repo.fork == true';
 const sameRepoCondition = 'github.event.pull_request.head.repo.fork == false';
-const changeGate = "steps.catalog_changes.outputs.catalog == 'true'";
+const prepareChangeGate = "steps.catalog_changes.outputs.catalog == 'true'";
 const mergeChangeGate = "steps.merge_changes.outputs.catalog == 'true'";
-// The paths the change-detection step must recognise. The workflow-path
+// The paths the change-detection steps must recognise. The workflow-path
 // entries tolerate the grep escaping (`\.yml`, `\.test\.mjs`) so the required
-// check keeps running the dump whenever the catalog can actually change, and
-// the skill entry keeps `.kilo/skills/kilo-mcp/SKILL.md` inside the detected
-// set so a hand-edited skill re-runs the pipeline.
+// check keeps running the pipeline whenever the catalog can actually change,
+// and the skill entry keeps `.kilo/skills/kilo-mcp/SKILL.md` inside the
+// detected set so a hand-edited skill re-runs the pipeline.
 const catalogPathFragments = [
   /apps\/web\/src\//,
   /services\/kilo-mcp\//,
@@ -53,14 +60,65 @@ function findStep(job, predicate, what) {
   return step;
 }
 
+/**
+ * The credential scoping invariant: the minted token exists only as the
+ * completing step's step-level env, sourced from the mint step outputs. No
+ * step anywhere writes it to the job-wide environment, and no job other than
+ * the two completion sites references it at all.
+ */
+function assertCredentialConfinement(workflow, completeByJob) {
+  for (const [jobName, job] of Object.entries(workflow.jobs)) {
+    for (const step of job.steps) {
+      const text = `${step.run ?? ''} ${JSON.stringify(step.env ?? {})}`;
+      assert.doesNotMatch(
+        text,
+        /GITHUB_ENV[\s\S]{0,200}KILO_API_KEY|KILO_API_KEY[\s\S]{0,200}GITHUB_ENV/,
+        `${jobName}/${step.name ?? step.uses}: the token stays out of the job-wide environment`
+      );
+      const envKeys = Object.keys(step.env ?? {});
+      const tokenEnv = envKeys.filter(key => key === 'KILO_API_KEY' || key === 'KILO_ORG_ID');
+      const expected = completeByJob.get(jobName) === step ? tokenEnv : [];
+      assert.deepEqual(
+        tokenEnv.filter(key => !expected.includes(key)),
+        [],
+        `${jobName}/${step.name ?? step.uses}: only the completion step may receive the minted token via step-level env`
+      );
+    }
+  }
+  for (const [jobName, complete] of completeByJob) {
+    assert.equal(complete.env?.KILO_API_KEY, '${{ steps.mint.outputs.token }}');
+    assert.equal(complete.env?.KILO_ORG_ID, '${{ steps.mint.outputs.organization }}');
+    // Every completion job mints its own token right before completing.
+    const mint = findStep(workflow.jobs[jobName], step => step.id === 'mint', 'mint step');
+    assert.equal(mint.env?.MCP_CATALOG_TOKEN_SECRET, mintSecretEnv);
+    assert.match(mint.run ?? '', new RegExp(mintCommand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    const steps = workflow.jobs[jobName].steps;
+    assert.ok(
+      steps.indexOf(mint) < steps.indexOf(complete),
+      `${jobName}: the completion step must run after the mint`
+    );
+  }
+}
+
 function validate(workflow) {
-  assert.deepEqual(Object.keys(workflow.jobs), [prJobName, mergeJobName], 'exactly two jobs');
+  assert.deepEqual(
+    Object.keys(workflow.jobs),
+    [prepareJobName, summariesJobName, prJobName, mergeJobName],
+    'exactly four jobs: prepare, trusted summaries, required PR check, merge'
+  );
+  const prepare = workflow.jobs[prepareJobName];
+  const summaries = workflow.jobs[summariesJobName];
   const pr = workflow.jobs[prJobName];
   const merge = workflow.jobs[mergeJobName];
 
   // Triggers: PRs on every branch head (the check is required and must always
   // report); pushes on main only.
-  assert.equal(pr.if, "github.event_name == 'pull_request'", `${prJobName}: PR-event only`);
+  assert.equal(
+    prepare.if,
+    "github.event_name == 'pull_request'",
+    `${prepareJobName}: PR-event only`
+  );
+  assert.equal(pr.if, "${{ github.event_name == 'pull_request' && !cancelled() }}");
   assert.equal(merge.if, mergeGate, `${mergeJobName}: gated to main pushes only (requirement 10)`);
   assert.ok(
     !workflow.on.pull_request?.paths,
@@ -73,96 +131,148 @@ function validate(workflow) {
     'push must not filter by path: the merge job is required on main and must always report'
   );
 
-  // The job always reports, but only catalog-relevant changes pay for the dump.
-  const gate = findStep(pr, step => step.id === 'catalog_changes', 'change-detection step');
+  // Job graph: prepare → summaries → required check; the check still reports
+  // when an upstream job was skipped (unrelated PR) or failed (fatal, and the
+  // check itself names the failure instead of reporting green).
+  assert.deepEqual(summaries.needs, prepareJobName, 'the trusted job depends on prepare');
+  assert.deepEqual(pr.needs, [prepareJobName, summariesJobName]);
+  assert.match(
+    pr.if,
+    /!cancelled\(\)/,
+    'the required check must report even when an upstream job was skipped or failed'
+  );
+  const upstreamFail = findStep(
+    pr,
+    step => (step.if ?? '').includes("needs.catalog-prepare.result != 'success'"),
+    'the required check must fail loudly when an upstream job failed'
+  );
+  assert.match(upstreamFail.run ?? '', /exit 1/);
+
+  // The prepare job enumerates the PR checkout and writes the prompt
+  // artifact; the PR checkout code in this job never sees a credential.
+  const gate = findStep(prepare, step => step.id === 'catalog_changes', 'change-detection step');
   for (const fragment of catalogPathFragments) {
     assert.match(gate.run ?? '', fragment, `change-detection step must recognise ${fragment}`);
   }
-  const gateIndex = pr.steps.indexOf(gate);
-  for (const step of pr.steps.slice(gateIndex + 1)) {
+  const gateIndex = prepare.steps.indexOf(gate);
+  for (const step of prepare.steps.slice(gateIndex + 1)) {
     assert.match(
       step.if ?? '',
-      new RegExp(changeGate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      new RegExp(prepareChangeGate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
       `${step.name ?? step.uses}: every post-detection step must be gated on catalog-relevant changes`
     );
   }
-
-  // The merge job runs on every main push but gates the dump and the upsert on
-  // the same catalog paths, so an unrelated main push stays cheap (requirement
-  // 9/22) without leaving the required check "Expected".
-  const mergeDetect = findStep(
-    merge,
-    step => step.id === 'merge_changes',
-    'merge change-detection step'
-  );
-  for (const fragment of catalogPathFragments) {
-    assert.match(
-      mergeDetect.run ?? '',
-      fragment,
-      `merge change-detection step must recognise ${fragment}`
-    );
-  }
-  const mergeGateIndex = merge.steps.indexOf(mergeDetect);
-  for (const step of merge.steps.slice(mergeGateIndex + 1)) {
-    assert.match(
-      step.if ?? '',
-      new RegExp(mergeChangeGate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-      `${step.name ?? step.uses}: every post-detection step in the merge job must be gated on catalog-relevant changes`
-    );
-  }
-
-  // The PR job runs the real dump script with a short-lived benchmarking
-  // token mint (requirement 2), never a maintainer's personal credential, and
-  // keeps author edits through the dump's own keep-edit rule (requirement 5).
-  const prDump = findStep(pr, step => step.run === dumpCommand, 'PR job runs the real dump script');
-  const prMint = findStep(pr, step => step.id === 'mint', 'PR job mints a catalog token');
-  assert.equal(
-    prMint.env?.MCP_CATALOG_TOKEN_SECRET,
-    mintSecretEnv,
-    'PR mint reads the shared mint secret from the repo secret'
-  );
-  assert.match(prMint.run ?? '', new RegExp(mintCommand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.match(prMint.run ?? '', /KILO_API_KEY/, 'PR mint exports the short-lived Kilo API key');
-  assert.doesNotMatch(
-    JSON.stringify(prDump.env ?? {}),
-    /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
-    'PR dump must not use the personal CLI credential'
+  const prompts = findStep(
+    prepare,
+    step => (step.run ?? '').includes(promptsCommand),
+    'prompt writer'
   );
   findStep(
-    pr,
-    step => step.run === kiloInstallCommand,
-    'PR job installs the Kilo CLI the dump shells out to'
+    prepare,
+    step => (step.uses ?? '').startsWith('actions/upload-artifact@'),
+    'prompt artifact upload'
   );
+  assert.ok(
+    prepare.steps.indexOf(prompts) > gateIndex,
+    'prompt writing runs after change detection'
+  );
+  // No step in the prepare job may mint or reference the credential.
+  for (const step of prepare.steps) {
+    assert.doesNotMatch(
+      JSON.stringify(step.env ?? {}),
+      /MCP_CATALOG_TOKEN_SECRET|KILO_API_KEY/,
+      `${prepareJobName}/${step.name}: no PR-checkout step may receive the catalog credential`
+    );
+  }
 
-  // The PR job regenerates the skill from the catalog.json the dump just
-  // wrote, on the same change gate and with no credentials (s1's generator
-  // command; the workflow never imports the generator itself).
+  // The trusted job: no checkout, artifact in, summaries out, credential only
+  // on the completion step.
+  assert.ok(
+    !summaries.steps.some(step => (step.uses ?? '').includes('checkout')),
+    `${summariesJobName}: the trusted job must not check out any repository code`
+  );
+  const trustedComplete = findStep(
+    summaries,
+    step => step.run === completeCommand,
+    'trusted completion step'
+  );
+  findStep(
+    summaries,
+    step => (step.uses ?? '').startsWith('actions/download-artifact@'),
+    'prompt artifact download'
+  );
+  findStep(
+    summaries,
+    step => step.run === kiloInstallCommand,
+    'the trusted job installs the Kilo CLI the completion shells out to'
+  );
+  assert.equal(
+    trustedComplete['continue-on-error'],
+    '${{ github.event.pull_request.head.repo.fork == true }}',
+    'the trusted completion tolerates failure only on fork PRs'
+  );
+  // A failed completion still yields an (empty) summaries artifact, so the
+  // required check's apply step fails on uncovered paths instead of missing
+  // the file.
+  const fallback = findStep(
+    summaries,
+    step => (step.if ?? '').includes("steps.complete.outcome != 'success'"),
+    'empty-summaries fallback step'
+  );
+  assert.match(fallback.run ?? '', /summary-summaries\.json/);
+  const upload = findStep(
+    summaries,
+    step => (step.uses ?? '').startsWith('actions/upload-artifact@'),
+    'summaries artifact upload'
+  );
+  assert.equal(upload.if, 'always()', 'the summaries artifact uploads even after a failure');
+  assert.equal(upload.with.name, 'catalog-summaries');
+
+  // The required check applies the trusted summaries with the dump's
+  // --summaries-file path (the CLI runs only in its own job), regenerates
+  // the skill from the refreshed catalog, and fails on uncovered paths.
+  const prDump = findStep(
+    pr,
+    step => (step.run ?? '').includes('--summaries-file'),
+    'PR apply step'
+  );
+  assert.match(
+    prDump.run ?? '',
+    new RegExp(dumpApplyCommand.slice(0, 60).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  );
+  assert.equal(prDump.id, 'dump', 'PR apply exposes its outcome to later steps');
+  assert.equal(
+    prDump['continue-on-error'],
+    '${{ github.event.pull_request.head.repo.fork == true }}',
+    'PR apply tolerates failure only on fork PRs'
+  );
   const prSkill = findStep(
     pr,
     step => step.run === skillCommand,
     'PR job regenerates the kilo-mcp skill'
   );
-  assert.equal(
-    prSkill.if,
-    changeGate,
-    'PR skill regeneration is gated on catalog-relevant changes'
-  );
   assert.ok(
     pr.steps.indexOf(prDump) < pr.steps.indexOf(prSkill),
-    'PR skill regeneration must run after the dump, so it reads the refreshed catalog.json'
+    'PR skill regeneration must run after the apply, so it reads the refreshed catalog.json'
+  );
+  assert.doesNotMatch(
+    JSON.stringify(prDump.env ?? {}),
+    /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
+    'PR apply must not use the personal CLI credential'
+  );
+  // The required check must not install the Kilo CLI: the apply path never
+  // shells out to it, so a CLI here would only invite PR-side completions.
+  assert.ok(
+    !pr.steps.some(step => step.run === kiloInstallCommand),
+    `${prJobName}: no Kilo CLI install in the required check (completions run in the trusted job)`
   );
 
   // Fork PRs never receive the mint secret (GitHub withholds secrets from
-  // fork pull_request events), so a fork that adds a query cannot run the dump
-  // at all. Requirement 6 must still fire: the dump is continue-on-error on
-  // forks only, and a fork-conditioned follow-up step posts the self-service
-  // guidance and fails the job before drift detection could silently pass.
-  assert.equal(prDump.id, 'dump', 'PR dump exposes its outcome to later steps');
-  assert.equal(
-    prDump['continue-on-error'],
-    '${{ github.event.pull_request.head.repo.fork == true }}',
-    'PR dump tolerates failure only on fork PRs'
-  );
+  // fork pull_request events), so a fork that adds a query cannot apply
+  // generated summaries. Requirement 6 must still fire: the apply is
+  // continue-on-error on forks only, and a fork-conditioned follow-up step
+  // posts the self-service guidance and fails the job before drift detection
+  // could silently pass.
   const dumpGuidance = findStep(
     pr,
     step =>
@@ -180,7 +290,7 @@ function validate(workflow) {
   const drift = findStep(pr, step => step.id === 'drift', 'drift detection step');
   assert.ok(
     pr.steps.indexOf(dumpGuidance) < pr.steps.indexOf(drift),
-    'dump-failure guidance must run before drift detection, or a failed fork dump could pass silently'
+    'dump-failure guidance must run before drift detection, or a failed fork apply could pass silently'
   );
   assert.match(
     drift.run ?? '',
@@ -194,12 +304,14 @@ function validate(workflow) {
   );
 
   // PR jobs never touch Vectorize or the embed script (requirement 10).
-  for (const step of pr.steps) {
-    assert.doesNotMatch(
-      stepText(step),
-      /embed-catalog|catalog:embed|vectorize|CLOUDFLARE/i,
-      `${prJobName}: no PR-triggered step may reference the embed script or Vectorize`
-    );
+  for (const job of [prepare, summaries, pr]) {
+    for (const step of job.steps) {
+      assert.doesNotMatch(
+        stepText(step),
+        /embed-catalog|catalog:embed|vectorize|CLOUDFLARE/i,
+        `${job.name}: no PR-triggered step may reference the embed script or Vectorize`
+      );
+    }
   }
 
   // Same-repo drift is committed back under the bot identity: the catalog and
@@ -239,7 +351,7 @@ function validate(workflow) {
   assert.match(comment.env.COMMENT_BODY, /catalog\.patch/, 'comment points at the patch');
   assert.match(
     comment.env.COMMENT_BODY,
-    new RegExp(dumpCommand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+    /pnpm --filter web script src\/scripts\/mcp-catalog\/dump\.ts/,
     'comment gives the run command'
   );
   const fail = findStep(
@@ -250,25 +362,65 @@ function validate(workflow) {
   );
   assert.ok(fail, 'fork drift exits non-zero');
 
-  // Merge job: dump fills stragglers (requirement 8), the skill is regenerated
-  // from it, then the embed script upserts Vectorize with the Cloudflare
-  // credentials (requirement 9).
-  const mergeDump = findStep(merge, step => step.run === dumpCommand, 'merge job runs the dump');
-  const mergeMint = findStep(merge, step => step.id === 'mint', 'merge job mints a catalog token');
-  assert.equal(
-    mergeMint.env?.MCP_CATALOG_TOKEN_SECRET,
-    mintSecretEnv,
-    'merge mint reads the shared mint secret from the repo secret'
+  // Credential scoping across the whole workflow: token only on the two
+  // completion steps (trusted job + merge job), sourced from mint outputs.
+  const mergeComplete = findStep(
+    merge,
+    step => step.run === completeCommand,
+    'merge completion step'
   );
-  assert.doesNotMatch(
-    JSON.stringify(mergeDump.env ?? {}),
-    /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
-    'merge dump must not use the personal CLI credential'
+  assertCredentialConfinement(
+    workflow,
+    new Map([
+      [summariesJobName, trustedComplete],
+      [mergeJobName, mergeComplete],
+    ])
   );
+
+  // The merge job runs on every main push but gates the pipeline and the
+  // upsert on the same catalog paths, so an unrelated main push stays cheap
+  // (requirement 9/22) without leaving the required check "Expected".
+  const mergeDetect = findStep(
+    merge,
+    step => step.id === 'merge_changes',
+    'merge change-detection step'
+  );
+  for (const fragment of catalogPathFragments) {
+    assert.match(
+      mergeDetect.run ?? '',
+      fragment,
+      `merge change-detection step must recognise ${fragment}`
+    );
+  }
+  const mergeGateIndex = merge.steps.indexOf(mergeDetect);
+  for (const step of merge.steps.slice(mergeGateIndex + 1)) {
+    assert.match(
+      step.if ?? '',
+      new RegExp(mergeChangeGate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      `${step.name ?? step.uses}: every post-detection step in the merge job must be gated on catalog-relevant changes`
+    );
+  }
+
+  // Merge job: prompts on the trusted main checkout, completion fills
+  // stragglers (requirement 8), the skill is regenerated from it, then the
+  // embed script upserts Vectorize with the Cloudflare credentials
+  // (requirement 9).
+  const mergePrompts = findStep(
+    merge,
+    step => (step.run ?? '').includes(promptsCommand),
+    'merge prompt writer'
+  );
+  assert.equal(mergePrompts.if, mergeChangeGate);
+  const mergeDump = findStep(
+    merge,
+    step => (step.run ?? '').includes('--summaries-file'),
+    'merge apply step'
+  );
+  assert.equal(mergeDump.if, mergeChangeGate);
   findStep(
     merge,
     step => step.run === kiloInstallCommand,
-    'merge job installs the Kilo CLI the dump shells out to'
+    'merge job installs the Kilo CLI the completion shells out to'
   );
   const mergeSkill = findStep(
     merge,
@@ -289,12 +441,17 @@ function validate(workflow) {
   assert.ok(
     merge.steps.indexOf(mergeDump) < merge.steps.indexOf(mergeDrift) &&
       merge.steps.indexOf(mergeDrift) < merge.steps.indexOf(upsert),
-    'the merge drift check must run between the dump and the Vectorize upsert'
+    'the merge drift check must run between the apply and the Vectorize upsert'
+  );
+  assert.ok(
+    merge.steps.indexOf(mergePrompts) < merge.steps.indexOf(mergeComplete) &&
+      merge.steps.indexOf(mergeComplete) < merge.steps.indexOf(mergeDump),
+    'the merge pipeline must run prompts → complete → apply in order'
   );
   assert.ok(
     merge.steps.indexOf(mergeDump) < merge.steps.indexOf(mergeSkill) &&
       merge.steps.indexOf(mergeSkill) < merge.steps.indexOf(mergeDrift),
-    'the merge skill must be regenerated after the dump and before the stale check'
+    'the merge skill must be regenerated after the apply and before the stale check'
   );
   assert.match(
     mergeDrift.run ?? '',
@@ -332,16 +489,139 @@ test('catalog workflow wiring is valid', () => {
 
 for (const [name, defect] of [
   [
-    'dump step removed',
-    workflow => dropStep(workflow, prJobName, step => step.run === dumpCommand),
+    'apply step removed from the required check',
+    workflow =>
+      dropStep(workflow, prJobName, step => (step.run ?? '').includes('--summaries-file')),
   ],
   [
-    'Kilo CLI install removed from the PR job',
-    workflow => dropStep(workflow, prJobName, step => step.run === kiloInstallCommand),
+    'prompt writer removed from the prepare job',
+    workflow =>
+      dropStep(workflow, prepareJobName, step => (step.run ?? '').includes(promptsCommand)),
+  ],
+  [
+    'trusted checkout introduced',
+    workflow => {
+      workflow.jobs[summariesJobName].steps.unshift({
+        name: 'Checkout',
+        uses: 'actions/checkout@v4',
+      });
+    },
+  ],
+  [
+    'prepare job grows its own mint step',
+    workflow => {
+      workflow.jobs[prepareJobName].steps.push({
+        name: 'Mint',
+        id: 'mint',
+        env: { MCP_CATALOG_TOKEN_SECRET: mintSecretEnv },
+        run: `curl ${mintCommand}`,
+      });
+    },
+  ],
+  [
+    'mint exports the token through the job environment',
+    workflow => {
+      const step = workflow.jobs[summariesJobName].steps.find(item => item.id === 'mint');
+      step.run += '\n          echo "KILO_API_KEY=example" >> "$GITHUB_ENV"';
+    },
+  ],
+  [
+    'completion step loses the token env',
+    workflow => {
+      const step = workflow.jobs[summariesJobName].steps.find(item => item.run === completeCommand);
+      delete step.env.KILO_API_KEY;
+    },
+  ],
+  [
+    'an unrelated step references the token',
+    workflow => {
+      const step = workflow.jobs[summariesJobName].steps.find(item =>
+        (item.uses ?? '').startsWith('actions/upload-artifact@')
+      );
+      step.env = { KILO_API_KEY: '${{ steps.mint.outputs.token }}' };
+    },
+  ],
+  [
+    'fork apply made fatal',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'dump');
+      delete step['continue-on-error'];
+    },
+  ],
+  [
+    'fork dump-failure guidance removed',
+    workflow =>
+      dropStep(workflow, prJobName, step =>
+        (step.if ?? '').includes("steps.dump.outcome == 'failure'")
+      ),
+  ],
+  [
+    'fork dump-failure guidance not fatal',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item =>
+        (item.if ?? '').includes("steps.dump.outcome == 'failure'")
+      );
+      step.run = step.run.replace(/exit 1/, 'exit 0');
+    },
+  ],
+  [
+    'fork dump-failure guidance missing the self-service path',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item =>
+        (item.if ?? '').includes("steps.dump.outcome == 'failure'")
+      );
+      step.env.COMMENT_BODY = 'The catalog dump failed on this fork PR.';
+    },
+  ],
+  [
+    'fork dump-failure guidance runs after drift detection',
+    workflow => {
+      const steps = workflow.jobs[prJobName].steps;
+      const guidance = steps.find(step =>
+        (step.if ?? '').includes("steps.dump.outcome == 'failure'")
+      );
+      const driftIndex = steps.findIndex(step => step.id === 'drift');
+      steps.splice(steps.indexOf(guidance), 1);
+      steps.splice(driftIndex + 1, 0, guidance);
+    },
+  ],
+  [
+    'upstream-failure gate removed from the required check',
+    workflow =>
+      dropStep(workflow, prJobName, step =>
+        (step.if ?? '').includes("needs.catalog-prepare.result != 'success'")
+      ),
+  ],
+  [
+    'Kilo CLI install added to the required check',
+    workflow => {
+      workflow.jobs[prJobName].steps.push({
+        name: 'Install Kilo CLI',
+        run: kiloInstallCommand,
+      });
+    },
+  ],
+  [
+    'Kilo CLI install removed from the trusted job',
+    workflow => dropStep(workflow, summariesJobName, step => step.run === kiloInstallCommand),
   ],
   [
     'Kilo CLI install removed from the merge job',
     workflow => dropStep(workflow, mergeJobName, step => step.run === kiloInstallCommand),
+  ],
+  [
+    'summaries artifact upload removed',
+    workflow =>
+      dropStep(workflow, summariesJobName, step =>
+        (step.uses ?? '').startsWith('actions/upload-artifact@')
+      ),
+  ],
+  [
+    'empty-summaries fallback removed',
+    workflow =>
+      dropStep(workflow, summariesJobName, step =>
+        (step.if ?? '').includes("steps.complete.outcome != 'success'")
+      ),
   ],
   [
     'embed script referenced from a PR step',
@@ -385,57 +665,6 @@ for (const [name, defect] of [
       ),
   ],
   [
-    'fork dump-failure guidance removed',
-    workflow =>
-      dropStep(workflow, prJobName, step =>
-        (step.if ?? '').includes("steps.dump.outcome == 'failure'")
-      ),
-  ],
-  [
-    'fork dump-failure guidance not fatal',
-    workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item =>
-        (item.if ?? '').includes("steps.dump.outcome == 'failure'")
-      );
-      step.run = step.run.replace(/exit 1/, 'exit 0');
-    },
-  ],
-  [
-    'fork dump-failure guidance missing the self-service path',
-    workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item =>
-        (item.if ?? '').includes("steps.dump.outcome == 'failure'")
-      );
-      step.env.COMMENT_BODY = 'The catalog dump failed on this fork PR.';
-    },
-  ],
-  [
-    'fork dump-failure guidance runs after drift detection',
-    workflow => {
-      const steps = workflow.jobs[prJobName].steps;
-      const guidance = steps.find(step =>
-        (step.if ?? '').includes("steps.dump.outcome == 'failure'")
-      );
-      const driftIndex = steps.findIndex(step => step.id === 'drift');
-      steps.splice(steps.indexOf(guidance), 1);
-      steps.splice(driftIndex + 1, 0, guidance);
-    },
-  ],
-  [
-    'dump step fatal on forks too',
-    workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item => item.run === dumpCommand);
-      delete step['continue-on-error'];
-    },
-  ],
-  [
-    'dump step outcome not exposed',
-    workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item => item.run === dumpCommand);
-      delete step.id;
-    },
-  ],
-  [
     'bot identity stripped from the commit',
     workflow => {
       const step = workflow.jobs[prJobName].steps.find(item =>
@@ -456,35 +685,21 @@ for (const [name, defect] of [
       ),
   ],
   [
-    'PR dump reverted to the personal credential',
+    'merge mint secret changed',
     workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item => item.run === dumpCommand);
-      step.env = { KILO_AUTH_CONTENT: '${{ secrets.MCP_CATALOG_KILO_AUTH }}' };
-    },
-  ],
-  [
-    'PR mint secret changed',
-    workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'mint');
+      const step = workflow.jobs[mergeJobName].steps.find(item => item.id === 'mint');
       step.env.MCP_CATALOG_TOKEN_SECRET = '${{ secrets.SOMETHING_ELSE }}';
     },
   ],
   [
     'change-detection gate removed',
-    workflow => dropStep(workflow, prJobName, step => step.id === 'catalog_changes'),
+    workflow => dropStep(workflow, prepareJobName, step => step.id === 'catalog_changes'),
   ],
   [
     'change-detection drops a catalog path',
     workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'catalog_changes');
+      const step = workflow.jobs[prepareJobName].steps.find(item => item.id === 'catalog_changes');
       step.run = step.run.replace('^services/kilo-mcp/', '^services/other/');
-    },
-  ],
-  [
-    'a post-detection step escapes the gate',
-    workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item => item.run === dumpCommand);
-      delete step.if;
     },
   ],
   ['push paths filter added', workflow => (workflow.on.push.paths = ['apps/web/src/**'])],
@@ -493,9 +708,20 @@ for (const [name, defect] of [
     workflow => dropStep(workflow, mergeJobName, step => step.id === 'merge_changes'),
   ],
   [
-    'merge dump step escapes the gate',
+    'merge prompt step escapes the gate',
     workflow => {
-      const step = workflow.jobs[mergeJobName].steps.find(item => item.run === dumpCommand);
+      const step = workflow.jobs[mergeJobName].steps.find(item =>
+        (item.run ?? '').includes(promptsCommand)
+      );
+      delete step.if;
+    },
+  ],
+  [
+    'merge apply step escapes the gate',
+    workflow => {
+      const step = workflow.jobs[mergeJobName].steps.find(item =>
+        (item.run ?? '').includes('--summaries-file')
+      );
       delete step.if;
     },
   ],
@@ -508,9 +734,9 @@ for (const [name, defect] of [
     workflow => dropStep(workflow, mergeJobName, step => step.run === skillCommand),
   ],
   [
-    'skill path dropped from the PR change detection',
+    'skill path dropped from the prepare change detection',
     workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'catalog_changes');
+      const step = workflow.jobs[prepareJobName].steps.find(item => item.id === 'catalog_changes');
       step.run = step.run.replace('^\\.kilo/skills/', '^\\.kilo/other/');
     },
   ],
@@ -556,13 +782,19 @@ for (const [name, defect] of [
     },
   ],
   [
-    'skill step moved before the dump',
+    'skill step moved before the apply',
     workflow => {
       const steps = workflow.jobs[prJobName].steps;
       const skill = steps.find(step => step.run === skillCommand);
-      const dumpIndex = steps.findIndex(step => step.run === dumpCommand);
+      const dumpIndex = steps.findIndex(step => (step.run ?? '').includes('--summaries-file'));
       steps.splice(steps.indexOf(skill), 1);
       steps.splice(dumpIndex, 0, skill);
+    },
+  ],
+  [
+    'required check no longer reports when cancelled',
+    workflow => {
+      workflow.jobs[prJobName].if = "github.event_name == 'pull_request'";
     },
   ],
 ]) {

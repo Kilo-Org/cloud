@@ -666,7 +666,7 @@ function capContext(text: string, limit: number): string {
  */
 export type SummaryCompleter = (prompt: string, batchLabel: string) => string;
 
-type SummaryBatch = {
+export type SummaryBatch = {
   file: string;
   /** Name used in progress and failure messages. */
   label: string;
@@ -825,6 +825,37 @@ function buildSummaryPrompt(batch: SummaryBatch): string {
   return lines.join('\n');
 }
 
+/**
+ * Groups the missing leaves by their top-level router segment and builds one
+ * prompt batch per router file, in the exact shape
+ * {@link generateMissingSummaries} sends to the CLI. Exported so the CI
+ * pipeline can build the prompt artifact in the prepare job while the
+ * completion itself runs in its own trusted job.
+ */
+export function buildSummaryBatches(missing: CatalogLeaf[]): SummaryBatch[] {
+  const topLevelFiles = extractTopLevelRouterFiles();
+  const bySegment = new Map<string, CatalogLeaf[]>();
+  for (const leaf of missing) {
+    const segment = leaf.path.split('.')[0] ?? '';
+    const group = bySegment.get(segment);
+    if (group) group.push(leaf);
+    else bySegment.set(segment, [leaf]);
+  }
+  return [...bySegment.entries()].map(([segment, leaves]) =>
+    buildSummaryBatch(segment, leaves, topLevelFiles)
+  );
+}
+
+/**
+ * Renders a batch into the exact prompt text the Kilo CLI receives. Exported
+ * alongside {@link buildSummaryBatches} for the CI prompt artifact; the
+ * artifact stores the rendered prompt so the trusted completion step never
+ * needs PR router source.
+ */
+export function renderSummaryPrompt(batch: SummaryBatch): string {
+  return buildSummaryPrompt(batch);
+}
+
 function parseSummaries(
   content: string,
   requestedPaths: string[],
@@ -881,26 +912,18 @@ export async function generateMissingSummaries(
   log: (message: string) => void = () => {}
 ): Promise<Map<string, string>> {
   if (missing.length === 0) return new Map();
-  const topLevelFiles = extractTopLevelRouterFiles();
-  const bySegment = new Map<string, CatalogLeaf[]>();
-  for (const leaf of missing) {
-    const segment = leaf.path.split('.')[0] ?? '';
-    const group = bySegment.get(segment);
-    if (group) group.push(leaf);
-    else bySegment.set(segment, [leaf]);
-  }
+  const batches = buildSummaryBatches(missing);
   const generated = new Map<string, string>();
-  const batches = [...bySegment.entries()];
-  for (const [batchIndex, [segment, leaves]] of batches.entries()) {
-    const batch = buildSummaryBatch(segment, leaves, topLevelFiles);
+  for (const [batchIndex, batch] of batches.entries()) {
+    const count = batch.items.length;
     log(
-      `  batch ${batchIndex + 1}/${batches.length} ${batch.label}: generating ${leaves.length} ${leaves.length === 1 ? 'summary' : 'summaries'}…`
+      `  batch ${batchIndex + 1}/${batches.length} ${batch.label}: generating ${count} ${count === 1 ? 'summary' : 'summaries'}…`
     );
     const prompt = buildSummaryPrompt(batch);
     const content = complete(prompt, batch.label);
     const summaries = parseSummaries(
       content,
-      leaves.map(leaf => leaf.path),
+      batch.items.map(item => item.path),
       batch.label
     );
     for (const [path, summary] of summaries) generated.set(path, summary);

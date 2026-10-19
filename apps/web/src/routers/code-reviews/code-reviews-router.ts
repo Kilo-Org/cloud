@@ -67,6 +67,7 @@ import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/s
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 import {
   getManualCodeReviewConfig,
+  getManualCodeReviewConfigForDetail,
   isLocalKiloCodeReview,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
@@ -408,7 +409,10 @@ export const codeReviewRouter = createTRPCRouter({
         selectedModel = selectedModelFromReviewSources({
           persistedModel: null,
           repoFullName: review.repo_full_name,
-          config: getManualCodeReviewConfig(review)?.agentConfig ?? null,
+          // Detail-read tolerance: a legacy row whose stored manual_config
+          // fails the strict schema must not fail the whole load; read it as
+          // "no manual config" and fall through to the owner agent config.
+          config: getManualCodeReviewConfigForDetail(review)?.agentConfig ?? null,
         });
         if (!selectedModel) {
           const owner = review.owned_by_organization_id

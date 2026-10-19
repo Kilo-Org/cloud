@@ -15,6 +15,7 @@ import {
   INGEST_CHUNK_MAX_BYTES,
   INGEST_CHUNK_MAX_ITEMS,
   MAX_INGEST_ITEM_BYTES,
+  STAGING_MAX_BYTES,
 } from '../util/ingest-limits';
 import { readBoundedStream } from './bounded-stream-reader';
 import { parseDirectIngestConfig, selectDirectIngestUser } from './direct-ingest-rollout';
@@ -92,16 +93,21 @@ export async function handleDirectIngestRequest(
   const startedAt = performance.now();
   const r2Key = `ingest/${request.kiloUserId}/${request.sessionId}/${request.ingestRequestId}`;
   const configResult = parseDirectIngestConfig(request.env);
-  // Bodies entering staging are measured against a staging limit. When the
-  // rollout config is unreadable, the shared service ceiling applies, which is
-  // the same upper bound config validation applies to the configured limit.
-  const stagingBudget = configResult.ok ? configResult.config.maxBytes : INGEST_CHUNK_MAX_BYTES;
+  // Bodies entering staging are measured against a staging ceiling. When the
+  // rollout config is unreadable, the same ceiling applies. Declared lengths
+  // above the direct cap still stage, measured against this ceiling, and the
+  // queue consumer splits them into chunks. The ceiling sits above the direct
+  // cap so payloads that have always crossed the queue keep doing so, and low
+  // enough that the bounded read (which buffers the whole body in Worker
+  // memory before staging) stays well inside the isolate memory budget.
+  const stagingCeiling = STAGING_MAX_BYTES;
+  const stagingBudget = configResult.ok ? configResult.config.maxBytes : stagingCeiling;
 
   const legacyWithBoundedBody = async (
     reason: LegacyReason,
     metrics: DirectIngestMetrics
   ): Promise<DirectIngestResponse> => {
-    const buffered = await readBoundedStream(request.body, stagingBudget);
+    const buffered = await readBoundedStream(request.body, stagingCeiling);
     if (!buffered.ok) {
       logEvent('warn', {
         event: 'direct_ingest_reject',
@@ -147,7 +153,7 @@ export async function handleDirectIngestRequest(
       startedAt,
     });
   }
-  if (contentLength > stagingBudget) {
+  if (contentLength > stagingCeiling) {
     logEvent('warn', {
       event: 'direct_ingest_reject',
       ...eventBase(request, startedAt, {
@@ -155,9 +161,16 @@ export async function handleDirectIngestRequest(
         actualBytes: null,
         items: null,
       }),
-      reason: 'declared_bytes_exceeded',
+      reason: 'staging_budget_exceeded',
     });
     return { status: 413, body: { success: false, error: 'payload_too_large' } };
+  }
+  if (contentLength > stagingBudget) {
+    return legacyWithBoundedBody('oversized_body', {
+      declaredBytes: contentLength,
+      actualBytes: null,
+      items: null,
+    });
   }
 
   let buffered: Awaited<ReturnType<typeof readBoundedStream>>;

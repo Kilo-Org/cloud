@@ -58,12 +58,18 @@ import {
   bot_requests,
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
+  admin_action_audit_logs,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  agent_briefing_reports,
+  agent_briefing_events,
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
+  cli_sessions_v2,
   spend_alert_settings,
   spend_alert_rules,
   spend_alert_rule_state,
@@ -285,6 +291,7 @@ describe('User', () => {
     await db.delete(organization_recommendation_dismissals);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(admin_action_audit_logs);
     await db.delete(model_eval_ingestions);
     await db.delete(kiloclaw_scheduled_action_targets);
     await db.delete(kiloclaw_scheduled_action_stages);
@@ -347,6 +354,7 @@ describe('User', () => {
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
     await db.delete(organizations);
+    await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
   });
 
@@ -4650,6 +4658,70 @@ describe('User', () => {
       expect(logs[0].actor_email).toBe(adminUser.google_user_email); // admin not anonymized
     });
 
+    it('should anonymize admin action audit logs where user is actor', async () => {
+      const adminUser = await insertTestUser();
+
+      await db.insert(admin_action_audit_logs).values({
+        action: 'user.api_key.reset',
+        actor_id: adminUser.id,
+        actor_email: adminUser.google_user_email,
+        actor_name: adminUser.google_user_name,
+        target_type: 'user',
+        target_id: 'some-other-user',
+        message: 'API key reset',
+      });
+
+      await softDeleteUser(adminUser.id);
+
+      const logs = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+      expect(logs).toHaveLength(1);
+      expect(logs[0].actor_email).toBeNull();
+      expect(logs[0].actor_name).toBeNull();
+      expect(logs[0].target_id).toBe('some-other-user');
+    });
+
+    it('should anonymize admin action audit logs where user is the target', async () => {
+      const targetUser = await insertTestUser();
+      const adminUser = await insertTestUser();
+
+      await db.insert(admin_action_audit_logs).values([
+        {
+          action: 'user.api_key.reset',
+          actor_id: adminUser.id,
+          actor_email: adminUser.google_user_email,
+          actor_name: adminUser.google_user_name,
+          target_type: 'user',
+          target_id: targetUser.id,
+          message: 'API key reset',
+        },
+        {
+          action: 'organization.create',
+          actor_id: adminUser.id,
+          actor_email: adminUser.google_user_email,
+          actor_name: adminUser.google_user_name,
+          target_type: 'organization',
+          target_id: targetUser.id,
+          message: 'Organization created',
+        },
+      ]);
+
+      await softDeleteUser(targetUser.id);
+
+      const logs = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+      expect(logs).toHaveLength(2);
+      const userTargeted = logs.find(log => log.target_type === 'user');
+      const orgTargeted = logs.find(log => log.target_type === 'organization');
+      expect(userTargeted?.target_id).toBe('deleted-user');
+      expect(userTargeted?.actor_email).toBe(adminUser.google_user_email);
+      expect(orgTargeted?.target_id).toBe(targetUser.id);
+    });
+
     it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {
       // Per the GDPR policy in softDeleteUser's doc-comment, scheduled
       // action targets are retained operational records. The user_id FK
@@ -5568,6 +5640,66 @@ describe('User', () => {
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('removes owned briefing reports, excerpts, consent and schedule without touching another user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const now = new Date().toISOString();
+      for (const account of [user, otherUser]) {
+        const sessionId = `ses_briefing_delete_${crypto.randomUUID()}`;
+        await db
+          .insert(cli_sessions_v2)
+          .values({ session_id: sessionId, kilo_user_id: account.id, created_on_platform: 'cli' });
+        await db
+          .insert(agent_briefing_preferences)
+          .values({ kilo_user_id: account.id, timezone: 'UTC', next_run_at: now });
+        await db.insert(agent_briefing_context_preferences).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          model: 'test/model',
+          ai_enabled: true,
+        });
+        await db.insert(agent_briefing_events).values({
+          id: crypto.randomUUID(),
+          kilo_user_id: account.id,
+          session_id: sessionId,
+          kind: 'activity',
+          occurred_at: now,
+          payload: { excerpt: 'Private selected outcome' },
+        });
+        await db.insert(agent_briefing_reports).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          local_date: now.slice(0, 10),
+          night_start_at: now,
+          cutoff_at: now,
+          morning_end_at: now,
+          evidence_hash: 'private',
+          facts: { sessionTitle: 'Private work' },
+          summary: { text: 'Private briefing' },
+        });
+      }
+      await softDeleteUser(user.id);
+      for (const table of [
+        agent_briefing_reports,
+        agent_briefing_events,
+        agent_briefing_context_preferences,
+        agent_briefing_preferences,
+      ]) {
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, otherUser.id))
+        ).toHaveLength(1);
+      }
     });
 
     it('should delete personal spend alert settings, rules, counters, and deliveries', async () => {

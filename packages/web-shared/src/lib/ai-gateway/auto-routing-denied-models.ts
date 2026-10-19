@@ -1,9 +1,12 @@
 import {
   isVirtualAutoModelId,
+  type AutoRouter,
   type AutoRoutingDeniedModelsRequest,
 } from '@kilocode/auto-routing-contracts';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -60,6 +63,10 @@ export function deniedModelIdsForCandidates(
 }
 
 export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promise<string[] | null> {
+  const migrated = await findEffectiveLegacyPoolRouter(owner);
+  if (migrated) {
+    return migrated.entries.flatMap(entry => (entry.kind === 'gateway' ? [entry.model] : []));
+  }
   const owners = [
     ...(owner.organizationId ? [{ ownerType: 'org' as const, ownerId: owner.organizationId }] : []),
     { ownerType: 'user' as const, ownerId: owner.userId },
@@ -75,20 +82,24 @@ export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promis
   return null;
 }
 
-export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner): Promise<string[]> {
+export async function loadAutoRoutingCandidateModelIds(
+  owner: AutoRoutingOwner,
+  router: AutoRouter
+): Promise<string[]> {
   const [table, poolModelIds] = await Promise.all([
-    getCachedRoutingTable(),
-    loadEffectivePoolModelIds(owner),
+    getCachedRoutingTable(router),
+    router === 'efficient' ? loadEffectivePoolModelIds(owner) : null,
   ]);
   return candidateModelIdsFromSources(table, poolModelIds);
 }
 
 export async function collectDeniedAutoRoutingModelIds(
   policy: EffectiveOrganizationModelPolicy,
-  owner: AutoRoutingOwner
+  owner: AutoRoutingOwner,
+  router: AutoRouter
 ): Promise<string[]> {
   if (!policyNeedsCandidateEvaluation(policy)) return [];
-  return deniedAutoRoutingCandidates(policy, await loadAutoRoutingCandidateModelIds(owner));
+  return deniedAutoRoutingCandidates(policy, await loadAutoRoutingCandidateModelIds(owner, router));
 }
 
 export async function deniedAutoRoutingCandidates(
@@ -122,11 +133,18 @@ function dataCollectionRequiredCandidates(
   );
 }
 
+export async function dataCollectionRequiredAutoRoutingCandidates(
+  candidateIds: ReadonlyArray<string>
+): Promise<string[]> {
+  return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
+}
+
 export async function collectDataCollectionRequiredAutoRoutingModelIds(
-  owner: AutoRoutingOwner
+  owner: AutoRoutingOwner,
+  router: AutoRouter
 ): Promise<string[]> {
   const [candidateIds, dataCollectionRequiredModelIds] = await Promise.all([
-    loadAutoRoutingCandidateModelIds(owner),
+    loadAutoRoutingCandidateModelIds(owner, router),
     getDataCollectionRequiredModelIds(),
   ]);
   return dataCollectionRequiredCandidates(candidateIds, dataCollectionRequiredModelIds);
@@ -141,6 +159,7 @@ export async function deniedAutoRoutingModelIdsForMember(
   const policy = await resolveOrganizationMemberModelPolicy({
     organizationId: request.organizationId,
     kiloUserId: request.userId,
+    fromDb: readDb,
   });
   const candidateIds = [...new Set(request.modelIds.filter(id => !isVirtualAutoModelId(id)))];
   const [deniedByPolicy, deniedByPrivacy] = await Promise.all([
@@ -148,9 +167,7 @@ export async function deniedAutoRoutingModelIdsForMember(
     isDataCollectionExplicitlyDisallowed(
       getEffectiveProviderPrivacy(undefined, policy.dataCollection)
     )
-      ? getDataCollectionRequiredModelIds().then(requiredIds =>
-          dataCollectionRequiredCandidates(candidateIds, requiredIds)
-        )
+      ? dataCollectionRequiredAutoRoutingCandidates(candidateIds)
       : [],
   ]);
   return [...new Set([...deniedByPolicy, ...deniedByPrivacy])];

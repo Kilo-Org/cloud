@@ -592,6 +592,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       getDirectory: () => this.registration?.spec.directory,
       getWrapperId: () => this.currentWrapperId(),
       isRouteReady: () => this.route.state === 'ready',
+      getSandboxStatus: () => this.getSandboxStatus(),
       request: (sandboxId, input) => this.terminalRequest(sandboxId, input),
     });
     this.preview = createControlPlanePreview({

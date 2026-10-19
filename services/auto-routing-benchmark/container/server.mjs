@@ -64,22 +64,46 @@ function runCaseSerialized(params) {
 }
 
 const RESULT_DELIVERY_ATTEMPTS = 3;
+const RESPONSE_COMPLETION_TIMEOUT_MS = 10_000;
 
 // A rollout tears down the caller's connection while this process drains, so the
 // outcome is also posted to the worker, which persists it as recoverable output.
 async function deliverResult(callback, outcome) {
+  const body = JSON.stringify({ execution: callback.execution, outcome });
+  let category = 'http_error';
   for (let attempt = 1; attempt <= RESULT_DELIVERY_ATTEMPTS; attempt++) {
     try {
       const response = await fetch(callback.url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ execution: callback.execution, outcome }),
+        body,
         signal: AbortSignal.timeout(10_000),
       });
-      if (response.ok || response.status === 404) return;
-    } catch {}
-    await new Promise(resolve => setTimeout(resolve, attempt * 1_000));
+      if (response.ok) return;
+      if (response.status === 404) {
+        console.warn(
+          JSON.stringify({ event: 'benchmark_container_result_rejected', category: 'not_found' })
+        );
+        return;
+      }
+      category = 'http_error';
+    } catch (error) {
+      category =
+        error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+          ? 'timeout'
+          : 'network_error';
+    }
+    if (attempt < RESULT_DELIVERY_ATTEMPTS) {
+      await new Promise(resolve => setTimeout(resolve, attempt * 1_000));
+    }
   }
+  console.error(
+    JSON.stringify({
+      event: 'benchmark_container_result_delivery_exhausted',
+      category,
+      attempts: RESULT_DELIVERY_ATTEMPTS,
+    })
+  );
 }
 
 function isResultCallback(value) {
@@ -247,29 +271,44 @@ const server = createServer(
   { requestTimeout: 30_000, headersTimeout: 10_000, connectionsCheckingInterval: 1_000 },
   (req, res) => {
     activeHttpRequests += 1;
-    let responseFinished = false;
-    const finishRequest = () => {
-      if (responseFinished) return;
-      responseFinished = true;
+    let responseSettled = false;
+    let responseDeadline;
+    let completeResponse;
+    const responseCompletion = new Promise(resolve => {
+      completeResponse = resolve;
+    });
+    const finishRequest = delivered => {
+      if (responseSettled) return;
+      responseSettled = true;
+      clearTimeout(responseDeadline);
       activeHttpRequests -= 1;
+      completeResponse(delivered);
       exitWhenIdle();
     };
-    res.once('finish', finishRequest);
-    res.once('close', finishRequest);
+    res.once('finish', () => finishRequest(true));
+    res.once('close', () => finishRequest(false));
+    res.once('error', () => finishRequest(false));
+    const sendResponse = (status, body) => {
+      try {
+        sendJson(res, status, body);
+      } catch {
+        finishRequest(false);
+      }
+    };
     void (async () => {
       if (stopRequested) {
-        sendJson(res, 503, { error: 'container is stopping' });
+        sendResponse(503, { error: 'container is stopping' });
         return;
       }
       if (req.method === 'GET' && req.url === '/health') {
-        sendJson(res, 200, { ok: true });
+        sendResponse(200, { ok: true });
         return;
       }
 
       if (req.method === 'POST' && req.url === '/warmup') {
         req.resume();
         const result = await warmUpOnce();
-        sendJson(res, 200, { exitCode: result.exitCode, durationMs: result.durationMs });
+        sendResponse(200, { exitCode: result.exitCode, durationMs: result.durationMs });
         return;
       }
 
@@ -278,12 +317,12 @@ const server = createServer(
         try {
           parsed = JSON.parse(await readBody(req));
         } catch {
-          sendJson(res, 400, { error: 'invalid JSON body' });
+          sendResponse(400, { error: 'invalid JSON body' });
           return;
         }
 
         if (stopRequested) {
-          sendJson(res, 503, { error: 'container is stopping' });
+          sendResponse(503, { error: 'container is stopping' });
           return;
         }
         const { model, prompt, kiloToken, kiloApiUrl, orgId, variant, resultCallback } =
@@ -299,67 +338,79 @@ const server = createServer(
           typeof kiloToken !== 'string' ||
           typeof kiloApiUrl !== 'string'
         ) {
-          sendJson(res, 400, {
+          sendResponse(400, {
             error: 'model, prompt, kiloToken and kiloApiUrl are required strings',
           });
           return;
         }
         if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
-          sendJson(res, 400, { error: 'orgId must be a string when provided' });
+          sendResponse(400, { error: 'orgId must be a string when provided' });
           return;
         }
 
         if (variant !== undefined && variant !== null && typeof variant !== 'string') {
-          sendJson(res, 400, { error: 'variant must be a string when provided' });
+          sendResponse(400, { error: 'variant must be a string when provided' });
           return;
         }
         const callback = isResultCallback(resultCallback) ? resultCallback : null;
         if (callback) pendingDeliveries += 1;
-        let outcome;
-        let failure = null;
         try {
-          outcome = {
-            kind: 'completed',
-            response: await runCaseSerialized({
-              model,
-              prompt,
-              kiloToken,
-              kiloApiUrl,
-              orgId,
-              timeoutMs,
-              variant,
-            }),
-          };
-        } catch (err) {
-          // A case may only be reported as never started when no child was spawned.
-          if (err instanceof NotStartedError) {
-            outcome = { kind: 'not_started' };
-            if (!stopRequested) failure = err.message;
-          } else {
-            outcome = { kind: 'failed' };
-            failure = err instanceof Error ? err.message : 'run failed';
+          let outcome;
+          let failure = null;
+          try {
+            outcome = {
+              kind: 'completed',
+              response: await runCaseSerialized({
+                model,
+                prompt,
+                kiloToken,
+                kiloApiUrl,
+                orgId,
+                timeoutMs,
+                variant,
+              }),
+            };
+          } catch (err) {
+            // A case may only be reported as never started when no child was spawned.
+            if (err instanceof NotStartedError) {
+              outcome = { kind: 'not_started' };
+              if (!stopRequested) failure = err.message;
+            } else {
+              outcome = { kind: 'failed' };
+              failure = err instanceof Error ? err.message : 'run failed';
+            }
+          }
+          if (outcome.kind === 'completed') sendResponse(200, outcome.response);
+          else if (failure) sendResponse(500, { error: failure });
+          else sendResponse(503, { error: 'container is stopping' });
+          if (!callback) return;
+          const recoverable = outcome.kind === 'completed' || outcome.kind === 'not_started';
+          if (!responseSettled) {
+            responseDeadline = setTimeout(() => {
+              finishRequest(false);
+              res.destroy();
+            }, RESPONSE_COMPLETION_TIMEOUT_MS);
+            responseDeadline.unref();
+          }
+          const responseDelivered = await responseCompletion;
+          if (
+            recoverable &&
+            (outcome.kind === 'not_started' || stopRequested || !responseDelivered)
+          ) {
+            await deliverResult(callback, outcome);
+          }
+        } finally {
+          if (callback) {
+            pendingDeliveries -= 1;
+            exitWhenIdle();
           }
         }
-        const responseDelivered = !res.destroyed && !responseFinished;
-        if (outcome.kind === 'completed') sendJson(res, 200, outcome.response);
-        else if (failure) sendJson(res, 500, { error: failure });
-        else sendJson(res, 503, { error: 'container is stopping' });
-        if (!callback) return;
-        const recoverable = outcome.kind === 'completed' || outcome.kind === 'not_started';
-        if (
-          recoverable &&
-          (outcome.kind === 'not_started' || stopRequested || !responseDelivered)
-        ) {
-          await deliverResult(callback, outcome);
-        }
-        pendingDeliveries -= 1;
-        exitWhenIdle();
         return;
       }
 
-      sendJson(res, 404, { error: 'not found' });
+      sendResponse(404, { error: 'not found' });
     })().catch(error => {
-      sendJson(res, 500, { error: error instanceof Error ? error.message : 'run failed' });
+      sendResponse(500, { error: error instanceof Error ? error.message : 'run failed' });
     });
   }
 );

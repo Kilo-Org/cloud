@@ -478,12 +478,12 @@ function cardDescription(request: DeletionRequest | null, busy: Busy | null): st
     return 'Checking whether a deletion request already exists.';
   }
   if (request?.status === 'completed') {
-    return 'Deletion finished for the Cloud account, PostHog, Substack, Pylon, and CSA support data.';
+    return 'Deletion finished for the Cloud account, PostHog, Substack, and Pylon.';
   }
   if (request) {
     return 'Deletion is queued. Remaining work continues on cron. Use the deletion queue for recovery.';
   }
-  return 'This action is irreversible and will permanently delete Cloud, PostHog, Substack, Pylon, and CSA support data for this user. Stripe, Stytch, Sentry, and other handbook systems still need manual steps.';
+  return 'This action is irreversible and will permanently delete Cloud, PostHog, Substack, and Pylon data for this user. Stripe, Stytch, Sentry, and other handbook systems still need manual steps.';
 }
 
 function ViewGdprHandbookLink() {

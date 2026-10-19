@@ -88,7 +88,6 @@ describe('session plane identity', () => {
     '',
     'cloud-agent',
     'auto-triage',
-    'autofix',
     'app-builder',
     'cli',
     'code-review',

@@ -1295,7 +1295,6 @@ describe('SandboxControlV2 routes and forwarding', () => {
     'security-remediation',
     'webhook',
     'auto-triage',
-    'autofix',
     'cli',
     'unrecognized-origin',
     'cloud-agent-web',

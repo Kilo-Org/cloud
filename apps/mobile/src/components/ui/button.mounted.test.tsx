@@ -250,6 +250,47 @@ describe('Button native target contract', () => {
     expect(classes).not.toContain('opacity-50');
   });
 
+  // Android keeps a busy view's last content description when `busy` flips back
+  // to false and the view has no accessibility label (RN's
+  // `BaseViewManager.updateViewContentDescription` only rewrites a non-empty
+  // result). A derived label keeps the description fresh on every busy cycle,
+  // so the accessible name can never stick at "busy" while the visible label
+  // reads normally again.
+  it('derives the accessibility label from the visible text when the caller passes none', () => {
+    const button = renderButton({ accessibilityLabel: undefined });
+    expect(button.props.accessibilityLabel).toBe('Retry');
+  });
+
+  it('joins nested Text children into one label and prefers an explicit label', () => {
+    const composed = render(
+      createElement(
+        Button,
+        null,
+        createElement(Text, null, 'Start'),
+        createElement(Text, null, 'session')
+      )
+    );
+    expect(composed.props.accessibilityLabel).toBe('Start session');
+
+    const explicit = renderButton({ accessibilityLabel: 'Custom name' });
+    expect(explicit.props.accessibilityLabel).toBe('Custom name');
+  });
+
+  it('derives no label from a text-free icon button', () => {
+    const button = renderButton({ size: 'icon', children: null, accessibilityLabel: undefined });
+    expect(button.props.accessibilityLabel).toBeUndefined();
+  });
+
+  it('keeps the derived label stable across a busy cycle', () => {
+    const busy = renderButton({ loading: true, accessibilityLabel: undefined });
+    expect(busy.props.accessibilityLabel).toBe('Retry');
+    expect(busy.props.accessibilityState).toMatchObject({ busy: true });
+
+    const ready = renderButton({ loading: false, accessibilityLabel: undefined });
+    expect(ready.props.accessibilityLabel).toBe('Retry');
+    expect(ready.props.accessibilityState).toMatchObject({ busy: false });
+  });
+
   it('keeps the dimmed treatment for a disabled non-primary variant', () => {
     const button = renderButton({ variant: 'outline', disabled: true });
     const classes = (button.props.className as string).split(' ');

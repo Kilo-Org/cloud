@@ -1,3 +1,4 @@
+import React, { isValidElement, type ReactNode } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -103,6 +104,60 @@ type ButtonProps = Omit<React.ComponentProps<typeof Pressable>, 'children'> &
     children?: React.ReactNode;
   };
 
+/** A `ReactNode` string member, the only child a `Text` lays out as one run. */
+function isStringChild(child: ReactNode): child is string {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode is a closed union; typeof is its string discriminant.
+  return typeof child === 'string';
+}
+
+/** A `ReactNode` array member; `Array.isArray` alone narrows it to `any[]`. */
+function isChildArray(children: ReactNode): children is ReactNode[] {
+  return Array.isArray(children);
+}
+
+/**
+ * The visible text a button carries: the strings the caller rendered as its
+ * label, joined with spaces (the gap-2 row the styles draw). Non-string
+ * children — icons, spinners — contribute nothing, so a text-free button
+ * derives no label.
+ */
+function joinTextChildren(children: ReactNode): string | undefined {
+  const parts: string[] = [];
+  collectTextChildren(children, parts);
+  const joined = parts.join(' ').trim();
+  return joined.length > 0 ? joined : undefined;
+}
+
+function collectTextChildren(children: ReactNode, parts: string[]): void {
+  if (isStringChild(children)) {
+    parts.push(children);
+    return;
+  }
+  if (isChildArray(children)) {
+    for (const child of children) {
+      collectTextChildren(child, parts);
+    }
+    return;
+  }
+  if (isTextElementWithChildString(children)) {
+    parts.push(children.props.children);
+  }
+}
+
+/**
+ * The shared label element: one `Text` wrapping one string (the app's single
+ * label shape, see `AGENTS.md`'s Text inputs rules). A `Text` wrapping
+ * anything else — icons, nested runs — contributes nothing, so it never
+ * invents a label the visible row does not read as.
+ */
+function isTextElementWithChildString(
+  children: ReactNode
+): children is React.ReactElement<{ children: string }> {
+  return (
+    isValidElement<{ children?: ReactNode }>(children) && isStringChild(children.props.children)
+  );
+}
+
 function Button({
   className,
   variant,
@@ -110,11 +165,22 @@ function Button({
   loading,
   disabled,
   accessibilityState,
+  accessibilityLabel,
   hitSlop,
   children,
   ...props
 }: ButtonProps) {
   const colors = useThemeColors();
+  // Android keeps a busy button's last content description when `busy` flips
+  // back to false and the view has no accessibility label (RN's
+  // `BaseViewManager.updateViewContentDescription` only rewrites a non-empty
+  // result), so the accessible name can stick at "busy" while the visible
+  // label reads normally again. Deriving the label from the visible text
+  // gives every busy cycle a non-empty label, so every state change rebuilds
+  // the description from it. Explicit labels win; icon-only buttons have no
+  // text to derive from and keep today's behavior.
+  const derivedLabel =
+    accessibilityLabel ?? (size === 'icon' ? undefined : joinTextChildren(children));
   const isDisabled = Boolean(disabled) || Boolean(loading);
   const isPrimary = (variant ?? 'default') === 'default';
   // A default-variant fill is a saturated brand colour with a contrasting ink
@@ -146,6 +212,7 @@ function Button({
         )}
         role="button"
         disabled={isDisabled}
+        accessibilityLabel={derivedLabel}
         accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}
         hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
         {...props}

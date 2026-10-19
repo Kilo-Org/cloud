@@ -44,8 +44,6 @@ import { codingPlansRouter } from '@/routers/coding-plans-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
-import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
-import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { providerReviewRouter } from '@/routers/provider-review-router';
@@ -98,8 +96,6 @@ export const rootRouter = createTRPCRouter({
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
   usageAnalytics: usageAnalyticsRouter,
-  mcpGateway: mcpGatewayRouter,
-  mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
   providerReview: providerReviewRouter,

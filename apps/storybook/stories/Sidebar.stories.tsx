@@ -186,11 +186,6 @@ const cloudItems: SidebarStoryItem[] = [
     icon: Database,
     url: '/code-indexing',
   },
-  {
-    title: 'MCP Gateway',
-    icon: Cable,
-    url: '/cloud/mcp-gateway',
-  },
 ];
 
 const accountItems: SidebarStoryItem[] = [

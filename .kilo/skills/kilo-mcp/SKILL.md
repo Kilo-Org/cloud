@@ -51,7 +51,7 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**856 procedures** — **362 queries**, **494 mutations** — under **51 prefixes**.
+**838 procedures** — **357 queries**, **481 mutations** — under **49 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -67,7 +67,6 @@ each row's `summary` and `tags` are what the search matches.
 | `cliSessionsV2` | 18 | 10 | 8 |
 | `appBuilder` | 16 | 6 | 10 |
 | `cliSessions` | 16 | 7 | 9 |
-| `mcpGateway` | 16 | 4 | 12 |
 | `providerReview` | 16 | 8 | 8 |
 | `todos` | 16 | 6 | 10 |
 | `deployments` | 14 | 6 | 8 |
@@ -95,7 +94,6 @@ each row's `summary` and `tags` are what the search matches.
 | `credits` | 3 | 1 | 2 |
 | `linear` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |
-| `mcpGatewayAuthorizations` | 2 | 1 | 1 |
 | `models` | 2 | 2 | 0 |
 | `openAiChatGpt` | 2 | 1 | 1 |
 | `spendAlerts` | 2 | 1 | 1 |

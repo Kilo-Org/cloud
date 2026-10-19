@@ -169,12 +169,14 @@ function createMockCtx() {
 
 /** Drain microtasks so waitUntil-scheduled async IIFEs settle. */
 async function flushAsync(): Promise<void> {
-  await new Promise<void>(resolve => {
-    setTimeout(resolve, 0);
-  });
-  await new Promise<void>(resolve => {
-    setTimeout(resolve, 0);
-  });
+  // Glanceable delivery signs its snapshot credential before calling the web
+  // route, so allow a few macrotasks for the asynchronous signing step under
+  // load as well as the Durable Object commit.
+  for (let turn = 0; turn < 6; turn++) {
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+  }
 }
 
 /**
@@ -270,7 +272,9 @@ function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
   const notificationEnv = {
     HYPERDRIVE: { connectionString: 'postgres://unused' },
     KILO_WEB_API_BASE_URL: 'https://snapshot.test',
-    INTERNAL_API_SECRET: { get: async () => 'test-internal-secret' },
+    GLANCEABLE_SNAPSHOT_SIGNING_SECRET: {
+      get: async () => 'test-glanceable-snapshot-signing-secret',
+    },
     EXPO_ACCESS_TOKEN: { get: async () => 'test-expo-token' },
     NOTIFICATION_CHANNEL_DO: {
       idFromName: (userId: string) => userId,

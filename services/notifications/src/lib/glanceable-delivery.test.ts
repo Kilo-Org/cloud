@@ -11,6 +11,7 @@ import {
   type DispatchPushInput,
   sessionLiveActivityRelevance,
 } from '@kilocode/notifications';
+import { verifyGlanceableSnapshotCredential } from '@kilocode/worker-utils/glanceable-snapshot-credential';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../index';
 import { sendPushNotifications, type ExpoPushMessage } from './expo-push';
@@ -31,6 +32,8 @@ import {
   type GlanceableDeliveryDeps,
   type IosActivityToken,
 } from './glanceable-delivery';
+
+const TEST_SNAPSHOT_SIGNING_SECRET = 'test-glanceable-snapshot-signing-secret';
 
 const snapshot: ActiveAgentsGlanceable = {
   type: 'active_agents_glanceable',
@@ -121,6 +124,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           }
       >;
       privateKey?: () => Promise<string>;
+      signingSecret?: () => Promise<string>;
       beforeApnsDelivery?: (token: string) => Promise<void>;
       beforeApnsResponse?: (token: string) => Promise<void>;
       apnsStatus?: (token: string) => number;
@@ -307,6 +311,18 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       expect(url).toBe('https://snapshot.test/api/internal/glanceable-agents-snapshot');
       expect(new Headers(init.headers).get('accept')).toBe('application/json');
       const scope = JSON.parse(init.body) as Scope;
+      const authorization = new Headers(init.headers).get('authorization');
+      const credential = await verifyGlanceableSnapshotCredential({
+        token:
+          authorization?.startsWith('Bearer ') === true
+            ? authorization.slice('Bearer '.length)
+            : '',
+        secret: TEST_SNAPSHOT_SIGNING_SECRET,
+      });
+      if (!credential.ok || credential.userId !== scope.userId) {
+        throw new Error('Snapshot credential did not bind the requested user');
+      }
+      expect(new Headers(init.headers).get('x-internal-secret')).toBeNull();
       requestedScopes.push(scope);
       if (scope.organizationId === options.deniedOrganizationId)
         return new Response(null, { status: 403 });
@@ -326,7 +342,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const serviceEnv = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
       KILO_WEB_API_BASE_URL: 'https://snapshot.test',
-      INTERNAL_API_SECRET: { get: async () => 'test-internal-secret' },
+      GLANCEABLE_SNAPSHOT_SIGNING_SECRET: {
+        get: options.signingSecret ?? (async () => TEST_SNAPSHOT_SIGNING_SECRET),
+      },
       EXPO_ACCESS_TOKEN: { get: options.expoAccessToken ?? (async () => 'test-expo-token') },
       APNS_TEAM_ID: 'test-team',
       APNS_KEY_ID: 'test-key',
@@ -1987,7 +2005,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       const service = new NotificationsService(ctx, {
         HYPERDRIVE: { connectionString: 'postgres://unused' },
         KILO_WEB_API_BASE_URL: 'https://snapshot.test',
-        INTERNAL_API_SECRET: { get: async () => 'test-internal-secret' },
+        GLANCEABLE_SNAPSHOT_SIGNING_SECRET: {
+          get: async () => TEST_SNAPSHOT_SIGNING_SECRET,
+        },
         EXPO_ACCESS_TOKEN: { get: async () => 'test-expo-token' },
         NOTIFICATION_CHANNEL_DO: {
           idFromName: (userId: string) => userId,
@@ -2095,6 +2115,17 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       'replaced-activity:end',
     ]);
     expect([...activityRows.keys()]).toEqual(['live-activity']);
+  });
+
+  it('does not call the snapshot route when the dedicated signing secret is missing', async () => {
+    const { service, messages, requestedScopes } = setupService({
+      signingSecret: async () => '',
+    });
+
+    await service.refreshGlanceableSessions(personalRefresh);
+
+    expect(requestedScopes).toEqual([]);
+    expect(messages).toEqual([]);
   });
 });
 

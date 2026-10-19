@@ -13,7 +13,8 @@ PUSH_SINK_MODE=
 # Base origin of the web app for the internal glanceable-agents-snapshot
 # route (see ENVIRONMENT.md). Production pins `https://app.kilo.ai` in
 # wrangler.jsonc, which is single-config; the local dev override points the
-# worker at the local Next.js server so the route answers with the shared
-# INTERNAL_API_SECRET instead of a cross-environment 401.
+# worker at the local Next.js server. The snapshot route verifies the
+# dedicated GLANCEABLE_SNAPSHOT_SIGNING_SECRET credential, not the general
+# INTERNAL_API_SECRET.
 # @url nextjs
 KILO_WEB_API_BASE_URL=https://app.kilo.ai

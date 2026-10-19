@@ -249,6 +249,8 @@ const cleanupRoots = drizzleSql`
  * TRUNCATE recreates the files of all ~250 tables and their indexes on every
  * call; this only deletes from tables whose heap has pages. A table without
  * pages holds no tuples, so the set never misses rows.
+ * Like TRUNCATE RESTART IDENTITY, sequence restarts wait for transactions using
+ * those sequences to finish. Each Jest worker has its own database.
  *
  * `session_replication_role = replica` skips FK checks and ON DELETE actions,
  * which is safe because every table holding rows is emptied in the same

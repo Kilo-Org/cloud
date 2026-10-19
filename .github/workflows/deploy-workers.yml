@@ -220,10 +220,10 @@ jobs:
           AFFECTED_DIRS=""
           NARROW=false
           if affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA") \
-            && [ "$(jq -r '.full' <<< "$affected")" = false ]; then
+            && [ "$(jq -r '.full' <<< "$affected")" = false ] \
+            && AFFECTED_DIRS=$(jq -r '.dirs[]' <<< "$affected") \
+            && WORKSPACE_DIRS=$(set -o pipefail; pnpm ls -r --depth -1 --json | jq -r --arg root "$(pwd -P)/" '.[].path | ltrimstr($root)'); then
             NARROW=true
-            AFFECTED_DIRS=$(jq -r '.dirs[]' <<< "$affected")
-            WORKSPACE_DIRS=$(pnpm ls -r --depth -1 --json | jq -r --arg root "$(pwd -P)/" '.[].path | ltrimstr($root)')
           else
             echo "Workspace detection unavailable or selected everything; using the broad rule"
           fi

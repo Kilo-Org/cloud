@@ -133,9 +133,17 @@ describe('a Hugging Face model detail', () => {
       file('imatrix-27B.gguf', 13_642_656, '3'),
       file('draft-27B-Q4_0.gguf', 2_500_000_000, '4'),
       file('Aux-27B-embedding-F16.gguf', 1_500_000_000, '5'),
+      file('Aux-27B-embeddings.gguf', 1_500_000_000, '6'),
     ]);
     expect(detail.quants).toEqual([]);
     expect(detail.hasGgufFiles).toBe(true);
+  });
+
+  it('keeps a quantization of a model whose name contains embedding', () => {
+    const detail = readModelDetail(info({ gguf: { total: 8_000_000_000 } }), [
+      file('Qwen3-Embedding-8B-Q8_0.gguf', 8_100_000_000, '1'),
+    ]);
+    expect(detail.quants.map(quant => quant.label)).toEqual(['Q8_0']);
   });
 
   it('drops a file far smaller than its quantization needs for the stated parameters', () => {
@@ -162,6 +170,14 @@ describe('a Hugging Face model detail', () => {
     ]);
     expect(detail.quants).toEqual([]);
     expect(detail.hasGgufFiles).toBe(true);
+  });
+
+  it('says a repository without GGUF files has none', () => {
+    const detail = readModelDetail(info(), [
+      { type: 'file', path: 'README.md', size: 10, oid: 'x' },
+    ]);
+    expect(detail.quants).toEqual([]);
+    expect(detail.hasGgufFiles).toBe(false);
   });
 
   it('still offers a file without a quantization name when no file has one', () => {

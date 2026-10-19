@@ -16,7 +16,7 @@ const QUANT =
   /(?:^|[-_.])((?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|TQ\d_\d|MXFP4(?:_MOE)?|BF16|FP16|F16|F32))(?=[-_.]|$)/i;
 /** Auxiliary weights: not a quantization of the repository's model. */
 const AUXILIARY_FILE =
-  /(?:^|\/)(?:mtp-|dflash-|draft-|adapter-|imatrix-|lilicorr-)|\.imatrix\.|embedding/i;
+  /(?:^|\/)(?:mtp-|dflash-|draft-|adapter-|imatrix-|lilicorr-)|\.imatrix\.|embeddings?\.gguf$/i;
 
 const count = z.number().nonnegative().default(0);
 const entries = z.array(z.unknown());
@@ -238,6 +238,17 @@ function ggufFiles(tree: unknown): readonly HfFile[] {
   return files.sort((a, b) => a.sizeBytes - b.sizeBytes);
 }
 
+/** Whether the repository holds any GGUF file, including sharded ones. */
+function hasGgufEntry(tree: unknown): boolean {
+  for (const entry of entries.parse(tree)) {
+    const file = treeEntry.safeParse(entry);
+    if (file.success && /\.gguf$/i.test(file.data.path)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** The projector with the model's own quantization, else the smallest one. */
 function projectorFor(label: string, projectors: readonly HfFile[]): HfFile | undefined {
   return (
@@ -360,6 +371,6 @@ export function readModelDetail(info: HfRepoInfo, tree: unknown): HfModelDetail 
     tools: info.gguf?.chat_template?.includes('tools') === true,
     vision: info.pipeline_tag === VISION_PIPELINE || projectors.length > 0,
     quants,
-    hasGgufFiles: files.length > 0,
+    hasGgufFiles: hasGgufEntry(tree),
   };
 }

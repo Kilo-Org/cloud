@@ -2101,10 +2101,10 @@ describe('kilo-auto/efficient classifier billing', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith({
-        userId: 'user-123',
-        organizationId: 'org-123',
-      });
+      expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith(
+        { userId: 'user-123', organizationId: 'org-123' },
+        'efficient'
+      );
       expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
         expect.objectContaining({ deniedModelIds: ['meta/muse-spark-1.3-contributor'] })
       );
@@ -2389,6 +2389,45 @@ describe('custom routers and signed auto decisions', () => {
         organizationId: 'org-1',
       });
     });
+
+    it.each([haiku, `${haiku}:thinking`])(
+      'denies a suffixed pool entry when enterprise settings deny %s',
+      async deniedModel => {
+        const suffixedModel = `${haiku}:thinking`;
+        mockedGetBalanceAndOrgSettings.mockResolvedValue({
+          balance: 10_000_000,
+          settings: { model_deny_list: [deniedModel] },
+          plan: 'enterprise',
+        });
+        mockedFindCustomRouter.mockResolvedValue({
+          ...personalRouter,
+          entries: [{ kind: 'gateway', model: suffixedModel }],
+          defaultEntryKey: `gateway:${suffixedModel}`,
+        });
+        mockedFetchCustomRouterDecision.mockResolvedValue({
+          kind: 'ok',
+          decision: {
+            ...haikuDecision,
+            model: suffixedModel,
+            entry: { kind: 'gateway', model: suffixedModel },
+          },
+          costUsd: 0,
+        });
+
+        const response = await handleLlmProxyRequest(
+          makeRequest(makeBody('kilo-auto/custom/mine'))
+        );
+
+        expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
+          expect.objectContaining({
+            deniedModelIds: [haiku, suffixedModel],
+          })
+        );
+        expect(response.status).toBe(503);
+        expect(await response.json()).toMatchObject({ error_type: 'auto_routing_unavailable' });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
 
     it.each([
       ['an organization router without an organization context', 'kilo-auto/custom/org/team'],

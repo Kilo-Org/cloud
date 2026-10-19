@@ -16,7 +16,7 @@ const QUANT =
   /(?:^|[-_.])((?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|TQ\d_\d|MXFP4(?:_MOE)?|BF16|FP16|F16|F32))(?=[-_.]|$)/i;
 /** Auxiliary weights: not a quantization of the repository's model. */
 const AUXILIARY_FILE =
-  /(?:^|\/)(?:mtp-|dflash-|draft-|adapter-|imatrix-|lilicorr-)|\.imatrix\.|embeddings?[-_.][^/]*\.gguf$|embeddings?\.gguf$/i;
+  /(?:^|\/)(?:mtp|dflash|draft|adapter|imatrix|lilicorr)[-_.]|\.imatrix\.|embeddings?[-_.][^/]*\.gguf$|embeddings?\.gguf$/i;
 /** An embedding model quantization: "embedding" sits mid-name, before the model size. */
 const EMBEDDING_MODEL = /-embedding-\d/i;
 

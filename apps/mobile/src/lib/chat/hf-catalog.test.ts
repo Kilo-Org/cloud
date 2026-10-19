@@ -131,9 +131,11 @@ describe('a Hugging Face model detail', () => {
       file('mtp-Aux-27B-Q4_0.gguf', 1_680_271_776, '1'),
       file('dflash-Aux-27B-Q4_0.gguf', 1_094_346_080, '2'),
       file('imatrix-27B.gguf', 13_642_656, '3'),
-      file('draft-27B-Q4_0.gguf', 2_500_000_000, '4'),
-      file('Aux-27B-embedding-F16.gguf', 1_500_000_000, '5'),
-      file('Aux-27B-embeddings.gguf', 1_500_000_000, '6'),
+      file('imatrix_unsloth.gguf', 13_642_656, '4'),
+      file('mtp_Aux-27B-Q4_0.gguf', 1_680_271_776, '5'),
+      file('draft-27B-Q4_0.gguf', 2_500_000_000, '6'),
+      file('Aux-27B-embedding-F16.gguf', 1_500_000_000, '7'),
+      file('Aux-27B-embeddings.gguf', 1_500_000_000, '8'),
     ]);
     expect(detail.quants).toEqual([]);
     expect(detail.hasGgufFiles).toBe(true);

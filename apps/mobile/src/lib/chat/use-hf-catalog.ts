@@ -95,7 +95,7 @@ export function useHfModelDetail(id: string) {
  */
 export function useHfSmallestDownload(id: string, parameters: number | undefined) {
   return useQuery({
-    queryKey: ['hf-catalog', 'smallest', id],
+    queryKey: ['hf-catalog', 'smallest', id, parameters],
     queryFn: async ({ signal }): Promise<number | null> => {
       const tree = await hfGet(hfTreeUrl(id, 'main'), signal);
       return smallestDownloadBytes(tree.body, parameters) ?? null;

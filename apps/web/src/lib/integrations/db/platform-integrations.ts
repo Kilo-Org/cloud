@@ -1089,11 +1089,32 @@ export type GitHubConnectionStatus = {
  * installation (org owners resolve to their healthy primary row) counts as
  * connected only when the integration is healthy, matching what the
  * repository picker, Security Agent, and every operational caller require.
+ *
+ * A user can hold more than one workflow row (a locally disconnected row is
+ * retained on disconnect, and reconnecting a different installation inserts
+ * another), so the user lookup orders healthy rows first — the same rule
+ * `getInstallation` applies — instead of trusting an unordered `limit(1)`.
  */
 export async function getGitHubConnectionStatusForOwner(
   owner: Owner
 ): Promise<GitHubConnectionStatus> {
-  const integration = await getIntegrationForOwner(owner, PLATFORM.GITHUB);
+  const integration =
+    owner.type === 'org'
+      ? await getPrimaryGitHubIntegrationForOrganization(owner.id)
+      : ((
+          await db
+            .select()
+            .from(platform_integrations)
+            .where(
+              and(
+                eq(platform_integrations.owned_by_user_id, owner.id),
+                eq(platform_integrations.platform, PLATFORM.GITHUB),
+                eq(platform_integrations.github_connection_role, 'workflow')
+              )
+            )
+            .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
+            .limit(1)
+        )[0] ?? null);
 
   if (!isPlatformIntegrationHealthy(integration)) {
     return { connected: false, integration: null };

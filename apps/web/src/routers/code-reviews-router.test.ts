@@ -4130,4 +4130,28 @@ describe('personalReviewAgent.getGitHubStatus connection rule', () => {
 
     expect(status).toEqual({ connected: false, integration: null });
   });
+
+  it('reports connected when a healthy row coexists with a retained disconnected row', async () => {
+    // A locally disconnected row is retained, and reconnecting a different
+    // installation inserts another row. The status must resolve the healthy
+    // installation instead of an unordered first row.
+    await seedGitHubIntegration({ github_disconnected_at: '2026-02-01T00:00:00Z' });
+    await seedGitHubIntegration({
+      platform_installation_id: `inst-${crypto.randomUUID()}`,
+      platform_account_login: 'octocat-new',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octocat-new',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+        isValid: true,
+      },
+    });
+  });
 });

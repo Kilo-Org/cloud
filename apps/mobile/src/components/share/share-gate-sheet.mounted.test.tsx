@@ -15,7 +15,11 @@ import {
   remoteSpawnNonRetryableToast,
   remoteSpawnRetryableToast,
 } from '@/lib/remote-submit-outcome';
-import { __resetPendingShareNavigationForTests } from '@/lib/share-navigation';
+import {
+  __resetPendingShareNavigationForTests,
+  takePendingShareNavigation,
+} from '@/lib/share-navigation';
+import { i18n } from '@/i18n';
 import {
   __resetSharePayloadStoreForTests,
   peekSharePayload,
@@ -94,8 +98,21 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({}),
 }));
+const organizationMock = vi.hoisted(() => ({
+  current: { organizationId: null as string | null, isLoaded: true },
+}));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null, isLoaded: true }),
+  useOrganization: () => organizationMock.current,
+}));
+const organizationsListMock = vi.hoisted(() => ({
+  current: {
+    data: [{ organizationId: 'org-selected' }] as { organizationId: string }[] | undefined,
+    isFetched: true,
+    isError: false,
+  },
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => organizationsListMock.current,
 }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useAgentSessions: () => ({
@@ -422,5 +439,90 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+});
+
+describe('ShareGateSheet new-session organization', () => {
+  beforeEach(() => {
+    routerBack.mockClear();
+    shareDestinationListProps.current = null;
+    organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
+    organizationsListMock.current = {
+      data: [{ organizationId: 'org-selected' }],
+      isFetched: true,
+      isError: false,
+    };
+    __resetSharePayloadStoreForTests();
+    __resetPendingShareNavigationForTests();
+  });
+
+  async function commitNewSession(shareId: string): Promise<string> {
+    const renderer = await mountGate(shareId);
+    const row = renderer.root.find(
+      node =>
+        node.props.accessibilityRole === 'button' &&
+        node.props.accessibilityLabel === i18n.t('common.newSession')
+    );
+    const onPress: unknown = row.props.onPress;
+    if (typeof onPress !== 'function') {
+      throw new TypeError('the New session row has no press handler');
+    }
+    act(() => {
+      (onPress as () => void)();
+    });
+    await flushAsync();
+    const pending = takePendingShareNavigation();
+    act(() => {
+      renderer.unmount();
+    });
+    if (pending === null) {
+      throw new Error('the gate did not commit a destination');
+    }
+    return pending.href;
+  }
+
+  it('commits into the selected organization while the account holds it', async () => {
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('/agent-chat/new?organizationId=org-selected');
+    expect(href).toContain(`shareId=${shareId}`);
+  });
+
+  it('commits into the account default when the selection is no longer a membership', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    organizationsListMock.current = {
+      data: [{ organizationId: 'org-first' }, { organizationId: 'org-second' }],
+      isFetched: true,
+      isError: false,
+    };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-first');
+    expect(href).not.toContain('org-lost');
+  });
+
+  it('commits personal when the account holds no organization', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    organizationsListMock.current = { data: [], isFetched: true, isError: false };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('/agent-chat/new?shareId=');
+    expect(href).not.toContain('organizationId=');
+  });
+
+  it('keeps the selection while the membership list is unsettled', async () => {
+    organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
+    organizationsListMock.current = { data: undefined, isFetched: false, isError: false };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-selected');
   });
 });

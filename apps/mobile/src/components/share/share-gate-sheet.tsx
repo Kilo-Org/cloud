@@ -18,6 +18,7 @@ import { DestinationOptionRow } from '@/components/destination-option-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
@@ -47,6 +48,7 @@ import {
 import { selectShareDestinations, type ShareDestinationRow } from './share-destinations';
 import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
+import { resolveShareNewSessionOrganization } from './share-new-session-org';
 import { SharePayloadPreview } from './share-payload-preview';
 import { type SharePayloadValidation, validateSharePayload } from './share-payload-validation';
 import { selectShareReviewPr, selectShareReviewPrSubtitle } from './share-review-pr';
@@ -61,6 +63,13 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
+  // The account's memberships: the gate commits a new session only into an
+  // organization this list holds (see `resolveShareNewSessionOrganization`).
+  const {
+    data: memberships,
+    isFetched: membershipsFetched,
+    isError: membershipsFailed,
+  } = useOrganizationsList();
   // Org-scoped stored page (cloud-agent + cli) narrowed to live sessions:
   // a session that is not live cannot receive the share, so it is never
   // offered. The active list supplies the liveness filter and the
@@ -263,9 +272,23 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     if (!shareId || isSpawning) {
       return;
     }
-    const base = getNewAgentSessionPath(organizationId);
+    const selectedOrganizationId = resolveShareNewSessionOrganization({
+      organizationId,
+      membershipIds: memberships?.map(membership => membership.organizationId),
+      membershipsSettled: membershipsFetched,
+      membershipsFailed,
+    });
+    const base = getNewAgentSessionPath(selectedOrganizationId);
     commit(appendShareParams(base, shareId));
-  }, [commit, isSpawning, organizationId, shareId]);
+  }, [
+    commit,
+    isSpawning,
+    memberships,
+    membershipsFailed,
+    membershipsFetched,
+    organizationId,
+    shareId,
+  ]);
 
   const commitEnabled = isShareCommitEnabled({ orgLoaded, validation });
   const instanceRowsDisabled = !commitEnabled || isSpawning;

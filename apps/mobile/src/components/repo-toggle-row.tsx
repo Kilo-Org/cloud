@@ -33,9 +33,7 @@ export function RepoToggleRow({
       className={className}
     >
       <View className="flex-1 flex-row items-center gap-2 pr-3">
-        {repo.private ? (
-          <Lock size={12} className="shrink-0" color={colors.mutedForeground} />
-        ) : null}
+        {repo.private ? <Lock size={12} color={colors.mutedForeground} /> : null}
         {/* Middle ellipsis keeps the owner tail and the distinguishing repo
             suffix visible; a tail cut left every long row looking identical
             (explorer finding, 2026-10-18). The min-w-0 box makes the name

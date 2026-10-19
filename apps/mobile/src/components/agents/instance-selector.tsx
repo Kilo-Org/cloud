@@ -81,6 +81,7 @@ export function InstanceSelector({
     instancePickerSlot.set(UNFENCED_ROUTE_KEY, {
       instances,
       currentValue: value,
+      pendingComputer: pendingComputer && value === null,
       onSelect: onChange,
     });
     // See ModelSelector: the sheet never re-anchors after the keyboard hides,

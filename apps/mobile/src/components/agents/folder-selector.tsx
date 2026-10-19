@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -70,8 +71,8 @@ function FolderSelector({
  * this module so the configure form stays under its line limit.
  *
  * `runOnInstance` is null for the tour's computer target with no connected
- * computer yet: the field renders with the launch-directory label and stays
- * disabled — there is no connection to list folders on.
+ * computer yet: the Folder row renders the setup hint instead of the picker
+ * control, since there is no connection to list folders on.
  */
 export function LaunchFolderField({
   folderPath,
@@ -95,7 +96,7 @@ export function LaunchFolderField({
           {t('agentChat.folderPicker.fieldLabel')}
         </Text>
         <Text className="text-sm text-muted-foreground">
-          {t('agentChat.instancePicker.noCliInstancesDescription')}
+          {stripInlineCodeMarkers(t('agentChat.instancePicker.noCliInstancesDescription'))}
         </Text>
       </View>
     );

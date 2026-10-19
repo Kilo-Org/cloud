@@ -31,6 +31,7 @@ import {
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { useNewSessionModelState } from '@/components/agents/new-session-model-provider';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import {
   useNewSessionPrefill,
@@ -495,23 +496,6 @@ export function NewSessionScreenBody() {
     preselectRunOn,
   ]);
 
-  // The tour's computer target with no connected computer yet: bind the first
-  // one the moment a CLI connects (poll tick, Refresh, or focus refetch). The
-  // one-shot restore above cannot do this — it seals after the first resolved
-  // list, which may have been empty. A deliberate in-form pick wins and stops
-  // the auto-bind (`runOnUserPickedRef`); binding here is transient and never
-  // touches the stored preference.
-  useEffect(() => {
-    if (!computerTargetSelected || runOnUserPickedRef.current) {
-      return;
-    }
-    const first = instanceList[0];
-    if (runOnInstance !== null || first === undefined) {
-      return;
-    }
-    setRunOnInstance(first);
-  }, [computerTargetSelected, instanceList, runOnInstance]);
-
   // A successful session creation owns clearing the new-session draft; a
   // failure must preserve it for the retry. The success path navigates via
   // `replace`, so arm the discard-confirm bypass here — `onCreated` runs
@@ -703,6 +687,33 @@ export function NewSessionScreenBody() {
     },
     [organizationId, saveModel, persistServerLastSelected, setModel, setVariant]
   );
+
+  // The tour's computer target with no connected computer yet: bind the first
+  // one the moment a CLI connects (poll tick, Refresh, or focus refetch). The
+  // one-shot restore above cannot do this — it seals after the first resolved
+  // list, which may have been empty. A deliberate in-form pick wins and stops
+  // the auto-bind (`runOnUserPickedRef`); binding here is transient and never
+  // touches the stored preference. A retryable spawn failure that reset the
+  // selection shows the disconnected note: the note asks the person to pick
+  // again, so the auto-bind stays off until a deliberate choice clears it.
+  useEffect(() => {
+    if (!computerTargetSelected || runOnUserPickedRef.current) {
+      return;
+    }
+    if (remoteSpawn.showInstanceDisconnectedNote) {
+      return;
+    }
+    const first = instanceList[0];
+    if (runOnInstance !== null || first === undefined) {
+      return;
+    }
+    setRunOnInstance(first);
+  }, [
+    computerTargetSelected,
+    instanceList,
+    runOnInstance,
+    remoteSpawn.showInstanceDisconnectedNote,
+  ]);
 
   const handleRunOnChange = useCallback(
     (next: InstancePickerInstance | null) => {
@@ -964,7 +975,9 @@ export function NewSessionScreenBody() {
 
   let startBlockedReason: string | null = null;
   if (runOnInstance === null && computerTargetSelected) {
-    startBlockedReason = t('agentChat.instancePicker.noCliInstancesDescription');
+    startBlockedReason = stripInlineCodeMarkers(
+      t('agentChat.instancePicker.noCliInstancesDescription')
+    );
   } else if (startBlockedReasonKey === 'connect-provider') {
     startBlockedReason = t('agentChat.newSession.connectProviderToStart');
   } else if (startBlockedReasonKey === 'refresh-repositories') {

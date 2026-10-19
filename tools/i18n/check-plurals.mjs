@@ -374,7 +374,7 @@ function run() {
     const countedBases = new Set(
       [...english]
         .filter(([, value]) => /{{\s*count\s*}}/.test(value))
-        .map(([key]) => pluralFamilyBase(`${key}_one`) ?? key)
+        .map(([key]) => pluralFamilyBase(key) ?? key)
     );
     const report = [];
     let totalKeys = 0;

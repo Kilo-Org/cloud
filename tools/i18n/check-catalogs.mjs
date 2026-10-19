@@ -545,8 +545,9 @@ for (const catalog of CATALOGS) {
         !localeFamilies.has(parts.base) &&
         translated.has(parts.base)
       ) {
-        // The locale kept the flat base key; its family is still the English
-        // one and the missing categories are reported below.
+        // The locale kept the flat base key of a counted English family; it
+        // owes no categories for that family, so they are deliberately not
+        // reported. Only a non-counted English family reports below.
         continue;
       }
       fail(`${label}: missing key "${key}"`);

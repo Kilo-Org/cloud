@@ -72,10 +72,11 @@ export const sessionLiveSummarySchema = z.object({
 export type SessionLiveSummary = z.infer<typeof sessionLiveSummarySchema>;
 
 /**
- * Whether the code point draws nothing and only affects how the text around it
- * is laid out. Display text keeps just the characters it draws, so these are
- * removed. Compared numerically because a character class naming them reads in
- * the source as the characters themselves.
+ * Whether the code point is a format control: a code point that has no glyph of
+ * its own but can change how the text around it is drawn. Display text keeps
+ * only the code points that draw themselves, so these are removed. Compared
+ * numerically because a character class naming them reads in the source as the
+ * characters themselves.
  */
 function isFormatControl(code: number): boolean {
   return (

@@ -1276,6 +1276,53 @@ describe('translation failure exhaustion', () => {
     expect(requestMock).toHaveBeenCalledTimes(2);
   });
 
+  it('does not charge a stale attempt to the budget of a row that remounted mid-flight', async () => {
+    const mod = await loadRuntime();
+    // The gateway is unreachable and every attempt stays pending until the
+    // test releases it.
+    const resolvers = pendingBatches();
+
+    // The attempt is in flight when the row unmounts and immediately
+    // remounts: the re-ask re-inserts a fresh item for the same key while the
+    // old attempt is still pending.
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(1);
+    });
+    mod.releaseTranslationInterest({
+      itemId: 'part-1',
+      text: 'hello',
+      language: 'de',
+      model: MODEL,
+    });
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+
+    // The stale attempt settles unresolved: the remount's fresh budget must
+    // not be charged, so it still holds three full failures.
+    resolvers[0]?.([]);
+    // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
+    await flushBatch();
+    expect(mod.isTranslationFailed('part-1', 'hello', 'de', MODEL.id)).toBe(false);
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+      // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
+      await flushBatch();
+      // Each re-ask dispatched its own pending request; settle it unresolved
+      // so the outcome counts toward the remount's budget.
+      const roundResolvers = resolvers.slice(attempt);
+      if (roundResolvers.length > 0) {
+        roundResolvers[0]?.([]);
+      }
+      // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
+      await flushBatch();
+      if (attempt < 3) {
+        expect(mod.isTranslationFailed('part-1', 'hello', 'de', MODEL.id)).toBe(false);
+      }
+    }
+    expect(mod.isTranslationFailed('part-1', 'hello', 'de', MODEL.id)).toBe(true);
+  });
+
   it('keeps the failure state across a reconnect retry until a batch resolves', async () => {
     const mod = await loadRuntime();
     requestMock.mockRejectedValue(new Error('gateway down'));

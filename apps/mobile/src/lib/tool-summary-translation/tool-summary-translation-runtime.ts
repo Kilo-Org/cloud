@@ -647,18 +647,20 @@ async function runBatch(batch: FlushBatch): Promise<void> {
   // step toward exhaustion. Runs on every path — the success path and a
   // thrown or unreachable request — so a gateway outage reaches exhaustion
   // like a malformed reply does. Keys in `resolved` are skipped: `remember`
-  // cleared them. Keys whose surface released while the attempt was in flight
-  // (row unmounted, scrolled away, or superseded) are skipped too: the release
-  // dropped them from `retryable`, so counting them would leave a count — and
-  // a full summary string — behind for the rest of the session, and would
-  // charge the stale attempt to a fast remount instead of starting its fresh
-  // budget at zero.
+  // cleared them. Keys whose remembered entry is no longer this batch's item
+  // are skipped too: the surface released the summary while the attempt was
+  // in flight (row unmounted, scrolled away, or superseded), and a re-ask
+  // re-inserted a fresh item object — so counting would leave a count (and a
+  // full summary string) behind for the rest of the session, and would charge
+  // the stale attempt to the remount's fresh budget instead of starting it at
+  // zero. A continuously mounted row re-inserts the same item object, so its
+  // outcome still counts.
   const countFailures = (resolvedKeys: ReadonlySet<string>): void => {
     let exhausted = false;
     for (const item of batch.items) {
       if (
         item.generation === generation &&
-        retryable.has(item.key) &&
+        retryable.get(item.key) === item &&
         !resolvedKeys.has(item.key)
       ) {
         const next = (failureCounts.get(item.key) ?? 0) + 1;

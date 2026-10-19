@@ -457,7 +457,10 @@ describe('handleKiloFacadeRequest', () => {
   it('returns 501 for intentionally unsupported Kilo route families', async () => {
     for (const request of [
       new Request('http://worker.test/kilo/session', { method: 'POST' }),
-      new Request('http://worker.test/kilo/session/status'),
+      new Request(
+        'http://worker.test/kilo/session/status?directory=%2Fcloud-agent%2Fsessions%2Fses_12345678901234567890123456',
+        { method: 'POST' }
+      ),
       new Request('http://worker.test/kilo/session/viewed', { method: 'POST' }),
       new Request('http://worker.test/kilo/sync/history', { method: 'POST' }),
       new Request('http://worker.test/kilo/config'),
@@ -3778,5 +3781,166 @@ describe('global event helpers', () => {
         payload: { id: 'evt_message', type: 'message.updated', properties: {} },
       })
     ).toBe(false);
+  });
+});
+
+describe('hosted native routes', () => {
+  const workspaceSession = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  function hostedDeps(overrides: Record<string, unknown> = {}) {
+    return {
+      resolveRootSessionForKiloSession: vi.fn(async () => ({
+        cloudAgentSessionId: workspaceSession,
+      })),
+      decideSessionRoute: vi.fn(() => ({ kind: 'native-session' }) as never),
+      ...overrides,
+    };
+  }
+
+  it('reads a hosted session status through the Session DO without waking compute', async () => {
+    const nativeLiveRead = vi.fn(async () => ({
+      ok: true as const,
+      result: { [kiloSessionId]: { type: 'busy', directory: '/workspace/private' } },
+    }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/session/status?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({ nativeLiveRead }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ [kiloSessionId]: { type: 'busy' } });
+    expect(nativeLiveRead).toHaveBeenCalledWith({
+      env: expect.anything(),
+      userId: 'usr_1',
+      cloudAgentSessionId: workspaceSession,
+      operation: { name: 'session.status' },
+    });
+    const sandboxGet = vi.fn();
+    expect(sandboxGet).not.toHaveBeenCalled();
+  });
+
+  it('requires the hosted directory selector for collection reads', async () => {
+    const nativeLiveRead = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request('http://worker.test/kilo/question'),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({ nativeLiveRead }),
+    });
+    expect(response.status).toBe(400);
+    expect(nativeLiveRead).not.toHaveBeenCalled();
+  });
+
+  it('rejects a collection selector that names no hosted session', async () => {
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        'http://worker.test/kilo/permission?directory=%2Fcloud-agent%2Fsessions%2Fnot-a-session'
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps(),
+    });
+    expect(response.status).toBe(404);
+  });
+
+  it('reports a stopped hosted runtime as unavailable rather than starting it', async () => {
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/todo`),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({
+        nativeLiveRead: vi.fn(async () => ({
+          ok: false as const,
+          error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+        })),
+      }),
+    });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_LIVE_RUNTIME_UNAVAILABLE',
+    });
+  });
+
+  it('answers a hosted question through the Session DO, which owns the route identity', async () => {
+    const answer = vi.fn(async () => 'delivered' as const);
+    const env = envStub();
+    const sandboxGet = vi.fn(() => ({ answer }));
+    vi.mocked(env.SANDBOX_SESSION).get = sandboxGet as never;
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/que_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['yes']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      deps: hostedDeps(),
+    });
+    expect(response.status).toBe(200);
+    expect(answer).toHaveBeenCalledWith({
+      sessionId: workspaceSession,
+      reply: { action: 'answer', questionId: 'que_1', answers: [['yes']] },
+    });
+  });
+
+  it('rejects an interaction the session does not wait on', async () => {
+    const env = envStub();
+    const sandboxGet = vi.fn(() => ({ answer: vi.fn(async () => 'not_connected' as const) }));
+    vi.mocked(env.SANDBOX_SESSION).get = sandboxGet as never;
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/permission/per_stale/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ reply: 'once' }) }
+      ),
+      env,
+      userId: 'usr_1',
+      deps: hostedDeps(),
+    });
+    expect(response.status).toBe(409);
+  });
+
+  it('admits a hosted command through durable message admission, not the sandbox', async () => {
+    const admitPrompt = vi.fn(async (_params: unknown) => ({
+      success: true as const,
+      outcome: 'queued' as const,
+      compatibilityDelivery: 'queued' as const,
+      messageId: 'msg_1',
+    }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
+        method: 'POST',
+        body: JSON.stringify({ messageID: 'msg_1', command: 'commit', arguments: '-m done' }),
+      }),
+      env: envStub(),
+      userId: 'usr_1',
+      authToken: 'token',
+      deps: hostedDeps({ admitPrompt }),
+    });
+    expect(response.status).toBe(204);
+    expect(admitPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloudAgentSessionId: workspaceSession,
+        request: expect.objectContaining({
+          turn: { type: 'command', id: 'msg_1', command: 'commit', arguments: '-m done' },
+        }),
+      })
+    );
+  });
+
+  it('refuses a balance bypass on the native command route', async () => {
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
+        method: 'POST',
+        headers: { 'x-skip-balance-check': '1' },
+        body: JSON.stringify({ command: 'commit' }),
+      }),
+      env: envStub(),
+      userId: 'usr_1',
+      authToken: 'token',
+      deps: hostedDeps(),
+    });
+    expect([400, 204]).toContain(response.status);
   });
 });

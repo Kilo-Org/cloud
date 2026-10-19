@@ -40,14 +40,41 @@ import { isControlSession } from '../session-plane.js';
 import type { SessionId } from '../types/ids.js';
 import type {
   ControlPlaneSendResult,
+  NativeSnapshot,
   SandboxSessionV2,
 } from '../control-plane/session/session-do.js';
+import type {
+  ControlPlaneAnswerReply,
+  ControlPlaneControlResult,
+  ControlPlaneDispatchResult,
+} from '../shared/control-plane-protocol.js';
+import { createMessageId } from '../session/message-id.js';
 import { interruptControlSession } from '../router/control-plane-session.js';
 import {
   preflightAndAdmitPromptMessage,
   pendingQueueFullAdmissionFailure,
 } from '../session/queue-message.js';
 import { parseBasicKiloPrompt } from './basic-prompt.js';
+import {
+  readNativeLiveOperation,
+  type NativeLiveReader,
+  type NativeReadOutcome,
+} from './native-live.js';
+import {
+  createNativeAttachmentRegistry,
+  isDeliverableNativeEvent,
+  NATIVE_FACADE_FENCE_EVENT,
+  NATIVE_FACADE_RESNAPSHOT_EVENT,
+  toNativePublicEvent,
+  type NativeEventDelivery,
+  type NativePublicEvent,
+} from './native-event-source.js';
+import {
+  classifyNativeRoute,
+  parseNativeAnswerBody,
+  parseNativeCommandBody,
+  type NativeSessionRoute,
+} from './native-routes.js';
 import {
   isPublicCloudAgentExtensionSourceType,
   type PublicCloudAgentExtensionEvent,
@@ -79,7 +106,6 @@ const SLOW_SUBSCRIBER_ERROR = 'Global event subscriber fell behind';
 const SUPPORTED_SESSION_LIST_QUERY_PARAMS = new Set(['limit', 'start']);
 const SUPPORTED_SESSION_MESSAGES_QUERY_PARAMS = new Set(['directory', 'limit', 'before']);
 const KNOWN_UNSUPPORTED_ROUTES = new Set([
-  'GET /session/status',
   'POST /session/viewed',
   'POST /sync/history',
   'GET /config',
@@ -124,7 +150,14 @@ type PublicSubscriber = {
 
 export type KiloFacadeGlobalEvents = {
   openPublicGlobalEventStream(): Response;
-  openPublicSessionEventStream(kiloSessionId: string): Response;
+  openPublicSessionEventStream(
+    kiloSessionId: string,
+    native?: {
+      fence?: number | null;
+      resnapshot?: boolean;
+      snapshot?: NativePublicEvent[];
+    }
+  ): Response;
 };
 
 export type KiloFacadeRequestDeps = {
@@ -156,8 +189,76 @@ export type KiloFacadeRequestDeps = {
     userId: string;
     cloudAgentSessionId: string;
   }) => Promise<Awaited<ReturnType<CloudAgentSession['interruptExecution']>>>;
+  /**
+   * Performs one allowlisted native read against the selected hosted session.
+   * Production resolves it to the Session DO; it never wakes compute.
+   */
+  nativeLiveRead?: (params: {
+    env: Env;
+    userId: string;
+    cloudAgentSessionId: string;
+    operation: Parameters<NativeLiveReader>[0];
+  }) => Promise<ControlPlaneControlResult>;
+  /**
+   * Performs the native attach: subscribe to the hosted session's stored-event
+   * push, then read the durable snapshot through the subscription fence.
+   */
+  openNativeAttachment?: (params: {
+    env: Env;
+    userId: string;
+    cloudAgentSessionId: string;
+    kiloSessionId: string;
+  }) => Promise<NativeAttachOutcome>;
   globalEvents?: KiloFacadeGlobalEvents;
 };
+
+/** Result of one fenced native attach. */
+export type NativeAttachOutcome =
+  | { kind: 'fenced'; fence: number | null; events: NativePublicEvent[]; snapshot: NativeSnapshot }
+  | { kind: 'stopped' }
+  | { kind: 'resnapshot' }
+  | { kind: 'unavailable'; code: string; message: string; retryable: boolean };
+
+async function defaultOpenNativeAttachment(params: {
+  env: Env;
+  userId: string;
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+}): Promise<NativeAttachOutcome> {
+  const stub = getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId);
+  let subscription: { fence: number | null; kiloSessionId: string };
+  try {
+    subscription = await withDORetry<
+      DurableObjectStub<SandboxSessionV2>,
+      { fence: number | null; kiloSessionId: string }
+    >(
+      () => stub,
+      current => current.subscribeNativeEvents({ kiloSessionId: params.kiloSessionId }),
+      'subscribeNativeEvents'
+    );
+  } catch {
+    return {
+      kind: 'unavailable',
+      code: 'KILO_SESSION_READ_RETRYABLE',
+      message: 'Native event stream is unavailable',
+      retryable: true,
+    };
+  }
+  if (subscription.fence === null) return { kind: 'stopped' };
+  const snapshot = await withDORetry<DurableObjectStub<SandboxSessionV2>, NativeSnapshot>(
+    () => stub,
+    current => current.nativeSnapshot({}),
+    'nativeSnapshot'
+  );
+  if (snapshot.oversized) return { kind: 'resnapshot' };
+  const events: NativePublicEvent[] = [];
+  for (const event of snapshot.events) {
+    if (!isDeliverableNativeEvent(event)) continue;
+    const native = toNativePublicEvent(event, params.kiloSessionId);
+    if (native !== null) events.push(native);
+  }
+  return { kind: 'fenced', fence: subscription.fence, events, snapshot };
+}
 
 const encoder = new TextEncoder();
 
@@ -1295,11 +1396,68 @@ async function eventStreamResponse(params: {
   if (!root) {
     return missingRootKiloSessionResponse();
   }
+  // A hosted `workspace_*` session delivers its durable native log through the
+  // fenced native attach (spec §10); the legacy planes keep their producer
+  // feed. The response shape is the same SSE envelope in both cases.
+  if (isControlSession(root.cloudAgentSessionId)) {
+    const native = await openHostedNativeAttachment({
+      env,
+      userId,
+      deps,
+      cloudAgentSessionId: root.cloudAgentSessionId,
+      kiloSessionId,
+    });
+    return native;
+  }
+
   const globalEvents = deps?.globalEvents;
   if (!globalEvents) {
     return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Kilo facade stream is unavailable');
   }
   return globalEvents.openPublicSessionEventStream(kiloSessionId);
+}
+
+/**
+ * Hosted native attach. The snapshot is delivered first, then the fence, then
+ * pushes above it. A stopped runtime is reported as such instead of being
+ * woken, and an attach that cannot prove continuity asks for a resnapshot.
+ */
+async function openHostedNativeAttachment(params: {
+  env: Env;
+  userId: string;
+  deps?: KiloFacadeRequestDeps;
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+}): Promise<Response> {
+  const { env, userId, deps, cloudAgentSessionId, kiloSessionId } = params;
+  const open = deps?.openNativeAttachment ?? defaultOpenNativeAttachment;
+  let attach: NativeAttachOutcome;
+  try {
+    attach = await open({ env, userId, cloudAgentSessionId, kiloSessionId });
+  } catch {
+    return facadeError(503, 'KILO_SESSION_READ_RETRYABLE', 'Native event stream is unavailable');
+  }
+  if (attach.kind === 'stopped') {
+    return facadeError(
+      503,
+      'KILO_LIVE_RUNTIME_UNAVAILABLE',
+      'Cloud Agent Kilo runtime is not live'
+    );
+  }
+  if (attach.kind === 'unavailable') {
+    return facadeError(503, attach.code, attach.message);
+  }
+  const globalEvents = deps?.globalEvents;
+  if (!globalEvents) {
+    return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Kilo facade stream is unavailable');
+  }
+  if (globalEvents instanceof UserKiloFacade) {
+    globalEvents.prepareNativeAttachment(cloudAgentSessionId, kiloSessionId);
+  }
+  return globalEvents.openPublicSessionEventStream(kiloSessionId, {
+    ...(attach.kind === 'resnapshot' ? { resnapshot: true } : { fence: attach.fence }),
+    snapshot: attach.kind === 'resnapshot' ? [] : attach.events,
+  });
 }
 
 async function proxyOwnedKiloSessionRequest(params: {
@@ -1431,8 +1589,36 @@ export async function handleKiloFacadeRequest(params: {
     return Response.json(sessions.map(projectPublicListedSession));
   }
 
-  if (kiloPath === '/session' || KNOWN_UNSUPPORTED_ROUTES.has(`${request.method} ${kiloPath}`)) {
+  if (
+    kiloPath === '/session' ||
+    KNOWN_UNSUPPORTED_ROUTES.has(`${request.method} ${kiloPath}`) ||
+    (kiloPath === '/session/status' && request.method !== 'GET')
+  ) {
     return facadeError(501, 'KILO_ROUTE_UNSUPPORTED', 'Kilo facade route is not supported');
+  }
+
+  const collectionNativeRoute = classifyNativeRoute(request.method, kiloPath, null);
+  if (collectionNativeRoute?.kind === 'answering') {
+    const session = await resolveNativeRouteSession({ env, userId, deps, url });
+    if (session instanceof Response) return session;
+    return answerOwnedNativeInteraction({
+      request,
+      env,
+      userId,
+      cloudAgentSessionId: session.cloudAgentSessionId,
+      route: collectionNativeRoute,
+    });
+  }
+  if (collectionNativeRoute !== null) {
+    return handleCollectionNativeRoute({
+      request,
+      env,
+      userId,
+      authToken,
+      deps,
+      url,
+      route: collectionNativeRoute,
+    });
   }
 
   const route = parseRootSessionRoute(kiloPath);
@@ -1458,9 +1644,41 @@ export async function handleKiloFacadeRequest(params: {
     kiloSessionId: route.kiloSessionId,
     cloudAgentSessionId: root.cloudAgentSessionId,
   };
-  const decision = (deps?.decideSessionRoute ?? decideSessionKiloFacadeRoute)(policyInput);
+  const sessionNativeRoute = classifyNativeRoute(
+    request.method,
+    kiloPath,
+    route.encodedKiloSessionId
+  );
+  const decision =
+    sessionNativeRoute !== null
+      ? ({ kind: 'native-session' } as const)
+      : (deps?.decideSessionRoute ?? decideSessionKiloFacadeRoute)(policyInput);
   if (decision.kind === 'reject') {
     return facadeError(decision.status, decision.code, decision.message);
+  }
+
+  if (sessionNativeRoute?.kind === 'answering') {
+    return answerOwnedNativeInteraction({
+      request,
+      env,
+      userId,
+      cloudAgentSessionId: root.cloudAgentSessionId,
+      route: sessionNativeRoute,
+    });
+  }
+
+  if (sessionNativeRoute !== null) {
+    return handleSessionNativeRoute({
+      request,
+      env,
+      userId,
+      authToken,
+      deps,
+      url,
+      kiloSessionId: route.kiloSessionId,
+      cloudAgentSessionId: root.cloudAgentSessionId,
+      route: sessionNativeRoute,
+    });
   }
 
   const routeClassification = {
@@ -1523,6 +1741,263 @@ export async function handleKiloFacadeRequest(params: {
   });
 }
 
+/** Binds the test seam to one session without inventing a second default. */
+function nativeLiveReadSeam(
+  seam: KiloFacadeRequestDeps['nativeLiveRead'],
+  params: { env: Env; userId: string; cloudAgentSessionId: string }
+): { read?: NativeLiveReader } {
+  if (seam === undefined) return {};
+  return {
+    read: operation => seam({ ...params, operation }),
+  };
+}
+
+function nativeReadErrorResponse(outcome: NativeReadOutcome): Response {
+  if (outcome.kind === 'too_large') {
+    return facadeError(413, 'KILO_TRANSCRIPT_TOO_LARGE', 'Kilo response exceeds the public budget');
+  }
+  if (outcome.kind === 'not_ready') {
+    return facadeError(503, 'KILO_LIVE_RUNTIME_UNAVAILABLE', outcome.message);
+  }
+  if (outcome.kind === 'failed') {
+    const status =
+      outcome.code === 'KILO_LIVE_RUNTIME_UNAVAILABLE'
+        ? 503
+        : outcome.code === 'KILO_UPSTREAM_RESPONSE_INVALID'
+          ? 502
+          : 500;
+    return facadeError(status, outcome.code, outcome.message);
+  }
+  return Response.json(outcome.body);
+}
+
+/**
+ * Resolves the hosted session a non-session native route names. The public
+ * directory selector is the only accepted handle, and authorization runs for
+ * exactly that owner/org session, so a sibling workspace can never answer.
+ */
+async function resolveNativeRouteSession(params: {
+  env: Env;
+  userId: string;
+  deps?: KiloFacadeRequestDeps;
+  url: URL;
+}): Promise<{ kiloSessionId: string; cloudAgentSessionId: string } | Response> {
+  for (const key of params.url.searchParams.keys()) {
+    if (key !== 'directory') return unsupportedSessionSelectorResponse();
+  }
+  if (hasDuplicateQueryParameters(params.url.searchParams)) {
+    return unsupportedSessionSelectorResponse();
+  }
+  const directory = params.url.searchParams.get('directory');
+  if (!directory) {
+    return facadeError(
+      400,
+      'KILO_EVENT_DIRECTORY_REQUIRED',
+      'A Cloud Agent session directory selector is required'
+    );
+  }
+  const kiloSessionId = parsePublicSessionDirectory(directory);
+  if (!kiloSessionId) return unsupportedSessionSelectorResponse();
+  if (!isSessionIngestKiloSessionId(kiloSessionId)) return missingRootKiloSessionResponse();
+  const resolveRoot =
+    params.deps?.resolveRootSessionForKiloSession ?? defaultResolveRootSessionForKiloSession;
+  const root = await resolveRoot({
+    env: params.env,
+    userId: params.userId,
+    kiloSessionId,
+  });
+  if (!root) return missingRootKiloSessionResponse();
+  return { kiloSessionId, cloudAgentSessionId: root.cloudAgentSessionId };
+}
+
+async function handleCollectionNativeRoute(params: {
+  request: Request;
+  env: Env;
+  userId: string;
+  authToken?: string;
+  deps?: KiloFacadeRequestDeps;
+  url: URL;
+  route: NativeSessionRoute;
+}): Promise<Response> {
+  const { request, env, userId, deps, route } = params;
+  const session = await resolveNativeRouteSession(params);
+  if (session instanceof Response) return session;
+
+  if (route.kind === 'read') {
+    const outcome = await readNativeLiveOperation({
+      env,
+      userId,
+      cloudAgentSessionId: session.cloudAgentSessionId,
+      kiloSessionId: session.kiloSessionId,
+      operation: route.operation,
+      ...nativeLiveReadSeam(deps?.nativeLiveRead, {
+        env,
+        userId,
+        cloudAgentSessionId: session.cloudAgentSessionId,
+      }),
+    });
+    return nativeReadErrorResponse(outcome);
+  }
+  if (route.kind === 'answering') {
+    const body = await parseNativeAnswerBody(request, route);
+    if (!body.ok) return facadeError(body.status, body.code, body.message);
+    return answerHostedNativeInteraction({
+      env,
+      userId,
+      cloudAgentSessionId: session.cloudAgentSessionId,
+      reply: body.reply,
+    });
+  }
+  return facadeError(501, 'KILO_ROUTE_UNSUPPORTED', 'Kilo facade route is not supported');
+}
+
+async function handleSessionNativeRoute(params: {
+  request: Request;
+  env: Env;
+  userId: string;
+  authToken?: string;
+  deps?: KiloFacadeRequestDeps;
+  url: URL;
+  kiloSessionId: string;
+  cloudAgentSessionId: string;
+  route: NativeSessionRoute;
+}): Promise<Response> {
+  const { request, env, userId, deps, url, kiloSessionId, cloudAgentSessionId, route } = params;
+  const selectorResponse = validateIdScopedSelectors(url, kiloSessionId, new Set());
+  if (selectorResponse) return selectorResponse;
+
+  if (route.kind === 'read') {
+    const outcome = await readNativeLiveOperation({
+      env,
+      userId,
+      cloudAgentSessionId,
+      kiloSessionId,
+      operation: route.operation,
+      ...nativeLiveReadSeam(deps?.nativeLiveRead, { env, userId, cloudAgentSessionId }),
+    });
+    return nativeReadErrorResponse(outcome);
+  }
+  if (request.headers.get('x-skip-balance-check') !== null) {
+    return facadeError(
+      400,
+      'KILO_BALANCE_BYPASS_UNSUPPORTED',
+      'Balance bypass is not supported for public Kilo prompt mutations'
+    );
+  }
+  const body = await parseNativeCommandBody(request);
+  if (!body.ok) return facadeError(body.status, body.code, body.message);
+  return admitHostedCommand({
+    env,
+    userId,
+    authToken: params.authToken,
+    cloudAgentSessionId,
+    body: body.body,
+    deps,
+  });
+}
+
+async function answerOwnedNativeInteraction(params: {
+  request: Request;
+  env: Env;
+  userId: string;
+  cloudAgentSessionId: string;
+  route: Extract<NativeSessionRoute, { kind: 'answering' }>;
+}): Promise<Response> {
+  const body = await parseNativeAnswerBody(params.request, params.route);
+  if (!body.ok) return facadeError(body.status, body.code, body.message);
+  return answerHostedNativeInteraction({
+    env: params.env,
+    userId: params.userId,
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    reply: body.reply,
+  });
+}
+
+/**
+ * Questions and permissions route through the Session DO's answer path, which
+ * names the route itself and validates membership of the pending set. A stale
+ * runtime id or a sibling attachment therefore cannot answer anything.
+ */
+async function answerHostedNativeInteraction(params: {
+  env: Env;
+  userId: string;
+  cloudAgentSessionId: string;
+  reply: Extract<NativeSessionRoute, { kind: 'answering' }>['reply'];
+}): Promise<Response> {
+  const payload: ControlPlaneAnswerReply =
+    params.reply.action === 'question.reply'
+      ? { action: 'answer', questionId: params.reply.questionId, answers: params.reply.answers }
+      : params.reply.action === 'question.reject'
+        ? { action: 'reject', questionId: params.reply.questionId }
+        : {
+            action: 'permission',
+            permissionId: params.reply.permissionId,
+            response: params.reply.response,
+          };
+  const result = await withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneDispatchResult>(
+    () => getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId as SessionId),
+    stub => stub.answer({ sessionId: params.cloudAgentSessionId, reply: payload }),
+    'answer'
+  );
+  if (result === 'not_connected') {
+    return facadeError(
+      409,
+      'KILO_INTERACTION_UNAVAILABLE',
+      'The session does not wait on this interaction'
+    );
+  }
+  return Response.json(true);
+}
+
+/**
+ * Commands are admitted exactly like prompts: balance, model policy, durable
+ * queue, and idempotency all apply, so the native facade cannot bypass Cloud's
+ * controls by proxying a mutation straight to the sandbox.
+ */
+async function admitHostedCommand(params: {
+  env: Env;
+  userId: string;
+  authToken?: string;
+  cloudAgentSessionId: string;
+  body: { messageID?: string; command: string; arguments?: string; agent?: string; model?: string };
+  deps?: KiloFacadeRequestDeps;
+}): Promise<Response> {
+  if (!params.authToken) {
+    return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Durable prompt admission is unavailable');
+  }
+  const messageId = params.body.messageID ?? createMessageId();
+  const command = {
+    turn: {
+      type: 'command',
+      id: messageId,
+      command: params.body.command,
+      arguments: params.body.arguments ?? '',
+    },
+    ...(params.body.agent === undefined ? {} : { agent: { mode: params.body.agent } }),
+  } satisfies QueueExecutionTurnCommand;
+  const request: SubmittedSessionMessageRequest = { userId: params.userId, ...command };
+  const admitPrompt = params.deps?.admitPrompt ?? defaultAdmitPrompt;
+  let admission: SessionMessageAdmissionResult;
+  try {
+    admission = await preflightAndAdmitPromptMessage(
+      { cloudAgentSessionId: params.cloudAgentSessionId, ...command },
+      { env: params.env, userId: params.userId, authToken: params.authToken },
+      'kilo.command',
+      () =>
+        admitPrompt({
+          env: params.env,
+          userId: params.userId,
+          cloudAgentSessionId: params.cloudAgentSessionId,
+          request,
+        })
+    );
+  } catch (error) {
+    return promptPreflightError(error);
+  }
+  if (!admission.success) return promptAdmissionError(admission);
+  return new Response(null, { status: 204 });
+}
+
 function parseGlobalFeedSource(request: Request): GlobalFeedSource | Response {
   const url = new URL(request.url);
   if (hasDuplicateQueryParameters(url.searchParams)) {
@@ -1581,6 +2056,45 @@ function mayReplaceGlobalFeedProducer(
 
 export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlobalEvents {
   private subscribers = new Map<string, PublicSubscriber>();
+  private readonly nativeSubscriberSessions = new Map<string, string>();
+  private readonly nativeUnsubscribes = new Map<string, () => void>();
+  private readonly nativeAttachments = createNativeAttachmentRegistry(
+    (_cloudAgentSessionId, kiloSessionId) => {
+      this.broadcastGlobalEvent(
+        {
+          directory: publicCloudAgentDirectory(kiloSessionId),
+          payload: {
+            type: NATIVE_FACADE_RESNAPSHOT_EVENT,
+            properties: {
+              sessionID: kiloSessionId,
+              directory: publicCloudAgentDirectory(kiloSessionId),
+              reason: 'continuity_unproven',
+            },
+          },
+        },
+        kiloSessionId
+      );
+    }
+  );
+
+  /**
+   * Session DO -> facade native event push (spec §10). Only the owning
+   * session's events are accepted: the delivery names both identities and the
+   * facade re-checks the root mapping before fanning out.
+   */
+  async publishNativeEvent(input: NativeEventDelivery & { kiloUserId: string }): Promise<void> {
+    const resolved = await this.env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession({
+      kiloUserId: input.kiloUserId,
+      kiloSessionId: input.kiloSessionId,
+    });
+    if (resolved?.cloudAgentSessionId !== input.cloudAgentSessionId) return;
+    this.nativeAttachments.deliver({
+      cloudAgentSessionId: input.cloudAgentSessionId,
+      kiloSessionId: input.kiloSessionId,
+      eventId: input.eventId,
+      event: input.event,
+    });
+  }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -1608,8 +2122,25 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     return this.openPublicEventStream({ kind: 'global' });
   }
 
-  openPublicSessionEventStream(kiloSessionId: string): Response {
-    return this.openPublicEventStream({ kind: 'session', kiloSessionId });
+  openPublicSessionEventStream(
+    kiloSessionId: string,
+    native?: {
+      fence?: number | null;
+      resnapshot?: boolean;
+      snapshot?: NativePublicEvent[];
+    }
+  ): Response {
+    return this.openPublicEventStream(
+      { kind: 'session', kiloSessionId },
+      native === undefined ? undefined : { kind: 'native', ...native }
+    );
+  }
+
+  /** Registers the hosted attach a following `openPublicSessionEventStream` joins. */
+  prepareNativeAttachment(cloudAgentSessionId: string, kiloSessionId: string): void {
+    this.nativeSubscriberSessions.set(kiloSessionId, cloudAgentSessionId);
+    this.nativeAttachments.begin(cloudAgentSessionId, kiloSessionId);
+    this.nativeAttachments.complete(cloudAgentSessionId, null);
   }
 
   async publishCloudAgentExtensionEvent(input: {
@@ -1634,7 +2165,15 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     );
   }
 
-  private openPublicEventStream(scope: PublicSubscriber['scope']): Response {
+  private openPublicEventStream(
+    scope: PublicSubscriber['scope'],
+    native?: {
+      kind: 'native';
+      fence?: number | null;
+      resnapshot?: boolean;
+      snapshot?: NativePublicEvent[];
+    }
+  ): Response {
     const subscriberId = crypto.randomUUID();
     const publicConnectionEvent = () =>
       scope.kind === 'global'
@@ -1656,6 +2195,9 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
           };
           this.subscribers.set(subscriberId, subscriber);
           this.sendToSubscriber(subscriberId, publicConnectionEvent());
+          if (native !== undefined && scope.kind === 'session') {
+            this.openNativeSessionAttachment(subscriberId, scope.kiloSessionId, native);
+          }
         },
         cancel: () => {
           this.removeSubscriber(subscriberId);
@@ -1676,6 +2218,49 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     this.handleGlobalFeedMessage(ws, message);
+  }
+  /**
+   * Starts a hosted session's fenced native attach for one SSE subscriber. The
+   * snapshot through the fence is emitted synchronously at open, pushes above
+   * the fence follow, and the registry marks the fence complete so buffered
+   * pushes drain in order.
+   */
+  private openNativeSessionAttachment(
+    subscriberId: string,
+    kiloSessionId: string,
+    native: { fence?: number | null; resnapshot?: boolean; snapshot?: NativePublicEvent[] }
+  ): void {
+    const directory = publicCloudAgentDirectory(kiloSessionId);
+    if (native.resnapshot === true) {
+      this.sendToSubscriber(subscriberId, {
+        type: NATIVE_FACADE_RESNAPSHOT_EVENT,
+        properties: { sessionID: kiloSessionId, directory, reason: 'snapshot_too_large' },
+      });
+      return;
+    }
+    // `openHostedNativeAttachment` registered the attach for this session
+    // before opening the stream, so the subscriber joins the same attachment
+    // the fence describes.
+    const cloudAgentSessionId = this.nativeSubscriberSessions.get(kiloSessionId);
+    if (cloudAgentSessionId === undefined) return;
+    const unsubscribe = this.nativeAttachments.subscribe(cloudAgentSessionId, event => {
+      this.sendToSubscriber(subscriberId, event);
+    });
+    this.nativeUnsubscribes.set(subscriberId, unsubscribe);
+    // The durable snapshot is complete through the fence, so it is emitted
+    // before the fence marker and before any pushed event above it.
+    for (const event of native.snapshot ?? []) {
+      this.sendToSubscriber(subscriberId, event);
+    }
+    this.sendToSubscriber(subscriberId, {
+      type: NATIVE_FACADE_FENCE_EVENT,
+      properties: {
+        sessionID: kiloSessionId,
+        directory,
+        ...(native.fence === undefined || native.fence === null ? {} : { fence: native.fence }),
+        snapshotComplete: true,
+      },
+    });
   }
 
   private validateGlobalFeedProducer(source: GlobalFeedSource) {
@@ -1829,5 +2414,24 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     if (!subscriber) return;
     clearInterval(subscriber.heartbeat);
     this.subscribers.delete(subscriberId);
+    const unsubscribe = this.nativeUnsubscribes.get(subscriberId);
+    this.nativeUnsubscribes.delete(subscriberId);
+    unsubscribe?.();
+    this.releaseUnusedNativeAttachments();
+  }
+
+  /** Releases a hosted attachment once no subscriber reads it. */
+  private releaseUnusedNativeAttachments(): void {
+    const inUse = new Set([
+      ...[...this.subscribers.values()].flatMap(subscriber =>
+        subscriber.scope.kind === 'session' ? [subscriber.scope.kiloSessionId] : []
+      ),
+    ]);
+    for (const kiloSessionId of [...this.nativeSubscriberSessions.keys()]) {
+      if (inUse.has(kiloSessionId)) continue;
+      const cloudAgentSessionId = this.nativeSubscriberSessions.get(kiloSessionId);
+      this.nativeSubscriberSessions.delete(kiloSessionId);
+      if (cloudAgentSessionId !== undefined) this.nativeAttachments.release(cloudAgentSessionId);
+    }
   }
 }

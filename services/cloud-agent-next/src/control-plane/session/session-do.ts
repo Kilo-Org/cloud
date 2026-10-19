@@ -76,6 +76,7 @@ import {
   controlPlaneAnswerPayloadSchema,
   controlPlaneCredentialSourceSchema,
   controlPlaneEventsNotificationSchema,
+  controlPlaneNativeOperationSchema,
   controlPlaneOutcomeSchema,
   controlPlanePromptPayloadSchema,
   controlPlaneRegistrationRouteSpecSchema,
@@ -89,6 +90,8 @@ import {
   type ControlPlaneDeliverResult,
   type ControlPlaneDispatchResult,
   type ControlPlaneEventsNotification,
+  type ControlPlaneKiloRequestInput,
+  type ControlPlaneNativeOperation,
   type ControlPlaneOutcome,
   type ControlPlanePreparationStep,
   type ControlPlanePromptPayload,
@@ -105,8 +108,17 @@ import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import type { EventId, SessionId } from '../../types/ids.js';
 import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import type { StoredEvent } from '../../websocket/types.js';
-import { createStreamHandler, type QueuedMessageSnapshot } from '../../websocket/stream.js';
+import type { StreamEvent, StoredEvent } from '../../websocket/types.js';
+import {
+  createStreamHandler,
+  formatStreamEvent,
+  type QueuedMessageSnapshot,
+} from '../../websocket/stream.js';
+import {
+  isDeliverableNativeEvent,
+  NATIVE_MATERIALIZED_EVENT_TYPES,
+  toNativePublicEvent,
+} from '../../kilo-facade/native-event-source.js';
 import { sandboxControlPeerNamespace } from '../peer-bindings.js';
 import migrations from './drizzle/migrations';
 import {
@@ -361,6 +373,8 @@ export type ControlPlaneSandboxPeer = {
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
+  /** B10: forwards one allowlisted native read to the live wrapper. */
+  kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
   /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
   previewTarget(sessionId: string): Promise<PreviewTargetResult>;
   /** B10: the wrapper identity bound to the connected allocation. */
@@ -369,6 +383,19 @@ export type ControlPlaneSandboxPeer = {
   getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
   fetch(request: Request): Promise<Response>;
 };
+
+/** Native attach snapshot handed to the per-user Kilo facade (spec §10). */
+export type NativeSnapshot = {
+  oversized: boolean;
+  fence: number | null;
+  events: StreamEvent[];
+  sessionStatus?: SessionStatus;
+  questions?: unknown[];
+  permissions?: unknown[];
+};
+
+/** Upper bound on one native snapshot; beyond it the caller resnapshots. */
+const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = 16 * 1024 * 1024;
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
@@ -507,6 +534,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
+  /**
+   * The native facade attachment currently receiving this session's stored
+   * events. In-memory on purpose: a facade that outlives this DO instance
+   * resnapshots from the durable log before it trusts a live tail again.
+   */
+  private nativeSubscriber: { kiloSessionId: string } | null = null;
   private rootStatus: RootStatus | undefined;
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
@@ -1342,10 +1375,157 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Worker-facing live native read (spec §10). The route identity comes from
+   * this DO's own registration, never from the caller, so a request cannot name
+   * a sibling session or a stale runtime. A route that is not ready returns
+   * `not_ready` without preparing or waking the sandbox, and the Sandbox DO
+   * binds the request to the current wrapper socket as the generation fence.
+   */
+  async kiloRequest(operation: ControlPlaneNativeOperation): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneNativeOperationSchema.parse(operation);
+    if (this.registration === null) {
+      return {
+        ok: false,
+        error: { code: 'not_found', message: 'Session not found', retryable: false },
+      };
+    }
+    if (this.route.state !== 'ready') {
+      return {
+        ok: false,
+        error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+      };
+    }
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      return {
+        ok: false,
+        error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
+      };
+    }
+    return peer.kiloRequest({
+      session: {
+        sessionId: this.sessionId,
+        kiloSessionId: this.registration.spec.kiloSessionId,
+        directory: this.registration.spec.directory,
+      },
+      operation: parsed,
+    });
+  }
+
+  /**
+   * Native attach snapshot for the per-user Kilo facade (spec §10). Returns the
+   * durable event log from the client's cursor, then the materialized
+   * message/part rows, so the result is complete through `fence`. It never
+   * wakes compute: it reads only this DO's storage. A transcript that cannot
+   * fit the budget reports `oversized` so the caller asks for a fresh snapshot
+   * instead of treating a truncated one as complete.
+   */
+  async nativeSnapshot(input: { fromId?: number }): Promise<NativeSnapshot> {
+    await this.initialized;
+    if (this.registration === null) return { oversized: false, fence: null, events: [] };
+    const fence = this.eventQueries.getLatestEventId();
+    const events: StreamEvent[] = [];
+    let bytes = 0;
+    const push = (event: StreamEvent): boolean => {
+      const size = JSON.stringify(event).length;
+      if (bytes + size > CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES) return false;
+      bytes += size;
+      events.push(event);
+      return true;
+    };
+    for (const event of this.eventQueries.iterateByFilters({ fromId: input.fromId })) {
+      if (!push(formatStreamEvent(event, this.sessionId))) {
+        return { oversized: true, fence, events: [] };
+      }
+    }
+    for (const event of this.eventQueries.iterateByFilters({
+      eventTypes: [...NATIVE_MATERIALIZED_EVENT_TYPES],
+    })) {
+      if (!push(formatStreamEvent(event, this.sessionId))) {
+        return { oversized: true, fence, events: [] };
+      }
+    }
+    return {
+      oversized: false,
+      fence,
+      events,
+      sessionStatus: this.deriveSessionStatus(),
+      questions: this.pendingInteractions?.questions ?? [],
+      permissions: this.pendingInteractions?.permissions ?? [],
+    };
+  }
+
+  /**
+   * The per-user Kilo facade subscribes to this session's native events. The
+   * fence is the delivery watermark at subscribe time: the facade's snapshot is
+   * complete through it, and later events arrive as pushes.
+   */
+  async subscribeNativeEvents(input: { kiloSessionId: string }): Promise<{
+    fence: number | null;
+    kiloSessionId: string;
+  }> {
+    await this.initialized;
+    if (this.registration === null) return { fence: null, kiloSessionId: input.kiloSessionId };
+    this.nativeSubscriber = { kiloSessionId: input.kiloSessionId };
+    return { fence: this.eventQueries.getLatestEventId(), kiloSessionId: input.kiloSessionId };
+  }
+
+  async releaseNativeEvents(): Promise<void> {
+    await this.initialized;
+    this.nativeSubscriber = null;
+  }
+
+  private async publishNativeEvent(stored: StoredEvent): Promise<void> {
+    const subscriber = this.nativeSubscriber;
+    const userId = this.metadata?.identity.userId;
+    if (subscriber === null || userId === undefined) return;
+    const event = formatStreamEvent(stored, this.sessionId);
+    if (!isDeliverableNativeEvent(event)) return;
+    const native = toNativePublicEvent(event, subscriber.kiloSessionId);
+    if (native === null) return;
+    const facade = this.env.USER_KILO_FACADE.get(this.env.USER_KILO_FACADE.idFromName(userId));
+    try {
+      await withDORetry(
+        () => facade,
+        current =>
+          current.publishNativeEvent({
+            kiloUserId: userId,
+            cloudAgentSessionId: this.sessionId,
+            kiloSessionId: subscriber.kiloSessionId,
+            eventId: stored.id,
+            event: native,
+          }),
+        'publishNativeEvent'
+      );
+    } catch {
+      // Delivery is best effort; the facade's resnapshot covers a lost push.
+    }
+  }
+
   /** The pending questions and permissions this session waits on (C1 adapter). */
   async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
     await this.initialized;
     return this.readPendingInteractions() ?? { questions: [], permissions: [] };
+  }
+
+  /**
+   * Drops every pending question and permission. A new runtime generation can
+   * no longer satisfy an old request, and the stream snapshot is rebuilt from
+   * this state, so keeping it would offer the client an unanswerable prompt.
+   */
+  private async clearPendingInteractions(): Promise<void> {
+    const current = this.pendingInteractions;
+    if (current === undefined) return;
+    if (current.questions.length === 0 && current.permissions.length === 0) return;
+    const next: PendingInteractions = {
+      revision: current.revision + 1,
+      questions: [] as unknown[],
+      permissions: [] as unknown[],
+    };
+    this.pendingInteractions = next;
+    await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
   }
 
   private hasPendingInteraction(collection: PendingInteractionCollection, id: string): boolean {
@@ -2837,6 +3017,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   private broadcast(event: StoredEvent): void {
     this.streamHandler().broadcastEvent(event);
+    // A subscribed native facade also receives the stored event; the facade
+    // phases it against the fence its snapshot was taken at.
+    void this.publishNativeEvent(event);
   }
 
   private deriveCloudStatus(): {
@@ -2949,6 +3132,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         'failed',
         'agent_restarted'
       );
+      // A replaced attempt retires its questions and permissions with its
+      // runtime: a stale interaction id must not be answerable on the new one.
+      await this.clearPendingInteractions();
     }
     await this.ctx.storage.put(ROUTE_KEY, view);
     this.route = view;

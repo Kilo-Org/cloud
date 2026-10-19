@@ -14,7 +14,9 @@ import {
   type SessionCommandResponse,
   type SessionPromptResponse,
   type SessionMessagesResponse2,
+  type SnapshotFileDiff,
   type SuggestionRequest,
+  type Todo,
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
@@ -358,6 +360,16 @@ export type WrapperKiloClient = {
   ) => Promise<Record<string, { type: string; [key: string]: unknown }>>;
   getQuestions: (directory?: string, signal?: AbortSignal) => Promise<QuestionRequest[]>;
   getPermissions: (directory?: string, signal?: AbortSignal) => Promise<PermissionRequest[]>;
+  getSessionTodos: (
+    sessionID: string,
+    directory?: string,
+    signal?: AbortSignal
+  ) => Promise<Todo[]>;
+  getSessionDiff: (
+    sessionID: string,
+    directory?: string,
+    signal?: AbortSignal
+  ) => Promise<SnapshotFileDiff[]>;
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
   listEffectiveModels: (providerID: string) => Promise<string[]>;
@@ -741,6 +753,16 @@ export function createWrapperKiloClient(
     getPermissions: async (directory = workspacePath, signal) => {
       const result = await v2Client.permission.list({ directory }, { signal });
       return requireSdkData(result, 'Permission list');
+    },
+
+    getSessionTodos: async (sessionID, directory = workspacePath, signal) => {
+      const result = await v2Client.session.todo({ sessionID, directory }, { signal });
+      return requireSdkData(result, `Session todo ${sessionID}`);
+    },
+
+    getSessionDiff: async (sessionID, directory = workspacePath, signal) => {
+      const result = await v2Client.session.diff({ sessionID, directory }, { signal });
+      return requireSdkData(result, `Session diff ${sessionID}`);
     },
 
     getNetworkWaits: async () => {

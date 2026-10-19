@@ -656,11 +656,7 @@ function parseSessionMessagesQuery(
   const before = url.searchParams.get('before');
   if (before !== null) {
     if (before.length === 0) {
-      return facadeError(
-        400,
-        'KILO_QUERY_INVALID',
-        'Session messages before requires a positive limit'
-      );
+      return facadeError(400, 'KILO_QUERY_INVALID', 'Session messages before must not be empty');
     }
     if (!validateKiloSdkMessagesCursor(before)) {
       return facadeError(

@@ -26,6 +26,7 @@ import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
   CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT,
+  CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH,
 } from '@/lib/cloud-agent/constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_pending_uploads } from '@kilocode/db/schema';
@@ -617,6 +618,43 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(byId.get(linkedRow)).toBe('reaped');
     expect(byId.get(otherUserRow)).toBe('pending');
   });
+
+  it('purgeUserPendingUploads keeps claiming until every row is done, batch by batch', async () => {
+    mockSend.mockResolvedValue({});
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    // More rows than one purge batch, so the loop must make several passes.
+    const attachments = Array.from({ length: CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH + 3 }, () =>
+      crypto.randomUUID()
+    );
+    await db.insert(cloud_agent_pending_uploads).values(
+      attachments.map((attachmentId, index) => ({
+        id: crypto.randomUUID(),
+        kilo_user_id: kiloUserId,
+        object_key: buildObjectKey(kiloUserId, messageUuid, attachmentId),
+        message_uuid: messageUuid,
+        attachment_id: attachmentId,
+        byte_size: 42,
+        status: index % 2 === 0 ? ('pending' as const) : ('linked' as const),
+        expires_at: future,
+      }))
+    );
+
+    await purgeUserPendingUploads(kiloUserId);
+
+    const deletedKeys = mockSend.mock.calls.map(call => call[0].input.Key);
+    expect(deletedKeys).toHaveLength(attachments.length);
+
+    const remaining = await db
+      .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
+    expect(remaining.map(row => row.status)).toEqual(
+      Array.from({ length: attachments.length }, () => 'reaped')
+    );
+  }, 30_000);
 
   it('releasePendingUploads deletes only the caller pending object and leaves linked and other-user rows', async () => {
     mockSend.mockResolvedValue({});

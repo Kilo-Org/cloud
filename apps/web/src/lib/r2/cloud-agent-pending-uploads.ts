@@ -7,14 +7,12 @@ import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-share
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
+  CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH,
   CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT,
 } from '@/lib/cloud-agent/constants';
 import { cloud_agent_pending_uploads } from '@kilocode/db/schema';
 
 const CLOUD_AGENT_PENDING_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
-
-/** Objects purged per reaper run, so one cron invocation always finishes. */
-const CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH = 500;
 
 export type AdmitPendingUploadParams = {
   kiloUserId: string;

@@ -53,6 +53,9 @@ export const CLOUD_AGENT_ATTACHMENT_MAX_COUNT = 5;
 export const CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 export const CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS = 900; // 15 min
 
+/** Objects purged per reaper run, so one cron invocation always finishes. */
+export const CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH = 500;
+
 /**
  * Ceiling on live pending-upload rows per account, summed across every
  * message. Rows expire on a 24-hour lease, so the window renews as the

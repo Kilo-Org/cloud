@@ -181,30 +181,17 @@ describe('cleanup', () => {
   });
 
   it('blanks to privacy only after a successful list misses the selection', () => {
-    expect(
-      planOrgFenceAction({
-        organizationId: 'missing-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: false,
-        isError: false,
-      })
-    ).toBe('privacy');
-    expect(
-      planOrgFenceAction({
-        organizationId: 'missing-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: true,
-        isError: false,
-      })
-    ).toBe('none');
-    expect(
-      planOrgFenceAction({
-        organizationId: 'kept-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: false,
-        isError: false,
-      })
-    ).toBe('confirmed');
+    const fence = {
+      organizationId: 'missing-org',
+      orgs: [{ organizationId: 'kept-org' }],
+      isLoading: false,
+      isError: false,
+    };
+    expect(planOrgFenceAction(fence)).toBe('privacy');
+    expect(planOrgFenceAction({ ...fence, isLoading: true })).toBe('none');
+    expect(planOrgFenceAction({ ...fence, organizationId: 'kept-org', orgs: fence.orgs })).toBe(
+      'confirmed'
+    );
     expect(
       planOrgFenceAction({ organizationId: null, orgs: [], isLoading: false, isError: false })
     ).toBe('confirmed');
@@ -320,7 +307,7 @@ describe('cleanup', () => {
             expiresAt: terminal.expiresAt,
             running: 0,
             needsInput: 0,
-            idle: 0,
+            needsApproval: 0,
             needsInputSince: null,
           });
         }

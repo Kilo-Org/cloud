@@ -98,7 +98,7 @@ export function ModelAccessPolicyEditor({
   const providerIndex = useMemo(() => buildVariantModelProvidersIndex(providers), [providers]);
 
   const modelRows = useMemo((): ModelRow[] => {
-    return models.map((model, sourceIndex) => {
+    const rows = models.map((model, sourceIndex) => {
       const modelId = getSnapshotModelVariantId(model);
       const routes = [...(providerIndex.get(modelId) ?? [])];
       return {
@@ -110,7 +110,20 @@ export function ModelAccessPolicyEditor({
         inheritedFrom: inheritedGrantFor(selectedModels, modelId),
       };
     });
-  }, [models, providerIndex, selectedModels]);
+    const rowIds = new Set(rows.map(row => row.modelId));
+    const rowsForStoredIds = modelIds
+      .filter(modelId => !rowIds.has(modelId))
+      .sort()
+      .map((modelId, index) => ({
+        modelId,
+        modelName: modelId,
+        providerSlugs: [],
+        preferredIndex: undefined,
+        sourceIndex: rows.length + index,
+        unavailableReason: 'No catalog endpoint serves this id.',
+      }));
+    return [...rows, ...rowsForStoredIds];
+  }, [models, modelIds, providerIndex, selectedModels]);
 
   const filteredModels = useMemo(() => {
     const search = modelSearch.trim().toLowerCase();

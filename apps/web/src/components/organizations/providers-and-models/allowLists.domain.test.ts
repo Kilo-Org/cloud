@@ -52,12 +52,12 @@ describe('allowLists.domain', () => {
     const index = buildVariantModelProvidersIndex([
       { slug: 'deepinfra', models: [{ slug: 'x/y', endpoint: { variant: 'standard' } }] },
       { slug: 'nvidia', models: [{ slug: 'x/y', endpoint: { variant: 'free' } }] },
-      { slug: 'coreweave', models: [{ slug: 'x/y', endpoint: null }] },
+      { slug: 'coreweave', models: [{ slug: 'z/w', endpoint: null }] },
     ]);
 
     expect([...(index.get('x/y') ?? [])]).toEqual(['deepinfra']);
     expect([...(index.get('x/y:free') ?? [])]).toEqual(['nvidia']);
-    expect(index.has('coreweave')).toBe(false);
+    expect(index.has('z/w')).toBe(false);
   });
 
   test('legacy provider deny list can be inverted into an allow list snapshot', () => {

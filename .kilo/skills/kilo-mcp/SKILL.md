@@ -51,7 +51,7 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**891 procedures** — **380 queries**, **511 mutations** — under **54 prefixes**.
+**898 procedures** — **384 queries**, **514 mutations** — under **55 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, StatusBar, View } from 'react-native';
+import { Platform, Pressable, StatusBar, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -12,12 +12,13 @@ import { useScreenInsets } from '@/lib/screen-insets';
  *
  * - 'always': the surface owns the top of the window (full-screen modals), so
  *   the status-bar inset applies whenever it is non-zero.
- * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
- *   status bar, so it reserves no top clearance on either platform — the
- *   window inset would only be a dead band above the header (p7). Android
- *   caps the detents just below the inset (useFormSheetScreenOptions) and the
- *   iOS sheet clears the top edge with its grabber, so the same rule holds
- *   everywhere.
+ * - 'bottom-form-sheet': a bottom-anchored formSheet. On iOS the native sheet
+ *   presents below the status bar, so the header reserves no top clearance
+ *   there — the window inset would only be a dead band above the header.
+ *   On Android `sheetShouldOverflowTopInset` (useFormSheetScreenOptions)
+ *   lets the sheet surface reach the top of the window and only caps the
+ *   full detent's measure, so the header must reserve the status-bar inset
+ *   (and landscape cutout padding) itself.
  * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
  *   on both platforms, so the header reserves no top clearance — the native
  *   iOS pageSheet presents below the status bar, and the Android full-window
@@ -73,12 +74,15 @@ export function SheetHeader({
   // without branching on Platform.OS.
   const statusBarHeight = StatusBar.currentHeight ?? 0;
   const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
-  // Both sheet surfaces own the top of the window, so the header reserves no
-  // top clearance: a bottom formSheet is anchored below the status bar and a
-  // SessionPageSheet presents below it too (the native pageSheet on iOS, a
-  // full-window Modal that pads its own top inset on Android). Any resolved
-  // window inset here would only be a dead band above the header.
-  const dropsTopInset = topInset === 'bottom-form-sheet' || topInset === 'ios-page-sheet';
+  // A bottom formSheet owns the top of the window on Android
+  // (sheetShouldOverflowTopInset), so its header reserves the status-bar
+  // inset there; on iOS the native sheet presents below the status bar and
+  // the inset would only be a dead band. SessionPageSheet presents below the
+  // status bar on iOS too, and the Android full-window Modal pads its own top
+  // inset — either way its header reserves nothing.
+  const dropsTopInset =
+    topInset === 'ios-page-sheet' ||
+    (topInset === 'bottom-form-sheet' && Platform.OS !== 'android');
   const topInsetHeight = dropsTopInset ? 0 : resolvedTopInset;
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0

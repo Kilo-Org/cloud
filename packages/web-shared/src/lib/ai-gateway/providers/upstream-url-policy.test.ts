@@ -31,6 +31,7 @@ describe('findUpstreamUrlViolation', () => {
     ['https://api.localhost/v1', 'non_public_host'],
     ['https://127.0.0.1/v1', 'non_public_host'],
     ['https://2130706433/v1', 'non_public_host'],
+    ['https://0x7f.1/v1', 'non_public_host'],
     ['https://10.0.0.5/v1', 'non_public_host'],
     ['https://169.254.169.254/latest/meta-data', 'non_public_host'],
     ['https://[::1]/v1', 'non_public_host'],
@@ -109,8 +110,9 @@ describe('isUpstreamUrlPolicyEnforced', () => {
 
   it.each([
     ['production', true],
-    ['staging', false],
+    ['staging', true],
     ['preview', false],
+    ['development', false],
     [undefined, false],
   ])('VERCEL_TARGET_ENV=%s enforces the policy: %s', (targetEnv, enforced) => {
     if (targetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;

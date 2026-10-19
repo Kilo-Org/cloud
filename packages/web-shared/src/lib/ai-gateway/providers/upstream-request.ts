@@ -19,9 +19,9 @@ import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
 import {
-  findUpstreamUrlViolation,
   isUpstreamUrlPolicyEnforced,
-  type UpstreamUrlViolation,
+  rejectDisallowedUpstreamUrls,
+  rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 
 type UpstreamFetchFailureFamily =
@@ -258,71 +258,6 @@ function upstreamFetchFailureResponse(
   );
 }
 
-type RejectedUpstreamUrl = {
-  host: string;
-  violation: UpstreamUrlViolation | 'redirect';
-};
-
-async function findRejectedUpstreamUrl(urls: string[]): Promise<RejectedUpstreamUrl | null> {
-  const violations = await Promise.all(urls.map(url => findUpstreamUrlViolation(url)));
-  const index = violations.findIndex(violation => violation !== null);
-  const violation = violations[index];
-  if (!violation) return null;
-  return { host: getProviderTargetHost(urls[index]), violation };
-}
-
-function isRedirect(response: Response): boolean {
-  return response.status >= 300 && response.status < 400;
-}
-
-const UPSTREAM_URL_REJECTION_MESSAGES = {
-  invalid_url: 'The upstream provider URL is not a valid URL.',
-  non_https: 'The upstream provider URL is not allowed because it does not use HTTPS.',
-  non_public_host: 'The upstream provider URL is not allowed because its host is not public.',
-  non_public_address:
-    'The upstream provider URL is not allowed because its host resolves to a non-public address.',
-  dns_lookup_failed:
-    'The gateway could not resolve the upstream provider host. This may be temporary; try again shortly.',
-  redirect: 'The upstream provider responded with a redirect, which the gateway does not follow.',
-} as const satisfies Record<RejectedUpstreamUrl['violation'], string>;
-
-function upstreamUrlRejectedResponse(
-  rejected: RejectedUpstreamUrl,
-  provider: Provider,
-  vercelRequestId: string | null | undefined
-) {
-  const transient = rejected.violation === 'dns_lookup_failed';
-  const metadata = {
-    providerId: provider.id,
-    targetHost: rejected.host,
-    violation: rejected.violation,
-    ...(vercelRequestId && { vercelRequestId }),
-  };
-  errorExceptInTest('AI gateway upstream URL rejected', metadata);
-  captureMessage('AI gateway upstream URL rejected', {
-    level: transient ? 'warning' : 'error',
-    tags: {
-      source: 'ai-gateway-upstream-url-policy',
-      provider: provider.id,
-      violation: rejected.violation,
-    },
-    extra: metadata,
-  });
-
-  const error = withRequestId(UPSTREAM_URL_REJECTION_MESSAGES[rejected.violation], vercelRequestId);
-  return NextResponse.json(
-    {
-      error,
-      error_type: transient
-        ? ProxyErrorType.temporarily_unavailable
-        : ProxyErrorType.upstream_error,
-      message: error,
-      ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
-    },
-    { status: transient ? 503 : 502 }
-  );
-}
-
 export async function upstreamRequest({
   chatApi,
   search,
@@ -404,42 +339,42 @@ export async function upstreamRequest({
         })
       : { url: targetUrl, headers, body: JSON.stringify(body) };
 
+    // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
+    // upstream URL from the relay body, so both hops are checked.
     const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
-    if (enforceUrlPolicy) {
-      const rejected = await findRejectedUpstreamUrl(
-        provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url]
-      );
-      if (rejected) {
-        budgetSignal.removeEventListener('abort', onBudgetExceeded);
-        return {
-          type: 'error',
-          response: upstreamUrlRejectedResponse(rejected, provider, vercelRequestId),
-        };
-      }
+    const urlRejection = enforceUrlPolicy
+      ? await rejectDisallowedUpstreamUrls({
+          urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
+          providerId: provider.id,
+          vercelRequestId,
+        })
+      : null;
+    if (urlRejection) {
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return { type: 'error', response: urlRejection };
     }
 
     const response = await fetch(outgoing.url, {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
-      // A redirect could send the request to an address the policy never checked.
       redirect: enforceUrlPolicy ? 'manual' : 'follow',
       // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
       duplex: 'half',
       signal: combinedSignal,
     });
     headersReceivedAfterMs = performance.now() - fetchStartedAt;
-    if (enforceUrlPolicy && isRedirect(response)) {
+    const redirectRejection = enforceUrlPolicy
+      ? await rejectUpstreamRedirect({
+          response,
+          url: outgoing.url,
+          providerId: provider.id,
+          vercelRequestId,
+        })
+      : null;
+    if (redirectRejection) {
       budgetSignal.removeEventListener('abort', onBudgetExceeded);
-      await response.body?.cancel().catch(() => undefined);
-      return {
-        type: 'error',
-        response: upstreamUrlRejectedResponse(
-          { host: getProviderTargetHost(outgoing.url), violation: 'redirect' },
-          provider,
-          vercelRequestId
-        ),
-      };
+      return { type: 'error', response: redirectRejection };
     }
     return { type: 'success', response };
   } catch (error) {

@@ -163,7 +163,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => {
   return {
     ...actual,
     addUserByokAvailability: jest.fn(actual.addUserByokAvailability),
-    getBYOKforUser: jest.fn(async () => null),
     getUserByokProviderIds: jest.fn(async () => []),
   };
 });

@@ -47,7 +47,12 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 type Result = PrReviewFileListQueryResult;
 
 function Probe({ holder }: { holder: { current: Result | null } }) {
-  holder.current = usePrReviewFileListQuery({ owner: 'octocat', repo: 'hello', number: 1, enabled: true });
+  holder.current = usePrReviewFileListQuery({
+    owner: 'octocat',
+    repo: 'hello',
+    number: 1,
+    enabled: true,
+  });
   return null;
 }
 

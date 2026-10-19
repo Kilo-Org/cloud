@@ -290,5 +290,3 @@ describe('buildItems trailing gap totalLines', () => {
     });
   });
 });
-
-

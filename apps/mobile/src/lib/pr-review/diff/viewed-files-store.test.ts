@@ -94,9 +94,7 @@ describe('viewed-files-store', () => {
     storeMocks.getViewedFiles.mockRejectedValue(new Error('read failed'));
     subscribeViewedFiles(REF, SHA1, listenerStub());
 
-    await waitFor(
-      () => !getViewedFilesSnapshot(REF, SHA1).isLoading
-    );
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
     expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: false });
   });
 
@@ -194,7 +192,7 @@ describe('viewed-files-store', () => {
     expect(own).toHaveBeenCalledTimes(1);
     expect(other).not.toHaveBeenCalled();
 
-    writeGate.resolve();
+    writeGate.resolve(undefined);
     await toggling;
     await waitFor(() => other.mock.calls.length > 0);
 
@@ -230,7 +228,8 @@ describe('viewed-files-store', () => {
 
     await applyViewedFilesToggle(REF, SHA1, 'a.ts');
     await waitFor(
-      () => !getViewedFilesSnapshot(REF, SHA1).isLoading &&
+      () =>
+        !getViewedFilesSnapshot(REF, SHA1).isLoading &&
         !getViewedFilesSnapshot(REF, SHA1).paths.includes('a.ts')
     );
     expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual([]);
@@ -250,7 +249,8 @@ describe('viewed-files-store', () => {
     durable['octocat/other-repo'] = ['b.ts'];
     revalidateAllViewedFiles();
     await waitFor(
-      () => getViewedFilesSnapshot(REF, SHA1).paths.includes('a.ts') &&
+      () =>
+        getViewedFilesSnapshot(REF, SHA1).paths.includes('a.ts') &&
         getViewedFilesSnapshot(OTHER_REF, SHA1).paths.includes('b.ts')
     );
 
@@ -266,7 +266,6 @@ describe('viewed-files-store', () => {
     unsubscribe();
     readGate.resolve(['a.ts']);
     await flushTurn();
-
     expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: true });
   });
 

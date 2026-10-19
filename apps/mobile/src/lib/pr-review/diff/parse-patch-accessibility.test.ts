@@ -70,5 +70,4 @@ describe('buildDiffLineAccessibilityLabel', () => {
       buildDiffLineAccessibilityLabel(makeLine({ type: 'del', oldLine: 2, text: '   \t  ' }))
     ).toBe('Deleted line 2: (empty)');
   });
-
 });

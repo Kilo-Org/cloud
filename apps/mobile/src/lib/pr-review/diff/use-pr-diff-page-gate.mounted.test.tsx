@@ -3,7 +3,6 @@ import { act } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { usePrDiffPageGate } from '@/lib/pr-review/diff/use-pr-diff-page-gate';
-import { type usePrReviewFileListQuery } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { QueryClientProvider } from '@tanstack/react-query';
 
@@ -13,13 +12,14 @@ import { QueryClientProvider } from '@tanstack/react-query';
 // rendered PR's identity changes so a drag on the previous PR cannot load the
 // next PR's pages.
 
-type QueryStub = Parameters<typeof usePrReviewFileListQuery>[0] extends never
-  ? never
-  : {
-      hasNextPage: boolean;
-      isFetchingNextPage: boolean;
-      fetchNextPage: () => Promise<unknown>;
-    };
+// The gate reads only three fields of the query result, so the stub names
+// those three and casts once at the hook boundary; the full result type stays
+// TanStack's.
+type QueryStub = {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => Promise<unknown>;
+};
 
 type GateResult = ReturnType<typeof usePrDiffPageGate>;
 
@@ -34,7 +34,10 @@ function GateProbe({
   query: QueryStub;
   holder: GateHolder;
 }) {
-  holder.current = usePrDiffPageGate(query, identity);
+  holder.current = usePrDiffPageGate(
+    query as unknown as Parameters<typeof usePrDiffPageGate>[0],
+    identity
+  );
   return null;
 }
 

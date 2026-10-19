@@ -160,7 +160,7 @@ describe('infinite-query refetch fan-out through withInfiniteRetention', () => {
         return page([{ id: String(pageParam), title: 'x' }]);
       },
       initialPageParam: 0,
-      getNextPageParam: (_last: Page[], pages: Page[]) => pages.length,
+      getNextPageParam: (_lastPage: Page, pages: Page[]) => pages.length,
       staleTime: Infinity,
       retry: false,
     } as const;

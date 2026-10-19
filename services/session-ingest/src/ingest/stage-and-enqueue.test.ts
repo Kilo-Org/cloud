@@ -113,7 +113,8 @@ describe('boundedRequestBody', () => {
         try {
           await new Response(body).arrayBuffer();
         } catch (error) {
-          throw new Error(`upload failed: ${error instanceof Error ? error.message : error}`);
+          const message = error instanceof Error ? error.message : String(error);
+          throw new Error(`upload failed: ${message}`);
         }
         return true;
       }

@@ -93,8 +93,8 @@ export function boundedRequestBody(
         controller.error(error);
       }
     },
-    async cancel(reason) {
-      await cancelReader(body);
+    cancel() {
+      void cancelReader(body);
     },
   });
 }

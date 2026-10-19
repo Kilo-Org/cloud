@@ -34,12 +34,13 @@ const { TEST_STAGING_MAX_BYTES } = vi.hoisted(() => ({ TEST_STAGING_MAX_BYTES: 8
 // Real limit constants, except the staging ceiling: an 8 MiB test value
 // covers the declared cases, so the limit fixtures stay small.
 vi.mock('../util/ingest-limits', async importOriginal => {
-  const actual = await importOriginal<typeof import('../util/ingest-limits')>();
+  const actual = await importOriginal<typeof IngestLimitsModule>();
   return { ...actual, STAGING_MAX_BYTES: TEST_STAGING_MAX_BYTES };
 });
 
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
+import type * as IngestLimitsModule from '../util/ingest-limits';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { applyMetadataChanges } from '../ingest/metadata';

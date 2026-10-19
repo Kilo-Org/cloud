@@ -72,6 +72,17 @@ export function boundedRequestBody(
 ): ReadableStream<Uint8Array> {
   let totalBytes = 0;
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  const stopUpstream = async (): Promise<void> => {
+    if (!reader) reader = body.getReader();
+    try {
+      await reader.cancel('ingest body exceeded the staging limit');
+    } catch {
+      // The overflow signal already surfaced through the stream.
+    } finally {
+      reader.releaseLock();
+      reader = null;
+    }
+  };
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
@@ -85,7 +96,7 @@ export function boundedRequestBody(
         if (totalBytes > maxBytes) {
           onOverflow();
           controller.error(new StagingOverflowError());
-          await cancelReader(body);
+          await stopUpstream();
           return;
         }
         controller.enqueue(result.value);
@@ -94,17 +105,9 @@ export function boundedRequestBody(
       }
     },
     cancel() {
-      void cancelReader(body);
+      void stopUpstream();
     },
   });
-}
-
-async function cancelReader(stream: ReadableStream<Uint8Array>): Promise<void> {
-  try {
-    await stream.cancel('ingest body exceeded the staging limit');
-  } catch {
-    // The overflow error surfaced through the stream remains authoritative.
-  }
 }
 
 export async function stageAndEnqueue(

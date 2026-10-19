@@ -357,6 +357,195 @@ export async function canStartAnalysis(
   };
 }
 
+export type AnalysisStartReservation =
+  | { reserved: true }
+  | { reserved: false; reason: 'cap'; currentCount: number; limit: number }
+  | { reserved: false; reason: 'in_progress' };
+
+/**
+ * Atomically reserves one of the owner's concurrent analysis slots for a new
+ * start and takes the per-finding start lease in the same transaction.
+ *
+ * The per-owner `security_analysis_owner_state` row is locked `FOR UPDATE`,
+ * which serializes admission against other manual starts and against
+ * auto-analysis queue claims (which lock the same row). The inflight count
+ * inside that lock is the admission decision; the per-finding conditional
+ * update (`tryAcquireAnalysisStartLease` predicate) then flips the finding to
+ * `pending`, which is the reservation state every cap reader already counts.
+ *
+ * A restart reuses the finding's own slot, so `tryReserveAnalysisRestartSlot`
+ * only validates the cap under the same lock and writes no state.
+ */
+export async function tryReserveAnalysisStartSlot(
+  owner: SecurityReviewOwner,
+  findingId: string,
+  maxConcurrent = SECURITY_ANALYSIS_OWNER_CAP
+): Promise<AnalysisStartReservation> {
+  const ownerConverted = toOwner(owner);
+  const orgId = ownerConverted.type === 'org' ? ownerConverted.id : null;
+  const userId = ownerConverted.type === 'user' ? ownerConverted.id : null;
+
+  return db.transaction(async tx => {
+    await tx
+      .insert(security_analysis_owner_state)
+      .values({
+        owned_by_organization_id: orgId,
+        owned_by_user_id: userId,
+      })
+      .onConflictDoNothing();
+
+    const [stateRow] = await tx
+      .select({ id: security_analysis_owner_state.id })
+      .from(security_analysis_owner_state)
+      .where(ownerCondition(ownerConverted))
+      .for('update')
+      .limit(1);
+    if (!stateRow) {
+      // The upsert above created the row; a concurrent delete between insert
+      // and select is the only way to get here. Retry once via a fresh
+      // transaction by rejecting and letting the caller's ledger admit retry
+      // semantics apply.
+      throw new Error('security_analysis_owner_state row missing after upsert');
+    }
+
+    const [inflight] = await tx
+      .select({ total: count() })
+      .from(security_findings)
+      .where(
+        and(
+          ownerFindingsCondition(ownerConverted),
+          or(
+            eq(security_findings.analysis_status, 'pending'),
+            eq(security_findings.analysis_status, 'running')
+          )
+        )
+      );
+    const currentCount = inflight?.total ?? 0;
+    if (currentCount >= maxConcurrent) {
+      return { reserved: false, reason: 'cap', currentCount, limit: maxConcurrent } as const;
+    }
+
+    const acquired = await acquireAnalysisStartLeaseInTransaction(tx, findingId);
+    if (!acquired) {
+      return { reserved: false, reason: 'in_progress' } as const;
+    }
+    return { reserved: true } as const;
+  });
+}
+
+/**
+ * Validates that a restart keeps the owner within the concurrent analysis
+ * cap. A restart reuses the finding's own running slot, so the restarted
+ * finding is excluded from the count and no state is written. The
+ * `security_analysis_owner_state` row lock serializes this against new
+ * starts (which reserve slots) and auto-analysis claims.
+ */
+export async function tryReserveAnalysisRestartSlot(
+  owner: SecurityReviewOwner,
+  findingId: string,
+  maxConcurrent = SECURITY_ANALYSIS_OWNER_CAP
+): Promise<AnalysisStartReservation> {
+  const ownerConverted = toOwner(owner);
+
+  return db.transaction(async tx => {
+    await tx
+      .insert(security_analysis_owner_state)
+      .values({
+        owned_by_organization_id: ownerConverted.type === 'org' ? ownerConverted.id : null,
+        owned_by_user_id: ownerConverted.type === 'user' ? ownerConverted.id : null,
+      })
+      .onConflictDoNothing();
+
+    const [stateRow] = await tx
+      .select({ id: security_analysis_owner_state.id })
+      .from(security_analysis_owner_state)
+      .where(ownerCondition(ownerConverted))
+      .for('update')
+      .limit(1);
+    if (!stateRow) {
+      throw new Error('security_analysis_owner_state row missing after upsert');
+    }
+
+    const [inflight] = await tx
+      .select({ total: count() })
+      .from(security_findings)
+      .where(
+        and(
+          ownerFindingsCondition(ownerConverted),
+          or(
+            eq(security_findings.analysis_status, 'pending'),
+            eq(security_findings.analysis_status, 'running')
+          ),
+          sql`${security_findings.id} <> ${findingId}::uuid`
+        )
+      );
+    const currentCount = inflight?.total ?? 0;
+    if (currentCount >= maxConcurrent) {
+      return { reserved: false, reason: 'cap', currentCount, limit: maxConcurrent } as const;
+    }
+    return { reserved: true } as const;
+  });
+}
+
+/**
+ * Clears a pending start reservation when the submission failed before the
+ * Worker accepted the command. Guarded: only a `pending` status is cleared,
+ * and only when no queue row owns the finding, so a Worker that did receive
+ * the command keeps lifecycle control (mirrors `cleanupStaleAnalyses`).
+ */
+export async function releaseAnalysisStartReservation(findingId: string): Promise<void> {
+  await db
+    .update(security_findings)
+    .set({ analysis_status: null, updated_at: sql`now()` })
+    .where(
+      and(
+        eq(security_findings.id, findingId),
+        eq(security_findings.analysis_status, 'pending'),
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${security_analysis_queue}
+          WHERE ${security_analysis_queue.finding_id} = ${security_findings.id}
+            AND ${security_analysis_queue.queue_status} IN ('pending', 'running')
+        )`
+      )
+    );
+}
+
+function ownerCondition(owner: Owner) {
+  return owner.type === 'org'
+    ? eq(security_analysis_owner_state.owned_by_organization_id, owner.id)
+    : eq(security_analysis_owner_state.owned_by_user_id, owner.id);
+}
+
+function ownerFindingsCondition(owner: Owner) {
+  return owner.type === 'org'
+    ? eq(security_findings.owned_by_organization_id, owner.id)
+    : eq(security_findings.owned_by_user_id, owner.id);
+}
+
+/** Shared predicate of `tryAcquireAnalysisStartLease`, scoped to a transaction. */
+async function acquireAnalysisStartLeaseInTransaction(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  findingId: string
+): Promise<boolean> {
+  const [lease] = await tx
+    .update(security_findings)
+    .set({ analysis_status: 'pending', updated_at: sql`now()` })
+    .where(
+      and(
+        eq(security_findings.id, findingId),
+        eq(security_findings.status, 'open'),
+        or(
+          isNull(security_findings.analysis_status),
+          eq(security_findings.analysis_status, 'completed'),
+          eq(security_findings.analysis_status, 'failed')
+        )
+      )
+    )
+    .returning({ id: security_findings.id });
+  return Boolean(lease);
+}
+
 export async function getFindingsPendingAnalysis(
   owner: SecurityReviewOwner,
   limit = 10

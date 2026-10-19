@@ -6,7 +6,12 @@ import {
 import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
-import { ensureManualAnalysisQueueRow, prepareActiveAnalysisRestart } from './db/queries.js';
+import {
+  ensureManualAnalysisQueueRow,
+  prepareActiveAnalysisRestart,
+  releaseOrphanedStartReservation,
+  tryAcquireAnalysisStartLease,
+} from './db/queries.js';
 import type * as QueriesModule from './db/queries.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
 import {
@@ -33,6 +38,8 @@ vi.mock('./db/queries.js', async importOriginal => {
   return {
     ...actual,
     prepareActiveAnalysisRestart: vi.fn(),
+    tryAcquireAnalysisStartLease: vi.fn(async () => true),
+    releaseOrphanedStartReservation: vi.fn(async () => undefined),
   };
 });
 vi.mock('./analysis-start-lifecycle.js', () => ({
@@ -62,9 +69,101 @@ const finding = {
   severity: 'high',
 };
 
+/**
+ * Fake db for the serialized manual admission flow. `transaction(work)` runs
+ * `work(tx)`, where `tx` resolves the admission reads in order: owner-state
+ * row (`for('update')`), finding status (`admissionAnalysisStatus`), inflight
+ * total. The outer db resolves the post-admission reads in order: finding
+ * lookup (static `finding`), actor row, config row.
+ */
+function fakeAdmissionDb(options: {
+  admissionAnalysisStatus: string | null;
+  inflightTotal?: number;
+  actorRow?: unknown;
+  configRow?: unknown;
+  queueRowId?: string | null;
+  auditRows?: unknown[];
+}) {
+  const updateReturning = vi.fn(async () =>
+    options.queueRowId ? [{ id: options.queueRowId }] : []
+  );
+  const updateSet = vi.fn(() => ({ where: () => ({ returning: updateReturning }) }));
+
+  function makeTxExecutor() {
+    let selectCount = 0;
+    return {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return {
+            from: () => ({
+              where: () => ({
+                for: () => ({ limit: async () => [{ id: 'owner-state-row' }] }),
+              }),
+            }),
+          };
+        }
+        if (selectCount === 2) {
+          return {
+            from: () => ({
+              where: () => ({
+                limit: async () => [{ analysisStatus: options.admissionAnalysisStatus }],
+              }),
+            }),
+          };
+        }
+        return {
+          from: () => ({ where: async () => [{ total: options.inflightTotal ?? 0 }] }),
+        };
+      },
+      insert: () => ({
+        values: () => ({ onConflictDoNothing: async () => undefined }),
+      }),
+      update: () => ({ set: updateSet }),
+    };
+  }
+
+  let outerSelectCount = 0;
+  const db = {
+    select: () => {
+      outerSelectCount += 1;
+      if (outerSelectCount === 1) {
+        // getSecurityFindingById
+        return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+      }
+      if (options.actorRow !== undefined && outerSelectCount === 2) {
+        return {
+          from: () => ({ where: () => ({ limit: async () => [options.actorRow] }) }),
+        };
+      }
+      return {
+        from: () => ({ where: () => ({ limit: async () => [options.configRow ?? {}] }) }),
+      };
+    },
+    insert: () => ({
+      values: (values: unknown) => {
+        options.auditRows?.push(values);
+        return {
+          onConflictDoUpdate: () => ({
+            returning: async () => (options.queueRowId ? [{ id: options.queueRowId }] : []),
+          }),
+        };
+      },
+    }),
+    update: () => ({ set: updateSet }),
+    execute: vi.fn(async () => ({ rows: [] })),
+    transaction: async (work: (tx: never) => Promise<unknown>) => work(makeTxExecutor() as never),
+  };
+  return db;
+}
+
 beforeEach(() => {
   vi.mocked(startSecurityAnalysis).mockReset();
   vi.mocked(prepareActiveAnalysisRestart).mockReset();
+  vi.mocked(tryAcquireAnalysisStartLease).mockReset();
+  vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(true);
+  vi.mocked(releaseOrphanedStartReservation).mockReset();
+  vi.mocked(releaseOrphanedStartReservation).mockResolvedValue(undefined);
   vi.mocked(transitionAnalysisStartLifecycle).mockReset();
   vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
   vi.mocked(getWorkerDb).mockReturnValue({} as never);
@@ -102,36 +201,100 @@ describe('processManualAnalysisStart', () => {
   });
 
   it('enforces owner cap before claiming a manual queue row', async () => {
-    let selectCount = 0;
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        return { from: () => ({ where: async () => [{ total: 3 }] }) };
-      },
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      inflightTotal: 3,
+      queueRowId: null,
+    });
 
     await expect(
       processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
     ).resolves.toEqual({ status: 'owner-cap' });
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('accepts a pre-reserved pending finding without a second cap count', async () => {
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: 'pending',
+      inflightTotal: 99,
+      queueRowId: 'queue-row',
+    });
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({ started: true, triageOnly: false });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        } as unknown as CloudflareEnv,
+        command,
+      })
+    ).resolves.toEqual({ status: 'started' });
+
+    expect(startSecurityAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ preReserved: true })
+    );
+  });
+
+  it('treats a running finding as an in-progress duplicate', async () => {
+    const db = fakeAdmissionDb({ admissionAnalysisStatus: 'running', queueRowId: null });
+
+    await expect(
+      processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
+    ).resolves.toEqual({ status: 'duplicate' });
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('skips the lease for a pre-reserved finding and takes it for unreserved state', async () => {
+    const preReservedDb = fakeAdmissionDb({
+      admissionAnalysisStatus: 'pending',
+      queueRowId: 'queue-row',
+    });
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({ started: true, triageOnly: false });
+    await processManualAnalysisStart({
+      db: preReservedDb as never,
+      env: {
+        GIT_TOKEN_SERVICE: { getTokenForRepo: async () => ({ success: true, token: 't' }) },
+        NEXTAUTH_SECRET: { get: async () => 's' },
+        INTERNAL_API_SECRET: { get: async () => 's' },
+        CALLBACK_TOKEN_SECRET: { get: async () => 's' },
+      } as unknown as CloudflareEnv,
+      command,
+    });
+    expect(tryAcquireAnalysisStartLease).not.toHaveBeenCalled();
+
+    vi.mocked(startSecurityAnalysis).mockClear();
+    const unreservedDb = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row',
+    });
+    await processManualAnalysisStart({
+      db: unreservedDb as never,
+      env: {
+        GIT_TOKEN_SERVICE: { getTokenForRepo: async () => ({ success: true, token: 't' }) },
+        NEXTAUTH_SECRET: { get: async () => 's' },
+        INTERNAL_API_SECRET: { get: async () => 's' },
+        CALLBACK_TOKEN_SECRET: { get: async () => 's' },
+      } as unknown as CloudflareEnv,
+      command,
+    });
+    expect(tryAcquireAnalysisStartLease).toHaveBeenCalledWith(expect.anything(), command.findingId);
+    expect(startSecurityAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ preReserved: false })
+    );
   });
 
   it('rejects manual starts when the analysis actor is missing', async () => {
-    let selectCount = 0;
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        return { from: () => ({ where: () => ({ limit: async () => [] }) }) };
-      },
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row',
+      actorRow: null,
+    });
 
     await expect(
       processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
@@ -140,28 +303,12 @@ describe('processManualAnalysisStart', () => {
   });
 
   it('rejects duplicate manual starts after an active queue row wins admission', async () => {
-    let selectCount = 0;
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        return {
-          from: () => ({
-            where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-          }),
-        };
-      },
-      insert: () => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({ returning: async () => [] }),
-        }),
-      }),
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: null,
+      actorRow: { id: 'user-123', api_token_pepper: null },
+    });
+    vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(false);
 
     await expect(
       processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
@@ -170,30 +317,11 @@ describe('processManualAnalysisStart', () => {
   });
 
   it('settles queued manual starts when the GitHub token is unavailable', async () => {
-    let selectCount = 0;
-    const execute = vi.fn().mockResolvedValue({ rows: [] });
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        return {
-          from: () => ({
-            where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-          }),
-        };
-      },
-      insert: () => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row-token' }] }),
-        }),
-      }),
-      execute,
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row-token',
+      actorRow: { id: 'user-123', api_token_pepper: null },
+    });
 
     await expect(
       processManualAnalysisStart({
@@ -210,62 +338,27 @@ describe('processManualAnalysisStart', () => {
       })
     ).resolves.toEqual({ status: 'token-missing' });
 
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(releaseOrphanedStartReservation).toHaveBeenCalledWith(db, command.findingId);
     expect(startSecurityAnalysis).not.toHaveBeenCalled();
   });
 
   it('persists actor-selected model context in Worker launch and audit metadata', async () => {
-    let selectCount = 0;
-    let insertCount = 0;
     const auditRows: unknown[] = [];
     const execute = vi.fn().mockResolvedValue({ rows: [] });
     const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        if (selectCount === 3) {
-          return {
-            from: () => ({
-              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-            }),
-          };
-        }
-        return {
-          from: () => ({
-            where: () => ({
-              limit: async () => [
-                {
-                  config: {
-                    analysis_mode: 'deep',
-                    triage_model_slug: 'config/triage',
-                    analysis_model_slug: 'config/analysis',
-                  },
-                },
-              ],
-            }),
-          }),
-        };
-      },
-      insert: () => {
-        insertCount += 1;
-        if (insertCount === 1) {
-          return {
-            values: () => ({
-              onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row' }] }),
-            }),
-          };
-        }
-        return {
-          values: async (values: unknown) => {
-            auditRows.push(values);
+      ...fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: {
+          config: {
+            analysis_mode: 'deep',
+            triage_model_slug: 'config/triage',
+            analysis_model_slug: 'config/analysis',
           },
-        };
-      },
+        },
+        auditRows,
+      }),
       execute,
     };
     vi.mocked(startSecurityAnalysis).mockResolvedValue({ started: true, triageOnly: false });
@@ -312,7 +405,11 @@ describe('processManualAnalysisStart', () => {
         }),
       })
     );
-    expect(auditRows[0]).toMatchObject({
+    const auditRow = auditRows.find(
+      row =>
+        typeof row === 'object' && row !== null && (row as { action?: string }).action !== undefined
+    );
+    expect(auditRow).toMatchObject({
       actor_id: 'user-123',
       metadata: {
         model: 'request/analysis',
@@ -528,43 +625,14 @@ describe('processManualAnalysisStart', () => {
   });
 
   it('settles post-lease manual start failures through the lifecycle transition', async () => {
-    let selectCount = 0;
-    let insertCount = 0;
     const execute = vi.fn().mockResolvedValue({ rows: [] });
     const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        if (selectCount === 3) {
-          return {
-            from: () => ({
-              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-            }),
-          };
-        }
-        return {
-          from: () => ({
-            where: () => ({
-              limit: async () => [{ config: { analysis_mode: 'auto' } }],
-            }),
-          }),
-        };
-      },
-      insert: () => {
-        insertCount += 1;
-        return {
-          values: () => ({
-            onConflictDoUpdate: () => ({
-              returning: async () => [{ id: `queue-row-${insertCount}` }],
-            }),
-          }),
-        };
-      },
+      ...fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: { config: { analysis_mode: 'auto' } },
+      }),
       execute,
     };
     vi.mocked(startSecurityAnalysis).mockResolvedValue({
@@ -612,35 +680,12 @@ describe('processManualAnalysisStart', () => {
   });
 
   it('settles thrown manual credit failures before preserving queue retry behavior', async () => {
-    let selectCount = 0;
-    const db = {
-      select: () => {
-        selectCount += 1;
-        if (selectCount === 1) {
-          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
-        }
-        if (selectCount === 2) {
-          return { from: () => ({ where: async () => [{ total: 0 }] }) };
-        }
-        if (selectCount === 3) {
-          return {
-            from: () => ({
-              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
-            }),
-          };
-        }
-        return {
-          from: () => ({
-            where: () => ({ limit: async () => [{ config: { analysis_mode: 'auto' } }] }),
-          }),
-        };
-      },
-      insert: () => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row-credit' }] }),
-        }),
-      }),
-    };
+    const db = fakeAdmissionDb({
+      admissionAnalysisStatus: null,
+      queueRowId: 'queue-row-credit',
+      actorRow: { id: 'user-123', api_token_pepper: null },
+      configRow: { config: { analysis_mode: 'auto' } },
+    });
     vi.mocked(startSecurityAnalysis).mockRejectedValue(
       new InsufficientCreditsError('Insufficient credits')
     );

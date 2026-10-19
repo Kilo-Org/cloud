@@ -39,6 +39,9 @@ const mockSubmitRemediationCancellation = jest.fn() as jest.MockedFunction<
 const mockGetSecurityFindingById = jest.fn<() => Promise<unknown>>();
 const mockListSecurityFindings = jest.fn<() => Promise<unknown>>();
 const mockCanStartAnalysis = jest.fn<(owner: unknown) => Promise<unknown>>();
+const mockTryReserveAnalysisStartSlot = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockTryReserveAnalysisRestartSlot = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockReleaseAnalysisStartReservation = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
 const mockDecorateFindingWithRemediation = jest.fn<() => Promise<unknown>>();
@@ -159,6 +162,9 @@ jest.mock('../db/security-commands', () => ({
 jest.mock('../db/dashboard-stats', () => ({ getDashboardStats: jest.fn() }));
 jest.mock('../db/security-analysis', () => ({
   canStartAnalysis: mockCanStartAnalysis,
+  tryReserveAnalysisStartSlot: mockTryReserveAnalysisStartSlot,
+  tryReserveAnalysisRestartSlot: mockTryReserveAnalysisRestartSlot,
+  releaseAnalysisStartReservation: mockReleaseAnalysisStartReservation,
   enqueueBacklogFindings: mockEnqueueBacklogFindings,
 }));
 jest.mock('../services/auto-dismiss-service', () => ({
@@ -928,7 +934,7 @@ describe('queue-backed handlers', () => {
 
   it('returns manual analysis command correlation', async () => {
     mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
-    mockCanStartAnalysis.mockResolvedValue({ allowed: true, currentCount: 0, limit: 3 });
+    mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: true });
     mockSubmitManualAnalysisStart.mockResolvedValue({ queued: true, commandId });
     mockAdmitOperation.mockResolvedValue({
       admission: 'admitted',
@@ -947,17 +953,78 @@ describe('queue-backed handlers', () => {
       })
     ).resolves.toEqual({ success: true, queued: true, commandId });
 
-    expect(mockCanStartAnalysis).toHaveBeenCalledWith({
-      organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-    });
+    expect(mockTryReserveAnalysisStartSlot).toHaveBeenCalledWith(
+      { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    );
+    expect(mockReleaseAnalysisStartReservation).not.toHaveBeenCalled();
   });
 
-  it('bypasses owner capacity only for a validated active restart', async () => {
+  it('rejects a start when the owner is at the concurrent analysis cap', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
+    mockTryReserveAnalysisStartSlot.mockResolvedValue({
+      reserved: false,
+      reason: 'cap',
+      currentCount: 3,
+      limit: 3,
+    });
+
+    await expect(
+      createHandlers().startAnalysis.handler({
+        ctx: context,
+        input: { findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+      })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    expect(mockSubmitManualAnalysisStart).not.toHaveBeenCalled();
+  });
+
+  it('rejects a start with a conflict when the finding is already in progress', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
+    mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: false, reason: 'in_progress' });
+
+    await expect(
+      createHandlers().startAnalysis.handler({
+        ctx: context,
+        input: { findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    expect(mockSubmitManualAnalysisStart).not.toHaveBeenCalled();
+  });
+
+  it('releases the reservation when the worker submission fails', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
+    mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: true });
+    mockSubmitManualAnalysisStart.mockRejectedValue(new Error('worker unreachable'));
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'start_analysis',
+        resource_key:
+          'security:start_analysis:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    });
+
+    await expect(
+      createHandlers().startAnalysis.handler({
+        ctx: context,
+        input: { findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+      })
+    ).rejects.toThrow('worker unreachable');
+
+    expect(mockReleaseAnalysisStartReservation).toHaveBeenCalledWith(
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    );
+  });
+
+  it('validates the owner cap for a restart without reserving a new slot', async () => {
     mockGetSecurityFindingById.mockResolvedValue({
       id: 'finding-id',
       analysis_status: 'running',
     });
-    mockCanStartAnalysis.mockResolvedValue({ allowed: false, currentCount: 3, limit: 3 });
+    mockTryReserveAnalysisRestartSlot.mockResolvedValue({ reserved: true });
     mockSubmitManualAnalysisStart.mockResolvedValue({ queued: true, commandId });
     mockAdmitOperation.mockResolvedValue({
       admission: 'admitted',
@@ -979,10 +1046,40 @@ describe('queue-backed handlers', () => {
       })
     ).resolves.toEqual({ success: true, queued: true, commandId });
 
-    expect(mockCanStartAnalysis).not.toHaveBeenCalled();
+    expect(mockTryReserveAnalysisRestartSlot).toHaveBeenCalledWith(
+      { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    );
+    expect(mockTryReserveAnalysisStartSlot).not.toHaveBeenCalled();
+    expect(mockReleaseAnalysisStartReservation).not.toHaveBeenCalled();
     expect(mockSubmitManualAnalysisStart).toHaveBeenCalledWith(
       expect.objectContaining({ restartActive: true })
     );
+  });
+
+  it('rejects a restart when the owner is at the concurrent analysis cap', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: 'finding-id',
+      analysis_status: 'running',
+    });
+    mockTryReserveAnalysisRestartSlot.mockResolvedValue({
+      reserved: false,
+      reason: 'cap',
+      currentCount: 3,
+      limit: 3,
+    });
+
+    await expect(
+      createHandlers().startAnalysis.handler({
+        ctx: context,
+        input: {
+          findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          restartActive: true,
+        },
+      })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    expect(mockSubmitManualAnalysisStart).not.toHaveBeenCalled();
   });
 
   it('rejects active restart requests after finding is no longer running', async () => {
@@ -1004,7 +1101,7 @@ describe('queue-backed handlers', () => {
       message: 'Only a running Sandbox Analysis can be restarted',
     });
 
-    expect(mockCanStartAnalysis).not.toHaveBeenCalled();
+    expect(mockTryReserveAnalysisRestartSlot).not.toHaveBeenCalled();
     expect(mockSubmitManualAnalysisStart).not.toHaveBeenCalled();
   });
 });

@@ -33,7 +33,12 @@ import {
   markApplyAutoRemediationCommandAdmissionFailed,
   type SecurityAgentCommandStatusResponse,
 } from '@/lib/security-agent/db/security-commands';
-import { canStartAnalysis } from '@/lib/security-agent/db/security-analysis';
+import {
+  canStartAnalysis,
+  releaseAnalysisStartReservation,
+  tryReserveAnalysisRestartSlot,
+  tryReserveAnalysisStartSlot,
+} from '@/lib/security-agent/db/security-analysis';
 import {
   decorateFindingWithRemediation,
   decorateFindingsWithRemediation,
@@ -1709,15 +1714,25 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        if (!input.restartActive) {
-          const concurrencyCheck = await canStartAnalysis(securityOwner);
+        // Admission reserves the owner slot and the per-finding lease in one
+        // transaction, so concurrent starts cannot all pass a stale count. A
+        // restart keeps the finding's own running slot and only validates the
+        // owner cap under the same lock.
+        const reservation = input.restartActive
+          ? await tryReserveAnalysisRestartSlot(securityOwner, input.findingId)
+          : await tryReserveAnalysisStartSlot(securityOwner, input.findingId);
 
-          if (!concurrencyCheck.allowed) {
+        if (!reservation.reserved) {
+          if (reservation.reason === 'cap') {
             throw new TRPCError({
               code: 'TOO_MANY_REQUESTS',
-              message: `Maximum concurrent analyses reached (${concurrencyCheck.currentCount}/${concurrencyCheck.limit}). Please wait for existing analyses to complete.`,
+              message: `Maximum concurrent analyses reached (${reservation.currentCount}/${reservation.limit}). Please wait for existing analyses to complete.`,
             });
           }
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Analysis already in progress',
+          });
         }
 
         // Analysis has no client `operationKey`, so each start attempt gets a
@@ -1725,29 +1740,41 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         // Worker `commandId` is recorded as the provider reference, which the
         // web observation settle later joins on to emit
         // `security_command_settled` with the `start_analysis` intent.
-        const result: SecurityCommandResult = await runSecurityLedgerSubmit({
-          ctx,
-          owner: securityOwner,
-          intent: 'start_analysis',
-          operationKey: crypto.randomUUID(),
-          resourceKey: securityAnalysisLedgerResourceKey(securityOwner, input.findingId),
-          submit: async () => {
-            const { commandId } = await submitManualAnalysisStart({
-              findingId: input.findingId,
-              owner: securityOwner,
-              actorUserId: ctx.user.id,
-              requestedModels: {
-                model: input.model,
-                triageModel: input.triageModel,
-                analysisModel: input.analysisModel,
-              },
-              forceSandbox: input.forceSandbox,
-              retrySandboxOnly: input.retrySandboxOnly,
-              restartActive: input.restartActive,
-            });
-            return { accepted: true, commandId };
-          },
-        });
+        let result: SecurityCommandResult;
+        try {
+          result = await runSecurityLedgerSubmit({
+            ctx,
+            owner: securityOwner,
+            intent: 'start_analysis',
+            operationKey: crypto.randomUUID(),
+            resourceKey: securityAnalysisLedgerResourceKey(securityOwner, input.findingId),
+            submit: async () => {
+              const { commandId } = await submitManualAnalysisStart({
+                findingId: input.findingId,
+                owner: securityOwner,
+                actorUserId: ctx.user.id,
+                requestedModels: {
+                  model: input.model,
+                  triageModel: input.triageModel,
+                  analysisModel: input.analysisModel,
+                },
+                forceSandbox: input.forceSandbox,
+                retrySandboxOnly: input.retrySandboxOnly,
+                restartActive: input.restartActive,
+              });
+              return { accepted: true, commandId };
+            },
+          });
+        } catch (error) {
+          // Submission failed before the Worker accepted the command; the
+          // reservation would otherwise hold a slot until a terminal settle
+          // that will never come. Guarded clear: no-op when the Worker
+          // actually owns the finding lifecycle.
+          if (!input.restartActive) {
+            await releaseAnalysisStartReservation(input.findingId);
+          }
+          throw error;
+        }
 
         if (result.kind === 'replayed') {
           const commandId =

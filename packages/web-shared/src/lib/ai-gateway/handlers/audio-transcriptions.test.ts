@@ -7,7 +7,6 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 jest.mock('next/server', () => {
   return {
@@ -153,7 +152,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     });
   });
 
-  it('does not add organization provider policy to JSON requests', async () => {
+  it('forwards the organization data collection policy on JSON requests', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
@@ -178,10 +177,10 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     const [, init] = mockedFetch.mock.calls[0];
     const upstream = JSON.parse(init?.body as string);
-    expect(upstream).not.toHaveProperty('provider');
+    expect(upstream.provider).toEqual({ data_collection: 'allow' });
   });
 
-  it('rejects organization data collection denied for JSON requests', async () => {
+  it('applies a denied organization policy over the request provider preferences', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
@@ -189,6 +188,40 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
         provider_allow_list: ['openai'],
         model_deny_list: [],
         data_collection: 'deny',
+      } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+        provider: { data_collection: 'allow', zdr: true, options: { order: ['openai'] } },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const upstream = JSON.parse(init?.body as string);
+    expect(upstream.provider).toEqual({
+      data_collection: 'deny',
+      zdr: true,
+      options: { order: ['openai'] },
+    });
+  });
+
+  it('rejects malformed request provider privacy on JSON requests', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        provider_allow_list: ['openai'],
+        model_deny_list: [],
+        data_collection: 'allow',
       } satisfies OrganizationSettings,
       plan: 'enterprise',
     });
@@ -198,40 +231,11 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
+        provider: { data_collection: 'invalid' },
       }) as never
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error_type: ProxyErrorType.data_collection_required,
-    });
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
-
-  it('rejects organization data collection denied for multipart requests', async () => {
-    setUserAuth();
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: {
-        provider_allow_list: ['openai'],
-        model_deny_list: [],
-        data_collection: 'deny',
-      } satisfies OrganizationSettings,
-      plan: 'enterprise',
-    });
-
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
-      makeMultipartRequest(
-        { model: 'openai/gpt-4o-mini-transcribe' },
-        { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
-      ) as never
-    );
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error_type: ProxyErrorType.data_collection_required,
-    });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
@@ -389,14 +393,42 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstreamFile.size).toBe(8);
   });
 
-  it('does not add organization provider policy to multipart requests', async () => {
+  it('forwards the organization data collection policy on multipart requests', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
       settings: {
         provider_allow_list: ['openai'],
         model_deny_list: [],
-        data_collection: 'allow',
+        data_collection: 'deny',
+      } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeMultipartRequest(
+        { model: 'openai/gpt-4o-mini-transcribe' },
+        { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
+      ) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const upstreamForm = init?.body as FormData;
+    expect(upstreamForm.get('provider')).toBe(JSON.stringify({ data_collection: 'deny' }));
+  });
+
+  it('does not add provider preferences without an organization policy', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        provider_allow_list: ['openai'],
+        model_deny_list: [],
       } satisfies OrganizationSettings,
       plan: 'enterprise',
     });

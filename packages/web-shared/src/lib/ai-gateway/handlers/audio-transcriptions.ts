@@ -19,14 +19,18 @@ import {
   extractHeaderAndLimitLength,
   invalidRequestResponse,
   modelNotAllowedResponse,
-  dataCollectionRequiredResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import {
+  getEffectiveProviderPrivacy,
+  providerPrivacySchema,
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -295,17 +299,23 @@ export async function handleAudioTranscriptionsRequest(
     });
   }
 
-  // The organization data-collection setting applies here: the upstream
-  // accepts no per-request privacy fields, so it cannot be forwarded.
-  if (settings?.data_collection === 'deny') {
-    return dataCollectionRequiredResponse();
-  }
+  // OpenRouter's transcription endpoint accepts the same provider preferences
+  // as chat, so the organization data-collection policy is forwarded with the
+  // request instead of rejecting it.
+  const requestProvider = parsedRequest.kind === 'json' ? parsedRequest.body.provider : undefined;
+  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
+  if (!requestPrivacy.success) return invalidRequestResponse();
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    requestPrivacy.data,
+    settings?.data_collection
+  );
 
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
       modelId: requestedModelLowerCased,
+      fromDb: readDb,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
   }
@@ -340,10 +350,17 @@ export async function handleAudioTranscriptionsRequest(
     const safetyIdentifier = generateProviderSpecificHash(user.id, provider);
     upstreamForm.append('safety_identifier', safetyIdentifier);
     upstreamForm.append('user', safetyIdentifier);
+    // The multipart form takes the provider preferences as a JSON string.
+    if (Object.keys(effectivePrivacy).length > 0) {
+      upstreamForm.append('provider', JSON.stringify(effectivePrivacy));
+    }
     upstreamBody = upstreamForm;
   } else {
     parsedRequest.body.safety_identifier = generateProviderSpecificHash(user.id, provider);
     parsedRequest.body.user = parsedRequest.body.safety_identifier;
+    if (Object.keys(effectivePrivacy).length > 0) {
+      parsedRequest.body.provider = { ...requestProvider, ...effectivePrivacy };
+    }
     upstreamBody = buildUpstreamBody(parsedRequest.body);
   }
 

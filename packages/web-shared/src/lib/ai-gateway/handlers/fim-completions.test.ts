@@ -207,17 +207,15 @@ describe('POST /api/fim/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('rejects direct provider requests when organization data collection is denied', async () => {
+  it('serves requests from organizations that deny data collection', async () => {
     setOrganizationAuth(1000, { data_collection: 'deny' } satisfies OrganizationSettings);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(makeRequest() as never);
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error_type: ProxyErrorType.data_collection_required,
-    });
-    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
   });
 
   it.each([

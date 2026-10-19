@@ -21,7 +21,6 @@ import {
   captureProxyError,
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
-  dataCollectionRequiredResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -222,11 +221,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   setTag('ui.ai_model', requestBody.model);
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users
-  const { balance, settings, plan, payer } = await getBalanceAndOrgSettings(
-    organizationId,
-    user,
-    readDb
-  );
+  const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (!canSpendPaidUsage(balance) && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
@@ -249,12 +244,6 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {
       return modelNotAllowedResponse();
     }
-  }
-
-  // The organization data-collection setting applies here: the upstream
-  // accepts no per-request privacy fields, so it cannot be forwarded.
-  if (settings?.data_collection === 'deny') {
-    return dataCollectionRequiredResponse();
   }
 
   const systemKey = getSystemApiKey(fimProvider);

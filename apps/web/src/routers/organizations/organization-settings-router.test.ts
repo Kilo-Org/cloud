@@ -58,6 +58,7 @@ import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/pr
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
+  customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
@@ -760,9 +761,12 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.default_model).toBe('kilo-auto/balanced');
     });
 
-    it('keeps custom LLM defaults exempt from Enterprise model restrictions', async () => {
+    it('keeps custom LLM defaults exempt when the custom LLM is granted to the organization', async () => {
       const modelId = `acme/private-${randomUUID()}`;
-      await insertCustomLlmForTest(modelId);
+      await insertCustomLlmForTest(
+        modelId,
+        customLlmDefinition({ organization_ids: [orgWithModelDenyList.id] })
+      );
       try {
         const caller = await createCallerForUser(owner.id);
 
@@ -772,6 +776,23 @@ describe('organizations settings trpc router', () => {
         });
 
         expect(result.settings.default_model).toBe(modelId);
+      } finally {
+        await deleteCustomLlmForTest(modelId);
+      }
+    });
+
+    it('applies Enterprise model restrictions to a custom LLM granted to another organization', async () => {
+      const modelId = `acme/private-${randomUUID()}`;
+      await insertCustomLlmForTest(modelId, customLlmDefinition({ organization_ids: [] }));
+      try {
+        const caller = await createCallerForUser(owner.id);
+
+        await expect(
+          caller.organizations.settings.updateDefaultModel({
+            organizationId: orgWithModelDenyList.id,
+            default_model: modelId,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
       } finally {
         await deleteCustomLlmForTest(modelId);
       }

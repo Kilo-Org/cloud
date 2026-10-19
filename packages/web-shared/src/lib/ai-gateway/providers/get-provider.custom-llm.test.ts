@@ -6,6 +6,10 @@ import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-p
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import {
+  createAnonymousContext,
+  type AnonymousUserContext,
+} from '@kilocode/web-shared/lib/anonymous';
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const PUBLIC_ID = 'acme/secure-proxy-model';
@@ -28,15 +32,18 @@ async function insertCustomLlm(credentials: CustomLlmCredentials) {
   );
 }
 
-function resolveProvider() {
+function resolveProvider(
+  user: User | AnonymousUserContext = { id: 'user-id' } as User,
+  organizationId: string | undefined = ORG_ID
+) {
   return getProvider({
     requestedModel: PUBLIC_ID,
     request: {
       kind: 'chat_completions',
       body: { model: PUBLIC_ID, messages: [{ role: 'user', content: 'hi' }] },
     },
-    user: { id: 'user-id' } as User,
-    organizationId: ORG_ID,
+    user,
+    organizationId,
   });
 }
 
@@ -88,5 +95,27 @@ describe('getProvider custom LLM credentials', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected a provider');
     expect(result.provider.secureProxy).toBeUndefined();
+  });
+
+  it.each([
+    ['another organization', { id: 'user-id' } as User, '00000000-0000-4000-8000-000000000002'],
+    ['a personal account', { id: 'user-id' } as User, undefined],
+    ['an anonymous caller', createAnonymousContext('127.0.0.1'), undefined],
+  ])(
+    'fails closed for %s instead of falling back to another upstream',
+    async (_caller, user, orgId) => {
+      await insertCustomLlm({ type: 'api_key', api_key: 'upstream-key' });
+
+      await expect(resolveProvider(user, orgId)).resolves.toEqual({
+        kind: 'custom-llm-unavailable',
+      });
+    }
+  );
+
+  it('fails closed when the custom LLM has no usable credentials', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    await insertCustomLlmForTest(PUBLIC_ID, definition, null);
+
+    await expect(resolveProvider()).resolves.toEqual({ kind: 'custom-llm-unavailable' });
   });
 });

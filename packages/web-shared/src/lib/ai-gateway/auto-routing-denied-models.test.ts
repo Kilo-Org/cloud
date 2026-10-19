@@ -52,6 +52,7 @@ function policy(
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
     ...overrides,
   };
 }

@@ -3,12 +3,13 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import {
-  INTERNAL_API_SECRET,
+  SESSION_INGEST_INVALIDATION_SIGNING_SECRET,
   SESSION_INGEST_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { signSessionAccessInvalidationCredential } from '@kilocode/worker-utils/session-access-invalidation-credential';
 import type { User } from '@kilocode/db/schema';
 import {
   kiloSdkMessageHistorySchema,
@@ -588,9 +589,15 @@ export async function invalidateOrganizationSessionAccess(
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
-  if (!INTERNAL_API_SECRET) {
-    throw new Error('INTERNAL_API_SECRET is not configured');
+  if (!SESSION_INGEST_INVALIDATION_SIGNING_SECRET) {
+    throw new Error('SESSION_INGEST_INVALIDATION_SIGNING_SECRET is not configured');
   }
+
+  const token = await signSessionAccessInvalidationCredential({
+    userId: kiloUserId,
+    organizationId,
+    secret: SESSION_INGEST_INVALIDATION_SIGNING_SECRET,
+  });
 
   const response = await fetchSessionIngest(
     `${SESSION_INGEST_WORKER_URL}/internal/session-access/invalidate`,
@@ -598,7 +605,7 @@ export async function invalidateOrganizationSessionAccess(
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'X-Internal-Secret': INTERNAL_API_SECRET,
+        authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ kiloUserId, organizationId }),
       // Caller deadline, composed with the shared upstream budget by

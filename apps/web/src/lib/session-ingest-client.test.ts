@@ -1,4 +1,6 @@
 import { captureException } from '@sentry/nextjs';
+import jwt from 'jsonwebtoken';
+import { SESSION_INGEST_INVALIDATION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 // The client deadline the upstream budget must stay under. Imported from source
 // rather than restated so the two constants can never drift apart.
 import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
@@ -30,7 +32,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
-  INTERNAL_API_SECRET: 'internal-secret',
+  SESSION_INGEST_INVALIDATION_SIGNING_SECRET: 'invalidation-signing-secret',
 }));
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => ({
@@ -689,7 +691,7 @@ describe('invalidateOrganizationSessionAccess', () => {
     );
   });
 
-  it('calls the secret-protected organization invalidation endpoint', async () => {
+  it('calls the dedicated organization invalidation endpoint with a bound credential', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 204 });
 
     await invalidateOrganizationSessionAccess(
@@ -703,7 +705,7 @@ describe('invalidateOrganizationSessionAccess', () => {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'X-Internal-Secret': 'internal-secret',
+          authorization: expect.stringMatching(/^Bearer /),
         },
         body: JSON.stringify({
           kiloUserId: 'usr_removed',
@@ -712,6 +714,35 @@ describe('invalidateOrganizationSessionAccess', () => {
         signal: expect.any(AbortSignal),
       }
     );
+
+    const [, init] = mockFetch.mock.calls[0];
+    const headers = init.headers as Record<string, string>;
+    expect(headers).not.toHaveProperty('X-Internal-Secret');
+    const token = headers.authorization.slice('Bearer '.length);
+    const claims = jwt.verify(token, 'invalidation-signing-secret') as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      kiloUserId: 'usr_removed',
+      organizationId: '11111111-1111-4111-8111-111111111111',
+      aud: SESSION_INGEST_INVALIDATION_AUDIENCE,
+    });
+    expect(claims.exp! - claims.iat!).toBe(60);
+  });
+
+  it('fails closed without the dedicated invalidation secret', async () => {
+    const configServer = jest.requireMock('@kilocode/web-shared/lib/config.server') as {
+      SESSION_INGEST_INVALIDATION_SIGNING_SECRET: string;
+    };
+    const originalSecret = configServer.SESSION_INGEST_INVALIDATION_SIGNING_SECRET;
+    configServer.SESSION_INGEST_INVALIDATION_SIGNING_SECRET = '';
+
+    try {
+      await expect(
+        invalidateOrganizationSessionAccess('usr_removed', '11111111-1111-4111-8111-111111111111')
+      ).rejects.toThrow('SESSION_INGEST_INVALIDATION_SIGNING_SECRET is not configured');
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      configServer.SESSION_INGEST_INVALIDATION_SIGNING_SECRET = originalSecret;
+    }
   });
 
   it('keeps the 30-second caller deadline and composes it with the budget', async () => {
@@ -1121,6 +1152,15 @@ describe('redacted route label', () => {
       'usr_removed',
       '11111111-1111-4111-8111-111111111111'
     ).catch((error: unknown) => error);
+    // Signing the dedicated credential is asynchronous, so let it reach the
+    // mocked upstream before advancing the budget timer. Fake timers do not
+    // replace the real `timers.setImmediate` used here for a macrotask yield.
+    const realSetImmediate = jest.requireActual<{ setImmediate: (callback: () => void) => void }>(
+      'timers'
+    ).setImmediate;
+    for (let attempt = 0; attempt < 100 && mockFetch.mock.calls.length === 0; attempt++) {
+      await new Promise<void>(resolve => realSetImmediate(resolve));
+    }
     await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
     await outcome;
 

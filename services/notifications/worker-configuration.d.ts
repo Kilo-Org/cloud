@@ -8,6 +8,7 @@ interface __BaseEnv_Env {
 	EXPO_ACCESS_TOKEN: SecretsStoreSecret;
 	NEXTAUTH_SECRET: SecretsStoreSecret;
 	INTERNAL_API_SECRET: SecretsStoreSecret;
+	GLANCEABLE_SNAPSHOT_SIGNING_SECRET: SecretsStoreSecret;
 	KILO_WEB_API_BASE_URL: "https://app.kilo.ai";
 	APNS_TOPIC: "com.kilocode.kiloapp";
 	APNS_TEAM_ID: "X96D76J65Z";

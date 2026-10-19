@@ -1,3 +1,8 @@
 DIRECT_INGEST_PERCENT="0"
 DIRECT_INGEST_USER_IDS=""
 DIRECT_INGEST_MAX_BYTES="4194304"
+
+# Local session-access invalidation uses the dedicated
+# SESSION_INGEST_INVALIDATION_SIGNING_SECRET_PROD Secrets Store value. It must
+# match the web app's SESSION_INGEST_INVALIDATION_SIGNING_SECRET; the general
+# INTERNAL_API_SECRET is not accepted for this route.

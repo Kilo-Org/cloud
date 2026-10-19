@@ -16,6 +16,8 @@
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
     "./cloud-agent-authority": "./src/cloud-agent-authority.ts",
+    "./glanceable-snapshot-credential": "./src/glanceable-snapshot-credential.ts",
+    "./session-access-invalidation-credential": "./src/session-access-invalidation-credential.ts",
     "./runtime-authorization": "./src/runtime-authorization.ts",
     "./runtime-authorization-contract": "./src/runtime-authorization-contract.ts",
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",

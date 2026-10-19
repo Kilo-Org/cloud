@@ -2,6 +2,7 @@ import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snap
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_activity_tokens, user_push_tokens } from '@kilocode/db/schema';
 import { pushDataSchema, SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
+import { signGlanceableSnapshotCredential } from '@kilocode/worker-utils/glanceable-snapshot-credential';
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -49,23 +50,27 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
         console.warn('KILO_WEB_API_BASE_URL missing; skipping glanceable aggregate delivery');
         return null;
       }
-      let internalApiSecret: string | undefined;
+      let signingSecret: string | undefined;
       try {
-        internalApiSecret = await env.INTERNAL_API_SECRET.get();
+        signingSecret = await env.GLANCEABLE_SNAPSHOT_SIGNING_SECRET.get();
       } catch {
-        internalApiSecret = undefined;
+        signingSecret = undefined;
       }
-      if (!internalApiSecret) {
-        console.warn('INTERNAL_API_SECRET missing; skipping glanceable aggregate delivery');
+      if (!signingSecret) {
+        console.warn(
+          'GLANCEABLE_SNAPSHOT_SIGNING_SECRET missing; skipping glanceable aggregate delivery'
+        );
         return null;
       }
+
+      const token = await signGlanceableSnapshotCredential({ userId, secret: signingSecret });
 
       const response = await fetch(`${baseUrl}/api/internal/glanceable-agents-snapshot`, {
         method: 'POST',
         headers: {
           accept: 'application/json',
           'content-type': 'application/json',
-          'x-internal-secret': internalApiSecret,
+          authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ userId, organizationId }),
       });

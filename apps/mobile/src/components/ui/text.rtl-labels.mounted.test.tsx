@@ -88,7 +88,11 @@ describe('Text eyebrow in an RTL interface', () => {
 
     expect(classes).toContain('font-mono-medium');
     expect(classes).toContain('tracking-[1.5px]');
-    expect(label.props.style).toEqual([{ writingDirection: 'rtl' }, undefined, undefined]);
+    const style = label.props.style as ({ letterSpacing?: number } | undefined)[];
+    expect(style).toContainEqual({ writingDirection: 'rtl' });
+    expect(
+      style.filter(entry => entry?.letterSpacing)
+    ).toEqual([]);
   });
 
   it('drops the mono family and adds the reset for Arabic in an LTR interface', () => {

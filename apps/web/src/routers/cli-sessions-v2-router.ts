@@ -2322,8 +2322,9 @@ export const cliSessionsV2Router = createTRPCRouter({
   /**
    * Share a V2 session by issuing an opaque JWT share token.
    *
-   * Delegates to the session-ingest worker which is idempotent — if the session
-   * already has an active share generation, the existing one is reused.
+   * Delegates to the session-ingest worker, which rotates the public
+   * capability. Each call issues a fresh share generation and invalidates the
+   * previous link.
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;

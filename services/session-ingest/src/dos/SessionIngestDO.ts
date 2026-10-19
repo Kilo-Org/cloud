@@ -1196,9 +1196,35 @@ export class SessionIngestDO extends DurableObject<Env> {
    * `sessionDiff`; without it the output is the full export.
    */
   async getAllStream(upToMessageId?: string): Promise<ReadableStream<Uint8Array>> {
+    return this.buildSessionExportStream({ upToMessageId });
+  }
+
+  /**
+   * Stream the frozen boundary of a public share. Only items persisted strictly
+   * before `ingestedBeforeMs` are included, and the cumulative whole-session
+   * diff is never exposed. Message-summary diffs remain part of the transcript
+   * so `kilo import` can still restore intentional file changes.
+   */
+  async getSharedSessionStream(ingestedBeforeMs: number): Promise<ReadableStream<Uint8Array>> {
+    return this.buildSessionExportStream({
+      ingestedBeforeMs,
+      includeSessionDiff: false,
+    });
+  }
+
+  private buildSessionExportStream(options: {
+    upToMessageId?: string;
+    ingestedBeforeMs?: number;
+    includeSessionDiff?: boolean;
+  }): ReadableStream<Uint8Array> {
     const db = this.db;
     const r2 = this.env.SESSION_INGEST_R2;
     const encoder = new TextEncoder();
+    const upToMessageId = options.upToMessageId;
+    const ingestedBeforeCondition =
+      options.ingestedBeforeMs === undefined
+        ? undefined
+        : lt(ingestItems.ingested_at, options.ingestedBeforeMs);
 
     return new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -1237,6 +1263,7 @@ export class SessionIngestDO extends DurableObject<Env> {
               .where(
                 and(
                   eq(ingestItems.item_type, 'message'),
+                  ingestedBeforeCondition,
                   msgCursor ? afterIngestOrderCursor(msgCursor) : undefined
                 )
               )
@@ -1284,6 +1311,7 @@ export class SessionIngestDO extends DurableObject<Env> {
                       eq(ingestItems.item_type, 'part'),
                       gte(ingestItems.item_id, partRange.start),
                       lt(ingestItems.item_id, partRange.end),
+                      ingestedBeforeCondition,
                       partCursor ? afterIngestOrderCursor(partCursor) : undefined
                     )
                   )
@@ -1309,14 +1337,14 @@ export class SessionIngestDO extends DurableObject<Env> {
           controller.enqueue(encoder.encode(']'));
           controller.enqueue(encoder.encode(',"sessionDiff":'));
           const diffRow =
-            upToMessageId === undefined
+            upToMessageId === undefined && options.includeSessionDiff !== false
               ? db
                   .select({
                     item_data: ingestItems.item_data,
                     item_data_r2_key: ingestItems.item_data_r2_key,
                   })
                   .from(ingestItems)
-                  .where(eq(ingestItems.item_type, 'session_diff'))
+                  .where(and(eq(ingestItems.item_type, 'session_diff'), ingestedBeforeCondition))
                   .limit(1)
                   .get()
               : undefined;

@@ -25,6 +25,14 @@ export const SESSION_SHARE_TOKEN_ISSUER = 'kilo-session-ingest';
 export const SESSION_SHARE_TOKEN_AUDIENCE = 'kilo-session-share';
 export const SESSION_SHARE_TOKEN_VERSION = 1;
 
+/** Default lifetime of a public share capability. */
+export const SESSION_SHARE_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+/** Hard ceiling for any token this service accepts, including older tokens. */
+export const SESSION_SHARE_TOKEN_MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+const integerSecondsSchema = z.number().int().nonnegative().refine(Number.isSafeInteger);
+const integerMillisecondsSchema = z.number().int().nonnegative().refine(Number.isSafeInteger);
+
 const sessionShareTokenPayloadSchema = z
   .object({
     iss: z.literal(SESSION_SHARE_TOKEN_ISSUER),
@@ -32,19 +40,38 @@ const sessionShareTokenPayloadSchema = z
     version: z.literal(SESSION_SHARE_TOKEN_VERSION),
     sub: sessionIdSchema,
     jti: z.uuid(),
-    iat: z.number().int().nonnegative().refine(Number.isSafeInteger),
+    iat: integerSecondsSchema,
+    exp: integerSecondsSchema,
+    // Millisecond boundary captured when the capability is minted. Only ingest
+    // items persisted strictly before this instant are exposed publicly.
+    shared_at: integerMillisecondsSchema,
   })
-  .strict();
+  .strict()
+  .refine(payload => payload.exp > payload.iat, {
+    message: 'exp must be after iat',
+  })
+  .refine(payload => payload.exp - payload.iat <= SESSION_SHARE_TOKEN_MAX_TTL_SECONDS, {
+    message: 'exp exceeds the maximum share lifetime',
+  })
+  .refine(payload => Math.floor(payload.shared_at / 1000) === payload.iat, {
+    message: 'shared_at must match iat',
+  });
 
 const sessionShareTokenSigningPayloadSchema = z
   .object({
     version: z.literal(SESSION_SHARE_TOKEN_VERSION),
     sub: sessionIdSchema,
     jti: z.uuid(),
+    shared_at: integerMillisecondsSchema,
   })
   .strict();
 
 export type SessionShareTokenPayload = z.infer<typeof sessionShareTokenPayloadSchema>;
+
+export type SessionShareTokenOptions = {
+  /** Injectable clock for tests and deterministic callers. */
+  now?: () => Date;
+};
 
 export type ResolvedSessionShare = {
   sessionId: string;
@@ -54,6 +81,8 @@ export type ResolvedSessionShare = {
   gitUrl: string | null;
   gitBranch: string | null;
   createdAt: string;
+  /** Ingest items persisted strictly before this instant are public. */
+  contentCutoffMs: number;
 };
 
 export type SessionShareTokenEnv = {
@@ -61,6 +90,10 @@ export type SessionShareTokenEnv = {
   SESSION_SHARE_TOKEN_MIN_IAT: string | undefined;
   HYPERDRIVE: Pick<Env['HYPERDRIVE'], 'connectionString'>;
 };
+
+function getNowMs(options: SessionShareTokenOptions | undefined): number {
+  return (options?.now?.() ?? new Date()).getTime();
+}
 
 function parseMinimumIat(rawValue: string | undefined): number {
   const value = rawValue ?? '0';
@@ -86,14 +119,18 @@ async function getSessionShareSecret(env: SessionShareTokenEnv): Promise<string>
 
 export async function signSessionShareToken(
   env: SessionShareTokenEnv,
-  params: { sessionId: string; publicId: string }
+  params: { sessionId: string; publicId: string },
+  options: SessionShareTokenOptions = {}
 ): Promise<string> {
   const secret = await getSessionShareSecret(env);
-  const issuedAt = Math.floor(Date.now() / 1000);
+  const nowMs = getNowMs(options);
+  const issuedAt = Math.floor(nowMs / 1000);
+  const expiresAt = issuedAt + SESSION_SHARE_TOKEN_TTL_SECONDS;
   const payload = sessionShareTokenSigningPayloadSchema.parse({
     version: SESSION_SHARE_TOKEN_VERSION,
     sub: params.sessionId,
     jti: params.publicId,
+    shared_at: nowMs,
   });
 
   return new SignJWT(payload)
@@ -101,21 +138,25 @@ export async function signSessionShareToken(
     .setIssuer(SESSION_SHARE_TOKEN_ISSUER)
     .setAudience(SESSION_SHARE_TOKEN_AUDIENCE)
     .setIssuedAt(issuedAt)
+    .setExpirationTime(expiresAt)
     .sign(new TextEncoder().encode(secret));
 }
 
 export async function verifySessionShareToken(
   env: SessionShareTokenEnv,
-  token: string
+  token: string,
+  options: SessionShareTokenOptions = {}
 ): Promise<SessionShareTokenPayload | null> {
   const secret = await getSessionShareSecret(env);
   const minimumIat = parseMinimumIat(env.SESSION_SHARE_TOKEN_MIN_IAT);
+  const nowMs = getNowMs(options);
 
   try {
     const { payload, protectedHeader } = await jwtVerify(token, new TextEncoder().encode(secret), {
       algorithms: ['HS256'],
       issuer: SESSION_SHARE_TOKEN_ISSUER,
       audience: SESSION_SHARE_TOKEN_AUDIENCE,
+      currentDate: new Date(nowMs),
     });
 
     if (protectedHeader.alg !== 'HS256') {
@@ -131,9 +172,10 @@ export async function verifySessionShareToken(
 
 export async function resolveSessionShareToken(
   env: SessionShareTokenEnv,
-  token: string
+  token: string,
+  options: SessionShareTokenOptions = {}
 ): Promise<ResolvedSessionShare | null> {
-  const payload = await verifySessionShareToken(env, token);
+  const payload = await verifySessionShareToken(env, token, options);
   if (!payload?.jti) {
     return null;
   }
@@ -175,5 +217,5 @@ export async function resolveSessionShareToken(
     .limit(1);
 
   const row = rows[0];
-  return row ?? null;
+  return row ? { ...row, contentCutoffMs: payload.shared_at } : null;
 }

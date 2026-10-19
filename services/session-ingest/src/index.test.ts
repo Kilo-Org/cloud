@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SignJWT } from 'jose';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
@@ -273,8 +274,10 @@ describe('public session route', () => {
   });
 
   it('returns 404 for malformed share tokens', async () => {
-    const res = await app.request('/session/not-a-jwt', {}, defaultEnv);
-    expect(res.status).toBe(404);
+    const content = await app.request('/session/not-a-jwt', {}, defaultEnv);
+    const metadata = await app.request('/session/not-a-jwt/metadata', {}, defaultEnv);
+    expect(content.status).toBe(404);
+    expect(metadata.status).toBe(404);
   });
 
   it('returns 404 when the token generation is not found', async () => {
@@ -291,35 +294,151 @@ describe('public session route', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns a matching DO snapshot with no-store caching', async () => {
+  it('returns a matching shared snapshot at the token boundary with no-store caching', async () => {
     const { db, selectResult } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
-    const token = await signSessionShareToken(defaultEnv, {
-      sessionId: 'ses_12345678901234567890123456',
-      publicId: '11111111-1111-4111-8111-111111111111',
-    });
-    selectResult.mockResolvedValueOnce([
+    const now = new Date('2026-08-19T10:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    try {
+      const token = await signSessionShareToken(
+        defaultEnv,
+        {
+          sessionId: 'ses_12345678901234567890123456',
+          publicId: '11111111-1111-4111-8111-111111111111',
+        },
+        { now: () => now }
+      );
+      selectResult.mockResolvedValueOnce([
+        {
+          sessionId: 'ses_12345678901234567890123456',
+          kiloUserId: 'usr_123',
+          title: 'Shared title',
+          ownerName: 'Shared owner',
+        },
+      ]);
+
+      const stub = {
+        getSharedSessionStream: vi.fn(async () => new Response('{"ok":true}').body!),
+      };
+      vi.mocked(getSessionIngestDO).mockReturnValue(
+        stub as unknown as ReturnType<typeof getSessionIngestDO>
+      );
+
+      const res = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(await res.text()).toBe('{"ok":true}');
+      expect(stub.getSharedSessionStream).toHaveBeenCalledWith(now.getTime());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns 404 for an expired capability on both content and metadata endpoints', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const now = new Date('2026-08-19T10:00:00.000Z');
+    const token = await signSessionShareToken(
+      defaultEnv,
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        publicId: '11111111-1111-4111-8111-111111111111',
+      },
+      { now: () => now }
+    );
+    const afterExpiry = new Date(now.getTime() + 31 * 24 * 60 * 60 * 1000);
+    selectResult.mockResolvedValue([
       {
         sessionId: 'ses_12345678901234567890123456',
         kiloUserId: 'usr_123',
         title: 'Shared title',
         ownerName: 'Shared owner',
+        createdAt: '2026-08-19T10:00:00.000Z',
       },
     ]);
-
     const stub = {
-      getAllStream: vi.fn(async () => new Response('{"ok":true}').body!),
+      getSharedSessionStream: vi.fn(),
     };
     vi.mocked(getSessionIngestDO).mockReturnValue(
       stub as unknown as ReturnType<typeof getSessionIngestDO>
     );
 
-    const res = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+    vi.useFakeTimers();
+    vi.setSystemTime(afterExpiry);
+    try {
+      const content = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+      const metadata = await app.request(
+        `/session/${encodeURIComponent(token)}/metadata`,
+        {},
+        defaultEnv
+      );
 
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
-    expect(res.headers.get('cache-control')).toBe('no-store');
-    expect(await res.text()).toBe('{"ok":true}');
+      expect(content.status).toBe(404);
+      expect(metadata.status).toBe(404);
+      expect(stub.getSharedSessionStream).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns 404 for a legacy non-expiring capability on both endpoints', async () => {
+    const { db } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const legacyToken = await new SignJWT({
+      version: 1,
+      sub: 'ses_12345678901234567890123456',
+      jti: '11111111-1111-4111-8111-111111111111',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuer('kilo-session-ingest')
+      .setAudience('kilo-session-share')
+      .setIssuedAt()
+      .sign(new TextEncoder().encode('session-share-secret-for-tests-32-bytes'));
+
+    const content = await app.request(
+      `/session/${encodeURIComponent(legacyToken)}`,
+      {},
+      defaultEnv
+    );
+    const metadata = await app.request(
+      `/session/${encodeURIComponent(legacyToken)}/metadata`,
+      {},
+      defaultEnv
+    );
+
+    expect(content.status).toBe(404);
+    expect(metadata.status).toBe(404);
+    expect(getWorkerDb).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a revoked capability on both content and metadata endpoints', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    selectResult.mockResolvedValue([]);
+    const token = await signSessionShareToken(defaultEnv, {
+      sessionId: 'ses_12345678901234567890123456',
+      publicId: '11111111-1111-4111-8111-111111111111',
+    });
+    const stub = {
+      getSharedSessionStream: vi.fn(),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      stub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const content = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+    const metadata = await app.request(
+      `/session/${encodeURIComponent(token)}/metadata`,
+      {},
+      defaultEnv
+    );
+
+    expect(content.status).toBe(404);
+    expect(metadata.status).toBe(404);
+    expect(stub.getSharedSessionStream).not.toHaveBeenCalled();
   });
 
   it('serializes created_at as UTC ISO at the HTTP boundary', async () => {

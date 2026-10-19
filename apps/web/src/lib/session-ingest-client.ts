@@ -393,8 +393,8 @@ const SharedSessionMetadataResponseSchema = z
 /**
  * Share a session via the session-ingest worker.
  *
- * Calls POST /session/:sessionId/share which is idempotent — if the session
- * already has an active share generation, the existing one is reused.
+ * Calls POST /session/:sessionId/share, which rotates the public capability.
+ * Each call issues a fresh share generation and invalidates the previous link.
  *
  * @returns The opaque JWT used to construct the /s/{share_token} share URL.
  */

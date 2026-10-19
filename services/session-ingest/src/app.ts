@@ -86,8 +86,8 @@ app.get('/session/:shareToken', async c => {
         kiloUserId: sharedSession.kiloUserId,
         sessionId: sharedSession.sessionId,
       }),
-    s => s.getAllStream(),
-    'SessionIngestDO.getAllStream'
+    s => s.getSharedSessionStream(sharedSession.contentCutoffMs),
+    'SessionIngestDO.getSharedSessionStream'
   );
 
   return c.body(stream, 200, {

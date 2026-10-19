@@ -221,6 +221,82 @@ describe('SessionIngestDO integration', () => {
       expect(snapshot.messages[1].info.id).toBe('msg_2');
     });
 
+    it('exports only content persisted before the shared boundary and drops the session diff', async () => {
+      const sessionId = 'ses_roundtrip_shared_0000000006';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'Shared Session' } },
+          { type: 'message', data: { id: 'msg_1', role: 'user', content: 'public' } },
+          { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'A' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      // Private content appended after the share boundary.
+      await stub.ingest(
+        [
+          { type: 'message', data: { id: 'msg_2', role: 'assistant', content: 'private' } },
+          { type: 'part', data: { id: 'part_2', messageID: 'msg_2', type: 'text', text: 'B' } },
+          { type: 'session_diff', data: [{ file: 'private.ts', patch: 'private' }] },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub.getSharedSessionStream(2000).then(s => new Response(s).text())
+      );
+
+      expect(shared.info).toEqual({ title: 'Shared Session' });
+      expect(
+        shared.messages.map((m: { info: { id: string }; parts: Array<{ id: string }> }) => [
+          m.info.id,
+          m.parts.map(p => p.id),
+        ])
+      ).toEqual([['msg_1', ['part_1']]]);
+      expect(shared.sessionDiff).toEqual([]);
+      expect(JSON.stringify(shared)).not.toContain('private');
+    });
+
+    it('does not expose later updates to an item that existed at the boundary', async () => {
+      const sessionId = 'ses_roundtrip_shared_update_000007';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'Updated Shared Session' } },
+          { type: 'message', data: { id: 'msg_1', role: 'user', content: 'public' } },
+          { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'A' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await stub.ingest(
+        [{ type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'B' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub.getSharedSessionStream(2000).then(s => new Response(s).text())
+      );
+
+      expect(shared.messages).toHaveLength(1);
+      expect(shared.messages[0].info.id).toBe('msg_1');
+      expect(shared.messages[0].parts).toEqual([]);
+      expect(JSON.stringify(shared)).not.toContain('B');
+    });
+
     it('exports only the transcript up to an inclusive message cut and drops the session diff', async () => {
       const sessionId = 'ses_roundtrip_cut_0000000005';
       const stub = getStub(kiloUserId, sessionId);

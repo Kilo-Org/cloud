@@ -778,9 +778,16 @@ api.post('/session/:sessionId/share', async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
   const publicId = crypto.randomUUID();
+  // Mint the capability before mutating the row so a signing failure leaves the
+  // previous generation untouched. Every share rotates `public_id`, which
+  // invalidates the predecessor even while its signature is still valid.
+  const shareToken = await signSessionShareToken(c.env, {
+    sessionId: parsed.data,
+    publicId,
+  });
   const shareResult = await db.execute<{ public_id: string }>(sql`
     UPDATE ${cli_sessions_v2}
-    SET public_id = COALESCE(${cli_sessions_v2.public_id}, ${publicId})
+    SET public_id = ${publicId}
     WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
       AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
       AND (
@@ -818,11 +825,6 @@ api.post('/session/:sessionId/share', async c => {
   if (!sharedSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  const shareToken = await signSessionShareToken(c.env, {
-    sessionId: parsed.data,
-    publicId: sharedSession.public_id,
-  });
 
   return c.json({ success: true, share_token: shareToken }, 200);
 });

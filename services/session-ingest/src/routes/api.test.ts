@@ -2494,11 +2494,18 @@ describe('api routes', () => {
     expect(ingestStub.clear).toHaveBeenCalledTimes(1);
   });
 
-  it('POST /session/:sessionId/share returns a JWT for an existing generation', async () => {
+  it('POST /session/:sessionId/share rotates the generation and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.executeResult.mockResolvedValueOnce({
-      rows: [{ public_id: '11111111-1111-4111-8111-111111111111' }],
+    let sharedPublicId: string | undefined;
+    fns.executeResult.mockImplementationOnce(async query => {
+      if (!(query instanceof SQL)) {
+        throw new Error('Expected share query');
+      }
+      const generated = new PgDialect().sqlToQuery(query);
+      expect(generated.sql).not.toContain('COALESCE');
+      sharedPublicId = generated.params[0] as string;
+      return { rows: [{ public_id: sharedPublicId }] };
     });
 
     const app = makeApiApp();
@@ -2514,19 +2521,29 @@ describe('api routes', () => {
     expect(body).toMatchObject({ success: true });
     expect(body).toHaveProperty('share_token', expect.any(String));
     expect(body).not.toHaveProperty('public_id');
+    expect(sharedPublicId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
     await expect(verifySessionShareToken(makeTestEnv(), body.share_token)).resolves.toMatchObject({
       sub: 'ses_12345678901234567890123456',
-      jti: '11111111-1111-4111-8111-111111111111',
+      jti: sharedPublicId,
     });
   });
 
-  it('POST /session/:sessionId/share reuses the generation while minting a current token', async () => {
+  it('POST /session/:sessionId/share invalidates the previous generation', async () => {
     vi.useFakeTimers();
     try {
       const { db, fns } = makeDbFakes();
       vi.mocked(getWorkerDb).mockReturnValue(db);
-      fns.executeResult.mockResolvedValue({
-        rows: [{ public_id: '11111111-1111-4111-8111-111111111111' }],
+      const issuedPublicIds: string[] = [];
+      fns.executeResult.mockImplementation(async query => {
+        if (!(query instanceof SQL)) {
+          throw new Error('Expected share query');
+        }
+        const generated = new PgDialect().sqlToQuery(query);
+        const publicId = generated.params[0] as string;
+        issuedPublicIds.push(publicId);
+        return { rows: [{ public_id: publicId }] };
       });
 
       const app = makeApiApp();
@@ -2549,20 +2566,23 @@ describe('api routes', () => {
       );
       const second = (await secondResponse.json()) as { share_token: string };
 
-      expect(first.share_token).not.toBe(second.share_token);
+      expect(issuedPublicIds).toHaveLength(2);
+      expect(issuedPublicIds[0]).not.toBe(issuedPublicIds[1]);
       await expect(
         verifySessionShareToken(makeTestEnv(), first.share_token)
       ).resolves.toMatchObject({
         sub: 'ses_12345678901234567890123456',
-        jti: '11111111-1111-4111-8111-111111111111',
+        jti: issuedPublicIds[0],
         iat: Math.floor(firstIssuedAt.getTime() / 1000),
+        shared_at: firstIssuedAt.getTime(),
       });
       await expect(
         verifySessionShareToken(makeTestEnv(), second.share_token)
       ).resolves.toMatchObject({
         sub: 'ses_12345678901234567890123456',
-        jti: '11111111-1111-4111-8111-111111111111',
-        iat: Math.floor(firstIssuedAt.getTime() / 1000) + 1,
+        jti: issuedPublicIds[1],
+        iat: Math.floor((firstIssuedAt.getTime() + 1000) / 1000),
+        shared_at: firstIssuedAt.getTime() + 1000,
       });
       expect(fns.executeResult).toHaveBeenCalledTimes(2);
     } finally {
@@ -2570,7 +2590,7 @@ describe('api routes', () => {
     }
   });
 
-  it('POST /session/:sessionId/share sets public_id when missing and returns a JWT', async () => {
+  it('POST /session/:sessionId/share sets a fresh public_id and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     fns.executeResult.mockImplementationOnce(async query => {
@@ -2581,6 +2601,8 @@ describe('api routes', () => {
       expect(generated.sql).toContain('INNER JOIN "organizations"');
       expect(generated.sql).toMatch(/"organizations"\."deleted_at" is null/i);
       expect(generated.sql).toContain('"organization_memberships"."kilo_user_id" = $4');
+      expect(generated.sql).not.toContain('COALESCE');
+      expect(generated.sql).toContain('SET public_id = $1');
       return { rows: [{ public_id: generated.params[0] }] };
     });
 

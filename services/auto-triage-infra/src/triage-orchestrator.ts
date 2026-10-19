@@ -333,7 +333,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
       ? await fetchRepoLabels(this.state.sessionInput.repoFullName, githubToken)
       : DEFAULT_LABELS;
     const availableLabels = repoLabels.filter(
-      label => !excludedLabels.has(label) && !RESERVED_AUTOMATION_LABELS.has(label)
+      label => !excludedLabels.has(label) && RESERVED_AUTOMATION_LABELS[label] !== true
     );
 
     console.log('[auto-triage:labels] Available labels for prompt', {

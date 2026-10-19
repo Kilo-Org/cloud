@@ -8,6 +8,7 @@ import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { lockOrganizationMembershipMutation } from '@kilocode/web-shared/lib/organizations/organizations';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 
 export async function removeUserFromOrganization(
   organizationId: Organization['id'],
@@ -65,9 +66,11 @@ export async function removeUserFromOrganization(
 
   const result = txn ? await run(txn) : await db.transaction(run);
 
-  // Session access invalidation is a best-effort network call and must not run
-  // inside a caller-provided transaction; the caller handles it after commit.
+  // Session access and model policy invalidation are best-effort network calls
+  // and must not run inside a caller-provided transaction; the caller handles
+  // them after commit.
   if (!txn && (result.rowCount ?? 0) > 0) {
+    await invalidateOrganizationModelPolicyCache(organizationId);
     await invalidateRemovedMemberSessionAccess(organizationId, userId);
   }
 

@@ -5,6 +5,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { kilocode_users, organizations } from '@kilocode/db/schema';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import { restoreSalesDemoOrganization } from '@/lib/organizations/sales-demo';
 
 if (!CRON_SECRET) {
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
           txn: tx,
         });
       });
+      await invalidateOrganizationModelPolicyCache(org.id);
       reset++;
     } catch (error) {
       failed++;

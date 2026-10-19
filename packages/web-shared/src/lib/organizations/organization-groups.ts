@@ -23,6 +23,7 @@ import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { normalizeRegisteredOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/registry.server';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 
 const DEFAULT_POLICIES = [
   { type: 'model_access', data: { mode: 'all' } },
@@ -121,6 +122,10 @@ async function acquireOrganizationPolicyLock(tx: DrizzleTransaction, organizatio
   `);
 }
 
+/**
+ * Callers must also call `invalidateOrganizationModelPolicyCache` once `tx`
+ * commits, so the AI gateway stops serving the cached policy.
+ */
 export async function bumpOrganizationGroupPolicyRevision(
   tx: DrizzleTransaction,
   organizationId: string,
@@ -188,7 +193,7 @@ export async function withOrganizationGroupPolicyMutation<T>(
     currentSettings: CanonicalOrganizationGroupPolicySettings;
   }) => Promise<T>
 ): Promise<{ result: T; policyRevision: number }> {
-  return await db.transaction(async tx => {
+  const mutation = await db.transaction(async tx => {
     await acquireOrganizationPolicyLock(tx, organizationId);
     const organization = await assertEnterpriseOrganization(organizationId, tx);
     const existingSettings = await getSettingsRow(organizationId, tx);
@@ -230,6 +235,8 @@ export async function withOrganizationGroupPolicyMutation<T>(
 
     return { result, policyRevision };
   });
+  await invalidateOrganizationModelPolicyCache(organizationId);
+  return mutation;
 }
 
 async function getGroupForUpdate(tx: DrizzleTransaction, organizationId: string, groupId: string) {

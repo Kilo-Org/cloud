@@ -39,6 +39,7 @@ import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organizat
 import { captureOrganizationMemberJoined } from '@kilocode/web-shared/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 export async function getOrganizationById(
@@ -315,9 +316,11 @@ export async function addUserToOrganization(
   txn?: DrizzleTransaction
 ): Promise<boolean> {
   if (!txn) {
-    return await db.transaction(async tx =>
+    const added = await db.transaction(async tx =>
       addUserToOrganization(organizationId, userId, role, tx)
     );
+    if (added) await invalidateOrganizationModelPolicyCache(organizationId);
+    return added;
   }
   const result = await txn
     .insert(organization_memberships)
@@ -354,7 +357,7 @@ export async function addSsoUserToOrganization(
   userId: User['id'],
   options?: { isNewUser?: boolean }
 ): Promise<boolean> {
-  return db.transaction(async tx => {
+  const added = await db.transaction(async tx => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
     const [removal] = await tx
       .select({ id: organization_membership_removals.id })
@@ -383,6 +386,8 @@ export async function addSsoUserToOrganization(
 
     return added;
   });
+  if (added) await invalidateOrganizationModelPolicyCache(organizationId);
+  return added;
 }
 
 export async function updateUserRoleInOrganization(
@@ -863,6 +868,7 @@ export async function updateOrganizationSettings(
       settings,
     })
     .where(eq(organizations.id, organizationId));
+  if (!txn) await invalidateOrganizationModelPolicyCache(organizationId);
 
   return settings;
 }
@@ -909,8 +915,12 @@ export async function markOrganizationAsDeleted(
       .set({ ...auto_deleted_at })
       .where(eq(organizations.id, organizationId));
   };
-  if (txn) await execute(txn);
-  else await db.transaction(execute);
+  if (txn) {
+    await execute(txn);
+    return;
+  }
+  await db.transaction(execute);
+  await invalidateOrganizationModelPolicyCache(organizationId);
 }
 
 export async function getOrganizationMemberByEmail(

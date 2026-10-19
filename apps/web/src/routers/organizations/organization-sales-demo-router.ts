@@ -4,6 +4,7 @@ import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { NOT_LIVE_SALES_DEMO, restoreSalesDemoOrganization } from '@/lib/organizations/sales-demo';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import {
   ensureOrganizationAccess,
   organizationMemberMutationProcedure,
@@ -14,7 +15,7 @@ export const organizationSalesDemoRouter = createTRPCRouter({
     await ensureOrganizationAccess(ctx, input.organizationId, ['owner']);
 
     try {
-      return await db.transaction(async tx => {
+      const restored = await db.transaction(async tx => {
         const organizationId = await restoreSalesDemoOrganization({
           organizationId: input.organizationId,
           actorUser: ctx.user,
@@ -32,6 +33,8 @@ export const organizationSalesDemoRouter = createTRPCRouter({
           organizationName: org?.name ?? '',
         };
       });
+      await invalidateOrganizationModelPolicyCache(restored.organizationId);
+      return restored;
     } catch (error) {
       if (error instanceof Error && error.message === NOT_LIVE_SALES_DEMO) {
         throw new TRPCError({

@@ -43,6 +43,7 @@ import {
   markOrganizationAsDeleted,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { TRPCError } from '@trpc/server';
@@ -1044,6 +1045,7 @@ export const organizationAdminRouter = createTRPCRouter({
       }
       throw error;
     }
+    await invalidateOrganizationModelPolicyCache(organizationId);
 
     return successResult();
   }),

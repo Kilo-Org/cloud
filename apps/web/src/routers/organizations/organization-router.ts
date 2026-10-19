@@ -87,6 +87,7 @@ import { organizationGroupsRouter } from '@/routers/organizations/organization-g
 import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
 import { organizationSalesDemoRouter } from '@/routers/organizations/organization-sales-demo-router';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
@@ -521,6 +522,7 @@ export const organizationsRouter = createTRPCRouter({
           .set({ plan: opts.input.plan })
           .where(eq(organizations.id, opts.input.organizationId));
       });
+      await invalidateOrganizationModelPolicyCache(opts.input.organizationId);
       return {
         organization: {
           id: opts.input.organizationId,

@@ -44,6 +44,7 @@ import {
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 
@@ -298,6 +299,7 @@ async function handleSubscriptionEventInternal(
   // increase seat_count until payment succeeds (subscription becomes 'active').
   const isSubscriptionActive = subscription.status === 'active';
 
+  let planUpdated = false;
   await db.transaction(async tx => {
     const { rowCount } = await tx
       .insert(organization_seats_purchases)
@@ -324,6 +326,7 @@ async function handleSubscriptionEventInternal(
     if (plan !== null) {
       await bumpOrganizationGroupPolicyRevision(tx, meta.organizationId, meta.kiloUserId);
       await tx.update(organizations).set({ plan }).where(eq(organizations.id, meta.organizationId));
+      planUpdated = true;
     }
 
     if (isSubscriptionEnded) {
@@ -384,6 +387,10 @@ async function handleSubscriptionEventInternal(
       .set({ seat_count: maxSeatsForSubPeriod })
       .where(eq(organizations.id, meta.organizationId));
   });
+
+  if (planUpdated) {
+    await invalidateOrganizationModelPolicyCache(meta.organizationId);
+  }
 
   if (isCreation) {
     handleSubscriptionCreatedNonEssential(meta);

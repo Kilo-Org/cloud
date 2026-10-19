@@ -19,6 +19,7 @@ import {
   sendOssExistingOrgProvisionedEmail,
 } from '@kilocode/web-shared/lib/email';
 import { getAcceptInviteUrl } from '@kilocode/web-shared/lib/organizations/organizations';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import { TRPCError } from '@trpc/server';
 import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
@@ -546,6 +547,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
           }
         }
       });
+      await invalidateOrganizationModelPolicyCache(organizationId);
 
       // Send email to org owners if requested
       if (sendEmail) {

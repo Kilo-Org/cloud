@@ -28,6 +28,7 @@ import {
 import { removeUserFromOrganization } from './organization-member-removal';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 
 jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
@@ -35,6 +36,10 @@ jest.mock('@/lib/session-ingest-client', () => ({
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   closeCloudAgentOrgStreams: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@kilocode/web-shared/lib/organizations/organization-model-policy-cache', () => ({
+  invalidateOrganizationModelPolicyCache: jest.fn(async () => {}),
 }));
 
 // Mock next/server's after function which requires request context.
@@ -49,6 +54,7 @@ describe('removeUserFromOrganization', () => {
   beforeEach(() => {
     jest.mocked(invalidateOrganizationSessionAccess).mockClear();
     jest.mocked(closeCloudAgentOrgStreams).mockClear();
+    jest.mocked(invalidateOrganizationModelPolicyCache).mockClear();
   });
 
   afterEach(async () => {
@@ -93,6 +99,38 @@ describe('removeUserFromOrganization', () => {
 
     expect(result).toBeDefined();
     expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+    expect(invalidateOrganizationModelPolicyCache).not.toHaveBeenCalled();
+  });
+
+  test('invalidates the cached organization model policy after the removal commits', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createOrganization('Test Org', owner.id);
+    await addUserToOrganization(organization.id, member.id, 'member');
+    jest.mocked(invalidateOrganizationModelPolicyCache).mockClear();
+    let memberOrganizationsAtInvalidation: unknown[] | undefined;
+    jest.mocked(invalidateOrganizationModelPolicyCache).mockImplementationOnce(async () => {
+      memberOrganizationsAtInvalidation = await getUserOrganizationsWithSeats(member.id);
+    });
+
+    await removeUserFromOrganization(organization.id, member.id);
+
+    expect(invalidateOrganizationModelPolicyCache).toHaveBeenCalledWith(organization.id);
+    expect(memberOrganizationsAtInvalidation).toEqual([]);
+  });
+
+  test('leaves model policy invalidation to the caller when it supplies the transaction', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createOrganization('Test Org', owner.id);
+    await addUserToOrganization(organization.id, member.id, 'member');
+    jest.mocked(invalidateOrganizationModelPolicyCache).mockClear();
+
+    await db.transaction(tx =>
+      removeUserFromOrganization(organization.id, member.id, owner.id, tx)
+    );
+
+    expect(invalidateOrganizationModelPolicyCache).not.toHaveBeenCalled();
   });
 
   test('should complete removal when session access invalidation fails', async () => {

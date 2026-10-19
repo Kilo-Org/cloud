@@ -12,6 +12,7 @@ import {
   restoreSalesDemoOrganization,
 } from '@/lib/organizations/sales-demo';
 import { isAllowedSalesDemoEmail } from '@/lib/organizations/sales-demo-email';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 
 export const salesDemoRouter = createTRPCRouter({
   create: adminProcedure
@@ -62,7 +63,7 @@ export const salesDemoRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
       try {
-        return await db.transaction(async tx => {
+        const restored = await db.transaction(async tx => {
           const organizationId = await restoreSalesDemoOrganization({
             organizationId: input.organizationId,
             actorUser: ctx.user,
@@ -80,6 +81,8 @@ export const salesDemoRouter = createTRPCRouter({
             organizationName: org?.name ?? '',
           };
         });
+        await invalidateOrganizationModelPolicyCache(restored.organizationId);
+        return restored;
       } catch (error) {
         if (error instanceof Error && error.message === NOT_LIVE_SALES_DEMO) {
           throw new TRPCError({

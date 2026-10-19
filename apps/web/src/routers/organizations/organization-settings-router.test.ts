@@ -28,6 +28,10 @@ jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
+jest.mock('@kilocode/web-shared/lib/organizations/organization-model-policy-cache', () => ({
+  invalidateOrganizationModelPolicyCache: jest.fn(async () => {}),
+}));
+
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => {
   return {
     getEnhancedOpenRouterModels: jest.fn(),
@@ -58,6 +62,7 @@ import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/pr
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
   return {
@@ -309,6 +314,30 @@ describe('organizations settings trpc router', () => {
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings?.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo']);
       expect(updatedOrg?.settings?.provider_allow_list).toEqual(['openai', 'anthropic']);
+    });
+
+    it('invalidates the cached organization model policy after the update commits', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Policy Cache Invalidation',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      let committedDenyList: string[] | undefined;
+      jest.mocked(invalidateOrganizationModelPolicyCache).mockImplementationOnce(async () => {
+        committedDenyList = (await getOrganizationById(organization.id))?.settings.model_deny_list;
+      });
+
+      await caller.organizations.settings.updateAllowLists({
+        organizationId: organization.id,
+        model_deny_list: ['gpt-4'],
+      });
+
+      expect(invalidateOrganizationModelPolicyCache).toHaveBeenCalledWith(organization.id);
+      expect(committedDenyList).toEqual(['gpt-4']);
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
     });
 
     it('should deduplicate model_deny_list and provider_allow_list entries', async () => {
@@ -1023,6 +1052,26 @@ describe('organizations settings trpc router', () => {
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings.org_auto_model?.routes.code).toBe('kilo-auto/frontier');
       expect(updatedOrg?.settings.data_collection).toBe('deny');
+    });
+
+    it('invalidates the cached organization model policy when data collection changes', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Data Collection Invalidation',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      jest.mocked(invalidateOrganizationModelPolicyCache).mockClear();
+
+      await caller.organizations.settings.updateDataCollection({
+        organizationId: organization.id,
+        dataCollection: 'deny',
+      });
+
+      expect(invalidateOrganizationModelPolicyCache).toHaveBeenCalledWith(organization.id);
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
     });
 
     it('rejects model policy changes that would invalidate active Organization Auto', async () => {

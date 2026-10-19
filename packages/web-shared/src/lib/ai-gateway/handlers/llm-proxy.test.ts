@@ -65,6 +65,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { getCachedOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -122,6 +123,11 @@ jest.mock(
     getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
   })
 );
+jest.mock('@kilocode/web-shared/lib/organizations/organization-model-policy-cache', () => ({
+  getCachedOrganizationModelPolicy: jest.fn(
+    async (_params: unknown, computePolicy: () => Promise<unknown>) => await computePolicy()
+  ),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
@@ -1059,6 +1065,42 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(jest.mocked(getOrganizationGroupPolicyContext)).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: 'org-1', fromDb: readDb })
     );
+    expect(jest.mocked(getCachedOrganizationModelPolicy)).toHaveBeenCalledWith(
+      { organizationId: 'org-1', kiloUserId: 'user-123' },
+      expect.any(Function)
+    );
+  });
+
+  it('uses a cached organization model policy without reading the policy context', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {},
+      plan: 'enterprise',
+    });
+    const cachedPolicy = {
+      requireModelInCurrentSnapshot: true,
+      organizationModelDenyList: [],
+      memberGrant: { mode: 'organization_baseline' as const },
+      policyRevision: 7,
+    };
+    jest.mocked(getCachedOrganizationModelPolicy).mockResolvedValueOnce(cachedPolicy);
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(jest.mocked(getOrganizationGroupPolicyContext)).not.toHaveBeenCalled();
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(cachedPolicy, 'openai/gpt-4o');
   });
 
   describe('Anthropic provider for Claude', () => {

@@ -39,6 +39,12 @@ export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderbo
 export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
   redisKey(`organization:non-trial-enterprise:${organizationId}`);
 
+export const organizationModelPolicyEpochRedisKey = (organizationId: string) =>
+  redisKey(`organization-model-policy-epoch:v1:${organizationId}`);
+
+export const organizationModelPolicyRedisKey = (organizationId: string, kiloUserId: string) =>
+  redisKey(`organization-model-policy:v1:${organizationId}:${kiloUserId}`);
+
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 

@@ -8,6 +8,7 @@ import {
   getAcceptInviteUrl,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { updateOrganizationUserLimit } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import {
   organization_memberships,
   organization_invitations,
@@ -386,6 +387,7 @@ export const organizationsMembersRouter = createTRPCRouter({
 
         if (wasAdded) {
           added.push(childOrganizationId);
+          await invalidateOrganizationModelPolicyCache(childOrganizationId);
         }
       }
 
@@ -415,6 +417,7 @@ export const organizationsMembersRouter = createTRPCRouter({
 
         if (wasRemoved) {
           removed.push(membership.organizationId);
+          await invalidateOrganizationModelPolicyCache(membership.organizationId);
           // Best-effort session access invalidation after the transaction commits.
           try {
             await invalidateOrganizationSessionAccess(memberId, membership.organizationId);

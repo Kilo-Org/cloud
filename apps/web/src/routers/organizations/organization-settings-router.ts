@@ -19,6 +19,7 @@ import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/con
 import { createAllowPredicateFromRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { invalidateOrganizationModelPolicyCache } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -380,6 +381,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
         return settings;
       });
+      await invalidateOrganizationModelPolicyCache(organizationId);
       return { settings: updatedSettings };
     }),
 

@@ -141,6 +141,7 @@ import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import { getCachedOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/organization-model-policy-cache';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
@@ -332,12 +333,19 @@ export async function handleLlmProxyRequest(
   );
   const organizationGroupPolicyPromise = authPromise.then(async auth => {
     if (!auth.organizationId || !auth.user || auth.authFailedResponse) return null;
-    const context = await getOrganizationGroupPolicyContext({
-      organizationId: auth.organizationId,
-      subject: { type: 'member', kiloUserId: auth.user.id },
-      fromDb: readDb,
-    });
-    return evaluateEffectiveModelAccessPolicy(context);
+    const organizationId = auth.organizationId;
+    const kiloUserId = auth.user.id;
+    // Auth already rejected callers who are not direct members, so a cache hit
+    // can skip the membership check inside the policy context.
+    return await getCachedOrganizationModelPolicy({ organizationId, kiloUserId }, async () =>
+      evaluateEffectiveModelAccessPolicy(
+        await getOrganizationGroupPolicyContext({
+          organizationId,
+          subject: { type: 'member', kiloUserId },
+          fromDb: readDb,
+        })
+      )
+    );
   });
   // Some early returns do not await organization policy. Keep those paths from
   // surfacing policy-context failures as unhandled rejections.

@@ -70,21 +70,42 @@ describe('grantCreditForCategory', () => {
     jest.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
       throw thrown;
     });
+    const captureException = jest.fn();
+    jest.doMock('@sentry/nextjs', () => ({
+      captureException,
+      captureMessage: jest.fn(),
+    }));
 
     const config: PromoCreditCategoryConfig = {
       credit_category: 'unexpected-failure',
       amount_usd: 10,
     };
 
-    const result = await grantCreditForCategoryConfig(
-      { organization: null, user: mockUser },
-      { credit_category: 'unexpected-failure', counts_as_selfservice: false },
-      config
-    );
+    await jest.isolateModulesAsync(async () => {
+      const { grantCreditForCategoryConfig: isolatedGrant } =
+        await import('@kilocode/web-shared/lib/promotionalCredits');
 
-    expect(result.success).toBe(false);
-    expect(result.message).toBe(GRANT_MSG_UNEXPECTED_FAILURE);
-    expect(result.message).not.toContain('sensitive-internal-detail');
+      const result = await isolatedGrant(
+        { organization: null, user: mockUser },
+        { credit_category: 'unexpected-failure', counts_as_selfservice: false },
+        config
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(GRANT_MSG_UNEXPECTED_FAILURE);
+      expect(result.message).not.toContain('sensitive-internal-detail');
+    });
+
+    expect(captureException).toHaveBeenCalledWith(thrown, {
+      tags: { source: 'promotional_credits_grant' },
+      extra: {
+        credit_category: 'unexpected-failure',
+        kilo_user_id: mockUser.id,
+        organization_id: null,
+      },
+    });
+
+    jest.dontMock('@sentry/nextjs');
   });
 
   it('stores an explicitly provided creator and leaves omitted creators null', async () => {

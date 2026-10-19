@@ -137,6 +137,12 @@ describe('buildItems gap separators', () => {
     );
     const trailing = separatorFor(items, 1);
     expect(trailing).toMatchObject({ context: { gapIndex: 1, startLine: 8 }, state: 'idle' });
+    // The trailing end is unknown, so the expand row must take its
+    // `isUnknownEnd` branch (default window, no Expand-all affordance).
+    // Asserted as the builder hands it over; the bounded half of the same
+    // contract is covered by `uses totalLines to bound the trailing gap once
+    // known`.
+    expect(trailing?.context.endLine).toBe(Infinity);
   });
 
   it('renders between-hunk separators for gaps larger than 3 lines', () => {

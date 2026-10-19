@@ -118,7 +118,7 @@ function sanitizeKilocodeEventData(data: unknown): unknown {
         ...properties,
         info: {
           ...info,
-          error: projectSafeAssistantError(info.error),
+          error: safeAssistantErrorProjection(info.error),
         },
       },
     };
@@ -136,8 +136,7 @@ function sanitizeKilocodeEventData(data: unknown): unknown {
           ...part,
           // The classify fallback keeps the field a bounded public message
           // even when the shape is not recognized.
-          error:
-            projectSafeAssistantError(part.error) ?? classifyAssistantFailureMessage(part.error),
+          error: safeAssistantErrorProjection(part.error),
         },
       },
     };
@@ -148,12 +147,21 @@ function sanitizeKilocodeEventData(data: unknown): unknown {
       ...eventData,
       properties: {
         ...properties,
-        error: classifyAssistantFailureMessage(properties.error),
+        error: safeAssistantErrorProjection(properties.error),
       },
     };
   }
 
   return data;
+}
+
+/**
+ * The single projection for every typed error carrier on a kilocode event.
+ * The classify fallback keeps the field a bounded public message even when
+ * the shape is not recognized.
+ */
+function safeAssistantErrorProjection(source: unknown): string {
+  return projectSafeAssistantError(source) ?? classifyAssistantFailureMessage(source);
 }
 
 function sanitizePublicEventData(eventType: string, data: unknown): unknown {

@@ -55,7 +55,7 @@ catalog:
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
-  - tsx
+  - tsx@4.21.0
   # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
   # wrangler 4.134.0 is the first release with local development support for
   # DO-managed Containers (named-image selection via ctx.container.images).
@@ -70,28 +70,41 @@ minimumReleaseAgeExclude:
   - '@cloudflare/workerd-linux-64@1.20260918.1'
   - '@cloudflare/workerd-linux-arm64@1.20260918.1'
   - '@cloudflare/workerd-windows-64@1.20260918.1'
-  - expo-dev-client
-  - expo-dev-launcher
-  - expo-dev-menu
-  - expo-dev-menu-interface
-  - expo-manifests
-  - expo-updates-interface
-  - '@expo/schema-utils'
-  - '@typescript/native-preview'
-  - '@typescript/native-preview-darwin-arm64'
-  - '@typescript/native-preview-darwin-x64'
-  - '@typescript/native-preview-linux-arm'
-  - '@typescript/native-preview-linux-arm64'
-  - '@typescript/native-preview-linux-x64'
-  - '@typescript/native-preview-win32-arm64'
-  - '@typescript/native-preview-win32-x64'
-  # Anthropic adds new parameters regularly and we can't really wait for them to stabilize
-  - '@ai-sdk/anthropic'
-  - '@anthropic-ai/sdk'
+  - expo-dev-client@57.0.19
+  - expo-dev-launcher@57.0.20
+  - expo-dev-menu@57.0.18
+  - expo-dev-menu-interface@57.0.0
+  - expo-manifests@57.0.2
+  - expo-updates-interface@57.0.2
+  - '@expo/schema-utils@57.0.2'
+  - '@typescript/native-preview@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview@7.0.0-dev.20251019.1'
+  - '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-darwin-arm64@7.0.0-dev.20251019.1'
+  - '@typescript/native-preview-darwin-x64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-darwin-x64@7.0.0-dev.20251019.1'
+  - '@typescript/native-preview-linux-arm@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-linux-arm@7.0.0-dev.20251019.1'
+  - '@typescript/native-preview-linux-arm64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-linux-arm64@7.0.0-dev.20251019.1'
+  - '@typescript/native-preview-linux-x64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-linux-x64@7.0.0-dev.20251019.1'
+  - '@typescript/native-preview-win32-arm64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-win32-arm64@7.0.0-dev.20251019.1'
+  - '@typescript/native-preview-win32-x64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-win32-x64@7.0.0-dev.20251019.1'
+  # Anthropic adds new parameters regularly and we can't really wait for them to
+  # stabilize. 0.109.1 is openclaw's transitive pin; both locked versions are
+  # exempted.
+  - '@ai-sdk/anthropic@4.0.15'
+  - '@anthropic-ai/sdk@0.104.1'
+  - '@anthropic-ai/sdk@0.109.1'
   # Kilo SDK releases are owned internally and adopted with pinned runtime validation.
-  - '@kilocode/sdk'
+  - '@kilocode/sdk@7.2.14'
+  - '@kilocode/sdk@7.2.52'
+  - '@kilocode/sdk@7.8.1'
   # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.
-  - openclaw
+  - openclaw@2026.7.1
   # FlashList 2.3.3 fixes the scroll window in EngagedIndicesTracker: the window
   # was computed from the projected offset alone, so when the trailing buffer was
   # smaller than the projection delta, rows actually on screen were excluded. The

@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 
-import { writeSecretsFile } from './infra-env';
+import { writeSecretsFile } from './secrets-file';
 
 // ---------------------------------------------------------------------------
 // ANSI color constants

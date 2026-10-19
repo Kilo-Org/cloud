@@ -16,10 +16,10 @@
  * The primary checkout keeps the default Compose project and the default ports,
  * so an existing local database and CI stay as they are.
  */
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getInfraBasePort, localPostgresUrl, portOffset } from './services';
+import { writeSecretsFile } from './secrets-file';
 
 /** Compose variable substituted into `dev/docker-compose.yml`, per service. */
 const COMPOSE_PORT_VARS: Record<string, string> = {
@@ -138,41 +138,6 @@ export function applyAppEnv(
   }
 
   return { content: result, changed, kept };
-}
-
-/**
- * Replaces `filePath` with `content` through a temp file in the destination's
- * directory. The temp file is created with mode 0o600 under an unpredictable
- * name, so the replacement never exposes the content to other local
- * principals. An existing destination whose mode grants nothing to group or
- * other keeps that stricter mode; a default-mode file ends at 0o600. Refuses
- * to write through a symlinked destination.
- */
-export function writeSecretsFile(filePath: string, content: string): void {
-  if (fs.lstatSync(filePath, { throwIfNoEntry: false })?.isSymbolicLink()) {
-    throw new Error(`${filePath} is a symlink; refusing to write through it`);
-  }
-  const temp = path.join(
-    path.dirname(filePath),
-    `.${path.basename(filePath)}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`
-  );
-  try {
-    const fd = fs.openSync(temp, 'wx', 0o600);
-    try {
-      fs.writeFileSync(fd, content);
-      const existing = fs.statSync(filePath, { throwIfNoEntry: false });
-      fs.renameSync(temp, filePath);
-      if (existing && (existing.mode & 0o077) === 0) {
-        const current = existing.mode & 0o777;
-        if (current !== 0o600) fs.chmodSync(filePath, current);
-      }
-    } finally {
-      fs.closeSync(fd);
-    }
-  } catch (err) {
-    fs.rmSync(temp, { force: true });
-    throw err;
-  }
 }
 
 function infraPorts(offset: number): Record<string, number> {

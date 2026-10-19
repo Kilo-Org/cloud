@@ -12,9 +12,9 @@ import {
   currentComposeProject,
   DEFAULT_COMPOSE_PROJECT,
   syncInfraEnv,
-  writeSecretsFile,
 } from './infra-env';
 import { applyPortOffset, portOffset } from './services';
+import { writeSecretsFile } from './secrets-file';
 
 const PORTS = { postgres: 5532, redis: 6479, 'redis-http': 8179, grafana: 4100 };
 
@@ -160,6 +160,22 @@ test('writeSecretsFile refuses a symlinked destination and cleans up its temp fi
     assert.throws(() => writeSecretsFile(link, 'a=2\n'), /symlink/);
     assert.equal(fs.readFileSync(target, 'utf-8'), 'a=1\n');
     assert.equal(fs.readdirSync(root).filter(name => name.endsWith('.tmp')).length, 0);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('writeSecretsFile cleans up its temp file when the rename fails', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  try {
+    // A rename onto an existing directory always fails, forcing the failure
+    // path after the temp file exists: the catch must remove the temp.
+    const blocked = path.join(root, 'blocked.env');
+    fs.mkdirSync(blocked);
+
+    assert.throws(() => writeSecretsFile(blocked, 'a=1\n'));
+    assert.equal(fs.readdirSync(root).filter(name => name.endsWith('.tmp')).length, 0);
+    assert.ok(fs.statSync(blocked).isDirectory());
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

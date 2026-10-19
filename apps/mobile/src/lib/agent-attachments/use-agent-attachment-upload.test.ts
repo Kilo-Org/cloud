@@ -469,6 +469,29 @@ describe('addCandidates uploads documents at selection (Step 2)', () => {
     renderer.unmount();
   });
 
+  it('treats a resolved strip that returned the original URI as a strip failure too', async () => {
+    hoisted.manipulateAsync.mockReset();
+    // A manipulator that resolves while pointing at the input file must not
+    // pass as sanitized, so the URI-equality guard fails the chip closed.
+    hoisted.manipulateAsync.mockResolvedValue({
+      uri: 'file:///cache/IMG_0001.HEIC',
+      width: 100,
+      height: 100,
+    });
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('error');
+    expect(chip?.terminal).toBe(true);
+    expect(chip?.metadataStripFailed).toBe(true);
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
   it('renders the limit warning with the plural noun for the total it names', async () => {
     const renderer = await mountHook();
     // Four chips already fill the composer (max 5), so a two-file selection

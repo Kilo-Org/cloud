@@ -34,10 +34,12 @@ export type StripImageMetadataResult =
 /**
  * Re-encode an image with no operations, which drops EXIF, GPS, and maker
  * notes. Returns the new cache URI and the extension of the produced file. If
- * the format-matched re-encode fails, retries once with a forced JPEG output
- * (the one format every platform's encoder supports). Only when that retry
- * also fails does the result say so — the original URI is never returned as a
- * success value, so a caller can never treat an unstripped image as sanitized.
+ * the format-matched re-encode fails, PNG and WebP inputs retry once with a
+ * forced JPEG output (the one format every platform's encoder supports);
+ * JPEG-family inputs (jpg, jpeg, gif, heic, heif) already encode to JPEG and
+ * keep their single attempt. Only a total failure says so in the result — the
+ * original URI is never returned as a success value, so a caller can never
+ * treat an unstripped image as sanitized.
  */
 export async function stripImageMetadata(
   uri: string,

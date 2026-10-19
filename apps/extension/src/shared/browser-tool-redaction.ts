@@ -155,40 +155,42 @@ export const redactSensitiveBody = (text: string): string | undefined => {
 
 /**
  * Replaces urlencoded and multipart form field values whose name matches a
- * listed fragment. urlencoded pairs split on `&`; multipart entries split on
- * their boundary and rejoin untouched, so only matching field values change.
+ * listed fragment. Multipart detection is anchored to a real delimiter line;
+ * anything else is treated as urlencoded and redacted pair by pair, so a
+ * stray non-pair segment never disables the pass.
  */
 const redactFormBody = (text: string): string | undefined => {
-  // A leading `--` line marks a multipart body; the urlencoded path handles the rest.
-  if (/(?:boundary=|^--[^\r\n]+$)/im.test(text)) {
+  // A line of `--<boundary>` delimiters marks a multipart body.
+  if (/^--[^\r\n]+\r?$/m.test(text)) {
     return redactMultipartBody(text);
   }
 
   const pairs = text.split('&');
-
-  // A urlencoded body is only `name=value` pairs; other text passes through unchanged.
-  const isUrlencoded = pairs.length > 0 && pairs.every(pair => /^[\w.~%$-]+=.*/u.test(pair));
-
-  if (!isUrlencoded) {
-    return undefined;
-  }
+  let changed = false;
 
   const masked = pairs.map(pair => {
     const separator = pair.indexOf('=');
 
-    if (separator === -1) {
+    if (separator <= 0) {
       return pair;
     }
 
     const name = pair.slice(0, separator);
 
-    return matchesAnyFragment(name, REPLACED_BODY_KEY_FRAGMENTS) ? `${name}=${BODY_MASK}` : pair;
+    if (!matchesAnyFragment(name, REPLACED_BODY_KEY_FRAGMENTS)) {
+      return pair;
+    }
+
+    changed = true;
+
+    return `${name}=${BODY_MASK}`;
   });
 
-  return masked.join('&');
+  return changed ? masked.join('&') : undefined;
 };
 
 const MULTIPART_FIELD_NAME_PATTERN = /name="([^"]*)"/u;
+const MULTIPART_BOUNDARY_PREFIX = '--';
 
 const redactMultipartBody = (text: string): string | undefined => {
   const lines = text.split('\r\n');
@@ -203,12 +205,23 @@ const redactMultipartBody = (text: string): string | undefined => {
       disposition !== null &&
       matchesAnyFragment(disposition[1] ?? '', REPLACED_BODY_KEY_FRAGMENTS)
     ) {
-      const valueIndex = index + 2;
+      // Skip the part's header lines to the blank separator, then replace the
+      // Value line; stop before the next delimiter line.
+      let valueIndex = index + 1;
 
-      if (valueIndex < lines.length && lines[valueIndex] !== '') {
+      while (valueIndex < lines.length && lines[valueIndex] !== '') {
+        valueIndex += 1;
+      }
+      valueIndex += 1;
+
+      const value = lines[valueIndex];
+
+      if (value !== undefined && value !== '' && !value.startsWith(MULTIPART_BOUNDARY_PREFIX)) {
         lines[valueIndex] = BODY_MASK;
         changed = true;
       }
+
+      index = valueIndex;
     }
 
     index += 1;

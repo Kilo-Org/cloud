@@ -101,6 +101,18 @@ describe('body redaction', () => {
     expect(redactSensitiveBody('1 + 1 = 2')).toBeUndefined();
   });
 
+  it('replaces listed pairs when the body also carries non-pair segments', () => {
+    expect(redactSensitiveBody('note=boundary=x&password=hunter2&flag')).toBe(
+      'note=boundary=x&password=[REDACTED]&flag'
+    );
+  });
+
+  it('replaces bracket-notation names by fragment match', () => {
+    expect(redactSensitiveBody('user[password]=hunter2&remember=true')).toBe(
+      'user[password]=[REDACTED]&remember=true'
+    );
+  });
+
   it('replaces multipart listed-field values and keeps other parts', () => {
     const body = [
       '--BOUNDARY',
@@ -129,6 +141,43 @@ describe('body redaction', () => {
         '',
       ].join('\r\n')
     );
+  });
+
+  it('locates the multipart value line past extra part headers', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="password"',
+      'Content-Type: application/json',
+      '',
+      'hunter2',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="password"',
+        'Content-Type: application/json',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
+  it('reports no change for an empty multipart field value', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="password"',
+      '',
+      '',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBeUndefined();
   });
 
   it('returns undefined for free-text bodies', () => {

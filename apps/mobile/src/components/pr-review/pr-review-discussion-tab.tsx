@@ -310,7 +310,13 @@ export function PrReviewDiscussionTab({
 
   // ── First-page error / terminal states ─────────────────────────────
   const isEmpty = isDiscussionEmpty(threads, conversation);
-  const retainedContentError = !isEmpty && firstPageErrorState?.kind === 'retryable';
+  // A retryable gateway-class failure (retryable or service-unavailable)
+  // with already-loaded rows keeps them: the error renders as a later-page
+  // retry footer, not a tab-level blank.
+  const retainedContentError =
+    !isEmpty &&
+    (firstPageErrorState?.kind === 'retryable' ||
+      firstPageErrorState?.kind === 'service-unavailable');
   const view = selectDiscussionTabView({
     firstPageErrorState: retainedContentError ? null : firstPageErrorState,
     isPending: query.isPending && isEmpty,

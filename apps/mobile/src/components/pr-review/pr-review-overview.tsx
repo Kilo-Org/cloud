@@ -197,7 +197,9 @@ export function PrReviewOverview({
     // the request. A BAD_GATEWAY (service-unavailable) — the authorization
     // layer in front of GitHub, a GitHub 5xx, or a provider transport
     // failure — names its own cause, while every other failure keeps the
-    // generic server-error copy. Both offer Retry.
+    // generic server-error copy. Both offer Retry. Cached data (a failed
+    // background refetch of a previously loaded PR) keeps rendering through
+    // this arm unchanged; the branch only runs when no data is on screen.
     let errorTitle = t('prReview.couldNotLoadPullRequest');
     if (state.kind === 'service-unavailable') {
       errorTitle = t('prReview.reviewServiceUnavailable');

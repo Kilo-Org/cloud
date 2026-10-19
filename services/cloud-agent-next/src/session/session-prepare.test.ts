@@ -1749,6 +1749,38 @@ describe('explicit sandbox session creation', () => {
     );
   });
 
+  it.each([
+    { allocation: 'cloudflare-single' as const, pinned: true },
+    { allocation: 'isolated-standard' as const, pinned: false },
+  ])(
+    'pins a requested $allocation at admission only when selectable',
+    async ({ allocation, pinned }) => {
+      const request = requestForPreset(allocation);
+      const doStub = makeDoStub();
+      admitOperationMock.mockImplementationOnce(
+        async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+          admission: 'admitted' as const,
+          row: makeLedgerRow({
+            organization_id: orgId,
+            canonical_result: admitted.initialCanonicalResult,
+          }),
+        })
+      );
+
+      await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      });
+      const canonical = admitOperationMock.mock.calls[0]?.[1] as {
+        initialCanonicalResult: Record<string, unknown>;
+      };
+      if (pinned) {
+        expect(canonical.initialCanonicalResult).toMatchObject({ sandboxAllocation: allocation });
+      } else {
+        expect(canonical.initialCanonicalResult).not.toHaveProperty('sandboxAllocation');
+      }
+    }
+  );
+
   it('resolves the saved allocation for a fresh prepare create', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       contextAllocation: 'cloudflare-shared',

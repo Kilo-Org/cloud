@@ -1995,7 +1995,8 @@ export async function createSessionWithLedger(
         await sessionCreateIntentFingerprint(initialEffectiveInput),
       [SESSION_CREATE_WORKTREE_ENABLED_KEY]: initialWorktreeEnabled,
       [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
-      ...(requestedSandboxAllocationChoice !== undefined
+      // Match the replay comparison, which only considers selectable choices.
+      ...(isSelectableSandboxAllocation(requestedSandboxAllocationChoice)
         ? { sandboxAllocation: requestedSandboxAllocationChoice }
         : {}),
       ...(savedSandboxAllocation !== undefined

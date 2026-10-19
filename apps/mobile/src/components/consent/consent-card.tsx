@@ -8,6 +8,7 @@ import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRow } from '@/components/consent/consent-row';
+import { FoldSpacer, heightReporter } from '@/components/consent/fold-spacer';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -41,6 +42,9 @@ type ConsentCardProps = {
  */
 export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.6;
 
+const consentDetailsHref = (mode: ConsentMode) =>
+  mode === 'review' ? '/(app)/consent-details?mode=review' : '/(app)/consent-details';
+
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -64,6 +68,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const footerStyle = {
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
+  const [footerContentHeight, setFooterContentHeight] = useState(48);
+  const reportFooterHeight = heightReporter(setFooterContentHeight);
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Onboarding pre-selects optional telemetry. Review mode starts off and the
@@ -290,11 +296,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
           <Pressable
             onPress={() => {
-              router.push(
-                mode === 'review'
-                  ? ('/(app)/consent-details?mode=review' as Href)
-                  : ('/(app)/consent-details' as Href)
-              );
+              router.push(consentDetailsHref(mode));
             }}
             hitSlop={8}
             accessibilityLabel={t('consent.seeFullDetails')}
@@ -306,9 +308,16 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             <DirectionalChevronRight size={16} color={colors.primary} />
           </Pressable>
         </View>
+        {/* Tail clearance matching the footer's measured height: the fold lands
+            in blank spacer space, never inside a text row. */}
+        <FoldSpacer height={footerContentHeight} onMeasure={reportFooterHeight} />
       </ScrollView>
 
-      <View className="gap-3 bg-background px-6 pt-3" style={footerStyle}>
+      <View
+        className="gap-3 bg-background px-6 pt-3"
+        style={footerStyle}
+        onLayout={reportFooterHeight}
+      >
         {/* The error lives in the pinned footer, not the scroll content: the
             footer draws over the scroll tail, so a content-placed error was
             invisible behind the buttons (b911 vr2 device repro — staging

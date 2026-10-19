@@ -3,6 +3,7 @@ import type { OrganizationGroupPolicyContext } from './organization-group-policy
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
+  nonEnterpriseModelAccessPolicy,
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
@@ -77,6 +78,34 @@ describe('effective organization model access', () => {
     expect(
       (await getEffectiveModelDecision(policy, 'anthropic/claude', async () => new Set())).allowed
     ).toBe(true);
+  });
+
+  it('evaluates every non-Enterprise organization to the shared non-Enterprise policy', () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          plan: 'teams',
+          settings: {
+            provider_allow_list: ['anthropic'],
+            model_deny_list: ['openai/o3'],
+            data_collection: 'deny',
+          },
+        },
+        groupPolicies: [[{ type: 'model_access', data: { mode: 'none' } }]],
+        policyRevision: 4,
+      })
+    );
+
+    expect(policy).toStrictEqual(nonEnterpriseModelAccessPolicy('deny', 4));
+    expect(policy).toStrictEqual({
+      requireModelInCurrentSnapshot: false,
+      organizationModelDenyList: [],
+      organizationProviderCeiling: undefined,
+      memberGrant: { mode: 'unrestricted' },
+      dataCollection: 'deny',
+      policyRevision: 4,
+    });
   });
 
   it('denies Enterprise model aliases missing from the current snapshot', async () => {

@@ -280,6 +280,7 @@ function memberBalanceRow(overrides: Partial<OrganizationMemberBalanceRow> = {})
     auto_top_up_enabled: false,
     next_credit_expiration_at: null,
     created_at: '2026-01-01T00:00:00.000Z',
+    deleted_at: null,
     ...overrides,
   } satisfies OrganizationMemberBalanceRow;
 }

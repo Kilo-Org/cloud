@@ -55,26 +55,33 @@ export type EffectiveModelDecision = {
  */
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
+export function nonEnterpriseModelAccessPolicy(
+  dataCollection: OrganizationSettings['data_collection'],
+  policyRevision: number
+): EffectiveOrganizationModelPolicy {
+  return {
+    requireModelInCurrentSnapshot: false,
+    organizationModelDenyList: [],
+    organizationProviderCeiling: undefined,
+    memberGrant: { mode: 'unrestricted' },
+    dataCollection,
+    policyRevision,
+  };
+}
+
 export function evaluateEffectiveModelAccessPolicy(
   context: OrganizationGroupPolicyContext
 ): EffectiveOrganizationModelPolicy {
-  const organizationRestrictionsEnabled = context.organization.plan === 'enterprise';
-  const organizationModelDenyList = organizationRestrictionsEnabled
-    ? (context.organization.settings.model_deny_list ?? []).map(normalizeModelId)
-    : [];
-  const organizationProviderCeiling = organizationRestrictionsEnabled
-    ? context.organization.settings.provider_allow_list
-    : undefined;
-  if (!organizationRestrictionsEnabled) {
-    return {
-      requireModelInCurrentSnapshot: false,
-      organizationModelDenyList,
-      organizationProviderCeiling,
-      memberGrant: { mode: 'unrestricted' },
-      dataCollection: context.organization.settings.data_collection,
-      policyRevision: context.policyRevision,
-    };
+  if (context.organization.plan !== 'enterprise') {
+    return nonEnterpriseModelAccessPolicy(
+      context.organization.settings.data_collection,
+      context.policyRevision
+    );
   }
+  const organizationModelDenyList = (context.organization.settings.model_deny_list ?? []).map(
+    normalizeModelId
+  );
+  const organizationProviderCeiling = context.organization.settings.provider_allow_list;
 
   const defaultPolicy = context.defaultPolicies.find(policy => policy.type === 'model_access');
   const groupPolicies = context.groupPolicies

@@ -73,6 +73,22 @@ describe('Organization Usage Functions', () => {
       expect(result.settings?.model_deny_list).toEqual(['fizz', 'buzz']);
     });
 
+    test('should report whether the organization is soft-deleted', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Test Org', user.id, 50000);
+
+      const live = await getBalanceForOrganizationUser(organization.id, user.id);
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      const deleted = await getBalanceForOrganizationUser(organization.id, user.id);
+
+      expect(live.organizationDeleted).toBe(false);
+      expect(deleted.organizationDeleted).toBe(true);
+      expect(deleted.plan).toBe(live.plan);
+    });
+
     test('should return balance for regular member', async () => {
       const owner = await insertTestUser();
       const member = await insertTestUser();

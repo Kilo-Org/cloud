@@ -52,6 +52,7 @@ type BalanceAndOrgSettings = {
   balance: number;
   settings?: OrganizationSettings;
   plan?: OrganizationPlan;
+  organizationDeleted?: boolean;
   balanceLimitedByUserAllowance?: boolean;
   /** Absent when the user is not a member of the organization. */
   payer?: BalancePayer;
@@ -119,6 +120,7 @@ export async function getBalanceForOrganizationUser(
     auto_top_up_enabled,
     next_credit_expiration_at,
     created_at,
+    deleted_at,
   } = row;
 
   let total_microdollars_acquired = row.total_microdollars_acquired;
@@ -183,6 +185,7 @@ export async function getBalanceForOrganizationUser(
     balance: fromMicrodollars(balanceMicrodollars),
     settings,
     plan,
+    organizationDeleted: deleted_at !== null,
     balanceLimitedByUserAllowance: limitedByUserAllowance,
     payer,
   };

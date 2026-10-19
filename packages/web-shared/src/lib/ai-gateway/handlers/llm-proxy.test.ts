@@ -64,7 +64,12 @@ import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewrit
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import {
+  evaluateEffectiveModelAccessPolicy,
+  getEffectiveModelDecision,
+  nonEnterpriseModelAccessPolicy,
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import type * as EffectiveModelAccess from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -125,6 +130,9 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
+  nonEnterpriseModelAccessPolicy: jest.requireActual<typeof EffectiveModelAccess>(
+    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+  ).nonEnterpriseModelAccessPolicy,
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => ({
   isNonTrialEnterpriseOrganization: jest.fn(async () => false),
@@ -1059,6 +1067,86 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(jest.mocked(getOrganizationGroupPolicyContext)).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: 'org-1', fromDb: readDb })
     );
+  });
+
+  describe('organization model-access policy', () => {
+    function setOrganizationMember(
+      balanceAndSettings: Partial<Awaited<ReturnType<typeof getBalanceAndOrgSettings>>>
+    ) {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 1000, ...balanceAndSettings });
+    }
+
+    it.each([
+      { decision: { allowed: true }, status: 200 },
+      { decision: { allowed: false, denialSource: 'organization_model' as const }, status: 404 },
+    ])(
+      'decides a non-Enterprise organization without the policy context (allowed: $decision.allowed)',
+      async ({ decision, status }) => {
+        setOrganizationMember({
+          settings: { data_collection: 'deny', model_deny_list: ['openai/gpt-4o'] },
+          plan: 'teams',
+        });
+        mockedGetEffectiveModelDecision.mockResolvedValue(decision);
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(status);
+        expect(jest.mocked(getOrganizationGroupPolicyContext)).not.toHaveBeenCalled();
+        expect(jest.mocked(evaluateEffectiveModelAccessPolicy)).not.toHaveBeenCalled();
+        expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+          nonEnterpriseModelAccessPolicy('deny', 0),
+          'openai/gpt-4o'
+        );
+      }
+    );
+
+    it.each([
+      { name: 'an Enterprise organization', balanceAndSettings: { plan: 'enterprise' as const } },
+      { name: 'a member without a spending membership', balanceAndSettings: { plan: undefined } },
+      {
+        name: 'a soft-deleted organization',
+        balanceAndSettings: { plan: 'teams' as const, organizationDeleted: true },
+      },
+    ])('resolves the policy context for $name', async ({ balanceAndSettings }) => {
+      setOrganizationMember({ settings: {}, ...balanceAndSettings });
+      const groupPolicy = nonEnterpriseModelAccessPolicy(undefined, 3);
+      jest.mocked(evaluateEffectiveModelAccessPolicy).mockReturnValueOnce(groupPolicy);
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      const policyContextCalls = jest.mocked(getOrganizationGroupPolicyContext).mock.calls;
+      expect(policyContextCalls).toHaveLength(1);
+      expect(policyContextCalls[0]?.[0].organizationId).toBe('org-1');
+      expect(policyContextCalls[0]?.[0].subject).toEqual({
+        type: 'member',
+        kiloUserId: 'user-123',
+      });
+      expect(policyContextCalls[0]?.[0].fromDb).toBe(readDb);
+      expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(groupPolicy, 'openai/gpt-4o');
+    });
+
+    it('fails the request when the policy context rejects a soft-deleted organization', async () => {
+      setOrganizationMember({ settings: {}, plan: 'teams', organizationDeleted: true });
+      jest
+        .mocked(getOrganizationGroupPolicyContext)
+        .mockRejectedValueOnce(new Error('Organization not found'));
+
+      await expect(handleLlmProxyRequest(makeRequest(makeBody()) as never)).rejects.toThrow(
+        'Organization not found'
+      );
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
   });
 
   describe('Anthropic provider for Claude', () => {

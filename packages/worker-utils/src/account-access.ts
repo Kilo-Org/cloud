@@ -75,6 +75,7 @@ export type OrganizationMemberBalanceRow = Pick<
   | 'auto_top_up_enabled'
   | 'next_credit_expiration_at'
   | 'created_at'
+  | 'deleted_at'
 > & {
   microdollar_limit: number | null;
   microdollar_usage: number | null;
@@ -99,6 +100,7 @@ export async function findOrganizationMemberBalanceRow(
       auto_top_up_enabled: organizations.auto_top_up_enabled,
       next_credit_expiration_at: organizations.next_credit_expiration_at,
       created_at: organizations.created_at,
+      deleted_at: organizations.deleted_at,
     })
     .from(organizations)
     .innerJoin(

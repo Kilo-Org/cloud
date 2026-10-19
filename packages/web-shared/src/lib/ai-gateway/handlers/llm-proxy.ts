@@ -144,6 +144,7 @@ import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/orga
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
+  nonEnterpriseModelAccessPolicy,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
@@ -330,15 +331,24 @@ export async function handleLlmProxyRequest(
       plan: balanceAndSettings.plan,
     })
   );
-  const organizationGroupPolicyPromise = authPromise.then(async auth => {
-    if (!auth.organizationId || !auth.user || auth.authFailedResponse) return null;
-    const context = await getOrganizationGroupPolicyContext({
-      organizationId: auth.organizationId,
-      subject: { type: 'member', kiloUserId: auth.user.id },
-      fromDb: readDb,
-    });
-    return evaluateEffectiveModelAccessPolicy(context);
-  });
+  const organizationGroupPolicyPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(
+    async ([auth, { plan, settings, organizationDeleted }]) => {
+      if (!auth.organizationId || !auth.user || auth.authFailedResponse) return null;
+      // The policy context only adds group policies, which apply to Enterprise only. Its other
+      // checks are covered: auth required a membership row, a plan means the balance query found
+      // it, and soft-deleted organizations still take the context path, which rejects them.
+      // Nothing here reads policyRevision; 0 is what the context reports without a settings row.
+      if (plan && plan !== 'enterprise' && !organizationDeleted) {
+        return nonEnterpriseModelAccessPolicy(settings?.data_collection, 0);
+      }
+      const context = await getOrganizationGroupPolicyContext({
+        organizationId: auth.organizationId,
+        subject: { type: 'member', kiloUserId: auth.user.id },
+        fromDb: readDb,
+      });
+      return evaluateEffectiveModelAccessPolicy(context);
+    }
+  );
   // Some early returns do not await organization policy. Keep those paths from
   // surfacing policy-context failures as unhandled rejections.
   void organizationGroupPolicyPromise.catch(() => {});

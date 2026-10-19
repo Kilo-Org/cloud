@@ -538,6 +538,38 @@ describe('cloud-agent pending-upload ledger', () => {
     ).resolves.toBeDefined();
   });
 
+  it('applies the per-account ceiling when one attachment id repeats', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const attachmentId = crypto.randomUUID();
+
+    for (let i = 0; i < CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT; i++) {
+      const messageUuid = crypto.randomUUID();
+      await admitPendingUpload({
+        kiloUserId,
+        messageUuid,
+        attachmentId,
+        objectKey: buildObjectKey(kiloUserId, messageUuid, attachmentId),
+        freshObjectKey: buildObjectKey(kiloUserId, messageUuid, crypto.randomUUID()),
+        byteSize: 1,
+      });
+    }
+
+    const freshMessageUuid = crypto.randomUUID();
+    await expect(
+      admitPendingUpload({
+        kiloUserId,
+        messageUuid: freshMessageUuid,
+        attachmentId,
+        objectKey: buildObjectKey(kiloUserId, freshMessageUuid, attachmentId),
+        freshObjectKey: buildObjectKey(kiloUserId, freshMessageUuid, crypto.randomUUID()),
+        byteSize: 1,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: `Maximum ${CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT} uploads allowed per account`,
+    });
+  });
+
   it('purgeUserPendingUploads deletes objects for the caller across row statuses', async () => {
     mockSend.mockResolvedValue({});
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;

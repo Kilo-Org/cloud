@@ -40,7 +40,10 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import {
+  getValidGitLabToken,
+  isGitLabCredentialConnected,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
@@ -483,10 +486,26 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   /**
    * Gets the GitLab OAuth integration status for organization
    */
-  getGitLabStatus: organizationMemberProcedure.query(async ({ input }) => {
+  getGitLabStatus: organizationMemberProcedure.query(async ({ input, ctx }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
 
     if (!isPlatformIntegrationHealthy(integration)) {
+      return {
+        connected: false,
+        integration: null,
+      };
+    }
+
+    // The row being healthy says nothing about the stored credential. Ask the
+    // token service to resolve it, exactly as a review read would, so an
+    // expired or revoked credential reports as not connected instead of
+    // sending the settings surface into review-only content.
+    if (
+      !(await isGitLabCredentialConnected(integration, {
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+      }))
+    ) {
       return {
         connected: false,
         integration: null,

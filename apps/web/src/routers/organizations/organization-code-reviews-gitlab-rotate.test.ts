@@ -1,5 +1,6 @@
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsGitLabCredentialConnected = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
   syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
@@ -7,6 +8,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+  isGitLabCredentialConnected: (...args: unknown[]) => mockIsGitLabCredentialConnected(...args),
 }));
 
 // NOTE: `jest` is intentionally NOT imported from '@jest/globals' here. The
@@ -117,6 +119,7 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
   beforeEach(() => {
     mockSyncWebhooksForRepositories.mockReset();
     mockGetValidGitLabToken.mockReset();
+    mockIsGitLabCredentialConnected.mockReset().mockResolvedValue(true);
     // Default sync outcome: every currently-configured repo was "updated"
     // (mirrors the `previous=[]` "treat all as added" path used by rotate).
     mockSyncWebhooksForRepositories.mockImplementation(
@@ -198,6 +201,24 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
 
       expect(status.connected).toBe(true);
       expect(status.integration).not.toHaveProperty('webhookSecret');
+    });
+
+    it('reports not connected when the stored credential is unusable despite a healthy row', async () => {
+      const { organization } = await makeOrgAndOwner();
+      const member = await insertTestUser();
+      SEED_USER_IDS.push(member.id);
+      await addUserToOrganization(organization.id, member.id, 'member');
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+      });
+      mockIsGitLabCredentialConnected.mockResolvedValue(false);
+
+      const caller = await createCallerForUser(member.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status).toEqual({ connected: false, integration: null });
     });
   });
 

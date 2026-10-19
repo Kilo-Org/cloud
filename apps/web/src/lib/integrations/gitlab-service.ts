@@ -154,6 +154,30 @@ export async function getGitLabIntegration(owner: Owner): Promise<PlatformIntegr
 }
 
 /**
+ * Whether the integration's stored credential is currently usable. Asks the
+ * private-key holding token service to resolve it — the same resolution every
+ * review read performs — so a row that is active but whose credential the
+ * broker refuses answers `connected: false` instead of faking health.
+ *
+ * Only a definitive broker refusal disconnects. `temporarily_unavailable`
+ * (and any transport error, already mapped inside the broker client) fails
+ * open, so a token-service blip never renders a working connection as
+ * broken.
+ */
+export async function isGitLabCredentialConnected(
+  integration: PlatformIntegration,
+  actor: GitLabCredentialActor
+): Promise<boolean> {
+  const result = await fetchGitLabCredential(actor, {
+    credential: 'integration',
+    integrationId: integration.id,
+  });
+  if (result.status === 'available') return true;
+  if (result.status === 'reconnect_required' || result.status === 'not_connected') return false;
+  return true;
+}
+
+/**
  * Resolve a GitLab credential through the private-key holding token service.
  */
 function requireAvailableGitLabCredential(

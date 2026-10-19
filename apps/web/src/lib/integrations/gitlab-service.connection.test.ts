@@ -3,10 +3,12 @@ import type { GitLabCredentialBrokerResult } from '@/lib/integrations/platforms/
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { isGitLabCredentialConnected as IsGitLabCredentialConnected } from './gitlab-service';
 
-const mockFetchGitLabCredential = jest.fn<() => Promise<GitLabCredentialBrokerResult>>();
+const mockFetchGitLabCredential =
+  jest.fn<(actor: unknown, selector: unknown) => Promise<GitLabCredentialBrokerResult>>();
 
 jest.mock('@/lib/integrations/platforms/gitlab/credential-broker-client', () => ({
-  fetchGitLabCredential: (...args: unknown[]) => mockFetchGitLabCredential(...(args as [])),
+  fetchGitLabCredential: (...args: unknown[]) =>
+    mockFetchGitLabCredential(...(args as [unknown, unknown])),
 }));
 
 // `gitlab-service` imports the db module at load time; the status helper under

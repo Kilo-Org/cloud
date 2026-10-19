@@ -29,6 +29,7 @@ import {
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { isZeroDataRetentionUnsupportedForByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -69,6 +70,7 @@ import {
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
+  zeroDataRetentionByokResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -913,6 +915,16 @@ export async function handleLlmProxyRequest(
     if (effectiveProviderConfig) {
       requestBodyParsed.body.provider = effectiveProviderConfig;
     }
+  }
+
+  if (
+    isZeroDataRetentionUnsupportedForByok(
+      effectiveProviderContext.provider.id,
+      effectiveProviderContext.userByok,
+      requestBodyParsed.body.provider
+    )
+  ) {
+    return zeroDataRetentionByokResponse();
   }
 
   console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);

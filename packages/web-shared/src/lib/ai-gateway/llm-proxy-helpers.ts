@@ -224,6 +224,21 @@ export function dataCollectionRequiredResponse() {
   );
 }
 
+/**
+ * A request that asks for zero data retention cannot use the caller's own
+ * provider key: the gateway enforces retention by skipping credentials it cannot
+ * verify. Serving it would either drop the key or ignore the preference, so the
+ * combination is refused with a reason the caller can act on.
+ */
+export function zeroDataRetentionByokResponse() {
+  const error =
+    'Zero data retention cannot be applied when a request uses your own provider key. Remove the zero data retention preference or use a model served without your key.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.invalid_request, message: error },
+    { status: 400 }
+  );
+}
+
 export function checkExclusiveModelProviderAllowed(
   model: string,
   provider: OpenRouterProviderConfig | undefined

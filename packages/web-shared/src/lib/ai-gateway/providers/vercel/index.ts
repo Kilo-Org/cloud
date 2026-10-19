@@ -1,4 +1,4 @@
-import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { BYOKResult, ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { VercelUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
@@ -255,6 +255,22 @@ export function getVercelInferenceProviderConfigForUserByok(
   return [key, list];
 }
 
+/**
+ * Vercel applies request-level zero data retention by routing only to providers
+ * with which it holds a ZDR agreement. A request-scoped BYOK key cannot be marked
+ * ZDR-compliant (that flag lives on dashboard credentials), so enabling ZDR
+ * silently drops the caller's key and serves the request on the gateway's own
+ * credentials. The request is therefore rejected before routing instead of
+ * leaving the constraint unenforced or spending on another account.
+ */
+export function isZeroDataRetentionUnsupportedForByok(
+  providerId: ProviderId,
+  userByok: BYOKResult[] | null,
+  provider: Pick<OpenRouterProviderConfig, 'zdr'> | undefined
+): boolean {
+  return providerId === 'vercel' && Boolean(userByok?.length) && provider?.zdr === true;
+}
+
 export async function applyVercelSettings(
   requestedModel: string,
   requestToMutate: GatewayRequest,
@@ -295,15 +311,16 @@ export async function applyVercelSettings(
       Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
 
     // Pass request-scoped credentials and restrict routing to the corresponding providers.
-    // Request-level data handling preferences travel with the request on every routing path,
-    // so upstream providers receive the caller's retention and training choices consistently.
+    // `zeroDataRetention` is deliberately absent: Vercel enforces it by skipping BYOK
+    // keys it cannot verify and falling back to its own credentials, so setting it here
+    // would replace the caller's key with Kilo's. Requests that ask for it are rejected
+    // before this transform; see isZeroDataRetentionUnsupportedForByok.
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),
         sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
         models: requestToMutate.body.models,
-        zeroDataRetention: requestToMutate.body.provider?.zdr,
         disallowPromptTraining:
           requestToMutate.body.provider?.data_collection === 'deny' || undefined,
         ...getSessionAffinityOptions(requestToMutate),

@@ -242,6 +242,10 @@ describe('use-native-auth error mapping', () => {
     expect(mapError(undefined)).toBe(defaultErrorMessage());
   });
 
+  it('returns the default error message for an empty-string code', () => {
+    expect(mapError('')).toBe(defaultErrorMessage());
+  });
+
   it('returns the default error message for an unknown code', () => {
     expect(mapError('NONEXISTENT_CODE')).toBe(defaultErrorMessage());
   });

@@ -19,7 +19,8 @@ const attributionPathSegmentSchema = z
   // eslint-disable-next-line no-control-regex
   .refine(value => !/[\u0000-\u001f\u007f]/.test(value), 'must not contain control characters')
   .refine(
-    value => value.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..'),
+    value =>
+      value.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..'),
     'must be a normalized relative path'
   );
 

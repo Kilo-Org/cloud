@@ -4,7 +4,9 @@
  * implementation is exercised.
  */
 jest.mock('cloudflare:workers', () => ({ DurableObject: class {} }), { virtual: true });
-jest.mock('./util/logger', () => ({ logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() } }));
+jest.mock('./util/logger', () => ({
+  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
 
 const trackAttribution = jest.fn();
 jest.mock('./dos/AttributionTracker.do', () => ({
@@ -20,7 +22,9 @@ jest.mock('./util/auth', () => ({
     return next();
   },
 }));
-jest.mock('./util/admin-auth', () => ({ adminAuthMiddleware: async (_c: unknown, next: () => Promise<void>) => next() }));
+jest.mock('./util/admin-auth', () => ({
+  adminAuthMiddleware: async (_c: unknown, next: () => Promise<void>) => next(),
+}));
 
 import type { HonoContext } from './ai-attribution.worker';
 import {

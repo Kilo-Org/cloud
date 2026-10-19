@@ -834,15 +834,14 @@ describe('api routes', () => {
     });
 
     it.each([
-      ['missing', undefined, 'no_content_length', 'stream'],
-      ['negative', '-1', 'invalid_content_length', 'stream'],
-      ['fractional', '1.5', 'invalid_content_length', 'stream'],
-      ['non-numeric', 'abc', 'invalid_content_length', 'stream'],
-      ['zero', '0', 'empty_body', 'bytes'],
-      ['over cap', '4194305', 'oversized_body', 'stream'],
+      ['missing', undefined, 'no_content_length'],
+      ['negative', '-1', 'invalid_content_length'],
+      ['fractional', '1.5', 'invalid_content_length'],
+      ['non-numeric', 'abc', 'invalid_content_length'],
+      ['zero', '0', 'empty_body'],
     ] as const)(
       'uses the legacy path for %s Content-Length',
-      async (_name, contentLength, reason, bodyShape) => {
+      async (_name, contentLength, reason) => {
         const { app, ingest } = prepareIngestRoute();
         const env = directIngestEnv();
         const headers =
@@ -858,17 +857,47 @@ describe('api routes', () => {
         expect(response.status).toBe(200);
         expect(ingest).not.toHaveBeenCalled();
         expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
-        // A measured small body crosses the DO RPC by value; an unmeasured or
-        // over-budget body keeps streaming.
-        expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(
-          bodyShape === 'bytes' ? Uint8Array : ReadableStream
-        );
+        // The body is read through the staging byte budget before staging, so
+        // even unmeasured requests stage measured bytes.
+        expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(Uint8Array);
         expect(info).toHaveBeenCalledWith(
           expect.objectContaining({ event: 'direct_ingest_legacy', reason })
         );
         info.mockRestore();
       }
     );
+
+    it.each([
+      ['declared over cap', '4194305', 8],
+      ['undeclared over cap', undefined, 4_194_305],
+    ] as const)('rejects a %s body without staging', async (_name, contentLength, size) => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const headers = contentLength === undefined ? undefined : { 'content-length': contentLength };
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          headers,
+          body: 'x'.repeat(size),
+        }),
+        env
+      );
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ success: false, error: 'payload_too_large' });
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'direct_ingest_reject',
+          reason: expect.stringMatching(/declared_bytes_exceeded|staging_budget_exceeded/),
+        })
+      );
+      warn.mockRestore();
+    });
 
     it('keeps gate-miss staging failures out of the direct fallback denominator', async () => {
       const { app } = prepareIngestRoute();

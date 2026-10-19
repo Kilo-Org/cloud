@@ -92,14 +92,30 @@ export async function handleDirectIngestRequest(
   const startedAt = performance.now();
   const r2Key = `ingest/${request.kiloUserId}/${request.sessionId}/${request.ingestRequestId}`;
   const configResult = parseDirectIngestConfig(request.env);
+  // Bodies entering staging are measured against a staging limit. When the
+  // rollout config is unreadable, the shared service ceiling applies, which is
+  // the same upper bound config validation applies to the configured limit.
+  const stagingBudget = configResult.ok ? configResult.config.maxBytes : INGEST_CHUNK_MAX_BYTES;
+
+  const legacyWithBoundedBody = async (
+    reason: LegacyReason,
+    metrics: DirectIngestMetrics
+  ): Promise<DirectIngestResponse> => {
+    const buffered = await readBoundedStream(request.body, stagingBudget);
+    if (!buffered.ok) {
+      logEvent('warn', {
+        event: 'direct_ingest_reject',
+        ...eventBase(request, startedAt, { ...metrics, declaredBytes: null }),
+        reason: 'staging_budget_exceeded',
+      });
+      return { status: 413, body: { success: false, error: 'payload_too_large' } };
+    }
+    return legacy(request, r2Key, buffered.bytes, { reason, metrics, startedAt });
+  };
 
   if (!configResult.ok) {
     console.error({ event: 'direct_ingest_config_error', reason: configResult.reason });
-    return legacy(request, r2Key, request.body, {
-      reason: 'gate_config',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('gate_config', unknownMetrics());
   }
 
   let selection;
@@ -111,34 +127,18 @@ export async function handleDirectIngestRequest(
       reason: 'bucket_failure',
       error: errorMessage(error),
     });
-    return legacy(request, r2Key, request.body, {
-      reason: 'gate_config',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('gate_config', unknownMetrics());
   }
   if (!selection.selected) {
-    return legacy(request, r2Key, request.body, {
-      reason: 'gate_percent',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('gate_percent', unknownMetrics());
   }
 
   const contentLength = parseContentLength(request.contentLength);
   if (contentLength === 'missing') {
-    return legacy(request, r2Key, request.body, {
-      reason: 'no_content_length',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('no_content_length', unknownMetrics());
   }
   if (contentLength === 'invalid') {
-    return legacy(request, r2Key, request.body, {
-      reason: 'invalid_content_length',
-      metrics: unknownMetrics(),
-      startedAt,
-    });
+    return legacyWithBoundedBody('invalid_content_length', unknownMetrics());
   }
   if (contentLength === 'empty') {
     return legacy(request, r2Key, request.body, {
@@ -147,12 +147,17 @@ export async function handleDirectIngestRequest(
       startedAt,
     });
   }
-  if (contentLength > configResult.config.maxBytes) {
-    return legacy(request, r2Key, request.body, {
-      reason: 'oversized_body',
-      metrics: { declaredBytes: contentLength, actualBytes: null, items: null },
-      startedAt,
+  if (contentLength > stagingBudget) {
+    logEvent('warn', {
+      event: 'direct_ingest_reject',
+      ...eventBase(request, startedAt, {
+        declaredBytes: contentLength,
+        actualBytes: null,
+        items: null,
+      }),
+      reason: 'declared_bytes_exceeded',
     });
+    return { status: 413, body: { success: false, error: 'payload_too_large' } };
   }
 
   let buffered: Awaited<ReturnType<typeof readBoundedStream>>;

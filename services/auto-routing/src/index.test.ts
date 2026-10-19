@@ -1811,6 +1811,77 @@ describe('auto routing worker', () => {
       );
     });
 
+    it('serves an unmigrated org pool from its owner table beside a migrated personal pool', async () => {
+      const organizationId = '00000000-0000-4000-8000-000000000001';
+      const org = ownerSettingsObject({ mode: null, pool });
+      const personal = ownerSettingsObject({ mode: null, pool: null });
+      modeConfigGet.mockImplementation((id: string) =>
+        id === `org:${organizationId}` ? org.object : personal.object
+      );
+      const definition = convertedOwnerPoolRouter({
+        owner: { type: 'user', id: 'user-1' },
+        mode: 'cost_per_accuracy',
+        configuredMode: null,
+        models: ['personal/chat'],
+      });
+      const personalRouter = toCustomRouterDefinition({
+        id: '22222222-2222-4222-8222-222222222222',
+        owned_by_user_id: 'user-1',
+        owned_by_organization_id: null,
+        created_by_user_id: null,
+        slug: definition.slug,
+        name: definition.name,
+        base_router: definition.baseRouter,
+        mode: definition.mode,
+        entries: definition.entries,
+        default_entry_key: definition.defaultEntryKey,
+        legacy_pool: true,
+        legacy_mode_inherited: true,
+        created_at: '2026-10-18T00:00:00.000Z',
+        updated_at: '2026-10-18T00:00:00.000Z',
+      });
+      findLegacyPoolRouter.mockImplementation(async (_env, owner: { type: string }) =>
+        owner.type === 'user' ? personalRouter : null
+      );
+      dbWhereCaps.mockResolvedValue([
+        {
+          openrouterId: 'pool/chat',
+          inputModalities: [],
+          contextLength: 1_000_000,
+          isActive: true,
+        },
+      ]);
+      benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/custom-routing-table')) {
+          return Response.json({ table: customTable });
+        }
+        if (String(url).includes('/admin/classifier-winner')) {
+          return Response.json({ winner: null });
+        }
+        return Response.json({
+          table: benchmarkRoutingTable,
+          publishedAt: benchmarkRoutingTable.generatedAt,
+        });
+      });
+
+      const response = await decideRequest(mirrorPayload({ organizationId }));
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'pool/chat', variant: 'thinking', tableVersion: 'custom-1' },
+      });
+      expect(benchmarkFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/admin/custom-routing-table'),
+        expect.objectContaining({
+          body: JSON.stringify({
+            router: 'efficient',
+            ownerType: 'org',
+            ownerId: organizationId,
+            entries: pool,
+          }),
+        })
+      );
+    });
+
     it.each(['pool/chat', '~pool/latest'])(
       'uses returned candidate %s for capabilities across benchmark worker versions',
       async candidateModel => {

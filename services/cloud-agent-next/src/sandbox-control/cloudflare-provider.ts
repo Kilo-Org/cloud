@@ -7,6 +7,7 @@ import {
   isSandboxBillingBlocked,
   isSandboxContainerRunning,
   parseSandboxBillingInput,
+  releaseSandboxBillingAdmission,
 } from '../container-usage-context.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from '../sandbox-id.js';
 import type { SandboxInstance } from '../types.js';
@@ -21,6 +22,7 @@ import { ProviderCreationError } from './provider.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
 import { withDORetry } from '../utils/do-retry.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 
 export const WRAPPER_PROC_PROBE_TIMEOUT_MS = 5_000;
 
@@ -110,8 +112,15 @@ export function createCloudflareProviderAdapter(deps: {
     }
     const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
     const blocked = await isSandboxBillingBlocked(sandbox, input.enforcementRequested);
-    if (input.enforcementRequested || blocked) {
-      const admission = await ensureSandboxBillingAdmissionInput(sandbox, input);
+    if (input.enforcementRequested || blocked || input.allocationId !== undefined) {
+      const admission = await withDORetry(
+        () => deps.getSandbox(parsed.sandboxId, { containment: parsed.containment }),
+        sandbox => ensureSandboxBillingAdmissionInput(sandbox, input),
+        'ensureSandboxBillingAdmission'
+      ).catch((error: unknown) => {
+        if (getContainerCapacityFailureReason(error)) throw error;
+        throw new ProviderCreationError('meter_unavailable');
+      });
       if (!admission.success) {
         throw new ProviderCreationError(admission.code);
       }
@@ -171,8 +180,25 @@ export function createCloudflareProviderAdapter(deps: {
           : true,
         instanceId: intent.intentId,
       });
-      await ensureBillingAdmission(providerRef, intent.billing);
+      await ensureBillingAdmission(
+        providerRef,
+        intent.billing === undefined
+          ? undefined
+          : { ...intent.billing, allocationId: intent.intentId }
+      );
       return { providerRef };
+    },
+    async releaseBillingAdmission(intent) {
+      if (intent.billing === undefined) return;
+      const sandboxId = intent.allocationName ?? deps.sandboxId;
+      const containment = intent.containment
+        ? intent.containment.kilocode || intent.containment.github
+        : true;
+      await withDORetry(
+        () => deps.getSandbox(sandboxId, { containment }),
+        sandbox => releaseSandboxBillingAdmission(sandbox, intent.intentId),
+        'releaseSandboxBillingAdmission'
+      );
     },
     async launch(ref, env) {
       const parsed = decodeCloudflareProviderRef(ref);

@@ -30,6 +30,7 @@ export type ContainersBillingHost = {
   storage: BillingContextStorage;
   meter: ContainerUsageRpcMethods;
   heartbeatSeconds: number;
+  containerConcurrencyDisabled?: boolean;
   isContainerRunning: () => boolean;
   stopContainer: () => Promise<void>;
   destroyContainer: () => Promise<void>;
@@ -237,6 +238,7 @@ export class ContainersBilling {
     this.lifecycle = new MeteredBillingLifecycle({
       storage: host.storage,
       usageClient,
+      containerConcurrencyDisabled: host.containerConcurrencyDisabled,
       schedule: async (delaySeconds, callback, payload) => {
         await host.container.schedule(delaySeconds, callback, payload);
       },
@@ -299,6 +301,14 @@ export class ContainersBilling {
 
   configureBilling(input: unknown) {
     return this.lifecycle.configureBilling(this.billingIdentity, input);
+  }
+
+  reserveBeforeStart() {
+    return this.lifecycle.reserveBeforeStart(this.billingIdentity);
+  }
+
+  releaseBillingAdmission(allocationId: string) {
+    return this.lifecycle.releaseBillingAdmission(allocationId);
   }
 
   onContainerStarted() {

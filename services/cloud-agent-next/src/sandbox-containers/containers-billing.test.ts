@@ -386,8 +386,11 @@ describe('ContainersBilling identity and admission', () => {
     meter.startBehavior = 'reject';
 
     const admission = admit(instance, 'standard-4');
+    const rejected = expect(admission).rejects.toMatchObject({
+      code: 'container_capacity_unavailable',
+    });
     await vi.runAllTimersAsync();
-    await expect(admission).resolves.toMatchObject({ success: false, code: 'meter_unavailable' });
+    await rejected;
 
     const context = storage.map.get(BILLING_CONTEXT_KEY) as
       | { generation?: string; measurementStarted?: boolean }
@@ -465,7 +468,7 @@ describe('ContainersBilling physical lifecycle', () => {
     expect((await instance.getState()).status).toBe('running');
   });
 
-  it('stamps the launch time, not the admission time, on the first schedule', async () => {
+  it('preserves the admission cursor so successful creates bill their create duration', async () => {
     const { instance, storage, pendingTasks } = setup();
     await admit(instance, 'standard-4');
     const admittedAt = (storage.map.get(BILLING_CONTEXT_KEY) as { usageMeasuredAtMs: number })
@@ -480,11 +483,9 @@ describe('ContainersBilling physical lifecycle', () => {
       measurementStarted: boolean;
       usageMeasuredAtMs: number;
     };
-    // Containers never use the Vercel pin or `openIntervalBeforeCreate` path:
-    // their first schedule stamps `Date.now()` at launch, not at admission.
     expect(context.measurementStarted).toBe(true);
-    expect(context.usageMeasuredAtMs).toBe(launchedAt);
-    expect(context.usageMeasuredAtMs).not.toBe(admittedAt);
+    expect(context.usageMeasuredAtMs).toBe(admittedAt);
+    expect(context.usageMeasuredAtMs).not.toBe(launchedAt);
   });
 
   it('budget stop blocks, schedules force-stop, destroys, settles, and a fresh admission succeeds', async () => {
@@ -524,7 +525,8 @@ describe('ContainersBilling physical lifecycle', () => {
     meter.heartbeatBudget = { verdict: 'continue' };
     await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
     expect(storage.map.get(BLOCK_KEY)).toBeUndefined();
-    expect(meter.recordStartInputs).toHaveLength(2);
+    expect(meter.recordStartInputs).toHaveLength(3);
+    expect(new Set(meter.recordStartInputs.map(input => input.startEpochMs)).size).toBe(2);
   });
 
   it('keeps the block and re-arms billingForceStop when destroy stays retryable', async () => {

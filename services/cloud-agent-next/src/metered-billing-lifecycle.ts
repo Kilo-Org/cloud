@@ -13,9 +13,15 @@ import {
   type ClientRecordStartInput,
   type ContainerUsageClient,
   type UsageContext,
+  type ContainerCapacityCheckpoint,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
 import { logger } from './logger.js';
+import {
+  assertContainerCapacity,
+  ContainerCapacityUnavailableError,
+  getContainerCapacityFailureReason,
+} from './container-concurrency.js';
 import {
   assertSandboxBillingAllocation,
   billingCapacityForSandboxClass,
@@ -55,11 +61,6 @@ type SdkStopFields = {
   sdkRecordedExitCode?: number;
 };
 
-/**
- * Result of the pre-create interval open. The caller owns the decision to clear,
- * fail the canonical create, or continue; this method never throws for a meter
- * rejection.
- */
 export type OpenIntervalOutcome =
   | { kind: 'acked'; generation: string }
   | { kind: 'definite_rejection'; generation: string; error: unknown }
@@ -68,6 +69,7 @@ export type OpenIntervalOutcome =
 export type MeteredBillingHost = {
   storage: BillingContextStorage;
   usageClient: ContainerUsageClient;
+  containerConcurrencyDisabled?: boolean;
   schedule: (delaySeconds: number, callback: string, payload?: unknown) => Promise<unknown>;
   deleteSchedules: (callback: string) => void;
   getState: () => Promise<{ status: string; lastChange?: number; exitCode?: number }>;
@@ -154,6 +156,10 @@ export class MeteredBillingLifecycle {
     return (await this.getBillingBlock()) !== undefined;
   }
 
+  async hasAcknowledgedStart(generation: string): Promise<boolean> {
+    return (await this.host.storage.get<string>(START_ACK_GENERATION_STORAGE_KEY)) === generation;
+  }
+
   /** Read-only status: storage and container state only; this never wakes or admits. */
   async getBillingRuntimeStatus(identity: BillingIdentity): Promise<{
     sandboxClassName: SandboxClassName;
@@ -171,7 +177,8 @@ export class MeteredBillingLifecycle {
 
   async ensureBillingAdmission(
     identity: BillingIdentity,
-    input: unknown
+    input: unknown,
+    checkpoint: ContainerCapacityCheckpoint = 'control-plane-create'
   ): Promise<SandboxBillingAdmissionResult> {
     const parsed = parseSandboxBillingInput(input);
     assertSandboxBillingAllocation(identity.sandboxClassName, parsed);
@@ -180,19 +187,18 @@ export class MeteredBillingLifecycle {
       const block = await this.getBillingBlock();
       let active = await getBillingContext(this.host.storage);
 
-      if (!block && !parsed.enforcementRequested) {
-        return { success: true };
-      }
-
-      // An unmeasured context is admitted only when its start is already acknowledged and it
-      // carries no stop waiting for delivery. A pending stop must fall through to the
-      // stop-delivery path instead of being skipped.
       if (active && !active.measurementStarted && !block && !active.pendingStop) {
-        const acknowledgedGeneration = await this.host.storage.get<string>(
-          START_ACK_GENERATION_STORAGE_KEY
-        );
-        if (acknowledgedGeneration === active.generation) {
-          return { success: true };
+        if (
+          parsed.allocationId === undefined ||
+          active.metadata?.allocation_id === parsed.allocationId
+        ) {
+          try {
+            await this.ensureStartAcknowledged(active, checkpoint);
+            return { success: true };
+          } catch (error) {
+            if (getContainerCapacityFailureReason(error)) throw error;
+            return billingAdmissionFailureFromError(error);
+          }
         }
       }
 
@@ -236,18 +242,49 @@ export class MeteredBillingLifecycle {
 
       const context = await this.createBillingGeneration(identity, parsed, 'attribution-adoption');
       try {
-        await this.host.usageClient.recordStart(startInputFromContext(context));
+        await this.ensureStartAcknowledged(context, checkpoint);
       } catch (error) {
         // Only a definite rejection of this fresh generation means the interval cannot exist.
         // An uncertain error must keep the generation so a later attempt can settle it.
-        if (isDefiniteAdmissionRejection(error)) {
+        if (
+          isDefiniteAdmissionRejection(error) ||
+          getContainerCapacityFailureReason(error) === 'container_limit_reached'
+        ) {
           await clearBillingContext(this.host.storage);
         }
+        if (getContainerCapacityFailureReason(error)) throw error;
         return billingAdmissionFailureFromError(error);
       }
-      await this.host.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
       await this.host.storage.delete(BILLING_BLOCK_STORAGE_KEY);
       return { success: true };
+    });
+  }
+
+  async reserveBeforeStart(identity: BillingIdentity): Promise<void> {
+    const input = await this.getPendingAttribution();
+    if (!input) return;
+    const admission = await this.ensureBillingAdmission(identity, input, 'sandbox-start');
+    if (!admission.success) {
+      if (admission.code === 'insufficient_credits') {
+        throw new ContainerUsageAdmissionError(admission.code, admission.message, admission);
+      }
+      throw new ContainerCapacityUnavailableError();
+    }
+  }
+
+  async releaseBillingAdmission(allocationId: string): Promise<void> {
+    await this.runBillingExclusive(async () => {
+      const context = await getBillingContext(this.host.storage);
+      if (
+        !context ||
+        context.metadata?.allocation_id !== allocationId ||
+        context.measurementStarted ||
+        this.host.isContainerRunning()
+      ) {
+        return;
+      }
+      await this.heartbeat.recordStop({ reason: 'runtime_signal' }, context.startEpochMs);
+      await this.host.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
     });
   }
 
@@ -285,12 +322,6 @@ export class MeteredBillingLifecycle {
     });
   }
 
-  /**
-   * Open the billing interval before `createSandbox`. On a fresh generation this
-   * always attempts `recordStart`; on an existing generation it re-acknowledges
-   * instead of opening a second interval. It never clears the context or throws
-   * for a meter rejection; the caller decides.
-   */
   async openIntervalBeforeCreate(
     identity: BillingIdentity,
     input: unknown
@@ -302,9 +333,10 @@ export class MeteredBillingLifecycle {
       const existing = await getBillingContext(this.host.storage);
       if (existing) {
         try {
-          await this.ensureStartAcknowledged(existing);
+          await this.ensureStartAcknowledged(existing, 'control-plane-create');
           return { kind: 'acked', generation: existing.generation };
         } catch (error) {
+          if (getContainerCapacityFailureReason(error)) throw error;
           return isDefiniteAdmissionRejection(error)
             ? { kind: 'definite_rejection', generation: existing.generation, error }
             : { kind: 'uncertain', generation: existing.generation, error };
@@ -312,8 +344,12 @@ export class MeteredBillingLifecycle {
       }
       const context = await this.createBillingGeneration(identity, parsed, 'container-start');
       try {
-        await this.ensureStartAcknowledged(context);
+        await this.ensureStartAcknowledged(context, 'control-plane-create');
       } catch (error) {
+        if (getContainerCapacityFailureReason(error) === 'container_limit_reached') {
+          await clearBillingContext(this.host.storage);
+        }
+        if (getContainerCapacityFailureReason(error)) throw error;
         return isDefiniteAdmissionRejection(error)
           ? { kind: 'definite_rejection', generation: context.generation, error }
           : { kind: 'uncertain', generation: context.generation, error };
@@ -424,6 +460,7 @@ export class MeteredBillingLifecycle {
             return;
           }
         } else if (!previous.measurementStarted) {
+          await this.pinAssumeHeld(previous.generation, previous.startEpochMs);
           await this.admitAndScheduleBestEffort(identity, previous);
           return;
         } else {
@@ -598,12 +635,52 @@ export class MeteredBillingLifecycle {
     return this.runBillingExclusive(() => this.forceStopBillingGeneration(identity, generation));
   }
 
-  async ensureStartAcknowledged(context: BillingContext): Promise<void> {
+  async ensureStartAcknowledged(
+    context: BillingContext,
+    checkpoint?: ContainerCapacityCheckpoint
+  ): Promise<void> {
     const acknowledgedGeneration = await this.host.storage.get<string>(
       START_ACK_GENERATION_STORAGE_KEY
     );
-    if (acknowledgedGeneration !== context.generation) {
-      await this.host.usageClient.recordStart(startInputFromContext(context));
+    if (checkpoint !== undefined || acknowledgedGeneration !== context.generation) {
+      if (checkpoint === undefined) {
+        await this.host.usageClient.recordStart(startInputFromContext(context));
+      } else {
+        await assertContainerCapacity(
+          {
+            CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: this.host.containerConcurrencyDisabled
+              ? 'true'
+              : undefined,
+          },
+          {
+            subject: context.subject,
+            actor: context.actor,
+            instanceId: context.instanceId,
+            billingOrigin: context.metadata?.origin,
+            checkpoint,
+          },
+          {
+            reserveCapacity: async admission => {
+              try {
+                await this.host.usageClient.recordStart({
+                  ...startInputFromContext(context),
+                  ...(admission === undefined ? {} : { admission }),
+                });
+              } catch (error) {
+                if (
+                  error instanceof ContainerUsageAdmissionError &&
+                  error.code === 'interval_closed'
+                ) {
+                  await clearBillingContext(this.host.storage);
+                  await this.host.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+                  throw new ContainerCapacityUnavailableError();
+                }
+                throw error;
+              }
+            },
+          }
+        );
+      }
       await this.host.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
     }
   }
@@ -886,6 +963,7 @@ export class MeteredBillingLifecycle {
         memory_mib: String(capacity.memoryMiB),
         ...('diskMB' in capacity ? { disk_mb: String(capacity.diskMB) } : {}),
         ...(input.metadata?.origin ? { origin: input.metadata.origin } : {}),
+        ...(input.allocationId === undefined ? {} : { allocation_id: input.allocationId }),
       },
       startEpochMs,
     } satisfies UsageContext & { startEpochMs: number });

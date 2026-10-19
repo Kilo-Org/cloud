@@ -645,7 +645,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
   });
 
   it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
-    'does not call the %s provider when database admission is unavailable',
+    'does not provision the %s allocation when atomic admission is unavailable',
     async providerKind => {
       const sandboxId = `ses-${'b'.repeat(48)}`;
       const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
@@ -660,9 +660,31 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         });
       });
       const provider = createFakeProvider();
+      if (providerKind !== 'vercel') {
+        provider.adapter.create = async () => {
+          throw new ContainerCapacityUnavailableError();
+        };
+      }
+      const meter: ContainerUsageRpcMethods = {
+        async recordStart() {
+          throw new ContainerCapacityUnavailableError();
+        },
+        async recordHeartbeat() {
+          throw new Error('An unadmitted allocation cannot heartbeat');
+        },
+        async recordStop() {
+          throw new Error('The unavailable meter cannot settle');
+        },
+      };
       await startAllocation(provider, {
         sandboxId,
         provider: providerKind,
+        meter,
+        ...(providerKind === 'vercel'
+          ? {
+              configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } } as const,
+            }
+          : {}),
         preparingRoute: sessionId,
         billing: {
           sandboxId,
@@ -1254,7 +1276,10 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await startAllocation(provider, { billing, containment: { kilocode: true } });
     await awaitLaunch(provider);
 
-    expect(provider.createInputs[0]?.billing).toEqual(billing);
+    expect(provider.createInputs[0]?.billing).toEqual({
+      ...billing,
+      allocationId: provider.createInputs[0]?.intentId,
+    });
     expect(provider.createInputs[0]?.containment).toEqual({ kilocode: true });
   });
 
@@ -2061,7 +2086,17 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         expect(row[0]).toMatchObject({ state: 'failed', reason: 'billing_blocked' });
       }
       if (result === 'acked' || result === 'budget') {
-        const createdAtMs = Date.now() - 20_000;
+        const admittedAtMs = Date.now() - 30_000;
+        await runInDurableObject(stub, async (_instance, state) => {
+          const context = await getBillingContext(state.storage);
+          if (!context) throw new Error('Expected admitted billing context');
+          await updateBillingContext(state.storage, {
+            ...context,
+            startEpochMs: admittedAtMs,
+            usageMeasuredAtMs: admittedAtMs,
+          });
+        });
+        const createdAtMs = admittedAtMs + 10_000;
         const terminalAtMs = createdAtMs + 10_000;
         await runInDurableObject(stub, instance =>
           (
@@ -2091,7 +2126,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         });
         await runAlarm(stub);
         await waitFor(() => expect(heartbeats).toHaveLength(1));
-        expect(heartbeats[0]).toBeGreaterThanOrEqual(19);
+        expect(heartbeats[0]).toBeGreaterThanOrEqual(29);
         if (result === 'budget') {
           await waitFor(() => expect(provider.stopCalls).toContain(providerRef));
           const generation = billing.context?.generation;

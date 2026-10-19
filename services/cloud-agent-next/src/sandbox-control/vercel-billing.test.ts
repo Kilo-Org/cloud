@@ -73,7 +73,11 @@ describe('Vercel provider lifetime sink', () => {
       allocationName: 'ses-abc',
     });
     if ('unresolved' in created) throw new Error('Expected a Vercel provider reference');
-    expect(lifetime).toHaveBeenCalledWith({ providerRef: created.providerRef, createdAtMs: 1_000 });
+    expect(lifetime).toHaveBeenCalledWith({
+      providerRef: created.providerRef,
+      allocationId: 'attempt',
+      createdAtMs: 1_000,
+    });
     expect((await provider.observe(created.providerRef)).status).toBe('terminal');
     expect(lifetime).toHaveBeenLastCalledWith({
       providerRef: created.providerRef,
@@ -479,7 +483,7 @@ describe('openIntervalBeforeCreate', () => {
     });
   });
 
-  it('re-acknowledges an existing generation without a second recordStart', async () => {
+  it('revalidates the same reservation generation before another cold create', async () => {
     const { storage, meter, lifecycle } = setup();
     const context = await seedContext(storage);
     await storage.put('container-usage:start-ack-generation:v1', context.generation);
@@ -487,7 +491,11 @@ describe('openIntervalBeforeCreate', () => {
     const outcome = await lifecycle.openIntervalBeforeCreate(IDENTITY, BILLING_INPUT);
 
     expect(outcome).toEqual({ kind: 'acked', generation: context.generation });
-    expect(meter.recordStartInputs).toHaveLength(0);
+    expect(meter.recordStartInputs).toHaveLength(1);
+    expect(meter.recordStartInputs[0]).toMatchObject({
+      startEpochMs: context.startEpochMs,
+      admission: { checkpoint: 'control-plane-create' },
+    });
     expect((await getBillingContext(storage))?.generation).toBe(context.generation);
   });
 
@@ -546,15 +554,16 @@ describe('openIntervalBeforeCreate', () => {
     }
   );
 
-  it('returns uncertain for a generic meter error and retains the generation', async () => {
+  it('fails capacity closed for an uncertain meter result and retains the generation', async () => {
     const { storage, meter, lifecycle } = setup();
     meter.recordStartBehavior = 'reject';
 
-    const outcome = await lifecycle.openIntervalBeforeCreate(IDENTITY, BILLING_INPUT);
-
-    expect(outcome.kind).toBe('uncertain');
-    const generation = (outcome as { generation: string }).generation;
-    expect((await getBillingContext(storage))?.generation).toBe(generation);
+    const rejected = expect(
+      lifecycle.openIntervalBeforeCreate(IDENTITY, BILLING_INPUT)
+    ).rejects.toMatchObject({ code: 'container_capacity_unavailable' });
+    await vi.runAllTimersAsync();
+    await rejected;
+    expect(await getBillingContext(storage)).toBeDefined();
     expect(storage.values.get('container-usage:start-ack-generation:v1')).toBeUndefined();
   });
 });

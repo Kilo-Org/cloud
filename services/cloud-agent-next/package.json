@@ -23,6 +23,7 @@
     "check:duplication": "tsx scripts/check-duplication.ts",
     "test": "vitest run",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
+    "test:admission": "vitest run --config vitest.admission-workers.config.ts",
     "test:checkers": "vitest run scripts/check-duplication.test.ts",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.workers.config.ts",

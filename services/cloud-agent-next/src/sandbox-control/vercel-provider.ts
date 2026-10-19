@@ -103,6 +103,7 @@ function encodeVercelSessionProviderRef(
  */
 export type VercelBillingLifetimeSink = (evidence: {
   providerRef: string;
+  allocationId?: string;
   createdAtMs?: number;
   terminalAtMs?: number;
 }) => Promise<void>;
@@ -184,12 +185,14 @@ export function createVercelProviderAdapter(deps: {
   };
   const recordBillingLifetime = async (
     providerRef: string,
-    session: VercelSandboxSession
+    session: VercelSandboxSession,
+    allocationId?: string
   ): Promise<void> => {
     if (!deps.billingLifetimeSink) return;
     const terminalAtMs = session.stoppedAt ?? session.abortedAt;
     await deps.billingLifetimeSink({
       providerRef,
+      ...(allocationId === undefined ? {} : { allocationId }),
       createdAtMs: session.createdAt,
       ...(terminalAtMs === undefined ? {} : { terminalAtMs }),
     });
@@ -214,13 +217,15 @@ export function createVercelProviderAdapter(deps: {
       };
     },
     async create(intent: ProviderCreateIntent) {
-      // Read the authoritative grants and build the policy before the REST
-      // create: the sandbox must never open with an empty or stale policy, so a
-      // reader failure prevents the create entirely.
-      const networkPolicy = buildControlNetworkPolicy(
-        await deps.readContainedGrants(),
-        await deps.readAcceptedRuntimeProxyHandles?.()
-      );
+      let networkPolicy: ReturnType<typeof buildControlNetworkPolicy>;
+      try {
+        networkPolicy = buildControlNetworkPolicy(
+          await deps.readContainedGrants(),
+          await deps.readAcceptedRuntimeProxyHandles?.()
+        );
+      } catch {
+        throw new ProviderCreationError('pre_provisioning_failed');
+      }
       const created = await restClient
         .createSandbox({
           name: intent.allocationName ?? deps.sandboxName,
@@ -242,8 +247,20 @@ export function createVercelProviderAdapter(deps: {
           throw error;
         });
       const providerRef = encodeVercelSessionProviderRef(created.runtime, created.session);
-      await recordBillingLifetime(providerRef, created.session);
+      await recordBillingLifetime(providerRef, created.session, intent.intentId);
       return { providerRef };
+    },
+    isDefiniteCreateFailure(error) {
+      return (
+        error instanceof ProviderCreationError ||
+        (error instanceof VercelSandboxRestError &&
+          error.kind === 'request_failed' &&
+          error.status !== undefined &&
+          error.status >= 400 &&
+          error.status < 500 &&
+          error.status !== 408 &&
+          error.status !== 409)
+      );
     },
     async launch(ref, env) {
       const parsed = decodeOwnedProviderRef(ref);
@@ -285,7 +302,7 @@ export function createVercelProviderAdapter(deps: {
           };
         }
         const providerRef = encodeVercelSessionProviderRef(inspected.runtime, inspected.session);
-        await recordBillingLifetime(providerRef, inspected.session);
+        await recordBillingLifetime(providerRef, inspected.session, intent.intentId);
         return {
           status: classifyVercelSessionStatus(inspected.session.status),
           providerRef,

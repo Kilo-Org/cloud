@@ -88,6 +88,10 @@ export const recordStartInputSchema = usageContextBaseSchema
   .extend({
     idempotencyKey: z.string().min(1).max(1_024),
     startEpochMs: z.number().int().nonnegative().finite(),
+    admission: z
+      .object({ checkpoint: z.enum(['control-plane-create', 'sandbox-start']) })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine(validateAttribution);
@@ -134,11 +138,27 @@ export const nonRetryableSkuAdmissionCodes = [
 export const recordStartFailureCodeSchema = z.enum([
   ...nonRetryableSkuAdmissionCodes,
   'insufficient_credits',
+  'container_limit_reached',
+  'interval_closed',
 ]);
 export type RecordStartFailureCode = z.infer<typeof recordStartFailureCodeSchema>;
 
 /** Customer-safe billing admission failure carried across Worker and client boundaries. */
 const recordStartFailureSchema = z.discriminatedUnion('code', [
+  z
+    .object({
+      code: z.literal('interval_closed'),
+      message: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      code: z.literal('container_limit_reached'),
+      message: z.string().startsWith('container_limit_reached:'),
+      accountType: z.enum(['personal', 'organization']),
+      limit: z.number().int().positive(),
+    })
+    .strict(),
   z
     .object({
       code: z.literal('insufficient_credits'),

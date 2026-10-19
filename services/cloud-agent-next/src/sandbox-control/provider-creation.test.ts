@@ -113,13 +113,13 @@ describe('native egress policy forwarding', () => {
 });
 
 describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
-  it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
+  it('retries shadow capacity admission with a fresh handle and the same allocation', async () => {
     const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
     const failed = {
       isBillingBlocked: vi.fn().mockResolvedValue(false),
-      configureBilling: vi.fn().mockRejectedValue(error),
+      ensureBillingAdmission: vi.fn().mockRejectedValue(error),
     };
-    const recovered = { configureBilling: vi.fn().mockResolvedValue(undefined) };
+    const recovered = { ensureBillingAdmission: vi.fn().mockResolvedValue({ success: true }) };
     const resolveHandle = vi
       .fn()
       .mockReturnValueOnce(failed)
@@ -143,9 +143,15 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
     ).resolves.toMatchObject({ providerRef: expect.any(String) });
 
     expect(resolveHandle).toHaveBeenCalledTimes(3);
-    expect(failed.configureBilling).toHaveBeenCalledOnce();
-    expect(recovered.configureBilling).toHaveBeenCalledOnce();
-    expect(recovered.configureBilling.mock.calls[0]).toEqual(failed.configureBilling.mock.calls[0]);
+    expect(failed.ensureBillingAdmission).toHaveBeenCalledOnce();
+    expect(recovered.ensureBillingAdmission).toHaveBeenCalledOnce();
+    expect(recovered.ensureBillingAdmission.mock.calls[0]).toEqual(
+      failed.ensureBillingAdmission.mock.calls[0]
+    );
+    expect(recovered.ensureBillingAdmission.mock.calls[0]?.[0]).toMatchObject({
+      allocationId: intent.intentId,
+      enforcementRequested: false,
+    });
   });
 
   it.each([
@@ -153,13 +159,13 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
     { flags: { retryable: false }, attempts: 1 },
     { flags: { overloaded: true }, attempts: 1 },
   ])(
-    'propagates shadow configuration failure after $attempts attempts: $flags',
+    'fails shadow admission closed after $attempts attempts: $flags',
     async ({ flags, attempts }) => {
       const error = Object.assign(new Error('Billing configuration failed'), flags);
-      const configureBilling = vi.fn().mockRejectedValue(error);
+      const ensureBillingAdmission = vi.fn().mockRejectedValue(error);
       const resolveHandle = vi.fn(() => ({
         isBillingBlocked: async () => false,
-        configureBilling,
+        ensureBillingAdmission,
       }));
       const provider =
         kind === 'cloudflare'
@@ -177,9 +183,9 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
 
       await expect(
         provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
-      ).rejects.toBe(error);
+      ).rejects.toMatchObject({ code: 'meter_unavailable' });
 
-      expect(configureBilling).toHaveBeenCalledTimes(attempts);
+      expect(ensureBillingAdmission).toHaveBeenCalledTimes(attempts);
       expect(resolveHandle).toHaveBeenCalledTimes(attempts + 1);
     }
   );
@@ -280,7 +286,7 @@ describe('Vercel creation causes', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  it.each([400, 401, 402, 403, 404, 409, 429, 500, 503])(
+  it.each([400, 401, 402, 403, 404, 408, 409, 429, 500, 503])(
     'does not infer permanence from HTTP %s',
     async status => {
       const request = vi
@@ -298,6 +304,9 @@ describe('Vercel creation causes', () => {
       expect(error).toBeInstanceOf(VercelSandboxRestError);
       expect(error).toMatchObject({ kind: 'request_failed', status });
       expect(error).not.toBeInstanceOf(ProviderCreationError);
+      expect(provider.isDefiniteCreateFailure?.(error)).toBe(
+        status < 500 && status !== 408 && status !== 409
+      );
     }
   );
 
@@ -538,7 +547,10 @@ describe('Vercel contained-credential policy wiring', () => {
         throw new Error('grants unavailable');
       },
     });
-    await expect(provider.create(intent)).rejects.toThrow('grants unavailable');
+    await expect(provider.create(intent)).rejects.toMatchObject({
+      code: 'pre_provisioning_failed',
+      permanentReason: null,
+    });
     expect(request).not.toHaveBeenCalled();
   });
 });

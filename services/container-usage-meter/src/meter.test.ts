@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   heartbeatIdempotencyKey,
+  ContainerConcurrencyLimitError,
   startIdempotencyKey,
   stopIdempotencyKey,
   type RecordHeartbeatInput,
@@ -138,6 +139,23 @@ describe('ContainerUsageMeter', () => {
     );
   });
 
+  it('returns distinct closed-interval admission failures', async () => {
+    vi.mocked(applyStart).mockResolvedValue({
+      kind: 'rejected',
+      code: 'interval_closed',
+      message: 'The container reservation has ended',
+    });
+    await expect(
+      createMeter().recordStart({
+        ...validStart(),
+        admission: { checkpoint: 'sandbox-start' },
+      })
+    ).resolves.toEqual({
+      success: false,
+      error: { code: 'interval_closed', message: 'The container reservation has ended' },
+    });
+  });
+
   it('returns detailed insufficient-credit rejections from recordStart', async () => {
     vi.mocked(applyStart).mockResolvedValue({
       kind: 'rejected',
@@ -156,6 +174,46 @@ describe('ContainerUsageMeter', () => {
         minimumRequiredMicrodollars: 5_000_000,
       },
     });
+  });
+
+  it('passes optional admission to PostgreSQL without adding it to the context fingerprint', async () => {
+    const meter = createMeter();
+    await meter.recordStart(validStart());
+    const fingerprint = vi.mocked(applyStart).mock.calls[0]?.[3];
+    const input = { ...validStart(), admission: { checkpoint: 'sandbox-start' as const } };
+    await meter.recordStart(input);
+    expect(vi.mocked(applyStart).mock.calls[1]?.[1]).toEqual(input);
+    expect(vi.mocked(applyStart).mock.calls[1]?.[3]).toBe(fingerprint);
+  });
+
+  it('preserves the account type, limit, and recognizable prefix in capacity rejections', async () => {
+    const error = new ContainerConcurrencyLimitError('organization', 50);
+    vi.mocked(applyStart).mockResolvedValue({
+      kind: 'rejected',
+      code: error.code,
+      message: error.message,
+      accountType: error.accountType,
+      limit: error.limit,
+    });
+    await expect(createMeter().recordStart(validStart())).resolves.toEqual({
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        accountType: 'organization',
+        limit: 50,
+      },
+    });
+  });
+
+  it('propagates failed admission transactions rather than returning a capacity rejection', async () => {
+    vi.mocked(applyStart).mockRejectedValue(new Error('postgres unavailable'));
+    await expect(
+      createMeter().recordStart({
+        ...validStart(),
+        admission: { checkpoint: 'sandbox-start' },
+      })
+    ).rejects.toThrow('postgres unavailable');
   });
 
   it('writes heartbeats directly and returns the shadow budget verdict', async () => {

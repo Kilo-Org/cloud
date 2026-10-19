@@ -34,6 +34,7 @@ export const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
 
 export type VercelBillingLifetimeEvidence = {
   providerRef: string;
+  allocationId?: string;
   createdAtMs?: number;
   terminalAtMs?: number;
 };
@@ -87,6 +88,7 @@ export type VercelBillingRuntime = {
   admitShadow: (pin: StoredProviderPin) => Promise<boolean>;
   recordLifetime: (evidence: VercelBillingLifetimeEvidence) => Promise<void>;
   settleStoppedCreatedRef: (ref: string, confirmed: boolean) => Promise<void>;
+  releaseAdmission: (allocationId: string) => Promise<void>;
   afterTransition: (event: AllocationEvent) => Promise<void>;
   prepareSettlement: (generation: string) => Promise<void>;
   runAlarm: () => Promise<void>;
@@ -163,6 +165,8 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     const lifecycle = new MeteredBillingLifecycle({
       storage: deps.storage,
       usageClient,
+      containerConcurrencyDisabled:
+        deps.env().CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true',
       schedule,
       deleteSchedules,
       getState,
@@ -239,14 +243,36 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     pin: StoredProviderPin
   ): Promise<'admitted' | 'blocked' | 'unavailable' | 'retry'> {
     const existing = await getBillingContext(deps.storage);
-    if (existing !== undefined) {
+    if (
+      existing !== undefined &&
+      (pin.billing?.allocationId === undefined ||
+        existing.metadata?.allocation_id !== pin.billing.allocationId ||
+        existing.pendingStop !== undefined ||
+        existing.measurementStarted)
+    ) {
       await deps.schedule.ensure(
         VERCEL_BILLING_SETTLEMENT_CALLBACK,
         Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
         existing.generation
       );
-      await prepareSettlement(existing.generation);
-      return 'retry';
+      if (
+        existing.metadata?.allocation_id !== undefined &&
+        !existing.pendingStop &&
+        (await loadVercelBillingBinding(deps.storage, existing.generation)) === undefined
+      ) {
+        const active = await ensureRuntime();
+        if (
+          active === undefined ||
+          (await active.lifecycle.hasAcknowledgedStart(existing.generation))
+        ) {
+          return 'retry';
+        }
+        await releaseAdmission(existing.metadata.allocation_id);
+        if ((await getBillingContext(deps.storage)) !== undefined) return 'retry';
+      } else {
+        await prepareSettlement(existing.generation);
+        return 'retry';
+      }
     }
     const billing = pin.billing;
     const owner = await deps.requireOwner();
@@ -293,13 +319,15 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
         outcome.error instanceof ContainerUsageAdmissionError &&
         outcome.error.code === 'insufficient_credits'
         ? 'blocked'
-        : enforced
-          ? 'unavailable'
-          : 'admitted';
+        : 'unavailable';
     }
-    if (!enforced) return 'admitted';
     await prepareSettlement(outcome.generation);
     return 'retry';
+  }
+
+  async function releaseAdmission(allocationId: string): Promise<void> {
+    const active = await ensureRuntime();
+    await active?.lifecycle.releaseBillingAdmission(allocationId);
   }
 
   async function admitShadow(pin: StoredProviderPin): Promise<boolean> {
@@ -343,6 +371,10 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       (await loadVercelBillingBinding(deps.storage, context.generation)) !== undefined
     )
       return false;
+    const active = await ensureRuntime();
+    if (active?.identity === undefined) return false;
+    const outcome = await active.lifecycle.openIntervalBeforeCreate(active.identity, billing);
+    if (outcome.kind !== 'acked') return false;
     await deps.schedule.ensure(
       VERCEL_BILLING_SETTLEMENT_CALLBACK,
       Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
@@ -354,6 +386,13 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
   async function recordLifetime(evidence: VercelBillingLifetimeEvidence): Promise<void> {
     const context = await getBillingContext(deps.storage);
     if (context === undefined) return;
+    if (
+      evidence.allocationId !== undefined &&
+      context.metadata?.allocation_id !== undefined &&
+      evidence.allocationId !== context.metadata.allocation_id
+    ) {
+      return;
+    }
     const existing = await loadVercelBillingBinding(deps.storage, context.generation);
     if (existing !== undefined && existing.providerRef !== evidence.providerRef) return;
     const allocation = await deps.readAllocation();
@@ -361,9 +400,11 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       if (allocation.providerRef !== evidence.providerRef) return;
     } else {
       if (
-        allocation.kind === 'stopped' ||
-        existing !== undefined ||
-        evidence.createdAtMs === undefined
+        existing === undefined &&
+        (evidence.createdAtMs === undefined ||
+          (context.metadata?.allocation_id !== undefined
+            ? evidence.allocationId !== context.metadata.allocation_id
+            : allocation.kind === 'stopped'))
       )
         return;
       const decoded = decodeVercelProviderRef(evidence.providerRef);
@@ -430,7 +471,11 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       );
       return;
     }
-    if (state.kind === 'stopped' && !context.pendingStop) {
+    if (
+      state.kind === 'stopped' &&
+      !context.pendingStop &&
+      (binding !== undefined || context.metadata?.allocation_id === undefined)
+    ) {
       await (
         await ensureRuntime()
       )?.heartbeat.persistStop(
@@ -447,7 +492,10 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     ) {
       await (
         await ensureRuntime()
-      )?.lifecycle.pinMeasurementCursor(context.generation, binding.createdAtMs);
+      )?.lifecycle.pinMeasurementCursor(
+        context.generation,
+        context.metadata?.allocation_id === undefined ? binding.createdAtMs : context.startEpochMs
+      );
     }
   }
 
@@ -492,6 +540,48 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       }
       const binding = await loadVercelBillingBinding(deps.storage, generation);
       const state = await deps.readAllocation();
+      const startAcknowledged = await active.lifecycle.hasAcknowledgedStart(generation);
+      if (!context.measurementStarted && !context.pendingStop && startAcknowledged) {
+        try {
+          await active.lifecycle.ensureStartAcknowledged(context, 'control-plane-create');
+        } catch {
+          await defer(generation, entry.callback);
+          continue;
+        }
+      }
+      if (
+        binding === undefined &&
+        context.metadata?.allocation_id !== undefined &&
+        !context.pendingStop &&
+        !deps.isCreateInFlight()
+      ) {
+        if (!startAcknowledged) {
+          await releaseAdmission(context.metadata.allocation_id);
+          continue;
+        }
+        const observation = await withTimeout(
+          deps.provider().observe(null, {
+            intentId: context.metadata.allocation_id,
+            createdAt: context.startEpochMs,
+            allocationName: deps.currentPin()?.allocationName ?? deps.sandboxId,
+          }),
+          deps.timers().providerStopAttemptMs,
+          'Sandbox billing create outcome observation timed out'
+        ).catch(() => ({ status: 'unknown' as const }));
+        const recovered = await loadVercelBillingBinding(deps.storage, generation);
+        if (recovered !== undefined) {
+          if (recovered.terminalAtMs !== undefined) {
+            await active.billing.deliverSettlement(generation);
+          } else {
+            await defer(generation, entry.callback);
+          }
+        } else if (observation.status === 'terminal') {
+          await releaseAdmission(context.metadata.allocation_id);
+        } else {
+          await defer(generation, entry.callback);
+        }
+        continue;
+      }
       if (
         (state.kind === 'stopped' || (state.kind === 'creating' && !deps.isCreateInFlight())) &&
         binding !== undefined &&
@@ -563,6 +653,7 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     admitShadow,
     recordLifetime,
     settleStoppedCreatedRef,
+    releaseAdmission,
     afterTransition,
     prepareSettlement,
     runAlarm,

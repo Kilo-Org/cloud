@@ -644,6 +644,11 @@ export class SandboxContainers extends DurableObject<Env> {
     return billing ? billing.isBillingBlocked() : false;
   }
 
+  async releaseBillingAdmission(allocationId: string): Promise<void> {
+    const billing = await this.ensureBillingForPersistedRecord();
+    await billing?.releaseBillingAdmission(allocationId);
+  }
+
   async isContainerRunning(): Promise<boolean> {
     return this.ctx.container?.running === true;
   }
@@ -1442,6 +1447,7 @@ export class SandboxContainers extends DurableObject<Env> {
     options: ContainerStartupOptions
   ): Promise<void> {
     if (!container.running) {
+      await this.billingForRecord(record)?.reserveBeforeStart();
       try {
         container.start(options);
       } catch (error) {
@@ -1478,6 +1484,7 @@ export class SandboxContainers extends DurableObject<Env> {
       storage: this.ctx.storage,
       meter: this.env.CONTAINER_USAGE_METER,
       heartbeatSeconds: billingHeartbeatSeconds(this.env.CONTAINER_BILLING_HEARTBEAT_SECONDS),
+      containerConcurrencyDisabled: this.env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true',
       isContainerRunning: () => this.ctx.container?.running === true,
       stopContainer: () => this.stopBillingContainer(),
       destroyContainer: () => this.destroyBillingContainer(),

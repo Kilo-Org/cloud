@@ -117,6 +117,7 @@ import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
   microdollar_usage,
+  type User,
 } from '@kilocode/db/schema';
 import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { sum } from 'drizzle-orm';
@@ -138,7 +139,11 @@ import {
   getKiloClawSubscriptionAccessReason,
 } from '@/lib/kiloclaw/access-state';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
-import { recordAdminAction, userActionTarget } from '@/lib/admin/admin-action-audit';
+import {
+  recordAdminAction,
+  userActionTarget,
+  type AdminActionContext,
+} from '@/lib/admin/admin-action-audit';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   getKilocodeRepoOpenPullRequestCounts,
@@ -508,6 +513,33 @@ const CancelKiloClawSubscriptionSchema = z.object({
   subscriptionId: z.string(),
   mode: z.enum(['period_end', 'immediate']),
 });
+
+function adminRoleSnapshot(user: User) {
+  return {
+    isAdmin: user.is_admin,
+    isSuperadmin: user.is_super_admin,
+    canViewSessions: user.can_view_sessions,
+    canManageCredits: user.can_manage_credits,
+  };
+}
+
+// Viewing a session's conversation exposes customer content, so each content
+// fetch is recorded against the session owner.
+async function recordSessionContentView(
+  ctx: AdminActionContext,
+  action: 'cloud_agent_session.messages.view' | 'cloud_agent_session.api_history.view',
+  { sessionId, ownerKiloUserId }: { sessionId: string; ownerKiloUserId: string }
+) {
+  await recordAdminAction(ctx, {
+    action,
+    target: userActionTarget(ownerKiloUserId),
+    message:
+      action === 'cloud_agent_session.messages.view'
+        ? 'Viewed session messages'
+        : 'Viewed session API conversation history',
+    metadata: { sessionId },
+  });
+}
 
 export const adminRouter = createTRPCRouter({
   getPermissions: adminProcedure.query(async ({ ctx }) => {
@@ -1990,20 +2022,34 @@ export const adminRouter = createTRPCRouter({
             return {
               retryWithMembershipLock: false as const,
               result: { changed: true as const, user: toPlatformAdminUser(updatedTarget) },
+              previous: adminRoleSnapshot(target),
             };
           });
 
-        const firstAttempt = await updateAccess(false);
-        if (!firstAttempt.retryWithMembershipLock) return firstAttempt.result;
-
-        const serializedAttempt = await updateAccess(true);
-        if (serializedAttempt.retryWithMembershipLock) {
+        let attempt = await updateAccess(false);
+        if (attempt.retryWithMembershipLock) {
+          attempt = await updateAccess(true);
+        }
+        if (attempt.retryWithMembershipLock) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to serialize superadmin revocation',
           });
         }
-        return serializedAttempt.result;
+
+        // user_admin_notes can be deleted by any admin, so the audit row is the
+        // durable record of role changes.
+        if (attempt.result.changed) {
+          await recordAdminAction(ctx, {
+            action: 'admin.platform_access.set',
+            target: userActionTarget(targetId),
+            message: input.isAdmin
+              ? 'Granted platform admin access'
+              : 'Revoked platform admin access',
+            metadata: { isAdmin: input.isAdmin, previous: attempt.previous },
+          });
+        }
+        return attempt.result;
       }),
 
     setAdminPermissions: superadminProcedure
@@ -2019,7 +2065,7 @@ export const adminRouter = createTRPCRouter({
           });
         }
 
-        return db.transaction(async tx => {
+        const outcome = await db.transaction(async tx => {
           if (input.permissions.isSuperadmin !== undefined) {
             await lockSuperadminMembership(tx);
           }
@@ -2064,7 +2110,10 @@ export const adminRouter = createTRPCRouter({
           };
 
           if (Object.keys(changes).length === 0) {
-            return { changed: false as const, user: toPlatformAdminUser(target) };
+            return {
+              result: { changed: false as const, user: toPlatformAdminUser(target) },
+              audit: null,
+            };
           }
 
           if (changes.is_super_admin === false) {
@@ -2111,8 +2160,21 @@ export const adminRouter = createTRPCRouter({
             }))
           );
 
-          return { changed: true as const, user: toPlatformAdminUser(updatedTarget) };
+          return {
+            result: { changed: true as const, user: toPlatformAdminUser(updatedTarget) },
+            audit: { notes, changes, previous: adminRoleSnapshot(target) },
+          };
         });
+
+        if (outcome.audit) {
+          await recordAdminAction(ctx, {
+            action: 'admin.permissions.set',
+            target: userActionTarget(targetId),
+            message: outcome.audit.notes.join(' '),
+            metadata: { changes: outcome.audit.changes, previous: outcome.audit.previous },
+          });
+        }
+        return outcome.result;
       }),
   }),
 
@@ -2543,7 +2605,7 @@ export const adminRouter = createTRPCRouter({
 
     getMessages: sessionViewerProcedure
       .input(z.object({ session_id: sessionIdSchema }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         if (isNewSession(input.session_id)) {
           // V2 session — fetch messages from the session-ingest worker.
           // We need the owner's kilo_user_id to generate a service token.
@@ -2559,6 +2621,11 @@ export const adminRouter = createTRPCRouter({
               message: 'Session not found',
             });
           }
+
+          await recordSessionContentView(ctx, 'cloud_agent_session.messages.view', {
+            sessionId: input.session_id,
+            ownerKiloUserId: session.kilo_user_id,
+          });
 
           try {
             const snapshot = await fetchSessionSnapshot(input.session_id, session.kilo_user_id);
@@ -2581,6 +2648,7 @@ export const adminRouter = createTRPCRouter({
         const [session] = await db
           .select({
             ui_messages_blob_url: cliSessions.ui_messages_blob_url,
+            kilo_user_id: cliSessions.kilo_user_id,
           })
           .from(cliSessions)
           .where(eq(cliSessions.session_id, input.session_id))
@@ -2592,6 +2660,11 @@ export const adminRouter = createTRPCRouter({
             message: 'Session not found',
           });
         }
+
+        await recordSessionContentView(ctx, 'cloud_agent_session.messages.view', {
+          sessionId: input.session_id,
+          ownerKiloUserId: session.kilo_user_id,
+        });
 
         if (!session.ui_messages_blob_url) {
           return { messages: [], format: 'v1' as const };
@@ -2607,7 +2680,7 @@ export const adminRouter = createTRPCRouter({
 
     getApiConversationHistory: sessionViewerProcedure
       .input(z.object({ session_id: sessionIdSchema }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         if (isNewSession(input.session_id)) {
           // V2 sessions have no separate raw API conversation history
           return { history: null };
@@ -2617,6 +2690,7 @@ export const adminRouter = createTRPCRouter({
         const [session] = await db
           .select({
             api_conversation_history_blob_url: cliSessions.api_conversation_history_blob_url,
+            kilo_user_id: cliSessions.kilo_user_id,
           })
           .from(cliSessions)
           .where(eq(cliSessions.session_id, input.session_id))
@@ -2632,6 +2706,11 @@ export const adminRouter = createTRPCRouter({
         if (!session.api_conversation_history_blob_url) {
           return { history: null };
         }
+
+        await recordSessionContentView(ctx, 'cloud_agent_session.api_history.view', {
+          sessionId: input.session_id,
+          ownerKiloUserId: session.kilo_user_id,
+        });
 
         try {
           const history = await getBlobContent(session.api_conversation_history_blob_url);

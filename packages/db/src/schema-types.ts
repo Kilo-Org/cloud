@@ -883,6 +883,11 @@ export const AdminActionAuditAction = z.enum([
   'sales_demo.reset',
   'oss_sponsorship.enroll',
   'email_test.send',
+  'admin.platform_access.set',
+  'admin.permissions.set',
+  'cloud_agent_session.messages.view',
+  'cloud_agent_session.api_history.view',
+  'webhook_trigger.request_logs.view',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;

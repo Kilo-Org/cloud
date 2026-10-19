@@ -3797,6 +3797,95 @@ describe('hosted native routes', () => {
     };
   }
 
+  it.each(['snapshot_too_large', 'snapshot_unavailable'] as const)(
+    'releases %s attachments once while retaining the final notice and heartbeat',
+    async reason => {
+      vi.useFakeTimers();
+      const env = envStub();
+      const releaseNativeEvents = vi.fn(async () => undefined);
+      const waitUntil = vi.fn();
+      env.SANDBOX_SESSION.get = vi.fn().mockReturnValue({ releaseNativeEvents });
+      const facade = new UserKiloFacade({ waitUntil } as unknown as DurableObjectState, env);
+      const attachmentId = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
+      const reader = facade
+        .openPublicSessionEventStream(kiloSessionId, {
+          attachmentId,
+          resnapshot: reason === 'snapshot_too_large',
+          ...(reason === 'snapshot_unavailable'
+            ? { nextPage: async () => ({ kind: 'resnapshot' as const }) }
+            : {}),
+        })
+        .body!.getReader();
+      try {
+        await reader.read();
+        expect(new TextDecoder().decode((await reader.read()).value)).toContain(reason);
+        await Promise.all(waitUntil.mock.calls.map(([promise]) => promise));
+        expect(releaseNativeEvents).toHaveBeenCalledExactlyOnceWith({ attachmentId });
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(new TextDecoder().decode((await reader.read()).value)).toBe(': heartbeat\n\n');
+        await reader.cancel();
+        expect(releaseNativeEvents).toHaveBeenCalledTimes(1);
+      } finally {
+        await reader.cancel();
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('sends idle heartbeats after the native fence', async () => {
+    vi.useFakeTimers();
+    const env = envStub();
+    env.SANDBOX_SESSION.get = vi
+      .fn()
+      .mockReturnValue({ releaseNativeEvents: vi.fn(async () => undefined) });
+    const facade = new UserKiloFacade({ waitUntil: vi.fn() } as unknown as DurableObjectState, env);
+    const attachmentId = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
+    const reader = facade
+      .openPublicSessionEventStream(kiloSessionId, { attachmentId, fence: 10 })
+      .body!.getReader();
+    try {
+      await reader.read();
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain('kilo.native.fence');
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe(': heartbeat\n\n');
+    } finally {
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('suppresses heartbeats only while snapshot delivery waits for backpressure', async () => {
+    vi.useFakeTimers();
+    const env = envStub();
+    env.SANDBOX_SESSION.get = vi
+      .fn()
+      .mockReturnValue({ releaseNativeEvents: vi.fn(async () => undefined) });
+    const facade = new UserKiloFacade({ waitUntil: vi.fn() } as unknown as DurableObjectState, env);
+    const attachmentId = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
+    const reader = facade
+      .openPublicSessionEventStream(kiloSessionId, {
+        attachmentId,
+        fence: 10,
+        snapshot: Array.from({ length: 100 }, () => ({ type: 'snapshot', properties: {} })),
+      })
+      .body!.getReader();
+    try {
+      await vi.advanceTimersByTimeAsync(10_000);
+      await reader.read();
+      for (let i = 0; i < 100; i++) {
+        expect(new TextDecoder().decode((await reader.read()).value)).toContain(
+          '"type":"snapshot"'
+        );
+      }
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain('kilo.native.fence');
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe(': heartbeat\n\n');
+    } finally {
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
   it('attaches an empty registered log and uses the later snapshot watermark', async () => {
     const env = envStub();
     const subscribeNativeEvents = vi.fn(async () => ({
@@ -3863,12 +3952,13 @@ describe('hosted native routes', () => {
       cloudAgentSessionId: workspaceSession,
     } as never);
     const facade = new UserKiloFacade({ waitUntil } as unknown as DurableObjectState, env);
-    const push = (eventId: number) =>
+    const push = (eventId: number, materialized = false) =>
       facade.publishNativeEvent({
         kiloUserId: 'usr_1',
         cloudAgentSessionId: workspaceSession,
         kiloSessionId,
         eventId,
+        materialized,
         event: { type: 'pushed', properties: { eventId } },
       });
     const response = await handleKiloFacadeRequest({
@@ -3890,12 +3980,15 @@ describe('hosted native routes', () => {
               type: 'snapshot',
               properties: { id },
             })),
-            nextPage: async () => ({
-              kind: 'fenced',
-              fence: 10,
-              snapshot: { oversized: false, fence: 10, events: [] },
-              events: [{ type: 'last-page', properties: {} }],
-            }),
+            nextPage: async () => {
+              await push(2, true);
+              return {
+                kind: 'fenced',
+                fence: 10,
+                snapshot: { oversized: false, fence: 10, events: [] },
+                events: [{ type: 'last-page', properties: {} }],
+              };
+            },
           };
         },
       }),
@@ -3903,23 +3996,69 @@ describe('hosted native routes', () => {
     expect(response.status).toBe(200);
     const reader = response.body!.getReader();
     const frames: Array<{ type: string; properties: Record<string, unknown> }> = [];
-    for (let i = 0; i < 104; i++) {
+    for (let i = 0; i < 105; i++) {
       const frame = await reader.read();
       frames.push(JSON.parse(new TextDecoder().decode(frame.value).slice(6).trim()));
     }
     expect(frames.filter(frame => frame.type === 'snapshot')).toHaveLength(100);
-    expect(frames.slice(-3).map(frame => frame.type)).toEqual([
+    expect(frames.slice(-4).map(frame => frame.type)).toEqual([
       'last-page',
       'kilo.native.fence',
       'pushed',
+      'pushed',
     ]);
-    expect(frames.at(-1)?.properties.eventId).toBe(11);
+    expect(frames.at(-2)?.properties.eventId).toBe(11);
+    expect(frames.at(-1)?.properties.eventId).toBe(2);
+    await push(2, true);
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain('"eventId":2');
     await push(12);
     expect(new TextDecoder().decode((await reader.read()).value)).toContain('12');
     await reader.cancel();
     await Promise.all(waitUntil.mock.calls.map(([promise]) => promise));
     expect(releaseNativeEvents).toHaveBeenCalledTimes(1);
     expect(releaseNativeEvents).toHaveBeenCalledWith({ attachmentId: expect.any(String) });
+  });
+
+  it('does not send an overflowing attachment notice to a healthy same-session stream', async () => {
+    const env = envStub();
+    env.SANDBOX_SESSION.get = vi
+      .fn()
+      .mockReturnValue({ releaseNativeEvents: vi.fn(async () => undefined) });
+    vi.mocked(env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession).mockResolvedValue({
+      cloudAgentSessionId: workspaceSession,
+    } as never);
+    const facade = new UserKiloFacade({ waitUntil: vi.fn() } as unknown as DurableObjectState, env);
+    const slowId = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
+    const healthyId = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
+    const slow = facade
+      .openPublicSessionEventStream(kiloSessionId, {
+        attachmentId: slowId,
+        fence: 0,
+        snapshot: Array.from({ length: 100 }, () => ({ type: 'snapshot', properties: {} })),
+      })
+      .body!.getReader();
+    const healthy = facade
+      .openPublicSessionEventStream(kiloSessionId, { attachmentId: healthyId, fence: 0 })
+      .body!.getReader();
+    try {
+      await healthy.read();
+      await healthy.read();
+      for (let eventId = 1; eventId <= 513; eventId++) {
+        await facade.publishNativeEvent({
+          kiloUserId: 'usr_1',
+          cloudAgentSessionId: workspaceSession,
+          kiloSessionId,
+          eventId,
+          event: { type: 'pushed', properties: { eventId } },
+        });
+        expect(new TextDecoder().decode((await healthy.read()).value)).toContain(
+          `"eventId":${eventId}`
+        );
+      }
+    } finally {
+      await slow.cancel().catch(() => undefined);
+      await healthy.cancel();
+    }
   });
 
   it('reads a hosted session status through the Session DO without waking compute', async () => {

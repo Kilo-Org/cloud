@@ -116,6 +116,7 @@ import {
 } from '../../websocket/stream.js';
 import {
   isDeliverableNativeEvent,
+  isMaterializedNativeEvent,
   toNativePublicEvent,
 } from '../../kilo-facade/native-event-source.js';
 import { sandboxControlPeerNamespace } from '../peer-bindings.js';
@@ -1519,6 +1520,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             cloudAgentSessionId: this.sessionId,
             kiloSessionId: subscriber.kiloSessionId,
             eventId: stored.id,
+            materialized: isMaterializedNativeEvent(event),
             event: native,
           }),
         'publishNativeEvent'

@@ -102,6 +102,46 @@ describe('toNativePublicEvent', () => {
 });
 
 describe('createNativeAttachmentRegistry', () => {
+  it('replays materialized rewrites below the page cursor and fence in observation order', () => {
+    const registry = createNativeAttachmentRegistry(vi.fn());
+    const listener = vi.fn();
+    registry.begin(cloudAgentSessionId, kiloSessionId);
+    registry.subscribe(cloudAgentSessionId, listener);
+    registry.deliver({ ...delivery(2), materialized: true });
+    registry.deliver({
+      ...delivery(2),
+      materialized: true,
+      event: { type: 'message.updated', properties: { id: 'msg_2', body: 'newer' } },
+    });
+    registry.deliver(delivery(11));
+    expect(listener).not.toHaveBeenCalled();
+    registry.complete(cloudAgentSessionId, 12);
+    expect(listener.mock.calls.map(([event]) => event.properties)).toEqual([
+      { sessionID: kiloSessionId, id: 'msg_2' },
+      { id: 'msg_2', body: 'newer' },
+    ]);
+    registry.deliver({ ...delivery(1), materialized: true });
+    expect(listener).toHaveBeenLastCalledWith(delivery(1).event);
+    registry.deliver(delivery(12));
+    expect(listener).toHaveBeenCalledTimes(3);
+  });
+
+  it('reports only the overflowing attachment while a healthy attachment keeps receiving', () => {
+    const overflow = vi.fn();
+    const registry = createNativeAttachmentRegistry(overflow);
+    const healthy = vi.fn();
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'slow');
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'healthy');
+    registry.subscribe('healthy', healthy);
+    registry.complete('healthy', 0);
+    for (let id = 1; id <= MAX_PENDING_NATIVE_EVENTS + 1; id++) registry.deliver(delivery(id));
+    expect(overflow).toHaveBeenCalledExactlyOnceWith('slow', kiloSessionId);
+    expect(healthy).toHaveBeenCalledTimes(MAX_PENDING_NATIVE_EVENTS + 1);
+    expect(healthy.mock.calls.every(([event]) => event.type !== 'kilo.native.resnapshot')).toBe(
+      true
+    );
+  });
+
   it('delivers live pushes after completing a valid empty-log fence', () => {
     const registry = createNativeAttachmentRegistry(vi.fn());
     const listener = vi.fn();

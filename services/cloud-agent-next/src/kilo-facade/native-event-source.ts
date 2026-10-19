@@ -13,8 +13,8 @@ import { publicCloudAgentDirectory } from './public-sdk-projection.js';
  *
  * The history/live boundary is the attach fence: the snapshot (stored log plus
  * materialized message/part reconciliation) is complete through the fence, and
- * pushed events above the fence are delivered after it. A pushed event at or
- * below the fence is already covered by the snapshot. When continuity cannot be
+ * pushed events are delivered after it. Materialized rewrites retain their row
+ * IDs and must replay even below the fence. When continuity cannot be
  * proven (a dropped push, overflow, or transport gap) the facade reports
  * `resnapshot-required` and the client rebuilds its transcript and pending
  * interactions before more input is admitted.
@@ -50,6 +50,7 @@ export type NativeEventDelivery = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
   eventId: number;
+  materialized?: boolean;
   event: NativePublicEvent;
 };
 
@@ -124,20 +125,20 @@ export type NativeAttachmentRegistry = {
 
 /**
  * Holds pushed events per attachment while its snapshot is in flight. A push
- * above the fence that arrives before `complete` is buffered; once the snapshot
- * through the fence is delivered the buffer drains in order. A push at or below
- * the fence is already covered by the snapshot. Exceeding the buffer ends in a
+ * that arrives before `complete` is buffered; once the snapshot through the
+ * fence is delivered the buffer drains in order. Only immutable pushes at or
+ * below the fence are covered by the snapshot. Exceeding the buffer ends in a
  * `resnapshot` notice, because the client must rebuild rather than guess.
  */
 export function createNativeAttachmentRegistry(
-  onOverflow: (cloudAgentSessionId: string, kiloSessionId: string) => void
+  onOverflow: (attachmentId: string, kiloSessionId: string) => void
 ): NativeAttachmentRegistry {
   const attachments = new Map<string, NativeAttachmentState>();
 
-  function fail(cloudAgentSessionId: string, state: NativeAttachmentState): void {
+  function fail(attachmentId: string, state: NativeAttachmentState): void {
     state.overflowed = true;
     state.pending = [];
-    onOverflow(cloudAgentSessionId, state.kiloSessionId);
+    onOverflow(attachmentId, state.kiloSessionId);
   }
 
   function emit(state: NativeAttachmentState, event: NativePublicEvent): void {
@@ -174,19 +175,20 @@ export function createNativeAttachmentRegistry(
       const pending = state.pending;
       state.pending = [];
       for (const delivery of pending) {
-        if (fence !== null && delivery.eventId <= fence) continue;
+        if (!delivery.materialized && fence !== null && delivery.eventId <= fence) continue;
         emit(state, delivery.event);
       }
     },
     deliver(delivery) {
-      for (const state of attachments.values()) {
+      for (const [attachmentId, state] of attachments) {
         if (state.cloudAgentSessionId !== delivery.cloudAgentSessionId || state.overflowed)
           continue;
         if (state.kiloSessionId !== delivery.kiloSessionId) continue;
-        if (state.fence !== null && delivery.eventId <= state.fence) continue;
+        if (!delivery.materialized && state.fence !== null && delivery.eventId <= state.fence)
+          continue;
         if (state.snapshotPending) {
           if (state.pending.length >= MAX_PENDING_NATIVE_EVENTS) {
-            fail(delivery.cloudAgentSessionId, state);
+            fail(attachmentId, state);
             continue;
           }
           state.pending.push(delivery);

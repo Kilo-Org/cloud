@@ -2110,21 +2110,18 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
   >();
   private readonly nativeUnsubscribes = new Map<string, () => void>();
   private readonly nativeAttachments = createNativeAttachmentRegistry(
-    (_cloudAgentSessionId, kiloSessionId) => {
-      this.broadcastGlobalEvent(
-        {
-          directory: publicCloudAgentDirectory(kiloSessionId),
-          payload: {
-            type: NATIVE_FACADE_RESNAPSHOT_EVENT,
-            properties: {
-              sessionID: kiloSessionId,
-              directory: publicCloudAgentDirectory(kiloSessionId),
-              reason: 'continuity_unproven',
-            },
+    (attachmentId, kiloSessionId) => {
+      for (const [subscriberId, writer] of this.nativeWriters) {
+        if (writer.attachmentId !== attachmentId) continue;
+        this.sendToSubscriber(subscriberId, {
+          type: NATIVE_FACADE_RESNAPSHOT_EVENT,
+          properties: {
+            sessionID: kiloSessionId,
+            directory: publicCloudAgentDirectory(kiloSessionId),
+            reason: 'continuity_unproven',
           },
-        },
-        kiloSessionId
-      );
+        });
+      }
     }
   );
 
@@ -2143,6 +2140,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       cloudAgentSessionId: input.cloudAgentSessionId,
       kiloSessionId: input.kiloSessionId,
       eventId: input.eventId,
+      materialized: input.materialized,
       event: input.event,
     });
   }
@@ -2266,7 +2264,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
             controller,
             scope,
             heartbeat: setInterval(() => {
-              if (this.nativeWriters.has(subscriberId)) return;
+              if (this.nativeWriters.get(subscriberId)?.waiting !== undefined) return;
               this.sendCommentToSubscriber(subscriberId, 'heartbeat');
             }, HEARTBEAT_INTERVAL_MS),
           };
@@ -2335,10 +2333,11 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     };
     try {
       if (native.resnapshot === true) {
-        this.sendToSubscriber(subscriberId, {
+        await send({
           type: NATIVE_FACADE_RESNAPSHOT_EVENT,
           properties: { sessionID: kiloSessionId, directory, reason: 'snapshot_too_large' },
         });
+        this.clearNativeSubscriber(subscriberId);
         return;
       }
       let tail = Promise.resolve();
@@ -2374,6 +2373,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
             type: NATIVE_FACADE_RESNAPSHOT_EVENT,
             properties: { sessionID: kiloSessionId, directory, reason: 'snapshot_unavailable' },
           });
+          this.clearNativeSubscriber(subscriberId);
           return;
         }
         events = page.events;
@@ -2546,6 +2546,10 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     if (!subscriber) return;
     clearInterval(subscriber.heartbeat);
     this.subscribers.delete(subscriberId);
+    this.clearNativeSubscriber(subscriberId);
+  }
+
+  private clearNativeSubscriber(subscriberId: string): void {
     const unsubscribe = this.nativeUnsubscribes.get(subscriberId);
     this.nativeUnsubscribes.delete(subscriberId);
     unsubscribe?.();

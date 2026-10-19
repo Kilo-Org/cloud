@@ -44,7 +44,7 @@ function dataCollectingKiloExclusiveModels(
       continue;
     }
     const modelId = normalizeModelId(model.public_id);
-    if (model.inference_provider_restriction.length === 0) {
+    if (model.inference_providers.length === 0) {
       models.set(modelId, null);
       continue;
     }
@@ -54,9 +54,7 @@ function dataCollectingKiloExclusiveModels(
       modelId,
       new Set([
         ...(existing ?? []),
-        ...model.inference_provider_restriction.map(providerId =>
-          normalizeInferenceProviderId(providerId)
-        ),
+        ...model.inference_providers.map(providerId => normalizeInferenceProviderId(providerId)),
       ])
     );
   }

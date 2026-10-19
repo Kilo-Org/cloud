@@ -2,7 +2,7 @@ import { describe, test, expect } from '@jest/globals';
 import { selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
-  getKiloExclusiveInferenceProviderRestriction,
+  getKiloExclusiveInferenceProviders,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   shouldRedactErrorResponse,
@@ -61,7 +61,7 @@ describe('Reflection Beam (free)', () => {
       training: true,
       retainsPrompts: true,
     });
-    expect([...(getKiloExclusiveInferenceProviderRestriction(model.public_id) ?? [])]).toEqual([
+    expect([...(getKiloExclusiveInferenceProviders(model.public_id) ?? [])]).toEqual([
       'reflection',
     ]);
   });
@@ -150,7 +150,7 @@ describe('isFreeModel', () => {
       async model => {
         expect(kiloExclusiveModels.some(entry => entry.public_id === model)).toBe(false);
         expect(findKiloExclusiveModel(model)).toBeNull();
-        expect(getKiloExclusiveInferenceProviderRestriction(model)).toBeUndefined();
+        expect(getKiloExclusiveInferenceProviders(model)).toBeUndefined();
         expect(await isFreeModel(model)).toBe(true);
       }
     );
@@ -307,21 +307,24 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
   });
 });
 
-describe('getKiloExclusiveInferenceProviderRestriction', () => {
+describe('getKiloExclusiveInferenceProviders', () => {
+  test('returns the stealth provider for stealth exclusives', () => {
+    expect([
+      ...(getKiloExclusiveInferenceProviders(glyph_cluster_stealth_free_model.public_id) ?? []),
+    ]).toEqual(['stealth']);
+    expect([
+      ...(getKiloExclusiveInferenceProviders(claude_opus_4_7_stealth_model.public_id) ?? []),
+    ]).toEqual(['stealth']);
+  });
+
   test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(getKiloExclusiveInferenceProviders('stepfun/step-5-preview-free')).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviders('openai/gpt-5.6-sol-discounted')).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviders('tencent/hy3:free')).toBeUndefined();
     expect(
-      getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')
+      getKiloExclusiveInferenceProviders(gemma_4_26b_a4b_it_free_model.public_id)
     ).toBeUndefined();
-    expect(
-      getKiloExclusiveInferenceProviderRestriction('openai/gpt-5.6-sol-discounted')
-    ).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviderRestriction('tencent/hy3:free')).toBeUndefined();
-    expect(
-      getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)
-    ).toBeUndefined();
-    expect(
-      getKiloExclusiveInferenceProviderRestriction('deepseek/deepseek-v4-pro')
-    ).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviderRestriction('unknown/model')).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviders('deepseek/deepseek-v4-pro')).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviders('unknown/model')).toBeUndefined();
   });
 });

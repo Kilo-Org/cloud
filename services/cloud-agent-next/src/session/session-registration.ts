@@ -312,12 +312,16 @@ type SessionCreationLedgerHooks = {
 export type LedgerSessionCreateResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  messageId?: string;
+  delivery?: 'sent' | 'queued';
   replayed?: boolean;
 };
 
 export type SessionLedgerCreateOptions = {
   billingOrigin?: string;
   operationKey: string;
+  includeInitialMessage?: boolean;
+  resolveSavedAllocationBeforeAdmission?: boolean;
   /** Epoch ms when the user intent started, used for the outbox duration. */
   startedAt: number;
 };
@@ -788,8 +792,6 @@ async function allocateNewSession(
       // the ladder treats missing IDs as "nothing external happened". A failure
       // here still fails the create at the report allocation stage and settles
       // the admitted row so the client gets a terminal result. The immutable
-      // create-intent fingerprint is recorded with the same write so a same-key
-      // retry can reject a changed intent before any replay or reconciliation.
       // A clone-only create has no initial turn, so no initialMessageId is
       // recorded.
       await recordOperationProgress(ledger.db, ledger.rowId, {
@@ -1306,7 +1308,7 @@ export async function registerNewSession(
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
   assertSupportedSandboxAllocation(rawInput, options);
-  const input = await withSavedSandboxAllocation(rawInput, savedAllocationArgs(ctx, options));
+  const input = rawInput;
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: { success: boolean; error?: string };
@@ -1630,9 +1632,8 @@ export async function startNewSession(
 
 /**
  * Ledger `canonical_result` key holding the SHA-256 fingerprint of the immutable
- * create intent, recorded with the first admitted create's progress. A same-key
- * retry compares its own intent against it before replaying or reconciling, so a
- * changed request can never inherit the prior operation's session.
+ * create intent, recorded atomically with admission. A same-key retry compares
+ * its own intent before replaying, takeover, reconciliation, or effect execution.
  */
 export const SESSION_CREATE_INTENT_FINGERPRINT_KEY = 'createIntentFingerprint';
 export const SESSION_CREATE_WORKTREE_ENABLED_KEY = 'worktreeEnabled';
@@ -1853,9 +1854,9 @@ export async function sessionCreateIntentFingerprint(
 }
 
 /**
- * Rejects a same-key retry whose create intent changed after the row recorded
- * its intent fingerprint. Rows admitted before the fingerprint contract carry
- * no comparison data and keep the legacy replay/reconcile behavior.
+ * Rejects a same-key retry whose create intent differs from the admitted
+ * fingerprint. Rows admitted before the fingerprint contract carry no
+ * comparison data and keep the legacy replay/reconcile behavior.
  */
 async function assertCreateIntentUnchanged(
   input: SessionRegistrationInput,
@@ -1890,9 +1891,7 @@ async function assertCreateIntentUnchanged(
     return;
   }
   if ((await sessionCreateIntentFingerprint(input)) !== stored) {
-    // Typed non-retryable session creation failure: the client clears the key
-    // and starts a new intent instead of inheriting the prior operation.
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
   }
 }
 
@@ -1903,13 +1902,16 @@ async function assertCreateIntentUnchanged(
  * immutable create intent still matches the admitted one.
  */
 export async function createSessionWithLedger(
-  input: SessionRegistrationInput,
+  rawInput: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
-  assertSupportedSandboxAllocation(input, { billingOrigin: options.billingOrigin });
-  await assertSandboxAllocationMembership(input, ctx);
+  assertSupportedSandboxAllocation(rawInput, { billingOrigin: options.billingOrigin });
+  await assertSandboxAllocationMembership(rawInput, ctx);
   const db = getPgDb(ctx.env);
+  const input = options.resolveSavedAllocationBeforeAdmission
+    ? await withSavedSandboxAllocation(rawInput, savedAllocationArgs(ctx, options))
+    : rawInput;
   const allocation = input.runtime?.sandboxAllocation;
   if (allocation !== undefined) {
     const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
@@ -1961,6 +1963,11 @@ export async function createSessionWithLedger(
       }
     }
   }
+  const initialWorktreeEnabled =
+    isEligibleFirstWorktreeSession(input, ctx) &&
+    sessionPlaneForCreate(input, ctx, options) === 'control';
+  const initialEffectiveInput = effectiveSessionRegistrationInput(input, initialWorktreeEnabled, 2);
+  const savedSandboxAllocation = input.savedSandboxAllocation;
   const admission = await admitOperation(db, {
     userId: ctx.userId,
     orgId: input.options?.kilocodeOrganizationId,
@@ -1969,6 +1976,15 @@ export async function createSessionWithLedger(
     operationKey: options.operationKey,
     taxonomy: 'safe-retry',
     leaseSeconds: SESSION_CREATE_LEDGER_LEASE_SECONDS,
+    initialCanonicalResult: {
+      [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+        await sessionCreateIntentFingerprint(initialEffectiveInput),
+      [SESSION_CREATE_WORKTREE_ENABLED_KEY]: initialWorktreeEnabled,
+      [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+      ...(savedSandboxAllocation !== undefined
+        ? { [SESSION_CREATE_SAVED_ALLOCATION_KEY]: savedSandboxAllocation }
+        : {}),
+    },
   });
   assertSessionOperationIdentity(admission.row, {
     userId: ctx.userId,
@@ -1982,6 +1998,7 @@ export async function createSessionWithLedger(
     worktreeEnabledForCreate(resolvedInput, ctx, admission.row),
     finalizationVersionForCreate(admission.row)
   );
+  await assertCreateIntentUnchanged(effectiveInput, admission.row, ctx, options);
 
   switch (admission.admission) {
     case 'admitted':
@@ -2001,7 +2018,7 @@ async function replaySettledCreate(
   row: OperationLedgerRow,
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
-  options?: { billingOrigin?: string }
+  options?: { billingOrigin?: string; includeInitialMessage?: boolean }
 ): Promise<LedgerSessionCreateResult> {
   // Only a `completed` settle may replay a successful create. Failed, no_op,
   // interrupted, and superseded terminal rows must surface the typed
@@ -2020,7 +2037,11 @@ async function replaySettledCreate(
     // so the client clears the key.
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
-  return { ...ids, replayed: true };
+  return {
+    ...ids,
+    ...(options?.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),
+    replayed: true,
+  };
 }
 
 /** Canonical session IDs recorded by the create's progress write, when present. */
@@ -2035,6 +2056,15 @@ function canonicalSessionIds(
         kiloSessionId: canonical.kiloSessionId,
       }
     : undefined;
+}
+
+function canonicalInitialMessage(
+  row: OperationLedgerRow
+): { messageId: string; delivery: 'sent' | 'queued' } | undefined {
+  const messageId = row.canonical_result?.initialMessageId;
+  const delivery = row.canonical_result?.delivery;
+  if (typeof messageId !== 'string') return undefined;
+  return { messageId, delivery: delivery === 'sent' ? 'sent' : 'queued' };
 }
 
 /**
@@ -2114,18 +2144,20 @@ async function executeLedgerCreate(
 ): Promise<LedgerSessionCreateResult> {
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, admissionKind);
   const billingOrigin = { billingOrigin: options.billingOrigin };
-  let result: { cloudAgentSessionId: string; kiloSessionId: string };
   if (input.initialTurn === undefined) {
-    // Clone-only create: register the copied transcript without admitting a
-    // synthetic initial turn.
     const allocation = await allocateSessionForCreate(input, ctx, billingOrigin, hooks);
-    result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
-  } else {
-    result = await startNewSession(input, ctx, billingOrigin, hooks);
+    return registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
   }
+  const result = await startNewSession(input, ctx, billingOrigin, hooks);
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
+    ...(options.includeInitialMessage
+      ? {
+          messageId: result.admission.messageId,
+          delivery: result.admission.compatibilityDelivery,
+        }
+      : {}),
   };
 }
 
@@ -2279,13 +2311,20 @@ async function resumeCloneCreate(
     allocation.initialTurn
   );
   const billingOrigin = { billingOrigin: options.billingOrigin };
-  const result =
-    input.initialTurn === undefined
-      ? await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks)
-      : await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
+  if (input.initialTurn === undefined) {
+    const result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
+    return { ...result, replayed: true };
+  }
+  const result = await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
+    ...(options.includeInitialMessage
+      ? {
+          messageId: result.admission.messageId,
+          delivery: result.admission.compatibilityDelivery,
+        }
+      : {}),
     replayed: true,
   };
 }
@@ -2362,6 +2401,12 @@ async function resumeFirstWorktreeCreate(
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
+    ...(options.includeInitialMessage
+      ? {
+          messageId: result.admission.messageId,
+          delivery: result.admission.compatibilityDelivery,
+        }
+      : {}),
     replayed: true,
   };
 }
@@ -2487,6 +2532,7 @@ async function reconcileLedgerCreate(
       initialMessageId: row.canonical_result?.initialMessageId,
       startedAt: options.startedAt,
       inOrganization: input.options?.kilocodeOrganizationId != null,
+      includeInitialMessage: options.includeInitialMessage === true,
     });
 
   // (c) Ownership present → read the DO state.
@@ -2555,7 +2601,11 @@ async function reconcileLedgerCreate(
         inOrganization: input.options?.kilocodeOrganizationId != null,
       }),
     });
-    return { ...ids, replayed: true };
+    return {
+      ...ids,
+      ...(options.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),
+      replayed: true,
+    };
   }
   return confirm();
 }
@@ -2568,6 +2618,7 @@ async function confirmInitialMessageAdmitted(args: {
   initialMessageId: unknown;
   startedAt: number;
   inOrganization: boolean;
+  includeInitialMessage: boolean;
 }): Promise<LedgerSessionCreateResult> {
   const { ctx, db, row, ids, initialMessageId } = args;
   if (typeof initialMessageId !== 'string' || initialMessageId.length === 0) {
@@ -2615,5 +2666,9 @@ async function confirmInitialMessageAdmitted(args: {
   if (failed) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
-  return { ...ids, replayed: true };
+  return {
+    ...ids,
+    ...(args.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),
+    replayed: true,
+  };
 }

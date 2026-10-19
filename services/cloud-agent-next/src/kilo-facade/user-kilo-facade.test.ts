@@ -485,15 +485,24 @@ describe('handleKiloFacadeRequest', () => {
   it('lists mapped Cloud Agent roots without requiring private SDK snapshots', async () => {
     const env = envStub();
     const listCloudAgentRootSessions = vi.mocked(env.SESSION_INGEST.listCloudAgentRootSessions);
-    listCloudAgentRootSessions.mockResolvedValue([
-      {
-        kiloSessionId,
-        cloudAgentSessionId: 'agent_live',
-        title: 'Mapped session',
-        created: 100,
-        updated: 200,
-      },
-    ]);
+    listCloudAgentRootSessions.mockResolvedValue({
+      items: [
+        {
+          kiloSessionId,
+          cloudAgentSessionId: 'agent_live',
+          userId: 'usr_1',
+          organizationId: null,
+          title: 'Mapped session',
+          gitUrl: null,
+          gitBranch: null,
+          profileId: null,
+          createdOnPlatform: 'unknown',
+          created: 100,
+          updated: 200,
+        },
+      ],
+      nextCursor: null,
+    });
 
     const response = await handleKiloFacadeRequest({
       request: new Request('http://worker.test/kilo/session?limit=15&start=1234'),

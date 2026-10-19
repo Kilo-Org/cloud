@@ -15,6 +15,7 @@ export const CODE_REVIEW_PLATFORM = 'code-review';
  */
 const CONTROL_PLANE_ORIGINS: ReadonlySet<string> = new Set([
   'cloud-agent-web',
+  'desktop',
   'slack',
   'github',
   'linear',

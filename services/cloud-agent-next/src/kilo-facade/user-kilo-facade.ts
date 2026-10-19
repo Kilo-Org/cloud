@@ -834,6 +834,9 @@ async function defaultAdmitPrompt(params: {
     if (result.type === 'queue-full') {
       return pendingQueueFullAdmissionFailure();
     }
+    if (result.type === 'session-stopped') {
+      return { success: false, code: 'BAD_REQUEST', error: 'Session is stopped' };
+    }
     return {
       success: true,
       outcome: 'queued',
@@ -1113,11 +1116,17 @@ async function groupedPendingSessionDetailResponse(params: {
     projectPublicListedSession({
       kiloSessionId: ownership.kiloSessionId,
       cloudAgentSessionId: params.cloudAgentSessionId,
+      userId: ownership.userId,
+      organizationId: ownership.organizationId,
       title:
         (ownership.title ?? publicRepositoryTitle(ownership.repositoryUrl))?.slice(
           0,
           MAX_PUBLIC_SESSION_TITLE_CHARACTERS
         ) ?? null,
+      gitUrl: ownership.repositoryUrl,
+      gitBranch: null,
+      profileId: null,
+      createdOnPlatform: 'unknown',
       created,
       updated,
     })
@@ -1428,7 +1437,7 @@ export async function handleKiloFacadeRequest(params: {
       ...query,
       kiloUserId: userId,
     });
-    return Response.json(sessions.map(projectPublicListedSession));
+    return Response.json(sessions.items.map(projectPublicListedSession));
   }
 
   if (kiloPath === '/session' || KNOWN_UNSUPPORTED_ROUTES.has(`${request.method} ${kiloPath}`)) {

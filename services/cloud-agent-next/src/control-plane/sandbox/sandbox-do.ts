@@ -806,6 +806,30 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  async detach(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
+    const requestId = crypto.randomUUID();
+    const handoff = await this.enqueue(async () => {
+      const route = await readRoute(this.db, parsed.sessionId);
+      if (!route) return { result: { ok: true, result: { detached: true } } } as const;
+      return this.beginWrapperControlRequest({
+        type: 'session.detach',
+        requestId,
+        sessionId: parsed.sessionId,
+      });
+    });
+    const result =
+      'result' in handoff
+        ? handoff.result
+        : 'error' in handoff
+          ? handoff.error
+          : await handoff.promise;
+    if (!result.ok) return result;
+    await this.release(parsed);
+    return result;
+  }
+
   async status(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneStatusResult> {
     await this.initialized;
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
@@ -1176,14 +1200,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     if (
       !isRecord(parsed) ||
-      (parsed.type !== 'worktree.result' && parsed.type !== 'terminal.result')
+      (parsed.type !== 'worktree.result' &&
+        parsed.type !== 'terminal.result' &&
+        parsed.type !== 'session.detachResult')
     ) {
       return;
     }
     const result = controlPlaneWrapperFrameSchema.safeParse(parsed);
     if (
       !result.success ||
-      (result.data.type !== 'worktree.result' && result.data.type !== 'terminal.result')
+      (result.data.type !== 'worktree.result' &&
+        result.data.type !== 'terminal.result' &&
+        result.data.type !== 'session.detachResult')
     ) {
       return;
     }
@@ -4692,9 +4720,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         await onRouteFailed(ctx, frame.sessionId, frame.reason, frame.subtype, current);
         return;
       case 'session.events':
+        if (!(await readRoute(this.db, frame.sessionId))) return;
         this.forwardEvents(frame, current);
         return;
       case 'session.outcome':
+        if (!(await readRoute(this.db, frame.sessionId))) return;
         this.forwardOutcome(frame, current);
         return;
       case 'events_dropped':

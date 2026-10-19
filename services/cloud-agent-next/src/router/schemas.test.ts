@@ -13,11 +13,14 @@ import {
   PrepareSessionInput,
   SendMessageInput,
   SendMessageV2Input,
+  StartHostedSessionInput,
+  StartHostedSessionOutput,
   StartSessionOutput,
   StartSessionInput,
   branchNameSchema,
 } from './schemas.js';
 import { parseCanonicalBitbucketCloneUrl } from '../types.js';
+import { hostedStartInputToSessionCreateRequest } from './handlers/session-start.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const validSessionId = 'agent_12345678-1234-1234-1234-123456789012';
@@ -52,6 +55,66 @@ const baseStartInput = {
 };
 
 describe('grouped unified session input contracts', () => {
+  it('accepts only strict authenticated desktop start fields', () => {
+    const valid = {
+      ...baseStartInput,
+      operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      client: 'vscode',
+      options: { kilocodeOrganizationId: '123e4567-e89b-12d3-a456-426614174011' },
+    };
+    expect(StartHostedSessionInput.parse(valid)).toEqual(valid);
+    expect(StartHostedSessionInput.safeParse({ ...valid, client: 'jetbrains' }).success).toBe(true);
+    for (const input of [
+      { ...valid, operationKey: 'not-a-uuid' },
+      { ...valid, client: 'cli' },
+      { ...valid, createdOnPlatform: 'desktop' },
+      { ...valid, clientProvenance: 'browser' },
+      { ...valid, skipBalanceCheck: true },
+      { ...valid, options: { ...valid.options, createdOnPlatform: 'desktop' } },
+      { ...valid, options: { ...valid.options, clientProvenance: 'browser' } },
+      { ...valid, options: { ...valid.options, skipBalanceCheck: true } },
+    ]) {
+      expect(StartHostedSessionInput.safeParse(input).success).toBe(false);
+    }
+  });
+
+  it('requires a stable replay projection for hosted session starts', () => {
+    expect(
+      StartHostedSessionOutput.safeParse({
+        cloudAgentSessionId: validSessionId,
+        kiloSessionId: validKiloSessionId,
+        messageId: validMessageId,
+        replayed: true,
+        delivery: 'queued',
+      }).success
+    ).toBe(true);
+    expect(
+      StartHostedSessionOutput.safeParse({
+        cloudAgentSessionId: validSessionId,
+        kiloSessionId: validKiloSessionId,
+        messageId: validMessageId,
+        replayed: false,
+        delivery: 'queued',
+        executionId: 'forbidden',
+      }).success
+    ).toBe(false);
+  });
+
+  it('stamps desktop provenance server-side without persisting the client choice', () => {
+    const request = hostedStartInputToSessionCreateRequest(
+      StartHostedSessionInput.parse({
+        ...baseStartInput,
+        operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        client: 'jetbrains',
+      })
+    );
+    expect(request.options).toEqual({
+      kilocodeOrganizationId: undefined,
+      createdOnPlatform: 'desktop',
+    });
+    expect(request).not.toHaveProperty('client');
+  });
+
   it.each(
     [[], ['Z.Example.COM.', 'example.com', 'EXAMPLE.COM']].map(egressAllowlist => ({
       egressAllowlist,

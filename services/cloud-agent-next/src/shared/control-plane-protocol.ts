@@ -865,6 +865,39 @@ const controlPlaneSessionReleaseFrameSchema = z
   })
   .strict();
 
+const controlPlaneSessionDetachFrameSchema = z
+  .object({
+    type: z.literal('session.detach'),
+    requestId: z.string().min(1).max(128),
+    sessionId: z.string().min(1),
+  })
+  .strict();
+
+const controlPlaneSessionDetachResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('session.detachResult'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      result: z.object({ detached: z.literal(true) }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('session.detachResult'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: z
+        .object({
+          code: z.string().min(1).max(64),
+          message: z.string().max(4096),
+          retryable: z.boolean(),
+        })
+        .strict(),
+    })
+    .strict(),
+]);
+
 const controlPlaneSessionEventsFrameSchema = z
   .object({
     type: z.literal('session.events'),
@@ -1109,6 +1142,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneSessionAbortFrameSchema,
   controlPlaneSessionAnswerFrameSchema,
   controlPlaneSessionReleaseFrameSchema,
+  controlPlaneSessionDetachFrameSchema,
+  controlPlaneSessionDetachResultFrameSchema,
   controlPlaneSessionEventsFrameSchema,
   controlPlaneSessionOutcomeFrameSchema,
   controlPlaneEventsDroppedFrameSchema,

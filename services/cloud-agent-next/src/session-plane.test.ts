@@ -16,6 +16,7 @@ import {
 import { PROVIDER_CAPABILITIES, sessionHasTerminal } from './agent-sandbox/capabilities.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
 import { sessionIdSchema } from './types.js';
+import { isInteractiveSessionOrigin } from './shared/control-plane-permission.js';
 
 describe('session plane identity', () => {
   it('classifies workspace_ as control and everything else as legacy', () => {
@@ -66,6 +67,7 @@ describe('session plane identity', () => {
 
     for (const createdOnPlatform of [
       'cloud-agent-web',
+      'desktop',
       'slack',
       'github',
       'linear',
@@ -179,11 +181,18 @@ describe('session plane identity', () => {
 
   it('recognizes only the control-plane session origins', () => {
     expect(isControlPlaneOrigin({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
+    expect(isControlPlaneOrigin({ createdOnPlatform: 'desktop' })).toBe(true);
     expect(isControlPlaneOrigin({ createdOnPlatform: 'slack' })).toBe(true);
     expect(isControlPlaneOrigin({ createdOnPlatform: 'webhook' })).toBe(true);
     expect(isControlPlaneOrigin({ createdOnPlatform: 'auto-triage' })).toBe(false);
     expect(isControlPlaneOrigin({})).toBe(false);
     expect(isControlPlaneOrigin()).toBe(false);
+  });
+
+  it('treats desktop sessions as interactive', () => {
+    expect(isInteractiveSessionOrigin('cloud-agent-web')).toBe(true);
+    expect(isInteractiveSessionOrigin('desktop')).toBe(true);
+    expect(isInteractiveSessionOrigin('slack')).toBe(false);
   });
 
   it('supports control-plane terminals independently of legacy provider capabilities', () => {

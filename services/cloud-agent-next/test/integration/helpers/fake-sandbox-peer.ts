@@ -80,7 +80,12 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     return 'sent';
   }
 
-  async release(): Promise<void> {}
+  async release(_payload?: { sessionId: string }): Promise<void> {}
+
+  async detach(payload: { sessionId: string }) {
+    await this.release(payload);
+    return { ok: true as const, result: { detached: true } };
+  }
 
   async status(payload: { sessionId: string }) {
     this.statusCalls.push(payload.sessionId);

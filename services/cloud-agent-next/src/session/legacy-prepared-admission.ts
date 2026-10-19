@@ -150,6 +150,9 @@ export async function admitLegacyPreparedInitialMessage(
     if (sendResult.type === 'queue-full') {
       throwAdmissionError(pendingQueueFullAdmissionFailure());
     }
+    if (sendResult.type === 'session-stopped') {
+      throwAdmissionError({ success: false, code: 'BAD_REQUEST', error: 'session_stopped' });
+    }
     return projectAdmissionToPublicAck(sessionId, {
       success: true,
       outcome: 'queued',

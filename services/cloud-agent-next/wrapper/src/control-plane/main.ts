@@ -274,6 +274,32 @@ export function createControlPlaneFrameDispatcher(
         deps.preparation.current?.release(frame.sessionId);
         void deps.terminals.current?.forgetSession(frame.sessionId);
         return;
+      case 'session.detach':
+        deps.turns.current?.release(frame.sessionId);
+        void deps.preparation.current
+          ?.detach(frame.sessionId)
+          .then(async () => {
+            await deps.terminals.current?.forgetSession(frame.sessionId);
+            deps.send({
+              type: 'session.detachResult',
+              requestId: frame.requestId,
+              ok: true,
+              result: { detached: true },
+            });
+          })
+          .catch(error => {
+            deps.send({
+              type: 'session.detachResult',
+              requestId: frame.requestId,
+              ok: false,
+              error: {
+                code: 'cleanup_failed',
+                message: error instanceof Error ? error.message.slice(0, 4096) : 'Cleanup failed',
+                retryable: true,
+              },
+            });
+          });
+        return;
       case 'worktree.snapshot':
       case 'worktree.summary':
         void deps.worktreeChanges.current?.handle(frame);

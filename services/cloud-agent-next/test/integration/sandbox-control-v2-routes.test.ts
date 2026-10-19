@@ -2021,6 +2021,31 @@ describe('SandboxControlV2 routes and forwarding', () => {
     });
   });
 
+  it('drops late wrapper events and outcomes after the session route is released', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+
+    await stub.release({ sessionId: SESSION });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'kilo.chunk', properties: { text: 'late' } }],
+    });
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'late-message',
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(peer.events).toEqual([]);
+    expect(peer.outcomes).toEqual([]);
+  });
+
   it('delivers route, events, and outcome notifications in order', async () => {
     const provider = createFakeProvider();
     const { stub, peer } = await setup(provider);

@@ -956,6 +956,27 @@ export const StartSessionOutput = z.object({
   wrapperRunId: z.string().optional(),
 });
 
+export const StartHostedSessionInput = StartSessionInput.safeExtend({
+  operationKey: z.string().uuid(),
+  client: z.enum(['vscode', 'jetbrains']),
+  options: z
+    .object({
+      kilocodeOrganizationId: z.string().uuid().optional(),
+    })
+    .strict()
+    .optional(),
+}).strict();
+
+export const StartHostedSessionOutput = z
+  .object({
+    cloudAgentSessionId: z.string(),
+    kiloSessionId: z.string(),
+    messageId: MessageIdSchema,
+    replayed: z.boolean(),
+    delivery: z.enum(['sent', 'queued']),
+  })
+  .strict();
+
 /**
  * Input schema for the unified `send` endpoint.
  *

@@ -219,6 +219,7 @@ export type PreparationManager = {
     credentials?: ControlPlaneSessionCredentialsPayload
   ): Promise<void>;
   release(sessionId: string): void;
+  detach(sessionId: string): Promise<void>;
   isPrepared(sessionId: string): boolean;
   isPreparing(): boolean;
   /** In-flight prepares, for the native status line. */
@@ -1093,11 +1094,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * client would only emit false unreaped-process diagnostics. When a sibling
    * still holds the key, the route's Kilo session tree is aborted instead.
    */
-  function finishReleasedRoute(input: {
+  async function finishReleasedRoute(input: {
     key: string;
     sessionId: string;
     spec: ControlPlaneRouteSpec;
-  }): void {
+  }): Promise<void> {
     if (!hasRoutesForKey(input.key, input.sessionId)) {
       deps.runtimes.release(input.key);
       return;
@@ -1138,7 +1139,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       })
       .catch(() => undefined);
     releaseCleanups.set(input.sessionId, entry);
-    void entry.promise.finally(() => {
+    await entry.promise.finally(() => {
       if (releaseCleanups.get(input.sessionId) === entry) releaseCleanups.delete(input.sessionId);
     });
   }
@@ -1163,7 +1164,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (preparing.get(spec.sessionId) !== owner) return;
     preparing.delete(spec.sessionId);
     if (prepared.has(spec.sessionId)) return;
-    finishReleasedRoute({
+    void finishReleasedRoute({
       key: owner.runtimeKey,
       sessionId: spec.sessionId,
       spec,
@@ -1473,6 +1474,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       return running;
     },
     release(sessionId) {
+      void this.detach(sessionId);
+    },
+    async detach(sessionId) {
       const preparation = preparing.get(sessionId);
       if (preparation) preparation.released = true;
       const route = prepared.get(sessionId);
@@ -1483,7 +1487,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         // The in-flight prepare's finalizer owns the decision.
         return;
       }
-      finishReleasedRoute({
+      await finishReleasedRoute({
         key: route.key,
         sessionId,
         spec: route.spec,

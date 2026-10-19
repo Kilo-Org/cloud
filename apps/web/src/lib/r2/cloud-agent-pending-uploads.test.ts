@@ -656,7 +656,7 @@ describe('cloud-agent pending-upload ledger', () => {
     );
   }, 30_000);
 
-  it('purgeUserPendingUploads reaches rows behind a failed delete', async () => {
+  it('purgeUserPendingUploads retries a failed delete with a final pass over the account', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -691,19 +691,22 @@ describe('cloud-agent pending-upload ledger', () => {
     mockSend.mockRejectedValueOnce(new Error('R2 unavailable'));
     await purgeUserPendingUploads(kiloUserId);
 
-    // The failing row's delete runs once, fails, and its row returns to
-    // 'pending'; the row behind it in id order is still reached in the same
-    // pass. Ids are random, so compare as sets rather than in order.
-    const deletedKeys = mockSend.mock.calls.map(call => call[0].input.Key);
-    expect(deletedKeys).toHaveLength(2);
-    expect(deletedKeys).toContain(buildObjectKey(kiloUserId, messageUuid, failingAttachment));
-    expect(deletedKeys).toContain(buildObjectKey(kiloUserId, messageUuid, trailingAttachment));
+    // Whichever row sorts first in id order takes the failed delete: its
+    // object is attempted twice (the retry pass claims the row restored to
+    // 'pending'), and the other row is reached in the same sweep. Both rows
+    // end claimed.
+    const attemptedKeys = mockSend.mock.calls.map(call => call[0].input.Key);
+    expect(attemptedKeys).toHaveLength(3);
+    const firstAttemptedKey = attemptedKeys[0];
+    expect(attemptedKeys.filter(key => key === firstAttemptedKey)).toHaveLength(2);
+    expect(attemptedKeys[1]).not.toBe(firstAttemptedKey);
+    expect(attemptedKeys[2]).toBe(firstAttemptedKey);
 
     const remaining = await db
       .select({ status: cloud_agent_pending_uploads.status })
       .from(cloud_agent_pending_uploads)
       .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
-    expect(remaining.map(row => row.status).sort()).toEqual(['pending', 'reaped']);
+    expect(remaining.map(row => row.status).sort()).toEqual(['reaped', 'reaped']);
   });
 
   it('releasePendingUploads deletes only the caller pending object and leaves linked and other-user rows', async () => {

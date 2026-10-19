@@ -294,7 +294,7 @@ export async function purgeUserPendingUploads(kiloUserId: string): Promise<void>
       .orderBy(asc(cloud_agent_pending_uploads.id))
       .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
 
-    if (batch.length === 0) return;
+    if (batch.length === 0) break;
 
     cursor = batch[batch.length - 1].id;
 
@@ -305,6 +305,32 @@ export async function purgeUserPendingUploads(kiloUserId: string): Promise<void>
         inArray(
           cloud_agent_pending_uploads.id,
           batch.map(row => row.id)
+        )
+      )
+    );
+  }
+
+  // One more pass over the whole account: a delete that failed above put its
+  // row back to 'pending', and the cursor has moved past it, so this retries
+  // every such row once before account deletion drops the ledger rows.
+  const restoredBatch = await db
+    .select({ id: cloud_agent_pending_uploads.id })
+    .from(cloud_agent_pending_uploads)
+    .where(
+      and(
+        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+        inArray(cloud_agent_pending_uploads.status, ['pending', 'linked'])
+      )
+    )
+    .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
+
+  if (restoredBatch.length > 0) {
+    await claimAndDeleteUploadObjects(
+      and(
+        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+        inArray(
+          cloud_agent_pending_uploads.id,
+          restoredBatch.map(row => row.id)
         )
       )
     );

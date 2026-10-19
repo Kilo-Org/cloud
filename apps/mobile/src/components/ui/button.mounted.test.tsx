@@ -228,6 +228,19 @@ describe('Button native target contract', () => {
     expect(button.findAllByType(NativeText)).toHaveLength(0);
   });
 
+  it('wraps scalar entries of an array while skipping whitespace-only strings', () => {
+    // Mixed icon-plus-label callers pass arrays; a JSX `{' '}` separator between
+    // them draws nothing in a View today and the row gap does the spacing, so
+    // it must not start rendering inside a Text.
+    const button = renderButton({
+      children: [createElement(View, { key: 'i' }), '  ', 'Save', 7],
+    });
+    const labels = button.findAllByType(NativeText);
+    expect(labels).toHaveLength(2);
+    expect(labels[0]?.props.children).toBe('Save');
+    expect(labels[1]?.props.children).toBe(7);
+  });
+
   it('keeps an explicitly disabled control disabled after loading ends', () => {
     renderButton({ disabled: true, loading: true });
     const button = renderButton({ disabled: true, loading: false });

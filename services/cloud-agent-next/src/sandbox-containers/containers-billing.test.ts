@@ -17,6 +17,8 @@ vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 
 import type {
   BudgetVerdict,
+  ContainerCapacityCheck,
+  ContainerCapacityRequest,
   ContainerUsageRpcMethods,
   HeartbeatAck,
   RecordAck,
@@ -26,6 +28,25 @@ import type { Env } from '../types.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
+import { createCloudflareContainersProviderAdapter } from '../sandbox-control/cloudflare-containers-provider.js';
+
+type CapacityModule = typeof import('../container-concurrency.js');
+const capacity = vi.hoisted(() => ({
+  readCapacity: vi.fn<(request: ContainerCapacityRequest) => Promise<ContainerCapacityCheck[]>>(),
+}));
+vi.mock('../container-concurrency.js', async importOriginal => {
+  const original = await importOriginal<CapacityModule>();
+  const assertContainerCapacity: CapacityModule['assertContainerCapacity'] = (
+    env,
+    request,
+    dependencies
+  ) =>
+    original.assertContainerCapacity(env, request, {
+      readCapacity: capacity.readCapacity,
+      ...dependencies,
+    });
+  return { ...original, assertContainerCapacity };
+});
 
 const RECORD_KEY = 'containers:record:v1';
 const BILLING_CONTEXT_KEY = 'container-usage:billing-context:v1';
@@ -36,7 +57,7 @@ const REF_A = 'ref-a';
 const T0 = Date.UTC(2026, 0, 1, 0, 0, 0);
 
 const BILLING_INPUT = {
-  sandboxId: 'ses-0123456789abcdef',
+  sandboxId: 'ses-0123456789abcdef' as const,
   subject: { type: 'user' as const, id: 'user-1' },
   actor: { type: 'user' as const, id: 'user-1' },
   sessionId: 'agent_session_1',
@@ -336,6 +357,7 @@ async function launch(
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(T0);
+  capacity.readCapacity.mockReset().mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -343,6 +365,68 @@ afterEach(() => {
 });
 
 describe('ContainersBilling identity and admission', () => {
+  it.each([
+    { instanceSize: 'standard-2', live: 2 },
+    { instanceSize: 'standard-2', live: 3 },
+    { instanceSize: 'lite', live: 2 },
+    { instanceSize: 'lite', live: 3 },
+  ] as const)(
+    'preflights identity-less $instanceSize before provider create completes: live=$live',
+    async ({ instanceSize, live }) => {
+      const { instance, container, meter } = setup();
+      const provider = createCloudflareContainersProviderAdapter({
+        logicalSandboxId: BILLING_INPUT.sandboxId,
+        allocationName: BILLING_INPUT.sandboxId,
+        instance: instanceSize,
+        getContainer: () => instance as unknown as DurableObjectStub<SandboxContainers>,
+      });
+      capacity.readCapacity.mockImplementation(async () => {
+        expect(container.startCalls).toHaveLength(0);
+        expect(container.running).toBe(false);
+        return [{ subject: BILLING_INPUT.subject, live, limit: 3 }];
+      });
+      const admission = provider.create({
+        intentId: 'identity-less-allocation',
+        createdAt: T0,
+        billing: { ...BILLING_INPUT, enforcementRequested: false },
+      });
+
+      if (live === 3) {
+        await expect(admission).rejects.toMatchObject({ code: 'container_limit_reached' });
+        expect(container.startCalls).toHaveLength(0);
+      } else {
+        const created = await admission;
+        if ('unresolved' in created) throw new Error('Expected native allocation ref');
+        expect(container.startCalls).toHaveLength(0);
+        await expect(
+          provider.launch(created.providerRef, { CONTROL_WORKLOAD_LIMIT_MB: '1024' })
+        ).resolves.toBeDefined();
+        expect(container.startCalls).toHaveLength(1);
+      }
+      expect(capacity.readCapacity).toHaveBeenCalledOnce();
+      expect(capacity.readCapacity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: BILLING_INPUT.subject,
+          actor: BILLING_INPUT.actor,
+          checkpoint: 'control-plane-create',
+        })
+      );
+      expect(meter.recordStartInputs).toEqual([]);
+    }
+  );
+
+  it('keeps the meter reservation path for an identity-carrying native size', async () => {
+    const { instance, meter } = setup();
+    capacity.readCapacity.mockRejectedValue(new Error('Legacy preflight must not run'));
+
+    await expect(admit(instance, 'standard-3')).resolves.toEqual({ success: true });
+
+    expect(capacity.readCapacity).not.toHaveBeenCalled();
+    expect(meter.recordStartInputs[0]).toMatchObject({
+      admission: { checkpoint: 'control-plane-create' },
+    });
+  });
+
   it.each([
     { disabled: true, origin: 'cloud-agent' },
     { disabled: false, origin: 'code-review' },

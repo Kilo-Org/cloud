@@ -2,6 +2,8 @@ import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { billingHeartbeatSeconds } from '../container-usage.js';
+import { assertContainerCapacity } from '../container-concurrency.js';
+import { parseSandboxBillingInput } from '../container-usage-context.js';
 import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import { logger } from '../logger.js';
 import {
@@ -634,9 +636,16 @@ export class SandboxContainers extends DurableObject<Env> {
       };
     }
     const billing = this.billingForRecord(prepared.record);
-    return billing
-      ? billing.ensureBillingAdmission(input)
-      : unavailableContainersBillingAdmission(input);
+    if (billing) return billing.ensureBillingAdmission(input);
+    const attribution = parseSandboxBillingInput(input);
+    await assertContainerCapacity(this.env, {
+      subject: attribution.subject,
+      actor: attribution.actor,
+      instanceId: attribution.sandboxId,
+      billingOrigin: attribution.metadata?.origin,
+      checkpoint: 'control-plane-create',
+    });
+    return unavailableContainersBillingAdmission(input);
   }
 
   async isBillingBlocked(): Promise<boolean> {

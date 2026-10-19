@@ -58,7 +58,7 @@ export async function assertContainerCapacity(
       await dependencies.reserveCapacity({ checkpoint: request.checkpoint });
       return;
     }
-    // Read-only diagnostics and the existing test seam never authorize a physical start.
+    // Identity-less legacy starts keep this read-only preflight instead of a meter reservation.
     const readCapacity =
       dependencies.readCapacity ??
       (input => {

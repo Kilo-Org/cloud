@@ -2531,6 +2531,7 @@
       "title": "Sesiju filtrs",
       "platformCloud": "Mākonis",
       "platformExtension": "Paplašinājums",
+      "platformDesktop": "Darbvirsma",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

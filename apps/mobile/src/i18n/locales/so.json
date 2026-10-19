@@ -2498,6 +2498,7 @@
       "title": "Shaandhee kalfadhiyada",
       "platformCloud": "Daruurta",
       "platformExtension": "Kordhin",
+      "platformDesktop": "Kombiyuutar",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

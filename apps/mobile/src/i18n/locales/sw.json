@@ -2498,6 +2498,7 @@
       "title": "Chuja vikao",
       "platformCloud": "Wingu",
       "platformExtension": "Kiendelezi",
+      "platformDesktop": "Kompyuta",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

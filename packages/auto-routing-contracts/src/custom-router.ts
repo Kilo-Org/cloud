@@ -681,10 +681,6 @@ export const InternalClientEvalResultRequestSchema = ClientEvalResultUploadSchem
 });
 export type InternalClientEvalResultRequest = z.infer<typeof InternalClientEvalResultRequestSchema>;
 
-// Internal AI gateway API, behind the internal API secret. The auto-routing worker asks the
-// gateway which gateway candidates the organization model policy denies a member, so the CLI
-// path and the gateway evaluate one implementation of that policy.
-
 export const AUTO_ROUTING_DENIED_MODELS_PATH = '/api/v1/internal/auto-routing/denied-models';
 
 export const AutoRoutingDeniedModelsRequestSchema = z.object({

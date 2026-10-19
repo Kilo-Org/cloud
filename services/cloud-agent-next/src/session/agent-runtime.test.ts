@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ContainerConcurrencyLimitError } from '../container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from '../container-concurrency.js';
 import { AgentSandboxUnavailableError, type AgentSandbox } from '../agent-sandbox/protocol.js';
 import type { Env } from '../types.js';
 import type {
@@ -106,28 +109,36 @@ function createWorkspaceReady(): WorkspaceReady {
 }
 
 describe('AgentRuntime', () => {
-  it('does not schedule cleanup or sandbox recovery for quota-denied discovery', async () => {
-    const storage = createMemoryStorage();
-    const denial = `remote RPC: ${new ContainerConcurrencyLimitError('personal', 20).message}`;
-    const requestAlarmAtOrBefore = vi.fn();
-    const runtime = createAgentRuntime({
-      storage,
-      env: {} as Env,
-      getMetadata: async () => createMetadata(),
-      getSessionIdForLogs: () => 'agent_runtime',
-      sendToWrapper: () => false,
-      discoverSessionWrappers: async () => ({ status: 'inspection-failed', error: denial }),
-      requestAlarmAtOrBefore,
-    });
-    await expect(runtime.send(createPlan())).rejects.toThrow(denial);
-    expect((await getWrapperLease(storage)).state).toBe('none');
-    expect(await getSandboxRecoveryState(storage)).toBeUndefined();
-    expect(requestAlarmAtOrBefore).not.toHaveBeenCalled();
-  });
+  it.each([
+    new ContainerConcurrencyLimitError('personal', 20),
+    new ContainerCapacityUnavailableError(),
+  ])(
+    'does not schedule cleanup or sandbox recovery for capacity-denied discovery: %s',
+    async failure => {
+      const storage = createMemoryStorage();
+      const denial = `remote RPC: ${failure.message}`;
+      const requestAlarmAtOrBefore = vi.fn();
+      const runtime = createAgentRuntime({
+        storage,
+        env: {} as Env,
+        getMetadata: async () => createMetadata(),
+        getSessionIdForLogs: () => 'agent_runtime',
+        sendToWrapper: () => false,
+        discoverSessionWrappers: async () => ({ status: 'inspection-failed', error: denial }),
+        requestAlarmAtOrBefore,
+      });
+      await expect(runtime.send(createPlan())).rejects.toThrow(denial);
+      expect((await getWrapperLease(storage)).state).toBe('none');
+      expect(await getSandboxRecoveryState(storage)).toBeUndefined();
+      expect(requestAlarmAtOrBefore).not.toHaveBeenCalled();
+    }
+  );
 
-  it('releases an unstarted wrapper lease after quota denial without recovery cleanup', async () => {
+  it.each([
+    new ContainerConcurrencyLimitError('organization', 50),
+    new ContainerCapacityUnavailableError(),
+  ])('releases an unstarted wrapper lease after capacity denial: %s', async denial => {
     const storage = createMemoryStorage();
-    const denial = new ContainerConcurrencyLimitError('organization', 50);
     const runtime = createAgentRuntime({
       storage,
       env: {} as Env,

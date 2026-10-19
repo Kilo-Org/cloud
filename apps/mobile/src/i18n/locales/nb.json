@@ -2498,6 +2498,7 @@
       "title": "Filtrer økter",
       "platformCloud": "Sky",
       "platformExtension": "Utvidelse",
+      "platformDesktop": "Skrivebord",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

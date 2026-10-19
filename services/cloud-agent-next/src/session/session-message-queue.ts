@@ -11,7 +11,7 @@ import type {
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { isExecutionError } from '../execution/errors.js';
-import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import { logger } from '../logger.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -278,11 +278,12 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
       return { failureStage: 'pre_dispatch', failureCode: 'invalid_delivery_request' };
     case 'PAYMENT_REQUIRED':
       return { failureStage: 'pre_dispatch', failureCode: 'payment_required' };
+    case 'BILLING_UNAVAILABLE':
+      return { failureStage: 'pre_dispatch', failureCode: 'admission_billing_unavailable' };
     case 'MODEL_MISSING':
       return { failureStage: 'pre_dispatch', failureCode: 'model_missing' };
     case 'WRAPPER_CLEANUP_EXHAUSTED':
     case 'COMPUTE_STOPPING':
-    case 'BILLING_UNAVAILABLE':
     case 'SANDBOX_CAPABILITY_UNAVAILABLE':
     case 'WRAPPER_FINALIZING':
     case 'INTERNAL':
@@ -562,14 +563,17 @@ export async function flushNextPendingSessionMessage(params: {
         remainingCount: totalCount,
       };
     }
-    const quotaDenied = isContainerConcurrencyLimitError(error);
+    const capacityFailure = getContainerCapacityFailureReason(error);
+    const quotaDenied = capacityFailure === 'container_limit_reached';
     const code = quotaDenied
       ? 'CONTAINER_LIMIT_REACHED'
-      : error instanceof MessageDeliveryRequestValidationError
-        ? error.code
-        : isSandboxWorkspaceProbeTimeoutError(error)
-          ? 'INTERNAL'
-          : knownPreDispatchExecutionFailureCode(error);
+      : capacityFailure === 'billing_unavailable'
+        ? 'BILLING_UNAVAILABLE'
+        : error instanceof MessageDeliveryRequestValidationError
+          ? error.code
+          : isSandboxWorkspaceProbeTimeoutError(error)
+            ? 'INTERNAL'
+            : knownPreDispatchExecutionFailureCode(error);
     const failure = await recordPendingFlushFailure(
       params.storage,
       message,

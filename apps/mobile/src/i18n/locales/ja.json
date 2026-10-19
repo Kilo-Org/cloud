@@ -1986,6 +1986,7 @@
       "title": "セッションの絞り込み",
       "platformCloud": "クラウド",
       "platformExtension": "拡張機能",
+      "platformDesktop": "デスクトップ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

@@ -2020,6 +2020,7 @@
       "title": "Фильтр сеансов",
       "platformCloud": "Облако",
       "platformExtension": "Расширение",
+      "platformDesktop": "Десктоп",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

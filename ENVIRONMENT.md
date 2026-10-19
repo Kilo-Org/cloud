@@ -203,6 +203,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `APPLE_APP_BUNDLE_ID` - iOS app bundle ID for Apple App Attest and Sign In verification. [SERVER]
 - `NATIVE_ADMISSION_MODE` - Native admission enforcement mode: `off` (default), `report`, or `enforce`. [SERVER]
 - `NATIVE_ADMISSION_SIMULATOR_BYPASS` - When `true` in non-production, bypasses Play Integrity API verification. [SERVER]
+- `APPLE_JWKS_URL_OVERRIDE` - Apple JWKS endpoint override for local verification runs; applies only outside production deployments. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
 - `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]

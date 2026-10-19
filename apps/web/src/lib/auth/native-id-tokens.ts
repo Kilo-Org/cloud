@@ -8,10 +8,15 @@ import {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_IOS_CLIENT_ID,
 } from '@kilocode/web-shared/lib/config.server';
-import { captureMessage } from '@sentry/nextjs';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 
 /** Thrown when a native (mobile) ID token fails verification — maps to 401 INVALID_TOKEN. */
 export class NativeIdTokenError extends Error {}
+
+// The record is kept for the lifetime of the identity token it binds, so the
+// TTL matches the longest Apple ID-token lifetime. Redis expires the record on
+// its own; no cleanup job is needed.
+const NONCE_TTL_SECONDS = 10 * 60;
 
 /** Returns true when the error carries an HTTP response from Google's servers,
  *  as opposed to a network or infrastructure failure. */
@@ -36,7 +41,7 @@ export type VerifiedGoogleIdToken = {
 
 export async function verifyNativeAppleIdToken(
   idToken: string,
-  nonce?: string
+  nonce: string
 ): Promise<VerifiedAppleIdToken> {
   // The Apple identity token's `aud` claim is the native app's bundle ID.  Use
   // the configured bundle ID and fall back to the shipped default so
@@ -49,15 +54,30 @@ export async function verifyNativeAppleIdToken(
   // digest to AppleAuthentication.signInAsync.  Apple embeds the digest in the identity
   // token payload as-is (no second hash).  The server must compute SHA-256 of the raw
   // nonce the mobile client sent and compare against payload.nonce.
-  if (nonce !== undefined) {
-    const expectedNonce = createHash('sha256').update(nonce).digest('hex');
-    if (payload.nonce !== expectedNonce) {
-      throw new NativeIdTokenError('Apple nonce mismatch');
-    }
-  } else {
-    // ponytail: remove legacy no-nonce path after all shipped builds send a nonce
-    // and the legacy counter has drained.
-    captureMessage('native_apple_nonce_legacy_count: 1');
+  //
+  // The digest is also recorded so each one is accepted once while the token is
+  // valid: the insert below succeeds only for a digest that has never been
+  // accepted, so a captured nonce/token pair cannot be replayed.
+  const expectedNonce = createHash('sha256').update(nonce).digest('hex');
+  if (payload.nonce !== expectedNonce) {
+    throw new NativeIdTokenError('Apple nonce mismatch');
+  }
+  // Each nonce digest is accepted once: SET NX succeeds only for a digest
+  // that is not yet recorded, and the record expires with the token. A store
+  // write that cannot complete refuses the sign-in, keeping the acceptance
+  // rule uniform.
+  let recorded: string | null = null;
+  try {
+    recorded = await redisClient.set(
+      `auth:apple-signin-nonce:${expectedNonce}`,
+      '1',
+      { nx: true, ex: NONCE_TTL_SECONDS }
+    );
+  } catch {
+    throw new NativeIdTokenError('Apple nonce check unavailable');
+  }
+  if (recorded !== 'OK') {
+    throw new NativeIdTokenError('Apple nonce already used');
   }
 
   if (typeof payload.email !== 'string' || !payload.email) {

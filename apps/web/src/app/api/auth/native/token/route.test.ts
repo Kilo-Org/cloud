@@ -167,13 +167,13 @@ describe('POST /api/auth/native/token', () => {
       });
 
       const response = await POST(
-        createRequest({ provider: 'apple', idToken: 'apple-id-token', fullName: 'Jane Doe' })
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', fullName: 'Jane Doe', nonce: 'test-nonce' })
       );
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ token: 'minted-jwt', created: false });
-      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', undefined);
+      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', 'test-nonce');
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           google_user_email: 'appleuser@example.com',
@@ -198,7 +198,7 @@ describe('POST /api/auth/native/token', () => {
         email: 'appleuser@example.com',
       });
 
-      await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+      await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' }));
 
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({ google_user_name: 'appleuser' }),
@@ -214,7 +214,7 @@ describe('POST /api/auth/native/token', () => {
     it('returns 401 INVALID_TOKEN when Apple verification throws NativeIdTokenError', async () => {
       mockVerifyNativeAppleIdToken.mockRejectedValue(new NativeIdTokenError('bad token'));
 
-      const response = await POST(createRequest({ provider: 'apple', idToken: 'bad-token' }));
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'bad-token', nonce: 'test-nonce' }));
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -226,7 +226,7 @@ describe('POST /api/auth/native/token', () => {
       mockVerifyNativeAppleIdToken.mockRejectedValue(new Error('network'));
 
       await expect(
-        POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }))
+        POST(createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' }))
       ).rejects.toThrow('network');
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
@@ -243,7 +243,7 @@ describe('POST /api/auth/native/token', () => {
         ssoOrganizationId: 'workos-organization-id',
       });
 
-      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' }));
       const data = await response.json();
 
       expect(response.status).toBe(403);
@@ -263,7 +263,7 @@ describe('POST /api/auth/native/token', () => {
         errorCode: 'BLOCKED',
       });
 
-      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' }));
       const data = await response.json();
 
       expect(response.status).toBe(403);
@@ -293,16 +293,12 @@ describe('POST /api/auth/native/token', () => {
       );
     });
 
-    it('provides no nonce when the client sends none (legacy)', async () => {
-      mockVerifyNativeAppleIdToken.mockResolvedValue({
-        sub: 'apple-sub-1',
-        email: 'appleuser@example.com',
-      });
-
+    it('returns 400 INVALID_REQUEST when the client sends no nonce', async () => {
       const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
 
-      expect(response.status).toBe(200);
-      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', undefined);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
+      expect(mockVerifyNativeAppleIdToken).not.toHaveBeenCalled();
     });
   });
 
@@ -1317,6 +1313,7 @@ describe('POST /api/auth/native/token', () => {
         createRequest({
           provider: 'apple',
           idToken: 'apple-id-token',
+          nonce: 'test-nonce',
           admission: {},
         })
       );
@@ -1353,6 +1350,7 @@ describe('POST /api/auth/native/token', () => {
         createRequest({
           provider: 'apple',
           idToken: 'apple-id-token',
+          nonce: 'test-nonce',
           admission: {},
         })
       );
@@ -1389,6 +1387,7 @@ describe('POST /api/auth/native/token', () => {
         createRequest({
           provider: 'apple',
           idToken: 'apple-id-token',
+          nonce: 'test-nonce',
           admission: {},
         })
       );
@@ -1424,6 +1423,7 @@ describe('POST /api/auth/native/token', () => {
         createRequest({
           provider: 'apple',
           idToken: 'apple-id-token',
+          nonce: 'test-nonce',
           supportsRefresh: true,
           admission: {},
         })
@@ -1465,6 +1465,7 @@ describe('POST /api/auth/native/token', () => {
         createRequest({
           provider: 'apple',
           idToken: 'apple-id-token',
+          nonce: 'test-nonce',
           supportsRefresh: true,
           admission: {},
         })
@@ -1704,7 +1705,7 @@ describe('POST /api/auth/native/token', () => {
         isNew: true,
       } as never);
 
-      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' }));
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ token: 'minted-jwt', created: true });

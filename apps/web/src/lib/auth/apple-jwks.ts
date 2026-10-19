@@ -2,6 +2,19 @@ import jwt from 'jsonwebtoken';
 import { createPublicKey } from 'node:crypto';
 
 const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
+// Local verification runs can serve a fixture key set through this override.
+// The override applies only outside production deployments.
+function appleJwksUrl(): string {
+  const override = process.env['APPLE_JWKS_URL_OVERRIDE'];
+  if (
+    override &&
+    process.env.NODE_ENV !== 'production' &&
+    !process.env.VERCEL_ENV
+  ) {
+    return override;
+  }
+  return APPLE_JWKS_URL;
+}
 
 /** Thrown for malformed tokens or unresolvable keys — caller error, not a server fault. */
 export class AppleJwtClientError extends Error {}
@@ -23,7 +36,7 @@ async function getApplePublicKeys(): Promise<AppleJWK[]> {
     return cachedKeys.keys;
   }
 
-  const response = await fetch(APPLE_JWKS_URL);
+  const response = await fetch(appleJwksUrl());
   if (!response.ok) {
     throw new Error(`Failed to fetch Apple JWKS: ${response.status}`);
   }

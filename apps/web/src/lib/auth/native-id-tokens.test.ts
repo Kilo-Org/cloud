@@ -31,8 +31,11 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
     return mockConfig.APPLE_APP_BUNDLE_ID;
   },
 }));
-jest.mock('@sentry/nextjs', () => ({
-  captureMessage: jest.fn(),
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
+  getEnvVariable: (name: string) => process.env[name],
+}));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { set: jest.fn() },
 }));
 
 import {
@@ -42,14 +45,13 @@ import {
   NativeIdTokenError,
 } from './native-id-tokens';
 import { GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
-import { captureMessage } from '@sentry/nextjs';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 
 const mockVerifyAppleJwtWithJwks = jest.mocked(verifyAppleJwtWithJwks);
 const mockGetFederatedSignonCertsAsync = jest.fn();
 const mockVerifySignedJwtWithCertsAsync = jest.fn();
 const mockGetToken = jest.fn();
 const mockVerifyIdToken = jest.fn();
-const mockCaptureMessage = jest.mocked(captureMessage);
 
 (OAuth2Client as unknown as jest.Mock).mockImplementation(() => ({
   getFederatedSignonCertsAsync: mockGetFederatedSignonCertsAsync,
@@ -62,15 +64,22 @@ describe('verifyNativeAppleIdToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConfig.APPLE_APP_BUNDLE_ID = 'com.kilocode.kiloapp';
+    // Default: the single-use nonce record succeeds (first use).
+    jest.mocked(redisClient.set).mockResolvedValue('OK');
   });
 
   it('verifies against the configured Apple bundle ID and returns sub/email', async () => {
     mockConfig.APPLE_APP_BUNDLE_ID = 'com.kilocode.kiloapp.dev';
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: createHash('sha256').update('audience-nonce').digest('hex'),
+      })
     );
 
-    const result = await verifyNativeAppleIdToken('a-token');
+    const result = await verifyNativeAppleIdToken('a-token', 'audience-nonce');
 
     expect(mockVerifyAppleJwtWithJwks).toHaveBeenCalledWith('a-token', 'com.kilocode.kiloapp.dev');
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
@@ -79,10 +88,15 @@ describe('verifyNativeAppleIdToken', () => {
   it('falls back to the default bundle ID when APPLE_APP_BUNDLE_ID is not configured', async () => {
     mockConfig.APPLE_APP_BUNDLE_ID = '';
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: createHash('sha256').update('fallback-nonce').digest('hex'),
+      })
     );
 
-    const result = await verifyNativeAppleIdToken('a-token');
+    const result = await verifyNativeAppleIdToken('a-token', 'fallback-nonce');
 
     expect(mockVerifyAppleJwtWithJwks).toHaveBeenCalledWith('a-token', 'com.kilocode.kiloapp');
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
@@ -90,10 +104,15 @@ describe('verifyNativeAppleIdToken', () => {
 
   it('accepts a string "true" email_verified claim', async () => {
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: 'true' })
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: 'true',
+        nonce: createHash('sha256').update('verified-claim-nonce').digest('hex'),
+      })
     );
 
-    const result = await verifyNativeAppleIdToken('a-token');
+    const result = await verifyNativeAppleIdToken('a-token', 'verified-claim-nonce');
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
   });
 
@@ -102,7 +121,7 @@ describe('verifyNativeAppleIdToken', () => {
       applePayload({ sub: 'apple-sub-1', email_verified: true })
     );
 
-    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow();
+    await expect(verifyNativeAppleIdToken('a-token', 'missing-email-nonce')).rejects.toThrow();
   });
 
   it('throws when email_verified is not true', async () => {
@@ -110,13 +129,15 @@ describe('verifyNativeAppleIdToken', () => {
       applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: false })
     );
 
-    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow();
+    await expect(verifyNativeAppleIdToken('a-token', 'unverified-email-nonce')).rejects.toThrow();
   });
 
   it('propagates AppleJwtClientError from the underlying jwks verifier', async () => {
     mockVerifyAppleJwtWithJwks.mockRejectedValue(new AppleJwtClientError('bad jwt'));
 
-    await expect(verifyNativeAppleIdToken('bad-token')).rejects.toThrow(AppleJwtClientError);
+    await expect(verifyNativeAppleIdToken('bad-token', 'any-nonce')).rejects.toThrow(
+      AppleJwtClientError
+    );
   });
 
   // C12: Apple nonce binding
@@ -134,7 +155,11 @@ describe('verifyNativeAppleIdToken', () => {
 
     const result = await verifyNativeAppleIdToken('a-token', rawNonce);
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
-    expect(mockCaptureMessage).not.toHaveBeenCalled();
+    expect(redisClient.set).toHaveBeenCalledWith(
+      `auth:apple-signin-nonce:${expectedDigest}`,
+      '1',
+      { nx: true, ex: 600 }
+    );
   });
 
   it('throws NativeIdTokenError when the nonce does not match', async () => {
@@ -156,14 +181,42 @@ describe('verifyNativeAppleIdToken', () => {
     );
   });
 
-  it('accepts a token without a nonce and records legacy use', async () => {
+  it('accepts a nonce digest only once', async () => {
+    const rawNonce = 'second-use-raw-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+      })
     );
+    // SET NX returned null: the digest is already recorded.
+    jest.mocked(redisClient.set).mockResolvedValue(null);
 
-    const result = await verifyNativeAppleIdToken('a-token');
-    expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
-    expect(mockCaptureMessage).toHaveBeenCalledWith('native_apple_nonce_legacy_count: 1');
+    await expect(verifyNativeAppleIdToken('a-token', rawNonce)).rejects.toThrow(
+      'Apple nonce already used'
+    );
+  });
+
+  it('refuses the sign-in when the nonce record cannot be written', async () => {
+    const rawNonce = 'store-unavailable-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+      })
+    );
+    jest.mocked(redisClient.set).mockRejectedValue(new Error('upstash unreachable'));
+
+    // A sign-in is accepted only when the digest could be recorded.
+    await expect(verifyNativeAppleIdToken('a-token', rawNonce)).rejects.toThrow(
+      'Apple nonce check unavailable'
+    );
   });
 });
 

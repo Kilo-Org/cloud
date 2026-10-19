@@ -104,7 +104,7 @@ const requestSchema = z.discriminatedUnion('provider', [
     provider: z.literal('apple'),
     idToken: z.string(),
     fullName: z.string().optional(),
-    nonce: z.string().optional(),
+    nonce: z.string(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
   }),

@@ -2989,6 +2989,7 @@
       "backToProfile": "Back to profile",
       "loadErrorMessage": "Check your connection and try again.",
       "loadErrorTitle": "Couldn't load your organizations",
+      "membershipLostNotice": "You no longer have access to this organization. Switched to {{target}}.",
       "organizationUnavailable": "Organization unavailable",
       "selectDescription": "Choose an organization from your profile to continue.",
       "selectOrganization": "Select an organization",

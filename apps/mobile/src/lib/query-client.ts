@@ -221,6 +221,34 @@ function removePermissionDeniedQueries(
 }
 
 /**
+ * A permission denial on an org-scoped query can mean the membership itself is
+ * gone (the host removed the member) while the cached `organizations.list`
+ * still names the org — the provider's reconciliation then has nothing to act
+ * on. Mark the shared list stale so it refetches; when the fresh list drops
+ * the org, `OrganizationProvider` switches to the remaining context. A list
+ * still holding the org (role-scoped denial, org intact) changes nothing.
+ */
+function refreshOrganizationsListOnPermissionLoss(
+  queryClient: QueryClient,
+  error: unknown,
+  query: Query<unknown, unknown, unknown>
+): void {
+  if (!isPermissionDeniedError(error)) {
+    return;
+  }
+  const organizationId = queryKeyInput(query.queryKey)?.organizationId;
+  if (organizationId === undefined || organizationId === null) {
+    return;
+  }
+  const listKey: QueryKey = [['organizations', 'list']];
+  const list = queryClient.getQueryCache().find({ queryKey: listKey });
+  if (!list || list.state.fetchStatus !== 'idle') {
+    return;
+  }
+  void queryClient.refetchQueries({ queryKey: listKey, stale: true });
+}
+
+/**
  * Default freshness for app queries. Screens paint persisted-cache rows before
  * the network answers (U4); this keeps a mount or focus regain from re-requesting
  * the same payload for 30 s. Explicit `staleTime: 0` call sites still override it.
@@ -260,6 +288,7 @@ export function createKiloAppQueryClient(): QueryClient {
         if (!query.isActive()) {
           removePermissionDeniedQueries(queryClient, error, query);
         }
+        refreshOrganizationsListOnPermissionLoss(queryClient, error, query);
       },
     }),
     mutationCache: new MutationCache({

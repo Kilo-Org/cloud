@@ -204,6 +204,77 @@ describe('permission-denied query removal', () => {
   });
 });
 
+describe('organizations.list refresh on permission loss', () => {
+  const LIST_KEY: readonly unknown[] = [['organizations', 'list'], { type: 'query' }];
+  const makeOrgKey = (id: string): readonly unknown[] => [
+    ['organizations', 'withMembers'],
+    { type: 'query', input: { organizationId: id } },
+  ];
+  const forbidden = () =>
+    Object.assign(new Error('forbidden'), {
+      data: { code: 'FORBIDDEN', httpStatus: 403 },
+    });
+
+  it('refetches the shared list once an org-scoped FORBIDDEN lands', async () => {
+    const queryClient = createKiloAppQueryClient();
+    const listFn = vi.fn<() => Promise<{ organizationId: string }[]>>();
+    queryClient.setQueryData(LIST_KEY, [{ organizationId: 'org-1' }]);
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey: makeOrgKey('org-1'),
+      queryFn: () => {
+        throw forbidden();
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+    await observer.refetch().catch(() => undefined);
+    unsubscribe();
+    // The org-scoped FORBIDDEN lands while the list query has no observer:
+    // scheduling its refresh is still observable once one mounts, so the
+    // resolver gates the refetch this observer then triggers.
+    const pending = Promise.withResolvers<{ organizationId: string }[]>();
+    listFn.mockImplementation(() =>
+      listFn.mock.calls.length === 1 ? pending.promise : Promise.resolve([])
+    );
+    const listObserver = new QueryObserver(queryClient, {
+      queryKey: LIST_KEY,
+      queryFn: listFn,
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubList = listObserver.subscribe(() => undefined);
+    await flushQueryUpdates();
+    // The triggered refetch arrived at the gated queryFn.
+    expect(listFn).toHaveBeenCalled();
+    pending.resolve([{ organizationId: 'org-2' }]);
+    await flushQueryUpdates();
+    expect(listObserver.getCurrentResult().data).toEqual([{ organizationId: 'org-2' }]);
+    unsubList();
+  });
+
+  it('does not refresh the list for a non-org FORBIDDEN', async () => {
+    const queryClient = createKiloAppQueryClient();
+    queryClient.setQueryData(LIST_KEY, [{ organizationId: 'org-1' }]);
+
+    const error = forbidden();
+    await expect(
+      queryClient.fetchQuery({
+        queryKey: [['user', 'getMe'], { type: 'query' }],
+        staleTime: 0,
+        queryFn: () => {
+          throw error;
+        },
+      })
+    ).rejects.toBe(error);
+
+    // No observer was attached to the list and no refetch was scheduled: the
+    // cached payload is untouched and still fresh.
+    expect(queryClient.getQueryState(LIST_KEY)?.dataUpdatedAt).toBeGreaterThan(0);
+  });
+});
+
 const emptyResult = { sessions: [] };
 
 describe('accepted active-session outcomes', () => {

@@ -26,7 +26,7 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { and, asc, desc, eq, isNull, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import { randomUUID } from 'crypto';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
@@ -260,13 +260,35 @@ export async function createOrganization(
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
 
+    // The free trial window is anchored to the creator's first organization.
+    // When the creator has already started a trial, the new organization begins
+    // with its window already closed (a past timestamp keeps entitlement
+    // classification deterministic; null would re-derive a full window from
+    // created_at).
+    let freeTrialEndAt = trialEndDate.toISOString();
+    if (userId) {
+      const [priorTrial] = await tx
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+          and(
+            eq(organizations.created_by_kilo_user_id, userId),
+            isNotNull(organizations.free_trial_end_at)
+          )
+        )
+        .limit(1);
+      if (priorTrial) {
+        freeTrialEndAt = new Date(now.getTime() - 1).toISOString();
+      }
+    }
+
     const [org] = await tx
       .insert(organizations)
       .values({
         name,
         require_seats: true,
         created_by_kilo_user_id: userId,
-        free_trial_end_at: trialEndDate.toISOString(),
+        free_trial_end_at: freeTrialEndAt,
         settings: {
           enable_usage_limits: false,
           code_indexing_enabled: true,

@@ -4,12 +4,13 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   addUserToOrganization,
   createOrganization,
+  markOrganizationAsDeleted,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
@@ -313,7 +314,7 @@ describe('organization creation limit', () => {
     });
   });
 
-  test('does not count deleted organizations against the existing active-organization limit', async () => {
+  test('counts organizations the user created even after they are deleted', async () => {
     const user = await insertTestUser();
     const caller = await createCallerForUser(user.id);
     for (let index = 0; index < 5; index++) {
@@ -324,14 +325,65 @@ describe('organization creation limit', () => {
       .set({ deleted_at: new Date().toISOString() })
       .where(eq(organizations.created_by_kilo_user_id, user.id));
 
-    await caller.organizations.create({ name: 'Replacement', autoAddCreator: true });
+    await expect(
+      caller.organizations.create({ name: 'Over creation history', autoAddCreator: true })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
 
-    const active = await db.query.organizations.findMany({
-      where: and(
-        eq(organizations.created_by_kilo_user_id, user.id),
-        isNull(organizations.deleted_at)
-      ),
+    const persisted = await db.query.organizations.findMany({
+      where: eq(organizations.created_by_kilo_user_id, user.id),
     });
-    expect(active).toHaveLength(1);
+    expect(persisted).toHaveLength(5);
+  });
+
+  test('memberships in deleted organizations do not count toward the limit', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const deleted = await createOrganization('Deleted member org', owner.id);
+    await addUserToOrganization(deleted.id, member.id, 'member');
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, deleted.id));
+
+    const caller = await createCallerForUser(member.id);
+    for (let index = 0; index < 5; index++) {
+      await caller.organizations.create({ name: `Member org ${index}`, autoAddCreator: true });
+    }
+
+    const persisted = await db.query.organizations.findMany({
+      where: eq(organizations.created_by_kilo_user_id, member.id),
+    });
+    expect(persisted).toHaveLength(5);
+  });
+
+  test('grants the trial window only on the first organization a user creates', async () => {
+    const user = await insertTestUser();
+    const first = await createOrganization('First organization', user.id);
+    const second = await createOrganization('Second organization', user.id);
+
+    const firstTrial = new Date(first.free_trial_end_at!).getTime();
+    const secondTrial = new Date(second.free_trial_end_at!).getTime();
+    expect(firstTrial).toBeGreaterThan(Date.now());
+    expect(secondTrial).toBeLessThan(Date.now());
+  });
+
+  test('a re-created organization after deletion does not regain the trial window', async () => {
+    const user = await insertTestUser();
+    const original = await createOrganization('Original organization', user.id);
+    expect(new Date(original.free_trial_end_at!).getTime()).toBeGreaterThan(Date.now());
+
+    await markOrganizationAsDeleted(original.id);
+
+    const replacement = await createOrganization('Replacement organization', user.id);
+    expect(new Date(replacement.free_trial_end_at!).getTime()).toBeLessThan(Date.now());
+  });
+
+  test('each user gets their own first-organization trial window', async () => {
+    const userA = await insertTestUser();
+    const userB = await insertTestUser();
+    await createOrganization('User A organization', userA.id);
+    const firstForB = await createOrganization('User B organization', userB.id);
+
+    expect(new Date(firstForB.free_trial_end_at!).getTime()).toBeGreaterThan(Date.now());
   });
 });

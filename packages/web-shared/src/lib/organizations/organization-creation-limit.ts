@@ -39,16 +39,21 @@ export async function enforceOrganizationCreationLimit(
         inArray(organization_memberships.role, ['owner', 'admin', 'billing_manager'])
       )
     );
+  // A user's creation history is immutable: organizations they created count
+  // toward the limit even after being soft-deleted. Access inherited through
+  // memberships or managed parents only counts while the organization is live.
   const existingOrganizations = await tx
     .select({ id: organizations.id })
     .from(organizations)
     .where(
-      and(
-        isNull(organizations.deleted_at),
-        or(
-          eq(organizations.created_by_kilo_user_id, userId),
-          inArray(organizations.id, directOrganizations),
-          inArray(organizations.parent_organization_id, managedParents)
+      or(
+        eq(organizations.created_by_kilo_user_id, userId),
+        and(
+          isNull(organizations.deleted_at),
+          or(
+            inArray(organizations.id, directOrganizations),
+            inArray(organizations.parent_organization_id, managedParents)
+          )
         )
       )
     )

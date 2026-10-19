@@ -40,6 +40,8 @@ export class WorkerTransportError extends Error {
   }
 }
 
+const DISABLED_ROUTING_ERROR = 'Manual analysis Worker routing is disabled';
+
 export async function submitManualAnalysisStart(
   params: ManualAnalysisStartParams
 ): Promise<{ queued: true; commandId: string }> {
@@ -84,7 +86,12 @@ export async function submitManualAnalysisStart(
     );
   }
   if (!response.ok) {
-    if (response.status >= 500) {
+    // The known disabled-routing 503 is returned before enqueueing, so it is
+    // a definitive rejection. Any other 5xx may have been accepted and stays
+    // ambiguous transport.
+    const definitive =
+      response.status < 500 || (response.status === 503 && body.error === DISABLED_ROUTING_ERROR);
+    if (!definitive) {
       throw new WorkerTransportError(
         body.error ?? `Security analysis Worker request failed with ${response.status}`,
         response.status

@@ -45,7 +45,9 @@ export async function createGitHubConnectionOAuthState(
     })
   ).toString('base64url');
   return {
-    state: createOAuthState(`${PREFIX}${payload}`, input.userId),
+    state: createOAuthState(`${PREFIX}${payload}`, input.userId, undefined, {
+      provider: 'github',
+    }),
     codeChallenge: createHash('sha256').update(verifier).digest('base64url'),
   };
 }
@@ -54,6 +56,7 @@ export async function consumeGitHubConnectionOAuthState(state: string | null, us
   const verified = verifyOAuthStateDetailed(state);
   if (
     verified.status === 'invalid' ||
+    verified.state.provider !== 'github' ||
     verified.state.userId !== userId ||
     !verified.state.owner.startsWith(PREFIX)
   )

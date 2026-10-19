@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { Owner } from '@/lib/integrations/core/types';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   appendIntegrationOAuthRedirectQuery,
   parseOAuthStateOwner,
@@ -93,6 +94,14 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
     }
 
     const owner = parseOAuthStateOwner(verifiedState.owner);
+    if (verifiedState.provider !== PLATFORM.BITBUCKET) {
+      captureMessage('Bitbucket OAuth callback state minted for another flow', {
+        level: 'warning',
+        tags: { endpoint: 'bitbucket/callback', source: 'bitbucket_oauth' },
+        extra: safeCallbackContext(searchParams),
+      });
+      return redirectWithStatus(null, 'error', 'invalid_state');
+    }
     if (verifiedState.userId !== user.id || !owner) {
       return redirectWithStatus(verifiedState, 'error', 'unauthorized');
     }

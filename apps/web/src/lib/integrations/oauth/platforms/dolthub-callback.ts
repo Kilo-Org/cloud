@@ -95,6 +95,15 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
 
+    if (verified.provider !== PLATFORM.DOLTHUB) {
+      captureMessage('DoltHub callback state minted for another flow', {
+        level: 'warning',
+        tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
+        extra: { code: '***', state, allParams: redactedParams },
+      });
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+    }
+
     const ownerStr = verified.owner;
     const owner = parseOAuthStateOwner(ownerStr);
     if (!owner) {

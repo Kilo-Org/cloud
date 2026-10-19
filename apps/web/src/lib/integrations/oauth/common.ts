@@ -212,16 +212,12 @@ export async function handleStatefulPlatformOAuthConnect(
     });
     const returnToParam = request.nextUrl.searchParams.get('returnTo');
     const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
-    const purpose =
-      platform === 'slack' || platform === 'linear' || platform === 'discord'
-        ? 'provider_install'
-        : undefined;
-    const state = createOAuthState(
-      ownerToOAuthStateOwner(owner),
-      user.id,
-      returnTo ?? undefined,
-      purpose
-    );
+    const state = createOAuthState(ownerToOAuthStateOwner(owner), user.id, returnTo ?? undefined, {
+      provider: platform,
+      ...(platform === 'slack' || platform === 'linear' || platform === 'discord'
+        ? { purpose: 'provider_install' as const }
+        : {}),
+    });
     if (platform === 'slack' || platform === 'linear' || platform === 'discord') {
       await beginProviderOAuthAttempt({
         actorUserId: user.id,

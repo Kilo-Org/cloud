@@ -39,7 +39,9 @@ export async function handleBitbucketOAuthConnect(request: NextRequest): Promise
 
     const returnToParam = request.nextUrl.searchParams.get('returnTo');
     const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
-    const state = createOAuthState(`${owner.type}_${owner.id}`, user.id, returnTo ?? undefined);
+    const state = createOAuthState(`${owner.type}_${owner.id}`, user.id, returnTo ?? undefined, {
+      provider: 'bitbucket',
+    });
     return NextResponse.redirect(buildBitbucketOAuthUrl(state));
   } catch (error) {
     captureException(error, {

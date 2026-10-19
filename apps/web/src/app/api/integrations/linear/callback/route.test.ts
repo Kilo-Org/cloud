@@ -100,7 +100,10 @@ const PLATFORM_INTEGRATION_ID = 'pi_linear_1';
 const COMMENT_AUTHOR_LINEAR_ID = 'linear-user-A';
 const OAUTH_VIEWER_LINEAR_ID = 'linear-user-B';
 const createProviderState = (userId = USER_ID, returnTo?: string) =>
-  createOAuthState(`user_${userId}`, userId, returnTo, 'provider_install');
+  createOAuthState(`user_${userId}`, userId, returnTo, {
+    provider: 'linear',
+    purpose: 'provider_install',
+  });
 
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
@@ -230,12 +233,13 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations?error=unauthorized');
   });
 
-  test('accepts a purpose-less state within TTL while connection management is disabled', async () => {
+  test('rejects a state minted without a provider claim', async () => {
     jest.useFakeTimers();
     try {
-      process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
       jest.setSystemTime(new Date('2026-09-09T12:00:00.000Z'));
-      const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+      const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+        provider: 'linear',
+      });
       jest.advanceTimersByTime(30_000);
       mockedUpsertLinearInstallation.mockResolvedValue({} as never);
 
@@ -243,37 +247,50 @@ describe('GET /api/integrations/linear/callback', () => {
         makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
       );
 
-      expectRedirectLocation(response, '/integrations/linear?success=installed');
-      expect(mockHandleOAuthCallback).toHaveBeenCalledTimes(1);
-      expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
-      expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  test('rejects a purpose-less state when connection management is enabled', async () => {
-    jest.useFakeTimers();
-    try {
-      process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
-      jest.setSystemTime(new Date('2026-09-09T12:00:00.000Z'));
-      const state = createOAuthState(`user_${USER_ID}`, USER_ID);
-      const response = await callLinearCallback(
-        makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
-      );
       expectRedirectLocation(response, '/integrations?error=invalid_state');
       expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
       expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
       expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
       expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
     } finally {
-      process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
       jest.useRealTimers();
     }
   });
 
+  test('rejects a state minted for another provider', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'bitbucket',
+      purpose: 'provider_install',
+    });
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+    expectRedirectLocation(response, '/integrations?error=invalid_state');
+    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+    expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+    expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
+  });
+
+  test('rejects a provider-install state whose attempt was already consumed', async () => {
+    mockConsumeProviderOAuthAttempt.mockResolvedValue(false);
+    mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+    const state = createProviderState();
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+    expectRedirectLocation(response, '/integrations/linear?error=installation_failed');
+    expect(mockConsumeProviderOAuthAttempt).toHaveBeenCalledTimes(1);
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+  });
+
   test('rejects a wrong-purpose signed state without provider mutation', async () => {
-    const state = createSignedToken({ owner: `user_${USER_ID}`, uid: USER_ID, purpose: 'other' });
+    const state = createSignedToken({
+      provider: 'linear',
+      owner: `user_${USER_ID}`,
+      uid: USER_ID,
+      purpose: 'other',
+    });
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );

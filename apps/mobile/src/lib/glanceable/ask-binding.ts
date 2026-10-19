@@ -38,13 +38,11 @@ type ReadPermissionId = (input: AskBindingInput) => Promise<string | null>;
  */
 async function readPermissionId(input: AskBindingInput): Promise<string | null> {
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  const { resolveCloudAgentSessionId } =
-    require('./cloud-agent-session') as typeof CloudAgentSession;
+  const session = require('./cloud-agent-session') as typeof CloudAgentSession;
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  const { resolvePendingPermissionId } =
-    require('./pending-permission') as typeof PendingPermission;
-  const cloudAgentSessionId = await resolveCloudAgentSessionId(input.kiloSessionId);
-  return resolvePendingPermissionId({
+  const pending = require('./pending-permission') as typeof PendingPermission;
+  const cloudAgentSessionId = await session.resolveCloudAgentSessionId(input.kiloSessionId);
+  return pending.resolvePendingPermissionId({
     cloudAgentSessionId,
     organizationId: input.organizationId,
   });

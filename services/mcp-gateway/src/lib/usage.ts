@@ -79,7 +79,7 @@ export function recordProxyUsage(params: {
   try {
     params.env.MCP_GATEWAY_ANALYTICS?.writeDataPoint({
       indexes: [params.configId],
-      blobs: ['runtime_proxy', params.ownerScope, params.method, String(params.outcomeStatus)],
+      blobs: ['runtime_proxy', params.ownerScope, params.method],
       doubles: [params.outcomeStatus],
     });
   } catch {

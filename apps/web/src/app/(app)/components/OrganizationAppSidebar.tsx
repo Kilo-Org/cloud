@@ -240,15 +240,6 @@ export default function OrganizationAppSidebar({
           },
         ]
       : []),
-    ...(user?.is_admin
-      ? [
-          {
-            title: 'MCP Gateway',
-            icon: Cable,
-            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
-          },
-        ]
-      : []),
   ];
 
   // Account group

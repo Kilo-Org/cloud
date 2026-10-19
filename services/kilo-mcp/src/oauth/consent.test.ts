@@ -233,8 +233,8 @@ function seedAuthenticator(
 const FLOW_TOKEN = 'flow-tok-seed';
 
 /** The Cookie header the seeded record's browser presents. */
-function flowCookie(token: string = FLOW_TOKEN): string {
-  return `kilo_mcp_flow=${token}`;
+function flowCookie(id: string = 'pa-1', token: string = FLOW_TOKEN): string {
+  return `kilo_mcp_flow_${id}=${token}`;
 }
 
 async function seedPending(
@@ -1724,23 +1724,45 @@ describe('GET/POST /authorize/org', () => {
 });
 
 describe('GET /authorize (flow cookie)', () => {
-  it('sets the binding cookie and stores the same token on the record', async () => {
+  it('sets the record-scoped binding cookie and stores the same token on the record', async () => {
     const store = createFakeStore();
     const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
     const handler = createDefaultHandler(deps(store, flowFetch()));
     const response = await run(handler, authorizeRequestFor(), envWith(helpers));
     expect(response.status).toBe(200);
     const setCookie = response.headers.get('Set-Cookie');
-    expect(setCookie).toContain('kilo_mcp_flow=');
+    const id = [...store.pending.keys()][0]!;
+    // The name carries the record id, so concurrent flows in one browser keep
+    // separate cookies instead of overwriting each other.
+    expect(setCookie).toContain(`kilo_mcp_flow_${id}=`);
     expect(setCookie).toContain('HttpOnly');
     expect(setCookie).toContain('Secure');
     expect(setCookie).toContain('SameSite=Lax');
     expect(setCookie).toContain('Path=/');
-    const token = setCookie?.match(/kilo_mcp_flow=([^;]+)/)?.[1];
+    const token = setCookie?.match(new RegExp(`kilo_mcp_flow_${id}=([^;]+)`))?.[1];
     expect(token).toBeDefined();
     const record = [...store.pending.values()][0];
     expect(record?.flowToken).toBe(token);
     expect(record?.flowToken.length).toBeGreaterThan(0);
+  });
+
+  it('gives two concurrent flows separate cookie names and tokens', async () => {
+    const store = createFakeStore();
+    const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const first = await run(handler, authorizeRequestFor(), envWith(helpers));
+    const second = await run(handler, authorizeRequestFor(), envWith(helpers));
+    const [idA, idB] = [...store.pending.keys()];
+    const cookieA = first.headers.get('Set-Cookie')?.match(/kilo_mcp_flow_[^=]+/)?.[0];
+    const cookieB = second.headers.get('Set-Cookie')?.match(/kilo_mcp_flow_[^=]+/)?.[0];
+    expect(cookieA).toBe(`kilo_mcp_flow_${idA}`);
+    expect(cookieB).toBe(`kilo_mcp_flow_${idB}`);
+    expect(cookieA).not.toBe(cookieB);
+    // Each record's cookie carries its own token.
+    const tokenA = first.headers.get('Set-Cookie')?.match(/=([^;]+)/)?.[1];
+    const tokenB = second.headers.get('Set-Cookie')?.match(/=([^;]+)/)?.[1];
+    expect(store.pending.get(idA!)?.flowToken).toBe(tokenA);
+    expect(store.pending.get(idB!)?.flowToken).toBe(tokenB);
   });
 });
 

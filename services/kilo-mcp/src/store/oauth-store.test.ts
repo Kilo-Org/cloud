@@ -635,7 +635,7 @@ describe('production token routing (real provider + DO SQLite)', () => {
         )
         .get() as { id: string; flow_token: string } | undefined;
       const id = row?.id ?? '';
-      const cookie = `kilo_mcp_flow=${row?.flow_token ?? ''}`;
+      const cookie = `kilo_mcp_flow_${id}=${row?.flow_token ?? ''}`;
       const status = await worker.fetch(
         new Request(`https://kilo-mcp.test/authorize/status?id=${encodeURIComponent(id)}`, {
           headers: { Cookie: cookie },

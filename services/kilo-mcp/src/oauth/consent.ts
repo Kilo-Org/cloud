@@ -32,7 +32,7 @@ import {
   withAuthCors,
 } from '../auth/http';
 import { orgPickerFormSchema, orgPickerQuerySchema, pairingStatusQuerySchema } from '../schemas';
-import { flowCookieHeader, flowCookieToken } from './flow-cookie';
+import { flowCookieHeader, flowCookieToken, PENDING_TTL_SECONDS } from './flow-cookie';
 import type { McpAnalytics } from '../analytics';
 import type { OAuthStoreApi, PendingAuthorization } from '../store/oauth-store';
 import type { AuthenticatorEnrollmentApi } from '../types';
@@ -49,9 +49,6 @@ import {
   type AuthenticatorView,
   type OrgOption,
 } from './pages';
-
-/** Pending records are short-lived: 10 minutes to complete sign-in. */
-export const PENDING_TTL_SECONDS = 600;
 
 /** Operator-facing copy for a record that can no longer be acted on. */
 const STALE_REQUEST_MESSAGE =
@@ -259,7 +256,7 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
     statusUrl: `${AUTH_PATHS.pairingStatus}?id=${encodeURIComponent(id)}`,
     restartUrl: request.url,
   });
-  page.headers.append('Set-Cookie', flowCookieHeader(flowToken));
+  page.headers.append('Set-Cookie', flowCookieHeader(id, flowToken));
   return page;
 }
 
@@ -282,7 +279,7 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
   // The poll must come from the browser that opened /authorize: anything else
   // answers exactly like an expired record (`unknown`), so an id alone (the
   // initiating client's user agent, or a phished id) drives nothing.
-  if (flowCookieToken(request.headers.get('Cookie')) !== record.flowToken) {
+  if (flowCookieToken(request.headers.get('Cookie'), id) !== record.flowToken) {
     return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
   }
   const clientId = record.authRequest.clientId;
@@ -386,7 +383,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   // id — indistinguishable from expiry, and nothing about the record leaks:
   // the pending id alone (the initiating client's user agent, or a phished
   // id) can render the picker, submit a choice, or complete the flow.
-  if (flowCookieToken(request.headers.get('Cookie')) !== record.flowToken) {
+  if (flowCookieToken(request.headers.get('Cookie'), id) !== record.flowToken) {
     return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
   }
 

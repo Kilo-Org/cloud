@@ -324,7 +324,7 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
     contentType: .folder,
     documentSize: nil,
     contentModificationDate: nil,
-    itemVersion: zeroVersion,
+    itemVersion: ArtifactItem.zeroVersion,
     isDirectory: true
   )
 
@@ -369,7 +369,7 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
       contentType: .folder,
       documentSize: nil,
       contentModificationDate: nil,
-      itemVersion: zeroVersion,
+      itemVersion: ArtifactItem.zeroVersion,
       isDirectory: true
     )
   }

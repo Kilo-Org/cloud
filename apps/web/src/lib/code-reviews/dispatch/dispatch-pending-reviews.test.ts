@@ -5,6 +5,7 @@ const mockPrepareReviewPayload = jest.fn();
 const mockSendCodeReviewDisabledEmail = jest.fn();
 const mockGetIntegrationById = jest.fn();
 const mockUpdateCheckRun = jest.fn();
+const mockGetOrganizationById = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -47,6 +48,10 @@ const mockIsLocalCodeReviewDevelopmentEnabled = jest.fn<boolean, []>();
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
   isLocalCodeReviewDevelopmentEnabled: () => mockIsLocalCodeReviewDevelopmentEnabled(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
+  getOrganizationById: (...args: unknown[]) => mockGetOrganizationById(...args),
 }));
 
 import crypto from 'crypto';
@@ -166,6 +171,7 @@ describe('tryDispatchPendingReviews', () => {
 
   beforeEach(() => {
     mockIsLocalCodeReviewDevelopmentEnabled.mockReturnValue(false);
+    mockGetOrganizationById.mockReset();
     mockDispatchReview.mockResolvedValue(undefined);
     mockGetReviewStatus.mockResolvedValue(null);
     mockGetAgentConfigForOwner.mockResolvedValue({
@@ -198,6 +204,7 @@ describe('tryDispatchPendingReviews', () => {
     mockDispatchReview.mockReset();
     mockGetReviewStatus.mockReset();
     mockIsLocalCodeReviewDevelopmentEnabled.mockReset();
+    mockGetOrganizationById.mockReset();
     mockGetAgentConfigForOwner.mockReset();
     mockPrepareReviewPayload.mockReset();
     mockSendCodeReviewDisabledEmail.mockReset();
@@ -1985,6 +1992,9 @@ describe('tryDispatchPendingReviews', () => {
     });
 
     afterEach(async () => {
+      await db
+        .delete(organization_seats_purchases)
+        .where(eq(organization_seats_purchases.organization_id, gateOrgId));
       await db.delete(organizations).where(eq(organizations.id, gateOrgId));
     });
 
@@ -2049,6 +2059,13 @@ describe('tryDispatchPendingReviews', () => {
     it('dispatches a council review when the organization is entitled', async () => {
       const reviewId = await insertCouncilReview('pending');
       await addSeatPurchase('active');
+      // The other tests in this suite mock the entitlement lookup; this one
+      // reads the real organization row and seat purchase, so point the mock
+      // at the actual implementation.
+      mockGetOrganizationById.mockImplementation(
+        jest.requireActual('@kilocode/web-shared/lib/organizations/organizations')
+          .getOrganizationById as typeof mockGetOrganizationById
+      );
 
       const result = await tryDispatchPendingReviews({
         type: 'org',
@@ -2086,6 +2103,25 @@ describe('tryDispatchPendingReviews', () => {
         expect.objectContaining({ status: 'failed', terminalReason: 'billing' })
       );
       expect(mockDispatchReview).not.toHaveBeenCalled();
+    });
+
+    it('keeps a transient entitlement lookup error out of the plan denial path', async () => {
+      const reviewId = await insertCouncilReview('pending');
+      await addSeatPurchase('ended');
+      // The guard's entitlement lookups fail transiently; this is not a plan
+      // denial, so the reservation must not end with the billing reason.
+      mockGetOrganizationById.mockRejectedValue(new Error('connection reset'));
+
+      await tryDispatchPendingReviews({
+        type: 'org',
+        id: gateOrgId,
+        userId: testUser.id,
+      });
+
+      const stored = await db.query.cloud_agent_code_reviews.findFirst({
+        where: eq(cloud_agent_code_reviews.id, reviewId),
+      });
+      expect(stored?.terminal_reason).not.toBe('billing');
     });
 
     it('starts a non-council review of the same owner through the normal path', async () => {

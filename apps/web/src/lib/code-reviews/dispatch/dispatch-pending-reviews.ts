@@ -10,6 +10,7 @@
  */
 
 import crypto from 'crypto';
+import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   cloud_agent_code_reviews,
@@ -508,9 +509,15 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
   // reservation that does not meet the plan ends here rather than running.
   // No-op for non-council reviews and local development (the bypass lives
   // inside the guard).
+  //
+  // Only the guard's own denial ends the reservation. Any other error from the
+  // entitlement lookups (a transient database failure, for example) propagates
+  // to the normal dispatch failure handling instead of being recorded as a
+  // plan denial.
   try {
     await assertCouncilCreationAllowed({ owner, reviewType: review.review_type });
   } catch (error) {
+    if (!(error instanceof TRPCError)) throw error;
     logExceptInTest('[dispatchReview] Council plan gate denied dispatch', {
       reviewId: review.id,
       owner,

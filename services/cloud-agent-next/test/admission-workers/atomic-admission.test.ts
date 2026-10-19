@@ -38,11 +38,7 @@ import type { ProviderAdapter, ProviderCreateIntent } from '../../src/sandbox-co
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
 import { AgentSandboxUnavailableError } from '../../src/agent-sandbox/protocol.js';
 import type { VercelBillingLifetimeEvidence } from '../../src/control-plane/sandbox/vercel-billing-runtime.js';
-import {
-  VERCEL_BILLING_SCHEDULE_KEY,
-  type BillingScheduleEntries,
-  type BillingScheduleTable,
-} from '../../src/sandbox-control/billing-schedule.js';
+import type { BillingScheduleTable } from '../../src/sandbox-control/billing-schedule.js';
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import type { Env } from '../../src/types.js';
@@ -317,7 +313,7 @@ async function runRace(race: Race) {
               }
             )
           );
-          const create = attempt.provider.adapter.create;
+          const create = attempt.provider.adapter.create.bind(attempt.provider.adapter);
           attempt.provider.adapter.create = async intent => {
             await billing.ensureBillingAdmission(
               { sandboxClassName: 'Sandbox' },
@@ -575,16 +571,13 @@ async function runRace(race: Race) {
               return { status: 'terminal', providerRef };
             };
           }
-          const schedule = await state.storage.get<BillingScheduleEntries>(
-            VERCEL_BILLING_SCHEDULE_KEY
+          await (
+            instance as unknown as { billingSchedule: BillingScheduleTable }
+          ).billingSchedule.schedule(
+            VERCEL_BILLING_SETTLEMENT_CALLBACK,
+            Date.now() - 1,
+            context.generation
           );
-          await state.storage.put(VERCEL_BILLING_SCHEDULE_KEY, {
-            ...schedule,
-            [VERCEL_BILLING_SETTLEMENT_CALLBACK]: {
-              dueAtMs: Date.now() - 1,
-              payload: context.generation,
-            },
-          });
           await instance.alarm();
         });
         if (race.outcome === 'ambiguous-timeout') {

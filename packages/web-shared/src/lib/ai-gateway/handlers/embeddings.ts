@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
@@ -265,7 +266,7 @@ export async function handleEmbeddingsRequest(
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-      await getBalanceAndOrgSettings(organizationId, user);
+      await getBalanceAndOrgSettings(organizationId, user, readDb);
     accountBalance = balance;
     accountPlan = plan;
     accountPayer = payer;
@@ -287,6 +288,7 @@ export async function handleEmbeddingsRequest(
         organizationId,
         kiloUserId: user.id,
         modelId: requestedModelLowerCased,
+        fromDb: readDb,
       });
       if (!decision.allowed) return modelNotAllowedResponse();
       if (decision.eligibleProviderRoutes) {

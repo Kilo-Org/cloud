@@ -10,10 +10,11 @@ import {
   GEMMA_4_26B_A4B_IT_ID,
   GEMMA_4_26B_A4B_IT_FREE_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
-import type {
-  KiloExclusiveModel,
-  Pricing,
-  PricingTiers,
+import {
+  isStealthModel,
+  type KiloExclusiveModel,
+  type Pricing,
+  type PricingTiers,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { type ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
@@ -41,9 +42,9 @@ export const claude_opus_4_8_stealth_model: KiloExclusiveModel = {
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   provider: MARTIAN,
-  flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
-  inference_provider_restriction: [],
+  inference_providers: ['stealth'],
 };
 
 export const claude_opus_4_7_stealth_model: KiloExclusiveModel = {
@@ -55,9 +56,9 @@ export const claude_opus_4_7_stealth_model: KiloExclusiveModel = {
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   provider: MARTIAN,
-  flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
-  inference_provider_restriction: [],
+  inference_providers: ['stealth'],
 };
 
 const CLAUDE_SONNET_STEALTH_PRICING: PricingTiers = [
@@ -81,9 +82,9 @@ export const claude_sonnet_4_6_stealth_model: KiloExclusiveModel = {
   context_length: 1_000_000,
   max_completion_tokens: 64_000,
   provider: MARTIAN,
-  flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_SONNET_STEALTH_PRICING },
-  inference_provider_restriction: [],
+  inference_providers: ['stealth'],
 };
 
 export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
@@ -95,9 +96,9 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   provider: MARTIAN,
-  flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
-  inference_provider_restriction: [],
+  inference_providers: ['stealth'],
 };
 
 export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
@@ -111,7 +112,7 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   provider: OPENROUTER,
   internal_id: GEMMA_4_26B_A4B_IT_ID,
   pricing: null,
-  inference_provider_restriction: [],
+  inference_providers: [],
 };
 
 const KILO_STEALTH_DISCOUNT_FACTOR = 0.5;
@@ -162,7 +163,7 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
     "Your prompts and completions may be retained and used to train or improve the provider's services. This third-party-served variant of Qwen3.6 Plus is offered at 50% lower cost than standard Qwen3.6 Plus pricing and is not served by Alibaba or Kilo Code. Note: a surcharge applies to long-context workloads exceeding 256K input tokens.",
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
-  flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
   provider: MARTIAN,
   internal_id: 'qwen/qwen3.6-plus',
   pricing: {
@@ -190,7 +191,7 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
       KILO_STEALTH_DISCOUNT_FACTOR
     ),
   },
-  inference_provider_restriction: [],
+  inference_providers: ['stealth'],
 };
 
 export const glyph_cluster_stealth_free_model: KiloExclusiveModel = {
@@ -200,11 +201,11 @@ export const glyph_cluster_stealth_free_model: KiloExclusiveModel = {
     "Your prompts and completions may be retained and used to train or improve the provider's services. Glyph Cluster is a reasoning model for coding and long-context analysis, served through Vercel AI Gateway during its stealth period at no cost. It supports function calling and streaming, takes text input only, and does not support structured outputs. Zero Data Retention is not available for this model.",
   context_length: 256_000,
   max_completion_tokens: 256_000,
-  flags: ['reasoning', 'stealth', 'requires-data-collection'],
+  flags: ['reasoning', 'requires-data-collection'],
   provider: VERCEL_AI_GATEWAY,
   internal_id: 'stealth/glyph-cluster',
   pricing: null,
-  inference_provider_restriction: [],
+  inference_providers: ['stealth'],
 };
 
 export const reflection_beam_free_model: KiloExclusiveModel = {
@@ -218,7 +219,7 @@ export const reflection_beam_free_model: KiloExclusiveModel = {
   provider: VERCEL_AI_GATEWAY,
   internal_id: 'reflection/beam-free',
   pricing: null,
-  inference_provider_restriction: ['reflection'],
+  inference_providers: ['reflection'],
 };
 
 export function isKiloExclusiveFreeModel(model: string): boolean {
@@ -245,7 +246,7 @@ export const kiloExclusiveModels = [
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));
+  return kiloExclusiveModels.some(m => m.public_id === model && isStealthModel(m));
 }
 
 export function shouldRedactModelNameInMicrodollarUsage(
@@ -264,15 +265,15 @@ export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null
 }
 
 /**
- * Routing allow-list for an exclusive model. `undefined` means the model is
- * not a restricted exclusive and catalog provider metadata should be used.
+ * Inference providers of an exclusive model. `undefined` means the model is
+ * not an exclusive with explicit providers and catalog provider metadata should be used.
  */
-export function getKiloExclusiveInferenceProviderRestriction(
+export function getKiloExclusiveInferenceProviders(
   modelId: string
 ): ReadonlySet<string> | undefined {
   const exclusive = findKiloExclusiveModel(modelId);
-  if (!exclusive || exclusive.inference_provider_restriction.length === 0) {
+  if (!exclusive || exclusive.inference_providers.length === 0) {
     return undefined;
   }
-  return new Set(exclusive.inference_provider_restriction);
+  return new Set(exclusive.inference_providers);
 }

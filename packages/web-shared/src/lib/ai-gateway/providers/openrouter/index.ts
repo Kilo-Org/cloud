@@ -14,10 +14,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import {
-  convertFromKiloExclusiveModel,
-  getInferenceProvider,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { convertFromKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
@@ -182,11 +179,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     catalogModels.map(async (model: OpenRouterModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
       const exclusive = exclusiveById.get(model.id);
-      const exclusiveProvider = exclusive && getInferenceProvider(exclusive);
-      const providerIds = exclusiveProvider
-        ? [exclusiveProvider.slug]
-        : exclusive && exclusive.inference_provider_restriction.length > 0
-          ? exclusive.inference_provider_restriction
+      const providerIds =
+        exclusive && exclusive.inference_providers.length > 0
+          ? exclusive.inference_providers
           : (indexedProviders.get(providerLookupId(model)) ?? []);
       const inferenceProviderIds = [
         ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),

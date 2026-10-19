@@ -1,7 +1,4 @@
-import {
-  OpenRouterInferenceProviderIdSchema,
-  type OpenRouterInferenceProviderId,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { OpenRouterInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   isOpenRouterProviderConfig,
@@ -12,7 +9,6 @@ export type KiloExclusiveModelFlag =
   | 'reasoning'
   | 'vision'
   | 'flex'
-  | 'stealth'
   | 'vercel-routing'
   | 'rate-limited'
   | 'requires-data-collection';
@@ -83,11 +79,16 @@ export type KiloExclusiveModel = {
   internal_id: string;
   pricing: KiloExclusivePricing | null;
   /**
-   * Upstream inference providers this model may be routed to; empty means no
-   * restriction. Only honored by the OpenRouter and Vercel AI Gateway upstreams.
+   * Inference providers serving this model. Empty is only allowed for the
+   * OpenRouter and Vercel AI Gateway upstreams and means no restriction there.
+   * `stealth` hides the real upstream and marks the model as a stealth model.
    */
-  inference_provider_restriction: ReadonlyArray<OpenRouterInferenceProviderId>;
+  inference_providers: ReadonlyArray<OpenRouterInferenceProviderId>;
 };
+
+export function isStealthModel(model: KiloExclusiveModel): boolean {
+  return model.inference_providers.includes('stealth');
+}
 
 type TokenLimitMutation = 'removed' | 'clamped';
 
@@ -172,8 +173,14 @@ export function applyKiloExclusiveModelSettings(
   if (kiloExclusiveModel.flags.includes('flex')) {
     requestToMutate.body.service_tier = 'flex';
   }
-  const restriction = kiloExclusiveModel.inference_provider_restriction;
-  if (restriction.length === 0) {
+  const restriction = kiloExclusiveModel.inference_providers;
+  const routesByInferenceProvider =
+    kiloExclusiveModel.provider.id === 'openrouter' || kiloExclusiveModel.provider.id === 'vercel';
+  if (
+    !routesByInferenceProvider ||
+    restriction.length === 0 ||
+    isStealthModel(kiloExclusiveModel)
+  ) {
     return;
   }
   const provider = requestToMutate.body.provider;
@@ -193,25 +200,17 @@ type InferenceProvider = {
   retainsPrompts: boolean;
 };
 
-export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvider | null {
-  if (model.flags.includes('stealth')) {
-    return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
-  }
-
-  const slug: OpenRouterInferenceProviderId | null =
-    model.inference_provider_restriction.length === 1
-      ? model.inference_provider_restriction[0]
-      : model.provider.id === 'openrouter' || model.provider.id === 'vercel'
-        ? null
-        : OpenRouterInferenceProviderIdSchema.parse(model.provider.id);
-  if (!slug) return null;
-
-  return {
-    slug,
-    name: slug.toUpperCase(),
-    training: model.flags.includes('requires-data-collection'),
-    retainsPrompts: true,
-  };
+export function getInferenceProviders(model: KiloExclusiveModel): InferenceProvider[] {
+  return model.inference_providers.map(slug =>
+    slug === 'stealth'
+      ? { slug, name: 'Stealth', training: true, retainsPrompts: true }
+      : {
+          slug,
+          name: slug.toUpperCase(),
+          training: model.flags.includes('requires-data-collection'),
+          retainsPrompts: true,
+        }
+  );
 }
 
 function formatPricePerMillionAsPerToken(price: number): string;

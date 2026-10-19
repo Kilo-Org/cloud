@@ -64,12 +64,17 @@ export function useAgentProfileList(organizationId?: string) {
     enabled: !isOrganization,
     placeholderData: keepPreviousDataForQueryKey(personalOptions.queryKey),
     networkMode: 'always',
+    // `networkMode: 'always'` otherwise defaults refetchOnReconnect to false
+    // (queryClient.ts derives it from the mode); without this the list would
+    // never recover on reconnect without a manual Retry.
+    refetchOnReconnect: true,
   });
   const combined = useQuery({
     ...combinedOptions,
     enabled: isOrganization,
     placeholderData: keepPreviousDataForQueryKey(combinedOptions.queryKey),
     networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   const query = isOrganization ? combined : personal;
@@ -110,5 +115,9 @@ export function useAgentProfile(profileId: string, organizationId?: string) {
     // would hold the load-failure banner with a Retry that refetches into
     // another pause and never settles.
     networkMode: 'always',
+    // `networkMode: 'always'` otherwise defaults refetchOnReconnect to false
+    // (queryClient.ts derives it from the mode); without this the profile
+    // would not recover on reconnect without a manual Retry.
+    refetchOnReconnect: true,
   });
 }

@@ -33,6 +33,10 @@ export function useRepoBindings(organizationId?: string) {
     ...options,
     placeholderData: keepPreviousDataForQueryKey(options.queryKey),
     networkMode: 'always',
+    // `networkMode: 'always'` otherwise defaults refetchOnReconnect to false
+    // (queryClient.ts derives it from the mode); without this the pins would
+    // not recover on reconnect without a manual Retry.
+    refetchOnReconnect: true,
   });
 
   return {

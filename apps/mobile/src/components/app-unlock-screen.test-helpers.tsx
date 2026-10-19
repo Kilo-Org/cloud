@@ -136,6 +136,9 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
   useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
@@ -203,6 +206,7 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
+  useNavigation: () => ({ isFocused: () => true, addListener: () => vi.fn() }),
   usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => route.segments,

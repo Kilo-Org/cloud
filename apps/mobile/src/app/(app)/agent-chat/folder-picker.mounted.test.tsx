@@ -12,6 +12,7 @@ const connection = vi.hoisted(() => ({
   isConnected: () => true,
   retryConnection: () => undefined,
 }));
+const folderPickerSlotClear = vi.hoisted(() => vi.fn());
 const bridge = vi.hoisted(() => ({
   connectionId: 'conn-1',
   projectName: 'my-project',
@@ -20,6 +21,18 @@ const bridge = vi.hoisted(() => ({
 }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const router = vi.hoisted(() => ({ back: vi.fn() }));
+// Live BackHandler harness: every armed listener registers here so a test can
+// press hardware Back and observe exactly what the sheet's listener does.
+const backHandlers = vi.hoisted(() => {
+  const listeners = new Set<() => boolean>();
+  return {
+    listeners,
+    press(): boolean[] {
+      return [...listeners].map(listener => listener());
+    },
+  };
+});
+const navigation = vi.hoisted(() => ({ isFocused: (): boolean => true }));
 
 // FlashList renders through a callback, so a host-string mock would drop every
 // row and empty state. This mock mirrors the real list: rows via renderItem,
@@ -53,9 +66,20 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  BackHandler: {
+    addEventListener: (_event: string, listener: () => boolean) => {
+      backHandlers.listeners.add(listener);
+      return {
+        remove: () => {
+          backHandlers.listeners.delete(listener);
+        },
+      };
+    },
+  },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
+  useNavigation: () => navigation,
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -81,7 +105,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/route-registry', () => ({
   folderPickerSlot: {
     get: () => bridge,
-    clear: vi.fn(),
+    clear: folderPickerSlotClear,
   },
   UNFENCED_ROUTE_KEY: 'unscoped',
   useRouteRegistry: vi.fn(),
@@ -157,6 +181,8 @@ describe('FolderPickerScreen body', () => {
     bridge.onSelect.mockClear();
     router.back.mockClear();
     insets.bottom = 0;
+    backHandlers.listeners.clear();
+    navigation.isFocused = () => true;
   });
 
   it('renders one FlashList in the skeleton phase, with skeleton rows as the empty content', async () => {
@@ -244,6 +270,89 @@ describe('FolderPickerScreen body', () => {
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
     expect(findByType(renderer.root, 'Button')).toHaveLength(0);
 
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('FolderPickerScreen hardware Back', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    listFn.mockReset();
+    bridge.onSelect.mockClear();
+    router.back.mockClear();
+    folderPickerSlotClear.mockClear();
+    backHandlers.listeners.clear();
+    navigation.isFocused = () => true;
+  });
+
+  it('arms exactly one hardware-back listener for the mount lifetime', async () => {
+    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [] });
+    const renderer = await mount();
+
+    expect(backHandlers.listeners.size).toBe(1);
+    act(() => {
+      renderer.unmount();
+    });
+    expect(backHandlers.listeners.size).toBe(0);
+  });
+
+  it('at the launch frame dismisses the route without committing a folder', async () => {
+    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [] });
+    const renderer = await mount();
+
+    const results = backHandlers.press();
+    expect(results).toEqual([true]);
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(bridge.onSelect).not.toHaveBeenCalled();
+    expect(folderPickerSlotClear).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('at a nested frame pops the drill first and keeps the sheet open', async () => {
+    listFn.mockResolvedValueOnce({
+      ok: true,
+      path: '',
+      directories: [{ name: 'src', path: 'src' }],
+    });
+    listFn.mockResolvedValueOnce({ ok: true, path: 'src', directories: [] });
+    const renderer = await mount();
+    const folder = findByType(renderer.root, 'Pressable')[0];
+    if (!folder) {
+      throw new Error('folder row did not mount');
+    }
+    const pressFolder = folder.props.onPress as () => void;
+    act(() => {
+      pressFolder();
+    });
+    await settle();
+
+    // Back at a nested frame: consumed by the drill (sheet stays open).
+    expect(backHandlers.press()).toEqual([true]);
+    expect(router.back).not.toHaveBeenCalled();
+    await settle();
+    // The drill restored the parent listing: the launch frame's rows are back.
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
+
+    // A second Back at the launch frame dismisses the route.
+    expect(backHandlers.press()).toEqual([true]);
+    expect(router.back).toHaveBeenCalledTimes(1);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('ignores hardware Back while the route is not focused', async () => {
+    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [] });
+    const renderer = await mount();
+    navigation.isFocused = () => false;
+
+    const results = backHandlers.press();
+    expect(results).toEqual([false]);
+    expect(router.back).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();
     });

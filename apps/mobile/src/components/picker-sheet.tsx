@@ -1,7 +1,8 @@
 import { Info } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
+import { useNavigation, useRouter } from 'expo-router';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { BackHandler, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -18,6 +19,7 @@ export function PickerSheet({
   expired = false,
   scrollable = true,
   disabled = false,
+  onHardwareBack,
 }: {
   title: string;
   onDone: () => void;
@@ -37,9 +39,51 @@ export function PickerSheet({
   scrollable?: boolean;
   /** Disables the header Done/Cancel controls while the caller applies a choice. */
   disabled?: boolean;
+  /**
+   * Hardware Back override (Android; RN ships BackHandler as a no-op on iOS).
+   * Return `true` after consuming a step (e.g. popping a drill frame) to keep
+   * the sheet open; return `false` to let the shell dismiss. When absent, Back
+   * dismisses the route with `router.back()` — never `onDone`, which several
+   * sheets use to commit a choice (save, apply, reload). Arming this listener
+   * keeps Back during the sheet's opening transition on the same JS-driven
+   * dismiss path as the header controls instead of racing the native
+   * BottomSheetBehavior dismissal.
+   */
+  onHardwareBack?: () => boolean;
 }) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const router = useRouter();
+
+  // Latest-callback refs: the listener is armed once per mount and must run
+  // the CURRENT render's callback (a stale closure would re-read the first
+  // render's drill stack).
+  const onHardwareBackRef = useRef(onHardwareBack);
+  onHardwareBackRef.current = onHardwareBack;
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      // A sheet whose route lost focus (another screen pushed above it, or the
+      // native dismissal already popped it) must not pop the stack again: the
+      // focus-aware guard collapses the double-dismissal race (native hide →
+      // JS pop, user Back → JS pop) into one pop.
+      if (!navigation.isFocused()) {
+        return false;
+      }
+      if (onHardwareBackRef.current?.()) {
+        // The sheet handled Back internally (e.g. drilled one level up): it
+        // stays open.
+        return true;
+      }
+      router.back();
+      return true;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [navigation, router]);
+
   const body = expired ? (
     <EmptyState
       icon={Info}

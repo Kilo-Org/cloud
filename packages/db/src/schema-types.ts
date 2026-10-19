@@ -859,6 +859,38 @@ export const KiloClawAdminAuditAction = z.enum([
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
 
+// Platform admin actions recorded in admin_action_audit_logs. Stored as plain
+// text without a DB check constraint, so adding a value needs no migration.
+// Do not rename existing values; rows keep the name they were written with.
+export const AdminActionAuditAction = z.enum([
+  'user.api_key.reset',
+  'user.browser_sessions.revoke',
+  'user.login.reset_to_magic_link',
+  'user.email.release',
+  'user.personal_account.set_disabled',
+  'user.unblock',
+  'organization.create',
+  'organization.delete',
+  'organization.parent.set',
+  'organization.created_by.set',
+  'organization.free_trial_end.set',
+  'organization.trial_messaging.set',
+  'organization.sso.config.create',
+  'organization.sso.config.delete',
+  'organization.sso.admin_portal_link.generate',
+  'internal_bot_user.create',
+  'sales_demo.create',
+  'sales_demo.reset',
+  'oss_sponsorship.enroll',
+  'email_test.send',
+]);
+
+export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
+
+export const AdminActionAuditTargetType = z.enum(['user', 'organization']);
+
+export type AdminActionAuditTargetType = z.infer<typeof AdminActionAuditTargetType>;
+
 // --- KiloClaw scheduled action status enums ---
 
 // Parent action status. Lifecycle:

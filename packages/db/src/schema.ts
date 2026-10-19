@@ -139,6 +139,8 @@ import type {
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
   KiloClawAdminAuditAction,
+  AdminActionAuditAction,
+  AdminActionAuditTargetType,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
   KiloClawScheduledActionTargetStatus,
@@ -9037,6 +9039,40 @@ export const kiloclaw_admin_audit_logs = pgTable(
 );
 
 export type KiloClawAdminAuditLog = typeof kiloclaw_admin_audit_logs.$inferSelect;
+
+// Platform admin action audit log. Rows older than the retention window are
+// pruned by a cron, so the created_at index also serves deletion.
+export const admin_action_audit_logs = pgTable(
+  'admin_action_audit_logs',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    action: text().$type<AdminActionAuditAction>().notNull(),
+    actor_id: text().notNull(),
+    actor_email: text(),
+    actor_name: text(),
+    target_type: text().$type<AdminActionAuditTargetType>(),
+    target_id: text(),
+    message: text().notNull(),
+    metadata: jsonb().$type<Record<string, unknown>>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_admin_action_audit_logs_created_at').on(table.created_at),
+    index('IDX_admin_action_audit_logs_action_created_at').on(table.action, table.created_at),
+    index('IDX_admin_action_audit_logs_actor_id_created_at').on(table.actor_id, table.created_at),
+    index('IDX_admin_action_audit_logs_target_created_at').on(
+      table.target_type,
+      table.target_id,
+      table.created_at
+    ),
+  ]
+);
+
+export type AdminActionAuditLog = typeof admin_action_audit_logs.$inferSelect;
+export type NewAdminActionAuditLog = typeof admin_action_audit_logs.$inferInsert;
 
 // KiloClaw Access Codes — one-time codes for authenticating browser sessions to the worker
 export const kiloclaw_access_codes = pgTable(

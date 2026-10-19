@@ -1,4 +1,5 @@
 import 'server-only';
+import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import { createHash } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
@@ -24,6 +25,7 @@ import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
+  agent_briefing_events,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
@@ -2189,15 +2191,41 @@ export const cliSessionsV2Router = createTRPCRouter({
       }
 
       // The link passed verification; record it so the read path can show it.
-      await db
-        .update(cli_sessions_v2)
-        .set({ pr_link_verified_at: sql`now()` })
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+      await db.transaction(async tx => {
+        const verified = await tx
+          .update(cli_sessions_v2)
+          .set({ pr_link_verified_at: sql`now()` })
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              eq(cli_sessions_v2.pr_url, sessionPrUrl),
+              eq(cli_sessions_v2.git_url, gitUrl),
+              sql`${cli_sessions_v2.pr_head_sha} IS NOT DISTINCT FROM ${session.pr_head_sha}`,
+              sql`${cli_sessions_v2.pr_head_ref} IS NOT DISTINCT FROM ${session.pr_head_ref}`,
+              sql`${cli_sessions_v2.git_branch} IS NOT DISTINCT FROM ${session.git_branch}`
+            )
           )
-        );
+          .returning({ organizationId: cli_sessions_v2.organization_id });
+        const matched = verified[0];
+        if (matched && fetched.createdAt && Number.isFinite(Date.parse(fetched.createdAt))) {
+          const openedAt = new Date(fetched.createdAt).toISOString();
+          await tx
+            .insert(agent_briefing_events)
+            .values({
+              id: JSON.stringify([ctx.user.id, sessionId, 'pull_request', sessionPrUrl]),
+              kilo_user_id: ctx.user.id,
+              session_id: sessionId,
+              organization_id: matched.organizationId,
+              kind: 'pull_request',
+              occurred_at: openedAt,
+              title: `Opened pull request #${fetched.number}`,
+              url: fetched.htmlUrl,
+              payload: { openedAt },
+            })
+            .onConflictDoNothing();
+        }
+      });
 
       const verifiedSessionPr: SessionPrFields = {
         ...sessionPr,
@@ -2397,6 +2425,21 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       try {
         const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
+        if (input.organization_id) {
+          // A public snapshot exposes the transcript; record shares made by a
+          // Kilo admin who is not a member. The share token is never logged.
+          await recordElevatedOrganizationAdminAction(ctx, {
+            organizationId: input.organization_id,
+            requiredRoles: ['owner', 'admin', 'billing_manager', 'member'],
+            action: 'organization.webhook_session.share',
+            message: 'Created public share of a webhook-trigger session',
+            metadata: {
+              sessionId: input.kilo_session_id,
+              triggerId: input.trigger_id,
+              sessionOwnerKiloUserId: session.kilo_user_id,
+            },
+          });
+        }
         return { share_token: result.share_token, session_id: input.kilo_session_id };
       } catch (error) {
         if (error instanceof Error && error.message === 'Session not found') {

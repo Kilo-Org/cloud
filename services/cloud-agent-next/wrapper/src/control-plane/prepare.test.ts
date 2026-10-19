@@ -986,6 +986,229 @@ describe('createPreparationManager', () => {
     expect(harness.authorCalls).toEqual([author]);
   });
 
+  describe('Code Review clones', () => {
+    it.each(['github', 'gitlab'] as const)(
+      'uses a blobless clone and checks out the synthetic %s review ref directly',
+      async platform => {
+        const harness = createHarness();
+        const branch = platform === 'github' ? 'refs/pull/12/head' : 'refs/merge-requests/12/head';
+        const spec = routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: `https://${platform}.com/acme/repo.git`, platform },
+          branch,
+        });
+        harness.setGit(args =>
+          args[0] === 'config' ? { ...result(0), stdout: 'true\n' } : result(0)
+        );
+
+        await harness.manager.prepare(spec);
+
+        expect(harness.gitCalls[0]).toEqual([
+          'clone',
+          '--progress',
+          '--filter=blob:none',
+          '--no-checkout',
+          `https://${platform}.com/acme/repo.git`,
+          spec.directory,
+        ]);
+        expect(harness.gitCalls).toContainEqual(['config', '--get', 'remote.origin.promisor']);
+        expect(harness.gitCalls).toContainEqual(['fetch', '--progress', 'origin', branch]);
+        expect(harness.gitCalls.filter(args => args[0] === 'checkout')).toEqual([
+          ['checkout', '--progress', '-B', branch, 'FETCH_HEAD'],
+        ]);
+        expect(harness.logs.some(line => line.includes('mode=blobless attempts=1'))).toBe(true);
+        expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+      }
+    );
+
+    it.each([
+      ['code-review', 'bitbucket', 'plain-token', false],
+      ['code-review', 'bitbucket', undefined, false],
+      ['code-review', 'bitbucket', 'kbb1.capability', true],
+      ['code-review', 'bitbucket', `kcp1.c2FuZGJveA.bitbucket.${'ab12'.repeat(16)}`, true],
+      ['code-review', 'bitbucket', `kcp1.c2FuZGJveA.github.${'ab12'.repeat(16)}`, false],
+      ['code-review', undefined, 'token', false],
+      ['cloud-agent', 'github', 'token', false],
+      [undefined, 'github', 'token', false],
+    ] as const)(
+      'gates blobless clone for origin=%s platform=%s token=%s',
+      async (createdOnPlatform, platform, token, blobless) => {
+        const harness = createHarness();
+        await harness.manager.prepare(
+          routeSpec({
+            createdOnPlatform,
+            git: { url: 'https://example.com/acme/repo.git', platform, token },
+          })
+        );
+
+        const clone = harness.gitCalls.find(args => args[0] === 'clone');
+        expect(clone?.includes('--filter=blob:none')).toBe(blobless);
+        expect(clone).not.toContain('--no-checkout');
+        expect(clone).not.toContain('--depth');
+        expect(clone).not.toContain('--single-branch');
+        expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+      }
+    );
+
+    it('keeps non-review synthetic-ref clones unchanged', async () => {
+      const harness = createHarness();
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        branch: 'refs/pull/12/head',
+      });
+      await harness.manager.prepare(spec);
+      expect(harness.gitCalls[0]).toEqual([
+        'clone',
+        '--progress',
+        'https://github.com/acme/repo.git',
+        spec.directory,
+      ]);
+    });
+
+    it('retries a rejected filter once without it', async () => {
+      const harness = createHarness();
+      const spec = routeSpec({
+        createdOnPlatform: 'code-review',
+        git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        branch: 'refs/pull/12/head',
+      });
+      let clones = 0;
+      harness.setGit(args => {
+        if (args[0] !== 'clone') return result(0);
+        clones++;
+        if (clones === 1) return result(128, 'fatal: server does not support filter');
+        expect(harness.emptyCalls).toEqual([]);
+        return result(0);
+      });
+
+      await harness.manager.prepare(spec);
+
+      const cloneCalls = harness.gitCalls.filter(args => args[0] === 'clone');
+      expect(cloneCalls).toHaveLength(2);
+      expect(cloneCalls[0]).toContain('--filter=blob:none');
+      expect(cloneCalls[1]).not.toContain('--filter=blob:none');
+      expect(cloneCalls[1]).toContain('--no-checkout');
+      expect(harness.gitCalls).not.toContainEqual(['config', '--get', 'remote.origin.promisor']);
+      expect(harness.logs.some(line => line.includes('mode=blobless_fallback attempts=2'))).toBe(
+        true
+      );
+      expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+    });
+
+    it('does not repeat the filter fallback when the full clone also rejects it', async () => {
+      const harness = createHarness();
+      harness.setClone(result(128, 'fatal: server does not support filter'));
+      await harness.manager.prepare(
+        routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        })
+      );
+      expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(2);
+      expect(lastFrame(harness.frames)?.type).toBe('session.failed');
+    });
+
+    it('keeps the full-clone fallback on later network retries', async () => {
+      const harness = createHarness();
+      let clones = 0;
+      harness.setGit(args => {
+        if (args[0] !== 'clone') return result(0);
+        clones++;
+        if (clones === 1) return result(128, 'fatal: server does not support filter');
+        if (clones === 2) return result(128, 'fatal: unable to access: Connection reset by peer');
+        return result(0);
+      });
+      await harness.manager.prepare(
+        routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        })
+      );
+      const cloneCalls = harness.gitCalls.filter(args => args[0] === 'clone');
+      expect(cloneCalls).toHaveLength(3);
+      expect(cloneCalls[0]).toContain('--filter=blob:none');
+      for (const args of cloneCalls.slice(1)) expect(args).not.toContain('--filter=blob:none');
+      expect(harness.logs.some(line => line.includes('mode=blobless_fallback attempts=3'))).toBe(
+        true
+      );
+      expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+    });
+
+    it('does not restart the clone budget for a filter fallback', async () => {
+      const harness = createHarness(TIMEOUT_TIMERS);
+      let clones = 0;
+      let signal: AbortSignal | undefined;
+      harness.setGit(async (args, options) => {
+        if (args[0] !== 'clone') return result(0);
+        clones++;
+        signal = options?.signal;
+        if (clones === 1) return result(128, 'fatal: server does not support filter');
+        return new Promise<ExecResult>(resolve => {
+          options?.signal?.addEventListener(
+            'abort',
+            () => resolve(result(128, 'filter rejected')),
+            {
+              once: true,
+            }
+          );
+        });
+      });
+      await harness.manager.prepare(
+        routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        })
+      );
+      expect(signal?.aborted).toBe(true);
+      expect(clones).toBe(2);
+      expect(lastFrame(harness.frames)).toMatchObject({
+        type: 'session.failed',
+        subtype: 'git_clone_timeout',
+      });
+    });
+
+    it.each([
+      result(
+        128,
+        "fatal: destination path '/workspace/filter-repo' already exists and is not an empty directory."
+      ),
+      { ...result(1, 'filter not supported'), terminationReason: 'hard_timeout' as const },
+    ])(
+      'does not fallback or remove files for an unrelated or terminated failure',
+      async failure => {
+        const harness = createHarness();
+        harness.setClone(failure);
+        await harness.manager.prepare(
+          routeSpec({
+            createdOnPlatform: 'code-review',
+            git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+          })
+        );
+        expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
+        expect(harness.emptyCalls).toEqual([]);
+        expect(lastFrame(harness.frames)?.type).toBe('session.failed');
+      }
+    );
+
+    it.each([
+      result(1),
+      { ...result(0), stdout: 'false\n' },
+      result(0, 'warning: filtering not recognized by server, ignoring'),
+    ])('reports a full clone when promisor is not true', async promisor => {
+      const harness = createHarness();
+      harness.setGit(args => (args[0] === 'config' ? promisor : result(0)));
+      await harness.manager.prepare(
+        routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        })
+      );
+      expect(harness.logs.some(line => line.includes('mode=full attempts=1'))).toBe(true);
+      expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
+      expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+    });
+  });
+
   it('reports live clone progress and clone retries as step details', async () => {
     const harness = createHarness();
     let clones = 0;

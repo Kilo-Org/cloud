@@ -30,9 +30,7 @@ export function hasBestEffortGuessDataCollectionRequirement(model: string): bool
     isFreeModel(model) ||
     kiloExclusiveModels.some(
       candidate =>
-        candidate.public_id === model &&
-        candidate.status !== 'disabled' &&
-        candidate.flags.includes('requires-data-collection')
+        candidate.public_id === model && candidate.flags.includes('requires-data-collection')
     )
   );
 }

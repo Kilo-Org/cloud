@@ -34,6 +34,7 @@ import { prIntentFingerprint, type PrLedgerIntent } from '@kilocode/app-shared/p
 import {
   providerPrRefKey,
   providerPrTerm,
+  ProviderReviewError,
   type ProviderPrPlatform,
   type ProviderPrRef,
   type ProviderPrSummary,
@@ -47,8 +48,6 @@ import {
 } from '@kilocode/db/operation-ledger';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { assertTermsAccepted } from './github-pr-review-router';
-import { GitLabReviewError } from '@/lib/provider-review/gitlab-authorization';
-import { BitbucketReviewError } from '@/lib/provider-review/bitbucket-authorization';
 import * as gitlabRead from '@/lib/provider-review/gitlab-read';
 import {
   GITLAB_MR_REVIEW_CAPABILITIES,
@@ -376,7 +375,7 @@ function providerRef(input: {
  */
 function toProviderTrpcError(error: unknown): TRPCError {
   if (error instanceof TRPCError) return error;
-  if (error instanceof GitLabReviewError || error instanceof BitbucketReviewError) {
+  if (error instanceof ProviderReviewError) {
     switch (error.kind) {
       case 'not_found':
         return new TRPCError({ code: 'NOT_FOUND', message: error.message });
@@ -649,7 +648,7 @@ async function failProviderRowAmbiguous(
  * write path.
  */
 function outcomeCodeFromFailure(error: unknown, trpcError: TRPCError): string {
-  if (error instanceof GitLabReviewError || error instanceof BitbucketReviewError) {
+  if (error instanceof ProviderReviewError) {
     if (error.kind === 'stale_head') return 'head_moved';
   }
   switch (trpcError.code) {

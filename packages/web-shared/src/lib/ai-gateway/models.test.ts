@@ -2,14 +2,14 @@ import { describe, test, expect } from '@jest/globals';
 import { selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
-  getKiloExclusiveInferenceProviderRestriction,
+  getKiloExclusiveInferenceProviders,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   shouldRedactErrorResponse,
   shouldRedactModelNameInMicrodollarUsage,
 } from './kilo-exclusive-models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
-import { getInferenceProvider } from './providers/kilo-exclusive-model';
+import { getInferenceProviders } from './providers/kilo-exclusive-model';
 import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
@@ -39,12 +39,9 @@ describe('Glyph Cluster', () => {
     expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
     expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(true);
     expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(true);
-    expect(getInferenceProvider(model)).toEqual({
-      slug: 'stealth',
-      name: 'Stealth',
-      training: true,
-      retainsPrompts: true,
-    });
+    expect(getInferenceProviders(model)).toEqual([
+      { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true },
+    ]);
   });
 });
 
@@ -55,13 +52,10 @@ describe('Reflection Beam (free)', () => {
     expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
     expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(false);
     expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(false);
-    expect(getInferenceProvider(model)).toEqual({
-      slug: 'reflection',
-      name: 'REFLECTION',
-      training: true,
-      retainsPrompts: true,
-    });
-    expect([...(getKiloExclusiveInferenceProviderRestriction(model.public_id) ?? [])]).toEqual([
+    expect(getInferenceProviders(model)).toEqual([
+      { slug: 'reflection', name: 'REFLECTION', training: true, retainsPrompts: true },
+    ]);
+    expect([...(getKiloExclusiveInferenceProviders(model.public_id) ?? [])]).toEqual([
       'reflection',
     ]);
   });
@@ -94,23 +88,14 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('stealth/model-beta')).toBe(false);
     });
 
-    test('should return true for enabled Kilo exclusive models with no pricing', async () => {
-      // Test with known Kilo exclusive models that are enabled and have no pricing (free)
-      const enabledFreeModels = kiloExclusiveModels.filter(
-        m => m.status === 'public' && !m.pricing
-      );
-
-      // All enabled free models should be detected as free
-      for (const model of enabledFreeModels) {
+    test('should return true for Kilo exclusive models with no pricing', async () => {
+      for (const model of kiloExclusiveModels.filter(m => !m.pricing)) {
         expect(await isFreeModel(model.public_id)).toBe(true);
       }
     });
 
-    test('should return false for enabled Kilo exclusive models with pricing', async () => {
-      // Models with pricing should NOT be free
-      const pricedModels = kiloExclusiveModels.filter(m => m.status !== 'disabled' && !!m.pricing);
-
-      for (const model of pricedModels) {
+    test('should return false for Kilo exclusive models with pricing', async () => {
+      for (const model of kiloExclusiveModels.filter(m => !!m.pricing)) {
         expect(await isFreeModel(model.public_id)).toBe(false);
       }
     });
@@ -131,24 +116,10 @@ describe('isFreeModel', () => {
       }
     );
 
-    test('ignores pricing on disabled Kilo exclusive models', () => {
-      const disabledModel = {
-        ...claude_opus_4_7_stealth_model,
-        public_id: 'vendor/disabled-priced-exclusive:free',
-        status: 'disabled' as const,
-      };
-      kiloExclusiveModels.push(disabledModel);
-      try {
-        expect(isFreeModel(disabledModel.public_id)).toBe(true);
-      } finally {
-        kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(disabledModel), 1);
-      }
-    });
-
-    test('getInferenceProvider does not crash for any Kilo exclusive model', () => {
+    test('getInferenceProviders does not crash for any Kilo exclusive model', () => {
       expect(kiloExclusiveModels.length).toBeGreaterThan(0);
       for (const model of kiloExclusiveModels) {
-        expect(() => getInferenceProvider(model)).not.toThrow();
+        expect(() => getInferenceProviders(model)).not.toThrow();
       }
     });
 
@@ -173,17 +144,17 @@ describe('isFreeModel', () => {
       async model => {
         expect(kiloExclusiveModels.some(entry => entry.public_id === model)).toBe(false);
         expect(findKiloExclusiveModel(model)).toBeNull();
-        expect(getKiloExclusiveInferenceProviderRestriction(model)).toBeUndefined();
+        expect(getKiloExclusiveInferenceProviders(model)).toBeUndefined();
         expect(await isFreeModel(model)).toBe(true);
       }
     );
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
-      expect(getInferenceProvider(claude_opus_4_7_stealth_model)?.slug).toBe('stealth');
+      expect(claude_opus_4_7_stealth_model.inference_providers).toEqual(['stealth']);
       expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
-      expect(getInferenceProvider(claude_sonnet_4_6_stealth_model)?.slug).toBe('stealth');
+      expect(claude_sonnet_4_6_stealth_model.inference_providers).toEqual(['stealth']);
       expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
-      expect(getInferenceProvider(claude_opus_4_6_stealth_model)?.slug).toBe('stealth');
+      expect(claude_opus_4_6_stealth_model.inference_providers).toEqual(['stealth']);
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
     });
 
@@ -330,21 +301,24 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
   });
 });
 
-describe('getKiloExclusiveInferenceProviderRestriction', () => {
+describe('getKiloExclusiveInferenceProviders', () => {
+  test('returns the stealth provider for stealth exclusives', () => {
+    expect([
+      ...(getKiloExclusiveInferenceProviders(glyph_cluster_stealth_free_model.public_id) ?? []),
+    ]).toEqual(['stealth']);
+    expect([
+      ...(getKiloExclusiveInferenceProviders(claude_opus_4_7_stealth_model.public_id) ?? []),
+    ]).toEqual(['stealth']);
+  });
+
   test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(getKiloExclusiveInferenceProviders('stepfun/step-5-preview-free')).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviders('openai/gpt-5.6-sol-discounted')).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviders('tencent/hy3:free')).toBeUndefined();
     expect(
-      getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')
+      getKiloExclusiveInferenceProviders(gemma_4_26b_a4b_it_free_model.public_id)
     ).toBeUndefined();
-    expect(
-      getKiloExclusiveInferenceProviderRestriction('openai/gpt-5.6-sol-discounted')
-    ).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviderRestriction('tencent/hy3:free')).toBeUndefined();
-    expect(
-      getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)
-    ).toBeUndefined();
-    expect(
-      getKiloExclusiveInferenceProviderRestriction('deepseek/deepseek-v4-pro')
-    ).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviderRestriction('unknown/model')).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviders('deepseek/deepseek-v4-pro')).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviders('unknown/model')).toBeUndefined();
   });
 });

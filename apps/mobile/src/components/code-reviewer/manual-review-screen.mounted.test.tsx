@@ -1,11 +1,14 @@
+/* eslint-disable max-lines -- the pinned-action layout contract and the URL validation contract share one mounted harness */
+import { i18n } from '@/i18n';
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { scrollTo as scrollToSpy } from '@/test/scroll-view-mock';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ManualReviewScreen } from './manual-review-screen';
 
 // The explorer finding (manual-review, 2026-09-19) was the primary action
@@ -48,22 +51,31 @@ const keyboardStore = vi.hoisted(() => {
   };
 });
 
-vi.mock('react-native', () => ({
-  Platform: {
-    get OS() {
-      return platformState.OS;
+// The screen scrolls the body back to the URL section when Start rejects an
+// empty or malformed URL; the shared mock records those calls so the suite can
+// prove the field is revealed rather than trusting that it happened.
+
+vi.mock('react-native', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so the
+  // shared host-element mock is pulled in here too.
+  const { MockScrollView } = await import('@/test/scroll-view-mock');
+  return {
+    Platform: {
+      get OS() {
+        return platformState.OS;
+      },
     },
-  },
-  Dimensions: { get: () => ({ height: 900 }) },
-  // `@/components/ui/input` reads `I18nManager.isRTL` through
-  // `@/lib/rtl-text`; the mock must expose it or the shared box throws.
-  I18nManager: { isRTL: false },
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  TextInput: 'TextInput',
-  View: 'View',
-  useWindowDimensions: () => ({ fontScale: 1 }),
-}));
+    Dimensions: { get: () => ({ height: 900 }) },
+    // `@/components/ui/input` reads `I18nManager.isRTL` through
+    // `@/lib/rtl-text`; the mock must expose it or the shared box throws.
+    I18nManager: { isRTL: false },
+    Pressable: 'Pressable',
+    ScrollView: MockScrollView,
+    TextInput: 'TextInput',
+    View: 'View',
+    useWindowDimensions: () => ({ fontScale: 1 }),
+  };
+});
 vi.mock('react-native-keyboard-controller', async () => {
   // `vi.mock` factories are hoisted above the file's static imports, so `react`
   // must be pulled in here.
@@ -208,6 +220,7 @@ beforeEach(() => {
   status.pending = false;
   status.refetch.mockClear();
   status.push.mockClear();
+  scrollToSpy.mockClear();
 });
 
 describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on %s', platform => {
@@ -366,6 +379,109 @@ describe('ManualReviewScreen connect provider CTA', () => {
     const className = String(action.props.className);
     expect(className).toContain('w-full');
     expect(className).toContain('mt-3');
+
+    unmount();
+  });
+});
+
+describe('ManualReviewScreen URL validation', () => {
+  function findUrlField(root: TestRenderer.ReactTestInstance) {
+    return only(
+      root.findAll(node => String(node.type) === 'TextInput' && node.props.keyboardType === 'url'),
+      'URL field'
+    );
+  }
+
+  // `AccessibleStatus` renders nothing for a null message, so its visible lines
+  // are the exact set of status texts on screen.
+  function findVisibleStatusTexts(root: TestRenderer.ReactTestInstance) {
+    return root
+      .findAllByType(AccessibleStatus)
+      .flatMap(statusNode => statusNode.findAllByType('Text'));
+  }
+
+  it.each(['android', 'ios'] as const)(
+    'shows the localized message and an error border on %s, then clears both on edit',
+    async platform => {
+      platformState.OS = platform;
+      const { renderer, unmount } = await renderScreen();
+
+      // Nothing is invalid until Start is pressed: an empty field is not
+      // flagged while the person is filling the form.
+      expect(findVisibleStatusTexts(renderer.root)).toHaveLength(0);
+
+      // The body reports where the URL section sits, so pressing the pinned
+      // action can return to it rather than to the top of a form too short to
+      // hold both the platform group and the field.
+      const section = only(
+        renderer.root.findAll(
+          node => String(node.type) === 'View' && typeof node.props.onLayout === 'function'
+        ),
+        'URL section'
+      );
+      // The renderer exposes props as an index signature; the found node's own
+      // callback is the section's `onLayout` handler.
+      const onSectionLayout = section.props.onLayout as (event: {
+        nativeEvent: { layout: { y: number } };
+      }) => void;
+      act(() => {
+        onSectionLayout({ nativeEvent: { layout: { y: 320 } } });
+      });
+
+      const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+      act(() => {
+        (action.props as { onPress: () => void }).onPress();
+      });
+
+      // The finding: pressing Start with an empty URL left the screen
+      // unchanged and put the message only in the field's accessibility label.
+      // A sighted user now reads the localized copy under the field, and the
+      // box itself carries the destructive border `FormField` uses.
+      const message = i18n.t('codeReviewer.manualReview.invalidUrl');
+      const [statusText] = findVisibleStatusTexts(renderer.root);
+      expect(statusText?.props.children).toBe(message);
+      if (platform === 'android') {
+        expect(statusText?.props.accessibilityLiveRegion).toBe('polite');
+      }
+      expect(String(findUrlField(renderer.root).props.className)).toContain('border-destructive');
+      // The pinned action can be pressed with the URL section above the fold;
+      // the body returns to the measured section so the message is on screen.
+      expect(scrollToSpy).toHaveBeenCalledWith({ y: 304, animated: true });
+
+      act(() => {
+        // The status stays visible until the person edits the field, then the
+        // field is no longer invalid.
+        (
+          findUrlField(renderer.root).props as { onChangeText: (value: string) => void }
+        ).onChangeText('h');
+      });
+      expect(findVisibleStatusTexts(renderer.root)).toHaveLength(0);
+      expect(String(findUrlField(renderer.root).props.className)).not.toContain(
+        'border-destructive'
+      );
+
+      unmount();
+    }
+  );
+
+  it('keeps the message for an invalid URL rather than only an empty one', async () => {
+    platformState.OS = 'android';
+    const { renderer, unmount } = await renderScreen();
+
+    const field = findUrlField(renderer.root);
+    act(() => {
+      (field.props as { onChangeText: (value: string) => void }).onChangeText(
+        'https://example.com/not-a-pr'
+      );
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (action.props as { onPress: () => void }).onPress();
+    });
+
+    const [statusText] = findVisibleStatusTexts(renderer.root);
+    expect(statusText?.props.children).toBe(i18n.t('codeReviewer.manualReview.invalidUrl'));
+    expect(String(findUrlField(renderer.root).props.className)).toContain('border-destructive');
 
     unmount();
   });

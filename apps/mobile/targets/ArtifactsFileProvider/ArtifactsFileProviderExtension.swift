@@ -68,7 +68,7 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
         completionHandler(nil, NSFileProviderError(.noSuchItem))
         return progress
       }
-      let modified = fileAttributes(sessionId: sessionId, fileId: fileId)?.modified
+      let modified = mirror.fileAttributes(sessionId: sessionId, fileId: fileId)?.modified
       completionHandler(
         ArtifactItem(
           file: file,
@@ -113,7 +113,7 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
     // not match what it asked for, so a mismatch fails and the system
     // re-fetches the current state instead.
     if let requestedVersion, let current = item.itemVersion,
-      requestedVersion.contentVersion.map({ Data($0.utf8) }) != current.map({ Data($0.utf8) })
+      requestedVersion.contentVersion != current.data(using: .utf8)
     {
       completionHandler(nil, nil, NSError(
         domain: NSFileProviderErrorDomain,
@@ -766,7 +766,8 @@ enum ArtifactFileName {
 
   /** One sanitized basename, or an empty string when nothing survives. */
   private static func sanitizeName(_ raw: String) -> String {
-    let basename = raw[raw.lastIndex(of: "/").map { raw.index(after: $0) } ?? raw.startIndex...]
+    let fromIndex = raw.lastIndex(of: "/").map { raw.index(after: $0) } ?? raw.startIndex
+    let basename = String(raw[fromIndex...])
     var withoutControls = ""
     for character in basename {
       if let scalar = character.unicodeScalars.first,

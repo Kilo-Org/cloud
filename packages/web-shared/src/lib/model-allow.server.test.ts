@@ -1,4 +1,8 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import {
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
@@ -128,7 +132,39 @@ describe('model access predicates', () => {
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
-  test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    beforeAll(async () => {
+      await insertCustomLlmForTest('acme/private-model');
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/private-model');
+    });
+
+    test('keeps a custom LLM exempt from Enterprise model restrictions', async () => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        {
+          requireModelInCurrentSnapshot: true,
+          providerAllowList: [],
+          modelDenyList: ['acme/private-model'],
+        },
+        lookup({})
+      );
+
+      await expect(isAllowed('acme/private-model')).resolves.toBe(true);
+    });
+
+    test('does not exempt a kilo-internal/ id without a custom LLM', async () => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { requireModelInCurrentSnapshot: true, providerAllowList: [], modelDenyList: [] },
+        lookup({})
+      );
+
+      await expect(isAllowed('kilo-internal/missing-model')).resolves.toBe(false);
+    });
+  });
+
+  test.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from Enterprise model restrictions',
     async modelId => {
       const isAllowed = createAllowPredicateFromRestrictions(

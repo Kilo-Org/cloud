@@ -4,12 +4,18 @@ import { ENKRYPT_PUBLICATION_ENABLED } from '@kilocode/web-shared/lib/config.ser
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { enkrypt_sync_state, modelStats, type ModelStats } from '@kilocode/db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const FAILURE_RETRY_MS = 15 * 1000;
 
 export type ModelStatsCacheEntry = Readonly<{ stat: ModelStats; verification: unknown }>;
-export type ModelStatsCacheMetadata = Readonly<{ observedAt: number; generation: number }>;
+export type ModelStatsCacheMetadata = Readonly<{
+  observedAt: number;
+  generation: number;
+  /** Lowercased ids of custom LLMs, whose stats must never be published. */
+  customLlmIds: ReadonlySet<string>;
+}>;
 export type ModelStatsSnapshot = ModelStatsCacheMetadata & {
   readonly entries: readonly ModelStatsCacheEntry[];
 };
@@ -53,8 +59,13 @@ export async function getModelStatsSnapshot(): Promise<ModelStatsSnapshot> {
   const observedAt = Date.now();
   const thisLoad = (async () => {
     try {
-      const entries = await loadEntries();
-      const snapshot = { entries, observedAt, generation: startGeneration };
+      const [entries, customLlmsById] = await Promise.all([loadEntries(), getCustomLlmsById()]);
+      const snapshot = {
+        entries,
+        observedAt,
+        generation: startGeneration,
+        customLlmIds: new Set(customLlmsById.keys()),
+      };
       if (generation === startGeneration) {
         cached = snapshot;
         failure = null;

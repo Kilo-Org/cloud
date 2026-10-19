@@ -7,15 +7,13 @@ import {
   findKiloExclusiveModel,
   isKiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { custom_llm2, type User } from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -23,17 +21,17 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
-import {
-  CustomLlmCredentialsSchema,
-  CustomLlmDefinitionSchema,
-  type CustomLlmCredentials,
-} from '@kilocode/db/schema-types';
+import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
   buildDirectProvider,
   type DirectUpstreamAuth,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
+import {
+  findCustomLlm,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -118,28 +116,19 @@ async function resolveCustomLlmAuth(
 }
 
 async function checkCustomLlm(
-  requestedModel: string,
+  { definition: customLlm, encrypted_api_key }: CustomLlm,
   organizationId: string,
   kiloUserId: string
 ): Promise<GetProviderProviderResult | null> {
-  const [row] = await readDb
-    .select()
-    .from(custom_llm2)
-    .where(eq(custom_llm2.public_id, requestedModel));
-  const parsedCustomLlm = CustomLlmDefinitionSchema.safeParse(row?.definition);
-  if (row && !parsedCustomLlm.success) {
-    console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
-  }
-  const customLlm = parsedCustomLlm.data;
-  if (!customLlm || !(await userHasCustomLlmAccess(customLlm, organizationId, kiloUserId))) {
+  if (!(await userHasCustomLlmAccess(customLlm, organizationId, kiloUserId))) {
     return null;
   }
 
-  if (!row?.encrypted_api_key) {
+  if (!encrypted_api_key) {
     return null;
   }
 
-  const decrypted = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+  const decrypted = decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY);
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(decrypted);
@@ -253,8 +242,9 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
 
-  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId && !isAnonymousContext(user)) {
-    const customLlmResult = await checkCustomLlm(requestedModel, organizationId, user.id);
+  if (organizationId && !isAnonymousContext(user)) {
+    const customLlm = await findCustomLlm(requestedModel);
+    const customLlmResult = customLlm && (await checkCustomLlm(customLlm, organizationId, user.id));
     if (customLlmResult) {
       return customLlmResult;
     }

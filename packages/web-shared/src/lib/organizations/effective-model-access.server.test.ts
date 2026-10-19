@@ -1,4 +1,8 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
@@ -151,7 +155,25 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    beforeAll(async () => {
+      await insertCustomLlmForTest('acme/private-model');
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/private-model');
+    });
+
+    it('keeps a custom LLM exempt from effective Enterprise restrictions', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(context());
+
+      await expect(
+        getEffectiveModelDecision(policy, 'acme/private-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    });
+  });
+
+  it.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from effective Enterprise restrictions',
     async modelId => {
       const policy = evaluateEffectiveModelAccessPolicy(context());

@@ -1,10 +1,10 @@
 import 'server-only';
 import { getKiloExclusiveInferenceProviderRestriction } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
-  CUSTOM_LLM_PREFIX,
   KILO_AUTO_MODEL_PREFIX,
   normalizeModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
@@ -22,8 +22,8 @@ export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 export async function isModelRestrictionExempt(modelId: string): Promise<boolean> {
   const requestedModelId = modelId.trim().toLowerCase();
   if (
-    requestedModelId.startsWith(CUSTOM_LLM_PREFIX) ||
-    requestedModelId.startsWith(KILO_AUTO_MODEL_PREFIX)
+    requestedModelId.startsWith(KILO_AUTO_MODEL_PREFIX) ||
+    (await isCustomLlm(requestedModelId))
   ) {
     return true;
   }

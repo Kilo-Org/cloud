@@ -16,6 +16,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { EnkryptSyncError } from './enkrypt-errors';
 import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 import { ENKRYPT_MODEL_MAPPINGS, matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 export { matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';
 
@@ -143,7 +144,12 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
         )
       );
     stage = 'unexpected';
-    const matched = matchEnkryptScores(parsed.scores, models);
+    // Custom LLMs never get an Enkrypt benchmark, so publication cannot expose them.
+    const customLlmsById = await getCustomLlmsById();
+    const matched = matchEnkryptScores(
+      parsed.scores,
+      models.filter(model => !customLlmsById.has(model.openrouterId.toLowerCase()))
+    );
     counts.matchedCount = matched.matches.length;
     counts.unmatchedCount = matched.unmatchedRecords.length;
     counts.ambiguousCount = matched.ambiguousCount;

@@ -30,6 +30,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { select: mockSelect },
   readDb: { select: mockReplicaSelect },
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  getCustomLlmsById: async () => new Map([['acme/custom', {}]]),
+}));
 
 const score = {
   model_name: 'Model Name',
@@ -194,7 +197,7 @@ describe('enkryptFor', () => {
   });
 
   it.each([
-    { openrouterId: 'kilo-internal/custom' },
+    { openrouterId: 'acme/custom' },
     { isActive: false },
     { isActive: null },
     { isStealth: true },

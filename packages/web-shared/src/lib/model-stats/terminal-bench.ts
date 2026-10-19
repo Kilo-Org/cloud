@@ -1,9 +1,9 @@
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
 import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
-import { and, eq, notLike } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 const TerminalBenchSchema = ModelStatsBenchmarksSchema.unwrap()
   .pick({ kiloBench: true })
@@ -24,11 +24,15 @@ type Row = {
   benchmarks: unknown;
 };
 
-export function summarizeTerminalBench(rows: readonly Row[]): TerminalBenchSummaries {
+/** `customLlmIds` holds lowercased custom LLM ids, whose results are never published. */
+export function summarizeTerminalBench(
+  rows: readonly Row[],
+  customLlmIds: ReadonlySet<string>
+): TerminalBenchSummaries {
   const summaries = new Map<string, TerminalBenchSummary>();
 
   for (const row of rows) {
-    if (!row.isActive || row.openrouterId.startsWith(CUSTOM_LLM_PREFIX)) continue;
+    if (!row.isActive || customLlmIds.has(row.openrouterId.toLowerCase())) continue;
     const result = TerminalBenchSchema.safeParse(row.benchmarks);
     if (!result.success) continue;
     const bench = result.data?.kiloBench?.evals['terminal-bench'];
@@ -60,17 +64,19 @@ export function terminalBenchFor(
 }
 
 async function loadTerminalBench(): Promise<TerminalBenchSummaries> {
-  const rows = await readDb
+  const [rows, customLlmsById] = await Promise.all([loadActiveRows(), getCustomLlmsById()]);
+  return summarizeTerminalBench(rows, new Set(customLlmsById.keys()));
+}
+
+async function loadActiveRows(): Promise<Row[]> {
+  return await readDb
     .select({
       openrouterId: modelStats.openrouterId,
       isActive: modelStats.isActive,
       benchmarks: modelStats.benchmarks,
     })
     .from(modelStats)
-    .where(
-      and(eq(modelStats.isActive, true), notLike(modelStats.openrouterId, `${CUSTOM_LLM_PREFIX}%`))
-    );
-  return summarizeTerminalBench(rows);
+    .where(eq(modelStats.isActive, true));
 }
 
 function createTerminalBenchFetch(load = loadTerminalBench) {

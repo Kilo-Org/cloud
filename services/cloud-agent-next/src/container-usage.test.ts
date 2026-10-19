@@ -1618,7 +1618,7 @@ describe('MeteredSandbox container capacity', () => {
 
     expect(sandbox.startCalls).toBe(0);
     expect(await getBillingContext(storage)).toBeUndefined();
-    expect(storage.values.get('container-usage:start-ack-generation:v1')).toBeUndefined();
+    expect(await storage.get('container-usage:start-ack-generation:v1')).toBeUndefined();
   });
 
   it('revalidates an acknowledged cold start when other allocations fill its stale slot', async () => {

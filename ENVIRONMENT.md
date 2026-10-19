@@ -220,7 +220,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (default/typical: 10000). [SERVER]
 - `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
-- `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. [SERVER]
+- `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. When unset, the connection string's `sslmode` parameter decides: `require`/`prefer` encrypt, `verify-ca`/`verify-full` also verify the server certificate against the system trust store, `disable` or no `sslmode` keeps TLS off for local development. [SERVER]
 - `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`
 - `DATA_EXPORT_POSTGRES_URL` - Connection string for the separate, read-only data export database, loaded out of band and read by `apps/web/src/lib/data-export/db.ts`. Optional: when unset, data export reads are disabled and the application still starts. `[SECRET]`
 - `DATA_EXPORT_DATABASE_CA` - Optional CA certificate content (PEM) for the data export database, for when it does not share the primary's CA. Falls back to `DATABASE_CA`; remote connections require TLS either way. [SERVER]

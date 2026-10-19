@@ -36,8 +36,33 @@ export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
       servername: databaseUrl.hostname,
     };
   } else {
-    clientConfig.ssl = false;
+    clientConfig.ssl = resolveSslFromSslmode(databaseUrl);
   }
 
   return clientConfig;
+}
+
+const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
+  require: false,
+  prefer: false,
+  'verify-ca': true,
+  'verify-full': true,
+};
+
+/**
+ * `DATABASE_CA` is unset, so the connection string itself decides whether TLS is
+ * used. Encrypted transport without a certificate check still defeats passive
+ * eavesdropping; certificate verification relies on the Node system trust store.
+ */
+function resolveSslFromSslmode(databaseUrl: URL): ClientConfig['ssl'] {
+  const sslmode = databaseUrl.searchParams.get('sslmode')?.trim().toLowerCase();
+
+  if (!sslmode || sslmode === 'disable') return false;
+
+  const verifyCertificate = VERIFY_CERTIFICATE_BY_SSLMODE[sslmode];
+  if (verifyCertificate === undefined) {
+    throw new Error(`Unsupported sslmode in database URL: ${sslmode}`);
+  }
+
+  return { rejectUnauthorized: verifyCertificate };
 }

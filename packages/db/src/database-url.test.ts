@@ -1,0 +1,137 @@
+import { afterEach, describe, expect, it } from '@jest/globals';
+
+import { getDatabaseClientConfig } from './database-url';
+
+const originalCa = process.env.DATABASE_CA;
+
+afterEach(() => {
+  if (originalCa === undefined) {
+    delete process.env.DATABASE_CA;
+  } else {
+    process.env.DATABASE_CA = originalCa;
+  }
+});
+
+describe('getDatabaseClientConfig', () => {
+  describe('ssl derivation without DATABASE_CA', () => {
+    beforeEach(() => {
+      delete process.env.DATABASE_CA;
+    });
+
+    it('keeps TLS off when the URL carries no sslmode', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb'
+      );
+
+      expect(config.ssl).toBe(false);
+    });
+
+    it('encrypts without a certificate check for sslmode=require', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('encrypts without a certificate check for sslmode=prefer', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=prefer'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('verifies the certificate against the system trust store for sslmode=verify-full', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=verify-full'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: true });
+    });
+
+    it('verifies the certificate for sslmode=verify-ca', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=verify-ca'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: true });
+    });
+
+    it('keeps TLS off for sslmode=disable', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=disable'
+      );
+
+      expect(config.ssl).toBe(false);
+    });
+
+    it('matches sslmode values case-insensitively and trims whitespace', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=REQUIRE'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('fails startup on an unrecognized sslmode instead of guessing', () => {
+      expect(() =>
+        getDatabaseClientConfig(
+          'postgres://user:secret@db.example.com:5432/mydb?sslmode=re escalat'
+        )
+      ).toThrow(/Unsupported sslmode/);
+    });
+
+    it('preserves credentials and host parts alongside the ssl decision', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'user',
+        password: 'secret',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'mydb',
+      });
+    });
+  });
+
+  describe('with DATABASE_CA set', () => {
+    const pem = '-----BEGIN CERTIFICATE-----\\nabc\\n-----END CERTIFICATE-----';
+
+    it('prefers the configured CA over any URL sslmode', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
+      );
+
+      expect(config.ssl).toEqual({
+        ca: pem.replace(/\\n/g, '\n'),
+        rejectUnauthorized: true,
+        servername: 'db.example.com',
+      });
+    });
+
+    it('prefers the configured CA even when the URL disables TLS', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=disable'
+      );
+
+      expect(config.ssl).toMatchObject({ rejectUnauthorized: true });
+    });
+
+    it('expands escaped newlines in the CA', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb'
+      );
+
+      expect(config.ssl).toMatchObject({ ca: pem.replace(/\\n/g, '\n') });
+    });
+  });
+});

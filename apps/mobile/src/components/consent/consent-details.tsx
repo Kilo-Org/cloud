@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { Section } from '@/components/consent/section';
-import { type ConsentMode } from '@/components/consent/consent-mode';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -22,10 +21,6 @@ import {
   type VoiceNetworkConsent,
   writeVoiceNetworkConsent,
 } from '@/lib/voice-input/voice-network-consent';
-
-type ConsentDetailsProps = {
-  readonly mode?: ConsentMode;
-};
 
 export function VoiceTranscriptionControl() {
   const { userId, isLoading, isFetchError, refetch } = useCurrentUserId();
@@ -159,7 +154,7 @@ export function VoiceTranscriptionControl() {
   );
 }
 
-export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
+export function ConsentDetails() {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
   const sideInsetStyle = useSideInsetStyle();
@@ -210,7 +205,7 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
           />
 
           <Text className="mt-6 text-sm font-semibold text-foreground">
-            {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
+            {t('consent.optionalChangeAnytime')}
           </Text>
 
           <Section

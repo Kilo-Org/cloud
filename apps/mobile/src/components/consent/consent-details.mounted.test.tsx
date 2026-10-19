@@ -149,10 +149,10 @@ function collectTextStrings(element: any): string[] {
   return children;
 }
 
-function mount(mode?: 'onboarding' | 'review'): TestRenderer.ReactTestRenderer {
+function mount(): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   TestRenderer.act(() => {
-    renderer = TestRenderer.create(createElement(ConsentDetails, { mode }));
+    renderer = TestRenderer.create(createElement(ConsentDetails));
   });
   // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- act callback assignment, not statically guaranteed
   if (!renderer) {
@@ -195,14 +195,8 @@ describe('ConsentDetails copy', () => {
     expect(titles).toContain('Voice transcription');
   });
 
-  it('onboarding heading states the default-on behavior', () => {
-    const renderer = mount('onboarding');
-    const texts = findTextStrings(renderer.root);
-    expect(texts).toContain('Optional — on unless you turn it off');
-  });
-
-  it('review heading does not claim optional telemetry is on', () => {
-    const renderer = mount('review');
+  it('heading states the optional choice can be changed any time', () => {
+    const renderer = mount();
     const texts = findTextStrings(renderer.root);
     expect(texts).toContain('Optional — you can change this any time in Settings');
     expect(texts).not.toContain('Optional — on unless you turn it off');

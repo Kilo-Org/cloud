@@ -66,9 +66,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Onboarding pre-selects optional telemetry. Review mode starts off and the
-  // stored value loads over it, so a stored decline never flashes as on.
-  const [optionalToggle, setOptionalToggle] = useState(mode === 'onboarding');
+  // Optional telemetry starts off in both modes: onboarding must not
+  // pre-select a share the user has not chosen. Review mode loads the stored
+  // value over the off default, so a stored decline never flashes as on.
+  const [optionalToggle, setOptionalToggle] = useState(false);
   // Review mode must not present a switch state before the stored value has
   // loaded: the pre-load OFF looked like a completed revoke in the b911 vr5
   // e3 evidence (e3-toggled-off.png showed the switch off while the realm was

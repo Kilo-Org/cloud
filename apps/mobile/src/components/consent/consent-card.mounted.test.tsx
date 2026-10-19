@@ -191,9 +191,9 @@ describe('ConsentCard', () => {
     expect(t).toContain('Decline');
   });
 
-  it('defaults the optional switch to on', () => {
+  it('defaults the optional switch to off', () => {
     const renderer = mountCard('onboarding');
-    expect(singleSwitch(renderer.root).props.value).toBe(true);
+    expect(singleSwitch(renderer.root).props.value).toBe(false);
   });
 
   it('keeps the privacy line clear of the pinned actions', () => {
@@ -224,29 +224,29 @@ describe('ConsentCard', () => {
     expect(scroller.findAll(node => node === primary)).toHaveLength(0);
   });
 
-  it('accepts with optional on when the switch is untouched', async () => {
+  it('accepts with optional off when the switch is untouched', async () => {
     const renderer = mountCard('onboarding');
-    const btn = findButton(renderer.root, 'Accept and continue');
-    await act(async () => {
-      await Promise.resolve();
-      (btn.props.onPress as () => void)();
-    });
-    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);
-  });
-
-  it('calls acceptConsent with optional value on primary action', async () => {
-    const renderer = mountCard('onboarding');
-    const sw = singleSwitch(renderer.root);
-    await act(async () => {
-      await Promise.resolve();
-      (sw.props.onValueChange as (v: boolean) => void)(false);
-    });
     const btn = findButton(renderer.root, 'Accept and continue');
     await act(async () => {
       await Promise.resolve();
       (btn.props.onPress as () => void)();
     });
     expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', false);
+  });
+
+  it('stores an explicit opt-in when the switch is turned on', async () => {
+    const renderer = mountCard('onboarding');
+    const sw = singleSwitch(renderer.root);
+    await act(async () => {
+      await Promise.resolve();
+      (sw.props.onValueChange as (v: boolean) => void)(true);
+    });
+    const btn = findButton(renderer.root, 'Accept and continue');
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);
   });
 
   it('shows error when acceptConsent fails and does not navigate', async () => {

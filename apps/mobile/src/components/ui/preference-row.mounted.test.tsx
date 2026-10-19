@@ -35,6 +35,7 @@ function renderRow(props: {
   value: boolean;
   disabled?: boolean;
   onValueChange: (next: boolean) => void;
+  switchAccessibilityLabel?: string;
 }) {
   act(() => {
     const element = createElement(PreferenceRow, {
@@ -73,7 +74,8 @@ describe('PreferenceRow', () => {
     const label = root.find(
       node =>
         Object.is(node.type, 'Pressable') &&
-        node.props.accessibilityLabel === 'Let Kilo change app settings'
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('flex-1')
     );
 
     act(() => {
@@ -83,7 +85,7 @@ describe('PreferenceRow', () => {
     expect(seen).toEqual([false]);
   });
 
-  it('leaves the native switch as its own control, so a tap on it does not fire twice', () => {
+  it('moves the switch when the thumb is toggled, exactly once', () => {
     const seen: boolean[] = [];
     const root = renderRow({
       value: true,
@@ -98,11 +100,9 @@ describe('PreferenceRow', () => {
     });
 
     expect(seen).toEqual([false]);
-    expect(toggle.props.accessibilityLabel).toBeUndefined();
-    expect(toggle.props.accessible).toBe(false);
   });
 
-  it('names only the pressable, so a tap on the title is one control not two', () => {
+  it('names only the native switch, so the row announces one control', () => {
     const root = renderRow({
       value: true,
       onValueChange: () => undefined,
@@ -112,6 +112,7 @@ describe('PreferenceRow', () => {
     );
 
     expect(named).toHaveLength(1);
+    expect(Object.is(named[0]?.type, 'Switch')).toBe(true);
     expect(named[0]?.props.accessibilityRole).toBe('switch');
     expect(named[0]?.props.accessibilityHint).toBe(
       'Applies to theme, language, notifications, models and the rest of Preferences.'
@@ -121,5 +122,20 @@ describe('PreferenceRow', () => {
       busy: false,
       checked: true,
     });
+
+    const pressable = root.find(node => Object.is(node.type, 'Pressable'));
+    expect(pressable.props.accessible).toBe(false);
+    expect(pressable.props.importantForAccessibility).toBe('no');
+  });
+
+  it('prefers the action label over the row title on the switch', () => {
+    const root = renderRow({
+      value: true,
+      onValueChange: () => undefined,
+      switchAccessibilityLabel: 'Remove as default',
+    });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+
+    expect(toggle.props.accessibilityLabel).toBe('Remove as default');
   });
 });

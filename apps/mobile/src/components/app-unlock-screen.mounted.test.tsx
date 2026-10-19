@@ -252,13 +252,14 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
 
   it.each([false, true])('announces setting feedback once with locked=%s', async locked => {
     await mount(nestedUnlockScenes(<GeneralSettingsScreen />));
-    const preference = root().findByProps({
-      accessibilityLabel: 'Unlock with biometrics',
-    });
+    const preference = root().find(
+      node =>
+        Object.is(node.type, 'Switch') && node.props.accessibilityLabel === 'Unlock with biometrics'
+    );
     const save = Promise.withResolvers<undefined>();
     storage.setItemAsync.mockReturnValueOnce(save.promise);
     await flush(() => {
-      (preference.props.onPress as () => void)();
+      (preference.props.onValueChange as (next: boolean) => void)(!preference.props.value);
     });
     expect(preference.props).toMatchObject({ accessibilityState: { busy: true, checked: true } });
     expect(announcements).not.toHaveBeenCalled();

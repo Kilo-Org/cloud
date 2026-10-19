@@ -36,21 +36,21 @@ export function PreferenceRow({
   const colors = useThemeColors();
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      {/* One named control: the title is what a tap names, so it has to move
-          the value. A second accessibilityLabel on the native Switch made
-          Appium prefer that Switch, whose elementClick does not fire
-          onValueChange, and left the row On after two taps. The Switch stays
-          outside this Pressable so a finger on the thumb cannot fire both. */}
+      {/* One named control per row. The native Switch is the single accessible
+          switch: it carries the label, role, and state, and its own
+          onValueChange drives the value, so a tap on the thumb works for both
+          AssistTech and touch. The title Pressable toggles for pointer taps
+          but is not itself a switch node: with the label moved onto the
+          Switch, a second switch-role node would double-announce the row.
+          The row keeps one behavior regardless of where it is tapped. */}
       <Pressable
         className="min-h-11 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
         disabled={disabled}
         onPress={() => {
           onValueChange(!value);
         }}
-        accessibilityRole="switch"
-        accessibilityLabel={switchAccessibilityLabel ?? title}
-        accessibilityHint={subtitle}
-        accessibilityState={{ disabled, busy, checked: value }}
+        accessible={false}
+        importantForAccessibility="no"
       >
         {busy ? (
           <ActivityIndicator size="small" color={colors.mutedForeground} />
@@ -80,9 +80,10 @@ export function PreferenceRow({
       <Switch
         value={value}
         disabled={disabled}
-        accessible={false}
-        importantForAccessibility="no"
-        accessibilityElementsHidden
+        accessibilityRole="switch"
+        accessibilityLabel={switchAccessibilityLabel ?? title}
+        accessibilityHint={subtitle}
+        accessibilityState={{ disabled, busy, checked: value }}
         onValueChange={onValueChange}
       />
     </View>

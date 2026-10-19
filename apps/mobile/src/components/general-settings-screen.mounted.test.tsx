@@ -182,7 +182,7 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
     );
     const byLabel = (label: string) => switches.find(sw => sw.props.accessibilityLabel === label);
 
@@ -219,7 +219,7 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
     );
     const condenseSwitch = switches.find(
       sw => sw.props.accessibilityLabel === 'Condense tool calls'
@@ -235,7 +235,7 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
     );
     const biometricSwitch = switches.find(
       sw => sw.props.accessibilityLabel === 'Unlock with biometrics'
@@ -253,7 +253,7 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
     );
     const hideThinkingSwitch = switches.find(
       sw => sw.props.accessibilityLabel === 'Hide thinking details'

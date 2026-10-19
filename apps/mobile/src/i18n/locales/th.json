@@ -2988,6 +2988,8 @@
 
       "selectOrganization": "เลือกองค์กร",
       "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว เลือกองค์กรอื่นจากโปรไฟล์เพื่อดำเนินการต่อ",
+
+      "unavailableSessionsDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว โหลดเซสชันขององค์กรนี้ไม่ได้",
       "accessDeniedDescription": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้"
     },
     "creditActivity": {

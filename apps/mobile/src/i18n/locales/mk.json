@@ -2988,6 +2988,8 @@
 
       "selectOrganization": "Избор на организација",
       "unavailableDescription": "Оваа организација веќе не е достапна. Избери друга од твојот профил за да продолжиш.",
+
+      "unavailableSessionsDescription": "Оваа организација веќе не е достапна. Нејзините сесии не можат да се вчитаат.",
       "accessDeniedDescription": "Немаш пристап до оваа организација."
     },
     "creditActivity": {

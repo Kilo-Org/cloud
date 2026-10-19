@@ -3060,6 +3060,8 @@
 
       "selectOrganization": "Выберите организацию",
       "unavailableDescription": "Эта организация больше недоступна. Выберите другую в профиле, чтобы продолжить.",
+
+      "unavailableSessionsDescription": "Эта организация больше недоступна. Загрузить её сессии невозможно.",
       "accessDeniedDescription": "У вас нет доступа к этой организации."
     },
     "creditActivity": {

@@ -2988,6 +2988,8 @@
 
       "selectOrganization": "ជ្រើសរើសអង្គការ",
       "unavailableDescription": "អង្គការនេះលែងអាចចូលប្រើបានទៀតហើយ។ ជ្រើសរើសអង្គការមួយពីប្រវត្តិរូបរបស់អ្នក ដើម្បីបន្ត។",
+
+      "unavailableSessionsDescription": "អង្គការនេះលែងអាចចូលប្រើបានទៀតហើយ។ មិនអាចផ្ទុកសម័យរបស់វាបានទេ។",
       "accessDeniedDescription": "អ្នកមិនមានសិទ្ធិចូលប្រើអង្គការនេះទេ។"
     },
     "creditActivity": {

@@ -2988,6 +2988,8 @@
 
       "selectOrganization": "Chagua shirika",
       "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee.",
+
+      "unavailableSessionsDescription": "Shirika hili halipatikani tena. Vikao vyake haviwezi kupakiwa.",
       "accessDeniedDescription": "Huna ruhusa ya kufikia shirika hili."
     },
     "creditActivity": {

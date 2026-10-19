@@ -2996,7 +2996,8 @@
       "organizationUnavailable": "Organization unavailable",
       "selectDescriptionWithOrganizations": "You belong to one or more organizations. Choose the account this screen should use.",
       "selectOrganization": "Select an organization",
-      "unavailableDescription": "This organization is no longer available. Choose another account from the account picker to continue."
+      "unavailableDescription": "This organization is no longer available. Choose another account from the account picker to continue.",
+      "unavailableSessionsDescription": "This organization is no longer available. Sessions for it cannot be loaded."
     },
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",

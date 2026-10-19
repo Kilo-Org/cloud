@@ -2988,6 +2988,8 @@
 
       "selectOrganization": "ഒരു ഓർഗനൈസേഷൻ തിരഞ്ഞെടുക്കുക",
       "unavailableDescription": "ഈ ഓർഗനൈസേഷൻ ഇനി ലഭ്യമല്ല. തുടരാൻ നിങ്ങളുടെ പ്രൊഫൈലിൽ നിന്ന് ഒന്ന് തിരഞ്ഞെടുക്കുക.",
+
+      "unavailableSessionsDescription": "ഈ ഓർഗനൈസേഷൻ ഇനി ലഭ്യമല്ല. അതിന്റെ സെഷനുകൾ ലോഡ് ചെയ്യാനാവില്ല.",
       "accessDeniedDescription": "ഈ ഓർഗനൈസേഷനിൽ പ്രവേശിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല."
     },
     "creditActivity": {

@@ -109,7 +109,7 @@ export function OrganizationBoundary({
       };
       content = (
         <EmptyState
-          icon={Building2}
+          icon={icon}
           title={t('organization.boundary.noOrganization')}
           description={t('organization.boundary.noOrganizationDescription')}
           action={

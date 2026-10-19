@@ -2988,6 +2988,8 @@
 
       "selectOrganization": "ఒక సంస్థను ఎంచుకోండి",
       "unavailableDescription": "ఈ సంస్థ ఇక అందుబాటులో లేదు. కొనసాగించడానికి మీ ప్రొఫైల్‌లో మరో సంస్థను ఎంచుకోండి.",
+
+      "unavailableSessionsDescription": "ఈ సంస్థ ఇక అందుబాటులో లేదు. దాని సెషన్లను లోడ్ చేయడం సాధ్యం కాదు.",
       "accessDeniedDescription": "ఈ సంస్థను యాక్సెస్ చేయడానికి మీకు అనుమతి లేదు."
     },
     "creditActivity": {

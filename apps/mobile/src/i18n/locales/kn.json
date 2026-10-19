@@ -2988,6 +2988,8 @@
 
       "selectOrganization": "ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
       "unavailableDescription": "ಈ ಸಂಸ್ಥೆ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಿಂದ ಬೇರೆ ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+
+      "unavailableSessionsDescription": "ಈ ಸಂಸ್ಥೆ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಅದರ ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ.",
       "accessDeniedDescription": "ಈ ಸಂಸ್ಥೆಗೆ ನಿಮಗೆ ಪ್ರವೇಶವಿಲ್ಲ."
     },
     "creditActivity": {

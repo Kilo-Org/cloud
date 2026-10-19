@@ -3068,6 +3068,8 @@
 
       "selectOrganization": "Выберыце арганізацыю",
       "unavailableDescription": "Гэтая арганізацыя больш недаступная. Каб працягнуць, выберыце іншую ў сваім профілі.",
+
+      "unavailableSessionsDescription": "Гэтая арганізацыя больш недаступная. Загрузіць сесіі для яе немагчыма.",
       "accessDeniedDescription": "У вас няма доступу да гэтай арганізацыі."
     },
     "creditActivity": {

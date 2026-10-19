@@ -2988,6 +2988,8 @@
 
       "selectOrganization": "هەڵبژاردنی ڕێکخراوێک",
       "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون.",
+
+      "unavailableSessionsDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. دانیشتنەکانی ناتوانرێت بەردەست بکرێت.",
       "accessDeniedDescription": "مۆڵەتی دەستگەیشتن بەم ڕێکخراوەت نییە."
     },
     "creditActivity": {

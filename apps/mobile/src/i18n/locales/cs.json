@@ -3068,6 +3068,8 @@
 
       "selectOrganization": "Vyberte organizaci",
       "unavailableDescription": "Tato organizace už není dostupná. Vyberte ve svém profilu jinou organizaci a pokračujte.",
+
+      "unavailableSessionsDescription": "Tato organizace už není dostupná. Její relace nelze načíst.",
       "accessDeniedDescription": "Nemáte přístup do této organizace."
     },
     "creditActivity": {

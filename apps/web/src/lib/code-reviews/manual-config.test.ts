@@ -4,10 +4,7 @@ import {
 } from '@kilocode/db/schema-types';
 import { describe, expect, it } from '@jest/globals';
 
-import {
-  getManualCodeReviewConfig,
-  getManualCodeReviewConfigForDetail,
-} from './manual-config';
+import { getManualCodeReviewConfig, getManualCodeReviewConfigForDetail } from './manual-config';
 
 function validConfig(): ManualCodeReviewConfig {
   return {

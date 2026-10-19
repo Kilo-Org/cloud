@@ -8,15 +8,48 @@ import {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_IOS_CLIENT_ID,
 } from '@kilocode/web-shared/lib/config.server';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { captureMessage } from '@sentry/nextjs';
 
 /** Thrown when a native (mobile) ID token fails verification — maps to 401 INVALID_TOKEN. */
 export class NativeIdTokenError extends Error {}
 
-// The record is kept for the lifetime of the identity token it binds, so the
-// TTL matches the longest Apple ID-token lifetime. Redis expires the record on
-// its own; no cleanup job is needed.
-const NONCE_TTL_SECONDS = 10 * 60;
+/** Thrown when the single-use record cannot be written — maps to 503, retryable. */
+export class NonceStoreUnavailableError extends Error {}
+
+// Upper bound for the single-use record: the longest Apple ID-token lifetime.
+const NONCE_TTL_CAP_SECONDS = 10 * 60;
+
+/**
+ * End instant for the relaxed path: Apple sign-ins without a nonce are
+ * accepted only strictly before this instant, and only while the deployment
+ * toggle is on. Unset (or passed) ⇒ the nonce is always required. Read per
+ * call so a deployment can change it without a redeploy.
+ */
+function relaxedPathEnd(): Date | null {
+  const raw = getEnvVariable('NATIVE_APPLE_NONCE_REQUIRED_SINCE');
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Deployment switch for the relaxed path. It reads as false whenever the
+ * check cannot complete, so the nonce requirement stays active by default.
+ */
+const RELAXED_NONCE_PATH_TOGGLE = 'native-apple-signin-nonce-required';
+
+async function relaxedNoncePathAllowed(): Promise<boolean> {
+  const end = relaxedPathEnd();
+  if (!end || end <= new Date()) return false;
+  try {
+    return await isReleaseToggleEnabled(RELAXED_NONCE_PATH_TOGGLE);
+  } catch {
+    return false;
+  }
+}
 
 /** Returns true when the error carries an HTTP response from Google's servers,
  *  as opposed to a network or infrastructure failure. */
@@ -41,7 +74,7 @@ export type VerifiedGoogleIdToken = {
 
 export async function verifyNativeAppleIdToken(
   idToken: string,
-  nonce: string
+  nonce?: string
 ): Promise<VerifiedAppleIdToken> {
   // The Apple identity token's `aud` claim is the native app's bundle ID.  Use
   // the configured bundle ID and fall back to the shipped default so
@@ -57,20 +90,43 @@ export async function verifyNativeAppleIdToken(
   //
   // Each digest is accepted once: the record below exists only for a digest that
   // is not yet present, and it expires with the token.
+  if (nonce === undefined || nonce === '') {
+    if (!(await relaxedNoncePathAllowed())) {
+      throw new NativeIdTokenError('Apple nonce missing');
+    }
+    captureMessage('native_apple_nonce_legacy_count: 1');
+    if (typeof payload.email !== 'string' || !payload.email) {
+      throw new NativeIdTokenError('Apple ID token missing email');
+    }
+    if (payload.email_verified !== true && payload.email_verified !== 'true') {
+      throw new NativeIdTokenError('Apple email not verified');
+    }
+    if (typeof payload.sub !== 'string' || !payload.sub) {
+      throw new NativeIdTokenError('Apple ID token missing sub');
+    }
+    return { sub: payload.sub, email: payload.email };
+  }
+
   const expectedNonce = createHash('sha256').update(nonce).digest('hex');
   if (payload.nonce !== expectedNonce) {
     throw new NativeIdTokenError('Apple nonce mismatch');
   }
-  // A store write that cannot complete refuses the sign-in, keeping the
-  // acceptance rule uniform.
+  // The record lives as long as the identity token it binds, bounded by the
+  // longest Apple ID-token lifetime. A store write that cannot complete
+  // refuses the sign-in, keeping the acceptance rule uniform.
+  const ttlSeconds = (() => {
+    if (typeof payload.exp !== 'number') return NONCE_TTL_CAP_SECONDS;
+    const remaining = Math.floor(payload.exp - Date.now() / 1000);
+    return Math.max(1, Math.min(remaining, NONCE_TTL_CAP_SECONDS));
+  })();
   let recorded: string | null = null;
   try {
     recorded = await redisClient.set(`auth:apple-signin-nonce:${expectedNonce}`, '1', {
       nx: true,
-      ex: NONCE_TTL_SECONDS,
+      ex: ttlSeconds,
     });
   } catch {
-    throw new NativeIdTokenError('Apple nonce check unavailable');
+    throw new NonceStoreUnavailableError('Apple nonce check unavailable');
   }
   if (recorded !== 'OK') {
     throw new NativeIdTokenError('Apple nonce already used');

@@ -34,8 +34,14 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: (name: string) => process.env[name],
 }));
+jest.mock('@sentry/nextjs', () => ({
+  captureMessage: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { set: jest.fn() },
+}));
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
 import {
@@ -43,9 +49,15 @@ import {
   verifyNativeGoogleIdToken,
   exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
+  NonceStoreUnavailableError,
 } from './native-id-tokens';
 import { GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import { captureMessage } from '@sentry/nextjs';
+
+const mockIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 const mockVerifyAppleJwtWithJwks = jest.mocked(verifyAppleJwtWithJwks);
 const mockGetFederatedSignonCertsAsync = jest.fn();
@@ -64,8 +76,11 @@ describe('verifyNativeAppleIdToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConfig.APPLE_APP_BUNDLE_ID = 'com.kilocode.kiloapp';
-    // Default: the single-use nonce record succeeds (first use).
+    // Default: the single-use nonce record succeeds (first use), the relaxed
+    // path is closed, and the record-write failure path is not exercised.
     jest.mocked(redisClient.set).mockResolvedValue('OK');
+    mockIsReleaseToggleEnabled.mockResolvedValue(true);
+    delete process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE;
   });
 
   it('verifies against the configured Apple bundle ID and returns sub/email', async () => {
@@ -208,14 +223,128 @@ describe('verifyNativeAppleIdToken', () => {
         email: 'user@example.com',
         email_verified: true,
         nonce: expectedDigest,
+        exp: Math.floor(Date.now() / 1000) + 600,
       })
     );
     jest.mocked(redisClient.set).mockRejectedValue(new Error('upstash unreachable'));
 
-    // A sign-in is accepted only when the digest could be recorded.
+    // A sign-in is accepted only when the digest could be recorded; the
+    // failure is a store fault, distinct from an invalid credential.
     await expect(verifyNativeAppleIdToken('a-token', rawNonce)).rejects.toThrow(
-      'Apple nonce check unavailable'
+      NonceStoreUnavailableError
     );
+  });
+
+  it('derives the record TTL from the token expiry, capped at ten minutes', async () => {
+    const rawNonce = 'ttl-derivation-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    // Token with 5 minutes left: the record must not outlive the token.
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+        exp: Math.floor(Date.now() / 1000) + 300,
+      })
+    );
+
+    await verifyNativeAppleIdToken('a-token', rawNonce);
+    const call = jest.mocked(redisClient.set).mock.calls[0];
+    const options = call[2] as { nx: boolean; ex: number };
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBeLessThanOrEqual(300);
+    expect(options.ex).toBeGreaterThan(290);
+  });
+
+  it('caps the record TTL at ten minutes for a long-lived token', async () => {
+    const rawNonce = 'ttl-cap-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      })
+    );
+
+    await verifyNativeAppleIdToken('a-token', rawNonce);
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { nx: boolean; ex: number };
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBe(600);
+  });
+
+  it('uses the ten-minute cap when the token carries no exp claim', async () => {
+    const rawNonce = 'ttl-default-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+      })
+    );
+
+    await verifyNativeAppleIdToken('a-token', rawNonce);
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { nx: boolean; ex: number };
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBe(600);
+  });
+
+  it('refuses a missing nonce while the relaxed path is closed', async () => {
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow('Apple nonce missing');
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  it('accepts a missing nonce before the relaxed-path end instant with the toggle on', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    const result = await verifyNativeAppleIdToken('a-token');
+    expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
+    expect(mockCaptureMessage).toHaveBeenCalledWith('native_apple_nonce_legacy_count: 1');
+    expect(mockIsReleaseToggleEnabled).toHaveBeenCalled();
+  });
+
+  it('refuses a missing nonce once the relaxed-path end instant has passed', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() - 60_000).toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow('Apple nonce missing');
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  it('refuses a missing nonce when the relaxed-path toggle is off', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    mockIsReleaseToggleEnabled.mockResolvedValue(false);
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow('Apple nonce missing');
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  it('refuses a missing nonce when the toggle check errors (fail closed)', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    mockIsReleaseToggleEnabled.mockRejectedValue(new Error('posthog down'));
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow('Apple nonce missing');
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 });
 

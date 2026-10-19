@@ -233,7 +233,7 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations?error=unauthorized');
   });
 
-  test('rejects a state minted without a provider claim', async () => {
+  test('rejects a state minted without the provider-install purpose', async () => {
     jest.useFakeTimers();
     try {
       jest.setSystemTime(new Date('2026-09-09T12:00:00.000Z'));
@@ -255,6 +255,22 @@ describe('GET /api/integrations/linear/callback', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  test('rejects a signed state payload without a provider claim', async () => {
+    const state = createSignedToken({
+      owner: `user_${USER_ID}`,
+      uid: USER_ID,
+      purpose: 'provider_install',
+    });
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+    expectRedirectLocation(response, '/integrations?error=invalid_state');
+    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+    expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+    expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
   });
 
   test('rejects a state minted for another provider', async () => {

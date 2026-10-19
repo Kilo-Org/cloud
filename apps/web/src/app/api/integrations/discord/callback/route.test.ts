@@ -5,6 +5,7 @@ import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { handleDiscordOAuthCallback } from '@/lib/integrations/oauth/platforms/discord-callback';
+import { createSignedToken } from '@/lib/signed-token';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'discord-callback-test-secret',
@@ -101,9 +102,24 @@ describe('handleDiscordOAuthCallback', () => {
     expect(mockedUpsertDiscordInstallation).not.toHaveBeenCalled();
   });
 
-  test('rejects a state minted without a provider claim', async () => {
+  test('rejects a state minted without the provider-install purpose', async () => {
     const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
       provider: 'discord',
+    });
+
+    const response = await callDiscordCallback(makeRequest(state));
+
+    expectRedirectLocation(response, '/integrations?error=invalid_state');
+    expect(mockedConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+    expect(mockedExchangeDiscordCode).not.toHaveBeenCalled();
+    expect(mockedUpsertDiscordInstallation).not.toHaveBeenCalled();
+  });
+
+  test('rejects a signed state payload without a provider claim', async () => {
+    const state = createSignedToken({
+      owner: `user_${USER_ID}`,
+      uid: USER_ID,
+      purpose: 'provider_install',
     });
 
     const response = await callDiscordCallback(makeRequest(state));

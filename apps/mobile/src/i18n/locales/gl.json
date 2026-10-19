@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Esta revisión non se pode enviar tal como está. Pode que a {{term}} cambiase ou que non poidas revisar a túa propia {{term}}.",
       "couldNotPostComment": "Non se puido publicar o comentario.",
       "couldNotSubmitReview": "Non se puido enviar a revisión. Comproba a conexión e téntao de novo.",
-      "rateLimited": "Demasiadas solicitudes. Téntao de novo máis tarde."
+      "rateLimited": "Demasiadas solicitudes. Téntao de novo máis tarde.",
+      "conflict": "Isto cambiou mentres estabas a traballar nel. Volve cargalo e téntao de novo."
     },
     "operation": {
       "couldNotReply": "Non se puido responder.",

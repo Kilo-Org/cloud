@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Bu baxış olduğu kimi göndərilə bilmir. {{term}} dəyişmiş ola bilər və ya öz {{term}}na baxış keçirə bilməzsən.",
       "couldNotPostComment": "Şərhi göndərmək mümkün olmadı.",
       "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
-      "rateLimited": "Çoxlu sorğu göndərilib. Bir az sonra yenidən cəhd et."
+      "rateLimited": "Çoxlu sorğu göndərilib. Bir az sonra yenidən cəhd et.",
+      "conflict": "Bu, siz üzərində işləyərkən dəyişildi. Yenidən yükləyin və yenidən cəhd edin."
     },
     "operation": {
       "couldNotReply": "Cavab vermək mümkün olmadı.",

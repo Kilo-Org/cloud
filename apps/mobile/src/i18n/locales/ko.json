@@ -2931,7 +2931,8 @@
       "reviewNotSubmittedTerm": "이 리뷰는 그대로 제출할 수 없습니다. {{term}}이(가) 변경되었거나, 자신의 {{term}}은(는) 검토할 수 없습니다.",
       "couldNotPostComment": "댓글을 게시하지 못했습니다.",
       "couldNotSubmitReview": "리뷰를 제출하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-      "rateLimited": "요청이 너무 많습니다. 나중에 다시 시도하세요."
+      "rateLimited": "요청이 너무 많습니다. 나중에 다시 시도하세요.",
+      "conflict": "작업하는 동안 이 항목이 변경되었습니다. 다시 불러온 후 다시 시도하세요."
     },
     "operation": {
       "couldNotReply": "답글을 달 수 없습니다.",

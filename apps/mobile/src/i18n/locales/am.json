@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "ይህ ግምገማ እንዳለ ማስገባት አይቻልም። {{term}} ተቀይሮ ሊሆን ወይም የራስዎን {{term}} መገምገም አይችሉም።",
       "couldNotPostComment": "አስተያየት መለጠፍ አልተቻለም።",
       "couldNotSubmitReview": "ግምገማውን መላክ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
-      "rateLimited": "ብዙ ጥያቄዎች። እባክዎ ኋላ እንደገና ይሞክሩ።"
+      "rateLimited": "ብዙ ጥያቄዎች። እባክዎ ኋላ እንደገና ይሞክሩ።",
+      "conflict": "እርስዎ በሚሰሩበት ጊዜ ይህ ተቀይሯል። እንደገና ይጫኑት እና እባክዎ እንደገና ይሞክሩ።"
     },
     "operation": {
       "couldNotReply": "መልስ መስጠት አልተቻለም።",

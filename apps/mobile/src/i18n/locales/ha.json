@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Ba a iya aika wannan bita yadda yake ba. Wataƙila {{term}} ya canza, ko ba za ka iya bita {{term}} ɗinka ba.",
       "couldNotPostComment": "Ba a iya wallafa tsokaci ba.",
       "couldNotSubmitReview": "Ba a iya aika bita ba. Duba haɗinka na intanet ka sake gwadawa.",
-      "rateLimited": "An yi buƙatu da yawa. Da fatan za a sake gwadawa daga baya."
+      "rateLimited": "An yi buƙatu da yawa. Da fatan za a sake gwadawa daga baya.",
+      "conflict": "Wannan ya canza ne a lokacin da kake aiki a kansa. Loda shi daga kashi sannan ka sake gwadawa."
     },
     "operation": {
       "couldNotReply": "An kasa amsawa.",

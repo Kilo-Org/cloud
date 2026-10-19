@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Berrikuspen hau ezin da oraingo egoeran bidali. Baliteke {{term}} aldatu izana, edo ezin duzu zure {{term}} propioa berrikusi.",
       "couldNotPostComment": "Ezin izan da iruzkina argitaratu.",
       "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro.",
-      "rateLimited": "Eskari gehiegi. Saiatu geroago berriro."
+      "rateLimited": "Eskari gehiegi. Saiatu geroago berriro.",
+      "conflict": "Hau aldatu egin da lanean ari zinen bitartean. Birkargatu eta saiatu berriro."
     },
     "operation": {
       "couldNotReply": "Ezin izan da erantzun.",

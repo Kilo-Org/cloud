@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a {{term}} megváltozott, vagy nem ellenőrizheted a saját {{term}}.",
       "couldNotPostComment": "Nem sikerült közzétenni a hozzászólást.",
       "couldNotSubmitReview": "Nem sikerült elküldeni a kódellenőrzést. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
-      "rateLimited": "Túl sok kérés. Próbáld újra később."
+      "rateLimited": "Túl sok kérés. Próbáld újra később.",
+      "conflict": "Ez megváltozott, miközben dolgoztál rajta. Töltsd újra, és próbáld újra."
     },
     "operation": {
       "couldNotReply": "Nem sikerült válaszolni.",

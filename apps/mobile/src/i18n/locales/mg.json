@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Tsy azo alefa toy izao ny fandinihana. Mety io {{term}} io, na tsy afaka mamandrika ny {{term}}-anao manokana ianao.",
       "couldNotPostComment": "Tsy navoaka ny hevitra.",
       "couldNotSubmitReview": "Tsy nalefa ny fandinihana. Jereo ny fifandraisanao ary andramo indray.",
-      "rateLimited": "Be loatra ny fangatahana. Andramo indray azafady rehefa afara kelikely."
+      "rateLimited": "Be loatra ny fangatahana. Andramo indray azafady rehefa afara kelikely.",
+      "conflict": "Niova ity nandritra ny nampiasanao azy. Ampidiro indray ary andramo indray azafady."
     },
     "operation": {
       "couldNotReply": "Tsy tafalefa ny valiny.",

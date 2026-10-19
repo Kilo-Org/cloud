@@ -786,7 +786,8 @@
       "reviewNotSubmittedTerm": "Ovaj pregled koda nije moguće poslati u trenutačnom obliku. {{term}} se možda promijenio ili ne možeš pregledati vlastiti {{term}}.",
       "couldNotPostComment": "Nije moguće objaviti komentar.",
       "couldNotSubmitReview": "Nije moguće poslati pregled koda. Provjeri vezu i pokušaj ponovno.",
-      "rateLimited": "Previše zahtjeva. Pokušaj ponovno kasnije."
+      "rateLimited": "Previše zahtjeva. Pokušaj ponovno kasnije.",
+      "conflict": "Ovo se promijenilo dok ste radili na tome. Ponovno ga učitajte i pokušajte ponovno."
     },
     "operation": {
       "couldNotReply": "Nije moguće odgovoriti.",

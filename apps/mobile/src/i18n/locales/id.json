@@ -2931,7 +2931,8 @@
       "reviewNotSubmittedTerm": "Tinjauan ini tidak dapat dikirim seperti adanya. {{term}} mungkin telah berubah, atau kamu tidak dapat meninjau {{term}} milikmu sendiri.",
       "couldNotPostComment": "Tidak dapat mengirim komentar.",
       "couldNotSubmitReview": "Tidak dapat mengirim tinjauan. Periksa koneksimu dan coba lagi.",
-      "rateLimited": "Terlalu banyak permintaan. Coba lagi nanti."
+      "rateLimited": "Terlalu banyak permintaan. Coba lagi nanti.",
+      "conflict": "Ini berubah saat Anda sedang mengerjakannya. Muat ulang dan coba lagi."
     },
     "operation": {
       "couldNotReply": "Tidak dapat membalas.",

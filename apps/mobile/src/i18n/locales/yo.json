@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Kò ṣeé fi àtúnyẹ̀wò yìí ránṣẹ́ gẹ́gẹ́ bí ó ṣe wà. Ó lè jẹ́ pé {{term}} ti yí padà, tàbí kò lè ṣàtúnyẹ̀wò {{term}} tirẹ.",
       "couldNotPostComment": "A kò lè fi àsọyé ránṣẹ́.",
       "couldNotSubmitReview": "A kò lè fi àtúnyẹ̀wò ránṣẹ́. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
-      "rateLimited": "Ìbéèrè pọ̀ jù. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+      "rateLimited": "Ìbéèrè pọ̀ jù. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "conflict": "Èyí ti yí padà nígbà tí o ń ṣiṣẹ́ lórí rẹ̀. Jọ̀wọ́ gbé e wọlé, kí o sì tún gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "operation": {
       "couldNotReply": "A kò lè fi èsì ránṣẹ́.",

@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Dib-u-eegistan laguma diri karo sida uu yahay. {{term}} waa la yaabaa inuu isbeddelay, ama ma dib-u-eegi kartid {{term}} kaa ah.",
       "couldNotPostComment": "Faallada lama daabici karin.",
       "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day.",
-      "rateLimited": "Codsiyo aad u badan. Fadlan mar kale isku day."
+      "rateLimited": "Codsiyo aad u badan. Fadlan mar kale isku day.",
+      "conflict": "Tani way isbedhesay markaad ku shaqaynayso. Fadlan mar kale soo shubo oo isku day."
     },
     "operation": {
       "couldNotReply": "Lama jawaabi karin.",

@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Ky rishikim nuk mund të dërgohet siç është. Mbase {{term}} ka ndryshuar, ose nuk mund të rishikosh {{term}} tënde.",
       "couldNotPostComment": "Nuk u arrit të postohej komenti.",
       "couldNotSubmitReview": "Nuk u dërgua rishikimi. Kontrollo lidhjen dhe provo përsëri.",
-      "rateLimited": "Shumë kërkesa. Provo përsëri më vonë."
+      "rateLimited": "Shumë kërkesa. Provo përsëri më vonë.",
+      "conflict": "Kjo ndryshoi ndërkohë që po punonit në të. Ringarkoje dhe provo përsëri."
     },
     "operation": {
       "couldNotReply": "Përgjigjja nuk u dërgua.",

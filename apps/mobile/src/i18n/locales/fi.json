@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Tätä katselmointia ei voi lähettää sellaisenaan. {{term}} on voinut muuttua, tai kyseessä on oma {{term}}, jota et voi katselmoida.",
       "couldNotPostComment": "Kommenttia ei voitu julkaista.",
       "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen.",
-      "rateLimited": "Liian monta pyyntöä. Yritä myöhemmin uudelleen."
+      "rateLimited": "Liian monta pyyntöä. Yritä myöhemmin uudelleen.",
+      "conflict": "Tämä muuttui, kun työstit sitä. Lataa se uudelleen ja yritä uudelleen."
     },
     "operation": {
       "couldNotReply": "Vastaaminen epäonnistui.",

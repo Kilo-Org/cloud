@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Seda ülevaatust ei saa praegusel kujul esitada. {{term}} võib olla muutunud või ei tohi omaenda {{term}} üle vaadata.",
       "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
       "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
-      "rateLimited": "Liiga palju päringuid. Proovi hiljem uuesti."
+      "rateLimited": "Liiga palju päringuid. Proovi hiljem uuesti.",
+      "conflict": "See muutus, samal ajal kui sa sellega tegelesid. Laadi see uuesti ja proovi uuesti."
     },
     "operation": {
       "couldNotReply": "Vastamine ebaõnnestus.",

@@ -2971,7 +2971,8 @@
       "reviewNotSubmittedTerm": "Impossible d'envoyer cette revue en l'état. Il se peut que {{term}} ait changé, ou que vous ne puissiez pas examiner votre propre {{term}}.",
       "couldNotPostComment": "Impossible de publier le commentaire.",
       "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez.",
-      "rateLimited": "Trop de requêtes. Réessayez plus tard."
+      "rateLimited": "Trop de requêtes. Réessayez plus tard.",
+      "conflict": "Cet élément a été modifié pendant que vous y travailliez. Rechargez-le et réessayez."
     },
     "operation": {
       "couldNotReply": "Impossible de répondre.",

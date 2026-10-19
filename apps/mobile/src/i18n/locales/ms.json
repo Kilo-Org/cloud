@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Semakan ini tidak dapat dihantar seperti sedia ada. {{term}} mungkin telah berubah, atau anda tidak boleh menyemak {{term}} anda sendiri.",
       "couldNotPostComment": "Tidak dapat menyiarkan komen.",
       "couldNotSubmitReview": "Tidak dapat menghantar semakan. Semak sambungan anda dan cuba lagi.",
-      "rateLimited": "Terlalu banyak permintaan. Sila cuba lagi kemudian."
+      "rateLimited": "Terlalu banyak permintaan. Sila cuba lagi kemudian.",
+      "conflict": "Item ini telah berubah semasa anda mengeditnya. Muat semula dan cuba lagi."
     },
     "operation": {
       "couldNotReply": "Tidak dapat membalas.",

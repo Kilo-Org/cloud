@@ -117,6 +117,9 @@ export function mutationErrorDisplay(
   if (readTrpcErrorField(rawError, 'code') === 'TOO_MANY_REQUESTS') {
     return { kind: 'retryable', message: i18n.t('prReview.mutationError.rateLimited') };
   }
+  if (readTrpcErrorField(rawError, 'code') === 'CONFLICT') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.conflict') };
+  }
   const message =
     surface === 'edit-comment'
       ? i18n.t('prReview.discussion.commentEditFailed')

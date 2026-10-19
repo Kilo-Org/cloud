@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "This review can't be submitted as is. The {{term}} may have changed, or you can't review your own {{term}}.",
       "couldNotPostComment": "Could not post comment.",
       "couldNotSubmitReview": "Could not submit review. Check your connection and try again.",
-      "rateLimited": "Too many requests. Please try again later."
+      "rateLimited": "Too many requests. Please try again later.",
+      "conflict": "This changed while you were working on it. Reload it and try again."
     },
     "operation": {
       "couldNotReply": "Could not reply.",

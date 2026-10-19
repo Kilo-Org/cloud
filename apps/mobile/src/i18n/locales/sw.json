@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Ukaguzi huu hauwezi kutumwa kama ulivyo. Huenda {{term}} limebadilika, au huwezi kukagua {{term}} wako mwenyewe.",
       "couldNotPostComment": "Imeshindikana kuchapisha maoni.",
       "couldNotSubmitReview": "Imeshindikana kuwasilisha ukaguzi. Angalia muunganisho wako kisha ujaribu tena.",
-      "rateLimited": "Maombi mengi mno. Tafadhali jaribu tena baadaye."
+      "rateLimited": "Maombi mengi mno. Tafadhali jaribu tena baadaye.",
+      "conflict": "Imebadilika wakati ulikuwa unafanya kazi nayo. Tafadhali ipakie upya na ujaribu tena."
     },
     "operation": {
       "couldNotReply": "Imeshindikana kutuma jibu.",

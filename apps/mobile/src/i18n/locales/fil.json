@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo. Baka nagbago ang {{term}}, o hindi mo masusuri ang sarili mong {{term}}.",
       "couldNotPostComment": "Hindi ma-post ang komento.",
       "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli.",
-      "rateLimited": "Masyadong maraming kahilingan. Pakisubukang muli sa ibang pagkakataon."
+      "rateLimited": "Masyadong maraming kahilingan. Pakisubukang muli sa ibang pagkakataon.",
+      "conflict": "Nagbago ito habang ginagawa mo ito. I-reload ito at subukang muli."
     },
     "operation": {
       "couldNotReply": "Hindi maipadala ang sagot.",

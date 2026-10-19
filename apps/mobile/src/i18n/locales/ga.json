@@ -818,7 +818,8 @@
       "reviewNotSubmittedTerm": "Ní féidir an t-athbhreithniú seo a chur isteach mar atá. B’fhéidir gur athraíodh an {{term}}, nó ní féidir leat do {{term}} féin a athbhreithniú.",
       "couldNotPostComment": "Níorbh fhéidir an trácht a phostáil.",
       "couldNotSubmitReview": "Níorbh fhéidir an t-athbhreithniú a sheoladh. Seiceáil do nasc agus bain triail as arís.",
-      "rateLimited": "An iomarca iarratas. Bain triail as arís níos déanaí."
+      "rateLimited": "An iomarca iarratas. Bain triail as arís níos déanaí.",
+      "conflict": "Athraíodh é seo agus bhí tú ag obair air. Athluchtaigh é agus bain triall as arís le do thoil."
     },
     "operation": {
       "couldNotReply": "Níorbh fhéidir freagra a thabhairt.",

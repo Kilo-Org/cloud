@@ -2931,7 +2931,8 @@
       "reviewNotSubmittedTerm": "Không thể gửi đánh giá này ở trạng thái hiện tại. {{term}} có thể đã thay đổi, hoặc bạn không thể đánh giá {{term}} của chính mình.",
       "couldNotPostComment": "Không thể đăng bình luận.",
       "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại.",
-      "rateLimited": "Quá nhiều yêu cầu. Vui lòng thử lại sau."
+      "rateLimited": "Quá nhiều yêu cầu. Vui lòng thử lại sau.",
+      "conflict": "Mục này đã thay đổi trong khi bạn đang làm việc trên đó. Vui lòng tải lại và thử lại."
     },
     "operation": {
       "couldNotReply": "Không thể trả lời.",

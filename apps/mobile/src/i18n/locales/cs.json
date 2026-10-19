@@ -802,7 +802,8 @@
       "reviewNotSubmittedTerm": "Tuto revizi nelze v aktuálním stavu odeslat. {{term}} se možná změnil nebo nemůžeš revidovat vlastní {{term}}.",
       "couldNotPostComment": "Komentář se nepodařilo odeslat.",
       "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu.",
-      "rateLimited": "Příliš mnoho požadavků. Zkuste to prosím později znovu."
+      "rateLimited": "Příliš mnoho požadavků. Zkuste to prosím později znovu.",
+      "conflict": "Tato položka se změnila, zatímco jste na ní pracovali. Znovu ji načtěte a zkuste to znovu."
     },
     "operation": {
       "couldNotReply": "Odpověď se nepodařilo odeslat.",

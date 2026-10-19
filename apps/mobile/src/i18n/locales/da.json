@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Denne gennemgang kan ikke sendes, som den er. {{term}} kan være ændret, eller også kan du ikke gennemgå din egen {{term}}.",
       "couldNotPostComment": "Kunne ikke sende kommentaren.",
       "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen.",
-      "rateLimited": "For mange anmodninger. Prøv igen senere."
+      "rateLimited": "For mange anmodninger. Prøv igen senere.",
+      "conflict": "Dette blev ændret, mens du arbejdede på det. Genindlæs det og prøv igen."
     },
     "operation": {
       "couldNotReply": "Svaret kunne ikke sendes.",

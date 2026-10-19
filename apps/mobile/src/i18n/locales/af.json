@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die {{term}} het dalk verander, of jy kan nie jou eie {{term}} hersien nie.",
       "couldNotPostComment": "Kon nie kommentaar plaas nie.",
       "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer.",
-      "rateLimited": "Te veel versoeke. Probeer asseblief later weer."
+      "rateLimited": "Te veel versoeke. Probeer asseblief later weer.",
+      "conflict": "Dit het verander terwyl jy daaraan gewerk het. Laai dit weer en probeer asseblief weer."
     },
     "operation": {
       "couldNotReply": "Die antwoord kon nie gestuur word nie.",

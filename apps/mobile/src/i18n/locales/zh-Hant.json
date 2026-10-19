@@ -2931,7 +2931,8 @@
       "reviewNotSubmittedTerm": "此審查無法依現況提交。{{term}}可能已變更，或者你不能審查自己的{{term}}。",
       "couldNotPostComment": "無法發佈留言。",
       "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。",
-      "rateLimited": "要求過多。請稍後再試一次。"
+      "rateLimited": "要求過多。請稍後再試一次。",
+      "conflict": "此項目在您編輯時已變更。請重新載入並再試一次。"
     },
     "operation": {
       "couldNotReply": "無法回覆。",

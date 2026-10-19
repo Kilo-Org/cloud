@@ -3011,7 +3011,8 @@
       "reviewNotSubmittedTerm": "Nie można wysłać tego przeglądu w obecnej postaci. {{term}} mógł się zmienić albo nie możesz przeglądać własnego {{term}}.",
       "couldNotPostComment": "Nie udało się opublikować komentarza.",
       "couldNotSubmitReview": "Nie udało się wysłać przeglądu. Sprawdź połączenie i spróbuj ponownie.",
-      "rateLimited": "Zbyt wiele żądań. Spróbuj ponownie później."
+      "rateLimited": "Zbyt wiele żądań. Spróbuj ponownie później.",
+      "conflict": "Zmieniło się to, gdy nad tym pracowałeś. Odśwież go i spróbuj ponownie."
     },
     "operation": {
       "couldNotReply": "Nie udało się odpowiedzieć.",

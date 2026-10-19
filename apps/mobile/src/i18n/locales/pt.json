@@ -786,7 +786,8 @@
       "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou não podes rever o teu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
       "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente.",
-      "rateLimited": "Demasiados pedidos. Tente novamente mais tarde."
+      "rateLimited": "Demasiados pedidos. Tente novamente mais tarde.",
+      "conflict": "Isto mudou enquanto trabalhavas nele. Recarrega-o e tenta novamente."
     },
     "operation": {
       "couldNotReply": "Não foi possível responder.",

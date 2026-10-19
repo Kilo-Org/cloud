@@ -802,7 +802,8 @@
       "reviewNotSubmittedTerm": "Tega pregleda ni mogoče oddati v trenutni obliki. {{term}} se je morda spremenil ali ne moreš pregledovati svojega {{term}}.",
       "couldNotPostComment": "Komentarja ni bilo mogoče objaviti.",
       "couldNotSubmitReview": "Pregleda ni bilo mogoče oddati. Preveri povezavo in poskusi znova.",
-      "rateLimited": "Preveč zahtev. Poskusi znova pozneje."
+      "rateLimited": "Preveč zahtev. Poskusi znova pozneje.",
+      "conflict": "To se je spremenilo, medtem ko si delal na njem. Znova ga naloži in poskusi znova."
     },
     "operation": {
       "couldNotReply": "Odgovora ni bilo mogoče poslati.",

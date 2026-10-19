@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Kāore e taea te tuku i tēnei arotake kia pēnei tonu. Tērā pea kua huri te {{term}}, kāore rānei e taea e koe te arotake i tō ake {{term}}.",
       "couldNotPostComment": "Kāore i taea te tuku i te kōrero.",
       "couldNotSubmitReview": "Kāore i taea te tuku i te arotake. Tirohia tō hononga, ka whakamātau anō.",
-      "rateLimited": "Nui rawa ngā tono. Whakamātau anō ā muri atu."
+      "rateLimited": "Nui rawa ngā tono. Whakamātau anō ā muri atu.",
+      "conflict": "Kua hēngauna tēnei i a koe e mahi ana. Tāutia anō ka whakamātau anō."
     },
     "operation": {
       "couldNotReply": "Kāore i taea te whakautu.",

@@ -241,6 +241,20 @@ describe('mutationErrorDisplay', () => {
     });
   });
 
+  it('maps a typed conflict to the localized conflict copy', () => {
+    // A conflict means the PR moved under the writer, not a transport
+    // problem: connection copy would misdiagnose it.
+    const conflict = makeError('CONFLICT', 'GitHub reported a conflict for this PR');
+    expect(mutationErrorDisplayFromError('composer', conflict)).toEqual({
+      kind: 'retryable',
+      message: 'This changed while you were working on it. Reload it and try again.',
+    });
+    expect(mutationErrorDisplayFromError('edit-comment', conflict)).toEqual({
+      kind: 'retryable',
+      message: 'This changed while you were working on it. Reload it and try again.',
+    });
+  });
+
   it('mutationErrorDisplayFromError classifies then selects', () => {
     const serverMessage = 'Repository was archived so is read-only.';
     expect(

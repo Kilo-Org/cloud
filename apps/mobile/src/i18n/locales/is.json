@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. {{term}} gæti hafa breyst, eða þú mátt ekki yfirfara þína eigin {{term}}.",
       "couldNotPostComment": "Ekki tókst að birta athugasemd.",
       "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur.",
-      "rateLimited": "Of margar beiðnir. Reyndu aftur seinna."
+      "rateLimited": "Of margar beiðnir. Reyndu aftur seinna.",
+      "conflict": "Þessu var breytt á meðan þú varst að vinna í því. Hlaðaðu því aftur inn og reyndu aftur."
     },
     "operation": {
       "couldNotReply": "Tókst ekki að svara.",

@@ -770,7 +770,8 @@
       "reviewNotSubmittedTerm": "Enweghị ike izipu nyocha a ka ọ dị. Ọ nwere ike ịbụ na {{term}} agbanweela, ma ọ bụ ị gaghị enyocha {{term}} nke gị.",
       "couldNotPostComment": "Enweghị ike ibipụta okwu.",
       "couldNotSubmitReview": "Enweghị ike iziga nyocha. Lelee njikọ gị ma nwaa ọzọ.",
-      "rateLimited": "Ọtụtụ arịrịọ. Biko nwaa ọzọ mgbe e mesịrị."
+      "rateLimited": "Ọtụtụ arịrịọ. Biko nwaa ọzọ mgbe e mesịrị.",
+      "conflict": "Ihe a gbanwere mgbe ị na-arụ ọrụ na ya. Budata ya ọzọ, biko nwaa ọzọ."
     },
     "operation": {
       "couldNotReply": "Enweghị ike ịzaghachi.",

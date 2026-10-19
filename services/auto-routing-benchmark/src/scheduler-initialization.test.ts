@@ -198,6 +198,18 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     for (const benchCase of DECIDER_CASES) {
       result.run(benchCase.id, `${benchCase.taskType}/${benchCase.subtaskType}`);
     }
+    sqlite
+      .prepare(`UPDATE scheduler_chunks SET status = 'active', slot = 0, lease_until = ?
+        WHERE run_id = 'settled' AND chunk = 0`)
+      .run(NOW + 60_000);
+    await dispatchScheduler(env);
+    expect(sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'settled'").get()).toEqual({
+      status: 'running',
+    });
+    sqlite
+      .prepare(`UPDATE scheduler_chunks SET status = 'failed', slot = NULL, lease_until = 0
+        WHERE run_id = 'settled' AND chunk = 0`)
+      .run();
 
     await dispatchScheduler(env);
 

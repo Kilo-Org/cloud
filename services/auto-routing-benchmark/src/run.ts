@@ -1160,9 +1160,9 @@ export async function dispatchScheduler(env: Env): Promise<void> {
       AND EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
       AND NOT EXISTS (SELECT 1 FROM scheduler_chunks AS chunk WHERE chunk.run_id = benchmark_runs.id
         AND chunk.status IN ('pending', 'queued', 'active')
-        AND NOT EXISTS (SELECT 1 FROM run_lane_failures AS failure
+        AND (chunk.status = 'active' OR NOT EXISTS (SELECT 1 FROM run_lane_failures AS failure
           WHERE failure.run_id = chunk.run_id AND failure.model = chunk.model
-            AND failure.variant = chunk.variant AND failure.rep = chunk.rep)) LIMIT 3
+            AND failure.variant = chunk.variant AND failure.rep = chunk.rep))) LIMIT 3
   `).all<{ id: string }>();
   for (const run of settled.results) {
     await finalizeRunIfComplete(env, run.id, 'decider', await getRunState(env, run.id));

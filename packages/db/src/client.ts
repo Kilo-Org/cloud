@@ -9,7 +9,7 @@ types.setTypeParser(types.builtins.INT8, val => BigInt(val));
 
 export type CreateDrizzleClientOptions = {
   connectionString: string;
-  poolConfig?: Partial<pg.PoolConfig>;
+  poolConfig?: Partial<pg.PoolConfig> & { pipeline?: boolean };
   logger?: boolean;
   ssl?: { ca: string } | false;
 };

@@ -103,7 +103,11 @@ const sharedPoolConfig: Partial<pg.PoolConfig> = {
 // Primary pool - always points to Frankfurt (writes go here)
 const primary = createDrizzleClient({
   connectionString: postgresUrl,
-  poolConfig: { ...sharedPoolConfig, application_name: appName },
+  poolConfig: {
+    ...sharedPoolConfig,
+    application_name: appName,
+    pipeline: process.env.POSTGRES_QUERY_PIPELINING_ENABLED === 'true',
+  },
   logger: !!DEBUG_QUERY_LOGGING,
 });
 export const pool = primary.pool;

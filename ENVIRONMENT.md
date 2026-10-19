@@ -220,6 +220,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (default/typical: 10000). [SERVER]
 - `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
+- `POSTGRES_QUERY_PIPELINING_ENABLED` - Enables native query pipelining on the shared primary pool only when exactly `true`; default off. Verify the installed driver, connection pooler, rollback, and connection-loss handling before activation. Replica and Hyperdrive configuration remain unchanged. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. [SERVER]
 - `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`

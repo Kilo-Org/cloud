@@ -55,6 +55,8 @@ vi.mock('react-native', () => ({
       activityKit.settingsOpen = true;
     },
   },
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 
 vi.mock('expo-router', async () => {
@@ -241,7 +243,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'GitHub App installed',
       'Your repositories are now connected.',
-      [{ text: 'Continue' }]
+      [{ text: 'Continue' }],
+      { cancelable: true }
     );
     expect(getGitHubInstallReturnOutcome()).toBeNull();
     act(() => {
@@ -336,7 +339,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'Awaiting admin approval',
       'An organization admin must approve the installation request.',
-      [{ text: 'Done' }]
+      [{ text: 'Done' }],
+      { cancelable: true }
     );
     expect(getGitHubInstallReturnOutcome()).toBeNull();
     act(() => {
@@ -352,7 +356,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'Cannot complete installation',
       'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
-      [{ text: 'Back' }]
+      [{ text: 'Back' }],
+      { cancelable: true }
     );
     const backButton = lastAlertButtons()?.[0];
     expect(backButton?.text).toBe('Back');

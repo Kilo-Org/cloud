@@ -126,21 +126,33 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
     // The alert is the message now; clear the toast channel with it.
     toast.dismiss(VOICE_INPUT_TOAST_ID);
     if (presentation.destination === 'transcription-model-picker') {
-      Alert.alert(presentation.title, presentation.message, [
-        { text: i18n.t('common.cancel'), style: 'cancel' },
-        {
-          text: i18n.t('transcriptionModel.title'),
-          onPress: () => {
-            router.push('/(app)/transcription-model-picker');
+      Alert.alert(
+        presentation.title,
+        presentation.message,
+        [
+          { text: i18n.t('common.cancel'), style: 'cancel' },
+          {
+            text: i18n.t('transcriptionModel.title'),
+            onPress: () => {
+              router.push('/(app)/transcription-model-picker');
+            },
           },
-        },
-      ]);
+        ],
+        // Android back dismisses, which equals Cancel: nothing opens.
+        { cancelable: true }
+      );
       return;
     }
-    Alert.alert(presentation.title, presentation.message, [
-      { text: i18n.t('common.cancel'), style: 'cancel' },
-      { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
-    ]);
+    Alert.alert(
+      presentation.title,
+      presentation.message,
+      [
+        { text: i18n.t('common.cancel'), style: 'cancel' },
+        { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
+      ],
+      // Android back dismisses, which equals the no-op Cancel.
+      { cancelable: true }
+    );
     return;
   }
   // One stable toast id so a later message replaces an earlier one in place:
@@ -302,7 +314,10 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
                 })();
               },
             },
-          ]
+          ],
+          // Android back dismisses, which equals Not now: no download starts,
+          // and the gate re-offers on the next toggle.
+          { cancelable: true }
         );
         return;
       }
@@ -336,7 +351,11 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
             })();
           },
         },
-      ]
+      ],
+      // Android back dismisses without recording a consent answer: the state
+      // stays 'unset', so the next toggle raises the same disclosure instead
+      // of silently assuming the user declined.
+      { cancelable: true }
     );
   };
 

@@ -117,6 +117,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Platform: reactNativeMock.Platform,
   useWindowDimensions: reactNativeMock.useWindowDimensions,
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,

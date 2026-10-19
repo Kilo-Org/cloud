@@ -287,7 +287,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       if (!admission.ok) {
         // Keep the gate open and the payload staged so the user can pick
         // another destination.
-        Alert.alert(admission.title, admission.message);
+        Alert.alert(admission.title, admission.message, undefined, {
+          // Android back dismisses; the gate stays open for another choice.
+          cancelable: true,
+        });
         return;
       }
       const org = row.organization_id ?? undefined;
@@ -311,7 +314,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         hasFiles: resolveShareHasFiles(validation, payload?.files.length ?? 0),
       });
       if (!admission.ok) {
-        Alert.alert(admission.title, admission.message);
+        Alert.alert(admission.title, admission.message, undefined, {
+          // Android back dismisses; the gate stays open for another choice.
+          cancelable: true,
+        });
         return;
       }
 

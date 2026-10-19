@@ -86,19 +86,26 @@ export function sendAppFeedback(userId: string | undefined) {
  * this as the prompt's default surface.
  */
 export function showFeedbackPrompt(userId: string | undefined): boolean {
-  Alert.alert(i18n.t('feedback.neutralTitle'), undefined, [
-    { text: i18n.t('common.notNow'), style: 'cancel' },
-    {
-      text: i18n.t('feedback.rateTheApp'),
-      onPress: requestAppRating,
-    },
-    {
-      text: i18n.t('feedback.sendFeedback'),
-      onPress: () => {
-        sendAppFeedback(userId);
+  Alert.alert(
+    i18n.t('feedback.neutralTitle'),
+    undefined,
+    [
+      { text: i18n.t('common.notNow'), style: 'cancel' },
+      {
+        text: i18n.t('feedback.rateTheApp'),
+        onPress: requestAppRating,
       },
-    },
-  ]);
+      {
+        text: i18n.t('feedback.sendFeedback'),
+        onPress: () => {
+          sendAppFeedback(userId);
+        },
+      },
+    ],
+    // Android back dismisses, which equals Not now: nothing opens, and the
+    // one-time marker is already consumed either way.
+    { cancelable: true }
+  );
   return true;
 }
 

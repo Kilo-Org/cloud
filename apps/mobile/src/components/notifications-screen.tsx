@@ -557,10 +557,16 @@ export function NotificationsScreen() {
   const handleEnableNotifications = useCallback(async () => {
     const currentStatus = await getNotificationPermissionStatus();
     if (currentStatus === 'denied') {
-      Alert.alert(t('notifications.disabledTitle'), t('notifications.disabledMessage'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
-      ]);
+      Alert.alert(
+        t('notifications.disabledTitle'),
+        t('notifications.disabledMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+        ],
+        // Android back dismisses, which equals the no-op Cancel.
+        { cancelable: true }
+      );
       return;
     }
     setIsTogglingPermission(true);
@@ -614,10 +620,16 @@ export function NotificationsScreen() {
   }, [queryClient, registerToken, t]);
 
   const handleDisableNotifications = useCallback(() => {
-    Alert.alert(t('notifications.disableTitle'), t('notifications.disableMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
-    ]);
+    Alert.alert(
+      t('notifications.disableTitle'),
+      t('notifications.disableMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+      ],
+      // Android back dismisses, which equals the no-op Cancel.
+      { cancelable: true }
+    );
   }, [t]);
 
   const isMasterBusy = isTogglingPermission || isRegisteringToken;

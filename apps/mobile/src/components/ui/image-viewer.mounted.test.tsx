@@ -11,6 +11,8 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' as const },
   Pressable: 'Pressable',
   View: 'View',
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));

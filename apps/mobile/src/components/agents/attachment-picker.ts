@@ -19,10 +19,16 @@ import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-she
 import { registerTempFile } from '@/lib/temp-file-registry';
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
-  Alert.alert(title, message, [
-    { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
-  ]);
+  Alert.alert(
+    title,
+    message,
+    [
+      { text: i18n.t('common.cancel'), style: 'cancel' },
+      { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
+    ],
+    // Android back dismisses, which equals the no-op Cancel.
+    { cancelable: true }
+  );
 }
 
 export function normalizeImageAsset(asset: {

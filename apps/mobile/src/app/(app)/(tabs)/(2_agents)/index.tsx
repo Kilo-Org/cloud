@@ -119,7 +119,9 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
     Alert.alert(
       i18n.t('agents.githubInstall.couldNotOpenTitle'),
       i18n.t('agents.githubInstall.couldNotOpenMessage'),
-      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }]
+      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }],
+      // Android back dismisses; reopening the flow retries the same way.
+      { cancelable: true }
     );
   }
 }
@@ -132,7 +134,9 @@ export default function AgentSessionList() {
       void retryGitHubInstall(result?.organizationId);
     });
     if (alert) {
-      Alert.alert(alert.title, alert.message, alert.buttons);
+      // Android back dismisses; the outcome alerts are informational and the
+      // retry flow re-arms from the tab.
+      Alert.alert(alert.title, alert.message, alert.buttons, { cancelable: true });
     }
   }, []);
 

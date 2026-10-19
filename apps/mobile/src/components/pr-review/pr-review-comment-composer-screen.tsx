@@ -121,7 +121,15 @@ export function PrReviewCommentComposerScreen() {
             router.back();
           },
         },
-      ]
+      ],
+      // Android back dismisses and leaves the composer on its empty edit
+      // state; the formSheet's own back still navigates out from there.
+      {
+        cancelable: true,
+        onDismiss: () => {
+          router.back();
+        },
+      }
     );
   }, [parsed, isEdit, pendingItem, router, t]);
 

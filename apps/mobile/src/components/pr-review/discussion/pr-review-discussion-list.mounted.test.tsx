@@ -91,7 +91,12 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 // The real `@/i18n` module initializes i18next at import time; the delete
 // mutation only needs `t` for its failure copy, which this suite asserts.
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }));
-vi.mock('react-native', () => ({ View: 'View', Alert: { alert: observed.alert } }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Alert: { alert: observed.alert },
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
+}));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({
     data,
@@ -530,7 +535,8 @@ describe('PrReviewDiscussionList optimistic delete (s4, mounted)', () => {
     expect(observed.alert).toHaveBeenCalledWith(
       'common.somethingWentWrong',
       'prReview.discussion.commentDeleteFailed',
-      expect.any(Array)
+      expect.any(Array),
+      { cancelable: true }
     );
 
     renderer.unmount();

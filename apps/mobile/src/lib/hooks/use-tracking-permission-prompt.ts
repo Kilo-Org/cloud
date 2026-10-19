@@ -63,7 +63,10 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
                 })();
               },
             },
-          ]
+          ],
+          // Android back dismisses, which equals Not now: no request fires
+          // and the prompt stays governed by its own re-ask policy.
+          { cancelable: true }
         );
       };
 

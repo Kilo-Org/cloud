@@ -34,6 +34,8 @@ vi.mock('react-native', () => ({
       return reactNativeMock.os;
     },
   },
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 // The real library reports the window insets unchanged inside the sheet Modal;
 // the fix must not rewrite that context, only the header's own top clearance.

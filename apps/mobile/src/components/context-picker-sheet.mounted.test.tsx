@@ -21,6 +21,8 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useWindowDimensions: () => ({ width: 400, height: 800 }),
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 24 }) }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

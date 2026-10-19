@@ -124,6 +124,8 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useWindowDimensions: () => windowDims,
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));

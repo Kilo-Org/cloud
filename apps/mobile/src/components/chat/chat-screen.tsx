@@ -149,7 +149,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             }
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: the model stays as is.
+      { cancelable: true }
     );
   };
 
@@ -189,7 +191,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       } catch (error) {
         Alert.alert(
           t('modelChat.backends.title'),
-          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget')
+          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget'),
+          // Android back dismisses the error; the composer keeps the draft.
+          undefined,
+          { cancelable: true }
         );
         throw error;
       }

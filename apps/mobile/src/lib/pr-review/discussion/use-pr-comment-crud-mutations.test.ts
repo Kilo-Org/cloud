@@ -255,7 +255,8 @@ describe('useDeletePrCommentMutation', () => {
     expect(hoistedAlert.alert).toHaveBeenCalledWith(
       'Something went wrong',
       "Couldn't delete your comment. Check your connection and try again.",
-      expect.any(Array)
+      expect.any(Array),
+      { cancelable: true }
     );
 
     const buttons = hoistedAlert.alert.mock.calls[0]?.[2] as {

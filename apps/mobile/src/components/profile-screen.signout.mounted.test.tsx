@@ -23,6 +23,8 @@ vi.mock('react-native', () => ({
   },
   Pressable: 'Pressable',
   View: 'View',
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 
 vi.mock('react-native-safe-area-context', () => ({

@@ -84,6 +84,8 @@ vi.mock('react-native', () => ({
   StatusBar: { currentHeight: 24 },
   AppState: { addEventListener: () => ({ remove: vi.fn() }) },
   Alert: { alert: vi.fn() },
+  // Sheet arms its Android back queue on the android platform this suite mocks.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),

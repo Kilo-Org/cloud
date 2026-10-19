@@ -7,7 +7,7 @@ vi.mock('../dos/SessionIngestDO', () => ({
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import type { Env } from '../env';
 import { INGEST_CHUNK_MAX_BYTES } from '../util/ingest-limits';
-import { stageAndEnqueue, toRpcBody } from './stage-and-enqueue';
+import { boundedRequestBody, stageAndEnqueue, toRpcBody } from './stage-and-enqueue';
 
 const encoder = new TextEncoder();
 
@@ -79,5 +79,61 @@ describe('stageAndEnqueue', () => {
     const body = stageR2Object.mock.calls[0]?.[1] as Uint8Array;
     expect(body).toBeInstanceOf(Uint8Array);
     expect(new TextDecoder().decode(body)).toBe('{"data":[]}');
+  });
+});
+
+describe('boundedRequestBody', () => {
+  it('delivers the body unchanged under the limit', async () => {
+    const payload = encoder.encode('{"data":[]}');
+    const body = new Blob([payload]).stream();
+    const staged = boundedRequestBody(body, 1024, () => {
+      throw new Error('must not trip');
+    });
+
+    await expect(new Response(staged).arrayBuffer()).resolves.toEqual(
+      await new Response(new Blob([payload]).stream()).arrayBuffer()
+    );
+  });
+
+  it('reports the limit when the body passes it', async () => {
+    let tripped = false;
+    const payload = new Uint8Array(64).fill(1);
+    const body = new Blob([payload, payload, payload]).stream();
+    const staged = boundedRequestBody(body, 100, () => {
+      tripped = true;
+    });
+
+    await expect(new Response(staged).text()).rejects.toThrow('staging byte budget');
+    expect(tripped).toBe(true);
+  });
+
+  it('carries the limit signal through the staging call', async () => {
+    const stageR2Object = vi.fn(
+      async (_params: { key: string }, body: ReadableStream<Uint8Array>) => {
+        try {
+          await new Response(body).arrayBuffer();
+        } catch (error) {
+          throw new Error(`upload failed: ${error instanceof Error ? error.message : error}`);
+        }
+        return true;
+      }
+    );
+    vi.mocked(getSessionIngestDO).mockReturnValue({ stageR2Object } as never);
+
+    let tripped = false;
+    const payload = new Uint8Array(64).fill(1);
+    const body = new Blob([payload, payload, payload]).stream();
+
+    await expect(
+      stageAndEnqueue(
+        makeEnv(),
+        params,
+        boundedRequestBody(body, 100, () => {
+          tripped = true;
+        }),
+        undefined
+      )
+    ).rejects.toThrow('staging byte budget');
+    expect(tripped).toBe(true);
   });
 });

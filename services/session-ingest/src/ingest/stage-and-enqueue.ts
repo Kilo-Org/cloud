@@ -12,6 +12,18 @@ type StageAndEnqueueParams = Omit<IngestQueueMessage, 'r2Key' | 'ingestedAt'> & 
 
 export type StageAndEnqueueFailureStage = 'staging_upload' | 'queue_send';
 
+/**
+ * The staged body outgrew the measured staging budget: the counting reader
+ * stopped it before any storage write. The caller answers with the shared
+ * too-large response instead of retrying or staging.
+ */
+export class StagingOverflowError extends Error {
+  constructor() {
+    super('Ingest body exceeds the staging byte budget');
+    this.name = 'StagingOverflowError';
+  }
+}
+
 export class StageAndEnqueueError extends Error {
   constructor(
     readonly stage: StageAndEnqueueFailureStage,
@@ -40,15 +52,67 @@ export async function toRpcBody(
   }
   if (declaredBytes === undefined || declaredBytes > INGEST_CHUNK_MAX_BYTES) return body;
   const result = await readBoundedStream(body, INGEST_CHUNK_MAX_BYTES);
-  if (!result.ok) throw new Error('Ingest body exceeds the staging byte budget');
+  if (!result.ok) throw new StagingOverflowError();
   return result.bytes;
+}
+
+/**
+ * Caps a request stream at `maxBytes` without buffering it: a counting pass-through
+ * that rejects (`StagingOverflowError`) as soon as the running total exceeds the
+ * limit, so memory stays flat no matter how large the body claims to be. The
+ * consumer of the returned stream observes the rejection when the DO uploads the
+ * body to storage; nothing is written on overflow. `onOverflow` runs locally when
+ * the limit trips — the RPC layer reconstructs stream errors, so the flag is the
+ * reliable signal that the body, not staging, was too large.
+ */
+export function boundedRequestBody(
+  body: ReadableStream<Uint8Array>,
+  maxBytes: number,
+  onOverflow: () => void
+): ReadableStream<Uint8Array> {
+  let totalBytes = 0;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        if (!reader) reader = body.getReader();
+        const result = await reader.read();
+        if (result.done) {
+          controller.close();
+          return;
+        }
+        totalBytes += result.value.byteLength;
+        if (totalBytes > maxBytes) {
+          onOverflow();
+          controller.error(new StagingOverflowError());
+          await cancelReader(body);
+          return;
+        }
+        controller.enqueue(result.value);
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+    async cancel(reason) {
+      await cancelReader(body);
+    },
+  });
+}
+
+async function cancelReader(stream: ReadableStream<Uint8Array>): Promise<void> {
+  try {
+    await stream.cancel('ingest body exceeded the staging limit');
+  } catch {
+    // The overflow error surfaced through the stream remains authoritative.
+  }
 }
 
 export async function stageAndEnqueue(
   env: Env,
   params: StageAndEnqueueParams,
   body: ReadableStream<Uint8Array> | Uint8Array,
-  declaredBytes?: number
+  declaredBytes?: number,
+  overflowed?: () => boolean
 ): Promise<boolean> {
   try {
     const rpcBody = await toRpcBody(body, declaredBytes);
@@ -64,7 +128,18 @@ export async function stageAndEnqueue(
     );
     if (!accepted) return false;
   } catch (error) {
+    // The counting stream surfaces its overflow directly: it is the request's
+    // own measure, not a staging failure, so the caller answers with the shared
+    // too-large response instead of a staging error.
+    if (error instanceof StagingOverflowError) throw error;
     throw new StageAndEnqueueError('staging_upload', error);
+  }
+  // The storage boundary may swallow a stream error and report success for a
+  // body that was never fully written. A tripped overflow flag means no queue
+  // message may reference the key.
+  if (overflowed?.()) {
+    await env.SESSION_INGEST_R2.delete(params.r2Key).catch(() => {});
+    throw new StagingOverflowError();
   }
 
   const message: IngestQueueMessage = {

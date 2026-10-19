@@ -2680,3 +2680,58 @@ describe('custom routers and signed auto decisions', () => {
     });
   });
 });
+
+describe('caller-key requests with zero data retention', () => {
+  const vercelProvider = {
+    ...provider,
+    id: 'vercel',
+    apiUrl: 'https://ai-gateway.vercel.sh/v1',
+  } satisfies Provider;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: vercelProvider,
+      userByok: [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+      bypassAccessCheck: false,
+    });
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
+    });
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+  });
+
+  it('returns 400 before any upstream work', async () => {
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody(), provider: { zdr: true, data_collection: 'deny' } }) as never
+    );
+    const body = (await response.json()) as { error_type?: string; message?: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error_type).toBe('invalid_request');
+    expect(body.message).toContain('Zero data retention');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('routes the request when it does not ask for zero data retention', async () => {
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody(), provider: { zdr: false, data_collection: 'deny' } }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions).toEqual({
+      gateway: {
+        only: ['anthropic'],
+        byok: { anthropic: [{ apiKey: 'sk-anthropic' }] },
+        disallowPromptTraining: true,
+        sessionAffinity: true,
+      },
+    });
+  });
+});

@@ -7,6 +7,7 @@ import {
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
   isVercelRoutingOptOut,
+  isZeroDataRetentionUnsupportedForByok,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type {
   GatewayRequest,
@@ -376,6 +377,19 @@ describe('shouldRouteToVercel', () => {
   });
 });
 
+describe('isZeroDataRetentionUnsupportedForByok', () => {
+  const byok = [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' as const }];
+
+  it('matches Vercel requests that carry caller credentials and a retention preference', () => {
+    expect(isZeroDataRetentionUnsupportedForByok('vercel', byok, { zdr: true })).toBe(true);
+    expect(isZeroDataRetentionUnsupportedForByok('vercel', null, { zdr: true })).toBe(false);
+    expect(isZeroDataRetentionUnsupportedForByok('vercel', [], { zdr: true })).toBe(false);
+    expect(isZeroDataRetentionUnsupportedForByok('vercel', byok, { zdr: false })).toBe(false);
+    expect(isZeroDataRetentionUnsupportedForByok('vercel', byok, undefined)).toBe(false);
+    expect(isZeroDataRetentionUnsupportedForByok('openrouter', byok, { zdr: true })).toBe(false);
+  });
+});
+
 describe('applyVercelSettings BYOK pinning', () => {
   function byokRequest(ignore: string[]): GatewayRequest {
     return {
@@ -439,7 +453,7 @@ describe('applyVercelSettings BYOK pinning', () => {
     expect(request.body.provider).toBeUndefined();
   });
 
-  it('keeps the same gateway options on BYOK and managed paths for identical provider preferences', async () => {
+  it('keeps routing preferences aligned with the managed path', async () => {
     const provider = {
       sort: 'latency' as const,
       zdr: true,
@@ -464,23 +478,18 @@ describe('applyVercelSettings BYOK pinning', () => {
       throw new Error('convertProviderOptions did not produce managed gateway options');
     }
 
-    const gatewayOptions = byok.body.providerOptions?.gateway;
-    if (!gatewayOptions) {
-      throw new Error('applyVercelSettings did not produce BYOK gateway options');
-    }
-    const byokCredentials = gatewayOptions.byok;
-    expect(byokCredentials).toEqual({ anthropic: [{ apiKey: 'sk-anthropic' }] });
-    for (const [key, value] of Object.entries(managedOptions)) {
-      if (key === 'only' || key === 'order' || key === 'sessionId') {
-        continue;
-      }
-      expect(gatewayOptions[key as keyof typeof gatewayOptions]).toEqual(value);
-    }
-    expect(gatewayOptions.zeroDataRetention).toBe(true);
-    expect(gatewayOptions.disallowPromptTraining).toBe(true);
+    expect(managedOptions.zeroDataRetention).toBe(true);
+    expect(managedOptions.disallowPromptTraining).toBe(true);
+    expect(byok.body.providerOptions?.gateway).toEqual({
+      only: ['anthropic'],
+      sort: 'ttft',
+      byok: { anthropic: [{ apiKey: 'sk-anthropic' }] },
+      disallowPromptTraining: true,
+      sessionAffinity: true,
+    });
   });
 
-  it('sets zeroDataRetention and disallowPromptTraining in the BYOK gateway options', async () => {
+  it('carries the training filter and omits gateway retention for caller-key routing', async () => {
     const request = byokRequest([]);
     request.body.provider = { zdr: true, data_collection: 'deny' };
 
@@ -490,7 +499,6 @@ describe('applyVercelSettings BYOK pinning', () => {
     ]);
 
     expect(request.body.providerOptions?.gateway).toMatchObject({
-      zeroDataRetention: true,
       disallowPromptTraining: true,
       only: ['anthropic', 'bedrock'],
       byok: {
@@ -498,6 +506,7 @@ describe('applyVercelSettings BYOK pinning', () => {
         bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
       },
     });
+    expect(request.body.providerOptions?.gateway?.zeroDataRetention).toBeUndefined();
     expect(request.body.provider).toBeUndefined();
   });
 

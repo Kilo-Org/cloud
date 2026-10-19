@@ -11,6 +11,7 @@ import {
   BODY_MAX_LINES_CLOSED,
   BODY_MAX_LINES_OPEN,
   BODY_VERTICAL_PADDING,
+  resolveCommentBodyFade,
   resolveCommentBodyMaxHeight,
 } from './comment-body-geometry';
 
@@ -32,5 +33,34 @@ describe('resolveCommentBodyMaxHeight', () => {
 
   it('keeps the keyboard-closed cap at ten whole lines (212)', () => {
     expect(resolveCommentBodyMaxHeight(BODY_MAX_LINES_CLOSED)).toBe(212);
+  });
+});
+
+describe('resolveCommentBodyFade', () => {
+  it('shows no fade before the first layout measurement', () => {
+    expect(resolveCommentBodyFade({ contentHeight: null, frameHeight: 212, atBottom: false })).toBe(
+      false
+    );
+    expect(resolveCommentBodyFade({ contentHeight: 400, frameHeight: null, atBottom: false })).toBe(
+      false
+    );
+  });
+
+  it('shows no fade while the content fits the frame', () => {
+    expect(resolveCommentBodyFade({ contentHeight: 200, frameHeight: 212, atBottom: false })).toBe(
+      false
+    );
+  });
+
+  it('shows the fade when the content overflows and more remains below the fold', () => {
+    expect(resolveCommentBodyFade({ contentHeight: 400, frameHeight: 212, atBottom: false })).toBe(
+      true
+    );
+  });
+
+  it('hides the fade once the last line is in view', () => {
+    expect(resolveCommentBodyFade({ contentHeight: 400, frameHeight: 212, atBottom: true })).toBe(
+      false
+    );
   });
 });

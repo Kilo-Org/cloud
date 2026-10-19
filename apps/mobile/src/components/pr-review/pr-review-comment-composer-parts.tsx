@@ -15,6 +15,7 @@ import {
   BODY_LINE_HEIGHT,
   BODY_MAX_LINES_CLOSED,
   BODY_MAX_LINES_OPEN,
+  resolveCommentBodyFade,
   resolveCommentBodyMaxHeight,
 } from '@/components/pr-review/comment-body-geometry';
 import {
@@ -68,8 +69,7 @@ export function CommentBodyField({
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [frameHeight, setFrameHeight] = useState<number | null>(null);
   const [atBottom, setAtBottom] = useState(false);
-  const overflowing =
-    contentHeight !== null && frameHeight !== null && contentHeight > frameHeight + 0.5;
+  const overflowing = resolveCommentBodyFade({ contentHeight, frameHeight, atBottom });
 
   // Android's TextInput onScroll payload only declares contentOffset; the
   // runtime includes contentSize and layoutMeasurement like any ScrollView.

@@ -22,6 +22,8 @@ const hopByHopHeaders = new Set([
   'upgrade',
 ]);
 
+const framingHeader = 'content-length';
+
 const headerNamePattern = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 
 const blockedExactHeaders = new Set([
@@ -102,6 +104,13 @@ const staticHeadersSchema = z.record(z.string(), headerValueSchema).superRefine(
         path: [name],
       });
     }
+    if (normalized === framingHeader) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Static header cannot be a framing header',
+        path: [name],
+      });
+    }
   }
 });
 
@@ -121,6 +130,20 @@ const auxiliaryHeadersSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Auxiliary header cannot be transport or credential-like',
+          path: [name],
+        });
+      }
+      if (isTransportIdentityHeader(normalized)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Auxiliary header cannot be transport identity metadata',
+          path: [name],
+        });
+      }
+      if (normalized === framingHeader) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Auxiliary header cannot be a framing header',
           path: [name],
         });
       }
@@ -164,6 +187,8 @@ export function buildUpstreamHeaders(params: {
       if (
         hopByHopHeaders.has(normalized) ||
         isCredentialLikeHeader(normalized) ||
+        isTransportIdentityHeader(normalized) ||
+        normalized === framingHeader ||
         blockedStaticNames.has(normalized)
       )
         continue;

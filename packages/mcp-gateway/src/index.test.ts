@@ -6,6 +6,7 @@ import {
   buildScopedConnectRootPath,
   buildUpstreamHeaders,
   parseScopedConnectPath,
+  parseAuxiliaryHeaders,
   parseStaticHeaders,
   isPublicIp,
   ProviderGrantBundleSchema,
@@ -118,6 +119,50 @@ describe('provider grant schema', () => {
   });
 });
 
+describe('auxiliary headers', () => {
+  test('rejects transport identity and framing headers', () => {
+    expect(() => parseAuxiliaryHeaders({ Host: 'example.com' })).toThrow(
+      'Auxiliary header cannot be transport identity metadata'
+    );
+    expect(() => parseAuxiliaryHeaders({ Forwarded: 'for=192.0.2.1' })).toThrow(
+      'Auxiliary header cannot be transport identity metadata'
+    );
+    expect(() => parseAuxiliaryHeaders({ 'X-Forwarded-For': '192.0.2.1' })).toThrow(
+      'Auxiliary header cannot be transport identity metadata'
+    );
+    expect(() => parseAuxiliaryHeaders({ 'X-Forwarded-Host': 'example.com' })).toThrow(
+      'Auxiliary header cannot be transport identity metadata'
+    );
+    expect(() => parseAuxiliaryHeaders({ 'CF-Connecting-IP': '192.0.2.1' })).toThrow(
+      'Auxiliary header cannot be transport identity metadata'
+    );
+    expect(() => parseAuxiliaryHeaders({ 'Content-Length': '10' })).toThrow(
+      'Auxiliary header cannot be a framing header'
+    );
+    expect(parseAuxiliaryHeaders({ 'X-Request-Id': 'request-1' })).toEqual({
+      'X-Request-Id': 'request-1',
+    });
+  });
+
+  test('buildUpstreamHeaders drops transport identity and framing auxiliary headers', () => {
+    const headers = buildUpstreamHeaders({
+      source: new Headers({ Accept: 'application/json' }),
+      auxiliaryHeaders: [
+        ['Host', 'attacker.example'],
+        ['X-Forwarded-For', '192.0.2.1'],
+        ['Content-Length', '10'],
+        ['X-Request-Id', 'request-1'],
+      ],
+    });
+
+    expect(headers.get('host')).toBeNull();
+    expect(headers.get('x-forwarded-for')).toBeNull();
+    expect(headers.get('content-length')).toBeNull();
+    expect(headers.get('x-request-id')).toBe('request-1');
+    expect(headers.get('accept')).toBe('application/json');
+  });
+});
+
 describe('static headers', () => {
   test('allows authorization but rejects transport identity headers', () => {
     expect(parseStaticHeaders({ Authorization: 'Bearer test' })).toEqual({
@@ -131,6 +176,9 @@ describe('static headers', () => {
     );
     expect(() => parseStaticHeaders({ 'CF-Connecting-IP': '203.0.113.1' })).toThrow(
       'Static header cannot be transport identity metadata'
+    );
+    expect(() => parseStaticHeaders({ 'Content-Length': '10' })).toThrow(
+      'Static header cannot be a framing header'
     );
     expect(
       parseStaticHeaders({

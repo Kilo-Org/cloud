@@ -17,11 +17,14 @@ const config = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   isFetching: false,
+  fetchStatus: 'idle' as string,
   data: null as unknown,
   refetch: vi.fn(),
 }));
 
 const provider = vi.hoisted(() => ({ status: 'connected' }));
+const connectivity = vi.hoisted(() => ({ known: true }));
+const platformError = vi.hoisted(() => ({ variants: [] as string[] }));
 const centeredState = vi.hoisted(() => vi.fn());
 const scrollView = vi.hoisted(() => vi.fn());
 
@@ -68,7 +71,10 @@ vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
   ProviderConnectCard: () => null,
 }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: () => null,
+  PlatformErrorScreen: (props: { variant?: string }) => {
+    platformError.variants.push(props.variant ?? 'server');
+    return null;
+  },
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/security-agent/settings-toggle-row', () => ({
@@ -119,6 +125,9 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.known ? 'offline' : 'unknown'),
 }));
 
 function makeActionRequired(reason: string) {
@@ -183,11 +192,14 @@ beforeEach(() => {
   config.isLoading = false;
   config.isError = false;
   config.isFetching = false;
+  config.fetchStatus = 'idle';
   config.data = null;
   config.refetch.mockClear();
   permission.status = 'ready';
   permission.canEdit = true;
   provider.status = 'connected';
+  connectivity.known = true;
+  platformError.variants = [];
   centeredState.mockClear();
   scrollView.mockClear();
 });
@@ -199,6 +211,52 @@ describe('PlatformOverviewScreen disconnected setup', () => {
     await renderScreen();
     expect(centeredState).toHaveBeenCalledOnce();
     expect(scrollView).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlatformOverviewScreen connected with unavailable config', () => {
+  it('shows the offline error while the config query is paused with no cache', async () => {
+    // The exact blank-body repro: provider status is cached as connected, the
+    // config query is paused by NetInfo before its first success, and
+    // `config.isLoading` (isPending && isFetching) is false while paused.
+    config.fetchStatus = 'paused';
+    config.data = null;
+
+    await renderScreen();
+
+    expect(platformError.variants).toEqual(['offline']);
+  });
+
+  it('keeps the skeleton while the query is paused and connectivity is unsettled', async () => {
+    config.fetchStatus = 'paused';
+    config.data = null;
+    connectivity.known = false;
+
+    const texts = await renderScreen();
+
+    // Connectivity not yet settled: no confirmed-offline signal, the loading
+    // skeleton branch renders while the query waits.
+    expect(platformError.variants).toEqual([]);
+    expect(texts).not.toContain('Automatic reviews');
+  });
+
+  it('renders content from cache when the config query is paused with data', async () => {
+    config.fetchStatus = 'paused';
+    config.data = makeConfig();
+
+    const texts = await renderScreen();
+
+    expect(platformError.variants).toEqual([]);
+    expect(texts).toContain('Automatic reviews');
+  });
+
+  it('shows the server error when the config fetch fails with no cache', async () => {
+    config.isError = true;
+    config.data = null;
+
+    await renderScreen();
+
+    expect(platformError.variants).toEqual(['server']);
   });
 });
 

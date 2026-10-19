@@ -22,6 +22,7 @@ import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   classifyProviderState,
   useBitbucketReadiness,
@@ -51,6 +52,8 @@ export function BitbucketOverview({
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useAvailableModels(scope);
+  // A successful probe can confirm online while NetInfo still pauses queries.
+  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
   const providerState = classifyProviderState({
     isLoading: readiness.isLoading,
     isError: readiness.isError,
@@ -77,15 +80,23 @@ export function BitbucketOverview({
   const isLoading = providerState.status === 'loading' || config.isLoading || permissionLoading;
   const connected = providerState.status === 'connected';
 
-  // A connected workspace whose config fails to load (and has no stale
-  // cache to fall back on) has nothing to show — surface a retry instead of
-  // a header over blank space. A background refetch failure with data
-  // already cached falls through to the normal content below, unaffected.
-  if (!isLoading && connected && config.isError && config.data == null) {
+  // A connected workspace whose config has nothing to show (no cached data
+  // and either a failed fetch or a paused one — `config.isLoading` is false
+  // while a query is paused by NetInfo, which used to render a header over
+  // blank space) surfaces a retry instead. A paused query with cached config
+  // data, and a background refetch failure with data already cached, both
+  // fall through to the normal content below, unaffected.
+  const configUnavailable =
+    !isLoading &&
+    connected &&
+    config.data == null &&
+    (config.isError || (config.fetchStatus === 'paused' && isConnectivityKnown));
+  if (configUnavailable) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
+          variant={config.isError ? 'server' : 'offline'}
           onRetry={() => {
             void config.refetch();
           }}

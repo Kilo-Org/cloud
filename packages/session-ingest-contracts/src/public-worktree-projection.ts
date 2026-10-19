@@ -36,7 +36,10 @@ export function projectPrivateWorktreePaths<T extends object>(
       if (typeof current === 'string') {
         let projected = current;
         for (const directory of privateDirectories) {
-          projected = projected.replaceAll(directory, publicDirectory);
+          projected = projected.replace(
+            new RegExp(directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+            () => publicDirectory
+          );
         }
         Reflect.set(target, key, projected);
       } else if (typeof current === 'object' && current !== null) {

@@ -30,6 +30,28 @@ describe('projectPrivateWorktreePaths', () => {
     expect(value).toEqual(original);
   });
 
+  it('projects string occurrences with different letter casing', () => {
+    const mixedCase = privateDirectory
+      .split('')
+      .map((char, index) => (index % 2 === 0 ? char.toUpperCase() : char.toLowerCase()))
+      .join('');
+    const value = {
+      text: `Read ${mixedCase}/file.txt`,
+      nested: [null, 1, true, { output: `Created ${mixedCase}/other.txt` }],
+    };
+
+    const projected = projectPrivateWorktreePaths(
+      value,
+      [{ directory: privateDirectory }],
+      publicDirectory
+    );
+
+    expect(projected).toEqual({
+      text: `Read ${publicDirectory}/file.txt`,
+      nested: [null, 1, true, { output: `Created ${publicDirectory}/other.txt` }],
+    });
+  });
+
   it.each([
     null,
     { directory: '/' },

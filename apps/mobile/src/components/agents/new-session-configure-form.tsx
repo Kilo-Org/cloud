@@ -55,7 +55,8 @@ type NewSessionProfileOverrideProps = {
   onOpenRepoDefaults?: () => void;
   /**
    * The Organization section above Run on: the active account the create is
-   * attributed to. Undefined hides the section entirely (the clone entry).
+   * attributed to. The body renders it for every entry point — switchable on
+   * the ordinary entry, a read-only scope row on the clone entry.
    */
   organizationSection?: React.ReactNode;
 };

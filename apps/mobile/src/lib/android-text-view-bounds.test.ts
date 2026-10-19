@@ -128,6 +128,15 @@ describe('Android text-view bounds plugin', () => {
     expect(appThemeItems).toHaveLength(1);
   });
 
+  it('leaves the input text style alone', () => {
+    // EditText resolves android:editTextStyle, a separate attribute. Writing it
+    // would change field metrics and text appearance for no reason.
+    const { mod } = captureStylesMod();
+    const result = mod({ modResults: appThemeTree() });
+    const allItems = result.modResults.resources.style.flatMap(style => style.item ?? []);
+    expect(allItems.some(item => item.$?.name === 'android:editTextStyle')).toBe(false);
+  });
+
   it('returns the tree unchanged when the activity theme is absent', () => {
     const { mod } = captureStylesMod();
     const tree: StylesTree = {

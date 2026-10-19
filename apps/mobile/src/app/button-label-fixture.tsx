@@ -51,6 +51,10 @@ export default function ButtonLabelFixtureRoute() {
             <Text>{hi.agentChat.session.continueInNewSession}</Text>
           </Button>
         </View>
+        <Text>Italic · glyph overhang</Text>
+        <Button variant="outline">
+          <Text className="italic">Italic overhang label</Text>
+        </Button>
         <Text>Loading · tap to toggle</Text>
         <Button loading={loading}>
           <Text>{hi.profiles.newProfile}</Text>

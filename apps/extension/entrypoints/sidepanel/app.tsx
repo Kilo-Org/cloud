@@ -130,12 +130,12 @@ export const App = (): JSX.Element => {
 
       return pollDeviceAuthCode({
         apiBaseUrl,
-        code: pendingAuthRequest.code,
+        deviceCode: pendingAuthRequest.deviceCode,
         fetch: fetchFromWindow,
         signal,
       });
     },
-    queryKey: ['side-panel', 'device-auth', pendingAuthRequest?.code ?? 'idle'],
+    queryKey: ['side-panel', 'device-auth', pendingAuthRequest?.deviceCode ?? 'idle'],
     refetchInterval: pendingAuthRequest === undefined ? false : pollIntervalMs,
   });
 

@@ -24,6 +24,7 @@ export type FetchLike = (input: string, init?: RequestInit) => MaybePromise<Resp
 
 export interface DeviceAuthRequest {
   readonly code: string;
+  readonly deviceCode: string;
   readonly verificationUrl: string;
 }
 
@@ -51,7 +52,7 @@ interface ApiClientOptions {
 }
 
 interface PollDeviceAuthCodeOptions extends ApiClientOptions {
-  readonly code: string;
+  readonly deviceCode: string;
   readonly signal?: AbortSignal;
 }
 
@@ -66,10 +67,17 @@ const storedAuthSchema = z.object({
   token: nonEmptyStringSchema,
   userEmail: nonEmptyStringSchema.optional(),
 });
-const deviceAuthRequestSchema = z.object({
-  code: nonEmptyStringSchema,
-  verificationUrl: nonEmptyStringSchema,
-});
+const deviceAuthRequestSchema = z
+  .object({
+    code: nonEmptyStringSchema,
+    device_code: nonEmptyStringSchema,
+    verificationUrl: nonEmptyStringSchema,
+  })
+  .transform(({ code, device_code, verificationUrl }) => ({
+    code,
+    deviceCode: device_code,
+    verificationUrl,
+  }));
 const userResponseSchema = z.object({
   google_user_email: nonEmptyStringSchema.optional(),
 });
@@ -158,13 +166,18 @@ export const createDeviceAuthRequest = async ({
 
 export const pollDeviceAuthCode = async ({
   apiBaseUrl,
-  code,
+  deviceCode,
   fetch,
   signal,
 }: PollDeviceAuthCodeOptions): Promise<DeviceAuthPollResult> => {
-  const requestInit: RequestInit = signal === undefined ? {} : { signal };
+  const requestInit: RequestInit = {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceCode }),
+    method: 'POST',
+    ...(signal === undefined ? {} : { signal }),
+  };
   const response = await fetch(
-    `${trimTrailingSlash(apiBaseUrl)}/api/device-auth/codes/${encodeURIComponent(code)}`,
+    `${trimTrailingSlash(apiBaseUrl)}/api/device-auth/token`,
     requestInit
   );
 

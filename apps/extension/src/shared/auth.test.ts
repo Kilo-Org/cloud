@@ -138,6 +138,7 @@ describe('device auth API client', () => {
       return jsonResponse(
         {
           code: 'ABCD-2345',
+          device_code: 'base64url-device-secret',
           verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
         },
         { status: 200 }
@@ -148,17 +149,24 @@ describe('device auth API client', () => {
       createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai/', fetch })
     ).resolves.toStrictEqual({
       code: 'ABCD-2345',
+      deviceCode: 'base64url-device-secret',
       verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
     });
     expect(seenRequests).toStrictEqual(['https://app.kilo.ai/api/device-auth/codes?app=1']);
   });
 
-  it('maps poll status codes to pending, approved, denied, and expired states', async () => {
+  it('maps token-endpoint status codes to pending, approved, denied, and expired states', async () => {
+    const seenRequests: string[] = [];
+    const seenBodies: unknown[] = [];
     const pollWithResponse = (response: Response) =>
       pollDeviceAuthCode({
         apiBaseUrl: 'https://app.kilo.ai',
-        code: 'ABCD-2345',
-        fetch: () => response,
+        deviceCode: 'base64url-device-secret',
+        fetch: (input, init) => {
+          seenRequests.push(String(input));
+          seenBodies.push(init?.body);
+          return response;
+        },
       });
 
     await expect(
@@ -178,6 +186,13 @@ describe('device auth API client', () => {
     await expect(
       pollWithResponse(jsonResponse({ status: 'expired' }, { status: 410 }))
     ).resolves.toStrictEqual({ status: 'expired' });
+    expect(seenRequests).toHaveLength(4);
+    for (const requestUrl of seenRequests) {
+      expect(requestUrl).toContain('/api/device-auth/token');
+    }
+    expect(seenBodies).toStrictEqual(
+      Array(4).fill(JSON.stringify({ deviceCode: 'base64url-device-secret' }))
+    );
   });
 
   it('validates stored tokens with the user endpoint', async () => {

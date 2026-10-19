@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} реда",
       "matchesBadge_one": "{{displayCount}} съвпадение",
       "matchesBadge_other": "{{displayCount}} съвпадения",
-      "noOutput": "Няма изход."
+      "noOutput": "Няма изход.",
+      "translationFailed": "Преводът не бе успешен"
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",

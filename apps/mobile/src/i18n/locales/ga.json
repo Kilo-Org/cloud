@@ -2374,7 +2374,8 @@
       "matchesBadge_two": "{{displayCount}} toradh",
       "matchesBadge_few": "{{displayCount}} toradh",
       "matchesBadge_many": "{{displayCount}} toradh",
-      "noOutput": "Níl aon aschur ann."
+      "noOutput": "Níl aon aschur ann.",
+      "translationFailed": "Theip ar an aistriúchán"
     },
     "readToolMarkdown": {
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",

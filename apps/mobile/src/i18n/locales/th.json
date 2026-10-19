@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} บรรทัด",
       "matchesBadge_one": "พบ {{displayCount}} รายการ",
       "matchesBadge_other": "พบ {{displayCount}} รายการ",
-      "noOutput": "ไม่มีเอาต์พุต"
+      "noOutput": "ไม่มีเอาต์พุต",
+      "translationFailed": "การแปลล้มเหลว"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",

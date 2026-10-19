@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} liñas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
-      "noOutput": "Non hai saída."
+      "noOutput": "Non hai saída.",
+      "translationFailed": "Fallou a tradución"
     },
     "readToolMarkdown": {
       "linesTruncated": "liñas {{start}}–{{end}} (contido truncado)",

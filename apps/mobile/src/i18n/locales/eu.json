@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
       "matchesBadge_other": "{{displayCount}} bat etortze",
-      "noOutput": "Irteerarik ez."
+      "noOutput": "Irteerarik ez.",
+      "translationFailed": "Itzulpena huts egin du"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",

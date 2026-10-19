@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} treff",
       "matchesBadge_other": "{{displayCount}} treff",
-      "noOutput": "Ingen utdata."
+      "noOutput": "Ingen utdata.",
+      "translationFailed": "Oversettelse mislyktes"
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (avkortet)",

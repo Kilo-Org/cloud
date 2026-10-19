@@ -1766,7 +1766,8 @@
       "linesBadge_other": "{{displayCount}} regels",
       "matchesBadge_one": "{{displayCount}} treffer",
       "matchesBadge_other": "{{displayCount}} treffers",
-      "noOutput": "Geen uitvoer."
+      "noOutput": "Geen uitvoer.",
+      "translationFailed": "Vertaling mislukt"
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",

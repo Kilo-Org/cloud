@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} տող",
       "matchesBadge_one": "{{displayCount}} համընկնում",
       "matchesBadge_other": "{{displayCount}} համընկնում",
-      "noOutput": "Ելք չկա։"
+      "noOutput": "Ելք չկա։",
+      "translationFailed": "Թարգմանությունը ձախողվեց"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",

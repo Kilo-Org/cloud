@@ -2342,7 +2342,8 @@
       "matchesBadge_other": "супадзенняў: {{displayCount}}",
       "matchesBadge_few": "супадзенні: {{displayCount}}",
       "matchesBadge_many": "супадзенняў: {{displayCount}}",
-      "noOutput": "Няма вываду."
+      "noOutput": "Няма вываду.",
+      "translationFailed": "Пераклад не ўдаўся"
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",

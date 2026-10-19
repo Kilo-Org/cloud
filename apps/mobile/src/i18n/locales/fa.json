@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} خط",
       "matchesBadge_one": "{{displayCount}} تطابق",
       "matchesBadge_other": "{{displayCount}} تطابق",
-      "noOutput": "هیچ خروجی وجود ندارد."
+      "noOutput": "هیچ خروجی وجود ندارد.",
+      "translationFailed": "ترجمه ناموفق بود"
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",

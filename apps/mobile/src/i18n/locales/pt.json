@@ -2310,7 +2310,8 @@
       "matchesBadge_one": "{{displayCount}} correspondência",
       "matchesBadge_other": "{{displayCount}} correspondências",
       "matchesBadge_many": "{{displayCount}} correspondências",
-      "noOutput": "Sem saída."
+      "noOutput": "Sem saída.",
+      "translationFailed": "Falha na tradução"
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",

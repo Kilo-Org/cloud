@@ -2278,7 +2278,8 @@
       "linesBadge_other": "පේළි {{displayCount}}",
       "matchesBadge_one": "ගැළපීම් {{displayCount}}",
       "matchesBadge_other": "ගැළපීම් {{displayCount}}",
-      "noOutput": "ප්රතිදානයක් නැත."
+      "noOutput": "ප්රතිදානයක් නැත.",
+      "translationFailed": "පරිවර්තනය අසාර්ථක විය"
     },
     "readToolMarkdown": {
       "linesTruncated": "පේළි {{start}}–{{end}} (කෙටි කර ඇත)",

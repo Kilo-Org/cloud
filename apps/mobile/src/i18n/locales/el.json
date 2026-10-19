@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} γραμμές",
       "matchesBadge_one": "{{displayCount}} αντιστοιχία",
       "matchesBadge_other": "{{displayCount}} αντιστοιχίες",
-      "noOutput": "Δεν υπάρχει έξοδος."
+      "noOutput": "Δεν υπάρχει έξοδος.",
+      "translationFailed": "Η μετάφραση απέτυχε"
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",

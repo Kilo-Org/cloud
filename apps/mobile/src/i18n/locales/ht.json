@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} liy",
       "matchesBadge_one": "{{displayCount}} rezilta",
       "matchesBadge_other": "{{displayCount}} rezilta",
-      "noOutput": "Pa gen rezilta."
+      "noOutput": "Pa gen rezilta.",
+      "translationFailed": "Tradiksyon echwe"
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",

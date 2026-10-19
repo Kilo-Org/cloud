@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} sətir",
       "matchesBadge_one": "{{displayCount}} uyğunluq",
       "matchesBadge_other": "{{displayCount}} uyğunluq",
-      "noOutput": "Çıxış yoxdur."
+      "noOutput": "Çıxış yoxdur.",
+      "translationFailed": "Tərcümə alınmadı"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",

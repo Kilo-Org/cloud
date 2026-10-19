@@ -1751,7 +1751,8 @@
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
       "matchesBadge_many": "{{displayCount}} corrispondenze",
-      "noOutput": "Nessun output."
+      "noOutput": "Nessun output.",
+      "translationFailed": "Traduzione non riuscita"
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",

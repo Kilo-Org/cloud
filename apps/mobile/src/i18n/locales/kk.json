@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} жол",
       "matchesBadge_one": "{{displayCount}} сәйкестік",
       "matchesBadge_other": "{{displayCount}} сәйкестік",
-      "noOutput": "Шығыс жоқ."
+      "noOutput": "Шығыс жоқ.",
+      "translationFailed": "Аударма сәтсіз болды"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} жолдары (қысқартылған)",

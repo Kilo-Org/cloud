@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} መስመሮች",
       "matchesBadge_one": "{{displayCount}} ተዛማጅ",
       "matchesBadge_other": "{{displayCount}} ተዛማጆች",
-      "noOutput": "ምንም ውጤት የለም።"
+      "noOutput": "ምንም ውጤት የለም።",
+      "translationFailed": "ትርጉም አልተሳካም"
     },
     "readToolMarkdown": {
       "linesTruncated": "መስመሮች {{start}}–{{end}} (በከፊል የታዩ)",

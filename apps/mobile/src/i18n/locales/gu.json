@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} પંક્તિઓ",
       "matchesBadge_one": "{{displayCount}} મેળ",
       "matchesBadge_other": "{{displayCount}} મેળ",
-      "noOutput": "કોઈ આઉટપુટ નથી."
+      "noOutput": "કોઈ આઉટપુટ નથી.",
+      "translationFailed": "અનુવાદ નિષ્ફળ ગયો"
     },
     "readToolMarkdown": {
       "linesTruncated": "પંક્તિઓ {{start}}–{{end}} (ટૂંકાવેલી)",

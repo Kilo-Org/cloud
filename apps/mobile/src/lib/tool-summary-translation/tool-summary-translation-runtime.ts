@@ -113,6 +113,15 @@ const MAX_IN_FLIGHT_BATCHES = 2;
  * keeps that memory bounded to more than any single screen shows.
  */
 const MAX_RETRYABLE_ENTRIES = 200;
+/**
+ * Failed batches after which a summary is considered exhausted: the row stops
+ * reporting `pending` and surfaces the localized failure state instead of
+ * silently holding the English source for the rest of the mount. The count is
+ * consecutive per continuously mounted row: it clears on a resolution, on the
+ * surface releasing the summary (remount, supersede), and on a config change —
+ * so any of those re-arms the full cadence.
+ */
+export const TOOL_SUMMARY_TRANSLATION_MAX_FAILURES = 3;
 
 let config: ToolSummaryTranslationConfig = {
   enabled: false,
@@ -132,6 +141,13 @@ const queue: QueueItem[] = [];
 // so at most one text per part is remembered. Insertion order is oldest-first,
 // so eviction is `keys().next()`.
 const retryable = new Map<string, QueueItem>();
+// Consecutive failed batch outcomes per key. `runBatch` bumps each served
+// key's count when the batch produced no translation for it and clears it on
+// success. A count reaching {@link TOOL_SUMMARY_TRANSLATION_MAX_FAILURES}
+// marks the key exhausted: mounted rows render the localized failure state
+// instead of an unbounded silent wait. Cleared on success, config change,
+// sign-out, and each re-queue from a reconnect edge.
+const failureCounts = new Map<string, number>();
 // The keys the queue currently holds. A mounted row re-asks on its own cadence
 // while its summary is unresolved, and a summary parked behind the batch window
 // or the in-flight cap is neither cached nor in flight, so without this each
@@ -301,6 +317,7 @@ function forgetSupersededEntries(
       !surfaceInterest.has(remembered)
     ) {
       retryable.delete(remembered);
+      failureCounts.delete(remembered);
     }
   }
   for (let index = queue.length - 1; index >= 0; index -= 1) {
@@ -464,6 +481,7 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   queued.clear();
   inFlight.clear();
   retryable.clear();
+  failureCounts.clear();
   // The hook effect re-runs for every active row (its deps carry the config),
   // so interest re-registers under the new generation.
   surfaceInterest.clear();
@@ -474,6 +492,26 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   }
   version += 1;
   emit();
+}
+
+/**
+ * True when the key's shared retry budget is spent: the batches that carried
+ * this summary failed {@link TOOL_SUMMARY_TRANSLATION_MAX_FAILURES} times
+ * without a translation, so a mounted row may surface the localized failure
+ * state instead of holding `pending` forever. Not final — a resolution, the
+ * surface releasing the summary, or a config change clears the budget.
+ */
+// eslint-disable-next-line max-params -- the language, model, part id and source text form the key, like `getTranslation`
+export function isTranslationFailed(
+  itemId: string,
+  text: string,
+  language: string,
+  modelId: string
+): boolean {
+  return (
+    (failureCounts.get(translationKey(language, modelId, itemId, text)) ?? 0) >=
+    TOOL_SUMMARY_TRANSLATION_MAX_FAILURES
+  );
 }
 
 // eslint-disable-next-line max-params -- the part id, source text, language and model are the lookup key
@@ -504,6 +542,7 @@ function remember(resolved: ResolvedTranslation[]): void {
     cache.set(key, { translation, text, expiresAt });
     // Resolved: it is no longer a retry candidate.
     retryable.delete(key);
+    failureCounts.delete(key);
   }
   version += 1;
   emit();
@@ -602,6 +641,28 @@ async function runBatch(batch: FlushBatch): Promise<void> {
   for (const item of batch.items) {
     inFlight.set(item.key, token);
   }
+  // Count the batch outcome per served key: a key the batch could not
+  // translate (null entry, stale generation, or a thrown request) moves one
+  // step toward exhaustion. Runs on every path — the success path and a
+  // thrown or unreachable request — so a gateway outage reaches exhaustion
+  // like a malformed reply does. Keys in `resolved` are skipped: `remember`
+  // cleared them.
+  const countFailures = (resolvedKeys: ReadonlySet<string>): void => {
+    let exhausted = false;
+    for (const item of batch.items) {
+      if (item.generation === generation && !resolvedKeys.has(item.key)) {
+        const next = (failureCounts.get(item.key) ?? 0) + 1;
+        failureCounts.set(item.key, next);
+        if (next >= TOOL_SUMMARY_TRANSLATION_MAX_FAILURES) {
+          exhausted = true;
+        }
+      }
+    }
+    if (exhausted) {
+      version += 1;
+      emit();
+    }
+  };
   try {
     const { requestToolSummaryTranslations } = await loadClient();
     const results = await requestToolSummaryTranslations({
@@ -632,9 +693,12 @@ async function runBatch(batch: FlushBatch): Promise<void> {
         }
       }
     }
+    const resolvedKeys = new Set(resolved.map(entry => entry.key));
+    countFailures(resolvedKeys);
     remember(resolved);
   } catch {
     // Leave it uncached; the original summary stays visible (layout is fixed).
+    countFailures(new Set());
   } finally {
     activeBatches -= 1;
     // Delete only this request's entries: a config change clears the map and a
@@ -727,7 +791,18 @@ export function ensureTranslation(input: {
       retryable.delete(oldest);
     }
   }
+  // A re-ask under a fresh surface (row remount, config change) gets a fresh
+  // failure budget — but only when the failure memory was released in between.
+  // A continuously mounted row re-asks on its own retry tick while the runtime
+  // still remembers the unresolved summary; resetting there would spend the
+  // budget anew on every tick and exhaustion would never be reached. The
+  // release path (`releaseTranslationInterest`) drops the count, so a genuine
+  // remount starts from zero.
+  const wasRemembered = retryable.has(key);
   retryable.set(key, item);
+  if (!wasRemembered) {
+    failureCounts.delete(key);
+  }
   if (inFlight.has(key) || queued.has(key)) {
     return;
   }
@@ -766,6 +841,7 @@ export function releaseTranslationInterest(input: {
   // summary no row shows any more; a copy still waiting for a slot is dropped
   // from the queue for the same reason.
   retryable.delete(key);
+  failureCounts.delete(key);
   if (queued.delete(key)) {
     for (let index = queue.length - 1; index >= 0; index -= 1) {
       if (queue[index]?.key === key) {
@@ -786,7 +862,10 @@ export function releaseTranslationInterest(input: {
  * attempt settles unresolved, and drops them if it resolves them, while a key
  * the queue already holds is not stacked a second time. The opt-in lifecycle
  * needs no check here: `setConfig` clears this memory on any change, so what
- * remains was asked for under the current configuration.
+ * remains was asked for under the current configuration. A key whose failure
+ * budget was spent keeps its exhausted state through this re-queue: the
+ * mounted row stays in the localized failure state until a batch resolves it,
+ * the surface releases the summary, or the configuration changes.
  */
 export function retryUnresolvedTranslations(): void {
   if (retryable.size === 0) {
@@ -821,6 +900,7 @@ export function clearToolSummaryTranslationMemory(): void {
   queued.clear();
   inFlight.clear();
   retryable.clear();
+  failureCounts.clear();
   cache.clear();
   surfaceInterest.clear();
   version += 1;

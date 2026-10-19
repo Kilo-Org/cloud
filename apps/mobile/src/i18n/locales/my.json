@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} ကြောင်း",
       "matchesBadge_one": "ကိုက်ညီမှု {{displayCount}} ခု",
       "matchesBadge_other": "ကိုက်ညီမှု {{displayCount}} ခု",
-      "noOutput": "အထွက် မရှိပါ။"
+      "noOutput": "အထွက် မရှိပါ။",
+      "translationFailed": "ဘာသာပြန်မှု မအောင်မြင်ပါ"
     },
     "readToolMarkdown": {
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အပြည့်အစုံမဟုတ်)",

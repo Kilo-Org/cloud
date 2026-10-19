@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} qator",
       "matchesBadge_one": "{{displayCount}} natija",
       "matchesBadge_other": "{{displayCount}} natija",
-      "noOutput": "Chiqish yo'q."
+      "noOutput": "Chiqish yo'q.",
+      "translationFailed": "Tarjima muvaffaqiyatsiz"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}-qatorlar (qisqartirilgan)",

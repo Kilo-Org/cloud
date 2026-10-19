@@ -1798,7 +1798,8 @@
       "matchesBadge_other": "dopasowania: {{displayCount}}",
       "matchesBadge_few": "dopasowania: {{displayCount}}",
       "matchesBadge_many": "dopasowań: {{displayCount}}",
-      "noOutput": "Brak wyjścia."
+      "noOutput": "Brak wyjścia.",
+      "translationFailed": "Tłumaczenie nie powiodło się"
     },
     "readToolMarkdown": {
       "linesTruncated": "wiersze {{start}}–{{end}} (skrócono)",

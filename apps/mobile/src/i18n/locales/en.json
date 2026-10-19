@@ -2278,7 +2278,8 @@
       "matchesBadge_one": "{{displayCount}} match",
       "matchesBadge": "{{displayCount}} matches",
       "matchesBadge_other": "{{displayCount}} matches",
-      "noOutput": "No output."
+      "noOutput": "No output.",
+      "translationFailed": "Translation failed"
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",

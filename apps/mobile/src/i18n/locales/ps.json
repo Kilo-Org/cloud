@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} کرښې",
       "matchesBadge_one": "{{displayCount}} پایلې",
       "matchesBadge_other": "{{displayCount}} پایلې",
-      "noOutput": "هېڅ پایلې نشته."
+      "noOutput": "هېڅ پایلې نشته.",
+      "translationFailed": "ژباړه ناکامه شوه"
     },
     "readToolMarkdown": {
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",

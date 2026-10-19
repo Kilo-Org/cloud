@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} سطریں",
       "matchesBadge_one": "{{displayCount}} مماثلت",
       "matchesBadge_other": "{{displayCount}} مماثلتیں",
-      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔",
+      "translationFailed": "ترجمہ ناکام رہا"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",

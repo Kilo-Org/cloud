@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} riviä",
       "matchesBadge_one": "{{displayCount}} osuma",
       "matchesBadge_other": "{{displayCount}} osumaa",
-      "noOutput": "Ei tulostetta."
+      "noOutput": "Ei tulostetta.",
+      "translationFailed": "Käännös epäonnistui"
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",

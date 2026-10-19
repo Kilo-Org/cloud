@@ -1766,7 +1766,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 筆相符結果",
       "matchesBadge_other": "{{displayCount}} 筆相符結果",
-      "noOutput": "沒有輸出。"
+      "noOutput": "沒有輸出。",
+      "translationFailed": "翻譯失敗"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",

@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} पङ्क्ति",
       "matchesBadge_one": "{{displayCount}} नतिजा",
       "matchesBadge_other": "{{displayCount}} नतिजा",
-      "noOutput": "कुनै आउटपुट छैन।"
+      "noOutput": "कुनै आउटपुट छैन।",
+      "translationFailed": "अनुवाद असफल भयो"
     },
     "readToolMarkdown": {
       "linesTruncated": "पङ्क्ति {{start}}–{{end}} (केही अंश काटिएको)",

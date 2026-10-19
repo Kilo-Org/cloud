@@ -6,6 +6,7 @@ import {
   ensureTranslation,
   getConfig,
   getTranslation,
+  isTranslationFailed,
   releaseTranslationInterest,
   retryUnresolvedTranslations,
   subscribe,
@@ -15,6 +16,12 @@ import {
 export type ToolSummaryTranslation = {
   text: string;
   pending: boolean;
+  /**
+   * True when the translation failed enough times to exhaust the shared retry
+   * budget: the row keeps the original text and may surface the localized
+   * failure state. Not final — a reconnect edge resets the budget.
+   */
+  failed: boolean;
 };
 
 /**
@@ -146,12 +153,15 @@ function armTranslationRetry(): () => void {
  * reactive value, so the row re-renders when it lands. `FixedPartRow` is
  * single-line, so the swap cannot shift layout.
  *
- * `pending` is true only while translation is on for this text and the runtime
- * holds no translation for it, but the row joins the shared retry while it stays
- * mounted: a request that failed (or timed out) leaves the runtime uncached, so
- * the row retries it rather than reporting the missing summary as final. A row
+ * `pending` is true only while translation is on for this text, the runtime
+ * holds no translation for it, and the shared retry budget is not spent. A
+ * request that failed (or timed out) leaves the runtime uncached, so the row
+ * retries it rather than reporting the missing summary as final — until the
+ * budget is exhausted (`failed`): then `pending` drops, the caller shows the
+ * original text plus the localized failure state instead of an unbounded wait,
+ * and a reconnect edge or a later resolution re-arms the normal cadence. A row
  * that embeds the summary in a sentence of its own (`CondensedToolRunRow`) has
- * nowhere to put the original English while it waits, so it reads this flag
+ * nowhere to put the original English while it waits, so it reads `pending`
  * instead of the fallback text.
  */
 export function useToolSummaryTranslation(
@@ -166,6 +176,9 @@ export function useToolSummaryTranslation(
   const getSnapshot = (): string | undefined =>
     active ? getTranslation(itemId ?? '', text, language, config.model.id) : undefined;
   const translated = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const getFailedSnapshot = (): boolean =>
+    active && isTranslationFailed(itemId ?? '', text, language, config.model.id);
+  const failed = useSyncExternalStore(subscribe, getFailedSnapshot, getFailedSnapshot);
 
   useEffect(() => {
     if (!active) {
@@ -197,7 +210,11 @@ export function useToolSummaryTranslation(
     };
   }, [active, itemId, text, language, config.model, translated]);
 
-  return { text: translated ?? text, pending: active && translated === undefined };
+  return {
+    text: translated ?? text,
+    pending: active && translated === undefined && !failed,
+    failed,
+  };
 }
 
 /**

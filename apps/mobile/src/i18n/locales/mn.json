@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} мөр",
       "matchesBadge_one": "{{displayCount}} илэрц",
       "matchesBadge_other": "{{displayCount}} илэрц",
-      "noOutput": "Гаралт байхгүй."
+      "noOutput": "Гаралт байхгүй.",
+      "translationFailed": "Орчуулга амжилтгүй боллоо"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",

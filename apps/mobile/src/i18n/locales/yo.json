@@ -2278,7 +2278,8 @@
       "linesBadge_other": "ìlà {{displayCount}}",
       "matchesBadge_one": "ìbámu {{displayCount}}",
       "matchesBadge_other": "ìbámu {{displayCount}}",
-      "noOutput": "Kò sí ìjáde."
+      "noOutput": "Kò sí ìjáde.",
+      "translationFailed": "Ìtumọ kùnà"
     },
     "readToolMarkdown": {
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",

@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} rreshta",
       "matchesBadge_one": "{{displayCount}} përputhje",
       "matchesBadge_other": "{{displayCount}} përputhje",
-      "noOutput": "Nuk ka dalje."
+      "noOutput": "Nuk ka dalje.",
+      "translationFailed": "Përkthimi dështoi"
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",

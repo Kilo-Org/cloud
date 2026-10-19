@@ -2278,7 +2278,8 @@
       "linesBadge_other": "{{displayCount}} വരികൾ",
       "matchesBadge_one": "{{displayCount}} പൊരുത്തം",
       "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ",
-      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല."
+      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല.",
+      "translationFailed": "പരിഭാഷ പരാജയപ്പെട്ടു"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} വരികൾ (ഭാഗികം)",

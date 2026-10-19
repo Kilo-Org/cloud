@@ -1766,7 +1766,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 项匹配",
       "matchesBadge_other": "{{displayCount}} 项匹配",
-      "noOutput": "没有输出。"
+      "noOutput": "没有输出。",
+      "translationFailed": "翻译失败"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",

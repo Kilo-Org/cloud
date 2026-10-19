@@ -2278,7 +2278,8 @@
       "linesBadge_other": "ahịrị {{displayCount}}",
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
       "matchesBadge_other": "ndakọrịta {{displayCount}}",
-      "noOutput": "Enweghị mpụta."
+      "noOutput": "Enweghị mpụta.",
+      "translationFailed": "Ọsịsa agaghị"
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",

@@ -2153,7 +2153,8 @@
       "linesBadge_other": "{{displayCount}} पंक्तियाँ",
       "matchesBadge_one": "{{displayCount}} मिलान",
       "matchesBadge_other": "{{displayCount}} मिलान",
-      "noOutput": "कोई आउटपुट नहीं है।"
+      "noOutput": "कोई आउटपुट नहीं है।",
+      "translationFailed": "अनुवाद विफल हुआ"
     },
     "autoApprove": {
       "title": "स्वतः अनुमोदन",

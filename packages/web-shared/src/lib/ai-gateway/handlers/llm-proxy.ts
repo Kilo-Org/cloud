@@ -37,7 +37,7 @@ import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
+  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
@@ -659,8 +659,9 @@ export async function handleLlmProxyRequest(
       return invalidTokenResponse();
     }
 
-    // No valid auth
-    if (!(await isFreeModel(effectiveModelIdLowerCased))) {
+    // No valid auth. Anonymous callers can never use a custom LLM, so a custom
+    // LLM id must not look free here: that would reveal that the id exists.
+    if (!isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased)) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -902,7 +903,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !(await isFreeModel(effectiveModelIdLowerCased)) &&
+      !isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased) &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {

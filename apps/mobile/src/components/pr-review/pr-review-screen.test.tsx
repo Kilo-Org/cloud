@@ -69,6 +69,7 @@ vi.mock('expo-router', () => ({
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
+  BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',

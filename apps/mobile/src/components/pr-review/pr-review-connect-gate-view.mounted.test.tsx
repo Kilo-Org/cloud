@@ -92,6 +92,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
+  BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Platform: platform,
   View: 'View',
 }));

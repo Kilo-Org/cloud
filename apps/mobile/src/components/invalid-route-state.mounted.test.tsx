@@ -1,7 +1,7 @@
 // A route that failed parameter validation is a terminal screen, so its only
-// control must never strand the user: Back returns to the screen they came
-// from when the app still holds that history, and replaces the route with the
-// declared in-app parent when it does not (a cold deep link).
+// control must not guess: it replaces with the in-app parent its caller chose.
+// `canGoBack()` cannot be trusted here — a cold deep link renders on top of the
+// tab anchor, so it reports history the user never had.
 
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -69,16 +69,16 @@ afterEach(() => {
 });
 
 describe('InvalidRouteState Back', () => {
-  it('pops back to the screen the user came from', () => {
-    router.canGoBack.mockReturnValue(true);
+  it('replaces the route with its declared in-app parent', () => {
+    router.canGoBack.mockReturnValue(false);
     pressBack(mount());
 
-    expect(router.back).toHaveBeenCalledOnce();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
+    expect(router.back).not.toHaveBeenCalled();
   });
 
-  it('replaces the route with its in-app parent when there is no history', () => {
-    router.canGoBack.mockReturnValue(false);
+  it('does not pop even when the anchor makes canGoBack report history', () => {
+    router.canGoBack.mockReturnValue(true);
     pressBack(mount());
 
     expect(router.replace).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');

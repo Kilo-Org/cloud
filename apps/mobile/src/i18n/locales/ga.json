@@ -620,6 +620,7 @@
     "checkConnection": "Seiceáil an nasc",
     "couldNotLoadPullRequest": "Níorbh fhéidir an t-iarratas tarraingthe a lódáil.",
     "reviewServiceUnavailable": "Níl an tseirbhís ar fáil",
+    "reviewServiceUnavailableDescription": "Níl an tseirbhís ar fáil go sealadach. Bain triail as arís gan mhoill.",
     "description": "Cur síos",
     "noDescriptionProvided": "Níor soláthraíodh aon chur síos.",
     "review": "Athbhreithniú",

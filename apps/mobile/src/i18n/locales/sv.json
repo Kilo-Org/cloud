@@ -587,6 +587,7 @@
     "checkConnection": "Kontrollera anslutningen",
     "couldNotLoadPullRequest": "Kunde inte läsa in PR:en.",
     "reviewServiceUnavailable": "Tjänsten är otillgänglig",
+    "reviewServiceUnavailableDescription": "Tjänsten är tillfälligt otillgänglig. Försök igen om en stund.",
     "description": "Beskrivning",
     "noDescriptionProvided": "Ingen beskrivning har angetts.",
     "review": "Granskning",

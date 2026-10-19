@@ -587,6 +587,7 @@
     "checkConnection": "კავშირის შემოწმება",
     "couldNotLoadPullRequest": "შერწყმის მოთხოვნის ჩატვირთვა ვერ მოხერხდა.",
     "reviewServiceUnavailable": "სერვისი მიუწვდომელია",
+    "reviewServiceUnavailableDescription": "სერვისი დროებით მიუწვდომელია. სცადეთ ხელახლა მალე.",
     "description": "აღწერა",
     "noDescriptionProvided": "აღწერა არ არის დამატებული.",
     "review": "შემოწმება",

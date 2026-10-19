@@ -587,6 +587,7 @@
     "checkConnection": "Έλεγχος σύνδεσης",
     "couldNotLoadPullRequest": "Δεν ήταν δυνατή η φόρτωση του αιτήματος ενσωμάτωσης.",
     "reviewServiceUnavailable": "Η υπηρεσία δεν είναι διαθέσιμη",
+    "reviewServiceUnavailableDescription": "Η υπηρεσία είναι προσωρινά μη διαθέσιμη. Δοκιμάστε ξανά σε λίγο.",
     "description": "Περιγραφή",
     "noDescriptionProvided": "Δεν έχει προστεθεί περιγραφή.",
     "review": "Έλεγχος",

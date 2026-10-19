@@ -587,6 +587,7 @@
     "checkConnection": "پشکنینی پەیوەندی",
     "couldNotLoadPullRequest": "نەتوانرا داواکاری ڕاکێشان بار بکرێت.",
     "reviewServiceUnavailable": "خزمەتگوزاری بەردەست نییە",
+    "reviewServiceUnavailableDescription": "خزمەتگوزاری کاتی بەردەست نییە. دووبارە هەوڵ بدەوە.",
     "description": "وەسف",
     "noDescriptionProvided": "هیچ وەسفێک نەدراوە.",
     "review": "پێداچوونەوە",

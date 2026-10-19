@@ -2507,6 +2507,7 @@
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",
     "reviewServiceUnavailable": "Dịch vụ không khả dụng",
+    "reviewServiceUnavailableDescription": "Dịch vụ tạm thời không khả dụng. Vui lòng thử lại sau.",
     "couldNotOpenGitHubAppSettings": "Không thể mở cài đặt ứng dụng GitHub.",
     "description": "Mô tả",
     "discussion": {

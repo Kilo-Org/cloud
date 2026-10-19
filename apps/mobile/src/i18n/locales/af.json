@@ -587,6 +587,7 @@
     "checkConnection": "Kontroleer verbinding",
     "couldNotLoadPullRequest": "Kon nie die trekversoek laai nie.",
     "reviewServiceUnavailable": "Diens onbeskikbaar",
+    "reviewServiceUnavailableDescription": "Die diens is tydelik onbeskikbaar. Probeer binnekort weer.",
     "description": "Beskrywing",
     "noDescriptionProvided": "Geen beskrywing is verskaf nie.",
     "review": "Hersiening",

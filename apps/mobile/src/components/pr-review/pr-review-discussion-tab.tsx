@@ -487,6 +487,7 @@ export function PrReviewDiscussionTab({
         <QueryError
           variant="server"
           title={t('prReview.reviewServiceUnavailable')}
+          message={t('prReview.reviewServiceUnavailableDescription')}
           onRetry={() => {
             void query.refetch();
           }}

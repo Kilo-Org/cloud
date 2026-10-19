@@ -587,6 +587,7 @@
     "checkConnection": "Ստուգել կապը",
     "couldNotLoadPullRequest": "Չհաջողվեց բեռնել միավորման հարցումը։",
     "reviewServiceUnavailable": "Ծառայությունը հասանելի չէ",
+    "reviewServiceUnavailableDescription": "Ծառայությունը ժամանակավոր հասանելի չէ։ Փորձեք կրկին շուտով։",
     "description": "Նկարագրություն",
     "noDescriptionProvided": "Նկարագրություն չկա։",
     "review": "Ստուգում",

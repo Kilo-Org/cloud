@@ -587,6 +587,7 @@
     "checkConnection": "Kapcsolat ellenőrzése",
     "couldNotLoadPullRequest": "Nem sikerült betölteni a módosítási kérelmet.",
     "reviewServiceUnavailable": "A szolgáltatás nem érhető el",
+    "reviewServiceUnavailableDescription": "A szolgáltatás átmenetileg nem érhető el. Rövidesen próbálja újra.",
     "description": "Leírás",
     "noDescriptionProvided": "Nincs megadva leírás.",
     "review": "Ellenőrzés",

@@ -587,6 +587,7 @@
     "checkConnection": "ກວດສອບການເຊື່ອມຕໍ່",
     "couldNotLoadPullRequest": "ບໍ່ສາມາດໂຫຼດຄຳຂໍລວມໂຄດໄດ້.",
     "reviewServiceUnavailable": "ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້",
+    "reviewServiceUnavailableDescription": "ບໍລິການຊົ່ວຄາວບໍ່ສາມາດໃຊ້ໄດ້. ກະລຸນາລອງໃໝ່ອີກຄັ້ງໃນບໍ່ດົນ.",
     "description": "ຄຳອະທິບາຍ",
     "noDescriptionProvided": "ບໍ່ມີຄຳອະທິບາຍ.",
     "review": "ການກວດສອບ",

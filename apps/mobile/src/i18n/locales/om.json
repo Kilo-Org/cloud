@@ -587,6 +587,7 @@
     "checkConnection": "Walitti hidhamiinsa ilaali",
     "couldNotLoadPullRequest": "Gaaffii walitti makuu fe'uu hin danda'amne.",
     "reviewServiceUnavailable": "Tajaajila hin argamne",
+    "reviewServiceUnavailableDescription": "Tajaajiliin kuufamaan hin argamne. Yeroo gabaabaa booda irra deebi'i yaali.",
     "description": "Ibsa",
     "noDescriptionProvided": "Ibsi hin kennamne.",
     "review": "Sakatta'a",

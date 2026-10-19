@@ -587,6 +587,7 @@
     "checkConnection": "കണക്ഷൻ പരിശോധിക്കുക",
     "couldNotLoadPullRequest": "പുൾ റിക്വസ്റ്റ് ലോഡ് ചെയ്യാനായില്ല.",
     "reviewServiceUnavailable": "സേവനം ലഭ്യമല്ല",
+    "reviewServiceUnavailableDescription": "സേവനം താൽക്കാലികമായി ലഭ്യമല്ല. ഉടൻ വീണ്ടും ശ്രമിക്കുക.",
     "description": "വിവരണം",
     "noDescriptionProvided": "വിവരണം നൽകിയിട്ടില്ല.",
     "review": "പരിശോധന",

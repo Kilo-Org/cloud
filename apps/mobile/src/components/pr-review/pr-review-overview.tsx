@@ -216,6 +216,11 @@ export function PrReviewOverview({
         refreshControl={refreshControl}
         variant="server"
         title={errorTitle}
+        message={
+          state.kind === 'service-unavailable'
+            ? t('prReview.reviewServiceUnavailableDescription')
+            : undefined
+        }
         onRetry={() => {
           void pr.refetch();
         }}

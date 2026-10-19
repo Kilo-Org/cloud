@@ -587,6 +587,7 @@
     "checkConnection": "కనెక్షన్‌ను తనిఖీ చేయండి",
     "couldNotLoadPullRequest": "పుల్ రిక్వెస్ట్‌ను లోడ్ చేయలేకపోయాము.",
     "reviewServiceUnavailable": "సేవ అందుబాటులో లేదు",
+    "reviewServiceUnavailableDescription": "సేవ తాత్కాలికంగా అందుబాటులో లేదు. కొంతకాలం తర్వాత మళ్లీ ప్రయత్నించండి.",
     "description": "వివరణ",
     "noDescriptionProvided": "వివరణ ఇవ్వలేదు.",
     "review": "సమీక్ష",

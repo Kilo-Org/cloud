@@ -587,6 +587,7 @@
     "checkConnection": "Hlola uxhumano",
     "couldNotLoadPullRequest": "Asikwazanga ukulayisha isicelo sokuhlanganisa.",
     "reviewServiceUnavailable": "Isevisi ayitholakali",
+    "reviewServiceUnavailableDescription": "Isevisi ayitholakali okwesikhashana. Zama futhi maduze.",
     "description": "Incazelo",
     "noDescriptionProvided": "Akukho ncazelo enikeziwe.",
     "review": "Ukuhlola",

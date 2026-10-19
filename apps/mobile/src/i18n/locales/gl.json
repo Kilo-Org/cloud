@@ -587,6 +587,7 @@
     "checkConnection": "Comprobar a conexión",
     "couldNotLoadPullRequest": "Non se puido cargar a solicitude de integración.",
     "reviewServiceUnavailable": "O servizo non está dispoñible",
+    "reviewServiceUnavailableDescription": "O servizo non está dispoñible temporalmente. Téntao de novo en breves.",
     "description": "Descrición",
     "noDescriptionProvided": "Non se engadiu ningunha descrición.",
     "review": "Revisión",

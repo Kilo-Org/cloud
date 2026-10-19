@@ -2507,6 +2507,7 @@
     "connectionExpired": "GitHub 連線已過期。",
     "couldNotLoadPullRequest": "無法載入提取請求。",
     "reviewServiceUnavailable": "審查服務無法使用",
+    "reviewServiceUnavailableDescription": "審查服務暫時無法使用。請稍後再試一次。",
     "couldNotOpenGitHubAppSettings": "無法開啟 GitHub 應用程式設定。",
     "description": "說明",
     "discussion": {

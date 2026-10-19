@@ -587,6 +587,7 @@
     "checkConnection": "ချိတ်ဆက်မှုကို စစ်ဆေးပါ",
     "couldNotLoadPullRequest": "PR ကို ရယူ၍မရပါ။",
     "reviewServiceUnavailable": "ဝန်ဆောင်မှုကို မရနိုင်ပါ",
+    "reviewServiceUnavailableDescription": "ဝန်ဆောင်မှုကို ခေတ္တမရနိုင်ပါ။ မကြာမီ ပြန်လည်ကြိုးစားပါ။",
     "description": "ဖော်ပြချက်",
     "noDescriptionProvided": "ဖော်ပြချက် မပေးထားပါ။",
     "review": "စစ်ဆေးမှု",

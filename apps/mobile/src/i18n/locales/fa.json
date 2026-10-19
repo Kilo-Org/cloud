@@ -587,6 +587,7 @@
     "checkConnection": "بررسی اتصال",
     "couldNotLoadPullRequest": "بارگذاری درخواست ادغام ممکن نشد.",
     "reviewServiceUnavailable": "سرویس در دسترس نیست",
+    "reviewServiceUnavailableDescription": "سرویس موقتاً در دسترس نیست. دوباره تلاش کنید.",
     "description": "توضیحات",
     "noDescriptionProvided": "توضیحی ارائه نشده است.",
     "review": "بازبینی",

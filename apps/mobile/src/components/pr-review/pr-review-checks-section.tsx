@@ -332,7 +332,7 @@ export function PrReviewChecksSection({
         <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">
             {state.kind === 'service-unavailable'
-              ? t('prReview.reviewServiceUnavailable')
+              ? t('prReview.reviewServiceUnavailableDescription')
               : t('prReview.checks.couldNotLoad')}
           </Text>
           <Button

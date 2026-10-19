@@ -587,6 +587,7 @@
     "checkConnection": "Duba haɗi",
     "couldNotLoadPullRequest": "Ba a iya loda buƙatar haɗawa ba.",
     "reviewServiceUnavailable": "Sabis ba a samu ba",
+    "reviewServiceUnavailableDescription": "Sabis na ɗan lokaci ba a samu ba. Sake gwadawa nan ba da jimawa.",
     "description": "Bayani",
     "noDescriptionProvided": "Babu bayanin da aka bayar.",
     "review": "Bita",

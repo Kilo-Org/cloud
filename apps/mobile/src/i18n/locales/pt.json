@@ -598,6 +598,7 @@
     "checkConnection": "Verificar ligação",
     "couldNotLoadPullRequest": "Não foi possível carregar o PR.",
     "reviewServiceUnavailable": "Serviço indisponível",
+    "reviewServiceUnavailableDescription": "O serviço está temporariamente indisponível. Tente novamente em breve.",
     "description": "Descrição",
     "noDescriptionProvided": "Não foi fornecida nenhuma descrição.",
     "review": "Revisão",

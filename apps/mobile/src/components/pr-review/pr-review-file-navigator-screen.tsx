@@ -135,6 +135,11 @@ function NavigatorError({
           ? t('prReview.reviewServiceUnavailable')
           : t('prReview.fileNavigator.couldNotLoadFiles')
       }
+      message={
+        state?.kind === 'service-unavailable'
+          ? t('prReview.reviewServiceUnavailableDescription')
+          : undefined
+      }
       onRetry={onRetry}
       isRetrying={isRetrying}
     />

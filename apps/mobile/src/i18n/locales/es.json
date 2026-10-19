@@ -2532,6 +2532,7 @@
     "connectionExpired": "La conexión con GitHub ha caducado.",
     "couldNotLoadPullRequest": "No se pudo cargar la PR.",
     "reviewServiceUnavailable": "Servicio no disponible",
+    "reviewServiceUnavailableDescription": "El servicio no está disponible temporalmente. Inténtalo de nuevo en unos momentos.",
     "couldNotOpenGitHubAppSettings": "No se pudieron abrir los ajustes de la aplicación de GitHub.",
     "description": "Descripción",
     "discussion": {

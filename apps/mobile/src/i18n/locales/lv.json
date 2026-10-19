@@ -598,6 +598,7 @@
     "checkConnection": "Pārbaudīt savienojumu",
     "couldNotLoadPullRequest": "Neizdevās ielādēt izmaiņu pieprasījumu.",
     "reviewServiceUnavailable": "Pakalpojums nav pieejams",
+    "reviewServiceUnavailableDescription": "Pakalpojums īslaicīgi nav pieejams. Drīz mēģiniet vēlreiz.",
     "description": "Apraksts",
     "noDescriptionProvided": "Nav sniegts apraksts.",
     "review": "Pārskatīšana",

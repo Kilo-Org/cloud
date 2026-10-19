@@ -587,6 +587,7 @@
     "checkConnection": "Провери връзката",
     "couldNotLoadPullRequest": "Не можахме да заредим заявката за обединяване.",
     "reviewServiceUnavailable": "Услугата е временно недостъпна",
+    "reviewServiceUnavailableDescription": "Услугата е временно недостъпна. Опитайте отново след малко.",
     "description": "Описание",
     "noDescriptionProvided": "Няма описание.",
     "review": "Преглед",

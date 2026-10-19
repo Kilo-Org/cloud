@@ -598,6 +598,7 @@
     "checkConnection": "Comprova la connexió",
     "couldNotLoadPullRequest": "No s'ha pogut carregar la sol·licitud d'integració.",
     "reviewServiceUnavailable": "El servei no està disponible",
+    "reviewServiceUnavailableDescription": "El servei no està disponible temporalment. Torna-ho a provar en una estona.",
     "description": "Descripció",
     "noDescriptionProvided": "No s'ha proporcionat cap descripció.",
     "review": "Revisió",

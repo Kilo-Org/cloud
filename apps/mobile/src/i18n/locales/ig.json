@@ -587,6 +587,7 @@
     "checkConnection": "Lelee njikọ",
     "couldNotLoadPullRequest": "Enweghị ike ibudata arịrịọ njikọta.",
     "reviewServiceUnavailable": "Ozi ahụ adịghị",
+    "reviewServiceUnavailableDescription": "Ozi ahụ nọ nʼoke nke oge adịghị. Nwalee ọzọ nʼoge na-adịghị anya.",
     "description": "Nkọwa",
     "noDescriptionProvided": "Enyeghị nkọwa.",
     "review": "Nyocha",

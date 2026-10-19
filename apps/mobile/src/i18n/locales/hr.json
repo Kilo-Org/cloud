@@ -598,6 +598,7 @@
     "checkConnection": "Provjeri vezu",
     "couldNotLoadPullRequest": "Nije moguće učitati zahtjev za spajanje.",
     "reviewServiceUnavailable": "Usluga je privremeno nedostupna",
+    "reviewServiceUnavailableDescription": "Usluga je privremeno nedostupna. Pokušajte ponovo uskoro.",
     "description": "Opis",
     "noDescriptionProvided": "Nema opisa.",
     "review": "Pregled",

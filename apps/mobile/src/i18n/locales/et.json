@@ -587,6 +587,7 @@
     "checkConnection": "Kontrolli ühendust",
     "couldNotLoadPullRequest": "Tõmbetaotlust ei õnnestunud laadida.",
     "reviewServiceUnavailable": "Teenus ei ole saadaval",
+    "reviewServiceUnavailableDescription": "Teenus on ajutiselt saavamatu. Proovi peagi uuesti.",
     "description": "Kirjeldus",
     "noDescriptionProvided": "Kirjeldust pole esitatud.",
     "review": "Ülevaatus",

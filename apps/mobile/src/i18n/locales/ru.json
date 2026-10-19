@@ -2557,6 +2557,7 @@
     "connectionExpired": "Срок действия подключения к GitHub истёк.",
     "couldNotLoadPullRequest": "Не удалось загрузить запрос на слияние.",
     "reviewServiceUnavailable": "Сервис временно недоступен",
+    "reviewServiceUnavailableDescription": "Сервис временно недоступен. Повторите попытку чуть позже.",
     "couldNotOpenGitHubAppSettings": "Не удалось открыть настройки приложения GitHub.",
     "description": "Описание",
     "discussion": {

@@ -587,6 +587,7 @@
     "checkConnection": "Semak sambungan",
     "couldNotLoadPullRequest": "Tidak dapat memuatkan permintaan tarik.",
     "reviewServiceUnavailable": "Perkhidmatan tidak tersedia",
+    "reviewServiceUnavailableDescription": "Perkhidmatan tidak tersedia buat sementara waktu. Cuba lagi sebentar lagi.",
     "description": "Penerangan",
     "noDescriptionProvided": "Tiada penerangan disediakan.",
     "review": "Semakan",

@@ -587,6 +587,7 @@
     "checkConnection": "Angalia muunganisho",
     "couldNotLoadPullRequest": "Imeshindikana kupakia ombi la kuunganisha.",
     "reviewServiceUnavailable": "Hudima haipatikani",
+    "reviewServiceUnavailableDescription": "Hudima haipatikani kwa muda. Jaribu tena hivi karibuni.",
     "description": "Maelezo",
     "noDescriptionProvided": "Hakuna maelezo yaliyotolewa.",
     "review": "Ukaguzi",

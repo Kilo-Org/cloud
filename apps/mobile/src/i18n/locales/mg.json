@@ -587,6 +587,7 @@
     "checkConnection": "Jereo ny fifandraisana",
     "couldNotLoadPullRequest": "Tsy tafiditra ny fangatahana fampiraisana.",
     "reviewServiceUnavailable": "Tsy misy ny serivisy",
+    "reviewServiceUnavailableDescription": "Tsy misy ny serivisy vetivety. Andramo indray tsy ho ela.",
     "description": "Famaritana",
     "noDescriptionProvided": "Tsy nisy famaritana nomena.",
     "review": "Fandinihana",

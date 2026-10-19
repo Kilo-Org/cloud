@@ -587,6 +587,7 @@
     "checkConnection": "ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ",
     "couldNotLoadPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
     "reviewServiceUnavailable": "ਸੇਵਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
+    "reviewServiceUnavailableDescription": "ਸੇਵਾ ਆਰਜ਼ੀ ਤੌਰ 'ਤੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "description": "ਵੇਰਵਾ",
     "noDescriptionProvided": "ਕੋਈ ਵੇਰਵਾ ਨਹੀਂ ਦਿੱਤਾ ਗਿਆ।",
     "review": "ਸਮੀਖਿਆ",

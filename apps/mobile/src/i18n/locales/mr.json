@@ -587,6 +587,7 @@
     "checkConnection": "जोडणी तपासा",
     "couldNotLoadPullRequest": "पुल रिक्वेस्ट लोड करता आली नाही.",
     "reviewServiceUnavailable": "सेवा अनुपलब्ध आहे",
+    "reviewServiceUnavailableDescription": "सेवा तात्पुरती अनुपलब्ध आहे. लवकरच पुन्हा प्रयत्न करा.",
     "description": "वर्णन",
     "noDescriptionProvided": "वर्णन दिलेले नाही.",
     "review": "समीक्षा",

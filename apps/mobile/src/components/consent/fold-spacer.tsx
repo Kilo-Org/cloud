@@ -19,11 +19,6 @@ export function FoldSpacer({ height }: FoldSpacerProps) {
   return <View className="bg-background" style={{ height: Math.max(height, 1) }} />;
 }
 
-/** The measured layout height of a view, rounded to whole pixels. */
-export function measuredHeight(event: LayoutChangeEvent): number {
-  return Math.max(Math.round(event.nativeEvent.layout.height), 1);
-}
-
 /**
  * A stable layout handler that reports a view's measured height through
  * `setState`. Two callers in one screen need the identical behavior, so the
@@ -31,6 +26,6 @@ export function measuredHeight(event: LayoutChangeEvent): number {
  */
 export function heightReporter(set: (height: number) => void) {
   return (event: LayoutChangeEvent) => {
-    set(measuredHeight(event));
+    set(Math.max(Math.round(event.nativeEvent.layout.height), 1));
   };
 }

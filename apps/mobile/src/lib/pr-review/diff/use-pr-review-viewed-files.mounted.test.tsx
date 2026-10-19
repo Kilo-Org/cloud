@@ -2,8 +2,8 @@
 // end. The store folds `providerPrRefKey` into the durable key only when it
 // receives the ref, so a GitLab MR and a same-numbered GitHub PR — or one
 // project on two GitLab instances — never share a viewed set. These tests
-// pin the hook's pass-through; the store's keying itself is covered in
-// `viewed-files.test.ts`.
+// exercise the hook's mounted behavior; the store's keying itself is covered
+// in `viewed-files.test.ts`.
 
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -41,6 +41,13 @@ const GITLAB_REF: ProviderPrRef = {
   instanceHint: 'https://gitlab.example.com',
 };
 
+const GITHUB_REF_SAME_NUMBER: ProviderPrRef = {
+  platform: 'github',
+  owner: 'octocat',
+  repo: 'hello-world',
+  number: 12,
+};
+
 type ViewedRefArg = Parameters<typeof usePrReviewViewedFiles>[0];
 
 type ProbeResult = {
@@ -71,10 +78,6 @@ function viewedOf(holder: ProbeHolder): ProbeResult {
   return holder.current;
 }
 
-async function mountProbe(viewRef: ViewedRefArg) {
-  return viewedOf(await mountProbeHolder(viewRef));
-}
-
 beforeEach(() => {
   // The mounted renderers are not unmounted between tests, so drop the store's
   // subscriptions to make each test start from a fresh read.
@@ -84,27 +87,43 @@ beforeEach(() => {
 });
 
 describe('usePrReviewViewedFiles provider refs (s6)', () => {
-  it('reads the viewed set under the provider ref, not the bare triple', async () => {
-    await mountProbe(GITLAB_REF);
-    expect(storeMocks.getViewedFiles).toHaveBeenCalledWith(GITLAB_REF, 'sha-1');
-  });
+  it('keeps two provider identities independent through the same mount flow', async () => {
+    // Same number, different providers: the store keys by provider identity,
+    // so a toggle on the GitLab MR never lights up the GitHub PR. The fake
+    // durable layer records per-key sets so the post-write revalidation sees
+    // exactly what the optimistic publish showed.
+    const durable: Record<string, string[]> = {};
+    storeMocks.getViewedFiles.mockImplementation(async (ref: unknown) => {
+      await Promise.resolve();
+      return [...(durable[JSON.stringify(ref)] ?? [])];
+    });
+    storeMocks.toggleViewedFile.mockImplementation(
+      async (input: { path: string; headSha: string } & Record<string, unknown>) => {
+        await Promise.resolve();
+        // getViewedFiles is called as (ref, headSha); the durable record key
+        // is the ref alone, so the toggle input's headSha drops out too.
+        const { path, headSha: _headSha, ...ref } = input;
+        const key = JSON.stringify(ref);
+        const current = durable[key] ?? [];
+        durable[key] = current.includes(path)
+          ? current.filter(p => p !== path)
+          : [...current, path];
+      }
+    );
 
-  it('writes the toggle under the provider ref, folding the key identity', async () => {
-    const viewed = await mountProbe(GITLAB_REF);
+    const gitlab = await mountProbeHolder(GITLAB_REF);
+    const github = await mountProbeHolder(GITHUB_REF_SAME_NUMBER);
+
+    // One durable read per distinct key: each identity read its own set.
+    expect(storeMocks.getViewedFiles).toHaveBeenCalledTimes(2);
+
     await act(async () => {
-      await viewed.toggle('src/a.ts');
+      await viewedOf(gitlab).toggle('src/a.ts');
     });
-    expect(storeMocks.toggleViewedFile).toHaveBeenCalledWith({
-      ...GITLAB_REF,
-      headSha: 'sha-1',
-      path: 'src/a.ts',
-    });
-  });
 
-  it('keeps the legacy GitHub triple working byte-for-byte', async () => {
-    const legacy = { owner: 'octocat', repo: 'hello-world', number: 7 };
-    await mountProbe(legacy);
-    expect(storeMocks.getViewedFiles).toHaveBeenCalledWith(legacy, 'sha-1');
+    // The GitLab probe shows the toggle; the GitHub probe does not.
+    await waitFor(() => viewedOf(gitlab).isViewed('src/a.ts'));
+    expect(viewedOf(github).isViewed('src/a.ts')).toBe(false);
   });
 
   it('shares one read and one toggle across two mounted probes', async () => {

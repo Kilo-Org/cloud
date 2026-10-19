@@ -15,7 +15,6 @@ jest.mock('@/lib/device-auth/device-auth', () => {
   return {
     DeviceAuthPendingLimitError,
     createDeviceAuthRequest: jest.fn(),
-    pollDeviceAuthRequest: jest.fn(),
     denyDeviceAuthRequest: jest.fn(),
     consumeDeviceAuthByDeviceCode: jest.fn(),
     approveDeviceAuthRequest: jest.fn(),
@@ -40,7 +39,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-import { createDeviceAuthRequest, pollDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+import { createDeviceAuthRequest } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import * as codesRoute from '@/app/api/device-auth/codes/route';
 import * as codesCodeRoute from '@/app/api/device-auth/codes/[code]/route';
@@ -56,7 +55,6 @@ const MOBILE_HEADERS = {
 };
 
 const mockCreateDeviceAuthRequest = jest.mocked(createDeviceAuthRequest);
-const mockPollDeviceAuthRequest = jest.mocked(pollDeviceAuthRequest);
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 
 let logSpy: jest.SpiedFunction<typeof console.log>;
@@ -133,18 +131,6 @@ describe('REST data routes emit one api_timing line', () => {
     ).rejects.toThrow('unexpected');
 
     expectSingleTimingLine('/api/device-auth/codes', 'POST', false);
-  });
-
-  test('GET /api/device-auth/codes/[code]', async () => {
-    mockPollDeviceAuthRequest.mockResolvedValue({ status: 'pending' });
-
-    const response = await codesCodeRoute.GET(
-      makeRequest('https://app.kilo.ai/api/device-auth/codes/ABCD-EFGH', 'GET'),
-      { params: Promise.resolve({ code: 'ABCD-EFGH' }) }
-    );
-
-    expect(response.status).toBe(202);
-    expectSingleTimingLine('/api/device-auth/codes/[code]', 'GET');
   });
 
   test('DELETE /api/device-auth/codes/[code]', async () => {

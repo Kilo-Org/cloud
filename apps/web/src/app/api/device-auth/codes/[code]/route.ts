@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { pollDeviceAuthRequest, denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+import { denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { checkRateLimit } from '@vercel/firewall';
@@ -11,48 +11,6 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
 type RouteContext = {
   params: Promise<{ code: string }>;
 };
-
-// ──────────────── legacy poll ────────────────
-// @ponytail: remove this GET after all shipped clients migrate to POST /api/device-auth/token
-
-export const GET = withRestTiming(
-  '/api/device-auth/codes/[code]',
-  async (_request: Request, context: RouteContext) => {
-    const { code } = await context.params;
-
-    if (!code) {
-      return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
-    }
-
-    const result = await pollDeviceAuthRequest(code);
-
-    // Return appropriate status codes based on the result
-    switch (result.status) {
-      case 'pending':
-        return NextResponse.json({ status: 'pending' }, { status: 202 });
-
-      case 'approved':
-        return NextResponse.json(
-          {
-            status: 'approved',
-            token: result.token,
-            userId: result.userId,
-            userEmail: result.userEmail,
-          },
-          { status: 200 }
-        );
-
-      case 'denied':
-        return NextResponse.json({ status: 'denied' }, { status: 403 });
-
-      case 'expired':
-        return NextResponse.json({ status: 'expired' }, { status: 410 });
-
-      default:
-        return NextResponse.json({ error: 'Unknown status' }, { status: 500 });
-    }
-  }
-);
 
 // ──────────────── deny with viewer token ────────────────
 

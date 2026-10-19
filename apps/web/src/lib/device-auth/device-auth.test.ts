@@ -4,14 +4,12 @@ import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode
 import { eq } from 'drizzle-orm';
 import {
   generateUserCode,
-  generateDeviceCode,
   generateDeviceSecret,
   hashDeviceSecret,
   createDeviceAuthRequest,
   getDeviceAuthRequest,
   approveDeviceAuthRequest,
   denyDeviceAuthRequest,
-  pollDeviceAuthRequest,
   consumeDeviceAuthByDeviceCode,
   isDeviceAuthRequestExpired,
   cleanupExpiredDeviceAuthRequests,
@@ -95,13 +93,6 @@ describe('Device Auth', () => {
         codes.add(generateUserCode());
       }
       expect(codes.size).toBe(100);
-    });
-  });
-
-  describe('generateDeviceCode (deprecated alias)', () => {
-    test('is an alias for generateUserCode', () => {
-      // They are the same function reference.
-      expect(generateDeviceCode).toBe(generateUserCode);
     });
   });
 
@@ -648,136 +639,6 @@ describe('Device Auth', () => {
       mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
         (_realIssueSessionCredentials as any)(...args)
       );
-    });
-  });
-
-  describe('pollDeviceAuthRequest (legacy)', () => {
-    test('returns pending status for unapproved request', async () => {
-      const { code } = await createDeviceAuthRequest({});
-
-      const result = await pollDeviceAuthRequest(code);
-
-      expect(result.status).toBe('pending');
-      expect(result.token).toBeUndefined();
-    });
-
-    test('returns approved status with token for approved request', async () => {
-      const { code } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(code, testUserId);
-
-      const result = await pollDeviceAuthRequest(code);
-
-      expect(result.status).toBe('approved');
-      expect(result.token).toBeDefined();
-      expect(result.userId).toBe(testUserId);
-      expect(result.userEmail).toBe(testUserEmail);
-    });
-
-    test('returns denied status for denied request', async () => {
-      const { code } = await createDeviceAuthRequest({});
-      await denyDeviceAuthRequest(code);
-
-      const result = await pollDeviceAuthRequest(code);
-
-      expect(result.status).toBe('denied');
-      expect(result.token).toBeUndefined();
-    });
-
-    test('returns expired status for expired request', async () => {
-      const { code } = await createDeviceAuthRequest({});
-
-      // Manually expire the request
-      await db
-        .update(device_auth_requests)
-        .set({ expires_at: new Date(Date.now() - 1000).toISOString() })
-        .where(eq(device_auth_requests.code, code));
-
-      const result = await pollDeviceAuthRequest(code);
-
-      expect(result.status).toBe('expired');
-      expect(result.token).toBeUndefined();
-    });
-
-    test('returns expired for non-existent code', async () => {
-      const result = await pollDeviceAuthRequest('XXX-XXX');
-      expect(result.status).toBe('expired');
-    });
-
-    test('concurrent legacy polls mint at most one token', async () => {
-      for (let i = 0; i < 20; i++) {
-        const { code } = await createDeviceAuthRequest({});
-        await approveDeviceAuthRequest(code, testUserId);
-
-        const [a, b] = await Promise.all([
-          pollDeviceAuthRequest(code),
-          pollDeviceAuthRequest(code),
-        ]);
-
-        const approved = [a, b].filter(r => r.status === 'approved');
-        expect(approved.length).toBe(1);
-        expect(approved[0]!.token).toBeDefined();
-      }
-    });
-
-    test('sequential legacy polls consume only once (single-use)', async () => {
-      const { code } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(code, testUserId);
-
-      const first = await pollDeviceAuthRequest(code);
-      expect(first.status).toBe('approved');
-      expect(first.token).toBeDefined();
-
-      const second = await pollDeviceAuthRequest(code);
-      // After consume, the second sequential poll returns expired.
-      expect(second.status).toBe('expired');
-      expect(second.token).toBeUndefined();
-    });
-
-    test('returns denied for a blocked user (legacy path)', async () => {
-      const { code } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(code, testUserId);
-
-      // Block the user
-      await db
-        .update(kilocode_users)
-        .set({ blocked_reason: 'test block', blocked_at: new Date().toISOString() })
-        .where(eq(kilocode_users.id, testUserId));
-
-      const result = await pollDeviceAuthRequest(code);
-
-      expect(result.status).toBe('denied');
-      expect(result.token).toBeUndefined();
-
-      // Verify the request is durably denied, not consumed.
-      const request = await getDeviceAuthRequest(code);
-      expect(request?.status).toBe('denied');
-    });
-
-    test('failed token generation after consume restores row for re-redemption', async () => {
-      mockedGenerateApiToken.mockImplementation(() => {
-        throw new Error('token generation failed');
-      });
-
-      const { code } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(code, testUserId);
-
-      // First poll fails because generateApiToken throws.
-      await expect(pollDeviceAuthRequest(code)).rejects.toThrow('token generation failed');
-
-      // Row was restored to approved.
-      const request = await getDeviceAuthRequest(code);
-      expect(request?.status).toBe('approved');
-      expect(request?.consumed_at).toBeNull();
-
-      // Reset mock to pass-through for the re-consume.
-      mockedGenerateApiToken.mockImplementation((...args: any[]) =>
-        (_realGenerateApiToken as any)(...args)
-      );
-
-      // A later poll succeeds.
-      const retry = await pollDeviceAuthRequest(code);
-      expect(retry.status).toBe('approved');
-      expect(retry.token).toBeDefined();
     });
   });
 

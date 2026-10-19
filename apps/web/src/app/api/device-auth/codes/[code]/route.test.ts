@@ -8,83 +8,18 @@ jest.mock('@/lib/device-auth/device-auth-viewer-token');
 jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
 
-import { pollDeviceAuthRequest, denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+import { denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { checkRateLimit } from '@vercel/firewall';
-import * as Sentry from '@sentry/nextjs';
-import { GET, DELETE } from './route';
+import { DELETE } from './route';
 
-const mockPoll = jest.mocked(pollDeviceAuthRequest);
 const mockDeny = jest.mocked(denyDeviceAuthRequest);
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockVerifyToken = jest.mocked(verifyDeviceAuthViewerToken);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 
 const fakeUser = { id: 'user-1' } as never;
-
-describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  test('returns 202 for pending', async () => {
-    mockPoll.mockResolvedValue({ status: 'pending' });
-
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
-    });
-    expect(response.status).toBe(202);
-    expect(await response.json()).toEqual({ status: 'pending' });
-    expect(Sentry.captureMessage).not.toHaveBeenCalled();
-    expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
-
-  test('returns 200 with token for approved', async () => {
-    mockPoll.mockResolvedValue({
-      status: 'approved',
-      token: 'jwt',
-      userId: 'user-1',
-      userEmail: 'user@example.com',
-    });
-
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
-    });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      status: 'approved',
-      token: 'jwt',
-      userId: 'user-1',
-      userEmail: 'user@example.com',
-    });
-  });
-
-  test('returns 403 for denied', async () => {
-    mockPoll.mockResolvedValue({ status: 'denied' });
-
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
-    });
-    expect(response.status).toBe(403);
-  });
-
-  test('returns 410 for expired', async () => {
-    mockPoll.mockResolvedValue({ status: 'expired' });
-
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
-    });
-    expect(response.status).toBe(410);
-  });
-
-  test('returns 400 for missing code', async () => {
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: '' }),
-    });
-    expect(response.status).toBe(400);
-  });
-});
 
 describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => {
   beforeEach(() => {

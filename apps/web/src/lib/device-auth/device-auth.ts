@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
-import { eq, and, lt, lte, gt, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, lt, lte, gt, isNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
@@ -34,9 +34,6 @@ export function generateUserCode(): string {
   // Format as XXXX-XXXX (8 characters total)
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
-
-/** @deprecated — ponytail: remove after all shipped clients migrate to userCode/deviceCode split */
-export const generateDeviceCode = generateUserCode;
 
 /**
  * Generate a high-entropy device secret for polling.
@@ -327,115 +324,6 @@ export async function consumeDeviceAuthByDeviceCode(
       );
     throw err;
   }
-}
-
-/**
- * Poll for device authorization status and return token if approved.
- * Legacy path — uses atomic consume to prevent double-spend.
- *
- * If credential issuance fails after the atomic consume succeeds, the row is
- * restored to `approved` so the request remains redeemable.
- */
-export async function pollDeviceAuthRequest(code: string): Promise<{
-  status: 'pending' | 'approved' | 'denied' | 'expired';
-  token?: string;
-  userId?: string;
-  userEmail?: string;
-}> {
-  const now = new Date().toISOString();
-
-  // Atomic consume — UPDATE … RETURNING guarantees at most one caller succeeds.
-  const [consumed] = await db
-    .update(device_auth_requests)
-    .set({ status: 'consumed', consumed_at: now })
-    .where(
-      and(
-        eq(device_auth_requests.code, code),
-        eq(device_auth_requests.status, 'approved'),
-        isNotNull(device_auth_requests.kilo_user_id),
-        gt(device_auth_requests.expires_at, now),
-        isNull(device_auth_requests.consumed_at)
-      )
-    )
-    .returning();
-
-  if (consumed) {
-    // Only reachable after a successful atomic consume.
-    try {
-      const kiloUserId = consumed.kilo_user_id;
-      if (!kiloUserId) {
-        throw new Error('Approved request has no user');
-      }
-
-      const [user] = await db
-        .select()
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, kiloUserId))
-        .limit(1);
-
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      if (user.blocked_reason) {
-        await db
-          .update(device_auth_requests)
-          .set({ status: 'denied' })
-          .where(eq(device_auth_requests.code, code));
-        return { status: 'denied' };
-      }
-
-      const token = generateApiToken(user, {
-        deviceAuthRequestCode: consumed.code,
-      });
-
-      return {
-        status: 'approved',
-        token,
-        userId: user.id,
-        userEmail: user.google_user_email,
-      };
-    } catch (err) {
-      // Restore the row so the request remains redeemable.
-      await db
-        .update(device_auth_requests)
-        .set({ status: 'approved', consumed_at: null })
-        .where(
-          and(eq(device_auth_requests.id, consumed.id), eq(device_auth_requests.status, 'consumed'))
-        );
-      throw err;
-    }
-  }
-
-  // Fall through: not consumed, look up current status.
-  const [request] = await db
-    .select()
-    .from(device_auth_requests)
-    .where(eq(device_auth_requests.code, code))
-    .limit(1);
-
-  // Normalize response: return 'expired' for non-existent codes to prevent enumeration
-  if (!request) {
-    return { status: 'expired' };
-  }
-
-  // Check expiration
-  if (isDeviceAuthRequestExpired(request)) {
-    if (request.status !== 'expired') {
-      await db
-        .update(device_auth_requests)
-        .set({ status: 'expired' })
-        .where(eq(device_auth_requests.code, code));
-    }
-    return { status: 'expired' };
-  }
-
-  // Return status for non-approved requests (or already-consumed)
-  if (request.status === 'consumed') {
-    return { status: 'expired' };
-  }
-
-  return { status: request.status as 'pending' | 'denied' };
 }
 
 /**

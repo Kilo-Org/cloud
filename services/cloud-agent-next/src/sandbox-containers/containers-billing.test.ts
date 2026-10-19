@@ -337,6 +337,57 @@ afterEach(() => {
 });
 
 describe('ContainersBilling identity and admission', () => {
+  it('releases a failed native launch before the container starts with zero usage', async () => {
+    const { instance, container, storage, meter } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    container.startBehavior = 'reject';
+    vi.setSystemTime(T0 + 60_000);
+
+    await expect(launch(instance, REF_A, 'standard-4')).rejects.toThrow('container start failed');
+
+    expect(container.running).toBe(false);
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(0);
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+  });
+
+  it('keeps an unmeasured reservation while the physical container runs', async () => {
+    const { instance, container, storage, meter } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    const generation = readGeneration(storage);
+    container.running = true;
+
+    await instance.releaseBillingAdmission('allocation-1');
+
+    expect(readGeneration(storage)).toBe(generation);
+    expect(readMeasurementStarted(storage)).toBe(false);
+    expect(meter.recordStopInputs).toEqual([]);
+  });
+
+  it('does not void a measured generation after the physical container stops', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const generation = readGeneration(storage);
+    container.running = false;
+
+    await instance.releaseBillingAdmission('allocation-1');
+
+    expect(readGeneration(storage)).toBe(generation);
+    expect(readMeasurementStarted(storage)).toBe(true);
+    expect(meter.recordStopInputs).toEqual([]);
+  });
+
   it('admits on a real continue meter and rejects on a real insufficient_credits admission', async () => {
     const admitted = setup();
 

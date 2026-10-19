@@ -272,7 +272,7 @@ export class MeteredBillingLifecycle {
     }
   }
 
-  async releaseBillingAdmission(allocationId: string): Promise<void> {
+  async releaseBillingAdmission(allocationId?: string): Promise<void> {
     await this.runBillingExclusive(async () => {
       const context = await getBillingContext(this.host.storage);
       if (

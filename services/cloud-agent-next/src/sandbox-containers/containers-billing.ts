@@ -307,7 +307,7 @@ export class ContainersBilling {
     return this.lifecycle.reserveBeforeStart(this.billingIdentity);
   }
 
-  releaseBillingAdmission(allocationId: string) {
+  releaseBillingAdmission(allocationId?: string) {
     return this.lifecycle.releaseBillingAdmission(allocationId);
   }
 

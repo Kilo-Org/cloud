@@ -327,6 +327,15 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
 
   async function releaseAdmission(allocationId: string): Promise<void> {
     const active = await ensureRuntime();
+    const context = await getBillingContext(deps.storage);
+    if (
+      context !== undefined &&
+      context.metadata?.allocation_id === allocationId &&
+      (await loadVercelBillingBinding(deps.storage, context.generation)) !== undefined
+    ) {
+      await prepareSettlement(context.generation);
+      return;
+    }
     await active?.lifecycle.releaseBillingAdmission(allocationId);
   }
 

@@ -6,6 +6,8 @@ import {
   getBillingContext,
   intervalId,
   usageContextFingerprint,
+  createContainerUsageClient,
+  installBillingHeartbeat,
   type BillingActor,
   type BillingSubject,
   type UsageContext,
@@ -24,6 +26,8 @@ import { describe, expect, it } from 'vitest';
 import {
   parseSandboxBillingInput,
   vercelBillingIdentity,
+  SANDBOX_USAGE_SKUS,
+  usageServiceForSandboxClass,
 } from '../../src/container-usage-context.js';
 import type {
   EnsureAllocationInput,
@@ -40,13 +44,13 @@ import {
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import type { Env } from '../../src/types.js';
+import { MeteredBillingLifecycle } from '../../src/metered-billing-lifecycle.js';
 import { waitFor } from '../integration/wait-for.js';
 
 const bindings = env as Pick<Env, 'HYPERDRIVE' | 'CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED'> & {
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2>;
 };
 const resources = { vcpus: 2, memory: 4096 } as const;
-const identity = vercelBillingIdentity(resources);
 const ATTEMPTS = 6;
 
 function fakePhysicalProvider() {
@@ -100,10 +104,18 @@ function fakePhysicalProvider() {
 type Race = {
   scope: 'personal' | 'cross-org-actor' | 'organization';
   slots: number;
-  outcome?: 'definite-failure' | 'ambiguous-failure' | 'recovered-terminal';
+  outcome?:
+    | 'definite-failure'
+    | 'ambiguous-failure'
+    | 'recovered-terminal'
+    | 'cloudflare-launch-failure';
 };
 
 async function runRace(race: Race) {
+  const cloudflareLaunchFailure = race.outcome === 'cloudflare-launch-failure';
+  const identity = cloudflareLaunchFailure
+    ? { service: usageServiceForSandboxClass('Sandbox'), sku: SANDBOX_USAGE_SKUS.Sandbox }
+    : vercelBillingIdentity(resources);
   const suffix = crypto.randomUUID().replaceAll('-', '');
   const users = Array.from({ length: 4 }, (_, index) => `oauth/admission-${suffix}-${index}`);
   const orgs = [crypto.randomUUID(), crypto.randomUUID()];
@@ -150,8 +162,12 @@ async function runRace(race: Race) {
       stub: bindings.SANDBOX_CONTROL.getByName(sandboxId),
       provider: fakePhysicalProvider(),
       input: {
-        provider: 'vercel',
-        configuration: { provider: 'vercel', resources },
+        ...(cloudflareLaunchFailure
+          ? { provider: 'cloudflare' as const }
+          : {
+              provider: 'vercel' as const,
+              configuration: { provider: 'vercel' as const, resources },
+            }),
         allocationName: sandboxId,
         billing,
       } satisfies EnsureAllocationInput,
@@ -266,6 +282,52 @@ async function runRace(race: Race) {
       await runInDurableObject(attempt.stub, async (instance, state) => {
         await instance.getAllocationState();
         await state.storage.put('control_plane_owner', attempt.owner);
+        if (cloudflareLaunchFailure) {
+          const client = createContainerUsageClient(instance.env.CONTAINER_USAGE_METER, {
+            service: identity.service,
+          });
+          const billing = new MeteredBillingLifecycle({
+            storage: state.storage,
+            usageClient: client,
+            isContainerRunning: () => attempt.provider.running.size > 0,
+            stopContainer: async () => {},
+            destroyContainer: async () => {},
+            schedule: async () => {},
+            deleteSchedules: () => {},
+            getState: async () => ({ status: 'stopped' }),
+            durableObjectId: state.id.toString(),
+            waitUntil: promise => state.waitUntil(promise),
+          });
+          billing.attachHeartbeat(
+            installBillingHeartbeat(
+              {
+                getState: async () => ({ status: 'stopped' }),
+                schedule: async () => '',
+                deleteSchedules: () => {},
+              },
+              {
+                client,
+                storage: state.storage,
+                beforeStopDelivery: context => billing.ensureStartAcknowledged(context),
+              }
+            )
+          );
+          const create = attempt.provider.adapter.create;
+          attempt.provider.adapter.create = async intent => {
+            await billing.ensureBillingAdmission(
+              { sandboxClassName: 'Sandbox' },
+              { ...intent.billing, allocationId: intent.intentId }
+            );
+            return create(intent);
+          };
+          attempt.provider.adapter.launch = async ref => {
+            attempt.provider.launches.push(ref);
+            attempt.provider.running.delete(ref);
+            throw new Error('Cloudflare launch failed before container start');
+          };
+          attempt.provider.adapter.releaseBillingAdmission = intent =>
+            billing.releaseBillingAdmission(intent.intentId);
+        }
         Object.assign(instance, {
           createProviderAdapter: () => attempt.provider.adapter,
           provider: attempt.provider.adapter,
@@ -364,6 +426,32 @@ async function runRace(race: Race) {
       await attempt.stub.ensureAllocation(attempt.input);
     }
     expect((await readAttemptRows()).rows).toEqual(reserved);
+    if (cloudflareLaunchFailure) {
+      const winner = attempts.find(attempt => attempt.provider.creates.length > 0);
+      if (!winner) throw new Error('Expected admitted Cloudflare allocation');
+      await runInDurableObject(winner.stub, async () => {
+        winner.provider.creates[0].release();
+        await new Promise(resolve => setTimeout(resolve, 25));
+      });
+      await waitFor(async () => {
+        expect(winner.provider.launches).toHaveLength(1);
+        expect((await readAttemptRows()).rows).toEqual([
+          expect.objectContaining({
+            status: 'closed',
+            confirmed_seconds: 0,
+            settled_billable_seconds: 0,
+          }),
+        ]);
+        const checks = await readContainerCapacity(db.db, {
+          subject: winner.subject,
+          actor: winner.actor,
+          instanceId: `observer-${suffix}`,
+          checkpoint: 'control-plane-create',
+        });
+        expect(checks).toContainEqual(expect.objectContaining({ live: 2, limit: 3 }));
+      });
+      return;
+    }
     if (race.outcome !== undefined) {
       const winner = attempts.find(attempt => attempt.provider.creates.length > 0);
       if (!winner) throw new Error('Expected an admitted create');
@@ -557,6 +645,10 @@ async function runRace(race: Race) {
 }
 
 describe('atomic admission across real SandboxControlV2 Durable Objects and meter RPC', () => {
+  it('releases a failed Cloudflare launch with a closed zero-usage interval and no capacity slot', async () => {
+    await runRace({ scope: 'personal', slots: 1, outcome: 'cloudflare-launch-failure' });
+  });
+
   it.each([1, 2])(
     'reserves only %i remaining low-balance personal slots while insertion is uncommitted',
     async slots => runRace({ scope: 'personal', slots })

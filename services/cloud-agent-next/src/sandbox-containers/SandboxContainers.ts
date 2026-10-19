@@ -1452,6 +1452,12 @@ export class SandboxContainers extends DurableObject<Env> {
         container.start(options);
       } catch (error) {
         await this.activateBillingIfRunning(container, record);
+        if (!container.running) {
+          const context = await getBillingContext(this.ctx.storage);
+          await this.billingForRecord(record)?.releaseBillingAdmission(
+            context?.metadata?.allocation_id
+          );
+        }
         throw error;
       }
     }

@@ -4112,10 +4112,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
-        if (
-          createdRef === null &&
-          (error instanceof ProviderCreationError || this.provider.isDefiniteCreateFailure?.(error))
-        ) {
+        const releaseAdmission = async () => {
           try {
             if (pin.provider === 'vercel') {
               await this.billingRuntime.releaseAdmission(allocationId);
@@ -4131,6 +4128,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
               })
               .warn('Failed create billing reservation cleanup deferred');
           }
+        };
+        if (
+          createdRef === null &&
+          (error instanceof ProviderCreationError || this.provider.isDefiniteCreateFailure?.(error))
+        ) {
+          await releaseAdmission();
         }
         logControlDiagnostic(
           'create_failed',
@@ -4147,21 +4150,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const capacityFailure = getContainerCapacityFailureReason(error);
         if (capacityFailure) {
           await this.failCreationRoutes(allocationId, false, capacityFailure);
+          if (createdRef !== null) await releaseAdmission();
           return;
         }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
+          if (createdRef !== null) await releaseAdmission();
           return;
         }
-        // N5: only clean up a container the reducer still owns. If a `hello`
-        // was accepted during a slow launch, the sandbox has an owner and must
-        // not be destroyed here.
         if (createdRef !== null) {
           const latest = await this.readAllocation();
           if (latest.kind === 'creating' && latest.allocationId === allocationId) {
             const confirmed = await this.stopRef(createdRef, allocationId);
-            if (this.currentProvider() === 'vercel')
+            if (pin.provider === 'vercel') {
               await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
+            }
+            await releaseAdmission();
           }
         }
         await this.dispatchCreateFailed(allocationId);

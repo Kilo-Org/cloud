@@ -1,3 +1,4 @@
+import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import path from 'node:path';
 import { getPlatformProxy } from 'wrangler';
 import { AwsClient } from 'aws4fetch';
@@ -76,7 +77,13 @@ export function remoteArtifactStore(options: {
     async getBytes(key) {
       const response = await send(key, 'GET');
       if (response.status === 404) {
-        await response.body?.cancel();
+        if (response.body) {
+          const result = await readBoundedStream(response.body as ReadableStream<Uint8Array>, 4096);
+          if (!result.ok) throw new Error('Runtime store error response exceeds its byte cap');
+          const body = new TextDecoder().decode(result.bytes);
+          if (/<Code>\s*NoSuchBucket\s*<\/Code>/.test(body))
+            throw new Error('Runtime publication bucket does not exist');
+        }
         return null;
       }
       if (!response.ok) {

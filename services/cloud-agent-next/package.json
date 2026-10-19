@@ -40,7 +40,8 @@
     "snapshot:vercel": "tsx scripts/vercel-snapshot.ts",
     "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs",
     "test:runtime-installer": "tsx --test --test-concurrency=1 test/runtime-installer/*.test.ts",
-    "runtime:publish": "tsx scripts/publish-runtime.ts"
+    "runtime:publish": "tsx scripts/publish-runtime.ts",
+    "test:runtime-ci": "node --test scripts/runtime-ci-admission.test.mjs scripts/runtime-workflow.test.mjs"
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.12.9",

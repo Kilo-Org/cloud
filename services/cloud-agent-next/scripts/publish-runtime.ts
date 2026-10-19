@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { sha256, publishImmutableObject } from './runtime-publication.js';
+export { sha256, publishImmutableObject, type PublishedArtifact } from './runtime-publication.js';
 import { z } from 'zod';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -7,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../src/shared/control-plane-protocol.js';
 import { localR2ArtifactStore, remoteArtifactStore } from './runtime-publish-store.js';
+import { verifyRuntimeSourceCheckout } from './runtime-source.js';
 import { downloadVerified } from './runtime-cli-artifact.js';
 import { fileURLToPath } from 'node:url';
 import {
@@ -44,10 +46,6 @@ const archiveFactory = new Function(
 ) as () => (tar: Uint8Array) => RuntimeArchiveScan;
 const scanRuntimeArchive = archiveFactory();
 export const scanTar = scanRuntimeArchive;
-
-export function sha256(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
-}
 
 /** Local directory adapter for the create-only object store (no production creds). */
 export function localDirectoryArtifactStore(root: string): ArtifactObjectStore {
@@ -266,22 +264,6 @@ export async function packageRuntimeRelease(input: {
   };
 }
 
-export type PublishedArtifact = { key: string; sha256: string; size: number; created: boolean };
-
-async function publishImmutableObject(
-  store: ArtifactObjectStore,
-  key: string,
-  bytes: Uint8Array,
-  contentType: string
-): Promise<PublishedArtifact> {
-  const expected = sha256(bytes);
-  const created = await store.putIfAbsent(key, bytes, contentType);
-  const stored = await store.getBytes(key);
-  if (stored === null || stored.byteLength !== bytes.byteLength || sha256(stored) !== expected)
-    throw new Error('Runtime publication failed stored-byte verification');
-  return { key, sha256: expected, size: stored.byteLength, created };
-}
-
 export async function publishRuntimeRelease(store: ArtifactObjectStore, packaged: PackagedRuntime) {
   for (const artifact of packaged.descriptor.artifacts) {
     const payload = packaged[artifact.role];
@@ -326,6 +308,17 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const out = argValue(argv, '--out');
   const bucket = argValue(argv, '--bucket');
   const local = argv.includes('--local');
+  const sourceSha = argValue(argv, '--source-sha');
+  if (sourceSha) {
+    z.string()
+      .regex(/^[a-f0-9]{40}$/)
+      .parse(sourceSha);
+    verifyRuntimeSourceCheckout(
+      sourceSha,
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+    );
+    if (!bucket) throw new Error('CI handoffs require a retained remote bucket');
+  }
   if (Number(out !== undefined) + Number(bucket !== undefined) + Number(local) !== 1)
     throw new Error('Specify exactly one target: --out <directory>, --bucket <name>, or --local');
   const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -375,7 +368,24 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     const descriptorOut = argValue(argv, '--descriptor-out');
     if (descriptorOut)
       await fs.writeFile(descriptorOut, serializeRuntimeRelease(packaged.descriptor));
-    console.log(JSON.stringify(published));
+    if (sourceSha) {
+      if (!accountId || process.env.CLOUDFLARE_ACCOUNT_ID !== accountId)
+        throw new Error('Runtime base account differs from the publication account');
+      const { ensureRuntimeBase, withRuntimeRegistry } = await import('./runtime-base.js');
+      const { verifyRuntimeCompatibility } = await import('./runtime-compatibility.js');
+      const { publishRuntimeHandoff } = await import('./runtime-handoff.js');
+      await withRuntimeRegistry(packageRoot, async () => {
+        const base = await ensureRuntimeBase(store, packageRoot, accountId);
+        await verifyRuntimeCompatibility(base, packaged, packageRoot);
+        const handoff = await publishRuntimeHandoff({
+          store,
+          sourceSha,
+          base,
+          descriptor: packaged.descriptor,
+        });
+        console.log(JSON.stringify({ published, handoff }));
+      });
+    } else console.log(JSON.stringify(published));
   } finally {
     await localTarget?.dispose();
   }

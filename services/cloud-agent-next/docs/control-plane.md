@@ -935,6 +935,12 @@ Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
 Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 
+### Runtime release publication
+
+- CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
+  reads an immutable handoff for the exact commit, and verifies the base image digest and both
+  payloads before it deploys a `downloaded` target.
+
 ### Runtime credential proxy
 
 Modern runtime authorization uses the existing Worker facade for model, backend and native

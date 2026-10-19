@@ -16,7 +16,6 @@ import {
   Factory,
   Key,
   List,
-  ListChecks,
   MessageSquare,
   Plus,
   Receipt,
@@ -27,7 +26,6 @@ import {
   User,
   UserCog,
   Webhook,
-  Wrench,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import {
@@ -172,16 +170,6 @@ const cloudItems: SidebarStoryItem[] = [
     title: 'Security Agent',
     icon: Shield,
     url: '/security-agent',
-  },
-  {
-    title: 'Auto Triage',
-    icon: ListChecks,
-    url: '/auto-triage',
-  },
-  {
-    title: 'Auto Fix',
-    icon: Wrench,
-    url: '/auto-fix',
   },
   {
     title: 'Deploy',

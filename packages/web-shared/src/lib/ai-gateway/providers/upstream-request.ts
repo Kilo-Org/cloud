@@ -18,6 +18,11 @@ import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
+import {
+  isUpstreamUrlPolicyEnforced,
+  rejectDisallowedUpstreamUrls,
+  rejectUpstreamRedirect,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -334,15 +339,44 @@ export async function upstreamRequest({
         })
       : { url: targetUrl, headers, body: JSON.stringify(body) };
 
+    // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
+    // upstream URL from the relay body, so both hops are checked.
+    const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
+    const urlRejection = enforceUrlPolicy
+      ? await rejectDisallowedUpstreamUrls({
+          urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
+          providerId: provider.id,
+          vercelRequestId,
+          signal: combinedSignal,
+        })
+      : null;
+    if (urlRejection) {
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return { type: 'error', response: urlRejection };
+    }
+
     const response = await fetch(outgoing.url, {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
+      redirect: enforceUrlPolicy ? 'manual' : 'follow',
       // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
       duplex: 'half',
       signal: combinedSignal,
     });
     headersReceivedAfterMs = performance.now() - fetchStartedAt;
+    const redirectRejection = enforceUrlPolicy
+      ? await rejectUpstreamRedirect({
+          response,
+          url: outgoing.url,
+          providerId: provider.id,
+          vercelRequestId,
+        })
+      : null;
+    if (redirectRejection) {
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return { type: 'error', response: redirectRejection };
+    }
     return { type: 'success', response };
   } catch (error) {
     // No response body to bound; a later fallback attempt must not be blamed

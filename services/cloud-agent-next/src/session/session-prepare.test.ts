@@ -1981,7 +1981,7 @@ describe('createSessionWithLedger admission ladder', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'auto-triage',
+          createdOnPlatform: 'app-builder',
           kilocodeOrganizationId: orgId,
         },
       })
@@ -1997,7 +1997,7 @@ describe('createSessionWithLedger admission ladder', () => {
     );
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
-        identity: expect.objectContaining({ orgId, createdOnPlatform: 'auto-triage' }),
+        identity: expect.objectContaining({ orgId, createdOnPlatform: 'app-builder' }),
         workspace: expect.objectContaining({
           sandboxId,
           sandboxProvider: 'cloudflare',
@@ -2013,7 +2013,7 @@ describe('createSessionWithLedger admission ladder', () => {
       runtime: { sandboxAllocation: 'isolated-standard' },
       options: {
         operationKey: OPERATION_KEY,
-        createdOnPlatform: 'auto-triage',
+        createdOnPlatform: 'app-builder',
         kilocodeOrganizationId: orgId,
       },
     });
@@ -2254,7 +2254,6 @@ describe('createSessionWithLedger admission ladder', () => {
   it.each([
     ['missing platform', undefined, undefined],
     ['app-builder origin', 'browser', 'app-builder'],
-    ['auto-triage origin', 'browser', 'auto-triage'],
     ['code-review origin', undefined, 'code-review'],
   ] as const)(
     'keeps non-control-plane %s creates on agent_ sessions',
@@ -4922,7 +4921,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'auto-triage',
+          createdOnPlatform: 'app-builder',
           kilocodeOrganizationId: orgId,
         },
       })

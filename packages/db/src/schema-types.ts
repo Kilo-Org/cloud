@@ -859,6 +859,52 @@ export const KiloClawAdminAuditAction = z.enum([
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
 
+// Platform admin actions recorded in admin_action_audit_logs. Stored as plain
+// text without a DB check constraint, so adding a value needs no migration.
+// Do not rename existing values; rows keep the name they were written with.
+export const AdminActionAuditAction = z.enum([
+  'user.api_key.reset',
+  'user.browser_sessions.revoke',
+  'user.login.reset_to_magic_link',
+  'user.email.release',
+  'user.personal_account.set_disabled',
+  'user.unblock',
+  'organization.create',
+  'organization.delete',
+  'organization.parent.set',
+  'organization.created_by.set',
+  'organization.free_trial_end.set',
+  'organization.trial_messaging.set',
+  'organization.sso.config.create',
+  'organization.sso.config.delete',
+  'organization.sso.admin_portal_link.generate',
+  'internal_bot_user.create',
+  'sales_demo.create',
+  'sales_demo.reset',
+  'oss_sponsorship.enroll',
+  'email_test.send',
+  'admin.platform_access.set',
+  'admin.permissions.set',
+  'cloud_agent_session.messages.view',
+  'cloud_agent_session.api_history.view',
+  'webhook_trigger.request_logs.view',
+  'organization.member.invite',
+  'organization.member.role.update',
+  'organization.member.remove',
+  'organization.child_memberships.set',
+  'organization.token.mint',
+  'organization.mcp_gateway.update',
+  'organization.gitlab_webhook_secret.rotate',
+  'organization.bitbucket.update',
+  'organization.webhook_session.share',
+]);
+
+export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
+
+export const AdminActionAuditTargetType = z.enum(['user', 'organization']);
+
+export type AdminActionAuditTargetType = z.infer<typeof AdminActionAuditTargetType>;
+
 // --- KiloClaw scheduled action status enums ---
 
 // Parent action status. Lifecycle:
@@ -2345,6 +2391,36 @@ export const GatewayModelListConfigSchema = z.object({
 
 export type GatewayModelListConfig = z.infer<typeof GatewayModelListConfigSchema>;
 
+export const VercelModelIdOverrideSchema = z.object({
+  openrouter_model_id: GatewayModelIdSchema,
+  vercel_model_id: GatewayModelIdSchema,
+});
+
+export type VercelModelIdOverride = z.infer<typeof VercelModelIdOverrideSchema>;
+
+export const VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT = 200;
+
+export const VercelModelIdOverridesConfigSchema = z.object({
+  overrides: z
+    .array(VercelModelIdOverrideSchema)
+    .max(VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT)
+    .superRefine((overrides, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { openrouter_model_id }] of overrides.entries()) {
+        if (seen.has(openrouter_model_id)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate OpenRouter model "${openrouter_model_id}"`,
+            path: [index, 'openrouter_model_id'],
+          });
+        }
+        seen.add(openrouter_model_id);
+      }
+    }),
+});
+
+export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({
@@ -2405,6 +2481,9 @@ export const EndpointSchema = z.object({
       discount: z.number().optional(),
     })
     .optional(),
+  // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
+  has_zdr: z.boolean().optional().catch(undefined),
+  has_no_training: z.boolean().optional().catch(undefined),
 });
 
 export type Endpoint = z.infer<typeof EndpointSchema>;

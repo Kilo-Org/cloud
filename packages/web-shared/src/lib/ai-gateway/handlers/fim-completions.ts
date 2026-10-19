@@ -243,6 +243,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
       organizationId,
       kiloUserId: user.id,
       modelId: requestBody.model,
+      fromDb: readDb,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {

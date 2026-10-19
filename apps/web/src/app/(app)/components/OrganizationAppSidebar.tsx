@@ -20,8 +20,6 @@ import {
   List,
   Shield,
   Plus,
-  ListChecks,
-  Wrench,
   Webhook,
   Settings,
   MessageSquare,
@@ -59,7 +57,6 @@ export default function OrganizationAppSidebar({
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags
-  const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
   const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isChatGptSignInEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
@@ -225,16 +222,6 @@ export default function OrganizationAppSidebar({
       icon: Shield,
       url: `/organizations/${organizationId}/security-agent`,
     },
-    ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          {
-            title: 'Auto Triage',
-            icon: ListChecks,
-            url: `/organizations/${organizationId}/auto-triage`,
-          },
-          { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
-        ]
-      : []),
     ...(isDeployEnabled || isDevelopment
       ? [
           {

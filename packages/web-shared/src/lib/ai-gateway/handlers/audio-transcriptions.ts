@@ -282,7 +282,7 @@ export async function handleAudioTranscriptionsRequest(
   setTag('ui.ai_model', requestedModel);
 
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user);
+    await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).

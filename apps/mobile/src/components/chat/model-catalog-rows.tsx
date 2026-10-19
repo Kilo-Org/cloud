@@ -99,7 +99,7 @@ export function ModelRow({
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const smallest = useHfSmallestDownload(model.id);
+  const smallest = useHfSmallestDownload(model.id, model.parameters);
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);
   if (fitsOnly && (fit === 'tooLarge' || fit === 'noStorage')) {

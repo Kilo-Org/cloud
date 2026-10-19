@@ -14,6 +14,9 @@ const SPLIT_FILE = /-\d{5}-of-\d{5}\.gguf$/i;
 const PROJECTOR_FILE = /mmproj/i;
 const QUANT =
   /(?:^|[-_.])((?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|TQ\d_\d|MXFP4(?:_MOE)?|BF16|FP16|F16|F32))(?=[-_.]|$)/i;
+/** Auxiliary weights: not a quantization of the repository's model. */
+const AUXILIARY_FILE =
+  /(?:^|\/)(?:mtp-|dflash-|draft-|adapter-|imatrix-|lilicorr-)|\.imatrix\.|embedding/i;
 
 const count = z.number().nonnegative().default(0);
 const entries = z.array(z.unknown());
@@ -148,6 +151,8 @@ export type HfModelDetail = {
   readonly tools: boolean;
   readonly vision: boolean;
   readonly quants: readonly HfQuant[];
+  /** The repository holds GGUF files, even when no single-file quant remains. */
+  readonly hasGgufFiles: boolean;
 };
 
 export const hfRepoUrl = (id: string) => `${HF_LIST}/${id}`;
@@ -180,6 +185,46 @@ function quantLabel(path: string): string {
   return quantOf(path) ?? name.slice(0, -'.gguf'.length);
 }
 
+/**
+ * Bytes per weight of each quantization family, read from the sizes of real
+ * repositories. The lower bound is what the plausibility check needs; a file
+ * far below it cannot hold the repository's stated parameters at that quant.
+ */
+const BYTES_PER_PARAMETER = {
+  q1: 0.23,
+  iq1: 0.23,
+  iq2: 0.34,
+  q2: 0.34,
+  tq1: 0.22,
+  tq2: 0.3,
+  iq3: 0.48,
+  q3: 0.48,
+  iq4: 0.6,
+  q4: 0.6,
+  q5: 0.71,
+  q6: 0.82,
+  iq8: 1.06,
+  q8: 1.06,
+  mxfp4: 0.6,
+  bf16: 2,
+  f16: 2,
+  fp16: 2,
+  f32: 4,
+  fp32: 4,
+} satisfies Record<string, number>;
+
+function bytesPerParameterOf(quant: string): number | undefined {
+  const normalized = quant.toLowerCase().replace(/^ud-/, '');
+  const families = (Object.keys(BYTES_PER_PARAMETER) as readonly string[])
+    .filter(family => normalized.startsWith(family))
+    // eslint-disable-next-line unicorn/no-array-sort -- Hermes ships no Array.prototype.toSorted; the list is local
+    .sort((a, b) => b.length - a.length);
+  const family = families[0];
+  return family === undefined
+    ? undefined
+    : BYTES_PER_PARAMETER[family as keyof typeof BYTES_PER_PARAMETER];
+}
+
 /** Smallest first. */
 function ggufFiles(tree: unknown): readonly HfFile[] {
   const files: HfFile[] = [];
@@ -206,18 +251,42 @@ function projectorFor(label: string, projectors: readonly HfFile[]): HfFile | un
 /**
  * The model files, smallest first. When the repository names its
  * quantizations, a file without one is a draft model or an importance matrix,
- * not a quantization of the model.
+ * not a quantization of the model. Auxiliary weights (MTP, draft, adapter,
+ * importance matrix, embedding) never are, whatever their name carries, and
+ * a file far too small for the stated parameters at its quantization's
+ * bytes per weight is not the model either: a real quantization can be a
+ * little smaller than the table says (tied embeddings, a smaller
+ * vocabulary), so the bound is generous, while a 1.6 GB "Q4_0" beside 26.9B
+ * stated parameters (~15 GB expected) still cannot pass. A file with no
+ * quantization name, or a repository that states no parameter count, is not
+ * judged.
  */
-function quantFiles(files: readonly HfFile[]): readonly HfFile[] {
-  const models = files.filter(file => !PROJECTOR_FILE.test(file.path));
+function quantFiles(files: readonly HfFile[], parameters: number | undefined): readonly HfFile[] {
+  const models = files.filter(file => {
+    if (PROJECTOR_FILE.test(file.path) || AUXILIARY_FILE.test(file.path)) {
+      return false;
+    }
+    if (parameters === undefined) {
+      return true;
+    }
+    const quant = quantOf(file.path);
+    const bytesPerParameter = quant === undefined ? undefined : bytesPerParameterOf(quant);
+    return (
+      bytesPerParameter === undefined || file.sizeBytes >= parameters * bytesPerParameter * 0.65
+    );
+  });
   const named = models.filter(file => quantOf(file.path) !== undefined);
   return named.length > 0 ? named : models;
 }
 
-/** The bytes of the smallest quantization and its projector: the best fit the repository offers. */
-export function smallestDownloadBytes(tree: unknown): number | undefined {
+/**
+ * The bytes of the smallest quantization and its projector: the best fit the
+ * repository offers. The parameter count filters files that cannot be the
+ * model the entry claims to be.
+ */
+export function smallestDownloadBytes(tree: unknown, parameters?: number): number | undefined {
   const files = ggufFiles(tree);
-  const [smallest] = quantFiles(files);
+  const [smallest] = quantFiles(files, parameters);
   if (smallest === undefined) {
     return undefined;
   }
@@ -241,13 +310,15 @@ export function hfModelName(id: string): string {
  * pinned to the revision the tree was read at. The content hash names the
  * file on the device, so the same bytes are never downloaded twice, and a
  * file the pinned catalog already offers keeps the catalog's identity.
+ * `hasGgufFiles` says whether the repository holds GGUF files at all, so a
+ * screen can tell "nothing here" from "nothing this app can run".
  */
 export function readModelDetail(info: HfRepoInfo, tree: unknown): HfModelDetail {
   const files = ggufFiles(tree);
   const projectors = files.filter(file => PROJECTOR_FILE.test(file.path));
   const license = licenseOf(info.cardData);
   const name = hfModelName(info.id);
-  const quants = quantFiles(files).map((file): HfQuant => {
+  const quants = quantFiles(files, info.gguf?.total).map((file): HfQuant => {
     const label = quantLabel(file.path);
     const curated = CURATED.get(file.sha256);
     if (curated !== undefined) {
@@ -289,5 +360,6 @@ export function readModelDetail(info: HfRepoInfo, tree: unknown): HfModelDetail 
     tools: info.gguf?.chat_template?.includes('tools') === true,
     vision: info.pipeline_tag === VISION_PIPELINE || projectors.length > 0,
     quants,
+    hasGgufFiles: files.length > 0,
   };
 }

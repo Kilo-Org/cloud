@@ -81,8 +81,8 @@ describe('a Hugging Face model detail', () => {
   it('offers each single-file quantization pinned to the revision, smallest first', () => {
     const detail = readModelDetail(info(), [
       { type: 'file', path: 'README.md', size: 10, oid: 'x' },
-      file('Tiny-Chat-Q8_0.gguf', 900, '1'),
-      file('Tiny-Chat-Q4_K_M.gguf', 500, '2'),
+      file('Tiny-Chat-Q8_0.gguf', 560_000_000, '1'),
+      file('Tiny-Chat-Q4_K_M.gguf', 320_000_000, '2'),
       file('big/Tiny-Chat-F16-00001-of-00002.gguf', 5000, '3'),
       { type: 'directory', path: 'big', size: 0 },
     ]);
@@ -91,7 +91,7 @@ describe('a Hugging Face model detail', () => {
       fileId: `hf-${'2'.repeat(16)}`,
       name: 'Tiny Chat (Q4_K_M)',
       url: `https://huggingface.co/acme/Tiny-Chat-GGUF/resolve/${REVISION}/Tiny-Chat-Q4_K_M.gguf`,
-      sizeBytes: 500,
+      sizeBytes: 320_000_000,
       sha256: sha('2'),
       license: 'apache-2.0',
     });
@@ -106,10 +106,10 @@ describe('a Hugging Face model detail', () => {
 
   it('pairs each quantization of a vision model with a projector', () => {
     const detail = readModelDetail(info({ pipeline_tag: 'image-text-to-text' }), [
-      file('Vis-Q4_K_M.gguf', 500, '1'),
-      file('Vis-Q8_0.gguf', 900, '2'),
-      file('mmproj-Vis-F16.gguf', 300, '3'),
-      file('mmproj-Vis-Q8_0.gguf', 200, '4'),
+      file('Vis-Q4_K_M.gguf', 320_000_000, '1'),
+      file('Vis-Q8_0.gguf', 560_000_000, '2'),
+      file('mmproj-Vis-F16.gguf', 300_000_000, '3'),
+      file('mmproj-Vis-Q8_0.gguf', 200_000_000, '4'),
     ]);
     expect(detail.vision).toBe(true);
     expect(detail.quants.map(quant => [quant.label, quant.model.projector?.sha256])).toEqual([
@@ -124,6 +124,44 @@ describe('a Hugging Face model detail', () => {
       file('Big-27B-IQ2_M.gguf', 10_319_906_944, '2'),
     ]);
     expect(detail.quants.map(quant => quant.label)).toEqual(['IQ2_M']);
+  });
+
+  it('drops an auxiliary file whose quantization name would rescue it', () => {
+    const detail = readModelDetail(info({ gguf: { total: 27_000_000_000 } }), [
+      file('mtp-Aux-27B-Q4_0.gguf', 1_680_271_776, '1'),
+      file('dflash-Aux-27B-Q4_0.gguf', 1_094_346_080, '2'),
+      file('imatrix-27B.gguf', 13_642_656, '3'),
+      file('draft-27B-Q4_0.gguf', 2_500_000_000, '4'),
+      file('Aux-27B-embedding-F16.gguf', 1_500_000_000, '5'),
+    ]);
+    expect(detail.quants).toEqual([]);
+    expect(detail.hasGgufFiles).toBe(true);
+  });
+
+  it('drops a file far smaller than its quantization needs for the stated parameters', () => {
+    const detail = readModelDetail(info({ gguf: { total: 27_000_000_000 } }), [
+      file('Model-27B-Q4_0.gguf', 1_610_000_000, '1'),
+      file('Model-27B-Q4_K_M.gguf', 17_000_000_000, '2'),
+    ]);
+    expect(detail.quants.map(quant => quant.label)).toEqual(['Q4_K_M']);
+  });
+
+  it('keeps every quantization of a repository that states no parameter count', () => {
+    const detail = readModelDetail(info({ gguf: { context_length: 32_768 } }), [
+      file('Model-Q4_0.gguf', 1_610_000_000, '1'),
+      file('Model-Q4_K_M.gguf', 17_000_000_000, '2'),
+    ]);
+    expect(detail.quants.map(quant => quant.label)).toEqual(['Q4_0', 'Q4_K_M']);
+  });
+
+  it('shows nothing runnable when only sharded files and a stray small file remain', () => {
+    const detail = readModelDetail(info({ gguf: { total: 27_000_000_000 } }), [
+      file('Model-27B-Q4_K_M-00001-of-00002.gguf', 9_000_000_000, '1'),
+      file('Model-27B-Q4_K_M-00002-of-00002.gguf', 8_000_000_000, '2'),
+      file('mtp-Model-27B-Q4_0.gguf', 1_680_271_776, '3'),
+    ]);
+    expect(detail.quants).toEqual([]);
+    expect(detail.hasGgufFiles).toBe(true);
   });
 
   it('still offers a file without a quantization name when no file has one', () => {
@@ -163,12 +201,29 @@ describe('a Hugging Face model detail', () => {
 describe('the size a list entry is rated by', () => {
   it('is the smallest quantization, not a smaller draft model', () => {
     expect(
-      smallestDownloadBytes([
-        file('Big-27B-FastMTP-32K.gguf', 903_453_952, '1'),
-        file('Big-27B-Q4_K_P.gguf', 17_923_393_664, '2'),
-        file('Big-27B-IQ2_M.gguf', 10_319_906_944, '3'),
-      ])
+      smallestDownloadBytes(
+        [
+          file('Big-27B-FastMTP-32K.gguf', 903_453_952, '1'),
+          file('Big-27B-Q4_K_P.gguf', 17_923_393_664, '2'),
+          file('Big-27B-IQ2_M.gguf', 10_319_906_944, '3'),
+        ],
+        27_000_000_000
+      )
     ).toBe(10_319_906_944);
+  });
+
+  it('is unknown when every single file is auxiliary or implausibly small', () => {
+    expect(
+      smallestDownloadBytes(
+        [
+          file('Model-27B-Q4_K_M-00001-of-00002.gguf', 9_000_000_000, '1'),
+          file('Model-27B-Q4_K_M-00002-of-00002.gguf', 8_000_000_000, '2'),
+          file('mtp-Model-27B-Q4_0.gguf', 1_680_271_776, '3'),
+          file('Model-27B-Q8_0.gguf', 100_000_000, '4'),
+        ],
+        27_000_000_000
+      )
+    ).toBe(undefined);
   });
 
   it('adds the projector the smallest quantization downloads with', () => {

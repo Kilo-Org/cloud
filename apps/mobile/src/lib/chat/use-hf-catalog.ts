@@ -89,15 +89,16 @@ export function useHfModelDetail(id: string) {
 
 /**
  * A list entry states only a parameter count, which can describe a draft model
- * the repository also holds, so the list judges fit by the smallest real file.
- * Rows mount again as the list scrolls; the sizes stay cached meanwhile.
+ * the repository also holds, so the list judges fit by the smallest real file:
+ * files too small for the stated parameters, and auxiliary weights, do not
+ * count. Rows mount again as the list scrolls; the sizes stay cached meanwhile.
  */
-export function useHfSmallestDownload(id: string) {
+export function useHfSmallestDownload(id: string, parameters: number | undefined) {
   return useQuery({
     queryKey: ['hf-catalog', 'smallest', id],
     queryFn: async ({ signal }): Promise<number | null> => {
       const tree = await hfGet(hfTreeUrl(id, 'main'), signal);
-      return smallestDownloadBytes(tree.body) ?? null;
+      return smallestDownloadBytes(tree.body, parameters) ?? null;
     },
     staleTime: 30 * 60 * 1000,
     retry,

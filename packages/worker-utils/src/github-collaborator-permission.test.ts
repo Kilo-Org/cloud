@@ -17,6 +17,8 @@ describe('parseCollaboratorPermission', () => {
 
   it('returns null for unknown or malformed bodies', () => {
     expect(parseCollaboratorPermission({ permission: 'tier-1' })).toBeNull();
+    expect(parseCollaboratorPermission({ permission: 'toString' })).toBeNull();
+    expect(parseCollaboratorPermission({ permission: 'constructor' })).toBeNull();
     expect(parseCollaboratorPermission({})).toBeNull();
     expect(parseCollaboratorPermission(null)).toBeNull();
     expect(parseCollaboratorPermission('ok')).toBeNull();

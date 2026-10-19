@@ -36,7 +36,10 @@ export function hasWriteAccess(permission: CollaboratorPermission | null): boole
 export function parseCollaboratorPermission(body: unknown): CollaboratorPermission | null {
   if (typeof body !== 'object' || body === null || !('permission' in body)) return null;
   const permission: unknown = body.permission;
-  if (typeof permission !== 'string' || !(permission in COLLABORATOR_PERMISSION_LEVELS)) {
+  if (
+    typeof permission !== 'string' ||
+    !Object.hasOwn(COLLABORATOR_PERMISSION_LEVELS, permission)
+  ) {
     return null;
   }
   return permission as CollaboratorPermission;

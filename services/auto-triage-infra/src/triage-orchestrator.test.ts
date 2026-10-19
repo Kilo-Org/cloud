@@ -216,6 +216,30 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
     expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
   });
 
+  it('applies only worker-owned automation labels when the model selects one', async () => {
+    const ticket = {
+      ...createAutoFixTicket('repo-maintainer'),
+      availableLabels: ['bug', 'kilo-auto-fix'],
+    };
+    const harness = createHarness(ticket);
+    const fetchMock = await stubFetchResponses([
+      { urlPart: permissionUrl, body: { permission: 'write' } },
+    ]);
+
+    await harness.orchestrator.completeClassification(callbackSecret, {
+      cloudAgentSessionId,
+      status: 'completed',
+      lastAssistantMessageText:
+        'Classification complete.\n```json\n{"classification":"bug","confidence":0.5,"intentSummary":"Crash on startup","selectedLabels":["kilo-auto-fix","bug"]}\n```',
+    });
+
+    const calls = labelsInFetchCalls(fetchMock.mock.calls);
+    const applied = calls.find(call => call.labels !== undefined);
+    expect(applied?.labels).toContain('bug');
+    expect(applied?.labels).not.toContain('kilo-auto-fix');
+    expect(calledGithubPermissionApi(fetchMock)).toBe(false);
+  });
+
   it('applies the auto-fix label for a maintain-tier author at high confidence', async () => {
     const harness = createHarness(createAutoFixTicket('repo-maintainer'));
     const fetchMock = await stubFetchResponses([

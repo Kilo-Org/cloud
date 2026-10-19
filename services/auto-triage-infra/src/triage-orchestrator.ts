@@ -38,6 +38,21 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/**
+ * Labels owned by worker logic. They are excluded from the model's label
+ * choices and removed from model-provided label lists before application.
+ */
+const RESERVED_AUTOMATION_LABELS: Record<string, true> = {
+  'kilo-triaged': true,
+  'kilo-auto-fix': true,
+  'kilo-duplicate': true,
+};
+
+/** Remove worker-reserved labels from a model-provided label list. */
+function stripReservedLabels(labels: string[]): string[] {
+  return labels.filter(label => !RESERVED_AUTOMATION_LABELS[label]);
+}
+
 export class TriageOrchestrator extends DurableObject<Env> {
   private state!: TriageTicket;
 
@@ -313,12 +328,13 @@ export class TriageOrchestrator extends DurableObject<Env> {
     }
 
     // Fetch available labels from the repository (falls back to defaults on error or no token)
-    // Then exclude skip/required labels so the AI won't select them for auto-labeling
+    // Offered labels exclude skip/required labels and worker-owned automation labels
     const repoLabels = githubToken
       ? await fetchRepoLabels(this.state.sessionInput.repoFullName, githubToken)
       : DEFAULT_LABELS;
-    const availableLabels =
-      excludedLabels.size > 0 ? repoLabels.filter(label => !excludedLabels.has(label)) : repoLabels;
+    const availableLabels = repoLabels.filter(
+      label => !excludedLabels.has(label) && !RESERVED_AUTOMATION_LABELS.has(label)
+    );
 
     console.log('[auto-triage:labels] Available labels for prompt', {
       ticketId: this.state.ticketId,
@@ -412,11 +428,12 @@ export class TriageOrchestrator extends DurableObject<Env> {
    * callback-driven completion path.
    */
   private async applyClassificationResult(classification: ClassificationResult): Promise<void> {
+    const selectedLabels = stripReservedLabels(classification.selectedLabels);
     if (classification.classification === 'question') {
-      await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
+      await this.buildAndApplyLabels(['kilo-triaged'], selectedLabels);
       await this.answerQuestion(classification);
     } else if (classification.classification === 'unclear') {
-      await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
+      await this.buildAndApplyLabels(['kilo-triaged'], selectedLabels);
       await this.requestClarification(classification);
     } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
       const autoFixAuthorized = await this.authorizeAutoFix();
@@ -424,7 +441,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
         // Author does not (verifiably) have write access: apply the
         // classification labels only and leave the auto-fix label for a
         // maintainer to add by hand.
-        await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
+        await this.buildAndApplyLabels(['kilo-triaged'], selectedLabels);
         await this.updateStatus('actioned', {
           classification: classification.classification,
           confidence: classification.confidence,
@@ -439,7 +456,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
       }
       const labelsApplied = await this.buildAndApplyLabels(
         ['kilo-triaged', 'kilo-auto-fix'],
-        classification.selectedLabels
+        selectedLabels
       );
       if (!labelsApplied) {
         console.error('[TriageOrchestrator] kilo-auto-fix label may not have been applied', {
@@ -454,7 +471,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
         actionMetadata: labelsApplied ? undefined : { labelWarning: 'Failed to apply labels' },
       });
     } else {
-      await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
+      await this.buildAndApplyLabels(['kilo-triaged'], selectedLabels);
       await this.requestClarification(classification);
     }
   }

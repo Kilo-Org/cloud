@@ -24,8 +24,6 @@ export interface SessionInput {
   issueNumber: number;
   issueTitle: string;
   issueBody: string | null;
-  /** GitHub login of the issue author, used to gate the auto-fix label. */
-  issueAuthor?: string;
   githubToken?: string;
   kilocodeOrganizationId?: string;
   duplicateThreshold: number;

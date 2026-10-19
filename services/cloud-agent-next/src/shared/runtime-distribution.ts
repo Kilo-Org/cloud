@@ -59,6 +59,7 @@ export const GIT_CREDENTIAL_HELPER = {
 } as const;
 
 export const RUNTIME_INSTALL_DIR = '/usr/local/bin';
+export const RUNTIME_RESERVED_ROOT = '/opt/kilo-cloud';
 
 export function runtimeInstallPath(installName: string): string {
   return `${RUNTIME_INSTALL_DIR}/${installName}`;

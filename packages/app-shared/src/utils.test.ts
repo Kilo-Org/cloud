@@ -19,6 +19,7 @@ describe('parseTimestamp', () => {
   it('parses a date-only string as local midnight west of UTC', () => {
     inTimeZone('America/Los_Angeles', () => {
       const date = parseTimestamp('2026-09-26');
+      expect(date.toISOString()).toBe('2026-09-26T07:00:00.000Z');
       expect(calendarParts(date)).toEqual([2026, 8, 26, 0]);
       expect(date.toLocaleDateString('en-US')).toBe('9/26/2026');
     });
@@ -27,6 +28,7 @@ describe('parseTimestamp', () => {
   it('parses a date-only string as local midnight east of UTC', () => {
     inTimeZone('Asia/Tokyo', () => {
       const date = parseTimestamp('2026-09-26');
+      expect(date.toISOString()).toBe('2026-09-25T15:00:00.000Z');
       expect(calendarParts(date)).toEqual([2026, 8, 26, 0]);
       expect(date.toLocaleDateString('en-US')).toBe('9/26/2026');
     });
@@ -35,7 +37,14 @@ describe('parseTimestamp', () => {
   it('parses a date-only string as local midnight at UTC', () => {
     inTimeZone('UTC', () => {
       const date = parseTimestamp('2026-09-26');
+      expect(date.toISOString()).toBe('2026-09-26T00:00:00.000Z');
       expect(calendarParts(date)).toEqual([2026, 8, 26, 0]);
+    });
+  });
+
+  it('keeps a four-digit year below 100', () => {
+    inTimeZone('UTC', () => {
+      expect(calendarParts(parseTimestamp('0099-01-01'))).toEqual([99, 0, 1, 0]);
     });
   });
 

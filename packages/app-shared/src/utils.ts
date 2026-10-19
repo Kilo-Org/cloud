@@ -15,7 +15,11 @@ export function parseTimestamp(value: string): Date {
     const year = Number(value.slice(0, 4));
     const month = Number(value.slice(5, 7));
     const day = Number(value.slice(8, 10));
-    const date = new Date(year, month - 1, day);
+    // The multi-argument constructor maps years 0-99 to 1900-1999, so set the
+    // full year explicitly to keep the backend's four-digit year.
+    const date = new Date(0);
+    date.setFullYear(year, month - 1, day);
+    date.setHours(0, 0, 0, 0);
     // The Date constructor rolls a non-existent day into the next month. Keep
     // such input unusable, as the ISO parse did, so callers that check for an
     // invalid Date still take their fallback.

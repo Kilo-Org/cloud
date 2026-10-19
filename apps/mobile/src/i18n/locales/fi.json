@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Takaisin profiiliin",
       "loadErrorMessage": "Tarkista yhteys ja yritä uudelleen.",
+
+      "chooseAccount": "Valitse tili",
       "loadErrorTitle": "Organisaatioitasi ei voitu ladata.",
+      "noOrganization": "Ei organisaatiota",
+
+      "noOrganizationDescription": "Tämä tili ei kuulu mihinkään organisaatioon. Luo organisaatio tai liity sellaiseen verkossa käyttääksesi organisaatio-ominaisuuksia, kuten jäsenkutsuja ja alhaisen saldon hälytyksiä.",
+
+      "openWebOrganizations": "Avaa organisaatiot verkossa",
+
       "organizationUnavailable": "Organisaatio ei ole käytettävissä.",
-      "selectDescription": "Jatka valitsemalla organisaatio profiilistasi.",
+      "selectDescriptionWithOrganizations": "Kuulut yhteen tai useampaan organisaatioon. Valitse tili, jota tämän näytön tulee käyttää.",
+
       "selectOrganization": "Valitse organisaatio",
       "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Jatka valitsemalla toinen organisaatio profiilistasi.",
       "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."

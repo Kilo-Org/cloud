@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Bumalik sa profile",
       "loadErrorMessage": "Suriin ang koneksyon mo at subukan muli.",
+
+      "chooseAccount": "Pumili ng account",
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
+      "noOrganization": "Walang organisasyon",
+
+      "noOrganizationDescription": "Ang account na ito ay hindi bahagi ng isang organisasyon. Gumawa o sumali sa isang organisasyon sa web upang magamit ang mga feature ng organisasyon tulad ng mga imbitasyon ng miyembro at mga alerto sa mababang balanse.",
+
+      "openWebOrganizations": "Buksan ang mga organisasyon sa web",
+
       "organizationUnavailable": "Hindi ma-access ang organisasyon.",
-      "selectDescription": "Pumili ng organisasyon mula sa iyong profile para magpatuloy.",
+      "selectDescriptionWithOrganizations": "Kasapi ka ng isa o higit pang organisasyon. Piliin ang account na dapat gamitin ng screen na ito.",
+
       "selectOrganization": "Pumili ng organisasyon",
       "unavailableDescription": "Hindi na ma-access ang organisasyong ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
       "accessDeniedDescription": "Wala kang access sa organisasyong ito."

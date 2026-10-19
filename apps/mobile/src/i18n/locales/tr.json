@@ -2966,9 +2966,18 @@
     "boundary": {
       "backToProfile": "Profile geri dön",
       "loadErrorMessage": "Bağlantını kontrol edip tekrar dene.",
+
+      "chooseAccount": "Bir hesap seç",
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
+      "noOrganization": "Kuruluş yok",
+
+      "noOrganizationDescription": "Bu hesap bir kuruluşun parçası değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için web sitesinde bir kuruluş oluştur veya birine katıl.",
+
+      "openWebOrganizations": "Kuruluşları web sitesinde aç",
+
       "organizationUnavailable": "Kuruluş kullanılamıyor.",
-      "selectDescription": "Devam etmek için profilinden bir kuruluş seç.",
+      "selectDescriptionWithOrganizations": "Bir veya daha fazla kuruluşa aitsin. Bu ekranın kullanması gereken hesabı seç.",
+
       "selectOrganization": "Bir kuruluş seç",
       "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinden başka bir kuruluş seç.",
       "accessDeniedDescription": "Bu kuruluşa erişimin yok."

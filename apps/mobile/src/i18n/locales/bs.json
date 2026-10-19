@@ -3014,9 +3014,18 @@
     "boundary": {
       "backToProfile": "Nazad na profil",
       "loadErrorMessage": "Provjeri vezu i pokušaj ponovo.",
+
+      "chooseAccount": "Odaberi račun",
       "loadErrorTitle": "Nije moguće učitati tvoje organizacije.",
+      "noOrganization": "Nema organizacije",
+
+      "noOrganizationDescription": "Ovaj račun nije dio organizacije. Kreiraj ili se pridruži organizaciji na webu da bi koristio funkcije organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
+
+      "openWebOrganizations": "Otvori organizacije na webu",
+
       "organizationUnavailable": "Organizacija nije dostupna.",
-      "selectDescription": "Odaberi organizaciju na svom profilu za nastavak.",
+      "selectDescriptionWithOrganizations": "Pripadaš jednoj ili više organizacija. Odaberi račun koji ovaj ekran treba koristiti.",
+
       "selectOrganization": "Odaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Odaberi drugu na svom profilu za nastavak.",
       "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."

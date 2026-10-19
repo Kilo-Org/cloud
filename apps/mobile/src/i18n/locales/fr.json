@@ -3006,9 +3006,18 @@
     "boundary": {
       "backToProfile": "Retour au profil",
       "loadErrorMessage": "Vérifiez votre connexion et réessayez.",
+
+      "chooseAccount": "Choisir un compte",
       "loadErrorTitle": "Impossible de charger vos organisations.",
+      "noOrganization": "Aucune organisation",
+
+      "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez une organisation ou rejoignez-en une sur le site web pour utiliser les fonctionnalités d'organisation telles que les invitations de membres et les alertes de solde faible.",
+
+      "openWebOrganizations": "Ouvrir les organisations sur le site web",
+
       "organizationUnavailable": "L'organisation n'est pas disponible.",
-      "selectDescription": "Choisissez une organisation dans votre profil pour continuer.",
+      "selectDescriptionWithOrganizations": "Vous appartenez à une ou plusieurs organisations. Choisissez le compte que cet écran doit utiliser.",
+
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez-en une dans votre profil pour continuer.",
       "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."

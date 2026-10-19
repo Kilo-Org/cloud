@@ -3054,9 +3054,18 @@
     "boundary": {
       "backToProfile": "Späť na profil",
       "loadErrorMessage": "Skontroluj pripojenie a skús to znova.",
+
+      "chooseAccount": "Vyber účet",
       "loadErrorTitle": "Tvoje organizácie sa nepodarilo načítať.",
+      "noOrganization": "Žiadna organizácia",
+
+      "noOrganizationDescription": "Tento účet nie je súčasťou organizácie. Vytvor organizáciu alebo sa k nej pripoj na webe, aby si mohol používať funkcie organizácie, ako sú pozvánky pre členov a upozornenia na nízky zostatok.",
+
+      "openWebOrganizations": "Otvoriť organizácie na webe",
+
       "organizationUnavailable": "Organizácia nie je dostupná.",
-      "selectDescription": "Ak chceš pokračovať, vyber organizáciu vo svojom profile.",
+      "selectDescriptionWithOrganizations": "Patríš k jednej alebo viacerým organizáciám. Vyber účet, ktorý má táto obrazovka používať.",
+
       "selectOrganization": "Vybrať organizáciu",
       "unavailableDescription": "Táto organizácia už nie je dostupná. Ak chceš pokračovať, vyber inú vo svojom profile.",
       "accessDeniedDescription": "Nemáš prístup k tejto organizácii."

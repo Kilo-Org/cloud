@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "પ્રોફાઇલ પર પાછા જાઓ",
       "loadErrorMessage": "તમારું ઇન્ટરનેટ જોડાણ તપાસીને ફરી પ્રયાસ કરો.",
+
+      "chooseAccount": "એકાઉન્ટ પસંદ કરો",
       "loadErrorTitle": "તમારી સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
+      "noOrganization": "કોઈ સંસ્થા નથી",
+
+      "noOrganizationDescription": "આ એકાઉન્ટ કોઈ સંસ્થાનો ભાગ નથી. સભ્ય આમંત્રણો અને ઓછી બેલેન્સ ચેતવણીઓ જેવી સંસ્થા સુવિધાઓનો ઉપયોગ કરવા માટે વેબ પર સંસ્થા બનાવો અથવા એકમાં જોડાઓ.",
+
+      "openWebOrganizations": "વેબ પર સંસ્થાઓ ખોલો",
+
       "organizationUnavailable": "સંસ્થા ઉપલબ્ધ નથી.",
-      "selectDescription": "આગળ વધવા માટે તમારી પ્રોફાઇલમાંથી સંસ્થા પસંદ કરો.",
+      "selectDescriptionWithOrganizations": "તમે એક અથવા વધુ સંસ્થાઓના સભ્ય છો. આ સ્ક્રીન જે એકાઉન્ટનો ઉપયોગ કરવો જોઈએ તે પસંદ કરો.",
+
       "selectOrganization": "સંસ્થા પસંદ કરો",
       "unavailableDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. આગળ વધવા માટે તમારી પ્રોફાઇલમાંથી બીજી સંસ્થા પસંદ કરો.",
       "accessDeniedDescription": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ નથી."

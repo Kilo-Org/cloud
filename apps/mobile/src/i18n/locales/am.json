@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "ወደ መገለጫ ይመለሱ",
       "loadErrorMessage": "ግንኙነትህን አረጋግጠህ እንደገና ሞክር።",
+
+      "chooseAccount": "መለያ ይምረጡ",
       "loadErrorTitle": "ድርጅቶችዎን መጫን አልተቻለም።",
+      "noOrganization": "ድርጅት የለም",
+
+      "noOrganizationDescription": "ይህ መለያ የድርጅት አካል አይደለም። እንደ አባል ግብዣዎች እና ዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም በድር ላይ አንዱን ይፍጠሩ ወይም ይቀላቀሉ።",
+
+      "openWebOrganizations": "ድርጅቶችን በድር ላይ ይክፈቱ",
+
       "organizationUnavailable": "ድርጅቱ አይገኝም።",
-      "selectDescription": "ለመቀጠል ከመገለጫዎ ድርጅት ይምረጡ።",
+      "selectDescriptionWithOrganizations": "እርስዎ አንድ ወይም ከዚያ በላይ ድርጅቶች አባል ነዎት። ይህ ማያ ገጽ መጠቀም ያለበትን መለያ ይምረጡ።",
+
       "selectOrganization": "ድርጅት ይምረጡ",
       "unavailableDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። ለመቀጠል ከመገለጫዎ ሌላ ድርጅት ይምረጡ።",
       "accessDeniedDescription": "ይህን ድርጅት የመድረስ ፈቃድ የለዎትም።"

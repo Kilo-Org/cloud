@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Tilbake til profil",
       "loadErrorMessage": "Sjekk tilkoblingen og prøv igjen.",
+
+      "chooseAccount": "Velg en konto",
       "loadErrorTitle": "Kunne ikke laste inn organisasjonene dine.",
+      "noOrganization": "Ingen organisasjon",
+
+      "noOrganizationDescription": "Denne kontoen er ikke en del av en organisasjon. Opprett eller bli med i en organisasjon i nettleseren for å bruke organisasjonsfunksjoner som medlemsinvitasjoner og varsler om lav saldo.",
+
+      "openWebOrganizations": "Åpne organisasjoner i nettleseren",
+
       "organizationUnavailable": "Organisasjonen er ikke tilgjengelig.",
-      "selectDescription": "Velg en organisasjon fra profilen din for å fortsette.",
+      "selectDescriptionWithOrganizations": "Du tilhører én eller flere organisasjoner. Velg kontoen som denne skjermen skal bruke.",
+
       "selectOrganization": "Velg en organisasjon",
       "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette.",
       "accessDeniedDescription": "Du har ikke tilgang til denne organisasjonen."

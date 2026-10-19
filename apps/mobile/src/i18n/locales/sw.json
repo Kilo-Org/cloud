@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Rudi kwenye wasifu",
       "loadErrorMessage": "Angalia muunganisho wako wa intaneti na ujaribu tena.",
+
+      "chooseAccount": "Chagua akaunti",
       "loadErrorTitle": "Imeshindikana kupakia mashirika yako.",
+      "noOrganization": "Hakuna shirika",
+
+      "noOrganizationDescription": "Akaunti hii si sehemu ya shirika. Unda au jiunge na shirika kwenye wavuti ili kutumia vipengele vya shirika kama vile mialiko ya wanachama na arifa za salio la chini.",
+
+      "openWebOrganizations": "Fungua mashirika kwenye wavuti",
+
       "organizationUnavailable": "Shirika halipatikani.",
-      "selectDescription": "Chagua shirika kutoka kwenye wasifu wako ili uendelee.",
+      "selectDescriptionWithOrganizations": "Wewe ni mwanachama wa shirika moja au zaidi. Chagua akaunti ambayo skrini hii inapaswa kutumia.",
+
       "selectOrganization": "Chagua shirika",
       "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee.",
       "accessDeniedDescription": "Huna ruhusa ya kufikia shirika hili."

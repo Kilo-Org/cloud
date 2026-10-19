@@ -2966,9 +2966,18 @@
     "boundary": {
       "backToProfile": "Quay lại hồ sơ",
       "loadErrorMessage": "Kiểm tra kết nối và thử lại.",
+
+      "chooseAccount": "Chọn tài khoản",
       "loadErrorTitle": "Không thể tải danh sách tổ chức của bạn.",
+      "noOrganization": "Không có tổ chức",
+
+      "noOrganizationDescription": "Tài khoản này không thuộc tổ chức nào. Hãy tạo hoặc tham gia một tổ chức trên web để sử dụng các tính năng của tổ chức như lời mời thành viên và cảnh báo số dư thấp.",
+
+      "openWebOrganizations": "Mở tổ chức trên web",
+
       "organizationUnavailable": "Không thể truy cập tổ chức.",
-      "selectDescription": "Chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
+      "selectDescriptionWithOrganizations": "Bạn thuộc một hoặc nhiều tổ chức. Chọn tài khoản mà màn hình này nên sử dụng.",
+
       "selectOrganization": "Chọn một tổ chức",
       "unavailableDescription": "Bạn không còn truy cập được tổ chức này. Hãy chọn tổ chức khác trong hồ sơ để tiếp tục.",
       "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."

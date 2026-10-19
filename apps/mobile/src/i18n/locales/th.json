@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "กลับไปยังโปรไฟล์",
       "loadErrorMessage": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+
+      "chooseAccount": "เลือกบัญชี",
       "loadErrorTitle": "โหลดองค์กรของคุณไม่สำเร็จ",
+      "noOrganization": "ไม่มีองค์กร",
+
+      "noOrganizationDescription": "บัญชีนี้ไม่ได้เป็นส่วนหนึ่งขององค์กร สร้างหรือเข้าร่วมองค์กรบนเว็บเพื่อใช้ฟีเจอร์ขององค์กร เช่น คำเชิญสมาชิกและการแจ้งเตือนยอดคงเหลือต่ำ",
+
+      "openWebOrganizations": "เปิดองค์กรบนเว็บ",
+
       "organizationUnavailable": "องค์กรไม่พร้อมใช้งาน",
-      "selectDescription": "เลือกองค์กรจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
+      "selectDescriptionWithOrganizations": "คุณเป็นสมาชิกขององค์กรหนึ่งแห่งขึ้นไป เลือกบัญชีที่หน้าจอนี้ควรใช้",
+
       "selectOrganization": "เลือกองค์กร",
       "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว เลือกองค์กรอื่นจากโปรไฟล์เพื่อดำเนินการต่อ",
       "accessDeniedDescription": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้"

@@ -2966,9 +2966,18 @@
     "boundary": {
       "backToProfile": "Zurück zum Profil",
       "loadErrorMessage": "Prüfe deine Verbindung und versuche es erneut.",
+
+      "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
+      "noOrganization": "Keine Organisation",
+
+      "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
+
+      "openWebOrganizations": "Organisationen auf der Website öffnen",
+
       "organizationUnavailable": "Die Organisation ist nicht verfügbar.",
-      "selectDescription": "Wähle in deinem Profil eine Organisation aus, um fortzufahren.",
+      "selectDescriptionWithOrganizations": "Du gehörst einer oder mehreren Organisationen an. Wähle das Konto aus, das dieser Bildschirm verwenden soll.",
+
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."

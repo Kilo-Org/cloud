@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Til baka í prófíl",
       "loadErrorMessage": "Athugaðu tenginguna og reyndu aftur.",
+
+      "chooseAccount": "Veldu reikning",
       "loadErrorTitle": "Ekki tókst að hlaða félögunum þínum.",
+      "noOrganization": "Ekkert félag",
+
+      "noOrganizationDescription": "Þessi reikningur er ekki hluti af félagi. Búðu til eða gakktu til liðs við félag á vefnum til að nota eiginleika félagsins eins og boð til meðlima og viðvaranir um lága stöðu.",
+
+      "openWebOrganizations": "Opna félög á vefnum",
+
       "organizationUnavailable": "Félagið er ekki tiltækt.",
-      "selectDescription": "Veldu félag úr prófílnum þínum til að halda áfram.",
+      "selectDescriptionWithOrganizations": "Þú tilheyrir einu eða fleiri félögum. Veldu reikninginn sem þessi skjár á að nota.",
+
       "selectOrganization": "Val á félagi",
       "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
       "accessDeniedDescription": "Þú hefur ekki aðgang að þessu félagi."

@@ -3046,9 +3046,18 @@
     "boundary": {
       "backToProfile": "Wróć do profilu",
       "loadErrorMessage": "Sprawdź połączenie i spróbuj ponownie.",
+
+      "chooseAccount": "Wybierz konto",
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
+      "noOrganization": "Brak organizacji",
+
+      "noOrganizationDescription": "To konto nie należy do organizacji. Utwórz organizację lub dołącz do niej w przeglądarce, aby korzystać z funkcji organizacji, takich jak zaproszenia dla członków i alerty o niskim saldzie.",
+
+      "openWebOrganizations": "Otwórz organizacje w przeglądarce",
+
       "organizationUnavailable": "Organizacja jest niedostępna.",
-      "selectDescription": "Wybierz organizację w swoim profilu, aby kontynuować.",
+      "selectDescriptionWithOrganizations": "Należysz do jednej lub więcej organizacji. Wybierz konto, którego ma używać ten ekran.",
+
       "selectOrganization": "Wybierz organizację",
       "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną w swoim profilu, aby kontynuować.",
       "accessDeniedDescription": "Nie masz dostępu do tej organizacji."

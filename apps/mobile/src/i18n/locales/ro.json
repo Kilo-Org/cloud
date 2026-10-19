@@ -3014,9 +3014,18 @@
     "boundary": {
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
+
+      "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
+      "noOrganization": "Nicio organizație",
+
+      "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
+
+      "openWebOrganizations": "Deschide organizațiile pe site",
+
       "organizationUnavailable": "Organizația nu este disponibilă.",
-      "selectDescription": "Alege o organizație din profilul tău pentru a continua.",
+      "selectDescriptionWithOrganizations": "Aparții unei sau mai multor organizații. Alege contul pe care ar trebui să îl folosească acest ecran.",
+
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
       "accessDeniedDescription": "Nu ai acces la această organizație."

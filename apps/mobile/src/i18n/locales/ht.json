@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Tounen nan pwofil la",
       "loadErrorMessage": "Tcheke koneksyon ou epi eseye ankò.",
+
+      "chooseAccount": "Chwazi yon kont",
       "loadErrorTitle": "Nou pa t ka chaje òganizasyon ou yo.",
+      "noOrganization": "Pa gen òganizasyon",
+
+      "noOrganizationDescription": "Kont sa a pa fè pati yon òganizasyon. Kreye oswa rantre nan yon òganizasyon sou sit entènèt la pou itilize fonksyon òganizasyon tankou envitasyon manm ak alèt sou balans ki ba.",
+
+      "openWebOrganizations": "Louvri òganizasyon sou sit entènèt la",
+
       "organizationUnavailable": "Òganizasyon an pa disponib.",
-      "selectDescription": "Chwazi yon òganizasyon nan pwofil ou pou kontinye.",
+      "selectDescriptionWithOrganizations": "Ou fè pati youn oswa plizyè òganizasyon. Chwazi kont ki ekran sa a dwe itilize a.",
+
       "selectOrganization": "Chwazi yon òganizasyon",
       "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon lòt nan pwofil ou a pou kontinye.",
       "accessDeniedDescription": "Ou pa gen aksè nan òganizasyon sa a."

@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Terug na profiel",
       "loadErrorMessage": "Kontroleer jou verbinding en probeer weer.",
+
+      "chooseAccount": "Kies 'n rekening",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
+      "noOrganization": "Geen organisasie",
+
+      "noOrganizationDescription": "Hierdie rekening is nie deel van 'n organisasie nie. Skep of sluit by een aan op die web om organisasiefunksies soos lede-uitnodigings en waarskuwings oor lae saldo te gebruik.",
+
+      "openWebOrganizations": "Maak organisasies op die web oop",
+
       "organizationUnavailable": "Die organisasie is nie beskikbaar nie.",
-      "selectDescription": "Kies 'n organisasie uit jou profiel om voort te gaan.",
+      "selectDescriptionWithOrganizations": "Jy behoort aan een of meer organisasies. Kies die rekening wat hierdie skerm moet gebruik.",
+
       "selectOrganization": "Kies 'n organisasie",
       "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
       "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."

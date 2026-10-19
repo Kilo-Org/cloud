@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Tagasi profiilile",
       "loadErrorMessage": "Kontrolli ühendust ja proovi uuesti.",
+
+      "chooseAccount": "Vali konto",
       "loadErrorTitle": "Sinu organisatsioone ei õnnestunud laadida.",
+      "noOrganization": "Organisatsioon puudub",
+
+      "noOrganizationDescription": "See konto ei kuulu ühtegi organisatsiooni. Organisatsiooni funktsioonide, nagu liikmekutsed ja väikese saldo hoiatused, kasutamiseks loo organisatsioon või liitu sellega veebis.",
+
+      "openWebOrganizations": "Ava organisatsioonid veebis",
+
       "organizationUnavailable": "Organisatsioon pole saadaval.",
-      "selectDescription": "Jätkamiseks vali oma profiililt organisatsioon.",
+      "selectDescriptionWithOrganizations": "Kuulud ühte või mitmesse organisatsiooni. Vali konto, mida see ekraan peaks kasutama.",
+
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali oma profiililt teine organisatsioon.",
       "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."

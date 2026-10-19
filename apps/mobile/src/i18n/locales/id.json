@@ -2966,9 +2966,18 @@
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Periksa koneksimu dan coba lagi.",
+
+      "chooseAccount": "Pilih akun",
       "loadErrorTitle": "Tidak dapat memuat daftar organisasimu.",
+      "noOrganization": "Tidak ada organisasi",
+
+      "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat atau gabung ke organisasi di web untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah.",
+
+      "openWebOrganizations": "Buka organisasi di web",
+
       "organizationUnavailable": "Organisasi tidak tersedia.",
-      "selectDescription": "Pilih organisasi dari profilmu untuk melanjutkan.",
+      "selectDescriptionWithOrganizations": "Kamu termasuk dalam satu atau beberapa organisasi. Pilih akun yang harus digunakan layar ini.",
+
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih organisasi lain dari profilmu untuk melanjutkan.",
       "accessDeniedDescription": "Kamu tidak memiliki akses ke organisasi ini."

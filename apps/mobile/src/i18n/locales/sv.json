@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Tillbaka till profilen",
       "loadErrorMessage": "Kontrollera anslutningen och försök igen.",
+
+      "chooseAccount": "Välj ett konto",
       "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
+      "noOrganization": "Ingen organisation",
+
+      "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa eller gå med i en organisation på webben för att använda organisationsfunktioner som medlemsinbjudningar och varningar om lågt saldo.",
+
+      "openWebOrganizations": "Öppna organisationer på webben",
+
       "organizationUnavailable": "Organisationen är inte tillgänglig.",
-      "selectDescription": "Välj en organisation i din profil för att fortsätta.",
+      "selectDescriptionWithOrganizations": "Du tillhör en eller flera organisationer. Välj det konto som den här skärmen ska använda.",
+
       "selectOrganization": "Välj en organisation",
       "unavailableDescription": "Den här organisationen är inte längre tillgänglig. Välj en annan i din profil för att fortsätta.",
       "accessDeniedDescription": "Du har inte åtkomst till den här organisationen."

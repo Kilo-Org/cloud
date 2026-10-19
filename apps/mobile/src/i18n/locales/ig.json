@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Laghachi na profaịlụ",
       "loadErrorMessage": "Lelee njikọ gị ma nwaa ọzọ.",
+
+      "chooseAccount": "Họrọ akaụntụ",
       "loadErrorTitle": "Enweghị ike ibudata ụlọ ọrụ gị.",
+      "noOrganization": "Enweghị ụlọ ọrụ",
+
+      "noOrganizationDescription": "Akaụntụ a esonyeghị na ụlọ ọrụ. Mepụta ma ọ bụ sonye na ụlọ ọrụ na webụ iji jiri atụmatụ ụlọ ọrụ dị ka ịkpọ ndị otu oku na ịdọ aka ná ntị gbasara obere ego n'akaụntụ.",
+
+      "openWebOrganizations": "Mepee ụlọ ọrụ na webụ",
+
       "organizationUnavailable": "Ụlọ ọrụ adịghị.",
-      "selectDescription": "Họrọ ụlọ ọrụ site na profaịlụ gị ka ị gaa n'ihu.",
+      "selectDescriptionWithOrganizations": "Ị so n'otu ụlọ ọrụ ma ọ bụ karịa. Họrọ akaụntụ nke ihuenyo a kwesịrị iji.",
+
       "selectOrganization": "Họrọ ụlọ ọrụ",
       "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu.",
       "accessDeniedDescription": "Ị nweghị ikike ịbanye n'ụlọ ọrụ a."

@@ -3094,9 +3094,18 @@
     "boundary": {
       "backToProfile": "Lura għall-profil",
       "loadErrorMessage": "Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+
+      "chooseAccount": "Agħżel kont",
       "loadErrorTitle": "Ma setgħux jitgħabbew l-organizzazzjonijiet tiegħek.",
+      "noOrganization": "L-ebda organizzazzjoni",
+
+      "noOrganizationDescription": "Dan il-kont mhuwiex parti minn organizzazzjoni. Oħloq jew ingħaqad ma' organizzazzjoni fuq il-web biex tuża karatteristiċi tal-organizzazzjoni bħal stedini għall-membri u twissijiet dwar bilanċ baxx.",
+
+      "openWebOrganizations": "Iftaħ l-organizzazzjonijiet fuq il-web",
+
       "organizationUnavailable": "L-organizzazzjoni mhix disponibbli.",
-      "selectDescription": "Agħżel organizzazzjoni mill-profil tiegħek biex tkompli.",
+      "selectDescriptionWithOrganizations": "Int tagħmel parti minn organizzazzjoni waħda jew aktar. Agħżel il-kont li għandha tuża dan l-iskrin.",
+
       "selectOrganization": "Agħżel organizzazzjoni",
       "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli.",
       "accessDeniedDescription": "M'għandekx aċċess għal din l-organizzazzjoni."

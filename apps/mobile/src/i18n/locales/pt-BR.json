@@ -3006,9 +3006,18 @@
     "boundary": {
       "backToProfile": "Voltar para o perfil",
       "loadErrorMessage": "Verifique sua conexão e tente novamente.",
+
+      "chooseAccount": "Selecione uma conta",
       "loadErrorTitle": "Não foi possível carregar suas organizações.",
+      "noOrganization": "Sem organização",
+
+      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou entre em uma organização no site para usar recursos de organização como convites de membros e alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir organizações no site",
+
       "organizationUnavailable": "A organização não está disponível.",
-      "selectDescription": "Escolha uma organização no seu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Você pertence a uma ou mais organizações. Escolha a conta que esta tela deve usar.",
+
       "selectOrganization": "Selecione uma organização",
       "unavailableDescription": "Esta organização não está mais disponível. Escolha outra no seu perfil para continuar.",
       "accessDeniedDescription": "Você não tem acesso a esta organização."

@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Gara piroofaayiliitti deebi'i",
       "loadErrorMessage": "Walitti hidhamiinsa kee ilaalii irra deebi'ii yaali.",
+
+      "chooseAccount": "Herrega filadhu",
       "loadErrorTitle": "Dhaabbilee kee fe'uu hin danda'amne.",
+      "noOrganization": "Dhaabbanni hin jiru",
+
+      "noOrganizationDescription": "Herregni kun dhaabbata tokko keessaa hin qoodu. Faayidaalee dhaabbataa akka affeerraa miseensotaa fi akeekkachiisa haala maallaqaa gadii fayyadamuf marsariitii irratti dhaabbata uumi yookaan tokkotti makami.",
+
+      "openWebOrganizations": "Dhaabbilee marsariitii irratti bani",
+
       "organizationUnavailable": "Dhaabbanni hin argamu.",
-      "selectDescription": "Itti fufuuf piroofaayilii kee irraa dhaabbata filadhu.",
+      "selectDescriptionWithOrganizations": "Ati dhaabbata tokko yookaan tokkoo ol keessaa qoodda. Herrega fuulli kun fayyadamuu qabu filadhu.",
+
       "selectOrganization": "Dhaabbata filadhu",
       "unavailableDescription": "Dhaabbanni kun kana booda hin argamu. Itti fufuuf piroofaayilii kee irraa dhaabbata filadhu.",
       "accessDeniedDescription": "Dhaabbata kana bira ga'uuf hayyama hin qabdu."

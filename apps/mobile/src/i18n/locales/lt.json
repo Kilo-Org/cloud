@@ -3054,9 +3054,18 @@
     "boundary": {
       "backToProfile": "Grįžti į profilį",
       "loadErrorMessage": "Patikrink ryšį ir bandyk dar kartą.",
+
+      "chooseAccount": "Pasirinkite paskyrą",
       "loadErrorTitle": "Nepavyko įkelti jūsų organizacijų.",
+      "noOrganization": "Nėra organizacijos",
+
+      "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Kad galėtumėte naudoti organizacijos funkcijas, tokias kaip narių kvietimai ir įspėjimai apie mažą likutį, sukurkite organizaciją arba prisijunkite prie jos naršyklėje.",
+
+      "openWebOrganizations": "Atidaryti organizacijas naršyklėje",
+
       "organizationUnavailable": "Organizacija nepasiekiama.",
-      "selectDescription": "Norėdami tęsti, savo profilyje pasirinkite organizaciją.",
+      "selectDescriptionWithOrganizations": "Priklausote vienai ar daugiau organizacijų. Pasirinkite paskyrą, kurią turėtų naudoti šis ekranas.",
+
       "selectOrganization": "Pasirinkite organizaciją",
       "unavailableDescription": "Ši organizacija nebepasiekiama. Norėdami tęsti, savo profilyje pasirinkite kitą organizaciją.",
       "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."

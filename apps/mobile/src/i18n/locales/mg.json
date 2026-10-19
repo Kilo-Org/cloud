@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Miverena amin'ny mombamomba anao",
       "loadErrorMessage": "Jereo ny fifandraisanao ary andramo indray.",
+
+      "chooseAccount": "Misafidiana kaonty",
       "loadErrorTitle": "Tsy voaray ny fikambananao.",
+      "noOrganization": "Tsy misy fikambanana",
+
+      "noOrganizationDescription": "Ity kaonty ity dia tsy anisan'ny fikambanana. Mamorona na midira ao amin'ny fikambanana ao amin'ny tranonkala mba hampiasa ny endriky ny fikambanana toy ny fanasana mpikambana sy ny fampitandremana momba ny fifandanjana ambany.",
+
+      "openWebOrganizations": "Manokatra fikambanana ao amin'ny tranonkala",
+
       "organizationUnavailable": "Tsy azo idirana ny fikambanana.",
-      "selectDescription": "Misafidiana fikambanana ao amin'ny mombamomba anao mba hanohizana.",
+      "selectDescriptionWithOrganizations": "Anisan'ny fikambanana iray na maromaro ianao. Misafidiana ny kaonty tokony hampiasain'ity efijery ity.",
+
       "selectOrganization": "Misafidiana fikambanana",
       "unavailableDescription": "Tsy azo idirana intsony ity fikambanana ity. Misafidiana iray ao amin'ny mombamomba anao mba hanohizana.",
       "accessDeniedDescription": "Tsy manana alalana hiditra amin'ity fikambanana ity ianao."

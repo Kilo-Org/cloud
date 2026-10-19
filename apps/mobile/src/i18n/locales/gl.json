@@ -2974,9 +2974,18 @@
     "boundary": {
       "backToProfile": "Volver ao perfil",
       "loadErrorMessage": "Comproba a túa conexión e téntao de novo.",
+
+      "chooseAccount": "Seleccionar unha conta",
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
+      "noOrganization": "Sen organización",
+
+      "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir as organizacións na web",
+
       "organizationUnavailable": "A organización non está dispoñible.",
-      "selectDescription": "Escolle unha organización desde o teu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Pertences a unha ou máis organizacións. Escolle a conta que debe usar esta pantalla.",
+
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
       "accessDeniedDescription": "Non tes acceso a esta organización."

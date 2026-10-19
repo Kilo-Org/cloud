@@ -4,6 +4,7 @@ import {
   LOW_BALANCE_CONTAINER_LIMIT,
   ORGANIZATION_CONTAINER_LIMIT,
   getBillingContext,
+  updateBillingContext,
   intervalId,
   usageContextFingerprint,
   createContainerUsageClient,
@@ -40,11 +41,14 @@ import type { VercelBillingLifetimeEvidence } from '../../src/control-plane/sand
 import {
   VERCEL_BILLING_SCHEDULE_KEY,
   type BillingScheduleEntries,
+  type BillingScheduleTable,
 } from '../../src/sandbox-control/billing-schedule.js';
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import type { Env } from '../../src/types.js';
 import { MeteredBillingLifecycle } from '../../src/metered-billing-lifecycle.js';
+import { VERCEL_CREATE_SETTLE_MS } from '../../src/agent-sandbox/vercel/vercel-runtime-state.js';
+import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { waitFor } from '../integration/wait-for.js';
 
 const bindings = env as Pick<Env, 'HYPERDRIVE' | 'CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED'> & {
@@ -108,6 +112,7 @@ type Race = {
     | 'definite-failure'
     | 'ambiguous-failure'
     | 'recovered-terminal'
+    | 'ambiguous-timeout'
     | 'cloudflare-launch-failure';
 };
 
@@ -460,7 +465,7 @@ async function runRace(race: Race) {
         create.fail(
           race.outcome === 'definite-failure'
             ? new ProviderCreationError('invalid_configuration')
-            : race.outcome === 'recovered-terminal'
+            : race.outcome === 'recovered-terminal' || race.outcome === 'ambiguous-timeout'
               ? new AgentSandboxUnavailableError('Provider outcome is unknown', 'sandbox_stopped')
               : new Error('Provider create response timed out; outcome unknown')
         );
@@ -506,9 +511,48 @@ async function runRace(race: Race) {
           await new Promise(resolve => setTimeout(resolve, 1_100));
           expect((await winner.stub.getAllocationState()).kind).toBe('stopped');
         }
+        if (race.outcome === 'ambiguous-timeout') {
+          const context = await runInDurableObject(winner.stub, (_instance, state) =>
+            getBillingContext(state.storage)
+          );
+          if (!context) throw new Error('Expected unresolved reservation');
+          const elapsed =
+            CONTROL_PLANE_TIMERS.sandbox.providerCreateMs + VERCEL_CREATE_SETTLE_MS + 1;
+          const startEpochMs = context.startEpochMs - elapsed;
+          await observer.query(
+            "UPDATE container_usage_interval SET id = $1, start_epoch_ms = $2, started_at = started_at - ($3::double precision * interval '1 millisecond'), last_seen_at = last_seen_at - ($3::double precision * interval '1 millisecond') WHERE instance_id = $4",
+            [
+              intervalId(context.service, context.instanceId, startEpochMs),
+              startEpochMs,
+              elapsed,
+              winner.sandboxId,
+            ]
+          );
+          await runInDurableObject(winner.stub, (_instance, state) =>
+            updateBillingContext(state.storage, {
+              ...context,
+              startEpochMs,
+              usageMeasuredAtMs: startEpochMs,
+            })
+          );
+        }
         await runInDurableObject(winner.stub, async (instance, state) => {
           const context = await getBillingContext(state.storage);
           if (!context) throw new Error('Expected ambiguous reservation to remain');
+          if (race.outcome === 'ambiguous-timeout') {
+            winner.provider.adapter.observe = async () => {
+              throw new Error('Vercel API unavailable');
+            };
+            await (
+              instance as unknown as { billingSchedule: BillingScheduleTable }
+            ).billingSchedule.schedule(
+              VERCEL_BILLING_SETTLEMENT_CALLBACK,
+              Date.now() - 1,
+              context.generation
+            );
+            await instance.alarm();
+            return;
+          }
           if (race.outcome === 'recovered-terminal') {
             const providerRef = encodeVercelProviderRef({
               sandboxName: winner.sandboxId,
@@ -542,6 +586,24 @@ async function runRace(race: Race) {
           });
           await instance.alarm();
         });
+        if (race.outcome === 'ambiguous-timeout') {
+          const rows = (await readAttemptRows()).rows;
+          expect(rows).toEqual([
+            expect.objectContaining({
+              status: 'closed',
+              confirmed_seconds: 0,
+              settled_billable_seconds: 0,
+            }),
+          ]);
+          const checks = await readContainerCapacity(db.db, {
+            subject: winner.subject,
+            actor: winner.actor,
+            instanceId: `observer-${suffix}`,
+            checkpoint: 'control-plane-create',
+          });
+          expect(checks).toContainEqual(expect.objectContaining({ live: 2, limit: 3 }));
+          return;
+        }
         if (race.outcome === 'recovered-terminal') {
           await waitFor(async () => {
             const rows = (await readAttemptRows()).rows;
@@ -647,6 +709,10 @@ async function runRace(race: Race) {
 describe('atomic admission across real SandboxControlV2 Durable Objects and meter RPC', () => {
   it('releases a failed Cloudflare launch with a closed zero-usage interval and no capacity slot', async () => {
     await runRace({ scope: 'personal', slots: 1, outcome: 'cloudflare-launch-failure' });
+  });
+
+  it('releases the live reservation after the create deadline and settle window when Vercel observe always throws', async () => {
+    await runRace({ scope: 'personal', slots: 1, outcome: 'ambiguous-timeout' });
   });
 
   it.each([1, 2])(

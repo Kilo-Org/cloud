@@ -24,6 +24,7 @@ import {
   saveVercelBillingBinding,
 } from '../../sandbox-control/vercel-billing.js';
 import { decodeVercelProviderRef } from '../../sandbox-control/vercel-provider.js';
+import { VERCEL_CREATE_SETTLE_MS } from '../../agent-sandbox/vercel/vercel-runtime-state.js';
 import type { ProviderAdapter } from '../../sandbox-control/provider.js';
 import type { AgentSandboxProvider, Env } from '../../types.js';
 import type { AllocationEvent, AllocationState, SandboxTimers } from './allocation.js';
@@ -549,8 +550,18 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       }
       const binding = await loadVercelBillingBinding(deps.storage, generation);
       const state = await deps.readAllocation();
+      const createDeadlineAt =
+        state.allocationId === context.metadata?.allocation_id
+          ? (state.createDeadlineAt ?? context.startEpochMs + deps.timers().providerCreateMs)
+          : context.startEpochMs + deps.timers().providerCreateMs;
+      const canRenewReservation = Date.now() <= createDeadlineAt + VERCEL_CREATE_SETTLE_MS;
       const startAcknowledged = await active.lifecycle.hasAcknowledgedStart(generation);
-      if (!context.measurementStarted && !context.pendingStop && startAcknowledged) {
+      if (
+        !context.measurementStarted &&
+        !context.pendingStop &&
+        startAcknowledged &&
+        canRenewReservation
+      ) {
         try {
           await active.lifecycle.ensureStartAcknowledged(context, 'control-plane-create');
         } catch {
@@ -584,7 +595,7 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
           } else {
             await defer(generation, entry.callback);
           }
-        } else if (observation.status === 'terminal') {
+        } else if (observation.status === 'terminal' || !canRenewReservation) {
           await releaseAdmission(context.metadata.allocation_id);
         } else {
           await defer(generation, entry.callback);

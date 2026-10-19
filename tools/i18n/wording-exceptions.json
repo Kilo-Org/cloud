@@ -185,7 +185,7 @@
   ],
   "hi": ["github connection expired", "merge", "open", "open pull request", "sign out"],
   "hr": ["commit", "files", "open", "open pull request", "plan", "reactions", "tokens"],
-  "hu": ["files", "open", "open pull request", "reactions", "tokens"],
+  "hu": ["files", "open", "open pull request", "reactions", "review", "stopped", "tokens"],
   "hy": ["commit", "open", "open pull request", "reactions", "review", "tokens"],
   "id": ["open", "open pull request"],
   "ig": ["commit", "open"],

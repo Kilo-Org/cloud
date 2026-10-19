@@ -52,11 +52,18 @@ function renderedTexts(root: I): string[] {
 
 describe('SecurityCommandRetryCard', () => {
   it('shows the stored error and both actions for a retryable failure', () => {
-    const root = renderCard({ lastError: 'Network error', retryable: true });
+    const root = renderCard({ lastError: 'Network error', retryable: true, onDiscard: vi.fn() });
 
     expect(renderedTexts(root.root)).toContain('Network error');
     expect(renderedTexts(root.root)).toContain('Retry');
     expect(renderedTexts(root.root)).toContain('Discard');
+  });
+
+  it('omits Discard when no discard handler is provided', () => {
+    const root = renderCard({ lastError: 'Network error', retryable: true, onRetry: vi.fn() });
+
+    expect(renderedTexts(root.root)).toContain('Retry');
+    expect(renderedTexts(root.root)).not.toContain('Discard');
   });
 
   it('hides Retry for a non-retryable failure but keeps the card', () => {

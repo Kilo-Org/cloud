@@ -186,6 +186,16 @@ describe('getAuthHeaders', () => {
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('sends the app product token as the User-Agent on every tRPC call', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+
+    await expect(headers()).resolves.toMatchObject({
+      'User-Agent': 'Kilo-Code/1.0.4 (ios)',
+    });
+  });
+
   it('uses the newest owner token published while the cold expiry was read', async () => {
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() - 1000));

@@ -10,8 +10,10 @@ export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDevice
  *
  * Browser requests always lead with the `Mozilla/5.0` compatibility token, so
  * those collapse to "Web browser". Everything else keeps its first product
- * token ("Kilo-Code/1.2.3" → "Kilo-Code", "axios/1.7.0" → "axios"), and a
- * missing or empty header falls back to "Unknown device".
+ * token — the mobile app now sends `Kilo-Code/<version> (<platform>)`, so a
+ * mobile row titles itself "Kilo-Code" instead of the platform HTTP library's
+ * default ("axios/1.7.0" → "axios"), and a missing or empty header falls back
+ * to "Unknown device".
  */
 export function deviceSessionLabel(userAgent: string | null | undefined): string {
   const trimmed = userAgent?.trim() ?? '';
@@ -21,7 +23,7 @@ export function deviceSessionLabel(userAgent: string | null | undefined): string
   if (trimmed.startsWith('Mozilla/')) {
     return i18n.t('deviceSessions.webBrowser');
   }
-  // "Kilo-Code/1.2.3 (darwin; arm64)" → "Kilo-Code" (drop the version and the rest).
+  // "Kilo-Code/1.2.3 (android)" → "Kilo-Code" (drop the version and the rest).
   return trimmed.split(/[\s/]/)[0] ?? i18n.t('kiloclaw.devicePairing.unknownDevice');
 }
 

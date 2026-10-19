@@ -37,6 +37,11 @@ describe('deviceSessionLabel', () => {
     expect(deviceSessionLabel('Kilo-Code/1.2.3 (darwin; arm64)')).toBe('Kilo-Code');
     expect(deviceSessionLabel('axios/1.7.0')).toBe('axios');
   });
+
+  it('titles a mobile-app user agent Kilo-Code instead of the HTTP client default', () => {
+    expect(deviceSessionLabel('Kilo-Code/1.2.3 (android)')).toBe('Kilo-Code');
+    expect(deviceSessionLabel('Kilo-Code/1.2.3 (ios)')).toBe('Kilo-Code');
+  });
 });
 
 describe('sortDeviceSessions', () => {

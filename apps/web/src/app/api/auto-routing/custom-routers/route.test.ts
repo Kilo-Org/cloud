@@ -25,7 +25,6 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -62,7 +61,6 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedRequireActiveSubscription = jest.mocked(requireActiveSubscriptionOrTrial);
 const mockedGetStatus = jest.mocked(getCustomRouterStatus);
 const mockedRegister = jest.mocked(registerOwnerBenchmarkProfiles);
@@ -184,7 +182,6 @@ describe('/api/auto-routing/custom-routers', () => {
     jest.resetAllMocks();
     user = await insertTestUser();
     signIn(user);
-    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
     mockedRequireActiveSubscription.mockResolvedValue({ isReadOnly: false, daysRemaining: 30 });
     mockedRegister.mockResolvedValue({ ok: true });
     mockedGetEnhanced.mockResolvedValue({ data: [model(SONNET), model(FLASH), model(DENIED)] });
@@ -206,43 +203,23 @@ describe('/api/auto-routing/custom-routers', () => {
     await cleanupDbForTest();
   });
 
-  describe('feature flag', () => {
-    test('a user without the flag gets router_not_found and cannot create routers', async () => {
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
-
-      const listed = await errorOf(await listRouters(request('')));
-      const created = await create(routerBody());
-
-      expect(listed).toEqual({
-        status: 404,
-        body: { error: { code: 'router_not_found', message: expect.any(String) } },
-      });
-      expect(created.status).toBe(404);
-      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-      expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith(
-        'kilo-auto-custom-routers',
-        user.id
-      );
-    });
-  });
-
   describe('migrated owner pools', () => {
-    test('an unflagged migrated owner can edit only the canonical router without creation access', async () => {
+    test('a migrated owner edits the canonical router and keeps full router access', async () => {
       await create(routerBody());
       await create(routerBody({ slug: 'efficient' }));
       await db
         .update(auto_routing_custom_routers)
         .set({ legacy_pool: true, legacy_mode_inherited: true })
         .where(eq(auto_routing_custom_routers.slug, 'efficient'));
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
 
       const listed = await list();
-      expect(listed.body.canCreate).toBe(false);
+      expect(listed.body.canCreate).toBe(true);
       expect(listed.body.routers).toEqual([
+        expect.objectContaining({ slug: 'coding', legacyPool: false, canEdit: true }),
         expect.objectContaining({ slug: 'efficient', legacyPool: true, canEdit: true }),
       ]);
-      expect((await create(routerBody({ slug: 'another' }))).status).toBe(404);
-      expect((await getRouter(request('/user/coding'), params('user', 'coding'))).status).toBe(404);
+      expect((await create(routerBody({ slug: 'another' }))).status).toBe(201);
+      expect((await getRouter(request('/user/coding'), params('user', 'coding'))).status).toBe(200);
       const response = await updateRouter(
         request('/user/efficient', {
           method: 'PATCH',
@@ -333,7 +310,7 @@ describe('/api/auto-routing/custom-routers', () => {
     });
 
     test.each(['member', 'billing_manager'] as const)(
-      'an unflagged organization %s retains existing role permissions',
+      'an organization %s retains existing role permissions on a migrated router',
       async role => {
         const organization = await createTestOrganization('Migrated', user.id, 0);
         await create(
@@ -350,7 +327,6 @@ describe('/api/auto-routing/custom-routers', () => {
           kilo_user_id: member.id,
           role,
         });
-        mockedIsReleaseToggleEnabled.mockResolvedValue(false);
         signIn(member, organization.id);
 
         const listed = await list();
@@ -370,7 +346,7 @@ describe('/api/auto-routing/custom-routers', () => {
     );
 
     test.each(['owner', 'admin', 'billing_manager'] as const)(
-      'an unflagged parent %s can discover and edit its child migrated router only',
+      'a parent %s can discover and edit every router of its child organization',
       async role => {
         const parent = await createTestOrganization('Parent', user.id, 0);
         const childOwner = await insertTestUser();
@@ -390,49 +366,34 @@ describe('/api/auto-routing/custom-routers', () => {
           .update(auto_routing_custom_routers)
           .set({ legacy_pool: true })
           .where(eq(auto_routing_custom_routers.slug, 'efficient'));
-        mockedIsReleaseToggleEnabled.mockResolvedValue(false);
         signIn(user, child.id);
 
         const listed = await list();
         expect(listed.status).toBe(200);
-        expect(listed.body.canCreate).toBe(false);
+        expect(listed.body.canCreate).toBe(true);
         expect(listed.body.routers).toEqual([
           expect.objectContaining({
             modelId: 'kilo-auto/custom/org/efficient',
             legacyPool: true,
             canEdit: true,
           }),
+          expect.objectContaining({
+            modelId: 'kilo-auto/custom/org/unrelated-router',
+            legacyPool: false,
+            canEdit: true,
+          }),
         ]);
-        expect(
-          (await getRouter(request('/org/efficient'), params('org', 'efficient'))).status
-        ).toBe(200);
-        expect(
-          (
-            await updateRouter(
-              request('/org/efficient', {
-                method: 'PATCH',
-                body: { name: 'Inherited editor change' },
-              }),
-              params('org', 'efficient')
-            )
-          ).status
-        ).toBe(200);
-        expect((await create(routerBody({ scope: 'org', slug: 'new-router' }))).status).toBe(404);
-        expect(
-          (await getRouter(request('/org/unrelated-router'), params('org', 'unrelated-router')))
-            .status
-        ).toBe(404);
         expect(
           (
             await updateRouter(
               request('/org/unrelated-router', {
                 method: 'PATCH',
-                body: { name: 'Denied change' },
+                body: { name: 'Inherited editor change' },
               }),
               params('org', 'unrelated-router')
             )
           ).status
-        ).toBe(404);
+        ).toBe(200);
         expect(mockedRequireActiveSubscription).toHaveBeenCalledWith(child.id);
       }
     );
@@ -456,7 +417,6 @@ describe('/api/auto-routing/custom-routers', () => {
         .update(auto_routing_custom_routers)
         .set({ legacy_pool: true })
         .where(eq(auto_routing_custom_routers.owned_by_organization_id, child.id));
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
       signIn(user, child.id);
 
       expect((await list()).body.routers).toEqual([expect.objectContaining({ canEdit: true })]);
@@ -505,7 +465,6 @@ describe('/api/auto-routing/custom-routers', () => {
             grandchild.id,
           ])
         );
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
       signIn(user);
       expect((await list(`?organizationId=${child.id}`)).status).toBe(200);
       for (const organization of [sibling, grandchild]) {

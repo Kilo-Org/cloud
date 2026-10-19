@@ -379,10 +379,7 @@ describe('upsertSlackInstallation', () => {
         }),
       })
     );
-    const insertedMetadata = mockInsertValues.mock.calls[0][0].metadata as Record<
-      string,
-      unknown
-    >;
+    const insertedMetadata = mockInsertValues.mock.calls[0][0].metadata as Record<string, unknown>;
     expect(insertedMetadata).not.toHaveProperty('access_token');
   });
 
@@ -470,8 +467,8 @@ describe('upsertSlackInstallation', () => {
       teamName: 'Kilo Team',
     } satisfies SlackInstallation;
 
-    await expect(
-      upsertSlackInstallation({ owner, teamId: 'T123', installation })
-    ).rejects.toThrow('encryption not configured');
+    await expect(upsertSlackInstallation({ owner, teamId: 'T123', installation })).rejects.toThrow(
+      'encryption not configured'
+    );
   });
 });

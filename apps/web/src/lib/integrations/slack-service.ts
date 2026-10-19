@@ -272,8 +272,7 @@ export async function upsertSlackInstallation({
     ...existingMetadata,
     bot_user_id: installation.botUserId,
     model_slug:
-      'model_slug' in existingMetadata &&
-      typeof existingMetadata.model_slug === 'string'
+      'model_slug' in existingMetadata && typeof existingMetadata.model_slug === 'string'
         ? existingMetadata.model_slug
         : defaultModel,
   };

@@ -239,9 +239,7 @@ async function main(): Promise<void> {
   console.log(`Eligible for backfill:       ${eligible}`);
   console.log(`Migrated:                    ${migrated}`);
   console.log(`Scrubbed plaintext tokens:   ${scrubbed}`);
-  console.log(
-    `Kept (no credential row):    ${skipped.scrub_no_credential}`
-  );
+  console.log(`Kept (no credential row):    ${skipped.scrub_no_credential}`);
   console.log(`Failed scrubs:               ${skipped.scrub_failed}`);
   console.log(`Skipped (already migrated):  ${skipped.already_migrated}`);
   console.log(`Skipped (no plaintext):      ${skipped.no_plaintext_token}`);

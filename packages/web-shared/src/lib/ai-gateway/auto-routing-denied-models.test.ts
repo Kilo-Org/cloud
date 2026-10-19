@@ -1,8 +1,11 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
-import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   resolveOrganizationMemberModelPolicy,
   type EffectiveOrganizationModelPolicy,
@@ -30,6 +33,7 @@ jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
   () => ({
     getDataCollectionRequiredModelIds: jest.fn(),
+    getProviderSlugsForModel: jest.fn(),
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
@@ -96,7 +100,9 @@ describe('policyNeedsCandidateEvaluation', () => {
 
 describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
-    await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
+    await expect(collectDeniedAutoRoutingModelIds(policy(), owner, 'efficient')).resolves.toEqual(
+      []
+    );
   });
 
   it('ignores the organization deny list for an unrestricted grant without loading candidates', async () => {
@@ -104,10 +110,63 @@ describe('collectDeniedAutoRoutingModelIds', () => {
     await expect(
       collectDeniedAutoRoutingModelIds(
         policy({ organizationModelDenyList: ['openai/gpt-4o'] }),
-        owner
+        owner,
+        'efficient'
       )
     ).resolves.toEqual([]);
     expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
+
+  describe('with an organization provider allowlist', () => {
+    const providerCeilingPolicy = policy({
+      memberGrant: { mode: 'organization_baseline' },
+      organizationProviderCeiling: ['anthropic'],
+    });
+
+    beforeEach(() => {
+      jest.mocked(getCachedRoutingTable).mockReset();
+      jest.mocked(getCachedRoutingTable).mockImplementation(
+        async router =>
+          (router === 'frontier'
+            ? { routes: { 'implementation/code_generation': [{ model: 'openai/gpt-5' }] } }
+            : {
+                routes: { 'implementation/code_generation': [{ model: 'anthropic/claude' }] },
+              }) as never
+      );
+      jest.mocked(getAutoRoutingSettings).mockReset();
+      jest.mocked(getAutoRoutingSettings).mockResolvedValue({
+        status: 200,
+        body: { configuredPool: [{ model: 'anthropic/claude' }] },
+      } as never);
+      jest
+        .mocked(getProviderSlugsForModel)
+        .mockImplementation(async modelId =>
+          modelId.startsWith('openai/') ? new Set(['openai']) : new Set(['anthropic'])
+        );
+    });
+
+    it('denies a frontier table model blocked by the provider allowlist and absent from the efficient table', async () => {
+      await expect(
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, owner, 'frontier')
+      ).resolves.toEqual(['openai/gpt-5']);
+      expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
+      expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
+    });
+
+    it('ignores the efficient custom pool for frontier', async () => {
+      await expect(
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, owner, 'frontier')
+      ).resolves.toEqual(['openai/gpt-5']);
+      expect(getAutoRoutingSettings).not.toHaveBeenCalled();
+    });
+
+    it('uses the custom pool for efficient instead of the frontier table', async () => {
+      await expect(
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, owner, 'efficient')
+      ).resolves.toEqual([]);
+      expect(getAutoRoutingSettings).toHaveBeenCalled();
+      expect(getCachedRoutingTable).toHaveBeenCalledWith('efficient');
+    });
   });
 });
 
@@ -157,10 +216,9 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       .mocked(getDataCollectionRequiredModelIds)
       .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor', 'unrelated/model']));
 
-    await expect(collectDataCollectionRequiredAutoRoutingModelIds(owner)).resolves.toEqual([
-      'meta/muse-spark-1.3-contributor',
-      'provider/free-model:free',
-    ]);
+    await expect(
+      collectDataCollectionRequiredAutoRoutingModelIds(owner, 'efficient')
+    ).resolves.toEqual(['meta/muse-spark-1.3-contributor', 'provider/free-model:free']);
   });
 });
 

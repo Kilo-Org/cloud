@@ -49,7 +49,9 @@ Split auto routing into platform routers and custom routers.
 - A member can use a personal router in an organization context. The organization pays, and the
   organization model policy removes denied gateway candidates.
 - `kilo-auto/org` route targets can name an organization custom router of the same organization.
-  The gateway resolves the target with gateway candidates only.
+  The organization model catalog lists that organization's routers for both the fallback and
+  custom-mode pickers, excluding personal routers. The gateway resolves the target with gateway
+  candidates only.
 
 ## Router definition
 
@@ -175,7 +177,9 @@ Older CLIs, OpenClaw, and API clients send the custom model ID to the gateway. T
 the internal `/decide` with the custom router reference. The worker considers gateway entries
 only. The gateway passes `router_not_found` and `custom_router_unavailable` to the caller; any
 other worker failure is a retryable `auto_routing_unavailable`. The gateway does not fall back to
-a model outside the pool.
+a model outside the pool. Organization deny-list IDs are normalized and expanded to the exact
+gateway candidate IDs, including suffixed variants, before calling the worker; the gateway also
+rejects a worker pick that matches any denied candidate.
 
 The `kilo-auto-frontier-routing` flag gates only the platform frontier table. A custom router with
 a frontier base serves its own pool and does not read that table, so the flag does not apply.

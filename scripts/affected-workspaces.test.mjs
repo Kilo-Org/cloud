@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { selectAffected } from './affected-workspaces.mjs';
+import { isModuleSpecifier, selectAffected } from './affected-workspaces.mjs';
 
 const workspace = (name, dir, dependencies = {}) => ({ name, dir, manifest: { dependencies } });
 const items = [
@@ -20,6 +20,7 @@ const references = [
 ];
 const select = (changedFiles, lockfileDirs = []) =>
   selectAffected({ items, changedFiles, lockfileDirs, references });
+const noTests = { test_only_dirs: [], test_only_packages: [], test_only_files: [] };
 
 test('a leaf change selects only the leaf', () => {
   assert.deepEqual(select(['services/leaf/src/index.ts']), {
@@ -28,6 +29,7 @@ test('a leaf change selects only the leaf', () => {
     full_checks: [],
     dirs: ['services/leaf'],
     packages: ['leaf'],
+    ...noTests,
   });
 });
 
@@ -110,6 +112,7 @@ test('a check script change runs only that check everywhere', () => {
     full_checks: ['lint'],
     dirs: [],
     packages: [],
+    ...noTests,
   });
   const both = select(['scripts/typecheck-all.sh', 'services/leaf/src/a.ts']);
   assert.deepEqual(both.full_checks, ['typecheck']);
@@ -121,4 +124,130 @@ test('lockfile changes select the workspaces whose dependencies changed', () => 
   assert.deepEqual(select(['pnpm-lock.yaml'], []).dirs, []);
   assert.equal(select(['pnpm-lock.yaml'], ['*']).full, true);
   assert.equal(select(['pnpm-lock.yaml'], ['.']).full, true);
+});
+
+// leaf-reader depends on leaf, so a full edge into leaf reaches it too.
+const dataItems = [
+  ...items,
+  workspace('leaf-reader', 'services/leaf-reader', { leaf: 'workspace:*' }),
+];
+const selectData = (changedFiles, references) =>
+  selectAffected({ items: dataItems, changedFiles, lockfileDirs: [], references });
+
+test('a test that reads another workspace as data runs only its tests', () => {
+  const references = [
+    ['services/leaf/src/slash-commands.test.ts', 'apps/mobile/src/i18n/en.json', true],
+  ];
+  assert.deepEqual(selectData(['apps/mobile/src/app/index.tsx'], references), {
+    full: false,
+    reasons: [],
+    full_checks: [],
+    dirs: ['apps/mobile'],
+    packages: ['kilo-app'],
+    test_only_dirs: ['services/leaf'],
+    test_only_packages: ['leaf'],
+    test_only_files: ['services/leaf/src/slash-commands.test.ts'],
+  });
+  for (const file of ['services/leaf/src/__tests__/copy.ts', 'services/leaf/src/copy.spec.tsx']) {
+    const result = selectData(['apps/mobile/README.md'], [[file, 'apps/mobile/README.md', true]]);
+    assert.deepEqual(result.dirs, [], file);
+    assert.deepEqual(result.test_only_files, [file]);
+  }
+});
+
+test('a test data read selects tests only when the read workspace has a changed file', () => {
+  const references = [['services/leaf/src/a.test.ts', 'apps/web/src/sandbox.ts', true]];
+  const viaDependency = selectData(['packages/db/src/schema.ts'], references);
+  assert.ok(viaDependency.packages.includes('web'));
+  assert.deepEqual(viaDependency.test_only_dirs, []);
+  const nested = selectData(
+    ['services/agent/wrapper/src/main.ts'],
+    [['services/leaf/src/a.test.ts', 'services/agent', true]]
+  );
+  assert.deepEqual(nested.test_only_dirs, ['services/leaf']);
+});
+
+test('a test that reads a root path as data runs only its tests', () => {
+  const result = selectData(
+    ['tools/fixtures/a.json'],
+    [['services/leaf/src/a.test.ts', 'tools/fixtures', true]]
+  );
+  assert.equal(result.full, false);
+  assert.deepEqual(result.dirs, []);
+  assert.deepEqual(result.test_only_dirs, ['services/leaf']);
+});
+
+test('a module import or a non-test path read stays a full edge', () => {
+  for (const reference of [
+    ['services/leaf/src/a.test.ts', 'apps/mobile/src/lib/sentinel', false],
+    ['services/leaf/vitest.config.ts', 'apps/mobile/src', true],
+    ['services/leaf/src/copy.ts', 'apps/mobile/src/i18n/en.json', true],
+  ]) {
+    const result = selectData(['apps/mobile/src/app/index.tsx'], [reference]);
+    assert.deepEqual(result.packages, ['kilo-app', 'leaf', 'leaf-reader'], reference[0]);
+    assert.deepEqual(result.test_only_dirs, [], reference[0]);
+  }
+});
+
+test('module specifiers are told apart from paths read as data', () => {
+  const at = (text, literal = "'../x'") => isModuleSpecifier(text, text.indexOf(literal));
+  for (const text of [
+    "import { a } from '../x';",
+    "export * from '../x';",
+    "import '../x';",
+    "import /* comment */ '../x';",
+    "import /* first */ /* second */ '../x';",
+    "import /* multi\nline */ '../x';",
+    "import // comment\n '../x';",
+    "import /* block */ // line\n /* block */ '../x';",
+    "import { a } from /* comment */ '../x';",
+    "export * from // comment\n '../x';",
+    "const url = 'https://example.test'; import /* comment */ '../x';",
+    "const a = import /* callee */ (/* argument */ '../x');",
+    "vi.mock /* callee */ (// argument\n '../x');",
+    "const a = vi.importActual /* callee */ <typeof A> /* type */ (/* argument */ '../x');",
+    "const a = await import('../x');",
+    "type A = typeof import('../x');",
+    "const a = require('../x');",
+    "vi.mock('../x', () => ({}));",
+    "jest.doMock(\n  '../x'\n);",
+    "const a = await vi.importActual<typeof A>('../x');",
+    "const a = jest.requireActual<{\n  run(): Promise<void>;\n  map: () => Map<string, number>;\n}>('../x');",
+  ]) {
+    assert.equal(at(text), true, text);
+  }
+  for (const text of [
+    "const a = new URL('../x', import.meta.url);",
+    "const a = fileURLToPath(\n  new URL('../x', import.meta.url)\n);",
+    "const a = join(__dirname, '../x');",
+    "readFileSync('../x');",
+    "it.each(['../x'])('reads %s', () => {});",
+    "const a = '../x';",
+    "readFileSync(/* comment */ '../x');",
+    "const a = /* import */ '../x';",
+    "const a = // import\n '../x';",
+  ]) {
+    assert.equal(at(text), false, text);
+  }
+});
+
+test('commented imports keep the reader and its dependents fully affected', () => {
+  for (const text of [
+    "import /* comment */ '../x';",
+    "import // comment\n '../x';",
+    "vi.mock /* callee */ (/* argument */ '../x');",
+  ]) {
+    const result = selectData(
+      ['apps/mobile/src/app/index.tsx'],
+      [
+        [
+          'services/leaf/src/a.test.ts',
+          'apps/mobile/src/lib/sentinel',
+          !isModuleSpecifier(text, text.indexOf("'../x'")),
+        ],
+      ]
+    );
+    assert.deepEqual(result.packages, ['kilo-app', 'leaf', 'leaf-reader'], text);
+    assert.deepEqual(result.test_only_dirs, [], text);
+  }
 });

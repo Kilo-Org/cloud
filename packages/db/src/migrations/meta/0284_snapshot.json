@@ -1,5 +1,5 @@
 {
-  "id": "2341b9cd-1a4d-48a6-9a66-fb2fa699a3e1",
+  "id": "ffb6951c-c4fc-4ac9-a219-5953c00fde1e",
   "prevId": "d48371da-3faf-40a7-b7b0-8deaef61ed7b",
   "version": "7",
   "dialect": "postgresql",
@@ -2929,20 +2929,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "legacy_pool": {
-          "name": "legacy_pool",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "legacy_mode_inherited": {
-          "name": "legacy_mode_inherited",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -27851,6 +27837,12 @@
         "usage_limit_resets_at": {
           "name": "usage_limit_resets_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usage_limit_error_code": {
+          "name": "usage_limit_error_code",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

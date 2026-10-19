@@ -86,6 +86,22 @@ describe('GET /api/organizations/[id]/models', () => {
     });
   });
 
+  test('preserves organization custom routers for both organization target pickers', async () => {
+    const model = makeModel('openai/gpt-5.4-mini');
+    const router = {
+      ...makeModel('kilo-auto/custom/org/coding'),
+      autoRouting: { models: [model.id] },
+    };
+    listAvailableModels.mockResolvedValue({ data: [model, router] });
+
+    const response = await handleOrganizationModelsRequest(request(), {
+      params: Promise.resolve({ id: 'org-1' }),
+    });
+
+    expect(listAvailableModels).toHaveBeenCalledWith({ organizationId: 'org-1' });
+    await expect(response.json()).resolves.toEqual({ data: [model, router] });
+  });
+
   test('returns the catalog unchanged when auto models are absent', async () => {
     const model = makeModel('openai/gpt-5.4-mini');
     listAvailableModels.mockResolvedValue({ data: [model] });

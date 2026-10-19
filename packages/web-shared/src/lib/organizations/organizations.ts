@@ -39,6 +39,7 @@ import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organizat
 import { captureOrganizationMemberJoined } from '@kilocode/web-shared/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -253,6 +254,9 @@ export async function createOrganization(
   plan?: 'teams' | 'enterprise'
 ): Promise<Organization> {
   const organization = await db.transaction(async tx => {
+    if (userId) {
+      await enforceOrganizationCreationLimit(tx, userId);
+    }
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
 

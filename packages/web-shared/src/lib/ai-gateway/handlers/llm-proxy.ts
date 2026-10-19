@@ -417,14 +417,20 @@ export async function handleLlmProxyRequest(
   };
   const autoRoutingDenials = async (
     fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
-    fromPrivacy: () => Promise<string[]>
+    fromPrivacy: () => Promise<string[]>,
+    candidateIds: ReadonlyArray<string> = []
   ) => {
     const { settings, plan } = await balanceAndSettingsPromise;
     const groupPolicy = await organizationGroupPolicyPromise;
-    const deniedFromSettings =
+    const deniedSettings = new Set(
       !groupPolicy && plan === 'enterprise'
         ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
-        : [];
+        : []
+    );
+    const deniedFromSettings = [
+      ...deniedSettings,
+      ...candidateIds.filter(modelId => deniedSettings.has(normalizeModelId(modelId))),
+    ];
     const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
       groupPolicy ? fromPolicy(groupPolicy) : [],
       isDataCollectionExplicitlyDisallowed(effectivePrivacy) ? fromPrivacy() : [],
@@ -498,8 +504,8 @@ export async function handleLlmProxyRequest(
       }
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy, owner),
-        () => collectDataCollectionRequiredAutoRoutingModelIds(owner)
+        policy => collectDeniedAutoRoutingModelIds(policy, owner, router),
+        () => collectDataCollectionRequiredAutoRoutingModelIds(owner, router)
       );
       const result = await fetchEfficientAutoDecision({
         ...decisionRequest(owner),
@@ -525,7 +531,8 @@ export async function handleLlmProxyRequest(
         deniedModelIds: candidateIds =>
           autoRoutingDenials(
             policy => deniedAutoRoutingCandidates(policy, candidateIds),
-            () => dataCollectionRequiredAutoRoutingCandidates(candidateIds)
+            () => dataCollectionRequiredAutoRoutingCandidates(candidateIds),
+            candidateIds
           ),
         decide: async (router, deniedModelIds) => {
           const outcome = await fetchCustomRouterDecision({

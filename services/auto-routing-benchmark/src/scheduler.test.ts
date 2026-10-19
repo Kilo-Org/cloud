@@ -11,6 +11,7 @@ import {
   cooldownProviders,
   deferChunk,
   finishChunk,
+  getPaidCasePromptRevision,
   getPaidCaseStartedAt,
   hasUnsettledChunks,
   recoverChunks,
@@ -166,7 +167,12 @@ describe('scheduler (production migrations and real SQLite)', () => {
       unknownProviderConcurrency: 2,
       modelLimits: {},
       providerLimits: {},
-      shares: { 'efficient/platform': 2, 'frontier/platform': 2, 'efficient/user': 1 },
+      shares: {
+        'efficient/platform': 2,
+        'frontier/platform': 2,
+        'efficient/user': 1,
+        'frontier/user': 1,
+      },
     });
     expect(() => schedulerConfig('{"slots":251}')).toThrow();
     expect(() => schedulerConfig('{"slots":0}')).toThrow();
@@ -792,6 +798,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
         case_id: 'paid-case',
         token: claim.token,
         started_at: NOW,
+        prompt_revision: 2,
       },
     ]);
     sqlite.close();
@@ -838,6 +845,39 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(await getPaidCaseStartedAt(db, key)).toBe(NOW);
     await restartPaidCase(db, key, NOW + 2_000);
     expect(await getPaidCaseStartedAt(db, key)).toBe(NOW + 2_000);
+  });
+
+  it('ledgers the prompt transport that opened a paid case, defaulting to the old one', async () => {
+    insertRun(sqlite, 'revision');
+    await scheduleRunChunks(db, {
+      runId: 'revision',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case', 'legacy'],
+      chunkSize: 2,
+    });
+    const [claim] = await claimMany(db, schedulerConfig(), 1, 'revision');
+    if (!claim) throw new Error('Expected a claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const key = paidCase(claim, 'case');
+    const legacy = paidCase(claim, 'legacy');
+    expect(await getPaidCasePromptRevision(db, key)).toBeNull();
+    expect(await beginPaidCase(db, key, NOW)).toBe(true);
+    expect(await getPaidCasePromptRevision(db, key)).toBe(2);
+    // A worker deployed before the column existed leaves the default.
+    sqlite
+      .prepare(`INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(
+        legacy.runId,
+        legacy.model,
+        legacy.variant,
+        legacy.rep,
+        legacy.caseId,
+        legacy.token,
+        NOW
+      );
+    expect(await getPaidCasePromptRevision(db, legacy)).toBe(1);
   });
 
   it('keys paid-case admission separately by exact variant and repetition', async () => {

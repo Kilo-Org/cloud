@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Tidak dapat memuatkan memori semakan.",
       "off": "Memori semakan dinyahdayakan.",
       "offDescription": "Dayakannya supaya Kilo dapat belajar daripada balasan penyelenggara dan mencadangkan panduan untuk REVIEW.md.",
-      "readOnlyDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh mendayakan memori semakan.",
+      "readOnlyDescription": "Hanya pemilik organisasi, pentadbir, dan pengurus pengebilan boleh mendayakan memori semakan.",
       "enable": "Dayakan memori semakan",
       "loadingProposals": "Memuatkan cadangan",
       "couldNotLoadProposals": "Tidak dapat memuatkan cadangan.",
@@ -1467,7 +1467,7 @@
       "starting": "Memulakan semakan…",
       "start": "Mulakan semakan"
     },
-    "notConnectedReadOnly": "{{platform}} tidak disambungkan. Hanya pemilik organisasi dan pengurus pengebilan boleh menyambungkannya.",
+    "notConnectedReadOnly": "{{platform}} tidak disambungkan. Hanya pemilik organisasi dan pentadbir boleh menyambungkannya.",
     "webhookSetup": "Persediaan webhook belum lengkap.",
     "webhookSetupDescription": "Sebilangan repositori mungkin tidak menerima semakan automatik.",
     "autoReviews": "Semakan automatik",
@@ -1475,7 +1475,7 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi dan pengurus pengebilan boleh menyambungkannya.",
+      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi dan pentadbir boleh menyambungkannya.",
       "setupIncomplete": "Persediaan belum lengkap. Selesaikan konfigurasi di kilo.ai.",
       "setup": "Persediaan Bitbucket"
     },
@@ -1729,7 +1729,7 @@
       "couldNotLoad": "Tidak dapat memuatkan dapatan ini.",
       "couldNotCheckPermissions": "Tidak dapat menyemak kebenaran untuk mengetepikan penemuan.",
       "cannotDismissTitle": "Penemuan ini tidak boleh diketepikan",
-      "cannotDismissDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh mengetepikan penemuan.",
+      "cannotDismissDescription": "Hanya pemilik organisasi, pentadbir, dan pengurus pengebilan boleh mengetepikan penemuan.",
       "alreadyResolvedDescription": "Penemuan ini telah diselesaikan dan tidak boleh diketepikan lagi."
     },
     "findingDetails": {
@@ -1771,7 +1771,7 @@
       "automationAllOff": "Semua dinyahdayakan",
       "automationCount": "{{displayCount}} daripada 3 didayakan",
       "notificationsCount": "{{displayCount}} daripada 2 didayakan",
-      "disabledNoManage": "Ejen Keselamatan dinyahdayakan. Hanya pemilik organisasi dan pengurus pengebilan boleh mendayakannya.",
+      "disabledNoManage": "Ejen Keselamatan dinyahdayakan. Hanya pemilik organisasi, pentadbir, dan pengurus pengebilan boleh mendayakannya.",
       "disabledNoRepo": "Pilih sekurang-kurangnya satu repositori sebelum mendayakan Ejen Keselamatan.",
       "disabledPrompt": "Dayakan Ejen Keselamatan untuk menyegerakkan amaran Dependabot, memilih repositori dan menetapkan automasi."
     },
@@ -1820,7 +1820,7 @@
       "invalidDayCount": "bilangan hari mesti antara 1 hingga 365, dalam nombor bulat sahaja.",
       "remediationDeadlineA11y": "Tempoh pemulihan {{label}} dalam hari",
       "enterWholeNumber": "Masukkan nombor bulat antara 1 dan 365",
-      "permissionNote": "Hanya pemilik organisasi dan pengurus pengebilan boleh menukar tetapan ini.",
+      "permissionNote": "Hanya pemilik organisasi, pentadbir, dan pengurus pengebilan boleh menukar tetapan ini.",
       "enableTracking": "Dayakan penjejakan SLA",
       "enableTrackingSubtitle": "Tetapkan tarikh akhir pemulihan berdasarkan keterukan penemuan.",
       "deadlinesHeading": "Tempoh pemulihan (hari)"
@@ -1872,7 +1872,7 @@
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
-      "unavailableDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh melihat laporan audit. Minta pemilik atau pengurus pengebilan memberikan anda akses.",
+      "unavailableDescription": "Hanya pemilik organisasi, pentadbir, dan pengurus pengebilan boleh melihat laporan audit. Minta pemilik, pentadbir, atau pengurus pengebilan memberikan anda akses.",
       "queryFailed": "Pertanyaan untuk laporan tidak selesai. Cuba lagi."
     },
     "notifications": {

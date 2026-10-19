@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Tsy nety nampidirina ny fitadidiana ny fanamarinana.",
       "off": "Tsy mandeha ny fitadidiana ny fanamarinana.",
       "offDescription": "Alefaso izany mba hahafahan'i Kilo mianatra avy amin'ny valin'ny mpikojakoja sy manolotra torolalana ho an'ny REVIEW.md.",
-      "readOnlyDescription": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mandefa ny fitadidiana ny fanamarinana.",
+      "readOnlyDescription": "Ny tompon'ny fikambanana, ny mpitantana ny fikambanana ary ny mpitantana ny faktiora ihany no afaka mandefa ny fitadidiana ny fanamarinana.",
       "enable": "Alefaso ny fitadidiana ny fanamarinana",
       "loadingProposals": "Mampiditra soso-kevitra",
       "couldNotLoadProposals": "Tsy nety nampidirina ny soso-kevitra.",
@@ -1467,7 +1467,7 @@
       "starting": "Manomboka ny fanamarinana…",
       "start": "Atombohy ny fanamarinana"
     },
-    "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+    "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Ny tompon'ny fikambanana sy ny mpitantana ny fikambanana ihany no afaka mampifandray azy.",
     "webhookSetup": "Tsy vita ny fametrahana ny rohy fampandrenesana.",
     "webhookSetupDescription": "Mety tsy hahazo fanamarinana mandeha ho azy ny tahirin-kaody sasany.",
     "autoReviews": "Fanamarinana mandeha ho azy",
@@ -1475,7 +1475,7 @@
     "followReviewMd": "Araho ny REVIEW.md",
     "followReviewMdSubtitle": "Araho ny torolalana ao amin'ny rakitra REVIEW.md isaky ny tahirin-kaody",
     "bitbucket": {
-      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana sy ny mpitantana ny fikambanana ihany no afaka mampifandray azy.",
       "setupIncomplete": "Tsy vita ny fametrahana. Vitao ao amin'ny kilo.ai ny fikirana.",
       "setup": "Fametrahana ny Bitbucket"
     },
@@ -1729,7 +1729,7 @@
       "couldNotLoad": "Tsy tafiditra ny antsipirian'ity olana ity.",
       "couldNotCheckPermissions": "Tsy nety nohamarinina ny alalana hanilihana olana hita.",
       "cannotDismissTitle": "Tsy azo ailika ity olana hita ity",
-      "cannotDismissDescription": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka manilika olana hita.",
+      "cannotDismissDescription": "Ny tompon'ny fikambanana, ny mpitantana ny fikambanana ary ny mpitantana ny faktiora ihany no afaka manilika olana hita.",
       "alreadyResolvedDescription": "Efa voavaha ity olana hita ity ka tsy azo ailika intsony."
     },
     "findingDetails": {
@@ -1771,7 +1771,7 @@
       "automationAllOff": "Tsy mandeha avokoa",
       "automationCount": "{{displayCount}} amin'ny 3 no mandeha",
       "notificationsCount": "{{displayCount}} amin'ny 2 no mandeha",
-      "disabledNoManage": "Tsy mandeha ny Security Agent. Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mandefa azy.",
+      "disabledNoManage": "Tsy mandeha ny Security Agent. Ny tompon'ny fikambanana, ny mpitantana ny fikambanana ary ny mpitantana ny faktiora ihany no afaka mandefa azy.",
       "disabledNoRepo": "Mifidiana tahirin-kaody iray farafahakeliny alohan'ny handefasana ny Security Agent.",
       "disabledPrompt": "Alefaso ny Security Agent mba hampifanarahana ny fampandrenesan'ny Dependabot, hifidianana tahirin-kaody ary hametrahana ny fikirana ho an'ny asa mandeha ho azy."
     },
@@ -1820,7 +1820,7 @@
       "invalidDayCount": "tokony ho 1–365 andro ny fe-potoana, ary isa feno ihany no ekena.",
       "remediationDeadlineA11y": "Fe-potoana fanarenana ho an'ny hamafy {{label}}, refesina amin'ny andro",
       "enterWholeNumber": "Ampidiro ny isa feno eo anelanelan'ny 1 sy 365",
-      "permissionNote": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka manova ireo fikirana ireo.",
+      "permissionNote": "Ny tompon'ny fikambanana, ny mpitantana ny fikambanana ary ny mpitantana ny faktiora ihany no afaka manova ireo fikirana ireo.",
       "enableTracking": "Alefaso ny fanaraha-maso ny SLA",
       "enableTrackingSubtitle": "Farito araka ny hamafin'ny olana hita ny fe-potoana fanarenana.",
       "deadlinesHeading": "Fe-potoana fanarenana (andro)"
@@ -1872,7 +1872,7 @@
       "summary": "Famintinana ny tatitra",
       "title": "Tatitra fanaraha-maso",
       "unavailable": "Tsy azo jerena ny tatitra fanaraha-maso",
-      "unavailableDescription": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mijery tatitra fanaraha-maso. Mangataha alalana hijery izany amin'ny iray amin'izy ireo.",
+      "unavailableDescription": "Ny tompon'ny fikambanana, ny mpitantana ny fikambanana ary ny mpitantana ny faktiora ihany no afaka mijery tatitra fanaraha-maso. Mangataha alalana hijery izany amin'ny tompon'ny fikambanana, mpitantana ny fikambanana na mpitantana ny faktiora.",
       "queryFailed": "Tsy vita ny fangatahana ny tatitra. Andramo indray."
     },
     "notifications": {

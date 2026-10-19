@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Hindi ma-load ang memorya ng pagsusuri.",
       "off": "Hindi pinagana ang memorya ng pagsusuri.",
       "offDescription": "Paganahin ito para matuto ang Kilo mula sa mga tugon ng tagapangalaga ng code at magmungkahi ng mga gabay para sa REVIEW.md.",
-      "readOnlyDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magpagana ng memorya ng pagsusuri.",
+      "readOnlyDescription": "Mga may-ari ng organisasyon, mga admin, at mga tagapamahala ng pagsingil lang ang maaaring magpagana ng memorya ng pagsusuri.",
       "enable": "Paganahin ang memorya ng pagsusuri",
       "loadingProposals": "Nilo-load ang mga mungkahi",
       "couldNotLoadProposals": "Hindi ma-load ang mga mungkahi.",
@@ -1467,7 +1467,7 @@
       "starting": "Sinisimulan ang pagsusuri...",
       "start": "Simulan ang pagsusuri"
     },
-    "notConnectedReadOnly": "Hindi nakakonekta ang {{platform}}. Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
+    "notConnectedReadOnly": "Hindi nakakonekta ang {{platform}}. Mga may-ari ng organisasyon at mga admin lang ang maaaring magkonekta nito.",
     "webhookSetup": "Hindi pa tapos ang setup ng webhook.",
     "webhookSetupDescription": "Maaaring hindi makatanggap ng awtomatikong pagsusuri ang ilang repository.",
     "autoReviews": "Mga awtomatikong pagsusuri",
@@ -1475,7 +1475,7 @@
     "followReviewMd": "Sundin ang REVIEW.md",
     "followReviewMdSubtitle": "Sundin ang mga tagubilin sa REVIEW.md file ng bawat repository",
     "bitbucket": {
-      "notConnectedReadOnly": "Hindi nakakonekta ang Bitbucket. Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
+      "notConnectedReadOnly": "Hindi nakakonekta ang Bitbucket. Mga may-ari ng organisasyon at mga admin lang ang maaaring magkonekta nito.",
       "setupIncomplete": "Hindi pa tapos ang setup. Tapusin ang pagsasaayos sa kilo.ai.",
       "setup": "Pag-setup ng Bitbucket"
     },
@@ -1729,7 +1729,7 @@
       "couldNotLoad": "Hindi ma-load ang natukoy na isyung ito.",
       "couldNotCheckPermissions": "Hindi masuri ang mga pahintulot sa pagbalewala.",
       "cannotDismissTitle": "Hindi mabalewala ang natukoy na isyung ito",
-      "cannotDismissDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magbalewala ng mga natukoy na isyu.",
+      "cannotDismissDescription": "Mga may-ari ng organisasyon, mga admin, at mga tagapamahala ng pagsingil lang ang maaaring magbalewala ng mga natukoy na isyu.",
       "alreadyResolvedDescription": "Nalutas na ang natukoy na isyung ito at hindi na ito maaaring balewalain."
     },
     "findingDetails": {
@@ -1771,7 +1771,7 @@
       "automationAllOff": "Lahat ay hindi pinagana",
       "automationCount": "{{displayCount}} sa 3 ang pinagana",
       "notificationsCount": "{{displayCount}} sa 2 ang pinagana",
-      "disabledNoManage": "Hindi pinagana ang Security Agent. Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magpagana nito.",
+      "disabledNoManage": "Hindi pinagana ang Security Agent. Mga may-ari ng organisasyon, mga admin, at mga tagapamahala ng pagsingil lang ang maaaring magpagana nito.",
       "disabledNoRepo": "Pumili ng kahit isang repository bago paganahin ang Security Agent.",
       "disabledPrompt": "Paganahin ang Security Agent para i-sync ang mga alerto ng Dependabot, pumili ng mga repository, at itakda ang mga awtomatikong proseso."
     },
@@ -1820,7 +1820,7 @@
       "invalidDayCount": "maglagay ng 1–365 araw gamit ang buong bilang lang.",
       "remediationDeadlineA11y": "Bilang ng araw bago ang takdang petsa ng pag-aayos para sa {{label}}",
       "enterWholeNumber": "Maglagay ng buong bilang mula 1 hanggang 365",
-      "permissionNote": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magbago ng mga setting na ito.",
+      "permissionNote": "Mga may-ari ng organisasyon, mga admin, at mga tagapamahala ng pagsingil lang ang maaaring magbago ng mga setting na ito.",
       "enableTracking": "Paganahin ang pagsubaybay sa SLA",
       "enableTrackingSubtitle": "Magtakda ng mga petsa ng pag-aayos batay sa kalubhaan ng natukoy na isyu.",
       "deadlinesHeading": "Mga takdang petsa ng pag-aayos (araw)"
@@ -1872,7 +1872,7 @@
       "summary": "Buod ng ulat",
       "title": "Ulat ng audit",
       "unavailable": "Hindi makuha ang ulat ng audit",
-      "unavailableDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring tumingin sa mga ulat ng audit. Humingi ng access sa isa sa kanila.",
+      "unavailableDescription": "Mga may-ari ng organisasyon, mga admin, at mga tagapamahala ng pagsingil lang ang maaaring tumingin sa mga ulat ng audit. Humingi sa may-ari, admin, o tagapamahala ng pagsingil ng access.",
       "queryFailed": "Hindi natapos ang pagkuha ng ulat. Subukang muli."
     },
     "notifications": {

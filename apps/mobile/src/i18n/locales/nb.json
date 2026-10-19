@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Kunne ikke laste inn minnet for kodegjennomganger.",
       "off": "Minnet for kodegjennomganger er deaktivert.",
       "offDescription": "Aktiver minnet for å la Kilo lære av svar fra vedlikeholderne og foreslå retningslinjer til REVIEW.md.",
-      "readOnlyDescription": "Bare organisasjonseiere og faktureringsansvarlige kan aktivere minnet for kodegjennomganger.",
+      "readOnlyDescription": "Bare organisasjonseiere, organisasjonsadministratorer og faktureringsansvarlige kan aktivere minnet for kodegjennomganger.",
       "enable": "Aktiver minne for kodegjennomganger",
       "loadingProposals": "Laster inn forslag",
       "couldNotLoadProposals": "Kunne ikke laste inn forslagene.",
@@ -1467,7 +1467,7 @@
       "starting": "Starter gjennomgang…",
       "start": "Start gjennomgang"
     },
-    "notConnectedReadOnly": "{{platform}} er ikke tilkoblet. Bare organisasjonseiere og faktureringsansvarlige kan opprette tilkoblingen.",
+    "notConnectedReadOnly": "{{platform}} er ikke tilkoblet. Bare organisasjonseiere og organisasjonsadministratorer kan opprette tilkoblingen.",
     "webhookSetup": "Oppsettet av webhook er ikke fullført.",
     "webhookSetupDescription": "Noen kodelagre får kanskje ikke automatiske gjennomganger.",
     "autoReviews": "Automatiske gjennomganger",
@@ -1475,7 +1475,7 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruksjonene i REVIEW.md i hvert kodelager",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere og faktureringsansvarlige kan opprette tilkoblingen.",
+      "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere og organisasjonsadministratorer kan opprette tilkoblingen.",
       "setupIncomplete": "Oppsettet er ikke fullført. Fullfør konfigurasjonen på kilo.ai.",
       "setup": "Bitbucket-oppsett"
     },
@@ -1729,7 +1729,7 @@
       "couldNotLoad": "Kunne ikke laste inn dette funnet.",
       "couldNotCheckPermissions": "Kunne ikke sjekke om du har tillatelse til å avvise funn.",
       "cannotDismissTitle": "Kan ikke avvise dette funnet",
-      "cannotDismissDescription": "Bare organisasjonseiere og faktureringsansvarlige kan avvise funn.",
+      "cannotDismissDescription": "Bare organisasjonseiere, organisasjonsadministratorer og faktureringsansvarlige kan avvise funn.",
       "alreadyResolvedDescription": "Dette funnet er allerede løst og kan ikke lenger avvises."
     },
     "findingDetails": {
@@ -1771,7 +1771,7 @@
       "automationAllOff": "Alt er deaktivert",
       "automationCount": "{{displayCount}} av 3 aktivert",
       "notificationsCount": "{{displayCount}} av 2 aktivert",
-      "disabledNoManage": "Sikkerhetsagenten er deaktivert. Bare organisasjonseiere og faktureringsansvarlige kan aktivere den.",
+      "disabledNoManage": "Sikkerhetsagenten er deaktivert. Bare organisasjonseiere, organisasjonsadministratorer og faktureringsansvarlige kan aktivere den.",
       "disabledNoRepo": "Velg minst ett kodelager før du aktiverer sikkerhetsagenten.",
       "disabledPrompt": "Aktiver sikkerhetsagenten for å synkronisere Dependabot-varsler, velge kodelagre og sette opp automatisering."
     },
@@ -1820,7 +1820,7 @@
       "invalidDayCount": "angi et helt antall dager fra 1 til 365.",
       "remediationDeadlineA11y": "Utbedringsfrist i dager for alvorlighetsgrad {{label}}",
       "enterWholeNumber": "Skriv inn et heltall mellom 1 og 365",
-      "permissionNote": "Bare organisasjonseiere og faktureringsansvarlige kan endre disse innstillingene.",
+      "permissionNote": "Bare organisasjonseiere, organisasjonsadministratorer og faktureringsansvarlige kan endre disse innstillingene.",
       "enableTracking": "Aktiver SLA-oppfølging",
       "enableTrackingSubtitle": "Angi utbedringsfrister ut fra funnenes alvorlighetsgrad.",
       "deadlinesHeading": "Utbedringsfrister (dager)"
@@ -1872,7 +1872,7 @@
       "summary": "Rapportsammendrag",
       "title": "Revisjonsrapport",
       "unavailable": "Revisjonsrapport utilgjengelig",
-      "unavailableDescription": "Bare organisasjonseiere og faktureringsansvarlige kan se revisjonsrapporter. Be en eier eller faktureringsansvarlig om å gi deg tilgang.",
+      "unavailableDescription": "Bare organisasjonseiere, organisasjonsadministratorer og faktureringsansvarlige kan se revisjonsrapporter. Be en eier, organisasjonsadministrator eller faktureringsansvarlig om å gi deg tilgang.",
       "queryFailed": "Rapportspørringen ble ikke fullført. Prøv igjen."
     },
     "notifications": {

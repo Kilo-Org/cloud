@@ -889,7 +889,7 @@
     },
     "autoReviews": "Rà soát tự động",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket chưa được kết nối. Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể kết nối.",
+      "notConnectedReadOnly": "Bitbucket chưa được kết nối. Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể kết nối.",
       "setupIncomplete": "Chưa hoàn tất thiết lập. Hãy hoàn tất cấu hình trên kilo.ai.",
       "setup": "Thiết lập Bitbucket"
     },
@@ -913,7 +913,7 @@
       "starting": "Đang bắt đầu rà soát…",
       "title": "Rà soát thủ công"
     },
-    "notConnectedReadOnly": "{{platform}} chưa được kết nối. Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể kết nối.",
+    "notConnectedReadOnly": "{{platform}} chưa được kết nối. Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể kết nối.",
     "platformList": {
       "activity": "Hoạt động",
       "checking": "Đang kiểm tra…",
@@ -988,7 +988,7 @@
       "noProposalsDescription": "Các đề xuất từ bộ nhớ rà soát sẽ xuất hiện tại đây sau khi Kilo phân tích phản hồi của người bảo trì.",
       "off": "Bộ nhớ rà soát đang tắt.",
       "offDescription": "Bật tính năng này để Kilo học từ phản hồi của người bảo trì và đề xuất hướng dẫn cho tệp REVIEW.md.",
-      "readOnlyDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể bật bộ nhớ rà soát.",
+      "readOnlyDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể bật bộ nhớ rà soát.",
       "title": "Bộ nhớ rà soát"
     },
     "scopeList": {
@@ -1131,7 +1131,7 @@
       "summary": "Tóm tắt báo cáo",
       "title": "Báo cáo kiểm toán",
       "unavailable": "Không có báo cáo kiểm toán",
-      "unavailableDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể xem báo cáo kiểm toán. Hãy nhờ chủ sở hữu hoặc người quản lý thanh toán cấp quyền truy cập cho bạn."
+      "unavailableDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể xem báo cáo kiểm toán. Hãy nhờ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán cấp quyền truy cập cho bạn."
     },
     "auditReportButton": {
       "viewA11y": "Xem báo cáo kiểm toán"
@@ -1228,7 +1228,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Vấn đề này đã được giải quyết nên không thể bỏ qua nữa.",
-      "cannotDismissDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể bỏ qua vấn đề.",
+      "cannotDismissDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể bỏ qua vấn đề.",
       "cannotDismissTitle": "Không thể bỏ qua vấn đề này",
       "commentAccessibility": "Ghi chú về việc bỏ qua vấn đề",
       "commentLabel": "Ghi chú (không bắt buộc)",
@@ -1361,7 +1361,7 @@
       "automationCount": "Đã bật {{displayCount}}/3",
       "couldNotLoadPermissions": "Không thể tải thông tin quyền truy cập.",
       "couldNotLoadSettings": "Không thể tải cài đặt Trợ lý bảo mật.",
-      "disabledNoManage": "Trợ lý bảo mật đang tắt. Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể bật tính năng này.",
+      "disabledNoManage": "Trợ lý bảo mật đang tắt. Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể bật tính năng này.",
       "disabledNoRepo": "Chọn ít nhất một kho lưu trữ trước khi bật Trợ lý bảo mật.",
       "disabledPrompt": "Bật Trợ lý bảo mật để đồng bộ cảnh báo Dependabot, chọn kho lưu trữ và thiết lập tự động hóa.",
       "notificationsCount": "Đã bật {{displayCount}}/2",
@@ -1393,7 +1393,7 @@
       "lowDescription": "Ảnh hưởng rất ít đến bảo mật.",
       "medium": "Trung bình",
       "mediumDescription": "Tác động hạn chế hoặc cần điều kiện cụ thể.",
-      "permissionNote": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể thay đổi các cài đặt này.",
+      "permissionNote": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể thay đổi các cài đặt này.",
       "remediationDeadlineA11y": "Thời hạn khắc phục cho mức {{label}}, tính bằng ngày",
       "title": "Chính sách SLA"
     },

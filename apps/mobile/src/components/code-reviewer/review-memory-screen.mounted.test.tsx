@@ -251,7 +251,7 @@ describe('ReviewMemoryScreen feature disabled', () => {
     const renderer = renderScreen();
 
     expect(collectText(renderer.toJSON())).toContain(
-      'Only organization owners and billing managers can enable review memory.'
+      'Only organization owners, admins, and billing managers can enable review memory.'
     );
     expect(
       buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
@@ -271,7 +271,7 @@ describe('ReviewMemoryScreen feature disabled', () => {
         buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
       ).toBeDefined();
       expect(collectText(renderer.toJSON())).not.toContain(
-        'Only organization owners and billing managers can enable review memory.'
+        'Only organization owners, admins, and billing managers can enable review memory.'
       );
     }
   );

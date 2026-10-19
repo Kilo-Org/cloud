@@ -1466,7 +1466,7 @@
       "couldNotLoad": "Nije moguće učitati memoriju pregleda.",
       "off": "Memorija pregleda je isključena.",
       "offDescription": "Uključi je kako bi Kilo učio iz odgovora održavatelja i predlagao smjernice za datoteku REVIEW.md.",
-      "readOnlyDescription": "Samo vlasnici organizacije i voditelji naplate mogu omogućiti memoriju pregleda.",
+      "readOnlyDescription": "Samo vlasnici organizacije, administratori i voditelji naplate mogu omogućiti memoriju pregleda.",
       "enable": "Omogući memoriju pregleda",
       "loadingProposals": "Učitavanje prijedloga",
       "couldNotLoadProposals": "Nije moguće učitati prijedloge.",
@@ -1486,7 +1486,7 @@
       "starting": "Pokretanje pregleda…",
       "start": "Pokreni pregled"
     },
-    "notConnectedReadOnly": "{{platform}} nije povezan. Samo vlasnici organizacije i voditelji naplate mogu ga povezati.",
+    "notConnectedReadOnly": "{{platform}} nije povezan. Samo vlasnici organizacije i administratori mogu ga povezati.",
     "webhookSetup": "Postavljanje webhooka nije dovršeno.",
     "webhookSetupDescription": "Automatski pregledi možda neće biti dostupni za neke repozitorije.",
     "autoReviews": "Automatski pregledi",
@@ -1494,7 +1494,7 @@
     "followReviewMd": "Slijedi REVIEW.md",
     "followReviewMdSubtitle": "Slijedi upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije i voditelji naplate mogu ga povezati.",
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije i administratori mogu ga povezati.",
       "setupIncomplete": "Postavljanje nije dovršeno. Dovrši ga na kilo.ai.",
       "setup": "Postavljanje Bitbucketa"
     },
@@ -1751,7 +1751,7 @@
       "couldNotLoad": "Nije moguće učitati ovaj nalaz.",
       "couldNotCheckPermissions": "Nije moguće provjeriti dopuštenja za odbacivanje.",
       "cannotDismissTitle": "Ovaj se nalaz ne može odbaciti",
-      "cannotDismissDescription": "Samo vlasnici organizacije i voditelji naplate mogu odbaciti nalaze.",
+      "cannotDismissDescription": "Samo vlasnici organizacije, administratori i voditelji naplate mogu odbaciti nalaze.",
       "alreadyResolvedDescription": "Ovaj je nalaz već riješen i više ga nije moguće odbaciti."
     },
     "findingDetails": {
@@ -1793,7 +1793,7 @@
       "automationAllOff": "Sve isključeno",
       "automationCount": "Omogućeno: {{displayCount}} od 3",
       "notificationsCount": "Omogućeno: {{displayCount}} od 2",
-      "disabledNoManage": "Sigurnosni agent je onemogućen. Samo vlasnici organizacije i voditelji naplate mogu ga uključiti.",
+      "disabledNoManage": "Sigurnosni agent je onemogućen. Samo vlasnici organizacije, administratori i voditelji naplate mogu ga uključiti.",
       "disabledNoRepo": "Odaberi barem jedan repozitorij prije omogućavanja sigurnosnog agenta.",
       "disabledPrompt": "Uključi sigurnosnog agenta za sinkronizaciju upozorenja iz Dependabota, odabir repozitorija i postavljanje automatizacije.",
       "repositoriesCount_few": "Odabrana {{displayCount}} repozitorija"
@@ -1843,7 +1843,7 @@
       "invalidDayCount": "broj dana mora biti cijeli broj od 1 do 365.",
       "remediationDeadlineA11y": "Rok za sanaciju u danima, ozbiljnost: {{label}}",
       "enterWholeNumber": "Unesi cijeli broj od 1 do 365",
-      "permissionNote": "Samo vlasnici organizacije i voditelji naplate mogu promijeniti ove postavke.",
+      "permissionNote": "Samo vlasnici organizacije, administratori i voditelji naplate mogu promijeniti ove postavke.",
       "enableTracking": "Omogući praćenje SLA-a",
       "enableTrackingSubtitle": "Postavlja rokove za sanaciju na temelju ozbiljnosti nalaza.",
       "deadlinesHeading": "Rokovi za sanaciju (dani)"
@@ -1895,7 +1895,7 @@
       "summary": "Sažetak izvješća",
       "title": "Izvješće o reviziji",
       "unavailable": "Izvješće o reviziji nedostupno",
-      "unavailableDescription": "Samo vlasnici organizacije i voditelji naplate mogu pregledavati izvješća o reviziji. Zamoli vlasnika ili voditelja naplate da ti odobri pristup.",
+      "unavailableDescription": "Samo vlasnici organizacije, administratori i voditelji naplate mogu pregledavati izvješća o reviziji. Zamoli vlasnika, administratora ili voditelja naplate da ti odobri pristup.",
       "queryFailed": "Upit za izvješće nije dovršen. Pokušaj ponovno."
     },
     "notifications": {

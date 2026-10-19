@@ -889,7 +889,7 @@
     },
     "autoReviews": "自动审查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者和账单管理员可以完成连接。",
+      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者和管理员可以完成连接。",
       "setupIncomplete": "配置尚未完成。请在 kilo.ai 上完成配置。",
       "setup": "Bitbucket 设置"
     },
@@ -913,7 +913,7 @@
       "starting": "正在启动审查…",
       "title": "手动审查"
     },
-    "notConnectedReadOnly": "尚未连接 {{platform}}。只有组织所有者和账单管理员可以完成连接。",
+    "notConnectedReadOnly": "尚未连接 {{platform}}。只有组织所有者和管理员可以完成连接。",
     "platformList": {
       "activity": "活动",
       "checking": "正在检查…",
@@ -988,7 +988,7 @@
       "noProposalsDescription": "Kilo 分析维护者回复后，审查记忆建议会显示在这里。",
       "off": "审查记忆已关闭。",
       "offDescription": "启用审查记忆后，Kilo 可以从维护者的回复中学习，并为 REVIEW.md 提出审查准则建议。",
-      "readOnlyDescription": "只有组织所有者和账单管理员可以启用审查记忆。",
+      "readOnlyDescription": "只有组织所有者、管理员和账单管理员可以启用审查记忆。",
       "title": "审查记忆"
     },
     "scopeList": {
@@ -1131,7 +1131,7 @@
       "summary": "报告摘要",
       "title": "审计报告",
       "unavailable": "审计报告不可用",
-      "unavailableDescription": "只有组织所有者和账单管理员可以查看审计报告。请联系组织所有者或账单管理员获取访问权限。"
+      "unavailableDescription": "只有组织所有者、管理员和账单管理员可以查看审计报告。请联系组织所有者、管理员或账单管理员获取访问权限。"
     },
     "auditReportButton": {
       "viewA11y": "查看审计报告"
@@ -1228,7 +1228,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "此安全问题已解决，无法再执行忽略操作。",
-      "cannotDismissDescription": "只有组织所有者和账单管理员可以忽略安全问题。",
+      "cannotDismissDescription": "只有组织所有者、管理员和账单管理员可以忽略安全问题。",
       "cannotDismissTitle": "无法忽略此安全问题",
       "commentAccessibility": "忽略备注",
       "commentLabel": "备注（可选）",
@@ -1361,7 +1361,7 @@
       "automationCount": "已启用 {{displayCount}}/3 项",
       "couldNotLoadPermissions": "无法加载权限信息。",
       "couldNotLoadSettings": "无法加载安全智能体设置。",
-      "disabledNoManage": "安全智能体已禁用。只有组织所有者和账单管理员可以启用。",
+      "disabledNoManage": "安全智能体已禁用。只有组织所有者、管理员和账单管理员可以启用。",
       "disabledNoRepo": "启用安全智能体前，请至少选择一个仓库。",
       "disabledPrompt": "启用安全智能体，即可同步 Dependabot 警报、选择仓库并配置自动化。",
       "notificationsCount": "已启用 {{displayCount}}/2 项",
@@ -1393,7 +1393,7 @@
       "lowDescription": "对安全的影响极小。",
       "medium": "中",
       "mediumDescription": "影响有限，或需满足特定条件才能利用。",
-      "permissionNote": "只有组织所有者和账单管理员可以更改这些设置。",
+      "permissionNote": "只有组织所有者、管理员和账单管理员可以更改这些设置。",
       "remediationDeadlineA11y": "{{label}}修复期限，单位为天",
       "title": "SLA 策略"
     },

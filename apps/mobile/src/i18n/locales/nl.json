@@ -889,7 +889,7 @@
     },
     "autoReviews": "Automatische reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren en factureringsbeheerders kunnen de koppeling instellen.",
+      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren en organisatiebeheerders kunnen de koppeling instellen.",
       "setupIncomplete": "Het instellen is nog niet voltooid. Rond de configuratie af op kilo.ai.",
       "setup": "Bitbucket-instellingen"
     },
@@ -913,7 +913,7 @@
       "starting": "Review wordt gestart…",
       "title": "Handmatige review"
     },
-    "notConnectedReadOnly": "{{platform}} is niet gekoppeld. Alleen organisatie-eigenaren en factureringsbeheerders kunnen de koppeling instellen.",
+    "notConnectedReadOnly": "{{platform}} is niet gekoppeld. Alleen organisatie-eigenaren en organisatiebeheerders kunnen de koppeling instellen.",
     "platformList": {
       "activity": "Activiteit",
       "checking": "Controleren…",
@@ -988,7 +988,7 @@
       "noProposalsDescription": "Hier verschijnen voorstellen uit het reviewgeheugen nadat Kilo antwoorden van beheerders heeft geanalyseerd.",
       "off": "Het reviewgeheugen is uitgeschakeld.",
       "offDescription": "Schakel het reviewgeheugen in zodat Kilo leert van antwoorden van beheerders en richtlijnen voor REVIEW.md voorstelt.",
-      "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen reviewgeheugen inschakelen.",
+      "readOnlyDescription": "Alleen organisatie-eigenaren, organisatiebeheerders en factureringsbeheerders kunnen reviewgeheugen inschakelen.",
       "title": "Geheugen voor beoordelingen"
     },
     "scopeList": {
@@ -1131,7 +1131,7 @@
       "summary": "Rapportsamenvatting",
       "title": "Auditrapport",
       "unavailable": "Auditrapport niet beschikbaar",
-      "unavailableDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen auditrapporten bekijken. Vraag een eigenaar of factureringsbeheerder om je toegang te geven."
+      "unavailableDescription": "Alleen organisatie-eigenaren, organisatiebeheerders en factureringsbeheerders kunnen auditrapporten bekijken. Vraag een eigenaar, organisatiebeheerder of factureringsbeheerder om je toegang te geven."
     },
     "auditReportButton": {
       "viewA11y": "Auditrapport bekijken"
@@ -1228,7 +1228,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Deze bevinding is al opgelost en kan niet meer worden afgewezen.",
-      "cannotDismissDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen bevindingen afwijzen.",
+      "cannotDismissDescription": "Alleen organisatie-eigenaren, organisatiebeheerders en factureringsbeheerders kunnen bevindingen afwijzen.",
       "cannotDismissTitle": "Deze bevinding kan niet worden afgewezen",
       "commentAccessibility": "Toelichting bij de afwijzing",
       "commentLabel": "Opmerking (optioneel)",
@@ -1361,7 +1361,7 @@
       "automationCount": "{{displayCount}} van de 3 ingeschakeld",
       "couldNotLoadPermissions": "De rechten konden niet worden geladen.",
       "couldNotLoadSettings": "De instellingen van Security Agent konden niet worden geladen.",
-      "disabledNoManage": "Security Agent is uitgeschakeld. Alleen organisatie-eigenaren en factureringsbeheerders kunnen Security Agent inschakelen.",
+      "disabledNoManage": "Security Agent is uitgeschakeld. Alleen organisatie-eigenaren, organisatiebeheerders en factureringsbeheerders kunnen Security Agent inschakelen.",
       "disabledNoRepo": "Selecteer minimaal één repository voordat je Security Agent inschakelt.",
       "disabledPrompt": "Schakel Security Agent in om Dependabot-waarschuwingen te synchroniseren, repositories te kiezen en automatisering te configureren.",
       "notificationsCount": "{{displayCount}} van de 2 ingeschakeld",
@@ -1393,7 +1393,7 @@
       "lowDescription": "Minimale gevolgen voor de beveiliging.",
       "medium": "Gemiddeld",
       "mediumDescription": "Beperkte gevolgen of alleen onder specifieke omstandigheden.",
-      "permissionNote": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze instellingen wijzigen.",
+      "permissionNote": "Alleen organisatie-eigenaren, organisatiebeheerders en factureringsbeheerders kunnen deze instellingen wijzigen.",
       "remediationDeadlineA11y": "Hersteldeadline voor {{label}}, in dagen",
       "title": "SLA-beleid"
     },

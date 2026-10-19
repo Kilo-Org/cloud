@@ -1466,7 +1466,7 @@
       "couldNotLoad": "No s'ha pogut carregar la memòria de revisió.",
       "off": "La memòria de revisió està desactivada.",
       "offDescription": "Activa-la perquè Kilo aprengui de les respostes dels mantenidors i proposi pautes per al fitxer REVIEW.md.",
-      "readOnlyDescription": "Només els propietaris de l'organització i els gestors de facturació poden activar la memòria de revisió.",
+      "readOnlyDescription": "Només els propietaris de l'organització, els administradors i els gestors de facturació poden activar la memòria de revisió.",
       "enable": "Activa la memòria de revisió",
       "loadingProposals": "S'estan carregant les propostes",
       "couldNotLoadProposals": "No s'han pogut carregar les propostes.",
@@ -1486,7 +1486,7 @@
       "starting": "S'està iniciant la revisió…",
       "start": "Inicia la revisió"
     },
-    "notConnectedReadOnly": "{{platform}} no està connectat. Només els propietaris de l'organització i els gestors de facturació poden connectar-lo.",
+    "notConnectedReadOnly": "{{platform}} no està connectat. Només els propietaris de l'organització i els administradors poden connectar-lo.",
     "webhookSetup": "La configuració del webhook és incompleta.",
     "webhookSetupDescription": "És possible que alguns repositoris no rebin revisions automàtiques.",
     "autoReviews": "Revisions automàtiques",
@@ -1494,7 +1494,7 @@
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris de l'organització i els gestors de facturació poden connectar-lo.",
+      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris de l'organització i els administradors poden connectar-lo.",
       "setupIncomplete": "La configuració és incompleta. Acaba-la a kilo.ai.",
       "setup": "Configuració de Bitbucket"
     },
@@ -1751,7 +1751,7 @@
       "couldNotLoad": "No s'ha pogut carregar aquest problema.",
       "couldNotCheckPermissions": "No s'han pogut comprovar els permisos per descartar incidències.",
       "cannotDismissTitle": "No es pot descartar aquesta incidència",
-      "cannotDismissDescription": "Només els propietaris de l'organització i els gestors de facturació poden descartar incidències.",
+      "cannotDismissDescription": "Només els propietaris de l'organització, els administradors i els gestors de facturació poden descartar incidències.",
       "alreadyResolvedDescription": "Aquesta incidència ja s'ha resolt i no es pot descartar."
     },
     "findingDetails": {
@@ -1793,7 +1793,7 @@
       "automationAllOff": "Tot desactivat",
       "automationCount": "{{displayCount}} de 3 activades",
       "notificationsCount": "{{displayCount}} de 2 activades",
-      "disabledNoManage": "L'agent de seguretat està desactivat. Només els propietaris de l'organització i els gestors de facturació poden activar-lo.",
+      "disabledNoManage": "L'agent de seguretat està desactivat. Només els propietaris de l'organització, els administradors i els gestors de facturació poden activar-lo.",
       "disabledNoRepo": "Selecciona almenys un repositori abans d'activar l'agent de seguretat.",
       "disabledPrompt": "Activa l'agent de seguretat per sincronitzar les alertes de Dependabot, triar repositoris i configurar l'automatització.",
       "repositoriesCount_many": "{{displayCount}} repositoris seleccionats"
@@ -1843,7 +1843,7 @@
       "invalidDayCount": "el termini ha de ser d'entre 1 i 365 dies, en nombres enters.",
       "remediationDeadlineA11y": "Termini de correcció en dies per a la gravetat {{label}}",
       "enterWholeNumber": "Introdueix un nombre enter entre 1 i 365",
-      "permissionNote": "Només els propietaris de l'organització i els gestors de facturació poden canviar aquesta configuració.",
+      "permissionNote": "Només els propietaris de l'organització, els administradors i els gestors de facturació poden canviar aquesta configuració.",
       "enableTracking": "Activa el seguiment de l'SLA",
       "enableTrackingSubtitle": "Estableix terminis de correcció segons la gravetat de la incidència.",
       "deadlinesHeading": "Terminis de correcció (dies)"
@@ -1895,7 +1895,7 @@
       "summary": "Resum de l'informe",
       "title": "Informe d'auditoria",
       "unavailable": "Informe d'auditoria no disponible",
-      "unavailableDescription": "Només els propietaris de l'organització i els gestors de facturació poden veure informes d'auditoria. Demana a un propietari o gestor de facturació que et concedeixi l'accés.",
+      "unavailableDescription": "Només els propietaris de l'organització, els administradors i els gestors de facturació poden veure informes d'auditoria. Demana a un propietari, administrador o gestor de facturació que et concedeixi l'accés.",
       "queryFailed": "La consulta de l'informe no ha acabat. Torna-ho a provar."
     },
     "notifications": {

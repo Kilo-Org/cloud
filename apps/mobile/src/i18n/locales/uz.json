@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Ko'rib chiqish xotirasini yuklab bo'lmadi.",
       "off": "Ko'rib chiqish xotirasi o'chiq.",
       "offDescription": "Kilo loyiha mas'ullarining javoblaridan o'rganishi va REVIEW.md uchun ko'rsatmalar taklif qilishi uchun bu funksiyani yoqing.",
-      "readOnlyDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari ko'rib chiqish xotirasini yoqishi mumkin.",
+      "readOnlyDescription": "Faqat tashkilot egalari, administratorlar va hisob-kitob menejerlari ko'rib chiqish xotirasini yoqishi mumkin.",
       "enable": "Ko'rib chiqish xotirasini yoqish",
       "loadingProposals": "Takliflar yuklanmoqda",
       "couldNotLoadProposals": "Takliflarni yuklab bo'lmadi.",
@@ -1467,7 +1467,7 @@
       "starting": "Ko'rib chiqish boshlanmoqda…",
       "start": "Ko'rib chiqishni boshlash"
     },
-    "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalari va hisob-kitob menejerlari uni ulashi mumkin.",
+    "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalari va administratorlari uni ulashi mumkin.",
     "webhookSetup": "Vebhukni sozlash yakunlanmagan.",
     "webhookSetupDescription": "Ba'zi repozitoriyalarda avtomatik ko'rib chiqish ishlamasligi mumkin.",
     "autoReviews": "Avtomatik ko'rib chiqishlar",
@@ -1475,7 +1475,7 @@
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalari va hisob-kitob menejerlari uni ulashi mumkin.",
+      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalari va administratorlari uni ulashi mumkin.",
       "setupIncomplete": "Sozlash yakunlanmagan. Uni kilo.ai saytida yakunlang.",
       "setup": "Bitbucketni sozlash"
     },
@@ -1729,7 +1729,7 @@
       "couldNotLoad": "Bu muammo haqidagi ma’lumotlarni yuklab bo‘lmadi.",
       "couldNotCheckPermissions": "Rad etish huquqini tekshirib bo'lmadi.",
       "cannotDismissTitle": "Bu muammoni rad etib bo'lmaydi",
-      "cannotDismissDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari muammolarni rad etishi mumkin.",
+      "cannotDismissDescription": "Faqat tashkilot egalari, administratorlar va hisob-kitob menejerlari muammolarni rad etishi mumkin.",
       "alreadyResolvedDescription": "Bu muammo allaqachon hal qilingan. Endi uni rad etib bo'lmaydi."
     },
     "findingDetails": {
@@ -1771,7 +1771,7 @@
       "automationAllOff": "Hammasi o'chiq",
       "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",
       "notificationsCount": "2 tadan {{displayCount}} tasi yoqilgan",
-      "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalari va hisob-kitob menejerlari uni yoqishi mumkin.",
+      "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalari, administratorlar va hisob-kitob menejerlari uni yoqishi mumkin.",
       "disabledNoRepo": "Xavfsizlik agentini yoqishdan oldin kamida bitta repozitoriyani tanlang.",
       "disabledPrompt": "Dependabot ogohlantirishlarini sinxronlash, repozitoriyalarni tanlash va avtomatlashtirishni sozlash uchun Xavfsizlik agentini yoqing."
     },
@@ -1820,7 +1820,7 @@
       "invalidDayCount": "kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
       "remediationDeadlineA11y": "{{label}} darajasidagi muammoni tuzatish muddati, kun hisobida",
       "enterWholeNumber": "1 Dan 365 gacha bo‘lgan butun sonni kiriting",
-      "permissionNote": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
+      "permissionNote": "Faqat tashkilot egalari, administratorlar va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
       "enableTracking": "SLA kuzatuvini yoqish",
       "enableTrackingSubtitle": "Muammoning xavf darajasiga qarab tuzatish muddatlarini belgilaydi.",
       "deadlinesHeading": "Tuzatish muddatlari (kun)"
@@ -1872,7 +1872,7 @@
       "summary": "Hisobot xulosasi",
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",
-      "unavailableDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi yoki hisob-kitob menejeridan sizga kirish huquqini berishni so'rang.",
+      "unavailableDescription": "Faqat tashkilot egalari, administratorlar va hisob-kitob menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi, administratori yoki hisob-kitob menejeridan sizga kirish huquqini berishni so'rang.",
       "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring."
     },
     "notifications": {

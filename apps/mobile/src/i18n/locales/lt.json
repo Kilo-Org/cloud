@@ -1485,7 +1485,7 @@
       "couldNotLoad": "Nepavyko įkelti peržiūros atminties.",
       "off": "Peržiūros atmintis išjungta.",
       "offDescription": "Įjunk ją, kad Kilo mokytųsi iš prižiūrėtojų atsakymų ir siūlytų gaires REVIEW.md failui.",
-      "readOnlyDescription": "Peržiūros atmintį gali įjungti tik organizacijos savininkai ir atsiskaitymų administratoriai.",
+      "readOnlyDescription": "Peržiūros atmintį gali įjungti tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "enable": "Įjungti peržiūros atmintį",
       "loadingProposals": "Įkeliami pasiūlymai",
       "couldNotLoadProposals": "Nepavyko įkelti pasiūlymų.",
@@ -1505,7 +1505,7 @@
       "starting": "Pradedama peržiūra…",
       "start": "Pradėti peržiūrą"
     },
-    "notConnectedReadOnly": "Platforma {{platform}} neprijungta. Ją prijungti gali tik organizacijos savininkai ir atsiskaitymų administratoriai.",
+    "notConnectedReadOnly": "Platforma {{platform}} neprijungta. Ją prijungti gali tik organizacijos savininkai ir administratoriai.",
     "webhookSetup": "Įvykių pranešimų sąranka neužbaigta.",
     "webhookSetupDescription": "Kai kuriose saugyklose automatinės peržiūros gali neveikti.",
     "autoReviews": "Automatinės peržiūros",
@@ -1513,7 +1513,7 @@
     "followReviewMd": "Laikytis REVIEW.md instrukcijų",
     "followReviewMdSubtitle": "Laikytis kiekvienos saugyklos REVIEW.md faile pateiktų instrukcijų",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai ir atsiskaitymų administratoriai.",
+      "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai ir administratoriai.",
       "setupIncomplete": "Sąranka neužbaigta. Užbaik ją svetainėje kilo.ai.",
       "setup": "Bitbucket sąranka"
     },
@@ -1773,7 +1773,7 @@
       "couldNotLoad": "Nepavyko įkelti šios problemos.",
       "couldNotCheckPermissions": "Nepavyko patikrinti teisės atmesti radinius.",
       "cannotDismissTitle": "Šio radinio atmesti negalima",
-      "cannotDismissDescription": "Radinius gali atmesti tik organizacijos savininkai ir atsiskaitymų administratoriai.",
+      "cannotDismissDescription": "Radinius gali atmesti tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "alreadyResolvedDescription": "Šis radinys jau išspręstas, todėl jo atmesti nebegalima."
     },
     "findingDetails": {
@@ -1815,7 +1815,7 @@
       "automationAllOff": "Viskas išjungta",
       "automationCount": "Įjungta {{displayCount}} iš 3",
       "notificationsCount": "Įjungta {{displayCount}} iš 2",
-      "disabledNoManage": "Saugos agentas išjungtas. Jį įjungti gali tik organizacijos savininkai ir atsiskaitymų administratoriai.",
+      "disabledNoManage": "Saugos agentas išjungtas. Jį įjungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "disabledNoRepo": "Prieš įjungdamas saugos agentą, pasirink bent vieną saugyklą.",
       "disabledPrompt": "Įjunk saugos agentą, kad galėtum sinchronizuoti Dependabot įspėjimus, pasirinkti saugyklas ir nustatyti automatizavimą.",
       "repositoriesCount_few": "Pasirinktos {{displayCount}} saugyklos",
@@ -1866,7 +1866,7 @@
       "invalidDayCount": "įvesk sveikąjį dienų skaičių nuo 1 iki 365.",
       "remediationDeadlineA11y": "Taisymo terminas dienomis. Pavojingumas: {{label}}",
       "enterWholeNumber": "Įvesk sveikąjį skaičių nuo 1 iki 365",
-      "permissionNote": "Šiuos nustatymus gali keisti tik organizacijos savininkai ir atsiskaitymų administratoriai.",
+      "permissionNote": "Šiuos nustatymus gali keisti tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "enableTracking": "Įjungti SLA stebėjimą",
       "enableTrackingSubtitle": "Nustato taisymo terminus pagal radinio pavojingumą.",
       "deadlinesHeading": "Taisymo terminai (dienomis)"
@@ -1918,7 +1918,7 @@
       "summary": "Ataskaitos santrauka",
       "title": "Audito ataskaita",
       "unavailable": "Audito ataskaita nepasiekiama",
-      "unavailableDescription": "Audito ataskaitas gali peržiūrėti tik organizacijos savininkai ir atsiskaitymų administratoriai. Paprašyk savininko arba atsiskaitymų administratoriaus suteikti tau prieigą.",
+      "unavailableDescription": "Audito ataskaitas gali peržiūrėti tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai. Paprašyk savininko, administratoriaus arba atsiskaitymų administratoriaus suteikti tau prieigą.",
       "queryFailed": "Nepavyko užbaigti ataskaitos užklausos. Bandyk dar kartą."
     },
     "notifications": {

@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Could not load review memory",
       "off": "Review memory is off",
       "offDescription": "Turn it on to let Kilo learn from maintainer replies and propose REVIEW.md guidance.",
-      "readOnlyDescription": "Only organization owners and billing managers can enable review memory.",
+      "readOnlyDescription": "Only organization owners, admins, and billing managers can enable review memory.",
       "enable": "Enable review memory",
       "loadingProposals": "Loading proposals",
       "couldNotLoadProposals": "Could not load proposals",
@@ -1467,7 +1467,7 @@
       "starting": "Starting review…",
       "start": "Start review"
     },
-    "notConnectedReadOnly": "{{platform}} isn't connected. Only organization owners and billing managers can connect it.",
+    "notConnectedReadOnly": "{{platform}} isn't connected. Only organization owners and admins can connect it.",
     "webhookSetup": "Webhook setup incomplete",
     "webhookSetupDescription": "Some repositories may not receive automatic reviews.",
     "autoReviews": "Automatic reviews",
@@ -1475,7 +1475,7 @@
     "followReviewMd": "Follow REVIEW.md",
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners and billing managers can connect it.",
+      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners and admins can connect it.",
       "setupIncomplete": "Setup incomplete — finish configuration on kilo.ai",
       "setup": "Bitbucket setup"
     },
@@ -1729,7 +1729,7 @@
       "couldNotLoad": "Could not load this finding",
       "couldNotCheckPermissions": "Could not check dismiss permissions",
       "cannotDismissTitle": "Can't dismiss this finding",
-      "cannotDismissDescription": "Only organization owners and billing managers can dismiss findings.",
+      "cannotDismissDescription": "Only organization owners, admins, and billing managers can dismiss findings.",
       "alreadyResolvedDescription": "This finding has already been resolved and no longer accepts a dismissal."
     },
     "findingDetails": {
@@ -1771,7 +1771,7 @@
       "automationAllOff": "All off",
       "automationCount": "{{displayCount}} of 3 enabled",
       "notificationsCount": "{{displayCount}} of 2 enabled",
-      "disabledNoManage": "Security Agent is disabled. Only organization owners and billing managers can turn it on.",
+      "disabledNoManage": "Security Agent is disabled. Only organization owners, admins, and billing managers can turn it on.",
       "disabledNoRepo": "Select at least one repository before enabling Security Agent.",
       "disabledPrompt": "Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation."
     },
@@ -1820,7 +1820,7 @@
       "invalidDayCount": "1-365 days, whole numbers only.",
       "remediationDeadlineA11y": "{{label}} remediation deadline in days",
       "enterWholeNumber": "Enter a whole number between 1 and 365",
-      "permissionNote": "Only organization owners and billing managers can change these settings.",
+      "permissionNote": "Only organization owners, admins, and billing managers can change these settings.",
       "enableTracking": "Enable SLA tracking",
       "enableTrackingSubtitle": "Set remediation deadlines based on finding severity.",
       "deadlinesHeading": "Remediation deadlines (days)"
@@ -1872,7 +1872,7 @@
       "summary": "Report summary",
       "title": "Audit report",
       "unavailable": "Audit report unavailable",
-      "unavailableDescription": "Only organization owners and billing managers can view audit reports. Ask an owner or billing manager to grant you access.",
+      "unavailableDescription": "Only organization owners, admins, and billing managers can view audit reports. Ask an owner, admin, or billing manager to grant you access.",
       "queryFailed": "Report query did not finish. Try again."
     },
     "notifications": {

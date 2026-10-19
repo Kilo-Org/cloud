@@ -1504,7 +1504,7 @@
       "couldNotLoad": "Ma setgħetx titgħabba l-memorja tar-reviżjoni.",
       "off": "Il-memorja tar-reviżjoni hija diżattivata.",
       "offDescription": "Attivaha biex Kilo jitgħallem mit-tweġibiet tal-manutenturi u jipproponi linji gwida għal REVIEW.md.",
-      "readOnlyDescription": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jattivaw il-memorja tar-reviżjoni.",
+      "readOnlyDescription": "Is-sidien tal-organizzazzjoni, l-amministraturi u l-maniġers tal-kontijiet biss jistgħu jattivaw il-memorja tar-reviżjoni.",
       "enable": "Attiva l-memorja tar-reviżjoni",
       "loadingProposals": "Qed jitgħabbew il-proposti",
       "couldNotLoadProposals": "Ma setgħux jitgħabbew il-proposti.",
@@ -1524,7 +1524,7 @@
       "starting": "Qed tibda r-reviżjoni…",
       "start": "Ibda r-reviżjoni"
     },
-    "notConnectedReadOnly": "{{platform}} mhux konness. Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jikkonnettjawh.",
+    "notConnectedReadOnly": "{{platform}} mhux konness. Is-sidien tal-organizzazzjoni u l-amministraturi biss jistgħu jikkonnettjawh.",
     "webhookSetup": "Il-konfigurazzjoni tal-webhook mhix lesta.",
     "webhookSetupDescription": "Xi repożitorji jistgħu ma jirċevux reviżjonijiet awtomatiċi.",
     "autoReviews": "Reviżjonijiet awtomatiċi",
@@ -1532,7 +1532,7 @@
     "followReviewMd": "Segwi REVIEW.md",
     "followReviewMdSubtitle": "Segwi l-fajls tal-istruzzjonijiet REVIEW.md ta' kull repożitorju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jikkonnettjawh.",
+      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien tal-organizzazzjoni u l-amministraturi biss jistgħu jikkonnettjawh.",
       "setupIncomplete": "Il-konfigurazzjoni mhix lesta. Lestiha fuq kilo.ai.",
       "setup": "Konfigurazzjoni ta' Bitbucket"
     },
@@ -1795,7 +1795,7 @@
       "couldNotLoad": "Ma stajniex ngħabbu din is-sejba.",
       "couldNotCheckPermissions": "Ma setgħux jiġu ċċekkjati l-permessi għat-twarrib.",
       "cannotDismissTitle": "Ma tistax twarrab din is-sejba",
-      "cannotDismissDescription": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jwarrbu s-sejbiet.",
+      "cannotDismissDescription": "Is-sidien tal-organizzazzjoni, l-amministraturi u l-maniġers tal-kontijiet biss jistgħu jwarrbu s-sejbiet.",
       "alreadyResolvedDescription": "Din is-sejba diġà ġiet solvuta u ma tistax titwarrab aktar."
     },
     "findingDetails": {
@@ -1837,7 +1837,7 @@
       "automationAllOff": "Kollha diżattivati",
       "automationCount": "{{displayCount}} minn 3 attivati",
       "notificationsCount": "{{displayCount}} minn 2 attivati",
-      "disabledNoManage": "L-aġent tas-sigurtà huwa diżattivat. Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jattivawh.",
+      "disabledNoManage": "L-aġent tas-sigurtà huwa diżattivat. Is-sidien tal-organizzazzjoni, l-amministraturi u l-maniġers tal-kontijiet biss jistgħu jattivawh.",
       "disabledNoRepo": "Agħżel mill-inqas repożitorju wieħed qabel ma tattiva l-aġent tas-sigurtà.",
       "disabledPrompt": "Attiva l-aġent tas-sigurtà biex tissinkronizza l-allerti ta' Dependabot, tagħżel ir-repożitorji u tikkonfigura l-awtomazzjoni.",
       "repositoriesCount_two": "{{displayCount}} repożitorji magħżula",
@@ -1889,7 +1889,7 @@
       "invalidDayCount": "daħħal minn 1 sa 365 jum, b'numri sħaħ biss.",
       "remediationDeadlineA11y": "Skadenza tar-rimedju għal {{label}}, f'jiem",
       "enterWholeNumber": "Daħħal numru sħiħ bejn 1 u 365",
-      "permissionNote": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jibdlu dan l-issettjar.",
+      "permissionNote": "Is-sidien tal-organizzazzjoni, l-amministraturi u l-maniġers tal-kontijiet biss jistgħu jibdlu dan l-issettjar.",
       "enableTracking": "Attiva t-traċċar tas-SLA",
       "enableTrackingSubtitle": "Issettja skadenzi ta' rimedju bbażati fuq is-severità tas-sejba.",
       "deadlinesHeading": "Skadenzi tar-rimedju (jiem)"
@@ -1941,7 +1941,7 @@
       "summary": "Sommarju tar-rapport",
       "title": "Rapport tal-awditjar",
       "unavailable": "Ir-rapport tal-awditjar mhux disponibbli",
-      "unavailableDescription": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jaraw ir-rapporti tal-awditjar. Itlob lil sid jew maniġer tal-kontijiet jagħtik aċċess.",
+      "unavailableDescription": "Is-sidien tal-organizzazzjoni, l-amministraturi u l-maniġers tal-kontijiet biss jistgħu jaraw ir-rapporti tal-awditjar. Itlob lil sid, amministratur jew maniġer tal-kontijiet jagħtik aċċess.",
       "queryFailed": "Il-mistoqsija għad-dejta tar-rapport ma tlestietx. Erġa' pprova."
     },
     "notifications": {

@@ -861,7 +861,7 @@
     },
     "autoReviews": "Revisões automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está conectado. Somente proprietários da organização e gerentes de cobrança podem conectá-lo.",
+      "notConnectedReadOnly": "O Bitbucket não está conectado. Somente proprietários da organização e administradores podem conectá-lo.",
       "setupIncomplete": "A configuração está incompleta. Conclua a configuração em kilo.ai.",
       "setup": "Configuração do Bitbucket"
     },
@@ -885,7 +885,7 @@
       "starting": "Iniciando revisão…",
       "title": "Revisão manual"
     },
-    "notConnectedReadOnly": "{{platform}} não está conectado. Somente proprietários da organização e gerentes de cobrança podem conectá-lo.",
+    "notConnectedReadOnly": "{{platform}} não está conectado. Somente proprietários da organização e administradores podem conectá-lo.",
     "platformList": {
       "activity": "Atividade",
       "checking": "Verificando…",
@@ -960,7 +960,7 @@
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois que o Kilo analisa as respostas dos mantenedores.",
       "off": "A memória de revisão está desativada.",
       "offDescription": "Ative-a para que o Kilo aprenda com as respostas dos mantenedores e proponha orientações para o REVIEW.md.",
-      "readOnlyDescription": "Somente proprietários da organização e gerentes de cobrança podem ativar a memória de revisão.",
+      "readOnlyDescription": "Somente proprietários da organização, administradores e gerentes de cobrança podem ativar a memória de revisão.",
       "title": "Memória das revisões"
     },
     "scopeList": {
@@ -1103,7 +1103,7 @@
       "summary": "Resumo do relatório",
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
-      "unavailableDescription": "Somente proprietários da organização e gerentes de cobrança podem ver relatórios de auditoria. Peça acesso a um deles."
+      "unavailableDescription": "Somente proprietários da organização, administradores e gerentes de cobrança podem ver relatórios de auditoria. Peça a um proprietário, administrador ou gerente de cobrança para conceder acesso a você."
     },
     "auditReportButton": {
       "viewA11y": "Ver relatório de auditoria"
@@ -1203,7 +1203,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Esta ocorrência já foi resolvida e não pode mais ser descartada.",
-      "cannotDismissDescription": "Somente proprietários da organização e gerentes de cobrança podem descartar ocorrências.",
+      "cannotDismissDescription": "Somente proprietários da organização, administradores e gerentes de cobrança podem descartar ocorrências.",
       "cannotDismissTitle": "Não é possível descartar esta ocorrência",
       "commentAccessibility": "Comentário sobre o descarte",
       "commentLabel": "Comentário (opcional)",
@@ -1336,7 +1336,7 @@
       "automationCount": "{{displayCount}} de 3 ativadas",
       "couldNotLoadPermissions": "Não foi possível carregar as permissões.",
       "couldNotLoadSettings": "Não foi possível carregar as configurações do agente de segurança.",
-      "disabledNoManage": "O agente de segurança está desativado. Somente proprietários da organização e gerentes de cobrança podem ativá-lo.",
+      "disabledNoManage": "O agente de segurança está desativado. Somente proprietários da organização, administradores e gerentes de cobrança podem ativá-lo.",
       "disabledNoRepo": "Selecione pelo menos um repositório antes de ativar o agente de segurança.",
       "disabledPrompt": "Ative o agente de segurança para sincronizar alertas do Dependabot, escolher repositórios e configurar a automação.",
       "notificationsCount": "{{displayCount}} de 2 ativadas",
@@ -1369,7 +1369,7 @@
       "lowDescription": "Impacto mínimo na segurança.",
       "medium": "Nível médio",
       "mediumDescription": "Impacto limitado ou condições específicas.",
-      "permissionNote": "Somente proprietários da organização e gerentes de cobrança podem alterar estas configurações.",
+      "permissionNote": "Somente proprietários da organização, administradores e gerentes de cobrança podem alterar estas configurações.",
       "remediationDeadlineA11y": "Prazo de correção para gravidade {{label}}, em dias",
       "title": "Política de SLA"
     },

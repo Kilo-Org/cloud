@@ -889,7 +889,7 @@
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber und Abrechnungsmanager können die Verbindung herstellen.",
+      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber und Administratoren können die Verbindung herstellen.",
       "setupIncomplete": "Die Einrichtung ist unvollständig. Schließe die Konfiguration auf kilo.ai ab.",
       "setup": "Bitbucket-Einrichtung"
     },
@@ -913,7 +913,7 @@
       "starting": "Review wird gestartet …",
       "title": "Manuelles Review"
     },
-    "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Nur Organisationsinhaber und Abrechnungsmanager können die Verbindung herstellen.",
+    "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Nur Organisationsinhaber und Administratoren können die Verbindung herstellen.",
     "platformList": {
       "activity": "Aktivität",
       "checking": "Wird geprüft …",
@@ -988,7 +988,7 @@
       "noProposalsDescription": "Hier erscheinen Vorschläge aus dem Review-Speicher, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
       "off": "Der Review-Speicher ist deaktiviert.",
       "offDescription": "Aktiviere ihn, damit Kilo aus Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
-      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können den Review-Speicher aktivieren.",
+      "readOnlyDescription": "Nur Organisationsinhaber, Administratoren und Abrechnungsmanager können den Review-Speicher aktivieren.",
       "title": "Gespeicherte Prüfhinweise"
     },
     "scopeList": {
@@ -1131,7 +1131,7 @@
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",
-      "unavailableDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber oder Abrechnungsmanager, dir Zugriff zu gewähren."
+      "unavailableDescription": "Nur Organisationsinhaber, Administratoren und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber, Administrator oder Abrechnungsmanager, dir Zugriff zu gewähren."
     },
     "auditReportButton": {
       "viewA11y": "Auditbericht ansehen"
@@ -1228,7 +1228,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Dieser Befund wurde bereits behoben und kann nicht mehr verworfen werden.",
-      "cannotDismissDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Befunde verwerfen.",
+      "cannotDismissDescription": "Nur Organisationsinhaber, Administratoren und Abrechnungsmanager können Befunde verwerfen.",
       "cannotDismissTitle": "Dieser Befund kann nicht verworfen werden",
       "commentAccessibility": "Kommentar zum Verwerfen",
       "commentLabel": "Kommentar (optional)",
@@ -1361,7 +1361,7 @@
       "automationCount": "{{displayCount}} von 3 aktiviert",
       "couldNotLoadPermissions": "Die Berechtigungen konnten nicht geladen werden.",
       "couldNotLoadSettings": "Die Einstellungen für Security Agent konnten nicht geladen werden.",
-      "disabledNoManage": "Security Agent ist deaktiviert. Nur Organisationsinhaber und Abrechnungsmanager können ihn aktivieren.",
+      "disabledNoManage": "Security Agent ist deaktiviert. Nur Organisationsinhaber, Administratoren und Abrechnungsmanager können ihn aktivieren.",
       "disabledNoRepo": "Wähle mindestens ein Repository aus, bevor du Security Agent aktivierst.",
       "disabledPrompt": "Aktiviere Security Agent, um Dependabot-Warnungen zu synchronisieren, Repositories auszuwählen und die Automatisierung einzurichten.",
       "notificationsCount": "{{displayCount}} von 2 aktiviert",
@@ -1393,7 +1393,7 @@
       "lowDescription": "Minimale Auswirkungen auf die Sicherheit.",
       "medium": "Mittel",
       "mediumDescription": "Begrenzte Auswirkungen oder nur unter bestimmten Bedingungen ausnutzbar.",
-      "permissionNote": "Nur Organisationsinhaber und Abrechnungsmanager können diese Einstellungen ändern.",
+      "permissionNote": "Nur Organisationsinhaber, Administratoren und Abrechnungsmanager können diese Einstellungen ändern.",
       "remediationDeadlineA11y": "Behebungsfrist für {{label}} in Tagen",
       "title": "SLA-Richtlinie"
     },

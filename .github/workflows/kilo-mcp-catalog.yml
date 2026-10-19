@@ -313,12 +313,31 @@ jobs:
               failed = true;
               break;
             }
+            // Mirror parseSummaries from catalog.ts: strip markdown fences
+            // and slice between the first { and last } before parsing.
+            const unfenced = content
+              .trim()
+              .replace(/^```(?:json)?\s*/i, '')
+              .replace(/```\s*$/i, '')
+              .trim();
+            const braceStart = unfenced.indexOf('{');
+            const braceEnd = unfenced.lastIndexOf('}');
+            const candidate =
+              braceStart !== -1 && braceEnd > braceStart
+                ? unfenced.slice(braceStart, braceEnd + 1)
+                : unfenced;
             let parsed;
             try {
-              parsed = JSON.parse(content);
+              parsed = JSON.parse(candidate);
             } catch {
               parsed = undefined;
             }
+            // Keep only the paths the batch requested, mirroring
+            // parseSummaries: anything else the model added is ignored.
+            const requested = batch.prompt
+              .split('\n')
+              .filter(line => line.startsWith('- '))
+              .map(line => line.slice(2).trim());
             if (
               parsed === undefined ||
               parsed === null ||
@@ -330,7 +349,8 @@ jobs:
               break;
             }
             for (const [path, summary] of Object.entries(parsed)) {
-              if (typeof summary === 'string' && summary.trim() !== '') summaries[path] = summary;
+              if (requested.includes(path) && typeof summary === 'string' && summary.trim() !== '')
+                summaries[path] = summary;
             }
           }
 
@@ -779,12 +799,31 @@ jobs:
               failed = true;
               break;
             }
+            // Mirror parseSummaries from catalog.ts: strip markdown fences
+            // and slice between the first { and last } before parsing.
+            const unfenced = content
+              .trim()
+              .replace(/^```(?:json)?\s*/i, '')
+              .replace(/```\s*$/i, '')
+              .trim();
+            const braceStart = unfenced.indexOf('{');
+            const braceEnd = unfenced.lastIndexOf('}');
+            const candidate =
+              braceStart !== -1 && braceEnd > braceStart
+                ? unfenced.slice(braceStart, braceEnd + 1)
+                : unfenced;
             let parsed;
             try {
-              parsed = JSON.parse(content);
+              parsed = JSON.parse(candidate);
             } catch {
               parsed = undefined;
             }
+            // Keep only the paths the batch requested, mirroring
+            // parseSummaries: anything else the model added is ignored.
+            const requested = batch.prompt
+              .split('\n')
+              .filter(line => line.startsWith('- '))
+              .map(line => line.slice(2).trim());
             if (
               parsed === undefined ||
               parsed === null ||
@@ -796,7 +835,8 @@ jobs:
               break;
             }
             for (const [path, summary] of Object.entries(parsed)) {
-              if (typeof summary === 'string' && summary.trim() !== '') summaries[path] = summary;
+              if (requested.includes(path) && typeof summary === 'string' && summary.trim() !== '')
+                summaries[path] = summary;
             }
           }
 

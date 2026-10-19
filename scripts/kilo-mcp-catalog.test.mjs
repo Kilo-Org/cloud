@@ -61,19 +61,25 @@ function findStep(job, predicate, what) {
 }
 
 /**
- * The credential scoping invariant: the minted token exists only as the
- * completing step's step-level env, sourced from the mint step outputs. No
- * step anywhere writes it to the job-wide environment, and no job other than
- * the two completion sites references it at all.
+ * The credential declaration invariant: the completion steps receive
+ * KILO_API_KEY/KILO_ORG_ID from the mint step outputs, and the credential is
+ * declared as step-level env of those two steps alone.
  */
 function assertCredentialConfinement(workflow, completeByJob) {
   for (const [jobName, job] of Object.entries(workflow.jobs)) {
+    // Job-level env applies to every step, so the credential is declared on
+    // the completion step instead.
+    assert.deepEqual(
+      Object.keys(job.env ?? {}).filter(key => key === 'KILO_API_KEY' || key === 'KILO_ORG_ID'),
+      [],
+      `${jobName}: the credential env is declared on the completion step`
+    );
     for (const step of job.steps) {
       const text = `${step.run ?? ''} ${JSON.stringify(step.env ?? {})}`;
       assert.doesNotMatch(
         text,
         /GITHUB_ENV[\s\S]{0,200}KILO_API_KEY|KILO_API_KEY[\s\S]{0,200}GITHUB_ENV/,
-        `${jobName}/${step.name ?? step.uses}: the token stays out of the job-wide environment`
+        `${jobName}/${step.name ?? step.uses}: the credential is declared as step-level env of the completion step`
       );
       const envKeys = Object.keys(step.env ?? {});
       const tokenEnv = envKeys.filter(key => key === 'KILO_API_KEY' || key === 'KILO_ORG_ID');
@@ -81,7 +87,7 @@ function assertCredentialConfinement(workflow, completeByJob) {
       assert.deepEqual(
         tokenEnv.filter(key => !expected.includes(key)),
         [],
-        `${jobName}/${step.name ?? step.uses}: only the completion step may receive the minted token via step-level env`
+        `${jobName}/${step.name ?? step.uses}: only the completion step declares the credential env`
       );
     }
   }
@@ -508,7 +514,7 @@ for (const [name, defect] of [
     },
   ],
   [
-    'prepare job grows its own mint step',
+    'prepare job declares the credential env',
     workflow => {
       workflow.jobs[prepareJobName].steps.push({
         name: 'Mint',

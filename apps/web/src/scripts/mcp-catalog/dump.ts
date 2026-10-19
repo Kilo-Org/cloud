@@ -101,6 +101,13 @@ async function main(): Promise<void> {
   const dryRun = args.includes('--dry-run');
   const summariesFlagIndex = args.indexOf('--summaries-file');
   const summariesFile = summariesFlagIndex === -1 ? undefined : args[summariesFlagIndex + 1];
+  if (
+    summariesFlagIndex !== -1 &&
+    (summariesFile === undefined || summariesFile.startsWith('--'))
+  ) {
+    console.error('❌ --summaries-file requires a file path argument');
+    process.exit(1);
+  }
   if (check && dryRun) {
     console.error('❌ --check and --dry-run are mutually exclusive');
     process.exit(1);
@@ -145,12 +152,14 @@ async function main(): Promise<void> {
       );
     }
     const generated = new Map(Object.entries(raw as Record<string, string>));
-    // Only paths that are actually missing may receive a generated summary:
-    // extra keys would silently overwrite committed (author-edited) rows.
-    const unknown = [...generated.keys()].filter(path => !missing.some(leaf => leaf.path === path));
-    if (unknown.length > 0) {
+    // A generated summary may never overwrite a committed (author-edited)
+    // row. Extra keys that are neither missing nor committed overwrite
+    // nothing and are ignored, mirroring the runner-side filter to the
+    // requested batch paths.
+    const collisions = [...generated.keys()].filter(path => committed.has(path));
+    if (collisions.length > 0) {
       throw new Error(
-        `Summary file ${summariesFile} carries summaries for ${unknown.length} ${unknown.length === 1 ? 'path' : 'paths'} that are not missing: ${unknown.join(', ')}`
+        `Summary file ${summariesFile} carries summaries for ${collisions.length} already-committed ${collisions.length === 1 ? 'path' : 'paths'}: ${collisions.join(', ')}`
       );
     }
     const uncovered = missing

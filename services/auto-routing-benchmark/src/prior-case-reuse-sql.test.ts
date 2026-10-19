@@ -24,13 +24,14 @@ const SCHEMA_SQL = `
     latency_ms INTEGER NOT NULL, cost_usd REAL, error TEXT,
     fallback_reason TEXT, route_hit INTEGER, retried INTEGER, exit_code INTEGER,
     output_prefix TEXT, event_count INTEGER, last_event_types TEXT,
-    rep INTEGER NOT NULL, timed_out INTEGER NOT NULL,
+    rep INTEGER NOT NULL, timed_out INTEGER NOT NULL, prompt_revision INTEGER NOT NULL DEFAULT 1,
     PRIMARY KEY (run_id, model, variant, case_id, rep)
   );
   CREATE TABLE pending_decider_outputs (
     run_id TEXT NOT NULL REFERENCES benchmark_runs(id), model TEXT NOT NULL,
     variant TEXT NOT NULL, case_id TEXT NOT NULL, rep INTEGER NOT NULL,
-    payload TEXT NOT NULL, PRIMARY KEY (run_id, model, variant, case_id, rep)
+    payload TEXT NOT NULL, prompt_revision INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (run_id, model, variant, case_id, rep)
   );
 `;
 
@@ -171,6 +172,8 @@ const reuseParams = {
   engineIdentity: 'dataset:engine',
   repetitions: 2,
   entries: [{ model: 'concrete/model', variant: 'high' }],
+  skipOldCaseIds: [],
+  promptRevision: 2,
 } as const;
 
 const gradedCaseResult: CaseResultRow = {
@@ -192,6 +195,7 @@ const gradedCaseResult: CaseResultRow = {
   last_event_types: '["text","completion"]',
   rep: 0,
   timed_out: 0,
+  prompt_revision: 2,
 };
 
 function results(db: DatabaseSync, runId: string) {
@@ -417,7 +421,7 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
         case_id: 'judge',
         rep: 0,
       })
-    ).toEqual(pendingPayload('new-z'));
+    ).toEqual({ ...pendingPayload('new-z'), promptRevision: 1 });
     expect(['old', 'new-a', 'new-z'].map(id => pending(sqlite, id))).toEqual(
       sourcePending.map(rows => rows.filter(row => row.case_id !== 'source-graded'))
     );

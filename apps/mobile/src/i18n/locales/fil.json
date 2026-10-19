@@ -2498,6 +2498,7 @@
       "title": "Salain ang mga sesyon",
       "platformCloud": "Serbisyo sa cloud",
       "platformExtension": "Ekstensiyon",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

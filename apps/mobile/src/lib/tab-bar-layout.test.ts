@@ -308,7 +308,8 @@ describe('shouldShowTabLabel', () => {
     // RTL-script advance measures the widest Arabic label at 75.55dp, so the
     // row stays.
     const arabicLabels = ['الرئيسية', 'الوكلاء', 'الدردشة', 'الملف الشخصي'];
-    expect(tabLabelWidth(arabicLabels[3])).toBeLessThan(360 / 4 - 10);
+    const widestArabicLabel = 'الملف الشخصي';
+    expect(tabLabelWidth(widestArabicLabel)).toBeLessThan(360 / 4 - 10);
     expect(shouldShowTabLabel(1, 360 / 4, arabicLabels)).toBe(true);
     // The same labels genuinely cannot fit a five-tab box (68.6dp), so the
     // width rule still does its job in Arabic.

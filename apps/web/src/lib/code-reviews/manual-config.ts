@@ -6,6 +6,8 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type ReviewWithManualConfig = {
   manual_config: unknown;
+  /** Present on real review rows; callers that wrap partial shapes may omit it. */
+  id?: string;
 };
 
 export function parseManualCodeReviewConfig(value: unknown): ManualCodeReviewConfig | null {
@@ -35,6 +37,7 @@ export function getManualCodeReviewConfigForDetail(
     return parseManualCodeReviewConfig(review.manual_config);
   } catch (error) {
     warnExceptInTest('[codeReviews.get] Stored manual_config failed the strict schema', {
+      reviewId: review.id,
       error: error instanceof Error ? error.message : String(error),
     });
     return null;

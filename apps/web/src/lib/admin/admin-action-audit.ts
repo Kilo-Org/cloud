@@ -169,22 +169,44 @@ export function organizationActionTarget(organizationId: string): AdminActionTar
  * allowed it. Admins acting within a role they actually hold are ordinary
  * members and are not recorded.
  *
+ * `requiredRoles` and `membershipScope` must mirror the guard the admin
+ * bypassed: some guards accept roles inherited from a parent organization,
+ * others only a direct membership. Pass `heldRoles` when the action itself
+ * changes the actor's membership (e.g. self-removal) and the roles were read
+ * beforehand.
+ *
  * Reads stay as `kilo_admin_elevation` log lines; call this only from
- * mutations, after they succeed.
+ * mutations, after they succeed. Like {@link recordAdminAction} it never
+ * throws: if the membership lookup fails, the action is recorded with
+ * `heldRoles: null` rather than failing a request that already took effect.
  */
 export async function recordElevatedOrganizationAdminAction(
   ctx: AdminActionContext & { user: { is_admin: boolean } },
   params: {
     organizationId: string;
     requiredRoles: readonly OrganizationRole[];
+    membershipScope?: OrganizationMembershipScope;
+    heldRoles?: OrganizationRole[];
     action: AdminActionAuditAction;
     message: string;
     metadata?: Record<string, unknown>;
   }
 ): Promise<void> {
   if (!ctx.user.is_admin) return;
-  const heldRoles = await getMembershipRoles(ctx.user.id, params.organizationId);
-  if (heldRoles.some(role => params.requiredRoles.includes(role))) return;
+
+  let heldRoles: OrganizationRole[] | null = params.heldRoles ?? null;
+  if (heldRoles === null) {
+    try {
+      heldRoles = await getOrganizationMembershipRoles(
+        ctx.user.id,
+        params.organizationId,
+        params.membershipScope ?? 'direct_or_inherited'
+      );
+    } catch (error) {
+      captureException(error, { tags: { operation: 'admin_action_membership_lookup' } });
+    }
+  }
+  if (heldRoles?.some(role => params.requiredRoles.includes(role))) return;
 
   await recordAdminAction(ctx, {
     action: params.action,
@@ -194,11 +216,17 @@ export async function recordElevatedOrganizationAdminAction(
   });
 }
 
-// Direct roles plus roles inherited from a parent organization, mirroring
-// ensureOrganizationAccess for non-admins.
-async function getMembershipRoles(
+export type OrganizationMembershipScope = 'direct' | 'direct_or_inherited';
+
+/**
+ * The caller's real roles in an organization: direct memberships, plus roles
+ * inherited from a parent organization when `scope` allows, mirroring
+ * ensureOrganizationAccess for non-admins.
+ */
+export async function getOrganizationMembershipRoles(
   userId: string,
-  organizationId: string
+  organizationId: string,
+  scope: OrganizationMembershipScope
 ): Promise<OrganizationRole[]> {
   const direct = await db
     .select({ role: organization_memberships.role })
@@ -209,18 +237,21 @@ async function getMembershipRoles(
         eq(organization_memberships.organization_id, organizationId)
       )
     );
-  const inherited = await db
-    .select({ role: organization_memberships.role })
-    .from(organizations)
-    .innerJoin(
-      organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, organizations.parent_organization_id),
-        eq(organization_memberships.kilo_user_id, userId),
-        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
-      )
-    )
-    .where(eq(organizations.id, organizationId));
+  const inherited =
+    scope === 'direct'
+      ? []
+      : await db
+          .select({ role: organization_memberships.role })
+          .from(organizations)
+          .innerJoin(
+            organization_memberships,
+            and(
+              eq(organization_memberships.organization_id, organizations.parent_organization_id),
+              eq(organization_memberships.kilo_user_id, userId),
+              inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+            )
+          )
+          .where(eq(organizations.id, organizationId));
   return [...new Set([...direct, ...inherited].map(row => row.role))];
 }
 

@@ -423,7 +423,9 @@ async function recordOrganizationGatewayWrite(
   if (!organizationId) return;
   await recordElevatedOrganizationAdminAction(ctx, {
     organizationId,
+    // requireOrganizationManager accepts only a direct owner membership.
     requiredRoles: ['owner'],
+    membershipScope: 'direct',
     action: 'organization.mcp_gateway.update',
     message: `MCP gateway: ${operation}`,
     metadata: { operation, ...metadata },

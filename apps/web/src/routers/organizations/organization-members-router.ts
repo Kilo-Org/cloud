@@ -28,8 +28,11 @@ import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
 } from '@kilocode/app-shared/organizations';
-import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
-import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import {
+  getOrganizationMembershipRoles,
+  recordElevatedOrganizationAdminAction,
+} from '@/lib/admin/admin-action-audit';
 import {
   enqueueInviteEmail,
   resetInviteEmailForResend,
@@ -284,7 +287,9 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       await recordElevatedOrganizationAdminAction(ctx, {
         organizationId,
-        requiredRoles: ORGANIZATION_MANAGE_ROLES,
+        // Changing an owner or granting owner needs owner authority.
+        requiredRoles:
+          targetMember.role === 'owner' || role === 'owner' ? ['owner'] : ORGANIZATION_MANAGE_ROLES,
         action: 'organization.member.role.update',
         message: `Changed member role from ${targetMember.role} to ${role}`,
         metadata: { memberKiloUserId: memberId, previousRole: targetMember.role, role },
@@ -441,7 +446,9 @@ export const organizationsMembersRouter = createTRPCRouter({
       if (added.length > 0 || removed.length > 0) {
         await recordElevatedOrganizationAdminAction(ctx, {
           organizationId,
-          requiredRoles: ORGANIZATION_BILLING_ROLES,
+          // Mirrors the direct-membership check above.
+          requiredRoles: ['owner', 'billing_manager'],
+          membershipScope: 'direct',
           action: 'organization.child_memberships.set',
           message: 'Changed child organization memberships',
           metadata: {
@@ -493,6 +500,13 @@ export const organizationsMembersRouter = createTRPCRouter({
       );
       assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
 
+      // Self-removal deletes the actor's own membership, so read their real
+      // roles first for the audit row.
+      const actorHeldRolesBeforeRemoval =
+        user.is_admin && memberId === user.id
+          ? await getOrganizationMembershipRoles(user.id, organizationId, 'direct_or_inherited')
+          : undefined;
+
       const result = await removeUserFromOrganization(organizationId, memberId, user.id);
       if (result.rowCount === 0) {
         throw new TRPCError({
@@ -516,7 +530,15 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       await recordElevatedOrganizationAdminAction(ctx, {
         organizationId,
-        requiredRoles: ORGANIZATION_MANAGE_ROLES,
+        // Only Kilo admins may remove themselves, so self-removal is always a
+        // bypass regardless of the roles they held.
+        requiredRoles:
+          memberId === user.id
+            ? []
+            : targetMember.role === 'owner'
+              ? ['owner']
+              : ORGANIZATION_MANAGE_ROLES,
+        heldRoles: actorHeldRolesBeforeRemoval,
         action: 'organization.member.remove',
         message: memberId === user.id ? 'Removed self from organization' : 'Removed member',
         metadata: { memberKiloUserId: memberId, previousRole: targetMember.role },
@@ -591,14 +613,19 @@ export const organizationsMembersRouter = createTRPCRouter({
         // (turning elevation into lasting membership) is flagged explicitly.
         await recordElevatedOrganizationAdminAction(ctx, {
           organizationId,
-          requiredRoles: role === 'member' ? ORGANIZATION_BILLING_ROLES : ORGANIZATION_MANAGE_ROLES,
+          requiredRoles:
+            role === 'owner'
+              ? ['owner']
+              : role === 'member'
+                ? ORGANIZATION_BILLING_ROLES
+                : ORGANIZATION_MANAGE_ROLES,
           action: 'organization.member.invite',
           message: `Invited a user as ${role}`,
           metadata: {
             invitationId: result.invitationId,
             role,
             invitedEmailDomain: getLowerDomainFromEmail(email),
-            invitedSelf: email.trim().toLowerCase() === user.google_user_email.toLowerCase(),
+            invitedSelf: normalizeEmail(email) === normalizeEmail(user.google_user_email),
           },
         });
 

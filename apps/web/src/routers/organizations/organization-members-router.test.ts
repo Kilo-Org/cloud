@@ -173,7 +173,8 @@ describe('organizations members trpc router', () => {
     }
 
     it('records role changes and self-invites by a non-member Kilo admin', async () => {
-      const organization = await createOrganization('Elevated Audit Org', regularUser.id);
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Elevated Audit Org', owner.id);
       const member = await insertTestUser({ is_admin: false });
       await addUserToOrganization(organization.id, member.id, 'member');
       const caller = await createCallerForUser(adminUser.id);
@@ -212,15 +213,70 @@ describe('organizations members trpc router', () => {
       );
     });
 
+    it('records owner-authority actions by a Kilo admin who only holds the admin role', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Owner Authority Org', owner.id);
+      const member = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const kiloAdmin = await insertTestUser({
+        is_admin: true,
+        google_user_email: `kilo-admin-${crypto.randomUUID()}@admin.example.com`,
+      });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+      const caller = await createCallerForUser(kiloAdmin.id);
+
+      await caller.organizations.members.update({
+        organizationId: organization.id,
+        memberId: member.id,
+        role: 'owner',
+      });
+      const [localPart, domain] = kiloAdmin.google_user_email.split('@');
+      await caller.organizations.members.invite({
+        organizationId: organization.id,
+        email: `${localPart}+alias@${domain}`,
+        role: 'owner',
+      });
+
+      const audits = await elevatedAudits(kiloAdmin.id, organization.id);
+      expect(
+        audits.find(a => a.action === 'organization.member.role.update')?.metadata
+      ).toMatchObject({ role: 'owner', heldRoles: ['admin'] });
+      expect(audits.find(a => a.action === 'organization.member.invite')?.metadata).toMatchObject({
+        role: 'owner',
+        invitedSelf: true,
+      });
+    });
+
+    it('records Kilo admin self-removal with the roles held before removal', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Self Removal Org', owner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+
+      await (
+        await createCallerForUser(kiloAdmin.id)
+      ).organizations.members.remove({
+        organizationId: organization.id,
+        memberId: kiloAdmin.id,
+      });
+
+      const [audit] = await elevatedAudits(kiloAdmin.id, organization.id);
+      expect(audit).toMatchObject({
+        action: 'organization.member.remove',
+        metadata: { previousRole: 'admin', heldRoles: ['admin'] },
+      });
+    });
+
     it('does not record writes by members acting within their own role', async () => {
-      const organization = await createOrganization('Member Write Org', regularUser.id);
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Member Write Org', owner.id);
       const member = await insertTestUser({ is_admin: false });
       await addUserToOrganization(organization.id, member.id, 'member');
       const kiloAdminOwner = await insertTestUser({ is_admin: true });
       await addUserToOrganization(organization.id, kiloAdminOwner.id, 'owner');
 
       await (
-        await createCallerForUser(regularUser.id)
+        await createCallerForUser(owner.id)
       ).organizations.members.update({
         organizationId: organization.id,
         memberId: member.id,
@@ -234,7 +290,7 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      expect(await elevatedAudits(regularUser.id, organization.id)).toEqual([]);
+      expect(await elevatedAudits(owner.id, organization.id)).toEqual([]);
       expect(await elevatedAudits(kiloAdminOwner.id, organization.id)).toEqual([]);
     });
   });

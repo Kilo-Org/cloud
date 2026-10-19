@@ -472,6 +472,21 @@ describe('explicit organization access', () => {
     });
   });
 
+  test('records resource tokens minted by a global admin whose real role cannot mint them', async () => {
+    await inherited('billing_manager');
+    await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, user.id));
+    expect((await request(new Headers(), '{"resource":"api"}')).status).toBe(200);
+
+    const [mint] = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, user.id));
+    expect(mint).toMatchObject({
+      action: 'organization.token.mint',
+      metadata: { resource: 'api', heldRoles: ['billing_manager'] },
+    });
+  });
+
   test('does not record token minting by a global admin who is an organization member', async () => {
     await inherited('owner');
     await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, user.id));

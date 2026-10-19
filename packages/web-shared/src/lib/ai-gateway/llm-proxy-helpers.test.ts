@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 
@@ -33,7 +33,15 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 import {
+  gemma_4_26b_a4b_it_free_model,
+  glyph_cluster_stealth_free_model,
+  kiloExclusiveModels,
+  reflection_beam_free_model,
+} from './kilo-exclusive-models';
+import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
+import {
   captureProxyError,
+  checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   extractEditPromptInfo,
@@ -1398,5 +1406,64 @@ describe('requestedSamples', () => {
     expect(requestedSamples({ n: 3 })).toBe(3);
     expect(requestedSamples({})).toBeNull();
     expect(requestedSamples({ n: null })).toBeNull();
+  });
+});
+
+describe('checkExclusiveModelProviderAllowed', () => {
+  const multiProviderModel: KiloExclusiveModel = {
+    ...reflection_beam_free_model,
+    public_id: 'test/multi-provider-exclusive',
+    inference_providers: ['anthropic', 'amazon-bedrock'],
+  };
+
+  beforeEach(() => {
+    kiloExclusiveModels.push(multiProviderModel);
+  });
+
+  afterEach(() => {
+    kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(multiProviderModel), 1);
+  });
+
+  it('allows non-exclusive models, missing provider config, and unrestricted exclusives', () => {
+    expect(checkExclusiveModelProviderAllowed('vendor/model', { only: ['openai'] })).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, undefined)
+    ).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
+        only: ['openai'],
+      })
+    ).toBeNull();
+  });
+
+  it('allows a model when any of its inference providers is eligible', () => {
+    expect(
+      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
+        only: ['amazon-bedrock'],
+      })
+    ).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, { ignore: ['anthropic'] })
+    ).toBeNull();
+  });
+
+  it('rejects a model when none of its inference providers is eligible', async () => {
+    const onlyResult = checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
+      only: ['openai'],
+    });
+    expect(onlyResult?.status).toBe(403);
+    expect(await onlyResult?.json()).toMatchObject({
+      error_type: 'provider_not_allowed',
+      error:
+        'No eligible provider can serve the selected model. Please enable provider: anthropic, amazon-bedrock',
+    });
+
+    const ignoreResult = checkExclusiveModelProviderAllowed(
+      glyph_cluster_stealth_free_model.public_id,
+      {
+        ignore: ['stealth'],
+      }
+    );
+    expect(ignoreResult?.status).toBe(403);
   });
 });

@@ -360,11 +360,7 @@ export type WrapperKiloClient = {
   ) => Promise<Record<string, { type: string; [key: string]: unknown }>>;
   getQuestions: (directory?: string, signal?: AbortSignal) => Promise<QuestionRequest[]>;
   getPermissions: (directory?: string, signal?: AbortSignal) => Promise<PermissionRequest[]>;
-  getSessionTodos: (
-    sessionID: string,
-    directory?: string,
-    signal?: AbortSignal
-  ) => Promise<Todo[]>;
+  getSessionTodos: (sessionID: string, directory?: string, signal?: AbortSignal) => Promise<Todo[]>;
   getSessionDiff: (
     sessionID: string,
     directory?: string,

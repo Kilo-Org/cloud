@@ -36,8 +36,7 @@ function harness(nativeClient: WrapperKiloClient | null, route = true) {
   const emitted: ControlPlaneWrapperFrame[] = [];
   const handler = createControlPlaneKiloRequests({
     emit: emittedFrame => emitted.push(emittedFrame),
-    preparedRoute: () =>
-      route ? { runtimeKey: 'runtime_1', directory: DIRECTORY } : null,
+    preparedRoute: () => (route ? { runtimeKey: 'runtime_1', directory: DIRECTORY } : null),
     clientFor: () => nativeClient,
   });
   return { emitted, handler };
@@ -83,7 +82,11 @@ describe('control-plane native reads', () => {
         type: 'kilo.result',
         requestId: 'req_1',
         ok: false,
-        error: { code: 'not_ready', message: 'Session directory is not attached', retryable: false },
+        error: {
+          code: 'not_ready',
+          message: 'Session directory is not attached',
+          retryable: false,
+        },
       },
     ]);
   });

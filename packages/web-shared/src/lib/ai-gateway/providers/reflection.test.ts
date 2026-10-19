@@ -243,6 +243,33 @@ describe('addReflectionReasoningPlaceholders for responses', () => {
     ]);
   });
 
+  it('starts a turn at a built-in tool call', () => {
+    const shellCall = {
+      type: 'local_shell_call' as const,
+      id: 'ls_1',
+      call_id: 'call-ls',
+      status: 'completed' as const,
+      action: { type: 'exec' as const, command: ['ls'], env: {} },
+    };
+    const shellCallOutput = {
+      type: 'local_shell_call_output' as const,
+      id: 'lso_1',
+      call_id: 'call-ls',
+      output: 'a.txt',
+    };
+    const request = makeResponsesRequest([user, shellCall, shellCallOutput, user]);
+
+    addReflectionReasoningPlaceholders(request);
+
+    expect(request.body.input).toEqual([
+      user,
+      placeholderItem(0),
+      shellCall,
+      shellCallOutput,
+      user,
+    ]);
+  });
+
   it('adds a placeholder when the reasoning item has no text', () => {
     const emptyReasoning = { type: 'reasoning' as const, id: 'rs_1', summary: [] };
     const request = makeResponsesRequest([user, emptyReasoning, assistantMessage]);

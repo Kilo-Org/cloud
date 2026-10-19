@@ -85,14 +85,24 @@ function addMessagesReasoningPlaceholders(request: GatewayMessagesRequest) {
 
 type ResponsesInputItem = OpenAI.Responses.ResponseInputItem;
 
+const assistantOutputItemTypes = new Set<ResponsesInputItem['type']>([
+  'reasoning',
+  'function_call',
+  'custom_tool_call',
+  'local_shell_call',
+  'shell_call',
+  'apply_patch_call',
+  'computer_call',
+  'web_search_call',
+  'file_search_call',
+  'code_interpreter_call',
+  'image_generation_call',
+  'mcp_call',
+]);
+
 /** Vercel merges a run of consecutive assistant output items into one assistant message. */
 function isAssistantTurnItem(item: ResponsesInputItem) {
-  return (
-    item.type === 'reasoning' ||
-    item.type === 'function_call' ||
-    item.type === 'custom_tool_call' ||
-    ('role' in item && item.role === 'assistant')
-  );
+  return assistantOutputItemTypes.has(item.type) || ('role' in item && item.role === 'assistant');
 }
 
 function hasResponsesReasoning(item: ResponsesInputItem) {

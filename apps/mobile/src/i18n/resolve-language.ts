@@ -31,13 +31,39 @@ function chineseScriptFor(tag: string): SupportedLanguage | undefined {
 }
 
 /**
+ * Portuguese variant resolution. iOS reports a pt-BR device as the bare tag
+ * `pt` with the region in `regionCode`, not in `languageTag`, and regionless
+ * or region-mismatched tags (`pt-US`) carry no variant either. Everything
+ * Portuguese resolves to the Brazilian variant unless the tag names Portugal:
+ * `pt-PT`, or bare `pt` with `regionCode: 'PT'`. Runs before the exact-match
+ * branch, which a bare `pt` would otherwise win against the Portugal entry.
+ * `tag` arrives lowercased from `normalizeLocale`, so the Portugal comparison
+ * is against `pt-pt`.
+ */
+function portugueseVariantFor(
+  tag: string,
+  regionCode: string | null | undefined
+): SupportedLanguage | undefined {
+  if (tag.split('-')[0] !== 'pt') {
+    return undefined;
+  }
+  if (tag === 'pt-pt') {
+    return 'pt';
+  }
+  if (tag === 'pt' && regionCode?.toUpperCase() === 'PT') {
+    return 'pt';
+  }
+  return 'pt-BR';
+}
+
+/**
  * Resolve the supported language for a locale list. For each tag in
- * preference order, map Chinese scripts, then exact match, then
- * same-language fallback. Returns `null` when no tag matches a supported
- * language, so callers can apply their own fallback.
+ * preference order, map Chinese scripts, map Portuguese variants, then exact
+ * match, then same-language fallback. Returns `null` when no tag matches a
+ * supported language, so callers can apply their own fallback.
  */
 export function resolveSupportedLanguageTag(
-  locales: readonly { languageTag?: string }[]
+  locales: readonly { languageTag?: string; regionCode?: string | null }[]
 ): SupportedLanguage | null {
   for (const locale of locales) {
     const raw = locale.languageTag;
@@ -47,6 +73,11 @@ export function resolveSupportedLanguageTag(
       const script = chineseScriptFor(tag);
       if (script) {
         return script;
+      }
+
+      const variant = portugueseVariantFor(tag, locale.regionCode);
+      if (variant) {
+        return variant;
       }
 
       const exact = SUPPORTED_LANGUAGES.find(supported => normalizeLocale(supported) === tag);
@@ -68,11 +99,12 @@ export function resolveSupportedLanguageTag(
 
 /**
  * Resolve the supported language for a device locale list. For each device
- * tag in preference order, map Chinese scripts, then exact match, then
- * same-language fallback. An empty list or no match resolves to `en`.
+ * tag in preference order, map Chinese scripts, map Portuguese variants, then
+ * exact match, then same-language fallback. An empty list or no match resolves
+ * to `en`.
  */
 export function resolveLanguageTag(
-  locales: readonly { languageTag?: string }[]
+  locales: readonly { languageTag?: string; regionCode?: string | null }[]
 ): SupportedLanguage {
   return resolveSupportedLanguageTag(locales) ?? 'en';
 }

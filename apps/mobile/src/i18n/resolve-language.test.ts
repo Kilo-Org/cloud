@@ -26,10 +26,16 @@ describe('resolveLanguageTag', () => {
     expect(resolveLanguageTag([])).toBe('en');
   });
 
-  it('matches pt-BR exactly and falls back from other Portuguese tags to pt', () => {
-    expect(resolveLanguageTag([{ languageTag: 'pt-BR' }])).toBe('pt-BR');
+  it('resolves Portuguese tags to pt-BR unless they name Portugal', () => {
+    // iOS reports a pt-BR device as the bare tag `pt` with the region in
+    // `regionCode`, not in `languageTag`.
+    expect(
+      resolveLanguageTag([{ languageTag: 'pt', regionCode: 'BR' } as const])
+    ).toBe('pt-BR');
     expect(resolveLanguageTag([{ languageTag: 'pt-PT' }])).toBe('pt');
-    expect(resolveLanguageTag([{ languageTag: 'pt' }])).toBe('pt');
+    expect(resolveLanguageTag([{ languageTag: 'pt', regionCode: 'PT' } as const])).toBe('pt');
+    expect(resolveLanguageTag([{ languageTag: 'pt' }])).toBe('pt-BR');
+    expect(resolveLanguageTag([{ languageTag: 'pt-US' }])).toBe('pt-BR');
   });
 
   it('matches es-MX to es via the same-language fallback', () => {
@@ -95,6 +101,14 @@ describe('resolveSupportedLanguageTag', () => {
 
   it('matches the whole tag, so pt-BR stays the Brazilian variant', () => {
     expect(resolveSupportedLanguageTag([{ languageTag: 'pt-BR' }])).toBe('pt-BR');
+  });
+
+  it('resolves the iOS bare-pt shape with a Brazilian regionCode to pt-BR', () => {
+    expect(resolveSupportedLanguageTag([{ languageTag: 'pt', regionCode: 'BR' }])).toBe('pt-BR');
+  });
+
+  it('resolves pt-PT to the Portugal variant', () => {
+    expect(resolveSupportedLanguageTag([{ languageTag: 'pt-PT' }])).toBe('pt');
   });
 });
 

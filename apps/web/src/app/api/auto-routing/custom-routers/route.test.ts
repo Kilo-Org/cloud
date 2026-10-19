@@ -328,7 +328,8 @@ describe('/api/auto-routing/custom-routers', () => {
         controller.abort(new DOMException('Benchmark admission timed out', 'TimeoutError'));
         const created = await pending;
 
-        expect(timeout).toHaveBeenCalledWith(5_000);
+        expect(timeout).toHaveBeenCalledWith(10_000);
+        expect(mockedRegister).toHaveBeenCalledTimes(1);
         expect(created.status).toBe(500);
         expect(created.body).toMatchObject({ error: { code: 'internal_error' } });
         expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
@@ -337,6 +338,27 @@ describe('/api/auto-routing/custom-routers', () => {
       }
 
       expect((await create(routerBody())).status).toBe(201);
+    });
+
+    test('retries one transient registration failure before saving', async () => {
+      mockedRegister.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+      const created = await create(routerBody());
+
+      expect(created.status).toBe(201);
+      expect(mockedRegister).toHaveBeenCalledTimes(2);
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
+    });
+
+    test('does not save when the registration retry also fails', async () => {
+      mockedRegister.mockRejectedValue(new TypeError('fetch failed'));
+
+      const created = await create(routerBody());
+
+      expect(created.status).toBe(500);
+      expect(created.body).toMatchObject({ error: { code: 'internal_error' } });
+      expect(mockedRegister).toHaveBeenCalledTimes(2);
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
 
     test('does not create the router when benchmark admission hits the owner quota', async () => {
@@ -355,11 +377,14 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
 
-    test('maps a benchmark worker without frontier owner profiles to a base router error', async () => {
+    test.each([
+      'Custom profiles are only supported by the efficient router',
+      'benchmark config not set: save it in the admin panel before registering profiles',
+    ])('maps the benchmark worker rejection "%s" to a base router error', async message => {
       mockedRegister.mockResolvedValue({
         ok: false,
         status: 400,
-        error: { error: 'Custom profiles are only supported by the efficient router' },
+        error: { error: message },
       });
 
       const created = await create(routerBody({ baseRouter: 'frontier' }));

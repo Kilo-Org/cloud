@@ -49,7 +49,7 @@ import * as z from 'zod';
 import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-pool-validation';
 
 const BENCHMARK_REGISTER_BATCH_SIZE = 10;
-const BENCHMARK_ADMISSION_TIMEOUT_MS = 5_000;
+const BENCHMARK_ADMISSION_TIMEOUT_MS = 10_000;
 // 400 bodies from benchmark workers that cannot benchmark the requested base router: a worker
 // that predates frontier owner profiles, or one without a saved config for that router.
 const UNSUPPORTED_BASE_ROUTER_ERRORS = [
@@ -327,17 +327,25 @@ async function requestPlatformBenchmarks(params: {
   if (models.length === 0) return;
   const signal = AbortSignal.timeout(BENCHMARK_ADMISSION_TIMEOUT_MS);
   for (let start = 0; start < models.length; start += BENCHMARK_REGISTER_BATCH_SIZE) {
-    const result = await registerOwnerBenchmarkProfiles(
-      {
-        router: params.baseRouter,
-        ownerType: params.owner.type,
-        ownerId: params.owner.id,
-        entries: models.slice(start, start + BENCHMARK_REGISTER_BATCH_SIZE),
-      },
-      signal
-    ).catch(() => {
-      throw new CustomRouterApiError('internal_error', 'Could not request benchmarks');
-    });
+    const registration = {
+      router: params.baseRouter,
+      ownerType: params.owner.type,
+      ownerId: params.owner.id,
+      entries: models.slice(start, start + BENCHMARK_REGISTER_BATCH_SIZE),
+    };
+    // Registration is idempotent for pending, running, and ready profiles, so one retry is safe.
+    const result = await registerOwnerBenchmarkProfiles(registration, signal)
+      .catch(error => {
+        if (signal.aborted) throw error;
+        return registerOwnerBenchmarkProfiles(registration, signal);
+      })
+      .catch(error => {
+        captureException(error, {
+          tags: { source: 'auto_routing_custom_router_admission' },
+          extra: { ownerType: params.owner.type, baseRouter: params.baseRouter },
+        });
+        throw new CustomRouterApiError('internal_error', 'Could not request benchmarks');
+      });
     if (result.ok) continue;
     if ('quota' in result) {
       throw new CustomRouterApiError(

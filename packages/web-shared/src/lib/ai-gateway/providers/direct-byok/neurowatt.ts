@@ -1,6 +1,9 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  faviconIcon,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'neuralwatt',
@@ -21,4 +24,14 @@ export default {
       },
     ],
   }),
+  provider_listing: {
+    dataPolicy: {
+      training: false,
+      retainsPrompts: true,
+      canPublish: false,
+      termsOfServiceURL: 'https://neuralwatt.com/terms',
+      privacyPolicyURL: 'https://neuralwatt.com/privacy',
+    },
+    icon: faviconIcon('https://neuralwatt.com/'),
+  },
 } satisfies DirectByokProvider;

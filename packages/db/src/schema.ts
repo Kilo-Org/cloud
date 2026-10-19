@@ -7269,6 +7269,7 @@ export const openai_chatgpt_connections = pgTable(
     usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
     /** The reset time OpenAI reported with the limit, when it reported one. */
     usage_limit_resets_at: timestamp({ withTimezone: true, mode: 'string' }),
+    usage_limit_error_code: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

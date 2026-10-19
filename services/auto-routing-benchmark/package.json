@@ -6,6 +6,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "predeploy": "wrangler d1 migrations apply auto-routing-benchmark --remote",
+    "predev": "CI=1 wrangler d1 migrations apply auto-routing-benchmark --local",
     "dev": "wrangler dev",
     "types": "wrangler types --include-runtime=false --strict-vars=false",
     "typecheck": "tsgo --noEmit",
@@ -22,6 +23,7 @@
   "dependencies": {
     "@cloudflare/containers": "0.1.1",
     "@kilocode/auto-routing-contracts": "workspace:*",
+    "@kilocode/usage-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

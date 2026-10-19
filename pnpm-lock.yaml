@@ -2388,6 +2388,9 @@ importers:
       '@kilocode/auto-routing-contracts':
         specifier: workspace:*
         version: link:../../packages/auto-routing-contracts
+      '@kilocode/usage-contracts':
+        specifier: workspace:*
+        version: link:../../packages/usage-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

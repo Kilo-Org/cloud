@@ -1,5 +1,5 @@
 {
-  "id": "f75177c8-4b56-4cde-867b-19038cb7a78e",
+  "id": "ffb6951c-c4fc-4ac9-a219-5953c00fde1e",
   "prevId": "d48371da-3faf-40a7-b7b0-8deaef61ed7b",
   "version": "7",
   "dialect": "postgresql",
@@ -16123,153 +16123,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.inference_reservations": {
-      "name": "inference_reservations",
-      "schema": "",
-      "columns": {
-        "request_id": {
-          "name": "request_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "amount_microdollars": {
-          "name": "amount_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actual_cost_microdollars": {
-          "name": "actual_cost_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'reserved'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "finalized_at": {
-          "name": "finalized_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "IDX_inference_reservations_user": {
-          "name": "IDX_inference_reservations_user",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_inference_reservations_org_user_status": {
-          "name": "IDX_inference_reservations_org_user_status",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"inference_reservations\".\"organization_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "inference_reservations_kilo_user_id_kilocode_users_id_fk": {
-          "name": "inference_reservations_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "inference_reservations",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "inference_reservations_organization_id_organizations_id_fk": {
-          "name": "inference_reservations_organization_id_organizations_id_fk",
-          "tableFrom": "inference_reservations",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "inference_reservations_amount_check": {
-          "name": "inference_reservations_amount_check",
-          "value": "\"inference_reservations\".\"amount_microdollars\" BETWEEN 0 AND 9007199254740991"
-        },
-        "inference_reservations_actual_cost_check": {
-          "name": "inference_reservations_actual_cost_check",
-          "value": "\"inference_reservations\".\"actual_cost_microdollars\" BETWEEN 0 AND 9007199254740991"
-        },
-        "inference_reservations_state_check": {
-          "name": "inference_reservations_state_check",
-          "value": "(\n        \"inference_reservations\".\"status\" = 'reserved'\n        AND \"inference_reservations\".\"actual_cost_microdollars\" IS NULL\n        AND \"inference_reservations\".\"finalized_at\" IS NULL\n      ) OR (\n        \"inference_reservations\".\"status\" = 'settled'\n        AND \"inference_reservations\".\"actual_cost_microdollars\" IS NOT NULL\n        AND \"inference_reservations\".\"finalized_at\" IS NOT NULL\n      ) OR (\n        \"inference_reservations\".\"status\" = 'released'\n        AND \"inference_reservations\".\"actual_cost_microdollars\" IS NULL\n        AND \"inference_reservations\".\"finalized_at\" IS NOT NULL\n      )"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.ja4_digest": {
       "name": "ja4_digest",
       "schema": "",
@@ -22738,13 +22591,6 @@
           "notNull": true,
           "default": "'0'"
         },
-        "inference_microdollars_held": {
-          "name": "inference_microdollars_held",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "kilo_pass_threshold": {
           "name": "kilo_pass_threshold",
           "type": "bigint",
@@ -27994,6 +27840,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "usage_limit_error_code": {
+          "name": "usage_limit_error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -29696,13 +29548,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'0'"
-        },
-        "inference_microdollars_held": {
-          "name": "inference_microdollars_held",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "microdollars_balance": {
           "name": "microdollars_balance",

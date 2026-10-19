@@ -3,6 +3,7 @@ import { AUTO_ROUTERS, POLICY_SETTING_KEYS } from '@kilocode/auto-routing-contra
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
+import { registerClientEvalRoutes } from './client-eval';
 import type { HonoEnv } from './hono-env';
 import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
 import { isRetryableContainerAvailabilityError } from './cli-runner';
@@ -37,6 +38,7 @@ app.use('*', authMiddleware);
 app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing-benchmark' }));
 
 registerAdminRoutes(app);
+registerClientEvalRoutes(app);
 
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler());
@@ -90,12 +92,7 @@ export default {
               })
             );
           }
-          const startedRuns = await drainQueues(
-            env,
-            router === 'frontier' ? 'platform' : 'both',
-            undefined,
-            router
-          );
+          const startedRuns = await drainQueues(env, 'both', undefined, router);
           const published = await publishPlatformRoutingTable(env, fetch, router).catch(error => {
             console.warn(
               JSON.stringify({

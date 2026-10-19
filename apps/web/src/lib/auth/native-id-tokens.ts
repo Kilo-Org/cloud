@@ -44,6 +44,7 @@ const RELAXED_NONCE_PATH_TOGGLE = 'native-apple-signin-nonce-required';
 async function relaxedNoncePathAllowed(): Promise<boolean> {
   const end = relaxedPathEnd();
   if (!end || end <= new Date()) return false;
+  if (process.env.NODE_ENV === 'development') return true;
   try {
     return await isReleaseToggleEnabled(RELAXED_NONCE_PATH_TOGGLE);
   } catch {

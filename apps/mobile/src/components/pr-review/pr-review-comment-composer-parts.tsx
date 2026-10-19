@@ -14,6 +14,7 @@ import {
   BODY_VERTICAL_PADDING,
   resolveCommentBodyFade,
   resolveCommentBodyMaxHeight,
+  resolveFadeColor,
 } from '@/components/pr-review/comment-body-geometry';
 import {
   PrFormSheetFooter,
@@ -41,18 +42,6 @@ const BOTTOM_FADE_STYLE = {
   bottom: 1,
   borderRadius: BOTTOM_FADE_RADIUS,
 } as const;
-
-/** `#rrggbb` to an `rgba()` string; expo-linear-gradient ignores 8-digit hex. */
-function fadeColor(hex: string, alpha: number): string {
-  const raw = hex.replace('#', '');
-  const r = Number.parseInt(raw.slice(0, 2), 16);
-  const g = Number.parseInt(raw.slice(2, 4), 16);
-  const b = Number.parseInt(raw.slice(4, 6), 16);
-  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
-    return `rgba(0, 0, 0, ${alpha})`;
-  }
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 export function CommentBodyField({
   inputRef,
@@ -116,7 +105,10 @@ export function CommentBodyField({
       {overflowing ? (
         <LinearGradient
           pointerEvents="none"
-          colors={[fadeColor(colors.foreground, 0), fadeColor(colors.foreground, 0.06)]}
+          colors={[
+            resolveFadeColor(colors.foreground, 0),
+            resolveFadeColor(colors.foreground, 0.06),
+          ]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={[BOTTOM_FADE_STYLE, { height: BODY_LINE_HEIGHT }]}

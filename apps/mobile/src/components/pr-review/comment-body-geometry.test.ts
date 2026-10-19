@@ -14,6 +14,7 @@ import {
   BODY_VERTICAL_PADDING,
   resolveCommentBodyFade,
   resolveCommentBodyMaxHeight,
+  resolveFadeColor,
 } from './comment-body-geometry';
 
 describe('resolveCommentBodyMaxHeight', () => {
@@ -50,5 +51,16 @@ describe('resolveCommentBodyFade', () => {
 
   it('shows the fade when the content is taller than the frame', () => {
     expect(resolveCommentBodyFade({ contentHeight: 400, frameHeight: 212 })).toBe(true);
+  });
+});
+
+describe('resolveFadeColor', () => {
+  it('builds an rgba stop from a six-digit hex color', () => {
+    expect(resolveFadeColor('#14130F', 0.06)).toBe('rgba(20, 19, 15, 0.06)');
+    expect(resolveFadeColor('#FFFFFF', 0)).toBe('rgba(255, 255, 255, 0)');
+  });
+
+  it('falls back to black when the color cannot be parsed', () => {
+    expect(resolveFadeColor('not-a-color', 0.06)).toBe('rgba(0, 0, 0, 0.06)');
   });
 });

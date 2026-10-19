@@ -33,10 +33,12 @@ export function useRepoBindings(organizationId?: string) {
     ...options,
     placeholderData: keepPreviousDataForQueryKey(options.queryKey),
     networkMode: 'always',
-    // `networkMode: 'always'` otherwise defaults refetchOnReconnect to false
-    // (queryClient.ts derives it from the mode); without this the pins would
-    // not recover on reconnect without a manual Retry.
-    refetchOnReconnect: true,
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when the option is undefined), so re-enable it unconditionally:
+    // a connectivity blip must recover the pins without waiting for the
+    // freshness window.
+    refetchOnReconnect: 'always',
   });
 
   return {

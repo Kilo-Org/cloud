@@ -64,10 +64,12 @@ export function useAgentProfileList(organizationId?: string) {
     enabled: !isOrganization,
     placeholderData: keepPreviousDataForQueryKey(personalOptions.queryKey),
     networkMode: 'always',
-    // `networkMode: 'always'` otherwise defaults refetchOnReconnect to false
-    // (queryClient.ts derives it from the mode); without this the list would
-    // never recover on reconnect without a manual Retry.
-    refetchOnReconnect: true,
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when the option is undefined), so re-enable it unconditionally:
+    // a connectivity blip must recover the list without waiting for the
+    // freshness window, and a served refetch keeps the cached rows.
+    refetchOnReconnect: 'always',
   });
   const combined = useQuery({
     ...combinedOptions,
@@ -115,9 +117,11 @@ export function useAgentProfile(profileId: string, organizationId?: string) {
     // would hold the load-failure banner with a Retry that refetches into
     // another pause and never settles.
     networkMode: 'always',
-    // `networkMode: 'always'` otherwise defaults refetchOnReconnect to false
-    // (queryClient.ts derives it from the mode); without this the profile
-    // would not recover on reconnect without a manual Retry.
-    refetchOnReconnect: true,
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when the option is undefined), so re-enable it unconditionally:
+    // a connectivity blip must recover the profile without waiting for the
+    // freshness window, instead of needing a manual Retry.
+    refetchOnReconnect: 'always',
   });
 }

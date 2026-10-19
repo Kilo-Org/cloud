@@ -2768,6 +2768,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tvoje aktivne sesije nisu dostupne dok se podaci ne učitaju.",
     "currentDeviceUnidentified": "Prepoznavanje trenutnog uređaja nije uspelo.",
+    "kiloApp": "Aplikacija Kilo",
     "noSessions": "Nema aktivnih sesija",
     "noSessionsDescription": "Prijavi se u aplikaciju Kilo na drugom uređaju i ta sesija će se prikazati ovde.",
     "onlyKiloAppSignIns": "Ovde se prikazuju samo prijave preko aplikacije Kilo. Prijave preko uređivača koda i CLI-ja nisu navedene.",

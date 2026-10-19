@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Aktiiviset istuntosi eivät ole käytettävissä, ennen kuin niiden tiedot on ladattu.",
     "currentDeviceUnidentified": "Nykyistä laitetta ei voitu tunnistaa.",
+    "kiloApp": "Kilo-sovellus",
     "noSessions": "Ei aktiivisia istuntoja",
     "noSessionsDescription": "Kirjaudu Kilo-sovellukseen toisella laitteella, niin laite näkyy tässä.",
     "onlyKiloAppSignIns": "Täällä näkyvät vain Kilo-sovelluksen kirjautumiset. Editorin ja CLI:n kirjautumisia ei luetella.",

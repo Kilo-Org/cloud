@@ -2309,6 +2309,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "لا يمكن عرض جلساتك النشطة حتى يكتمل تحميل البيانات.",
     "currentDeviceUnidentified": "تعذّر التعرّف على الجهاز الحالي.",
+    "kiloApp": "تطبيق Kilo",
     "noSessions": "لا توجد جلسات نشطة",
     "noSessionsDescription": "سجّل الدخول بتطبيق Kilo على جهاز آخر وسيظهر هنا.",
     "onlyKiloAppSignIns": "تظهر هنا فقط عمليات تسجيل الدخول عبر تطبيق Kilo. لا تُدرج عمليات تسجيل الدخول عبر المحرر أو CLI.",

@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Ձեր ակտիվ նիստերը հասանելի չեն, քանի դեռ տվյալները չեն բեռնվել։",
     "currentDeviceUnidentified": "Չհաջողվեց նույնականացնել այս սարքը։",
+    "kiloApp": "Kilo հավելված",
     "noSessions": "Ակտիվ նիստեր չկան",
     "noSessionsDescription": "Մեկ այլ սարքում մուտք գործեք Kilo հավելված, և այդ սարքը կհայտնվի այստեղ։",
     "onlyKiloAppSignIns": "Այստեղ ցուցադրվում են միայն Kilo հավելվածի մուտքերը։ Խմբագրիչից և CLI-ից մուտքերը չեն ցուցադրվում։",

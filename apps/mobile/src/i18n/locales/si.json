@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "මෙය පූරණය වන තෙක් ඔබේ සක්‍රීය සැසි ලබා ගත නොහැක.",
     "currentDeviceUnidentified": "වත්මන් උපාංගය හඳුනාගත නොහැකි විය.",
+    "kiloApp": "Kilo යෙදුම",
     "noSessions": "සක්‍රීය සැසි නැත",
     "noSessionsDescription": "වෙනත් උපාංගයක Kilo යෙදුමෙන් පුරනය වන්න. එවිට එම උපාංගය මෙහි දිස්වේ.",
     "onlyKiloAppSignIns": "Kilo යෙදුමේ පුරනය වීම් පමණක් මෙහි දිස්වේ. සංස්කාරක සහ CLI පුරනය වීම් ලැයිස්තුගත නොවේ.",

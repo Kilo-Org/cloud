@@ -9,11 +9,12 @@ export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDevice
  * stored on the session row.
  *
  * Browser requests always lead with the `Mozilla/5.0` compatibility token, so
- * those collapse to "Web browser". Everything else keeps its first product
- * token — the mobile app now sends `Kilo-Code/<version> (<platform>)`, so a
- * mobile row titles itself "Kilo-Code" instead of the platform HTTP library's
- * default ("axios/1.7.0" → "axios"), and a missing or empty header falls back
- * to "Unknown device".
+ * those collapse to "Web browser". Mobile sessions title themselves with the
+ * localized app name: the app sends `Kilo-Code/<version> (android|ios)`, and
+ * rows minted before that header existed recorded OkHttp's default
+ * `okhttp/<version>` on Android. Other clients keep their first product token
+ * (the CLI's `Kilo-Code/1.2.3 (darwin; arm64)` → "Kilo-Code", `axios/1.7.0` →
+ * "axios"), and a missing or empty header falls back to "Unknown device".
  */
 export function deviceSessionLabel(userAgent: string | null | undefined): string {
   const trimmed = userAgent?.trim() ?? '';
@@ -23,7 +24,15 @@ export function deviceSessionLabel(userAgent: string | null | undefined): string
   if (trimmed.startsWith('Mozilla/')) {
     return i18n.t('deviceSessions.webBrowser');
   }
-  // "Kilo-Code/1.2.3 (android)" → "Kilo-Code" (drop the version and the rest).
+  // `Kilo-Code/<version> (android|ios)` names the app; the platform annotation
+  // separates it from the CLI's `(darwin; arm64)` shape. OkHttp's default
+  // names the Android app on rows created before the header shipped.
+  if (
+    /^okhttp(?:[/\s]|$)/i.test(trimmed) ||
+    /^Kilo-Code\/[^\s(]*\s*\((?:android|ios)[;)]/i.test(trimmed)
+  ) {
+    return i18n.t('deviceSessions.kiloApp');
+  }
   return trimmed.split(/[\s/]/)[0] ?? i18n.t('kiloclaw.devicePairing.unknownDevice');
 }
 

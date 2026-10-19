@@ -2217,6 +2217,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "정보를 불러올 때까지 로그인 중인 세션을 확인할 수 없습니다.",
     "currentDeviceUnidentified": "현재 기기를 식별할 수 없습니다.",
+    "kiloApp": "Kilo 앱",
     "noSessions": "로그인 중인 세션 없음",
     "noSessionsDescription": "다른 기기에서 Kilo 앱으로 로그인하면 여기에 표시됩니다.",
     "onlyKiloAppSignIns": "Kilo 앱의 로그인 내역만 여기에 표시됩니다. 에디터 및 CLI의 로그인 내역은 표시되지 않습니다.",

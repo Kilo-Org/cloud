@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "यो लोड नभएसम्म तपाईंका सक्रिय सत्रहरू अनुपलब्ध छन्।",
     "currentDeviceUnidentified": "हालको यन्त्र पहिचान गर्न सकिएन।",
+    "kiloApp": "Kilo एप",
     "noSessions": "कुनै सक्रिय सत्र छैन",
     "noSessionsDescription": "अर्को यन्त्रमा Kilo एपबाट साइन इन गर्नुहोस्। त्यसपछि त्यो यन्त्र यहाँ देखिनेछ।",
     "onlyKiloAppSignIns": "यहाँ केवल Kilo एप साइन-इनहरू देखिन्छन्। एडिटर र CLI साइन-इनहरू सूचीबद्ध छैनन्।",

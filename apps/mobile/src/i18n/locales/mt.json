@@ -2846,6 +2846,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Is-sessjonijiet attivi tiegħek ma jkunux disponibbli sakemm titgħabba d-dejta.",
     "currentDeviceUnidentified": "L-apparat attwali ma setax jiġi identifikat.",
+    "kiloApp": "Applikazzjoni ta' Kilo",
     "noSessions": "L-ebda sessjoni attiva",
     "noSessionsDescription": "Idħol bl-applikazzjoni ta' Kilo fuq apparat ieħor u s-sessjoni tidher hawn.",
     "onlyKiloAppSignIns": "Hawn jidhru biss is-sessjonijiet tal-applikazzjoni ta' Kilo. Is-sessjonijiet tal-editur u tal-CLI mhumiex elenkati.",

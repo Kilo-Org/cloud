@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "De aktive øktene dine kan ikke vises før innlastingen er fullført.",
     "currentDeviceUnidentified": "Kunne ikke identifisere denne enheten.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Ingen aktive økter",
     "noSessionsDescription": "Logg inn med Kilo-appen på en annen enhet, så vises den her.",
     "onlyKiloAppSignIns": "Her vises bare innlogginger i Kilo-appen. Innlogginger i kodeeditoren og CLI-en vises ikke.",

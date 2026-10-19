@@ -2240,6 +2240,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "לא ניתן להציג את החיבורים הפעילים שלך עד לסיום הטעינה.",
     "currentDeviceUnidentified": "לא ניתן היה לזהות את המכשיר הנוכחי.",
+    "kiloApp": "אפליקציית Kilo",
     "noSessions": "אין חיבורים פעילים",
     "noSessionsDescription": "היכנס לאפליקציית Kilo במכשיר אחר, והמכשיר יופיע כאן.",
     "onlyKiloAppSignIns": "כאן מופיעים רק חיבורים לאפליקציית Kilo. חיבורים דרך העורך או ה-CLI אינם מופיעים ברשימה.",

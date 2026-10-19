@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Your active sessions are unavailable until this loads.",
     "currentDeviceUnidentified": "Current device could not be identified",
+    "kiloApp": "Kilo app",
     "noSessions": "No active sessions",
     "noSessionsDescription": "Sign in with the Kilo app on another device and it will show up here.",
     "onlyKiloAppSignIns": "Only Kilo app sign-ins appear here. Editor and CLI sign-ins are not listed.",

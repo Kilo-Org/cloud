@@ -2846,6 +2846,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Ní bheidh do sheisiúin ghníomhacha ar fáil go dtí go mbeidh na sonraí lódáilte.",
     "currentDeviceUnidentified": "Níorbh fhéidir an gléas reatha a shainaithint.",
+    "kiloApp": "Aip Kilo",
     "noSessions": "Níl aon seisiún gníomhach ann",
     "noSessionsDescription": "Sínigh isteach le haip Kilo ar ghléas eile agus taispeánfar é anseo.",
     "onlyKiloAppSignIns": "Ní thaispeántar anseo ach sínithe isteach tríd an aip Kilo. Ní liostaítear sínithe isteach tríd an eagarthóir ná tríd an CLI.",

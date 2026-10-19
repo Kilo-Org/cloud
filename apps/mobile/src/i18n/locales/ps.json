@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "تر بارېدو پورې ستاسو فعالې ناستې د لاسرسي وړ نه دي.",
     "currentDeviceUnidentified": "اوسنۍ وسیله ونه پېژندل شوه.",
+    "kiloApp": "د Kilo اپلیکیشن",
     "noSessions": "هېڅ فعاله ناسته نشته",
     "noSessionsDescription": "په بله وسیله کې د Kilo اپلیکیشن ته ننوځئ، ناسته به یې دلته ښکاره شي.",
     "onlyKiloAppSignIns": "دلته یوازې د Kilo اپلیکیشن ننوتنې ښکاري. د کوډ سمونګر او CLI ننوتنې په لېست کې نه راځي.",

@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Hindi makikita ang mga aktibo mong sesyon hangga't hindi ito na-load.",
     "currentDeviceUnidentified": "Hindi matukoy ang kasalukuyang device.",
+    "kiloApp": "Kilo app",
     "noSessions": "Walang aktibong sesyon",
     "noSessionsDescription": "Mag-sign in gamit ang Kilo app sa ibang device para makita ito rito.",
     "onlyKiloAppSignIns": "Ang mga sign-in sa Kilo app lang ang lumalabas dito. Hindi nakalista ang mga sign-in sa editor at CLI.",

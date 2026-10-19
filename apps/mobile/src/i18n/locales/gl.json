@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Non se poden mostrar as túas sesións activas ata que se carguen os datos.",
     "currentDeviceUnidentified": "Non se puido identificar o dispositivo actual.",
+    "kiloApp": "Aplicación de Kilo",
     "noSessions": "Non hai sesións activas",
     "noSessionsDescription": "Inicia sesión coa aplicación de Kilo noutro dispositivo e aparecerá aquí.",
     "onlyKiloAppSignIns": "Aquí só aparecen os inicios de sesión da aplicación de Kilo. Non se inclúen os do editor nin os do CLI.",

@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Àwọn ìgbà ìwọlé rẹ tó ń ṣiṣẹ́ kò ní wà lárọ̀ọ́wọ́tó títí a ó fi gbé èyí wọlé.",
     "currentDeviceUnidentified": "A kò lè dá ẹ̀rọ lọ́wọ́lọ́wọ́ mọ̀.",
+    "kiloApp": "Ohun èlò Kilo",
     "noSessions": "Kò sí ìgbà ìwọlé tó ń ṣiṣẹ́",
     "noSessionsDescription": "Wọlé pẹ̀lú ohun èlò Kilo lórí ẹ̀rọ mìíràn, ẹ̀rọ náà yóò sì hàn níbí.",
     "onlyKiloAppSignIns": "Àwọn ìwọlé ohun èlò Kilo nìkan ló hàn níbí. Àwọn ìwọlé olóòtú kóòdù àti CLI kò sí nínú àkójọ yìí.",

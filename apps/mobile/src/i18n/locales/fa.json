@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "تا زمانی که بارگذاری کامل شود، نشست‌های فعال شما در دسترس نیستند.",
     "currentDeviceUnidentified": "شناسایی دستگاه فعلی ممکن نشد.",
+    "kiloApp": "برنامه Kilo",
     "noSessions": "هیچ نشست فعالی وجود ندارد",
     "noSessionsDescription": "با برنامه Kilo در دستگاه دیگری وارد شوید تا در اینجا نمایش داده شود.",
     "onlyKiloAppSignIns": "فقط ورودهای برنامه Kilo در اینجا ظاهر می‌شوند. ورودهای ویرایشگر و CLI فهرست نمی‌شوند.",

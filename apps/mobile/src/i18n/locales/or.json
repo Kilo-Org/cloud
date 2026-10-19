@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "ଏହା ଲୋଡ୍ ନହେବା ପର୍ଯ୍ୟନ୍ତ ଆପଣଙ୍କ ସକ୍ରିୟ ସେସନ୍ ଦେଖିହେବ ନାହିଁ।",
     "currentDeviceUnidentified": "ବର୍ତ୍ତମାନର ଡିଭାଇସ୍ ଚିହ୍ନଟ ହୋଇପାରିଲା ନାହିଁ।",
+    "kiloApp": "Kilo ଆପ୍",
     "noSessions": "କୌଣସି ସକ୍ରିୟ ସେସନ୍ ନାହିଁ",
     "noSessionsDescription": "ଅନ୍ୟ ଡିଭାଇସରେ Kilo ଆପ୍‌ରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ। ସେହି ଡିଭାଇସ୍ ଏଠାରେ ଦେଖାଯିବ।",
     "onlyKiloAppSignIns": "ଏଠାରେ କେବଳ Kilo ଆପ୍ ସାଇନ୍-ଇନ୍ ଦେଖାଯାଏ। ଏଡିଟର ଏବଂ CLI ସାଇନ୍-ଇନ୍ ତାଲିକାଭୁକ୍ତ ନୁହେଁ।",

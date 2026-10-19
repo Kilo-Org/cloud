@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Seancat e tua aktive nuk janë të disponueshme derisa të ngarkohen të dhënat.",
     "currentDeviceUnidentified": "Nuk u identifikua pajisja aktuale.",
+    "kiloApp": "Aplikacioni Kilo",
     "noSessions": "Nuk ka seanca aktive",
     "noSessionsDescription": "Hyr në aplikacionin Kilo në një pajisje tjetër dhe ajo do të shfaqet këtu.",
     "onlyKiloAppSignIns": "Këtu shfaqen vetëm hyrjet nga aplikacioni Kilo. Hyrjet nga redaktori dhe CLI nuk renditen.",

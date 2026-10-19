@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Dina aktiva sessioner kan inte visas förrän inläsningen är klar.",
     "currentDeviceUnidentified": "Det gick inte att identifiera den här enheten.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Inga aktiva sessioner",
     "noSessionsDescription": "Logga in i Kilo-appen på en annan enhet så visas den här.",
     "onlyKiloAppSignIns": "Här visas bara inloggningar i Kilo-appen. Inloggningar i kodredigeraren och CLI visas inte.",

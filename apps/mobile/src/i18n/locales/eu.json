@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Zure saio aktiboak ez daude erabilgarri hau kargatu arte.",
     "currentDeviceUnidentified": "Ezin izan da uneko gailua identifikatu.",
+    "kiloApp": "Kilo aplikazioa",
     "noSessions": "Ez dago saio aktiborik",
     "noSessionsDescription": "Hasi saioa Kilo aplikazioarekin beste gailu batean, eta hemen agertuko da.",
     "onlyKiloAppSignIns": "Kilo aplikazioko saio-hasierak bakarrik agertzen dira hemen. Editoreko eta CLIko saio-hasierak ez daude zerrendatuta.",

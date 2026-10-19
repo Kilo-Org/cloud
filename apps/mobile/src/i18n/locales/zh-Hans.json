@@ -2217,6 +2217,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "加载完成后，才能查看当前登录的设备。",
     "currentDeviceUnidentified": "无法识别当前设备。",
+    "kiloApp": "Kilo 应用",
     "noSessions": "暂无已登录的设备",
     "noSessionsDescription": "在其他设备上登录 Kilo 应用后，即可在这里看到该设备。",
     "onlyKiloAppSignIns": "这里仅列出 Kilo 应用的登录会话，不含编辑器和 CLI 的登录会话。",

@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "हे लोड होईपर्यंत तुमची सक्रिय सत्रे अनुपलब्ध आहेत.",
     "currentDeviceUnidentified": "सध्याचे डिव्हाइस ओळखता आले नाही.",
+    "kiloApp": "Kilo अ‍ॅप",
     "noSessions": "सक्रिय सत्रे नाहीत",
     "noSessionsDescription": "दुसऱ्या डिव्हाइसवरील Kilo अ‍ॅपमध्ये साइन इन करा. ते सत्र येथे दिसेल.",
     "onlyKiloAppSignIns": "येथे फक्त Kilo अ‍ॅपमधील साइन इनची सत्रे दिसतात. एडिटर आणि CLI मधील सत्रे या यादीत नाहीत.",

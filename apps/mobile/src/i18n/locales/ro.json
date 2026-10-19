@@ -2768,6 +2768,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesiunile tale active nu pot fi afișate până la încărcarea datelor.",
     "currentDeviceUnidentified": "Nu s-a putut identifica dispozitivul curent.",
+    "kiloApp": "Aplicația Kilo",
     "noSessions": "Nicio sesiune activă",
     "noSessionsDescription": "Autentifică-te în aplicația Kilo pe alt dispozitiv, iar sesiunea va apărea aici.",
     "onlyKiloAppSignIns": "Doar autentificările din aplicația Kilo apar aici. Autentificările din editor și CLI nu sunt listate.",

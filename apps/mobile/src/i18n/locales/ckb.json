@@ -2729,6 +2729,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "تا ئەمە بار نەکرێت، سێشنە چالاکەکانت بەردەست نابن.",
     "currentDeviceUnidentified": "نەتوانرا ئامێری ئێستا بناسرێتەوە.",
+    "kiloApp": "ئەپی Kilo",
     "noSessions": "هیچ سێشنێکی چالاک نییە",
     "noSessionsDescription": "لە ئامێرێکی ترەوە بە ئەپی Kilo بچۆ ژوورەوە، تا لێرە دەربکەوێت.",
     "onlyKiloAppSignIns": "تەنها چوونەژوورەوەکانی ئەپی Kilo لێرە دەردەکەون. چوونەژوورەوەکانی دەستکاریکەری کۆد و CLI لە لیستەکەدا نین.",

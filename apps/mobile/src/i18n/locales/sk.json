@@ -2807,6 +2807,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tvoje aktívne relácie sa nedajú zobraziť, kým sa údaje nenačítajú.",
     "currentDeviceUnidentified": "Aktuálne zariadenie sa nepodarilo identifikovať.",
+    "kiloApp": "Aplikácia Kilo",
     "noSessions": "Žiadne aktívne relácie",
     "noSessionsDescription": "Prihlás sa do aplikácie Kilo na inom zariadení a zobrazí sa tu.",
     "onlyKiloAppSignIns": "Zobrazujú sa iba prihlásenia cez aplikáciu Kilo. Prihlásenia z editora a CLI nie sú uvedené.",

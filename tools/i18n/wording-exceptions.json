@@ -1,16 +1,6 @@
 {
-  "af": [
-    "commit",
-    "open",
-    "open pull request",
-    "review",
-    "starting"
-  ],
-  "am": [
-    "github connection expired",
-    "open",
-    "open pull request"
-  ],
+  "af": ["commit", "open", "open pull request", "review", "starting"],
+  "am": ["github connection expired", "open", "open pull request"],
   "ar": [
     "commit",
     "file",
@@ -154,14 +144,7 @@
     "plan",
     "review"
   ],
-  "de": [
-    "block",
-    "manual review",
-    "no changes needed",
-    "open",
-    "open pull request",
-    "pr opened"
-  ],
+  "de": ["block", "manual review", "no changes needed", "open", "open pull request", "pr opened"],
   "el": [
     "balanced",
     "critical",
@@ -403,11 +386,7 @@
     "superseded",
     "tokens"
   ],
-  "id": [
-    "open",
-    "open pull request",
-    "remediation blocked"
-  ],
+  "id": ["open", "open pull request", "remediation blocked"],
   "ig": [
     "analysis failed",
     "cancelled",
@@ -518,14 +497,7 @@
     "remediation failed",
     "session exited"
   ],
-  "lo": [
-    "dismissed",
-    "manual review",
-    "pr opened",
-    "remediation blocked",
-    "review",
-    "superseded"
-  ],
+  "lo": ["dismissed", "manual review", "pr opened", "remediation blocked", "review", "superseded"],
   "lt": [
     "analysis failed",
     "commit",
@@ -618,13 +590,7 @@
     "remediation failed",
     "superseded"
   ],
-  "ms": [
-    "deleted",
-    "dismissed",
-    "open",
-    "open pull request",
-    "review"
-  ],
+  "ms": ["deleted", "dismissed", "open", "open pull request", "review"],
   "mt": [
     "(empty)",
     "analysis failed",
@@ -657,13 +623,7 @@
     "superseded",
     "unavailable"
   ],
-  "nb": [
-    "analysis failed",
-    "no changes needed",
-    "open",
-    "open pull request",
-    "review"
-  ],
+  "nb": ["analysis failed", "no changes needed", "open", "open pull request", "review"],
   "ne": [
     "block",
     "github connection expired",
@@ -675,14 +635,7 @@
     "remediation failed",
     "superseded"
   ],
-  "nl": [
-    "all",
-    "block",
-    "manual review",
-    "open",
-    "open pull request",
-    "pr opened"
-  ],
+  "nl": ["all", "block", "manual review", "open", "open pull request", "pr opened"],
   "om": [
     "analysis failed",
     "cancelled",
@@ -931,13 +884,7 @@
     "review",
     "superseded"
   ],
-  "ta": [
-    "dismissed",
-    "open",
-    "open pull request",
-    "pr opened",
-    "superseded"
-  ],
+  "ta": ["dismissed", "open", "open pull request", "pr opened", "superseded"],
   "te": [
     "cancelled",
     "commit",
@@ -1077,10 +1024,5 @@
     "no changes needed",
     "remediation blocked"
   ],
-  "ht": [
-    "no changes needed",
-    "pr opened",
-    "remediation blocked",
-    "remediation failed"
-  ]
+  "ht": ["no changes needed", "pr opened", "remediation blocked", "remediation failed"]
 }

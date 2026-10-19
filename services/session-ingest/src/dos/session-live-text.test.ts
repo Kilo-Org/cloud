@@ -46,5 +46,6 @@ describe('sessionLiveText', () => {
   it('returns null for non-strings and text that draws nothing', () => {
     expect(sessionLiveText(null, 40)).toBeNull();
     expect(sessionLiveText('\u200B\uFEFF\n', 40)).toBeNull();
+    expect(sessionLiveText('\u200C\u200D', 40)).toBeNull();
   });
 });

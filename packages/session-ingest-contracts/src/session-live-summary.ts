@@ -72,11 +72,11 @@ export const sessionLiveSummarySchema = z.object({
 export type SessionLiveSummary = z.infer<typeof sessionLiveSummarySchema>;
 
 /**
- * Whether the code point is a format control: a code point that has no glyph of
- * its own but can change how the text around it is drawn. Display text keeps
- * only the code points that draw themselves, so these are removed. Compared
- * numerically because a character class naming them reads in the source as the
- * characters themselves.
+ * Whether the code point is a layout format control: a code point with no glyph
+ * of its own that does not shape adjacent characters either. Display text keeps
+ * the code points that draw themselves and the joiners that shape their
+ * neighbours, so these are removed. Compared numerically because a character
+ * class naming them reads in the source as the characters themselves.
  */
 function isFormatControl(code: number): boolean {
   return (
@@ -93,9 +93,10 @@ function isFormatControl(code: number): boolean {
 
 /**
  * One line of display text: control characters and line breaks become spaces,
- * format controls that draw nothing are removed, runs of white space collapse,
- * and text longer than `limit` ends with an ellipsis inside the limit. The cut
- * never splits a UTF-16 surrogate pair. Empty text gives null.
+ * layout format controls are removed, the joiners that shape adjacent
+ * characters are kept, runs of white space collapse, and text longer than
+ * `limit` ends with an ellipsis inside the limit. The cut never splits a UTF-16
+ * surrogate pair. Empty text, or text that draws nothing, gives null.
  */
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;
@@ -111,6 +112,15 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
     .join('');
   const line = flattened.replace(/\s+/g, ' ').trim();
   if (line === '') return null;
+  // Joiners alone draw nothing, so they are empty display text like blanks.
+  if (
+    [...line].every(char => {
+      const code = char.codePointAt(0);
+      return code === 0x200c || code === 0x200d;
+    })
+  ) {
+    return null;
+  }
   if (line.length <= limit) return line;
   let cut = line.slice(0, limit - 1);
   const last = cut.charCodeAt(cut.length - 1);

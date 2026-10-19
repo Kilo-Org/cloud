@@ -279,6 +279,7 @@ patchedDependencies:
   # A finished first entry made a cold start re-enqueue with REPLACE, which
   # cancelled the glanceable refresh run in progress.
   expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
+  react-native-enriched-markdown@1.1.0: patches/react-native-enriched-markdown.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

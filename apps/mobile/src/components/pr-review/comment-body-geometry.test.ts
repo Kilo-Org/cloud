@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BODY_BORDER_WIDTH,
   BODY_LINE_HEIGHT,
   BODY_MAX_LINES_CLOSED,
   BODY_MAX_LINES_OPEN,
@@ -16,23 +17,24 @@ import {
 } from './comment-body-geometry';
 
 describe('resolveCommentBodyMaxHeight', () => {
-  it('adds the vertical padding around a whole number of line boxes', () => {
+  it('adds the vertical padding and borders around a whole number of line boxes', () => {
+    const inset = BODY_VERTICAL_PADDING + 2 * BODY_BORDER_WIDTH;
     const closed = resolveCommentBodyMaxHeight(BODY_MAX_LINES_CLOSED);
     const open = resolveCommentBodyMaxHeight(BODY_MAX_LINES_OPEN);
-    expect(closed).toBe(BODY_MAX_LINES_CLOSED * BODY_LINE_HEIGHT + BODY_VERTICAL_PADDING);
-    expect(open).toBe(BODY_MAX_LINES_OPEN * BODY_LINE_HEIGHT + BODY_VERTICAL_PADDING);
-    // Whole-line invariants: subtracting the padding leaves an exact multiple
+    expect(closed).toBe(BODY_MAX_LINES_CLOSED * BODY_LINE_HEIGHT + inset);
+    expect(open).toBe(BODY_MAX_LINES_OPEN * BODY_LINE_HEIGHT + inset);
+    // Whole-line invariants: subtracting the inset leaves an exact multiple
     // of the line box, so the bottom line can never be sliced mid-glyph.
-    expect((closed - BODY_VERTICAL_PADDING) % BODY_LINE_HEIGHT).toBe(0);
-    expect((open - BODY_VERTICAL_PADDING) % BODY_LINE_HEIGHT).toBe(0);
+    expect((closed - inset) % BODY_LINE_HEIGHT).toBe(0);
+    expect((open - inset) % BODY_LINE_HEIGHT).toBe(0);
   });
 
-  it('grows the keyboard-open cap to four whole lines (92) from the old 64', () => {
-    expect(resolveCommentBodyMaxHeight(BODY_MAX_LINES_OPEN)).toBe(92);
+  it('grows the keyboard-open cap to four whole lines (94) from the old 64', () => {
+    expect(resolveCommentBodyMaxHeight(BODY_MAX_LINES_OPEN)).toBe(94);
   });
 
-  it('keeps the keyboard-closed cap at ten whole lines (212)', () => {
-    expect(resolveCommentBodyMaxHeight(BODY_MAX_LINES_CLOSED)).toBe(212);
+  it('keeps the keyboard-closed cap at ten whole lines (214)', () => {
+    expect(resolveCommentBodyMaxHeight(BODY_MAX_LINES_CLOSED)).toBe(214);
   });
 });
 

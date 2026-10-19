@@ -42,15 +42,17 @@ function FieldLabel({ children }: Readonly<{ children: string }>) {
  * clips the END, so the field shows the beginning of the name, matching the
  * list header; tapping or focusing swaps in the real `Input`.
  */
-function NameField(props: Readonly<{
-  defaultValue: string;
-  autoFocus: boolean;
-  onChangeText: (text: string) => void;
-  onSubmitEditing: () => void;
-  maxLength: number;
-  placeholder: string;
-  accessibilityLabel: string;
-}>) {
+function NameField(
+  props: Readonly<{
+    defaultValue: string;
+    autoFocus: boolean;
+    onChangeText: (text: string) => void;
+    onSubmitEditing: () => void;
+    maxLength: number;
+    placeholder: string;
+    accessibilityLabel: string;
+  }>
+) {
   const [editing, setEditing] = useState(false);
   // The live value: the preview after a blur must show the text the user
   // typed, not the name the sheet opened with.
@@ -59,14 +61,14 @@ function NameField(props: Readonly<{
     return (
       <Pressable
         accessibilityLabel={props.accessibilityLabel}
-        accessibilityRole="text"
+        accessibilityRole="button"
         accessibilityValue={{ text }}
         onPress={() => {
           setEditing(true);
         }}
-        className="rounded-lg border border-border bg-secondary pl-3 pr-3"
+        className="min-h-[44px] justify-center rounded-lg border border-border bg-secondary pl-3 pr-3"
       >
-        <Text className="min-h-[44px] text-base leading-[normal] text-foreground" numberOfLines={1}>
+        <Text className="text-base text-foreground" numberOfLines={1}>
           {text}
         </Text>
       </Pressable>

@@ -102,7 +102,7 @@ export function CommentBodyField({
           'focus:border-ring',
           keyboardVisible ? 'min-h-12' : 'min-h-14'
         )}
-        style={{ maxHeight }}
+        style={{ maxHeight, lineHeight: BODY_LINE_HEIGHT }}
       />
       {overflowing ? (
         <LinearGradient

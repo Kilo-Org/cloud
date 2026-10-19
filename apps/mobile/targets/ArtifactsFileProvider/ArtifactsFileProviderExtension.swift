@@ -112,8 +112,7 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
     // different bytes against it would hand the Files app content that does
     // not match what it asked for, so a mismatch fails and the system
     // re-fetches the current state instead.
-    if let requestedVersion, let current = item.itemVersion,
-      requestedVersion.contentVersion != current.contentVersion
+    if let requestedVersion, requestedVersion.contentVersion != item.itemVersion.contentVersion
     {
       completionHandler(nil, nil, NSError(
         domain: NSFileProviderErrorDomain,
@@ -300,7 +299,7 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
   let contentType: UTType
   let documentSize: NSNumber?
   let contentModificationDate: Date?
-  let version: NSFileProviderItemVersion?
+  let version: NSFileProviderItemVersion
   let capabilities: NSFileProviderItemCapabilities
 
   /**
@@ -310,9 +309,10 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
    `NSFileProviderItem.itemVersion` is an `NSFileProviderItemVersion` whose
    `contentVersion` is `Data` — a `String` property is never read by the
    system — so the identity `fetchContents` compares against and the identity
-   the system pins are the same bytes.
+   the system pins are the same bytes. The protocol requirement is
+   non-optional, so folders carry the zero version.
    */
-  var itemVersion: NSFileProviderItemVersion? {
+  var itemVersion: NSFileProviderItemVersion {
     version
   }
 
@@ -324,7 +324,7 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
     contentType: .folder,
     documentSize: nil,
     contentModificationDate: nil,
-    itemVersion: nil,
+    itemVersion: zeroVersion,
     isDirectory: true
   )
 
@@ -335,7 +335,7 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
     contentType: UTType,
     documentSize: NSNumber?,
     contentModificationDate: Date?,
-    itemVersion: NSFileProviderItemVersion?,
+    itemVersion: NSFileProviderItemVersion,
     isDirectory: Bool
   ) {
     self.itemIdentifier = itemIdentifier
@@ -369,7 +369,7 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
       contentType: .folder,
       documentSize: nil,
       contentModificationDate: nil,
-      itemVersion: nil,
+      itemVersion: zeroVersion,
       isDirectory: true
     )
   }
@@ -399,15 +399,22 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
     )
   }
 
+  /** The zero version, what a folder (or a file with no readable stamp) carries. */
+  static let zeroVersion = NSFileProviderItemVersion(
+    contentVersion: Data(),
+    metadataVersion: Data()
+  )
+
   /**
    The content version of a mirrored file: its size and modification date.
    The mirror writer replaces a file wholesale, so both change with every
    rewrite; an equal pair means the bytes are unchanged. `contentVersion` is
-   `Data` because that is what the framework compares.
+   `Data` because that is what the framework compares. A file whose
+   modification date cannot be read falls back to the zero version.
    */
-  static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion? {
+  static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion {
     guard let modified else {
-      return nil
+      return zeroVersion
     }
     let content = Data("size:\(size) modified:\(modified.timeIntervalSince1970)".utf8)
     return NSFileProviderItemVersion(contentVersion: content, metadataVersion: content)

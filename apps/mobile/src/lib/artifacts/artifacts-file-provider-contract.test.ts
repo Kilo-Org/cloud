@@ -148,11 +148,12 @@ describe('artifacts File Provider extension contract', () => {
     // The version is the mirror file's own size and modification date, which
     // the wholesale rewrite changes on every rewrite. It is exposed as the
     // `NSFileProviderItemVersion` the framework compares — `contentVersion`
-    // is `Data`, and a String-typed property is never read by the system.
+    // is `Data`, a String-typed property is never read by the system, and the
+    // protocol requirement is non-optional, so folders carry the zero version.
     expect(extensionSource).toContain('let contentModificationDate: Date?');
-    expect(extensionSource).toContain('let version: NSFileProviderItemVersion?');
+    expect(extensionSource).toContain('let version: NSFileProviderItemVersion');
     expect(extensionSource).toContain(
-      'static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion? {'
+      'static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion {'
     );
     expect(extensionSource).toContain(
       'NSFileProviderItemVersion(contentVersion: content, metadataVersion: content)'
@@ -165,7 +166,7 @@ describe('artifacts File Provider extension contract', () => {
     expect(extensionSource).toContain('-2009');
     expect(extensionSource).not.toContain('.versionNoLongerAvailable)');
     expect(fetchContentsBody).toContain(
-      'requestedVersion.contentVersion != current.contentVersion'
+      'requestedVersion.contentVersion != item.itemVersion.contentVersion'
     );
   });
 

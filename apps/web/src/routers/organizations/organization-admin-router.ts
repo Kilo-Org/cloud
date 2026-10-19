@@ -816,6 +816,7 @@ export const organizationAdminRouter = createTRPCRouter({
             description: description?.trim() || 'Admin credit grant',
             credit_category: 'organization_custom',
             ...(paidPolicy ?? {}),
+            credit_source: paidPolicy?.credit_source ?? 'promotion',
             expiry_date: expiresAt,
             organization_id: organizationId,
             original_baseline_microdollars_used: org.microdollars_used,

@@ -117,6 +117,7 @@ export async function recomputeOrganizationBalances(args: {
       consumed_microdollars: credit_transactions.consumed_microdollars,
       retired_microdollars: credit_transactions.retired_microdollars,
       credit_source: credit_transactions.credit_source,
+      source_transaction_id: credit_transactions.source_transaction_id,
       paid_credit_policy: credit_transactions.paid_credit_policy,
       credit_category: credit_transactions.credit_category,
     })
@@ -129,6 +130,13 @@ export async function recomputeOrganizationBalances(args: {
       transaction.paid_credit_policy !== 'settlement' &&
       transaction.credit_category !== 'accounting_adjustment' &&
       (transaction.consumed_microdollars > 0 || transaction.retired_microdollars > 0)
+  );
+  // Lots written by source-aware grants or linked to a source lot carry exposure baselines.
+  // Only untracked legacy lots are rebuilt from usage history.
+  const trackedLotIds = new Set(
+    creditTransactions
+      .filter(t => t.credit_source !== null || t.source_transaction_id !== null)
+      .map(t => t.id)
   );
   // Compute total usage AND original baselines in a single pass.
   // usageRecords contains LLM, Exa, and metered-compute charges, merge-sorted
@@ -143,7 +151,7 @@ export async function recomputeOrganizationBalances(args: {
     }
     computedOriginalBaselines.set(
       txn.id,
-      txn.credit_source !== null || hasNormalizedLots
+      trackedLotIds.has(txn.id) || hasNormalizedLots
         ? (txn.original_baseline_microdollars_used ?? cumulativeUsage)
         : cumulativeUsage
     );
@@ -158,10 +166,9 @@ export async function recomputeOrganizationBalances(args: {
     .filter(t => t.expiry_date != null)
     .map(t => ({
       ...t,
-      expiration_baseline_microdollars_used:
-        t.credit_source !== null
-          ? (t.expiration_baseline_microdollars_used ?? 0) + cumulativeUsage - org.microdollars_used
-          : (computedOriginalBaselines.get(t.id) ?? 0),
+      expiration_baseline_microdollars_used: trackedLotIds.has(t.id)
+        ? (t.expiration_baseline_microdollars_used ?? 0) + cumulativeUsage - org.microdollars_used
+        : (computedOriginalBaselines.get(t.id) ?? 0),
     }));
 
   const lastExpirationTime = creditTransactions
@@ -194,7 +201,7 @@ export async function recomputeOrganizationBalances(args: {
     .map(t => ({
       id: t.id,
       baseline:
-        hasNormalizedLots || t.credit_source !== null || t.expiry_date === null
+        hasNormalizedLots || trackedLotIds.has(t.id) || t.expiry_date === null
           ? (t.expiration_baseline_microdollars_used ?? 0) + cumulativeUsage - org.microdollars_used
           : (computedExpirationBaselines.get(t.id) ?? 0),
       db: t.expiration_baseline_microdollars_used,

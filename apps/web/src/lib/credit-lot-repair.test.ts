@@ -216,6 +216,7 @@ describe('legacy expiration replay', () => {
     consumed_microdollars: 0,
     retired_microdollars: 0,
     credit_source: null,
+    source_transaction_id: null,
     credit_category: null,
     paid_credit_policy: null,
     original_baseline_microdollars_used: 0,
@@ -284,6 +285,44 @@ describe('legacy expiration replay', () => {
     expect(expiry.newTransactions[0].amount_microdollars).toBe(
       result.accounting_error_mUsd - balance
     );
+  });
+
+  it('keeps debt repaid by a linked lot non-expiring when usage has not drifted', () => {
+    const linked = {
+      ...defaults,
+      id: crypto.randomUUID(),
+      amount_microdollars: 5,
+      created_at: '2029-02-01',
+      expiry_date: '2032-01-01',
+      source_transaction_id: crypto.randomUUID(),
+      original_baseline_microdollars_used: 3,
+      expiration_baseline_microdollars_used: 1,
+    };
+    const result = computeUserBalanceUpdates({
+      user: defineTestUser({ microdollars_used: 3, total_microdollars_acquired: 6 }),
+      usageRecords: [{ cost: 3, created_at: '2029-01-15' }],
+      creditTransactions: [
+        {
+          ...defaults,
+          id: crypto.randomUUID(),
+          amount_microdollars: 1,
+          created_at: '2029-01-01',
+          expiry_date: null,
+          expiration_baseline_microdollars_used: 0,
+        },
+        linked,
+      ],
+    });
+    const baseline =
+      result.updatesForExpirationBaseline.find(update => update.id === linked.id)?.baseline ??
+      linked.expiration_baseline_microdollars_used;
+    const expiry = computeExpiration(
+      [{ ...linked, expiration_baseline_microdollars_used: baseline }],
+      { id: result.user.id, microdollars_used: result.user_update.microdollars_used },
+      new Date('2033-01-01'),
+      result.user.id
+    );
+    expect(expiry.newTransactions[0].amount_microdollars).toBe(-3);
   });
 
   it.each(['settlement', 'accounting_adjustment'])(

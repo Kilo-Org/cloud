@@ -569,6 +569,7 @@ async function grant(
       credit_category: input.identity,
       check_category_uniqueness: true,
       ...(paidPolicy ?? {}),
+      credit_source: paidPolicy?.credit_source ?? 'promotion',
       expiry_date: expiresAt ?? null,
       expiration_baseline_microdollars_used: expiresAt ? baseline : null,
       original_baseline_microdollars_used: organization.microdollars_used,

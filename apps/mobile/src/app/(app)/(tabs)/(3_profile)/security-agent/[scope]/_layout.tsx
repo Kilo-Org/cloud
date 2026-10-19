@@ -1,5 +1,5 @@
 import { type Href, Stack, useLocalSearchParams } from 'expo-router';
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { appScreenLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { SecurityAgentCommandObserver } from '@/components/security-agent/security-agent-command-observer';
@@ -27,7 +27,7 @@ export default function SecurityAgentScopeLayout() {
       {/* Anchored entry needs a valid scope root, not a parameterless dismissal route. */}
       <Stack
         initialRouteName="index"
-        screenLayout={appUnlockScreenLayout}
+        screenLayout={appScreenLayout}
         screenOptions={{ headerShown: false }}
       >
         {/*

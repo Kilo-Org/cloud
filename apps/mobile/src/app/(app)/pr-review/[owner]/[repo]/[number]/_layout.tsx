@@ -1,5 +1,5 @@
 import { type Href, Stack, useLocalSearchParams } from 'expo-router';
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { appScreenLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
@@ -65,7 +65,7 @@ export default function PrReviewNumberLayout() {
           userId={userId}
           draftEntityKey={draftEntityKey}
         >
-          <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+          <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
             {/* Register the overview first: unregistered routes sort after
                 registered siblings, so without this the initial screen is the
                 comment-composer formSheet instead of the PR overview. */}

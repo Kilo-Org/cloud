@@ -48,7 +48,6 @@ function CoveredScreenA11yGate({
   }, [navigation]);
   return (
     <View
-      key={focused ? 'focused' : 'covered'}
       className="flex-1"
       // Keep the native view: Android collapses Views whose only props are
       // styles, and a collapsed view drops its accessibility props, so the

@@ -40,6 +40,11 @@ vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
 vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactNode }): ReactNode => children,
 }));
+// The security-agent stack now renders through the covered-screen gate; the
+// pass-through mock keeps the scene as the focused screen under test.
+vi.mock('@/components/app-screen-layout', () => ({
+  appScreenLayout: ({ children }: { children: ReactNode }): ReactNode => children,
+}));
 vi.mock('@/lib/form-sheet', () => ({
   useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
   useFormSheetScreenOptions: () => ({

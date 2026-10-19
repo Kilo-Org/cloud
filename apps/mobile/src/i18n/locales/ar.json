@@ -1739,6 +1739,7 @@
       "selectRepositoryToStart": "اختر مستودعًا للبدء.",
       "connectProviderToStart": "اربط مزوّدًا للبدء.",
       "connectProviderAction": "اربط مزوّدًا",
+      "noRepositoriesToStart": "لم يتم العثور على مستودعات.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",
       "prefillRepoAndModelUnavailable": "لم يعد مستودع الجلسة الأصلية ونموذجها متاحين. اختر مستودعًا ونموذجًا أدناه.",

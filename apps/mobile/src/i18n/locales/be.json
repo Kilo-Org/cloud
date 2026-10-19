@@ -2259,6 +2259,7 @@
       "selectRepositoryToStart": "Выберыце рэпазіторый, каб пачаць.",
       "connectProviderToStart": "Падключыце платформу, каб пачаць.",
       "connectProviderAction": "Падключыце платформу",
+      "noRepositoriesToStart": "Рэпазіторыі не знойдзены.",
       "promptPlaceholder": "Над чым будзем працаваць?",
       "couldNotLoadModels": "Не ўдалося загрузіць мадэлі.",
       "prefillRepoAndModelUnavailable": "Рэпазіторый і мадэль зыходнага сеанса больш недаступныя. Выберыце іншыя ніжэй.",

@@ -53,7 +53,7 @@ async function mountButton(props: {
   isStartDisabled?: boolean;
   isStarting?: boolean;
   startBlockedReason?: string | null;
-  startBlockedAction?: { label: string; onPress: () => void } | null;
+  startBlockedAction?: { label: string; onPress: () => void; isBusy?: boolean } | null;
 }): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -212,6 +212,21 @@ describe('NewSessionStartButton', () => {
 
     expect(hostByType(renderer.root, 'Pressable')).toHaveLength(1);
     expect(hasTextLabel(renderer.root, 'Connect a provider')).toBe(false);
+
+    renderer.unmount();
+  });
+
+  it('disables the recovery action and shows the spinner while its work is in flight', async () => {
+    const onPress = vi.fn<() => void>();
+    const renderer = await mountButton({
+      isStartDisabled: true,
+      startBlockedReason: 'No repositories found.',
+      startBlockedAction: { label: 'Refresh repositories', onPress, isBusy: true },
+    });
+
+    const button = hostByType(renderer.root, 'Pressable')[0];
+    expect(button?.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(hostByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
 
     renderer.unmount();
   });

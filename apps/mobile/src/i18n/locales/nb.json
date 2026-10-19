@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Velg et kodelager for å starte.",
       "connectProviderToStart": "Koble til en leverandør for å starte.",
       "connectProviderAction": "Koble til en leverandør",
+      "noRepositoriesToStart": "Ingen kodelagre funnet.",
       "promptPlaceholder": "Hva vil du jobbe med?",
       "couldNotLoadModels": "Kunne ikke laste inn modellene.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den opprinnelige økten er ikke lenger tilgjengelige. Velg nye nedenfor.",

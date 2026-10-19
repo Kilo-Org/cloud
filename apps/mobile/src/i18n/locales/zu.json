@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Khetha inqolobane yekhodi ukuze uqale.",
       "connectProviderToStart": "Xhuma umhlinzeki ukuze uqale.",
       "connectProviderAction": "Xhuma umhlinzeki",
+      "noRepositoriesToStart": "Azitholakalanga izinqolobane zekhodi.",
       "promptPlaceholder": "Ungathanda ukusebenza ngani?",
       "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",
       "prefillRepoAndModelUnavailable": "Inqolobane yekhodi nemodeli yeseshini yokuqala akusatholakali. Khetha okunye ngezansi.",

@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "ለመጀመር ማከማቻ ይምረጡ።",
       "connectProviderToStart": "ለመጀመር አቅራቢ ያገናኙ።",
       "connectProviderAction": "አቅራቢ ያገናኙ",
+      "noRepositoriesToStart": "ማንም ማከማቻዎች አልተገኙም።",
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
       "prefillRepoAndModelUnavailable": "የመጀመሪያው ክፍለ ጊዜ ማከማቻና ሞዴል ከእንግዲህ አይገኙም። ከታች ሌሎችን ይምረጡ።",

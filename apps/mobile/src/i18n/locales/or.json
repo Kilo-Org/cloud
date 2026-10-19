@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
       "connectProviderToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ।",
       "connectProviderAction": "ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ",
+      "noRepositoriesToStart": "କୌଣସି ରିପୋଜିଟୋରୀ ମିଳିଲା ନାହିଁ।",
       "promptPlaceholder": "କେଉଁ କାମ କରିବାକୁ ଚାହୁଁଛନ୍ତି?",
       "couldNotLoadModels": "ମଡେଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "prefillRepoAndModelUnavailable": "ମୂଳ ସେସନର ରିପୋଜିଟୋରୀ ଓ ମଡେଲ୍ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ନିମ୍ନରେ ନୂଆ ରିପୋଜିଟୋରୀ ଓ ମଡେଲ୍ ବାଛନ୍ତୁ।",

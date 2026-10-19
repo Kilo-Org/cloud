@@ -1672,6 +1672,7 @@
       "selectRepositoryToStart": "Seleziona un repository per iniziare.",
       "connectProviderToStart": "Connetti una piattaforma per iniziare.",
       "connectProviderAction": "Connetti una piattaforma",
+      "noRepositoriesToStart": "Nessun repository trovato.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
       "prefillRepoAndModelUnavailable": "Il repository e il modello della sessione originale non sono più disponibili. Selezionali qui sotto.",

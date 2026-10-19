@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
       "connectProviderToStart": "Başlamaq üçün provayder qoş.",
       "connectProviderAction": "Provayder qoş",
+      "noRepositoriesToStart": "Heç bir repozitoriya tapılmadı.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",
       "prefillRepoAndModelUnavailable": "İlkin sessiyanın repozitoriyası və modeli artıq əlçatan deyil. Aşağıdan repozitoriya və model seç.",

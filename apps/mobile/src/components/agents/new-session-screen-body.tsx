@@ -911,7 +911,7 @@ export function NewSessionScreenBody() {
   );
 
   let startBlockedReason: string | null = null;
-  let startBlockedAction: { label: string; onPress: () => void } | null = null;
+  let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
   if (startBlockedReasonKey === 'connect-provider') {
     startBlockedReason = t('agentChat.newSession.connectProviderToStart');
     // `connect-provider` requires at least one connectable group, so the first
@@ -927,10 +927,11 @@ export function NewSessionScreenBody() {
       };
     }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
-    startBlockedReason = t('agentChat.newSession.refreshRepositories');
+    startBlockedReason = t('agentChat.newSession.noRepositoriesToStart');
     startBlockedAction = {
       label: t('agentChat.newSession.refreshRepositories'),
       onPress: () => void refreshReposForceFresh(),
+      isBusy: isRetrying,
     };
   } else if (startBlockedReasonKey === 'select-repository') {
     startBlockedReason = t('agentChat.newSession.selectRepositoryToStart');

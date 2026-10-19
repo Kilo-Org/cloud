@@ -2231,6 +2231,7 @@
       "selectRepositoryToStart": "Izaberi repozitorijum da započneš.",
       "connectProviderToStart": "Poveži platformu da započneš.",
       "connectProviderAction": "Poveži platformu",
+      "noRepositoriesToStart": "Nisu pronađeni repozitorijumi.",
       "promptPlaceholder": "Na čemu želiš da radiš?",
       "couldNotLoadModels": "Učitavanje modela nije uspelo.",
       "prefillRepoAndModelUnavailable": "Repozitorijum i model izvorne sesije više nisu dostupni. Izaberi druge ispod.",

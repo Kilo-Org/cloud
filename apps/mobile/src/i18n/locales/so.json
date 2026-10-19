@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Dooro kayd si aad u bilowdo.",
       "connectProviderToStart": "Ku xidh bixiye si aad u bilowdo.",
       "connectProviderAction": "Ku xidh bixiye",
+      "noRepositoriesToStart": "Kaydad lama helin.",
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",
       "prefillRepoAndModelUnavailable": "Kaydka iyo moodeelka kalfadhigii asalka ahaa mar dambe lama heli karo. Hoos ka dooro kuwo kale.",

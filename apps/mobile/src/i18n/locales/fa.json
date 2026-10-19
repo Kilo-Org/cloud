@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
       "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
       "connectProviderAction": "یک ارائه‌دهنده را متصل کنید",
+      "noRepositoriesToStart": "هیچ مخزنی یافت نشد.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
       "prefillRepoAndModelUnavailable": "مخزن و مدل نشست اصلی دیگر در دسترس نیستند. از گزینه‌های زیر مخزن و مدل دیگری انتخاب کنید.",

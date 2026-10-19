@@ -2231,6 +2231,7 @@
       "selectRepositoryToStart": "Lai sāktu, izvēlies repozitoriju.",
       "connectProviderToStart": "Lai sāktu, pievieno pakalpojuma sniedzēju.",
       "connectProviderAction": "Pievieno pakalpojuma sniedzēju",
+      "noRepositoriesToStart": "Repozitoriji nav atrasti.",
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
       "prefillRepoAndModelUnavailable": "Sākotnējās sesijas repozitorijs un modelis vairs nav pieejami. Izvēlies tos zemāk.",

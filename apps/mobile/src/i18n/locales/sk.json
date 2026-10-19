@@ -2259,6 +2259,7 @@
       "selectRepositoryToStart": "Vyberte repozitár, aby ste mohli začať.",
       "connectProviderToStart": "Pripojte poskytovateľa, aby ste mohli začať.",
       "connectProviderAction": "Pripojiť poskytovateľa",
+      "noRepositoriesToStart": "Nenašli sa žiadne repozitáre.",
       "promptPlaceholder": "Na čom chceš pracovať?",
       "couldNotLoadModels": "Modely sa nepodarilo načítať.",
       "prefillRepoAndModelUnavailable": "Repozitár a model pôvodnej relácie už nie sú dostupné. Nižšie vyber nové.",

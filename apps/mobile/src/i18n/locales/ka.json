@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "დასაწყებად აირჩიეთ რეპოზიტორია.",
       "connectProviderToStart": "დასაწყებად დააკავშირეთ პროვაიდერი.",
       "connectProviderAction": "დააკავშირეთ პროვაიდერი",
+      "noRepositoriesToStart": "რეპოზიტორიები ვერ მოიძებნა.",
       "promptPlaceholder": "რაზე გსურთ მუშაობა?",
       "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",
       "prefillRepoAndModelUnavailable": "საწყისი სესიის რეპოზიტორია და მოდელი აღარ არის ხელმისაწვდომი. ქვემოთ აირჩიეთ სხვა რეპოზიტორია და მოდელი.",

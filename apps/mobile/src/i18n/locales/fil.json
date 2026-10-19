@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Pumili ng imbakan ng code para magsimula.",
       "connectProviderToStart": "Ikonekta ang isang provider para magsimula.",
       "connectProviderAction": "Ikonekta ang isang provider",
+      "noRepositoriesToStart": "Walang nahanap na mga imbakan ng code.",
       "promptPlaceholder": "Ano ang gusto mong gawin?",
       "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
       "prefillRepoAndModelUnavailable": "Hindi na magamit ang imbakan ng code at modelo ng orihinal na sesyon. Pumili ng mga kapalit sa ibaba.",

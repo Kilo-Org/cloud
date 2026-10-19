@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Επίλεξε ένα αποθετήριο για να ξεκινήσεις.",
       "connectProviderToStart": "Σύνδεσε έναν πάροχο για να ξεκινήσεις.",
       "connectProviderAction": "Σύνδεσε έναν πάροχο",
+      "noRepositoriesToStart": "Δεν βρέθηκαν αποθετήρια.",
       "promptPlaceholder": "Με τι θέλεις να ασχοληθείς;",
       "couldNotLoadModels": "Δεν ήταν δυνατή η φόρτωση των μοντέλων.",
       "prefillRepoAndModelUnavailable": "Το αποθετήριο και το μοντέλο της αρχικής συνεδρίας δεν είναι πλέον διαθέσιμα. Επίλεξε άλλα παρακάτω.",

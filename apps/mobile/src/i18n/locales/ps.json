@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "د پیل لپاره یو زېرمتون وټاکئ.",
       "connectProviderToStart": "د پیل لپاره د خدمت چمتو کوونکی ونښلوئ.",
       "connectProviderAction": "د خدمت چمتو کوونکی ونښلوئ",
+      "noRepositoriesToStart": "زېرمتونونه ونه موندل شول.",
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",
       "prefillRepoAndModelUnavailable": "د اصلي ناستې زېرمتون او ماډل نور د لاسرسي وړ نه دي. لاندې یې غوره کړئ.",

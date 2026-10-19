@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Zgjidh një depo për të filluar.",
       "connectProviderToStart": "Lidh një ofrues për të filluar.",
       "connectProviderAction": "Lidh një ofrues",
+      "noRepositoriesToStart": "Nuk u gjetën depo.",
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",
       "prefillRepoAndModelUnavailable": "Depoja dhe modeli i seancës fillestare nuk janë më të disponueshëm. Zgjidhi më poshtë.",

@@ -2287,6 +2287,7 @@
       "selectRepositoryToStart": "Roghnaigh stór chun tosú.",
       "connectProviderToStart": "Ceangail soláthraí chun tosú.",
       "connectProviderAction": "Ceangail soláthraí",
+      "noRepositoriesToStart": "Níor aimsíodh aon stórtha.",
       "promptPlaceholder": "Cad ar mhaith leat oibriú air?",
       "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",
       "prefillRepoAndModelUnavailable": "Níl stór ná samhail an tseisiúin bhunaidh ar fáil a thuilleadh. Roghnaigh stór agus samhail thíos.",

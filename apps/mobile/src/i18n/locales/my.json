@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "စတင်ရန် ကုဒ်သိုလှောင်ခန်းတစ်ခုကို ရွေးပါ။",
       "connectProviderToStart": "စတင်ရန် ဝန်ဆောင်မှုပေးသူတစ်ဦးကို ချိတ်ဆက်ပါ။",
       "connectProviderAction": "ဝန်ဆောင်မှုပေးသူတစ်ဦးကို ချိတ်ဆက်ပါ",
+      "noRepositoriesToStart": "ကုဒ်သိုလှောင်ခန်းများ မတွေ့ပါ။",
       "promptPlaceholder": "ဘာလုပ်ချင်ပါသလဲ။",
       "couldNotLoadModels": "မော်ဒယ်များကို ရယူ၍မရပါ။",
       "prefillRepoAndModelUnavailable": "မူရင်းစက်ရှင်၏ ကုဒ်သိုလှောင်ခန်းနှင့် မော်ဒယ်ကို အသုံးပြု၍မရတော့ပါ။ အောက်တွင် အသစ်ရွေးပါ။",

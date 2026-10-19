@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
       "connectProviderToStart": "Anslut en leverantör för att starta.",
       "connectProviderAction": "Anslut en leverantör",
+      "noRepositoriesToStart": "Inga kodarkiv hittades.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
       "prefillRepoAndModelUnavailable": "Den ursprungliga sessionens kodarkiv och modell är inte längre tillgängliga. Välj ett nytt kodarkiv och en ny modell nedan.",

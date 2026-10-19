@@ -1691,6 +1691,7 @@
       "selectRepositoryToStart": "शुरू करने के लिए रिपॉज़िटरी चुनें।",
       "connectProviderToStart": "शुरू करने के लिए प्रदाता कनेक्ट करें।",
       "connectProviderAction": "प्रदाता कनेक्ट करें",
+      "noRepositoriesToStart": "कोई रिपॉज़िटरी नहीं मिली।",
       "promptPlaceholder": "आप किस पर काम करना चाहेंगे?",
       "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
       "prefillRepoAndModelUnavailable": "मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे दूसरी रिपॉज़िटरी और मॉडल चुनें।",

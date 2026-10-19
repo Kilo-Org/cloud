@@ -2231,6 +2231,7 @@
       "selectRepositoryToStart": "Selecciona un repositori per començar.",
       "connectProviderToStart": "Connecta un proveïdor per començar.",
       "connectProviderAction": "Connecta un proveïdor",
+      "noRepositoriesToStart": "No s'han trobat repositoris.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
       "prefillRepoAndModelUnavailable": "El repositori i el model de la sessió original ja no estan disponibles. Tria'ls a continuació.",

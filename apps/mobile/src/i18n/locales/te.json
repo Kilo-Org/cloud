@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "ప్రారంభించడానికి రిపోజిటరీని ఎంచుకోండి.",
       "connectProviderToStart": "ప్రారంభించడానికి ప్రొవైడర్‌ను కనెక్ట్ చేయండి.",
       "connectProviderAction": "ప్రొవైడర్‌ను కనెక్ట్ చేయండి",
+      "noRepositoriesToStart": "ఎటువంటి రిపోజిటరీలు కనుగొనబడలేదు.",
       "promptPlaceholder": "మీరు దేనిపై పని చేయాలనుకుంటున్నారు?",
       "couldNotLoadModels": "మోడళ్లను లోడ్ చేయలేకపోయాము.",
       "prefillRepoAndModelUnavailable": "అసలు సెషన్‌లోని రిపోజిటరీ, మోడల్ ఇక అందుబాటులో లేవు. కింద మరో రిపోజిటరీని, మోడల్‌ను ఎంచుకోండి.",

@@ -1691,6 +1691,7 @@
       "selectRepositoryToStart": "Chọn một kho mã để bắt đầu.",
       "connectProviderToStart": "Kết nối nhà cung cấp để bắt đầu.",
       "connectProviderAction": "Kết nối nhà cung cấp",
+      "noRepositoriesToStart": "Không tìm thấy kho mã nào.",
       "promptPlaceholder": "Bạn muốn làm gì?",
       "couldNotLoadModels": "Không thể tải danh sách mô hình.",
       "prefillRepoAndModelUnavailable": "Kho mã và mô hình của phiên gốc không còn dùng được. Hãy chọn kho mã và mô hình khác bên dưới.",

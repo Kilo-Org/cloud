@@ -7,6 +7,8 @@ import { Text } from '@/components/ui/text';
 type NewSessionStartBlockedAction = {
   label: string;
   onPress: () => void;
+  /** True while the action's own work is in flight; the button disables. */
+  isBusy?: boolean;
 };
 
 type NewSessionStartButtonProps = {
@@ -63,6 +65,8 @@ export function NewSessionStartButton({
         onPress={() => {
           startBlockedAction.onPress();
         }}
+        disabled={startBlockedAction.isBusy === true}
+        loading={startBlockedAction.isBusy === true}
         accessibilityLabel={startBlockedAction.label}
       >
         <Text>{startBlockedAction.label}</Text>

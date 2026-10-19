@@ -1691,6 +1691,7 @@
       "selectRepositoryToStart": "Başlamak için bir depo seç.",
       "connectProviderToStart": "Başlamak için bir sağlayıcı bağla.",
       "connectProviderAction": "Sağlayıcı bağla",
+      "noRepositoriesToStart": "Depo bulunamadı.",
       "promptPlaceholder": "Ne üzerinde çalışmak istersin?",
       "couldNotLoadModels": "Modeller yüklenemedi.",
       "prefillRepoAndModelUnavailable": "Önceki oturumun deposu ve modeli artık kullanılamıyor. Aşağıdan yeni bir depo ve model seç.",

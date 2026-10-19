@@ -2231,6 +2231,7 @@
       "selectRepositoryToStart": "Selectează un depozit pentru a începe.",
       "connectProviderToStart": "Conectează un furnizor pentru a începe.",
       "connectProviderAction": "Conectează un furnizor",
+      "noRepositoriesToStart": "Nu au fost găsite depozite.",
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
       "prefillRepoAndModelUnavailable": "Depozitul și modelul sesiunii inițiale nu mai sunt disponibile. Alege altele mai jos.",

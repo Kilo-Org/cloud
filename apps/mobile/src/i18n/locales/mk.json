@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Изберете репозиториум за да започнете.",
       "connectProviderToStart": "Поврзете платформа за да започнете.",
       "connectProviderAction": "Поврзете платформа",
+      "noRepositoriesToStart": "Не се пронајдени репозиториуми.",
       "promptPlaceholder": "На што сакаш да работиш?",
       "couldNotLoadModels": "Не успеа вчитувањето на моделите.",
       "prefillRepoAndModelUnavailable": "Репозиториумот и моделот од првичната сесија веќе не се достапни. Избери други подолу.",

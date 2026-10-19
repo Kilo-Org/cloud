@@ -1,6 +1,12 @@
 {
   "af": ["commit", "open", "open pull request", "review", "starting"],
-  "am": ["connect a provider", "github connection expired", "open", "open pull request"],
+  "am": [
+    "connect a provider",
+    "github connection expired",
+    "no repositories found",
+    "open",
+    "open pull request"
+  ],
   "ar": [
     "commit",
     "file",
@@ -18,6 +24,7 @@
     "edit",
     "files",
     "merge",
+    "no repositories found",
     "open",
     "open pull request",
     "reactions",
@@ -63,6 +70,7 @@
     "check your connection and try again",
     "github connection expired",
     "merge",
+    "no repositories found",
     "open",
     "open pull request"
   ],
@@ -85,6 +93,7 @@
     "connect a provider",
     "edit",
     "files",
+    "no repositories found",
     "none",
     "open",
     "open pull request",
@@ -94,9 +103,16 @@
     "tokens",
     "unknown"
   ],
-  "cy": ["commit", "connect a provider", "open", "open pull request", "review"],
+  "cy": [
+    "commit",
+    "connect a provider",
+    "no repositories found",
+    "open",
+    "open pull request",
+    "review"
+  ],
   "da": ["commit", "open", "open pull request", "plan", "review"],
-  "de": ["block", "open", "open pull request"],
+  "de": ["block", "no repositories found", "open", "open pull request"],
   "el": ["balanced", "connect a provider", "critical", "open", "open pull request"],
   "es": [
     "cancelled",
@@ -120,6 +136,7 @@
     "connect a provider",
     "cost",
     "files",
+    "no repositories found",
     "open",
     "open pull request",
     "privacy policy",
@@ -136,6 +153,7 @@
     "copied",
     "deleted",
     "files",
+    "no repositories found",
     "open",
     "open pull request",
     "reactions",
@@ -148,6 +166,7 @@
     "edit",
     "files",
     "merge",
+    "no repositories found",
     "open",
     "open pull request",
     "plan",
@@ -155,7 +174,7 @@
     "review",
     "tokens"
   ],
-  "fil": ["open", "review"],
+  "fil": ["no repositories found", "open", "review"],
   "fr": [
     "all",
     "cancelled",
@@ -171,9 +190,16 @@
     "{{loaded}} of {{total}} files loaded",
     "only adding {{accepted}} of {{total}} files (max {{max}})"
   ],
-  "ga": ["block", "commit", "open", "open pull request", "reply"],
+  "ga": ["block", "commit", "no repositories found", "open", "open pull request", "reply"],
   "gl": ["enabled", "none", "open", "open pull request", "review"],
-  "gu": ["a security finding needs attention", "block", "merge", "open", "open pull request"],
+  "gu": [
+    "a security finding needs attention",
+    "block",
+    "merge",
+    "no repositories found",
+    "open",
+    "open pull request"
+  ],
   "he": [
     "completed",
     "connect a provider",
@@ -190,15 +216,25 @@
     "connect a provider",
     "github connection expired",
     "merge",
+    "no repositories found",
     "open",
     "open pull request",
     "sign out"
   ],
   "hr": ["commit", "files", "open", "open pull request", "plan", "reactions", "tokens"],
-  "hu": ["connect a provider", "files", "open", "open pull request", "reactions", "tokens"],
+  "hu": [
+    "connect a provider",
+    "files",
+    "no repositories found",
+    "open",
+    "open pull request",
+    "reactions",
+    "tokens"
+  ],
   "hy": [
     "commit",
     "connect a provider",
+    "no repositories found",
     "open",
     "open pull request",
     "reactions",
@@ -206,16 +242,24 @@
     "tokens"
   ],
   "id": ["open", "open pull request"],
-  "ig": ["commit", "open"],
-  "is": ["open", "open pull request"],
+  "ig": ["commit", "no repositories found", "open"],
+  "is": ["no repositories found", "open", "open pull request"],
   "it": ["block", "closed", "high", "low", "medium", "open", "open pull request"],
   "ja": ["analysis failed", "copied", "merged", "open", "open pull request", "queued", "reactions"],
-  "ka": ["connect a provider", "files", "open", "open pull request", "reactions", "tokens"],
+  "ka": [
+    "connect a provider",
+    "files",
+    "no repositories found",
+    "open",
+    "open pull request",
+    "reactions",
+    "tokens"
+  ],
   "kk": ["connect a provider", "open", "open pull request"],
-  "km": ["github connection expired", "review"],
-  "kn": ["commit", "merge", "open", "open pull request", "review"],
-  "ko": ["open", "open pull request", "plan", "session exited"],
-  "lo": ["review"],
+  "km": ["github connection expired", "no repositories found", "review"],
+  "kn": ["commit", "merge", "no repositories found", "open", "open pull request", "review"],
+  "ko": ["no repositories found", "open", "open pull request", "plan", "session exited"],
+  "lo": ["no repositories found", "review"],
   "lt": [
     "commit",
     "connect a provider",
@@ -227,31 +271,73 @@
     "plan",
     "reactions"
   ],
-  "lv": ["open", "open pull request", "review"],
-  "mg": ["block", "open", "open pull request"],
-  "mi": ["commit", "connect a provider", "open", "open pull request"],
-  "mk": ["commit", "connect a provider", "edit", "open", "open pull request"],
-  "ml": ["comment", "merge", "open", "open pull request"],
-  "mn": ["block", "connect a provider", "files", "open", "open pull request", "tokens"],
-  "mr": ["block", "open pull request"],
+  "lv": ["no repositories found", "open", "open pull request", "review"],
+  "mg": ["block", "no repositories found", "open", "open pull request"],
+  "mi": ["commit", "connect a provider", "no repositories found", "open", "open pull request"],
+  "mk": [
+    "commit",
+    "connect a provider",
+    "edit",
+    "no repositories found",
+    "open",
+    "open pull request"
+  ],
+  "ml": ["comment", "merge", "no repositories found", "open", "open pull request"],
+  "mn": [
+    "block",
+    "connect a provider",
+    "files",
+    "no repositories found",
+    "open",
+    "open pull request",
+    "tokens"
+  ],
+  "mr": ["block", "no repositories found", "open pull request"],
   "ms": ["open", "open pull request", "review"],
-  "mt": ["(empty)", "open", "open pull request"],
+  "mt": ["(empty)", "no repositories found", "open", "open pull request"],
   "my": [
     "balanced",
     "commit",
     "connect a provider",
     "github connection expired",
+    "no repositories found",
     "open",
     "open pull request",
     "review",
     "unavailable"
   ],
   "nb": ["open", "open pull request", "review"],
-  "ne": ["block", "github connection expired", "merge", "open", "open pull request"],
+  "ne": [
+    "block",
+    "github connection expired",
+    "merge",
+    "no repositories found",
+    "open",
+    "open pull request"
+  ],
   "nl": ["all", "block", "open", "open pull request"],
-  "om": ["open"],
-  "or": ["block", "cancelled", "close", "cost", "edit", "files", "merge", "open", "reactions"],
-  "pa": ["block", "commit", "github connection expired", "merge", "open", "open pull request"],
+  "om": ["no repositories found", "open"],
+  "or": [
+    "block",
+    "cancelled",
+    "close",
+    "cost",
+    "edit",
+    "files",
+    "merge",
+    "no repositories found",
+    "open",
+    "reactions"
+  ],
+  "pa": [
+    "block",
+    "commit",
+    "github connection expired",
+    "merge",
+    "no repositories found",
+    "open",
+    "open pull request"
+  ],
   "pl": [
     "block",
     "closed",
@@ -272,7 +358,7 @@
     "tokens",
     "unknown"
   ],
-  "ps": ["commit", "open", "open pull request"],
+  "ps": ["commit", "no repositories found", "open", "open pull request"],
   "pt": [
     "commit",
     "completed",
@@ -304,6 +390,7 @@
     "edit",
     "failed",
     "fixed",
+    "no repositories found",
     "none",
     "open",
     "open pull request"
@@ -335,7 +422,13 @@
     "tokens"
   ],
   "sl": ["open", "open pull request", "reactions", "retry loading more", "tokens"],
-  "so": ["a security finding needs attention", "open", "open pull request", "reactions"],
+  "so": [
+    "a security finding needs attention",
+    "no repositories found",
+    "open",
+    "open pull request",
+    "reactions"
+  ],
   "sq": [
     "added",
     "commit",
@@ -344,6 +437,7 @@
     "file",
     "files",
     "merged",
+    "no repositories found",
     "open",
     "open pull request",
     "reactions",
@@ -356,6 +450,7 @@
     "commit",
     "edit",
     "files",
+    "no repositories found",
     "open",
     "open pull request",
     "plan",
@@ -366,7 +461,7 @@
   "sv": ["block", "commit", "copied", "open", "open pull request", "review", "tokens"],
   "sw": ["off", "open", "review"],
   "ta": ["open", "open pull request"],
-  "te": ["commit", "open", "open pull request", "sign out", "unknown"],
+  "te": ["commit", "no repositories found", "open", "open pull request", "sign out", "unknown"],
   "th": ["completed", "no kiloclaw instances", "plan"],
   "tr": [
     "block",
@@ -387,18 +482,30 @@
     "github connection expired",
     "merge",
     "merged",
+    "no repositories found",
     "open",
     "open pull request"
   ],
   "uz": ["block", "connect a provider", "files", "open", "open pull request", "reactions"],
-  "vi": ["open", "open pull request", "plan"],
-  "yo": ["commit", "draft", "open"],
+  "vi": ["no repositories found", "open", "open pull request", "plan"],
+  "yo": ["commit", "draft", "no repositories found", "open"],
   "zh-Hans": ["commit", "file", "files", "open", "open pull request", "reactions"],
-  "zh-Hant": ["commit", "created", "file", "files", "open", "open pull request", "reactions"],
-  "zu": [
+  "zh-Hant": [
     "commit",
+    "created",
+    "file",
+    "files",
+    "no repositories found",
     "open",
+    "open pull request",
+    "reactions"
+  ],
+  "zu": [
     "{{loaded}} of {{total}} files loaded",
-    "only adding {{accepted}} of {{total}} files (max {{max}})"
-  ]
+    "commit",
+    "no repositories found",
+    "only adding {{accepted}} of {{total}} files (max {{max}})",
+    "open"
+  ],
+  "ht": ["no repositories found"]
 }

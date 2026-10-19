@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Chagua hazina ili kuanza.",
       "connectProviderToStart": "Unganisha mtoa huduma ili kuanza.",
       "connectProviderAction": "Unganisha mtoa huduma",
+      "noRepositoriesToStart": "Hakuna hazina zilizopatikana.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",
       "prefillRepoAndModelUnavailable": "Hazina na modeli ya kikao cha awali hazipatikani tena. Chagua hazina na modeli hapa chini.",

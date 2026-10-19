@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "بۆ دەستپێکردن کۆگایەک هەڵبژێرە.",
       "connectProviderToStart": "بۆ دەستپێکردن پەیوەندی بە دابینکەرێک بکە.",
       "connectProviderAction": "پەیوەندی بە دابینکەرێک بکە",
+      "noRepositoriesToStart": "هیچ کۆگایەک نەدۆزرایەوە.",
       "promptPlaceholder": "حەز دەکەیت لەسەر چی کار بکەیت؟",
       "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن.",
       "prefillRepoAndModelUnavailable": "کۆگا و مۆدێلی سێشنی سەرەکی چیتر بەردەست نیین. لە خوارەوە هەڵیانبژێرە.",

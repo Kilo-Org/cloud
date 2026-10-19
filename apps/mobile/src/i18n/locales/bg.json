@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Избери хранилище, за да започнеш.",
       "connectProviderToStart": "Свържи доставчик, за да започнеш.",
       "connectProviderAction": "Свържи доставчик",
+      "noRepositoriesToStart": "Не са намерени хранилища.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",
       "prefillRepoAndModelUnavailable": "Хранилището и моделът от първоначалната сесия вече не са достъпни. Избери други по-долу.",

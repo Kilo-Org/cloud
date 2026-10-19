@@ -2259,6 +2259,7 @@
       "selectRepositoryToStart": "Izberi skladišče za začetek.",
       "connectProviderToStart": "Poveži ponudnika za začetek.",
       "connectProviderAction": "Poveži ponudnika",
+      "noRepositoriesToStart": "Ni najdenih skladišč.",
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
       "prefillRepoAndModelUnavailable": "Skladišče in model prvotne seje nista več na voljo. Izberi ju spodaj.",

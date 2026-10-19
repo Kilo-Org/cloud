@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
       "connectProviderToStart": "Boshlash uchun provayderni ulang.",
       "connectProviderAction": "Provayderni ulang",
+      "noRepositoriesToStart": "Repozitoriyalar topilmadi.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
       "prefillRepoAndModelUnavailable": "Asl sessiyadagi repozitoriya va model endi mavjud emas. Quyida boshqa repozitoriya va modelni tanlang.",

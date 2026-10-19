@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Safidio ny tahirin-kaody hanombohana.",
       "connectProviderToStart": "Ampifandraiso ny mpanome tolotra hanombohana.",
       "connectProviderAction": "Ampifandraiso ny mpanome tolotra",
+      "noRepositoriesToStart": "Tsy hita ny tahirin-kaody.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",
       "prefillRepoAndModelUnavailable": "Tsy azo ampiasaina intsony ny tahirin-kaody sy ny modelin'ny fotoam-piasana niandohana. Misafidiana etsy ambany.",

@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "प्रारंभ करण्यासाठी रिपॉझिटरी निवडा.",
       "connectProviderToStart": "प्रारंभ करण्यासाठी सेवा पुरवठादार जोडा.",
       "connectProviderAction": "सेवा पुरवठादार जोडा",
+      "noRepositoriesToStart": "कोणतीही रिपॉझिटरी आढळली नाही.",
       "promptPlaceholder": "तुम्हाला कशावर काम करायचे आहे?",
       "couldNotLoadModels": "मॉडेल लोड करता आली नाहीत.",
       "prefillRepoAndModelUnavailable": "मूळ सत्रातील रिपॉझिटरी आणि मॉडेल आता उपलब्ध नाहीत. खाली नवीन रिपॉझिटरी आणि मॉडेल निवडा.",

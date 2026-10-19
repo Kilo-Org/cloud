@@ -1604,6 +1604,7 @@
       "selectRepositoryToStart": "Sélectionnez un dépôt pour commencer.",
       "connectProviderToStart": "Connectez un fournisseur pour commencer.",
       "connectProviderAction": "Connecter un fournisseur",
+      "noRepositoriesToStart": "Aucun dépôt trouvé.",
       "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
       "couldNotLoadModels": "Impossible de charger les modèles.",
       "prefillRepoAndModelUnavailable": "Le dépôt et le modèle de la session d'origine ne sont plus disponibles. Choisissez-en d'autres ci-dessous.",

@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Vælg et kodelager for at starte.",
       "connectProviderToStart": "Tilslut en udbyder for at starte.",
       "connectProviderAction": "Tilslut en udbyder",
+      "noRepositoriesToStart": "Ingen kodelagre fundet.",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den oprindelige session er ikke længere tilgængelige. Vælg et andet kodelager og en anden model nedenfor.",

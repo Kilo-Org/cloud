@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Zaɓi ma'ajiya don farawa.",
       "connectProviderToStart": "Haɗa mai ba da sabis don farawa.",
       "connectProviderAction": "Haɗa mai ba da sabis",
+      "noRepositoriesToStart": "Ba a sami ma'ajiyoyi ba.",
       "promptPlaceholder": "Me kake so ka yi aiki a kai?",
       "couldNotLoadModels": "An kasa loda samfura.",
       "prefillRepoAndModelUnavailable": "An daina samun ma'ajiya da samfurin da aka yi amfani da su a zaman na asali. Zaɓi wasu a ƙasa.",

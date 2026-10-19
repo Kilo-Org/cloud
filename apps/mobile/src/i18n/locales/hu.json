@@ -2203,6 +2203,7 @@
       "selectRepositoryToStart": "Válassz egy tárolót az indításhoz.",
       "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
       "connectProviderAction": "Csatlakoztass egy szolgáltatót",
+      "noRepositoriesToStart": "Nem találhatók tárolók.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
       "prefillRepoAndModelUnavailable": "Az eredeti munkamenet tárolója és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",

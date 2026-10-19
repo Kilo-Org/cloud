@@ -5,7 +5,12 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
-import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
+import {
+  AGENT_VISIBILITY_LABEL_KEYS,
+  agentRows,
+  type AgentSource,
+  type AgentVisibility,
+} from '@/components/profiles/profile-agents-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -31,7 +36,7 @@ function hasUsableMessage(error: unknown): boolean {
 type AgentRowViewProps = Readonly<{
   name: string;
   slug: string;
-  visibility: string;
+  visibility: AgentVisibility;
   description: string;
   model: string;
   onEdit: () => void;
@@ -62,7 +67,7 @@ function AgentRowView({
             {slug}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {visibility}
+            {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
           </Text>
         </View>
         {model.length > 0 ? (

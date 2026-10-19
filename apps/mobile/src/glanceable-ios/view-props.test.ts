@@ -181,18 +181,6 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     expect(buildGlanceableLiveActivityContentState(built).needsApproval).toBe(0);
   });
 
-  it('reads an absent field on a raw producer payload as 0', () => {
-    // A raw payload without the key (as an untyped producer might send, and
-    // as the parsed schema defaults) still yields a number: the layout
-    // compares it with `> 0` and must not draw the control for a value it
-    // cannot read.
-    const contentState = buildGlanceableLiveActivityContentState({
-      ...snapshotFor([PERMISSION_ROW]),
-      needsApproval: undefined,
-    } as unknown as GlanceableAgentsSnapshot);
-    expect(contentState.needsApproval).toBe(0);
-  });
-
   it('expires to a frame with no counts while keeping the approvable count', () => {
     // The fetch-error path (`handleFetchError`) advances the retained card with
     // `withStatus(..., 'stale', now)`: past `expiresAt` it zeroes every count

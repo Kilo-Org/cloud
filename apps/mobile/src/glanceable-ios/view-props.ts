@@ -436,8 +436,8 @@ export function widgetTimelineFrames(
  * widget's own in-place buttons read it from the snapshot while `actions` is
  * built, and the Lock Screen / Watch Smart Stack layout draws its Approve
  * control from this content state. The snapshot schema defaults the count to
- * zero, so a state without it hides both controls rather than offering an
- * Approve the service could not complete.
+ * zero, so a zero count hides both controls rather than offering an Approve
+ * the service could not complete.
  */
 export function buildGlanceableLiveActivityContentState(
   snapshot: GlanceableAgentsSnapshot,
@@ -448,7 +448,7 @@ export function buildGlanceableLiveActivityContentState(
     status: snapshot.status,
     running: snapshot.running,
     needsInput: snapshot.needsInput,
-    needsApproval: snapshot.needsApproval ?? 0,
+    needsApproval: snapshot.needsApproval,
     idle: snapshot.idle,
     updatedAt: snapshot.updatedAt,
     needsInputSince: snapshot.needsInputSince,

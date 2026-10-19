@@ -112,7 +112,6 @@ import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-res
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
-import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -945,10 +944,6 @@ export const adminRouter = createTRPCRouter({
 
           return current;
         });
-
-        if (didTransition && isBlocking) {
-          await revokeGatewayGrantsForBlockedUser(input.userId);
-        }
 
         // Blocking is attributed on the user row; unblocking clears those
         // columns, so the audit row is the only record of who lifted it.

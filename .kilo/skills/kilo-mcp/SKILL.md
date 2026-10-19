@@ -51,11 +51,11 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**877 procedures** — **373 queries**, **504 mutations** — under **53 prefixes**.
+**838 procedures** — **357 queries**, **481 mutations** — under **49 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
-| `organizations` | 296 | 128 | 168 |
+| `organizations` | 288 | 124 | 164 |
 | `kiloclaw` | 96 | 35 | 61 |
 | `user` | 40 | 15 | 25 |
 | `agentProfiles` | 36 | 4 | 32 |
@@ -67,7 +67,6 @@ each row's `summary` and `tags` are what the search matches.
 | `cliSessionsV2` | 18 | 10 | 8 |
 | `appBuilder` | 16 | 6 | 10 |
 | `cliSessions` | 16 | 7 | 9 |
-| `mcpGateway` | 16 | 4 | 12 |
 | `providerReview` | 16 | 8 | 8 |
 | `todos` | 16 | 6 | 10 |
 | `deployments` | 14 | 6 | 8 |
@@ -77,13 +76,10 @@ each row's `summary` and `tags` are what the search matches.
 | `personalReviewAgent` | 9 | 5 | 4 |
 | `webhookTriggers` | 9 | 5 | 4 |
 | `codingPlans` | 8 | 5 | 3 |
-| `personalAutoTriage` | 8 | 4 | 4 |
 | `reviewMemory` | 8 | 3 | 5 |
 | `agentBriefing` | 7 | 4 | 3 |
 | `byok` | 7 | 2 | 5 |
 | `userExports` | 7 | 3 | 4 |
-| `autoTriage` | 6 | 4 | 2 |
-| `codeIndexing` | 6 | 4 | 2 |
 | `dolthub` | 6 | 4 | 2 |
 | `modelPreferences` | 6 | 1 | 5 |
 | `usageAnalytics` | 6 | 6 | 0 |
@@ -97,7 +93,6 @@ each row's `summary` and `tags` are what the search matches.
 | `credits` | 3 | 1 | 2 |
 | `linear` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |
-| `mcpGatewayAuthorizations` | 2 | 1 | 1 |
 | `models` | 2 | 2 | 0 |
 | `openAiChatGpt` | 2 | 1 | 1 |
 | `spendAlerts` | 2 | 1 | 1 |
@@ -113,7 +108,7 @@ each row's `summary` and `tags` are what the search matches.
 
 The second path segment of each area that splits, with procedure counts:
 
-- `organizations.*` — 296: `kiloclaw` 66, `cloudAgentNext` 32, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `autoTriage` 8, `members` 7, `autoTopUp` 6, `bitbucket` 6, `sso` 6, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
+- `organizations.*` — 288: `kiloclaw` 66, `cloudAgentNext` 32, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `members` 7, `autoTopUp` 6, `bitbucket` 6, `sso` 6, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
 
 - `todos.*` — 16: `items` 11, `lists` 5
 

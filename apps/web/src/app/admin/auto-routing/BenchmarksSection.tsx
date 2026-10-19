@@ -10,6 +10,7 @@ import {
   BenchmarkRunsResponseSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
+  DEFAULT_BENCHMARK_DECIDER_MODEL_IDS,
   getReasoningVariantKeys,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
@@ -389,13 +390,16 @@ export type BenchmarkConfigFormState = {
   policyOverrides: PolicyOverrideForm;
 };
 
-export function configToFormState(config: BenchmarkConfig | null): BenchmarkConfigFormState {
+export function configToFormState(
+  config: BenchmarkConfig | null,
+  router: AutoRouter = config?.router ?? DEFAULT_AUTO_ROUTER
+): BenchmarkConfigFormState {
   if (config === null) {
     // No config saved yet: identity fields are overrides, so blank means the
     // worker uses its default benchmark user and org at run time.
     return {
       classifierModels: [],
-      deciderModels: [],
+      deciderModels: [{ id: DEFAULT_BENCHMARK_DECIDER_MODEL_IDS[router] }],
       minAccuracy: 0.7,
       accuracyNoiseBand: 0.05,
       frontierMinAccuracyDelta: 0,
@@ -599,7 +603,7 @@ function BenchmarkConfigEditor({
   registryEntries?: BenchmarkRegistryResponse['platformEntries'];
   catalogModalities: readonly ModalityCatalogModel[] | null;
 }) {
-  const [form, setForm] = useState(() => configToFormState(config));
+  const [form, setForm] = useState(() => configToFormState(config, router));
   // Tracks unsaved local edits. A background config refetch (the runs list
   // polls; the query also refetches on focus) must not silently overwrite
   // in-progress edits, so the sync effect only resets the form while pristine.
@@ -619,22 +623,22 @@ function BenchmarkConfigEditor({
   // Sync from server config only on initial load / after a save — never while
   // the admin has unsaved edits (that would discard their work).
   useEffect(() => {
-    if (!dirty) setForm(configToFormState(config));
-  }, [config, dirty]);
+    if (!dirty) setForm(configToFormState(config, router));
+  }, [config, dirty, router]);
 
   // Discard local edits and reload the latest server config (explicit conflict
   // recovery when a remote update arrived while editing).
   const handleReload = useCallback(() => {
-    setForm(configToFormState(config));
+    setForm(configToFormState(config, router));
     setDirty(false);
-  }, [config]);
+  }, [config, router]);
 
   const saveMutation = useMutation({
     mutationFn: (next: BenchmarkConfig) => saveBenchmarkConfig({ ...next, router }),
     onSuccess: data => {
       // The save is now the source of truth: clear dirty and re-sync so the
       // next background refetch is free to update the form again.
-      setForm(configToFormState(data.config));
+      setForm(configToFormState(data.config, router));
       setDirty(false);
       onSaved(data);
       toast.success('Benchmark config saved');

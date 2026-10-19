@@ -210,6 +210,12 @@ const config: ExpoConfig = {
       // disables both capabilities and the App Store profile loses them.
       'com.apple.developer.kernel.extended-virtual-addressing': true,
       'com.apple.developer.kernel.increased-memory-limit': true,
+      // Dev-only: the process that registers the artifacts File Provider domain
+      // and sets its automatically-enabled testing mode is the app itself, and
+      // iOS checks the calling process's entitlements. App-Store-forbidden;
+      // must be removed before any store submission (with the paired
+      // extension entitlement in plugins/withArtifactFileProvider.js).
+      'com.apple.developer.fileprovider.testing-mode': true,
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

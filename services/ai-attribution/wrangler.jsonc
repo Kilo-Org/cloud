@@ -9,7 +9,7 @@
   "ratelimits": [
     {
       "name": "ATTRIBUTION_TRACK_RATE_LIMITER",
-      "namespace_id": "1001",
+      "namespace_id": "1003",
       "simple": {
         "limit": 60,
         "period": 60,
@@ -91,7 +91,7 @@
       "ratelimits": [
         {
           "name": "ATTRIBUTION_TRACK_RATE_LIMITER",
-          "namespace_id": "1001",
+          "namespace_id": "1004",
           "simple": {
             "limit": 60,
             "period": 60,

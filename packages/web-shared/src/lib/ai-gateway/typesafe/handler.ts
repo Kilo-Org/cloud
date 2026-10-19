@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
@@ -102,7 +103,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
     await getBalanceAndOrgSettings(organizationId, user);
-  if (balance <= 0) {
+  if (!canSpendPaidUsage(balance)) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
   }
 

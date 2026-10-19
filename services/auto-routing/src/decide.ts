@@ -6,6 +6,8 @@ import {
   taxonomyRouteKey,
   type AutoRoutingDecision,
   type AutoRoutingDecisionResponse,
+  type AutoRoutingMode,
+  type CustomRouterReference,
   type EfficientModelPool,
   type MirrorPayload,
   type NormalizedClassifierInput,
@@ -13,7 +15,15 @@ import {
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { formatError, ttlCached } from '@kilocode/worker-utils';
-import type { Handler } from 'hono';
+import type { Context, Handler } from 'hono';
+import { CustomRouterError, customRouterErrorResponse } from './caller-auth';
+import {
+  customRouterDecision,
+  customRouterOwner,
+  customRouterTarget,
+  customRouting,
+} from './custom-router-decision';
+import { findCustomRouter } from './custom-router-store';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import type { ClassifierAnalyticsStatus } from './classifier-analytics';
 import {
@@ -34,7 +44,7 @@ import {
   putCachedClassification,
   putStickyDecision,
 } from './decision-cache';
-import type { StickyDecision } from './decision-cache';
+import type { DecisionScope, StickyDecision } from './decision-cache';
 import {
   computeDecision,
   computeShadowDecision,
@@ -184,7 +194,7 @@ function classifierErrorStatus(error: unknown): `classifier_error:${string}` {
 
 // Per-request fields shared by every metrics write and log line for the
 // decision: the validated payload plus everything derived from it once.
-type DecisionTimings = {
+export type DecisionTimings = {
   settingsMs: number;
   capabilitiesMs: number | null;
   tableMs: number | null;
@@ -196,6 +206,7 @@ type DecisionTimings = {
 
 type DecisionContext = {
   payload: MirrorPayload;
+  scope: DecisionScope;
   hashes: ContentHashes;
   conversationKey: string;
   // One-way hash of the user id: anonymous ids embed the client IP, so logs
@@ -342,6 +353,7 @@ function recordDecision(
       reqSeq: ctx.reqSeq,
       colo: ctx.colo,
       router: ctx.payload.router ?? DEFAULT_AUTO_ROUTER,
+      scope: ctx.scope,
       classifierDurationMs: Math.round(durationMs),
       classifierCostCredits: summary.cost,
       messageCount: ctx.payload.input.messageCount,
@@ -378,25 +390,90 @@ function recordDecision(
   );
 }
 
-export const decideHandler: Handler<HonoEnv> = async c => {
+export type RoutingPrerequisites = {
+  routingMode: AutoRoutingMode;
+  capabilities: ModelCapabilitiesMap;
+  routingTable: RoutingTable | null;
+  shadowRoutingTable: RoutingTable | null;
+  // Owner pools and custom routers fail closed on candidates without an active capability row.
+  customTable: boolean;
+};
+
+export type DecisionTarget = {
+  scope: DecisionScope;
+  // Billed as the classifier usage's requested model.
+  requestedModel: string;
+  deniedModelIds: ReadonlySet<string>;
+  loadRouting: (timings: DecisionTimings) => Promise<RoutingPrerequisites>;
+};
+
+export type DecisionRun = {
+  response: AutoRoutingDecisionResponse;
+  routingTable: RoutingTable | null;
+};
+
+function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTarget {
+  const router = payload.router ?? DEFAULT_AUTO_ROUTER;
+  return {
+    scope: router,
+    requestedModel: payload.input.requestedModel,
+    deniedModelIds: new Set(payload.routingPolicy?.deniedModelIds ?? []),
+    loadRouting: async timings => {
+      const settingsStartedAt = performance.now();
+      const effectiveSettings = await getEffectiveAutoRoutingSettings(c.env, {
+        userId: payload.userId,
+        organizationId: payload.organizationId,
+      });
+      timings.settingsMs = performance.now() - settingsStartedAt;
+      const configuredPool = router === 'efficient' ? effectiveSettings.pool : null;
+
+      const tableStartedAt = performance.now();
+      const [routingTable, shadowRoutingTable] = await Promise.all([
+        configuredPool === null
+          ? getRoutingTable(c.env, router)
+          : loadCustomRoutingTable(c.env, configuredPool),
+        router === 'efficient' ? getShadowRoutingTable(c.env) : null,
+      ]);
+      timings.tableMs = performance.now() - tableStartedAt;
+      let capabilities: ModelCapabilitiesMap = new Map();
+      if (payload.constraints !== undefined || configuredPool !== null) {
+        const capabilitiesStartedAt = performance.now();
+        capabilities = await getModelCapabilities(c.env, {
+          router,
+          waitUntil: promise => c.executionCtx.waitUntil(promise),
+          ...(configuredPool !== null
+            ? {
+                additionalModelIds: [
+                  ...new Set(
+                    Object.values(routingTable?.routes ?? {}).flatMap(candidates =>
+                      candidates.map(candidate => candidate.model)
+                    )
+                  ),
+                ],
+              }
+            : {}),
+        });
+        timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
+      }
+      return {
+        routingMode: effectiveSettings.mode,
+        capabilities,
+        routingTable,
+        shadowRoutingTable,
+        customTable: configuredPool !== null,
+      };
+    },
+  };
+}
+
+export async function runDecision(
+  c: Context<HonoEnv>,
+  payload: MirrorPayload,
+  target: DecisionTarget
+): Promise<DecisionRun> {
   const generation = Date.now();
   const usageCreatedAt = new Date(generation).toISOString();
-  let rawBody: unknown;
-  try {
-    rawBody = await c.req.json();
-  } catch {
-    writeClassifierMetricsDataPoint(c.env, { status: 'invalid_json' });
-    return c.json({ error: 'Invalid JSON body' }, 400);
-  }
-
-  const parsed = MirrorPayloadSchema.safeParse(rawBody);
-  if (!parsed.success) {
-    writeClassifierMetricsDataPoint(c.env, { status: 'invalid_envelope' });
-    return c.json({ error: 'Invalid classifier payload' }, 400);
-  }
-
-  const payload = parsed.data;
-  const router = payload.router ?? DEFAULT_AUTO_ROUTER;
+  const { scope, deniedModelIds } = target;
   const startedAt = performance.now();
   const timings: DecisionTimings = {
     settingsMs: 0,
@@ -407,62 +484,19 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     classifierMs: null,
     totalMs: 0,
   };
-  const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
   const hasConstraints = payload.constraints !== undefined;
   const constraints: RoutingConstraints | undefined = payload.constraints;
 
-  const routingPrerequisites = (async () => {
-    const settingsStartedAt = performance.now();
-    const effectiveSettings = await getEffectiveAutoRoutingSettings(c.env, {
-      userId: payload.userId,
-      organizationId: payload.organizationId,
-    });
-    timings.settingsMs = performance.now() - settingsStartedAt;
-    const configuredPool = router === 'efficient' ? effectiveSettings.pool : null;
-
-    const tableStartedAt = performance.now();
-    const [routingTable, shadowRoutingTable] = await Promise.all([
-      configuredPool === null
-        ? getRoutingTable(c.env, router)
-        : loadCustomRoutingTable(c.env, configuredPool),
-      router === 'efficient' ? getShadowRoutingTable(c.env) : null,
-    ]);
-    timings.tableMs = performance.now() - tableStartedAt;
-    let capabilities: ModelCapabilitiesMap = new Map();
-    if (hasConstraints || configuredPool !== null) {
-      const capabilitiesStartedAt = performance.now();
-      capabilities = await getModelCapabilities(c.env, {
-        router,
-        waitUntil: promise => c.executionCtx.waitUntil(promise),
-        ...(configuredPool !== null
-          ? {
-              additionalModelIds: [
-                ...new Set(
-                  Object.values(routingTable?.routes ?? {}).flatMap(candidates =>
-                    candidates.map(candidate => candidate.model)
-                  )
-                ),
-              ],
-            }
-          : {}),
-      });
-      timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
-    }
-    return {
-      configuredPool,
-      routingMode: effectiveSettings.mode,
-      capabilities,
-      routingTable,
-      shadowRoutingTable,
-    };
-  })();
+  const routingPrerequisites = target.loadRouting(timings);
   const classifyAndBill = async (
     ctx: DecisionContext,
     classifierModel: string
   ): Promise<ClassifierRunResult> => {
     const identity: ClassifierUsageIdentity = {
+      scope,
       conversationKey: ctx.conversationKey,
       usageId: crypto.randomUUID(),
+      requestedModel: target.requestedModel,
     };
     try {
       let classifier: ClassifierRunResult;
@@ -526,6 +560,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     timings.prepMs = performance.now() - prepStartedAt;
     const ctx: DecisionContext = {
       payload,
+      scope,
       hashes,
       conversationKey: deriveConversationKey(payload, hashes),
       userIdHash,
@@ -547,7 +582,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     };
     const speculative: ClassificationRun | null =
       (payload.input.messageCount === null || payload.input.messageCount <= 2) &&
-      !getHotCachedClassification(hashes.exact, classifierModel, router)
+      !getHotCachedClassification(hashes.exact, classifierModel, scope)
         ? { promise: runClassifier(), outcome: null }
         : null;
     if (speculative) {
@@ -563,7 +598,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       ctx.conversationKey,
       hashes.exact,
       classifierModel,
-      router
+      scope
     );
     timings.cacheReadMs = performance.now() - cacheReadStartedAt;
     if (cached) {
@@ -588,9 +623,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             preserveIncumbentVariant: true,
             constraints,
             contextTokens: payload.constraints?.promptTokensEstimate,
-            capabilityMap:
-              hasConstraints || routing.configuredPool !== null ? routing.capabilities : undefined,
-            failClosedOnInactive: routing.configuredPool !== null,
+            capabilityMap: hasConstraints || routing.customTable ? routing.capabilities : undefined,
+            failClosedOnInactive: routing.customTable,
           }
         );
         if (
@@ -610,7 +644,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const outcome = await (speculative?.promise ?? runClassifier());
     return { ctx, sticky, speculative, outcome };
   })();
-  // Keep an in-flight paid call alive if the gateway disconnects before its response.
+  // Keep an in-flight paid call alive if the caller disconnects before its response.
   c.executionCtx.waitUntil(
     preparedClassification.then(
       () => undefined,
@@ -619,14 +653,14 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   );
 
   const [routing, prepared] = await Promise.all([routingPrerequisites, preparedClassification]);
-  const { configuredPool, routingMode, capabilities, routingTable, shadowRoutingTable } = routing;
+  const { routingMode, capabilities, routingTable, shadowRoutingTable, customTable } = routing;
   const { ctx, sticky, speculative, outcome } = prepared;
   const incumbent = stickyToIncumbent(sticky);
   const decisionOptions = {
     constraints: payload.constraints,
     contextTokens: payload.constraints?.promptTokensEstimate,
-    capabilityMap: hasConstraints || configuredPool !== null ? capabilities : undefined,
-    failClosedOnInactive: configuredPool !== null,
+    capabilityMap: hasConstraints || customTable ? capabilities : undefined,
+    failClosedOnInactive: customTable,
   };
   if (outcome.kind === 'sticky_immediate') {
     const responseDurationMs = performance.now() - startedAt;
@@ -659,7 +693,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
               ctx.hashes.exact,
               classifier.classifierModel,
               classifier.classification,
-              router
+              scope
             ),
             decision
               ? putStickyDecision(
@@ -669,7 +703,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
                   decisionVariant(decision),
                   taxonomyRouteKey(classifier.classification),
                   generation,
-                  router
+                  scope
                 )
               : Promise.resolve(),
           ]);
@@ -723,7 +757,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         }
       })()
     );
-    return c.json({ cost: 0, decision: outcome.decision, classifierResult: null });
+    return {
+      response: { cost: 0, decision: outcome.decision, classifierResult: null },
+      routingTable,
+    };
   }
   if (outcome.kind === 'cache_hit') {
     const cached = outcome.classification;
@@ -740,7 +777,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           decisionVariant(decision),
           taxonomyRouteKey(cached),
           generation,
-          router
+          scope
         )
       );
     }
@@ -790,7 +827,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         shadow
       );
     }
-    return c.json(decisionResponse(cached, payload.input, decision));
+    return { response: decisionResponse(cached, payload.input, decision), routingTable };
   }
 
   try {
@@ -803,7 +840,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         ctx.hashes.exact,
         classifier.classifierModel,
         classifier.classification,
-        router
+        scope
       )
     );
     const decision = computeDecision(
@@ -823,7 +860,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           decisionVariant(decision),
           taxonomyRouteKey(classifier.classification),
           generation,
-          router
+          scope
         )
       );
     }
@@ -850,7 +887,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             { ...decisionOptions, confidence: classifier.classification.confidence }
           )
     );
-    return c.json(decisionResponse(classifier.classification, payload.input, decision));
+    return {
+      response: decisionResponse(classifier.classification, payload.input, decision),
+      routingTable,
+    };
   } catch (error) {
     recordDecision(
       c.env,
@@ -862,6 +902,52 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       sticky,
       speculative ? 'speculative' : 'sync'
     );
-    return c.json(emptyDecisionResponse());
+    return { response: emptyDecisionResponse(), routingTable };
   }
+}
+
+async function decideCustomRouter(
+  c: Context<HonoEnv>,
+  payload: MirrorPayload,
+  reference: CustomRouterReference
+): Promise<Response> {
+  try {
+    const owner = customRouterOwner(reference, payload);
+    const router = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
+    if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
+    const routing = customRouting(
+      router,
+      payload.clientEntries ?? [],
+      new Set(payload.routingPolicy?.deniedModelIds ?? [])
+    );
+    const run = await runDecision(
+      c,
+      payload,
+      customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
+    );
+    return c.json({ ...run.response, decision: customRouterDecision(routing, run) });
+  } catch (error) {
+    if (error instanceof CustomRouterError) return customRouterErrorResponse(error);
+    throw error;
+  }
+}
+
+export const decideHandler: Handler<HonoEnv> = async c => {
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    writeClassifierMetricsDataPoint(c.env, { status: 'invalid_json' });
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const parsed = MirrorPayloadSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    writeClassifierMetricsDataPoint(c.env, { status: 'invalid_envelope' });
+    return c.json({ error: 'Invalid classifier payload' }, 400);
+  }
+  const payload = parsed.data;
+  if (payload.customRouter) return decideCustomRouter(c, payload, payload.customRouter);
+  const { response } = await runDecision(c, payload, platformTarget(c, payload));
+  return c.json(response);
 };

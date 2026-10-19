@@ -1955,8 +1955,10 @@ describe('auto routing worker', () => {
       const expected = buildClassifierUsage(
         mirrorPayload({ input }),
         {
+          scope: 'efficient',
           conversationKey: 'user:user-1:task:task-123',
           usageId: usage.core.id,
+          requestedModel: input.requestedModel,
         },
         cost,
         new Date(generation).toISOString()

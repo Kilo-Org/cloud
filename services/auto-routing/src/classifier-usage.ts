@@ -1,13 +1,16 @@
-import { DEFAULT_AUTO_ROUTER, type MirrorPayload } from '@kilocode/auto-routing-contracts';
+import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import { ZodError } from 'zod';
+import type { DecisionScope } from './decision-cache';
 
 export type ClassifierUsageIdentity = {
+  scope: DecisionScope;
   conversationKey: string;
   usageId: string;
   prepaidReservationId?: string;
+  requestedModel: string;
 };
 
 type ClassifierUsageEnv = Pick<
@@ -38,7 +41,7 @@ export function buildClassifierUsage(
       created_at: createdAt,
       provider: 'openrouter',
       model: 'auto-routing/classifier',
-      requested_model: clean(payload.input.requestedModel.toLowerCase()),
+      requested_model: clean(identity.requestedModel.toLowerCase()),
       cache_discount: null,
       has_error: false,
       abuse_classification: 0,
@@ -83,7 +86,7 @@ export function buildClassifierUsage(
       feature: null,
       session_id: clean(payload.sessionId),
       mode: clean(payload.mode),
-      auto_model: clean(payload.input.requestedModel.toLowerCase()),
+      auto_model: clean(identity.requestedModel.toLowerCase()),
       reasoning_setting: null,
       market_cost: Math.round(costUsd * 1_000_000),
       is_free: false,
@@ -135,9 +138,7 @@ export async function recordClassifierUsage(
   await withDORetry(
     () =>
       env.AUTO_ROUTING_DECISION_CACHE.get(
-        env.AUTO_ROUTING_DECISION_CACHE.idFromName(
-          `${payload.router ?? DEFAULT_AUTO_ROUTER}:${identity.conversationKey}`
-        )
+        env.AUTO_ROUTING_DECISION_CACHE.idFromName(`${identity.scope}:${identity.conversationKey}`)
       ),
     stub => stub.recordClassifierUsage(usage),
     'recordClassifierUsage'

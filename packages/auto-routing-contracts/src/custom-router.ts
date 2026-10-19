@@ -680,3 +680,17 @@ export const InternalClientEvalResultRequestSchema = ClientEvalResultUploadSchem
   }
 });
 export type InternalClientEvalResultRequest = z.infer<typeof InternalClientEvalResultRequestSchema>;
+
+export const AUTO_ROUTING_DENIED_MODELS_PATH = '/api/v1/internal/auto-routing/denied-models';
+
+export const AutoRoutingDeniedModelsRequestSchema = z.object({
+  userId: z.string().trim().min(1),
+  organizationId: z.uuid(),
+  modelIds: z.array(ModelIdSchema).max(MAX_CUSTOM_ROUTER_ENTRIES),
+});
+export type AutoRoutingDeniedModelsRequest = z.infer<typeof AutoRoutingDeniedModelsRequestSchema>;
+
+export const AutoRoutingDeniedModelsResponseSchema = z.object({
+  deniedModelIds: z.array(z.string()),
+});
+export type AutoRoutingDeniedModelsResponse = z.infer<typeof AutoRoutingDeniedModelsResponseSchema>;

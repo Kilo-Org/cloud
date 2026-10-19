@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -225,7 +226,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     readDb
   );
 
-  if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

@@ -7,14 +7,12 @@ import type {
 import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   organization_user_limits,
-  organization_user_usage,
   organizations,
   organization_memberships,
   microdollar_usage,
   sharedCliSessions,
   cloud_agent_code_reviews,
   kilocode_users,
-  inference_reservations,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -37,6 +35,11 @@ import {
   type InferenceReservationTransaction,
   type InferenceSettlementPayer,
 } from '@kilocode/db/inference-reservations';
+import {
+  accountBalanceMicrodollars,
+  findOrganizationMemberBalanceRow,
+  organizationMemberBalance,
+} from '@kilocode/worker-utils/account-access';
 
 /**
  * The paying account's row as the balance check read it: the user for a personal request, the
@@ -98,65 +101,9 @@ export async function getBalanceForOrganizationUser(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
   );
 
-  const result = await fromDb
-    .select({
-      microdollar_limit: organization_user_limits.microdollar_limit,
-      microdollar_usage: organization_user_usage.microdollar_usage,
-      total_microdollars_acquired: organizations.total_microdollars_acquired,
-      microdollars_used: organizations.microdollars_used,
-      inference_microdollars_held: organizations.inference_microdollars_held,
-      member_inference_microdollars_held: sql`
-        CASE
-          WHEN NOT ${organizations.require_seats} AND ${organization_user_limits.microdollar_limit} IS NOT NULL
-          THEN (
-            SELECT COALESCE(SUM(${inference_reservations.amount_microdollars}), 0)
-            FROM ${inference_reservations}
-            WHERE ${inference_reservations.organization_id} = ${organizations.id}
-              AND ${inference_reservations.kilo_user_id} = ${userId}
-              AND ${inference_reservations.status} = 'reserved'
-          )
-          ELSE 0
-        END
-      `.mapWith(Number),
-      settings: organizations.settings,
-      require_seats: organizations.require_seats,
-      plan: organizations.plan,
-      auto_top_up_enabled: organizations.auto_top_up_enabled,
-      next_credit_expiration_at: organizations.next_credit_expiration_at,
-      created_at: organizations.created_at,
-    })
-    .from(organizations)
-    .innerJoin(
-      organization_memberships,
-      eq(organization_memberships.organization_id, organizations.id)
-    )
-    .leftJoin(
-      organization_user_limits,
-      and(
-        eq(organization_user_limits.organization_id, organizations.id),
-        eq(organization_user_limits.kilo_user_id, userId),
-        eq(organization_user_limits.limit_type, limitType)
-      )
-    )
-    .leftJoin(
-      organization_user_usage,
-      and(
-        eq(organization_user_usage.organization_id, organizations.id),
-        eq(organization_user_usage.kilo_user_id, userId),
-        eq(organization_user_usage.limit_type, limitType),
-        eq(organization_user_usage.usage_date, sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`)
-      )
-    )
-    .where(
-      and(
-        eq(organizations.id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId),
-        not(eq(organization_memberships.role, 'billing_manager'))
-      )
-    )
-    .limit(1);
+  const row = await findOrganizationMemberBalanceRow(fromDb, organizationId, userId, limitType);
 
-  if (result.length === 0) {
+  if (!row) {
     const endTime = performance.now();
     const duration = endTime - startTime;
     logExceptInTest(
@@ -169,7 +116,6 @@ export async function getBalanceForOrganizationUser(
   const {
     microdollar_limit,
     microdollar_usage,
-    total_microdollars_acquired: initial_total_microdollars_acquired,
     microdollars_used,
     inference_microdollars_held,
     member_inference_microdollars_held,
@@ -179,11 +125,9 @@ export async function getBalanceForOrganizationUser(
     auto_top_up_enabled,
     next_credit_expiration_at,
     created_at,
-  } = result[0];
+  } = row;
 
-  let total_microdollars_acquired = initial_total_microdollars_acquired;
-  let organization_balance =
-    total_microdollars_acquired - microdollars_used - inference_microdollars_held;
+  let total_microdollars_acquired = row.total_microdollars_acquired;
 
   // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
   const expireBefore = subHours(new Date(), Math.random());
@@ -202,8 +146,6 @@ export async function getBalanceForOrganizationUser(
     );
     if (expiryResult) {
       total_microdollars_acquired = expiryResult.total_microdollars_acquired;
-      organization_balance =
-        total_microdollars_acquired - microdollars_used - inference_microdollars_held;
     }
   }
 
@@ -223,61 +165,32 @@ export async function getBalanceForOrganizationUser(
     totalMicrodollarsAcquired: total_microdollars_acquired,
   };
 
-  // If organization requires seats, ignore any user limits and return full organization balance
-  if (require_seats) {
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    logExceptInTest(
-      `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (require_seats: ignoring limits)`
-    );
+  const organization_balance = accountBalanceMicrodollars({
+    total_microdollars_acquired,
+    microdollars_used,
+    inference_microdollars_held,
+  });
+  const { balanceMicrodollars, limitedByUserAllowance } = organizationMemberBalance({
+    ...row,
+    total_microdollars_acquired,
+  });
 
-    return {
-      balance: fromMicrodollars(organization_balance),
-      settings,
-      plan,
-      balanceLimitedByUserAllowance: false,
-      payer,
-    };
-  }
-
-  if (microdollar_limit == null) {
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    logExceptInTest(
-      `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (no limits)`
-    );
-
-    return {
-      balance: fromMicrodollars(organization_balance),
-      settings,
-      plan,
-      balanceLimitedByUserAllowance: false,
-      payer,
-    };
-  }
-
-  const usageAmount = microdollar_usage || 0;
-  const remainingAllowance = microdollar_limit - usageAmount - member_inference_microdollars_held;
-
-  // Cap the remaining allowance at the organization's actual balance
-  // This ensures a user's balance cannot exceed what the organization has available
-  const cappedBalance = Math.min(remainingAllowance, organization_balance);
-
-  // Return capped balance (can be negative if over limit or org has negative balance)
   const endTime = performance.now();
   const duration = endTime - startTime;
+  const detail = require_seats
+    ? 'require_seats: ignoring limits'
+    : microdollar_limit == null
+      ? 'no limits'
+      : `allowance: ${fromMicrodollars(microdollar_limit - (microdollar_usage ?? 0) - member_inference_microdollars_held)}, org balance: ${fromMicrodollars(organization_balance)}`;
   logExceptInTest(
-    `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(cappedBalance)} (allowance: ${fromMicrodollars(remainingAllowance)}, org balance: ${fromMicrodollars(organization_balance)})`
+    `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(balanceMicrodollars)} (${detail})`
   );
 
   return {
-    balance: fromMicrodollars(cappedBalance),
+    balance: fromMicrodollars(balanceMicrodollars),
     settings,
     plan,
-    // An organization top-up raises only the organization balance, so it clears
-    // the block only while the member still has allowance left. An exhausted
-    // allowance (remainingAllowance <= 0) is a per-user limit no top-up fixes.
-    balanceLimitedByUserAllowance: remainingAllowance <= 0,
+    balanceLimitedByUserAllowance: limitedByUserAllowance,
     payer,
   };
 }

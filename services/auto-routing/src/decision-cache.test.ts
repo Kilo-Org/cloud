@@ -41,9 +41,11 @@ function classifierUsage() {
       },
     }),
     {
+      scope: 'efficient',
       conversationKey: 'conversation-1',
       usageId,
       prepaidReservationId: usageId,
+      requestedModel: 'kilo-auto/efficient',
     },
     0.000013,
     new Date().toISOString()

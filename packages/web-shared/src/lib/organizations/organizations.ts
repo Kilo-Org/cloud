@@ -820,23 +820,6 @@ export async function acceptOrganizationInvite(
   }
 }
 
-/**
- * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
- */
-export async function isOrganizationMember(
-  organizationId: Organization['id'],
-  userId: User['id'],
-  fromDb: typeof db = db
-) {
-  const result = await fromDb.query.organization_memberships.findFirst({
-    where: and(
-      eq(organization_memberships.organization_id, organizationId),
-      eq(organization_memberships.kilo_user_id, userId)
-    ),
-  });
-  return !!result;
-}
-
 export function getAcceptInviteUrl(inviteToken: OrganizationInvitation['token']): string {
   const acceptInviteUrl = `${APP_URL}/users/accept-invite/${inviteToken}`;
   return acceptInviteUrl;

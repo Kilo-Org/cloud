@@ -491,6 +491,13 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `STAGING_AUTH_TOKEN` - Auth token for the staging deployment dispatcher env. `[SECRET]`
 - `PROD_AUTH_TOKEN` - Auth token for the production deployment dispatcher env. `[SECRET]`
 
+### Auto Routing Worker
+
+- `KILO_AI_GATEWAY_BASE_URL` - Origin of the AI gateway that `services/auto-routing` asks which custom router gateway entries the organization model policy denies (`/api/v1/internal/auto-routing/denied-models`). A `wrangler.jsonc` var for production; `pnpm dev:env` writes the local gateway port to `.dev.vars`. [SERVER]
+- `AUTO_ROUTING_DECISION_SECRET` - HMAC secret that signs custom router decision IDs; the AI gateway verifies them with the same value. Production Secrets Store name `AUTO_ROUTING_DECISION_SECRET_PROD`; locally `pnpm dev:env` seeds it from `.env.local`. `[SECRET]`
+- `AUTO_ROUTING_UPSTASH_REDIS_REST_URL` - Upstash REST URL of the web app's Redis, read by `services/auto-routing` for the blocked email domains. Production Secrets Store name `AUTO_ROUTING_UPSTASH_REDIS_REST_URL_PROD`; locally the dev `redis-http` container. `[SECRET]`
+- `AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN` - Read-only Upstash REST token for that database. Production Secrets Store name `AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN_PROD`; locally `example_token`. `[SECRET]`
+
 ### Other Services
 
 - `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; used by `services/cloud-agent-next/scripts/docker-privileged-proxy.mjs`. [SERVER]

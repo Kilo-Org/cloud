@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
@@ -797,7 +798,7 @@ export async function handleLlmProxyRequest(
     } = await accessCheckResolver.get();
 
     if (
-      balance <= 0 &&
+      !canSpendPaidUsage(balance) &&
       !isFreeModel(effectiveModelIdLowerCased) &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck

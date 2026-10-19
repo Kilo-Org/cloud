@@ -30,8 +30,10 @@ const payload: MirrorPayload = {
   },
 };
 const identity: ClassifierUsageIdentity = {
+  scope: 'efficient',
   conversationKey: 'conversation-1',
   usageId: '00000000-0000-4000-8000-000000000001',
+  requestedModel: 'kilo-auto/efficient',
 };
 const createdAt = '2026-01-01T00:00:00.000Z';
 const costUsd = 0.000013;
@@ -81,6 +83,18 @@ describe('classifier usage identity', () => {
     );
     expect(first.core.id).not.toBe(other.core.id);
     expect(other.metadata.id).toBe(other.core.id);
+  });
+
+  it('bills a custom router call under the custom router model ID', () => {
+    const usage = buildClassifierUsage(
+      payload,
+      { ...identity, scope: 'custom:router-1', requestedModel: 'kilo-auto/custom/org/team' },
+      costUsd,
+      createdAt
+    );
+    expect(usage.core.id).toBe(identity.usageId);
+    expect(usage.core.requested_model).toBe('kilo-auto/custom/org/team');
+    expect(usage.metadata.auto_model).toBe('kilo-auto/custom/org/team');
   });
 
   it('matches classifier billing fields without persisting prompt text or lifecycle identity', () => {
@@ -165,7 +179,7 @@ describe('classifier usage delivery', () => {
     expect(idFromName).toHaveBeenCalledExactlyOnceWith(`efficient:${identity.conversationKey}`);
   });
 
-  it('delivers frontier usage through its router-scoped conversation object', async () => {
+  it('delivers usage through its scope-keyed conversation object', async () => {
     const record = vi.fn(async () => {});
     const idFromName = vi.fn((name: string) => name);
     const env = {
@@ -176,12 +190,14 @@ describe('classifier usage delivery', () => {
     } as unknown as Env;
     await recordClassifierUsage(
       env,
-      { ...payload, router: 'frontier' },
-      identity,
+      payload,
+      { ...identity, scope: 'custom:router-1' },
       costUsd,
       createdAt
     );
-    expect(idFromName).toHaveBeenCalledExactlyOnceWith(`frontier:${identity.conversationKey}`);
+    expect(idFromName).toHaveBeenCalledExactlyOnceWith(
+      `custom:router-1:${identity.conversationKey}`
+    );
     expect(record).toHaveBeenCalledTimes(1);
   });
 

@@ -3467,7 +3467,7 @@
     },
     "localModels": {
       "title": "Modeller på enheten",
-      "help": "Modeller på enheten körs på den här telefonen. Dina frågor och svar stannar på enheten.",
+      "help": "Modeller på enheten körs på den här telefonen. Dina prompter och svar stannar på enheten.",
       "systemPurpose": "Modellen som är inbyggd i enhetens system. Den körs på enheten.",
       "apple": "Apple Intelligence (på enheten)",
       "checking": "Kontrollerar tillgänglighet…",

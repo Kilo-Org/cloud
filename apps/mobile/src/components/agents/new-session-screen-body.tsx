@@ -245,9 +245,7 @@ export function NewSessionScreenBody() {
         {t('common.organization')}
       </Text>
       {isCloneEntry ? (
-        <ContextControl
-          scope={{ organizationId: organizationId ?? null, isResolved: true }}
-        />
+        <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
       ) : (
         <ContextControl onSelectionChange={handleOrganizationSwitch} />
       )}

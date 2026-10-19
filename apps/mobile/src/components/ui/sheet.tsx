@@ -46,6 +46,10 @@ type SheetProps = {
  *
  * Android Back, a swipe down and a backdrop tap all dismiss. The native sheet
  * cannot separate those three, and every caller here dismisses on all of them.
+ * Back is handled natively inside the sheet's dialog window (see the
+ * `@expo/ui` patch): it dismisses from window focus onward, including during
+ * the opening animation; the first ~100 ms before the window takes focus are a
+ * timing race on fast devices.
  */
 export function Sheet({
   visible,

@@ -14,6 +14,49 @@ import {
   verifyAppleAssertion,
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+
+// ── Expected-condition telemetry ───────────────────────────────────────────
+
+/**
+ * Interval-aggregated counter for expected, traffic-scaled admission
+ * conditions (legacy clients, malformed shapes). Emits one structured log
+ * line per 60 s interval carrying the running count instead of one event per
+ * request, so rollout traffic cannot flood telemetry.
+ */
+const AGGREGATE_INTERVAL_MS = 60_000;
+const admissionCounters = new Map<string, number>();
+let admissionCountersWindowStart = 0;
+
+function countAdmissionCondition(metric: string): void {
+  const now = Date.now();
+  if (now - admissionCountersWindowStart >= AGGREGATE_INTERVAL_MS) {
+    flushAdmissionCounters(now);
+    admissionCountersWindowStart = now;
+  }
+  admissionCounters.set(metric, (admissionCounters.get(metric) ?? 0) + 1);
+}
+
+function flushAdmissionCounters(now: number): void {
+  for (const [metric, count] of admissionCounters) {
+    warnExceptInTest(
+      JSON.stringify({
+        event: 'native_admission_aggregate',
+        metric,
+        count,
+        intervalMs: AGGREGATE_INTERVAL_MS,
+        at: new Date(now).toISOString(),
+      })
+    );
+  }
+  admissionCounters.clear();
+}
+
+/** Exported for tests: flush any pending counters and reset the interval. */
+export function resetAdmissionCountersForTests(): void {
+  admissionCounters.clear();
+  admissionCountersWindowStart = 0;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -157,7 +200,7 @@ export function checkNativeAdmission(body: Record<string, unknown>): {
 
   if (!hasAdmission) {
     if (mode === 'enforce') {
-      captureMessage('native_admission_legacy_count: 1');
+      countAdmissionCondition('native_admission_legacy_count');
     }
     return { admission: { ok: true }, verifyAsync: false };
   }
@@ -166,7 +209,7 @@ export function checkNativeAdmission(body: Record<string, unknown>): {
   const admission = validateAdmissionPayload(body['admission']);
   if (!admission) {
     if (mode === 'report') {
-      captureMessage('native_admission_invalid_shape');
+      countAdmissionCondition('native_admission_invalid_shape');
       return { admission: { ok: true }, verifyAsync: false };
     }
     return { admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' }, verifyAsync: false };

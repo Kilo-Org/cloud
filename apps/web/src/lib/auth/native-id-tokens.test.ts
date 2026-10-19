@@ -385,7 +385,11 @@ describe('verifyNativeAppleIdToken', () => {
       expect(mockIsReleaseToggleEnabled).not.toHaveBeenCalled();
     } finally {
       Object.assign(process.env, { NODE_ENV: previousNodeEnv });
-      Object.assign(process.env, { VERCEL_ENV: previousVercelEnv });
+      if (previousVercelEnv === undefined) {
+        delete process.env.VERCEL_ENV;
+      } else {
+        process.env.VERCEL_ENV = previousVercelEnv;
+      }
       delete process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL;
     }
   });
@@ -405,7 +409,11 @@ describe('verifyNativeAppleIdToken', () => {
       await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
     } finally {
       Object.assign(process.env, { NODE_ENV: previousNodeEnv });
-      Object.assign(process.env, { VERCEL_ENV: previousVercelEnv });
+      if (previousVercelEnv === undefined) {
+        delete process.env.VERCEL_ENV;
+      } else {
+        process.env.VERCEL_ENV = previousVercelEnv;
+      }
       delete process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL;
     }
   });

@@ -65,6 +65,10 @@ export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
 export const USAGE_SHADOW_PUBLISH_ENABLED =
   getEnvVariable('USAGE_SHADOW_PUBLISH_ENABLED') === 'true';
+export const USAGE_QUEUE_ONLY_ENABLED =
+  getEnvVariable('USAGE_QUEUE_ONLY_ENABLED') === 'true' &&
+  getEnvVariable('VERCEL_TARGET_ENV') === 'staging' &&
+  getEnvVariable('VERCEL_ENV') !== 'production';
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.

@@ -661,7 +661,7 @@
       "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile.",
       "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
       "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
-      "bitbucketOrgOnlyDescription": "Pumili ng organisasyon sa iyong profile para suriin ang mga pull request nito sa Bitbucket.",
+      "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
       "contextLine": "Para sa {{organization}}"
     },
     "screen": {

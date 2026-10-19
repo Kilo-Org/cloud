@@ -661,7 +661,7 @@
       "description": "Ampifandraiso ny kaontinao GitHub mba handinihana fangatahana fampiraisana amin'ny finday.",
       "gitlabDescription": "Ampifandraiso ny kaonty GitLab-nao mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketDescription": "Ampifandraiso amin'ity fikambanana ity ny Bitbucket mba hijerena ny fangatahana fampiraisana amin'ny finday.",
-      "bitbucketOrgOnlyDescription": "Safidio fikambanana ao amin'ny mombamomba-nao mba hijerena ny fangatahana fampiraisana Bitbucket-ny.",
+      "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
       "contextLine": "Ho an'ny {{organization}}"
     },
     "screen": {

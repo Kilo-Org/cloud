@@ -685,7 +685,7 @@
       "description": "Poveži svoj račun GitHub, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "gitlabDescription": "Poveži svoj račun GitLab, da lahko pregleduješ merge requeste na mobilni napravi.",
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
-      "bitbucketOrgOnlyDescription": "V profilu izberi organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucket.",
+      "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
       "contextLine": "Za {{organization}}"
     },
     "screen": {

@@ -2552,7 +2552,7 @@
       "description": "Підключіть обліковий запис GitHub, щоб перевіряти запити на злиття в мобільному застосунку.",
       "gitlabDescription": "Підключіть обліковий запис GitLab, щоб переглядати merge-запити з мобільного.",
       "bitbucketDescription": "Підключіть Bitbucket до цієї організації, щоб переглядати запити на злиття з мобільного.",
-      "bitbucketOrgOnlyDescription": "Виберіть організацію у профілі, щоб переглядати її запити на злиття Bitbucket.",
+      "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
       "contextLine": "Для {{organization}}"
     },
     "connectionExpired": "Термін дії підключення до GitHub минув.",

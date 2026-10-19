@@ -2552,7 +2552,7 @@
       "description": "Połącz konto GitHub, aby przeglądać PR na telefonie.",
       "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
-      "bitbucketOrgOnlyDescription": "Wybierz organizację w swoim profilu, aby przeglądać jej PR-y na Bitbucket.",
+      "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
       "contextLine": "Dla {{organization}}"
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",

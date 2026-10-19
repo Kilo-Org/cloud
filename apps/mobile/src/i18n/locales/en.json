@@ -661,7 +661,7 @@
       "description": "Connect your GitHub account to review pull requests on mobile.",
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
-      "bitbucketOrgOnlyDescription": "Select an organization in your profile to review its Bitbucket pull requests.",
+      "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
       "contextLine": "For {{organization}}"
     },
     "screen": {

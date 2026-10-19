@@ -104,18 +104,20 @@ function emitForeground() {
 
 /** Begins a launch that stays open until the test settles it. */
 function beginPendingLaunch() {
-  const open =
-    platform.OS === 'android' ? WebBrowser.openBrowserAsync : WebBrowser.openAuthSessionAsync;
-  const pending = Promise.withResolvers<WebBrowser.WebBrowserResult>();
-  vi.mocked(open).mockReturnValueOnce(pending.promise as never);
+  if (platform.OS === 'android') {
+    const pending = Promise.withResolvers<WebBrowser.WebBrowserResult>();
+    vi.mocked(WebBrowser.openBrowserAsync).mockReturnValueOnce(pending.promise);
+    return {
+      settle: () => {
+        pending.resolve({ type: WebBrowser.WebBrowserResultType.OPENED });
+      },
+    };
+  }
+  const pending = Promise.withResolvers<WebBrowser.WebBrowserAuthSessionResult>();
+  vi.mocked(WebBrowser.openAuthSessionAsync).mockReturnValueOnce(pending.promise);
   return {
     settle: () => {
-      pending.resolve({
-        type:
-          platform.OS === 'android'
-            ? WebBrowser.WebBrowserResultType.OPENED
-            : WebBrowser.WebBrowserResultType.CANCEL,
-      });
+      pending.resolve({ type: WebBrowser.WebBrowserResultType.CANCEL });
     },
   };
 }
@@ -133,9 +135,11 @@ async function settleLaunch(pending: ReturnType<typeof beginPendingLaunch>) {
 }
 
 function failLaunch(error: Error) {
-  const open =
-    platform.OS === 'android' ? WebBrowser.openBrowserAsync : WebBrowser.openAuthSessionAsync;
-  vi.mocked(open).mockRejectedValueOnce(error);
+  if (platform.OS === 'android') {
+    vi.mocked(WebBrowser.openBrowserAsync).mockRejectedValueOnce(error);
+  } else {
+    vi.mocked(WebBrowser.openAuthSessionAsync).mockRejectedValueOnce(error);
+  }
 }
 
 /** Presses the gate's Connect button and lets the launch promise settle one tick. */

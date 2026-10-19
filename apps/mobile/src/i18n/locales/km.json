@@ -661,7 +661,7 @@
       "description": "ភ្ជាប់គណនី GitHub របស់អ្នក ដើម្បីពិនិត្យសំណើបញ្ចូលកូដនៅលើទូរស័ព្ទ។",
       "gitlabDescription": "ភ្ជាប់គណនី GitLab របស់អ្នកដើម្បីពិនិត្យសំណើបញ្ចូលលើទូរស័ព្ទ។",
       "bitbucketDescription": "ភ្ជាប់ Bitbucket ទៅអង្គភាពនេះដើម្បីពិនិត្យសំណើបញ្ចូលកូដលើទូរស័ព្ទ។",
-      "bitbucketOrgOnlyDescription": "ជ្រើសរើសអង្គភាពមួយក្នុងប្រវត្តិរូបរបស់អ្នកដើម្បីពិនិត្យសំណើបញ្ចូលកូដ Bitbucket របស់វា។",
+      "bitbucketOrgOnlyDescription": "ប្ដូរគណនីខាងលើទៅអង្គភាពមួយដើម្បីពិនិត្យសំណើបញ្ចូលកូដ Bitbucket របស់វា។",
       "contextLine": "សម្រាប់ {{organization}}"
     },
     "screen": {

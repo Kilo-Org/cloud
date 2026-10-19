@@ -2502,7 +2502,7 @@
       "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
       "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
       "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
-      "bitbucketOrgOnlyDescription": "在你的個人資料中選取一個組織，以審查其 Bitbucket 提取請求。",
+      "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
       "contextLine": "適用於 {{organization}}"
     },
     "connectionExpired": "GitHub 連線已過期。",

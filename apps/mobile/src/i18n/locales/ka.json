@@ -661,7 +661,7 @@
       "description": "მობილურზე შერწყმის მოთხოვნების განსახილველად დააკავშირე შენი GitHub ანგარიში.",
       "gitlabDescription": "დააკავშირეთ თქვენი GitLab ანგარიში, შერწყმის მოთხოვნების მობილურში განსახილველად.",
       "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
-      "bitbucketOrgOnlyDescription": "აირჩიეთ ორგანიზაცია თქვენს პროფილში, მისი Bitbucket PR-ების განსახილველად.",
+      "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
       "contextLine": "{{organization}}-სთვის"
     },
     "screen": {

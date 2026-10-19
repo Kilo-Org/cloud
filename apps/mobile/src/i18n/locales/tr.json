@@ -2502,7 +2502,7 @@
       "description": "Mobilde çekme isteklerini incelemek için GitHub hesabını bağla.",
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
-      "bitbucketOrgOnlyDescription": "Profilində bir kuruluş seç ve onun Bitbucket çekme isteklerini gözden geçir.",
+      "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
       "contextLine": "{{organization}} için"
     },
     "connectionExpired": "GitHub bağlantısının süresi doldu.",

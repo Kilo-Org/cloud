@@ -661,7 +661,7 @@
       "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş.",
       "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
-      "bitbucketOrgOnlyDescription": "Profilində bir təşkilat seç və onun Bitbucket birləşdirmə sorğularına baxış keçir.",
+      "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
       "contextLine": "{{organization}} üçün"
     },
     "screen": {

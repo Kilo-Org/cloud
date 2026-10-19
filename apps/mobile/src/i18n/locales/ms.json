@@ -661,7 +661,7 @@
       "description": "Sambungkan akaun GitHub anda untuk menyemak permintaan tarik pada peranti mudah alih.",
       "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
-      "bitbucketOrgOnlyDescription": "Pilih organisasi dalam profil anda untuk menyemak permintaan tarik Bitbucketnya.",
+      "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
       "contextLine": "Untuk {{organization}}"
     },
     "screen": {

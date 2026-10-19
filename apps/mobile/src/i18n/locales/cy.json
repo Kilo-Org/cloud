@@ -709,7 +709,7 @@
       "description": "Cysylltwch eich cyfrif GitHub i adolygu ceisiadau tynnu ar eich ffôn.",
       "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
       "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",
-      "bitbucketOrgOnlyDescription": "Dewiswch sefydliad yn eich proffil i adolygu ei geisiadau tynnu Bitbucket.",
+      "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
       "contextLine": "Ar gyfer {{organization}}"
     },
     "screen": {

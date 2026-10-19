@@ -661,7 +661,7 @@
       "description": "Ühenda oma GitHubi konto, et tõmbetaotlusi mobiilis üle vaadata.",
       "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
       "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
-      "bitbucketOrgOnlyDescription": "Vali oma profiilis organisatsioon, et vaadata selle Bitbucketi tõmbetaotlusi.",
+      "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsioonile, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
       "contextLine": "{{organization}} jaoks"
     },
     "screen": {

@@ -661,7 +661,7 @@
       "description": "ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ GitHub ගිණුම සම්බන්ධ කරන්න.",
       "gitlabDescription": "ජංගම දුරකථනයෙන් මර්ජ ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ GitLab ගිණුම සම්බන්ධ කරන්න.",
       "bitbucketDescription": "ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය කිරීමට Bitbucket මෙම සංවිධානයට සම්බන්ධ කරන්න.",
-      "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ පැතිකඩේ සංවිධානයක් තෝරන්න.",
+      "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඉහත ගිණුම සංවිධානයකට මාරු කරන්න.",
       "contextLine": "{{organization}} සඳහා"
     },
     "screen": {

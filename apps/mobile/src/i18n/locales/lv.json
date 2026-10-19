@@ -673,7 +673,7 @@
       "description": "Pievieno savu GitHub kontu, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
       "gitlabDescription": "Pievieno savu GitLab kontu, lai pārskatītu merge requests mobilajā ierīcē.",
       "bitbucketDescription": "Pievieno Bitbucket šai organizācijai, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
-      "bitbucketOrgOnlyDescription": "Profilā izvēlies organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
+      "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
       "contextLine": "Priekš {{organization}}"
     },
     "screen": {

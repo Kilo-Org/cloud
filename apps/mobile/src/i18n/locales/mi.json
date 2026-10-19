@@ -661,7 +661,7 @@
       "description": "Honoa tō pūkete GitHub hei arotake i ngā tono kume i tō waea pūkoro.",
       "gitlabDescription": "Honoa tō pūkete GitLab kia arotakehia ngā tono whakakotahi i te waea pūkoro.",
       "bitbucketDescription": "Honoa a Bitbucket ki tēnei whakahaere kia arotakehia ngā tono kume i te waea pūkoro.",
-      "bitbucketOrgOnlyDescription": "Kōwhiria he whakahaere i tō pūkoro kia arotakehia ōna tono kume Bitbucket.",
+      "bitbucketOrgOnlyDescription": "Whakawhiti te pūkete kei runga ake nei ki tētahi whakahaere kia arotakehia ōna tono kume Bitbucket.",
       "contextLine": "Mō {{organization}}"
     },
     "screen": {

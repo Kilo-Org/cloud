@@ -661,7 +661,7 @@
       "description": "Телефонда біріктіру сұрауларындағы кодты тексеру үшін GitHub тіркелгіңізді қосыңыз.",
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
-      "bitbucketOrgOnlyDescription": "Осы ұйымның Bitbucket тарту сұрауларын қарау үшін профиліңізден ұйымды таңдаңыз.",
+      "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
       "contextLine": "{{organization}} үшін"
     },
     "screen": {

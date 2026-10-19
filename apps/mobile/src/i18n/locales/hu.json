@@ -661,7 +661,7 @@
       "description": "Csatlakoztasd a GitHub-fiókodat a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requests kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
-      "bitbucketOrgOnlyDescription": "Válassz szervezetet a profilodban, hogy átnézd annak Bitbucket-módosítási kérelmeit.",
+      "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
       "contextLine": "{{organization}} számára"
     },
     "screen": {

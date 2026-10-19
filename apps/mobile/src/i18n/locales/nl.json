@@ -2502,7 +2502,7 @@
       "description": "Koppel je GitHub-account om PR's op je telefoon te beoordelen.",
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
-      "bitbucketOrgOnlyDescription": "Selecteer een organisatie in je profiel om de PR's van die organisatie op Bitbucket te beoordelen.",
+      "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "contextLine": "Voor {{organization}}"
     },
     "connectionExpired": "De GitHub-koppeling is verlopen.",

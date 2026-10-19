@@ -2527,7 +2527,7 @@
       "description": "Conecte sua conta do GitHub para revisar pull requests no celular.",
       "gitlabDescription": "Conecte sua conta do GitLab para revisar merge requests no celular.",
       "bitbucketDescription": "Conecte o Bitbucket a esta organização para revisar pull requests no celular.",
-      "bitbucketOrgOnlyDescription": "Selecione uma organização no seu perfil para revisar os pull requests dela no Bitbucket.",
+      "bitbucketOrgOnlyDescription": "Mude a conta acima para uma organização para revisar as pull requests dela no Bitbucket.",
       "contextLine": "Para {{organization}}"
     },
     "connectionExpired": "A conexão com o GitHub expirou.",

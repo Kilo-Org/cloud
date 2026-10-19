@@ -6,7 +6,11 @@ import '@/i18n';
 import { PrReviewContextLine } from './pr-review-context-line';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
-import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+import {
+  type RenderWithProvidersResult,
+  renderWithProviders,
+  waitFor,
+} from '@/test/render-with-providers';
 
 const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
@@ -56,10 +60,9 @@ const ChevronDown = 'ChevronDown' as ElementType;
 const ORG_A = { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' };
 const ORG_B = { organizationId: 'org-b', organizationName: 'Umbrella', role: 'member' };
 
-type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
-const mounted: Mounted[] = [];
+const mounted: RenderWithProvidersResult[] = [];
 
-async function mount(): Promise<Mounted> {
+async function mount(): Promise<RenderWithProvidersResult> {
   const result = await renderWithProviders(createElement(PrReviewContextLine), {
     wrapper: OrganizationProvider,
   });
@@ -67,11 +70,11 @@ async function mount(): Promise<Mounted> {
   return result;
 }
 
-function texts(ui: Mounted) {
+function texts(ui: RenderWithProvidersResult) {
   return ui.renderer.root.findAll(node => node.type === Text).flatMap(node => node.children);
 }
 
-function line(ui: Mounted) {
+function line(ui: RenderWithProvidersResult) {
   const nodes = ui.renderer.root.findAll(node => node.props.accessibilityHint === 'Select account');
   return nodes[0] as ReactTestInstance | undefined;
 }

@@ -685,7 +685,7 @@
       "description": "Připoj svůj účet GitHub a kontroluj PR na mobilu.",
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
-      "bitbucketOrgOnlyDescription": "Vyber organizaci ve svém profilu a kontroluj její Bitbucket PR.",
+      "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
       "contextLine": "Pro {{organization}}"
     },
     "screen": {

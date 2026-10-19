@@ -26,7 +26,7 @@ import { useTRPC } from '@/lib/trpc';
  * so `ScreenHeader` would render without a back control. The provider-neutral
  * inbox is the one exit every PR-review surface shares.
  */
-const PR_REVIEW_ENTRY_HREF = '/(app)/pr-review' as const;
+export const PR_REVIEW_ENTRY_HREF = '/(app)/pr-review' as const;
 
 /**
  * The pasted MR URL's origin, when the deep link carried one and it is worth

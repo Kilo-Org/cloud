@@ -554,6 +554,8 @@ export const clientCaseResults = sqliteTable(
     // This upload's revision from the profile's `upload_seq`, unique within the profile even
     // across same-millisecond uploads and delete-and-reinsert; the rollup guard compares it.
     revision: integer('revision').notNull().default(0),
+    // Grader usage the usage writer has not acknowledged yet; a retried upload resends it.
+    pending_grader_usage: text('pending_grader_usage'),
   },
   table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
 );

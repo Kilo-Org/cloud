@@ -770,21 +770,49 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
   return results[2]?.results ?? [];
 }
 
-/** SQL for {@link hasUnsettledChunks}; exported for the query-plan regression test. */
-export const SCHEDULER_UNSETTLED_SQL = `
-  SELECT 1 FROM scheduler_chunks AS chunk
-  WHERE chunk.run_id = ? AND chunk.status IN ('pending', 'queued', 'active')
+const UNSETTLED_CHUNK_PREDICATE = `
+  chunk.status IN ('pending', 'queued', 'active')
     AND (chunk.status = 'active' OR NOT EXISTS (
       SELECT 1 FROM run_lane_failures AS failure
       WHERE failure.run_id = chunk.run_id AND failure.model = chunk.model
         AND failure.variant = chunk.variant AND failure.rep = chunk.rep))
+`;
+
+/** SQL for {@link hasUnsettledChunks}; exported for the query-plan regression test. */
+export const SCHEDULER_UNSETTLED_SQL = `
+  SELECT 1 FROM scheduler_chunks AS chunk
+  WHERE chunk.run_id = ? AND ${UNSETTLED_CHUNK_PREDICATE}
   LIMIT 1
 `;
 
-/** Active calls retain their slots and keep runs unsettled even after their entry fails. */
+/** SQL for {@link listSettledSchedulerRuns}; exported for the query-plan regression test. */
+export const SCHEDULER_SETTLED_RUNS_SQL = `
+  SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
+    AND EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
+    AND NOT EXISTS (SELECT 1 FROM scheduler_chunks AS chunk
+      WHERE chunk.run_id = benchmark_runs.id AND ${UNSETTLED_CHUNK_PREDICATE})
+  LIMIT ?
+`;
+
+/**
+ * Whether a run still has scheduled work that could settle it: an active chunk,
+ * or a pending or queued chunk in a lane that has not dead-lettered. Active calls
+ * retain their slots and keep runs unsettled even after their entry fails. Runs
+ * without scheduler chunks (legacy whole-run work) are always settled.
+ */
 export async function hasUnsettledChunks(db: D1Database, runId: string): Promise<boolean> {
   const row = await db.prepare(SCHEDULER_UNSETTLED_SQL).bind(runId).first();
   return row !== null;
+}
+
+/**
+ * Running scheduler-initialized decider runs with no unsettled chunk left, by the
+ * same rule as {@link hasUnsettledChunks}. Dispatch finalizes these, since no chunk
+ * completion remains to do it.
+ */
+export async function listSettledSchedulerRuns(db: D1Database, limit: number): Promise<string[]> {
+  const rows = await db.prepare(SCHEDULER_SETTLED_RUNS_SQL).bind(limit).all<{ id: string }>();
+  return rows.results.map(row => row.id);
 }
 
 export async function beginPaidCase(

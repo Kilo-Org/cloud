@@ -16,6 +16,7 @@
  * The primary checkout keeps the default Compose project and the default ports,
  * so an existing local database and CI stay as they are.
  */
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getInfraBasePort, localPostgresUrl, portOffset } from './services';
@@ -139,10 +140,39 @@ export function applyAppEnv(
   return { content: result, changed, kept };
 }
 
-function writeAtomic(filePath: string, content: string): void {
-  const temp = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(temp, content);
-  fs.renameSync(temp, filePath);
+/**
+ * Replaces `filePath` with `content` through a temp file in the destination's
+ * directory. The temp file is created with mode 0o600 under an unpredictable
+ * name, so the replacement never exposes the content to other local
+ * principals. An existing destination whose mode grants nothing to group or
+ * other keeps that stricter mode; a default-mode file ends at 0o600. Refuses
+ * to write through a symlinked destination.
+ */
+export function writeSecretsFile(filePath: string, content: string): void {
+  if (fs.lstatSync(filePath, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    throw new Error(`${filePath} is a symlink; refusing to write through it`);
+  }
+  const temp = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`
+  );
+  try {
+    const fd = fs.openSync(temp, 'wx', 0o600);
+    try {
+      fs.writeFileSync(fd, content);
+      const existing = fs.statSync(filePath, { throwIfNoEntry: false });
+      fs.renameSync(temp, filePath);
+      if (existing && (existing.mode & 0o077) === 0) {
+        const current = existing.mode & 0o777;
+        if (current !== 0o600) fs.chmodSync(filePath, current);
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (err) {
+    fs.rmSync(temp, { force: true });
+    throw err;
+  }
 }
 
 function infraPorts(offset: number): Record<string, number> {
@@ -164,7 +194,7 @@ function syncAppEnv(repoRoot: string, ports: Record<string, number>): string[] {
   );
   const report: string[] = [];
   if (changed.length > 0) {
-    writeAtomic(envLocalPath, content);
+    writeSecretsFile(envLocalPath, content);
     report.push(`.env.local: updated ${changed.join(', ')}`);
   }
   if (kept.length > 0) {
@@ -198,7 +228,7 @@ function syncWebTestEnv(
   });
   const report: string[] = [];
   if (changed.length > 0) {
-    writeAtomic(testEnvPath, content);
+    writeSecretsFile(testEnvPath, content);
     report.push(`${WEB_TEST_ENV_FILE}: updated POSTGRES_URL`);
   }
   if (kept.length > 0) {
@@ -227,7 +257,7 @@ export function syncInfraEnv(repoRoot: string): string[] {
   const project = composeProjectName(repoRoot, portOffset);
   const composeEnv = buildComposeEnv(project, ports);
   const lines = Object.entries(composeEnv).map(([key, value]) => `${key}=${value}`);
-  writeAtomic(composeEnvPath, `${GENERATED_HEADER}\n${lines.join('\n')}\n`);
+  writeSecretsFile(composeEnvPath, `${GENERATED_HEADER}\n${lines.join('\n')}\n`);
 
   return [
     `${COMPOSE_ENV_FILE}: project ${project}, postgres port ${ports.postgres}`,

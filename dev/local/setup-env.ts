@@ -3,6 +3,8 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 
+import { writeSecretsFile } from './infra-env';
+
 // ---------------------------------------------------------------------------
 // ANSI color constants
 // ---------------------------------------------------------------------------
@@ -315,18 +317,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const tmpPath = path.join(repoRoot, '.env.local.tmp');
-  try {
-    fs.writeFileSync(tmpPath, finalContent, 'utf-8');
-    fs.renameSync(tmpPath, envLocalPath);
-  } catch (err) {
-    try {
-      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-    } catch {
-      // ignore cleanup failure
-    }
-    throw err;
-  }
+  writeSecretsFile(envLocalPath, finalContent);
 
   // -----------------------------------------------------------------------
   // Post-setup guidance

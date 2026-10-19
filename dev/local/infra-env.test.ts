@@ -12,6 +12,7 @@ import {
   currentComposeProject,
   DEFAULT_COMPOSE_PROJECT,
   syncInfraEnv,
+  writeSecretsFile,
 } from './infra-env';
 import { applyPortOffset, portOffset } from './services';
 
@@ -92,6 +93,74 @@ test('publishes this worktree database to the Jest env file', () => {
     assert.equal(fs.existsSync(testEnvPath), false);
   } finally {
     applyPortOffset(original);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('keeps a 0600 .env.local at 0600 through a sync', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  fs.mkdirSync(path.join(root, 'dev'));
+  fs.mkdirSync(path.join(root, 'apps', 'web'), { recursive: true });
+  const envLocalPath = path.join(root, '.env.local');
+  fs.writeFileSync(
+    envLocalPath,
+    'POSTGRES_URL=postgres://postgres:postgres@localhost:5432/postgres\nNEXTAUTH_SECRET=keep-me\n'
+  );
+  fs.chmodSync(envLocalPath, 0o600);
+  const original = portOffset;
+
+  try {
+    applyPortOffset(700);
+    syncInfraEnv(root);
+
+    assert.equal(fs.statSync(envLocalPath).mode & 0o777, 0o600);
+    assert.match(
+      fs.readFileSync(envLocalPath, 'utf-8'),
+      /^POSTGRES_URL=postgres:\/\/postgres:postgres@localhost:6132\/postgres$/m
+    );
+  } finally {
+    applyPortOffset(original);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('writeSecretsFile tightens a default-mode destination and creates at 0600', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  try {
+    const fresh = path.join(root, 'fresh.env');
+    writeSecretsFile(fresh, 'a=1\n');
+    assert.equal(fs.statSync(fresh).mode & 0o777, 0o600);
+
+    const loose = path.join(root, 'loose.env');
+    fs.writeFileSync(loose, 'a=1\n');
+    fs.chmodSync(loose, 0o644);
+    writeSecretsFile(loose, 'a=2\n');
+    assert.equal(fs.statSync(loose).mode & 0o777, 0o600);
+    assert.equal(fs.readFileSync(loose, 'utf-8'), 'a=2\n');
+
+    const strict = path.join(root, 'strict.env');
+    fs.writeFileSync(strict, 'a=1\n');
+    fs.chmodSync(strict, 0o400);
+    writeSecretsFile(strict, 'a=3\n');
+    assert.equal(fs.statSync(strict).mode & 0o777, 0o400);
+    assert.equal(fs.readFileSync(strict, 'utf-8'), 'a=3\n');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('writeSecretsFile refuses a symlinked destination and cleans up its temp file', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+  try {
+    const target = path.join(root, 'target.env');
+    fs.writeFileSync(target, 'a=1\n');
+    const link = path.join(root, 'link.env');
+    fs.symlinkSync(target, link);
+
+    assert.throws(() => writeSecretsFile(link, 'a=2\n'), /symlink/);
+    assert.equal(fs.readFileSync(target, 'utf-8'), 'a=1\n');
+    assert.equal(fs.readdirSync(root).filter(name => name.endsWith('.tmp')).length, 0);
+  } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

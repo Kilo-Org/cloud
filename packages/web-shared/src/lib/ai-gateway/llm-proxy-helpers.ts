@@ -612,6 +612,12 @@ export function getOutputHeaders(response: Response) {
   }
   outputHeaders.set('Content-Encoding', 'identity');
   // Content-Encoding: identity is here because Vercel modifies encoding/compression and causes issues
+  if (
+    outputHeaders.get('content-type')?.split(';')[0].trim().toLowerCase() === 'text/event-stream'
+  ) {
+    // Next.js rewrites can recompress identity responses and buffer SSE until EOF.
+    outputHeaders.set('Cache-Control', 'no-cache, no-transform');
+  }
 
   return outputHeaders;
 }

@@ -8,6 +8,8 @@ jest.mock('@/lib/auth/passkey', () => ({
   createRegistrationOptions: jest.fn(),
   verifyRegistration: jest.fn(),
 }));
+jest.mock('@vercel/firewall');
+jest.mock('@sentry/nextjs');
 
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import {
@@ -15,11 +17,15 @@ import {
   verifyRegistration,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
+import { checkRateLimit } from '@vercel/firewall';
+import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockCreateRegistrationOptions = jest.mocked(createRegistrationOptions);
 const mockVerifyRegistration = jest.mocked(verifyRegistration);
+const mockCheckRateLimit = jest.mocked(checkRateLimit);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', google_user_email: 'user@example.com' };
 
@@ -36,6 +42,7 @@ function createRequest(body: unknown): NextRequest {
 describe('POST /api/auth/passkey/register', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
     mockGetUserFromAuth.mockResolvedValue({
       user: fakeUser,
       authFailedResponse: null,
@@ -51,6 +58,7 @@ describe('POST /api/auth/passkey/register', () => {
     const response = await POST(createRequest({ action: 'options' }));
 
     expect(response.status).toBe(401);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
     expect(mockVerifyRegistration).not.toHaveBeenCalled();
   });
@@ -63,7 +71,39 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ challengeId, options });
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('passkey-registration-options', {
+      request: expect.any(NextRequest),
+      rateLimitKey: 'passkey-register-options:user-1',
+    });
     expect(mockCreateRegistrationOptions).toHaveBeenCalledWith('user-1', 'user@example.com');
+  });
+
+  it('rate limits the options action per user', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['not-found', 'is not configured'],
+    ['blocked', 'could not be evaluated'],
+  ] as const)('refuses minting when the registration limiter reports %s', async (error, message) => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error });
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      `Firewall rate limit 'passkey-registration-options' ${message}`,
+      { level: 'error', tags: { source: 'passkey_register_options' } }
+    );
   });
 
   it('binds the credential to the session user, ignoring the request body', async () => {

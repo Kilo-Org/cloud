@@ -16,11 +16,13 @@ import {
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
 import { checkRateLimit } from '@vercel/firewall';
+import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
 
 const mockCreateAuthenticationOptions = jest.mocked(createAuthenticationOptions);
 const mockVerifyAuthentication = jest.mocked(verifyAuthentication);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 const challengeId = '22222222-2222-4222-8222-222222222222';
 
@@ -61,6 +63,55 @@ describe('POST /api/auth/passkey/authenticate', () => {
       rateLimitKey: 'passkey-options:203.0.113.7',
     });
     expect(mockCreateAuthenticationOptions).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['not-found', 'is not configured'],
+    ['blocked', 'could not be evaluated'],
+  ] as const)('refuses minting when the options limiter reports %s', async (error, message) => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error });
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
+    expect(mockCreateAuthenticationOptions).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      `Firewall rate limit 'passkey-authentication-options' ${message}`,
+      { level: 'error', tags: { source: 'passkey_authenticate_options' } }
+    );
+  });
+
+  it('rate limits the unauthenticated verify action', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: { id: 'credential-1' } })
+    );
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('passkey-authentication-verify', {
+      request: expect.any(NextRequest),
+      rateLimitKey: 'passkey-verify:203.0.113.7',
+    });
+    expect(mockVerifyAuthentication).not.toHaveBeenCalled();
+  });
+
+  it('refuses verification when the verify limiter reports not-found', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: { id: 'credential-1' } })
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
+    expect(mockVerifyAuthentication).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'passkey-authentication-verify' is not configured",
+      { level: 'error', tags: { source: 'passkey_authenticate_verify' } }
+    );
   });
 
   it('returns a sign-in ticket for a verified assertion', async () => {

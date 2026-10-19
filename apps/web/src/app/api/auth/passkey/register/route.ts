@@ -8,7 +8,21 @@ import {
   verifyRegistration,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
+import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+
+/**
+ * Vercel Firewall rate-limit rule applied to `{ action: 'options' }`, keyed
+ * per user because the session is the actor. The rule lives in the project's
+ * firewall configuration and must be created there with this exact id. When a
+ * check returns an error the branch returns 503 RATE_LIMIT_UNAVAILABLE; the
+ * shared check reports that condition to Sentry.
+ */
+const REGISTRATION_OPTIONS_RATE_LIMIT_ID = 'passkey-registration-options';
+
+function registrationRateLimitKey(userId: string): string {
+  return `passkey-register-options:${userId}`;
+}
 
 /**
  * `{ action: 'options' }` mints registration options and stores the challenge
@@ -17,7 +31,9 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
  * authenticated user.
  *
  * Error contract: 400 invalid request, 401 `{ error }` with a stable
- * `PasskeyVerificationError` code on refusal.
+ * `PasskeyVerificationError` code on refusal, 429 when the account exceeds the
+ * registration-options firewall rule, 503 `RATE_LIMIT_UNAVAILABLE` when the
+ * firewall check cannot be evaluated.
  */
 const requestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('options') }),
@@ -42,6 +58,18 @@ export async function POST(request: NextRequest) {
 
   try {
     if (parsed.data.action === 'options') {
+      const limit = await checkFirewallRateLimit(REGISTRATION_OPTIONS_RATE_LIMIT_ID, {
+        source: 'passkey_register_options',
+        request,
+        rateLimitKey: registrationRateLimitKey(user.id),
+      });
+      if (limit === 'limited') {
+        return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+      }
+      if (limit === 'unavailable') {
+        return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
+      }
+
       const { challengeId, options } = await createRegistrationOptions(
         user.id,
         user.google_user_email

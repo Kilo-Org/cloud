@@ -155,11 +155,10 @@ describe('verifyNativeAppleIdToken', () => {
 
     const result = await verifyNativeAppleIdToken('a-token', rawNonce);
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
-    expect(redisClient.set).toHaveBeenCalledWith(
-      `auth:apple-signin-nonce:${expectedDigest}`,
-      '1',
-      { nx: true, ex: 600 }
-    );
+    expect(redisClient.set).toHaveBeenCalledWith(`auth:apple-signin-nonce:${expectedDigest}`, '1', {
+      nx: true,
+      ex: 600,
+    });
   });
 
   it('throws NativeIdTokenError when the nonce does not match', async () => {

@@ -6,11 +6,7 @@ const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
 // The override applies only outside production deployments.
 function appleJwksUrl(): string {
   const override = process.env['APPLE_JWKS_URL_OVERRIDE'];
-  if (
-    override &&
-    process.env.NODE_ENV !== 'production' &&
-    !process.env.VERCEL_ENV
-  ) {
+  if (override && process.env.NODE_ENV !== 'production' && !process.env.VERCEL_ENV) {
     return override;
   }
   return APPLE_JWKS_URL;

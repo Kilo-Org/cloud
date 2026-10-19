@@ -68,11 +68,10 @@ export async function verifyNativeAppleIdToken(
   // rule uniform.
   let recorded: string | null = null;
   try {
-    recorded = await redisClient.set(
-      `auth:apple-signin-nonce:${expectedNonce}`,
-      '1',
-      { nx: true, ex: NONCE_TTL_SECONDS }
-    );
+    recorded = await redisClient.set(`auth:apple-signin-nonce:${expectedNonce}`, '1', {
+      nx: true,
+      ex: NONCE_TTL_SECONDS,
+    });
   } catch {
     throw new NativeIdTokenError('Apple nonce check unavailable');
   }

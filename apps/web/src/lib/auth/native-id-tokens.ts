@@ -46,7 +46,15 @@ const RELAXED_NONCE_PATH_TOGGLE = 'native-apple-signin-nonce-relaxed-path';
 async function relaxedNoncePathAllowed(): Promise<boolean> {
   const end = relaxedPathEnd();
   if (!end || end <= new Date()) return false;
-  if (process.env.NODE_ENV === 'development') return true;
+  // Local verification runs without PostHog credentials opt in explicitly;
+  // the toggle still governs every other environment.
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.VERCEL_ENV === undefined &&
+    getEnvVariable('NATIVE_APPLE_NONCE_TRANSITION_LOCAL') === 'true'
+  ) {
+    return true;
+  }
   try {
     return await isReleaseToggleEnabled(RELAXED_NONCE_PATH_TOGGLE);
   } catch {

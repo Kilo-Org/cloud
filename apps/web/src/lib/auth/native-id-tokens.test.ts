@@ -311,30 +311,34 @@ describe('verifyNativeAppleIdToken', () => {
     process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
     const previousNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
-    mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
-    );
-    mockIsReleaseToggleEnabled.mockResolvedValue(false);
+    try {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+      mockIsReleaseToggleEnabled.mockResolvedValue(false);
 
-    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
-
-    process.env.NODE_ENV = previousNodeEnv;
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
   });
 
   it('honors the toggle in production mode', async () => {
     process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
     const previousNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
-    mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
-    );
-    mockIsReleaseToggleEnabled.mockResolvedValue(true);
+    try {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+      mockIsReleaseToggleEnabled.mockResolvedValue(true);
 
-    const result = await verifyNativeAppleIdToken('a-token');
-    expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
-    expect(mockIsReleaseToggleEnabled).toHaveBeenCalled();
-
-    process.env.NODE_ENV = previousNodeEnv;
+      const result = await verifyNativeAppleIdToken('a-token');
+      expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
+      expect(mockIsReleaseToggleEnabled).toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
   });
 
   it('keeps the requirement after the transition closes', async () => {
@@ -352,14 +356,16 @@ describe('verifyNativeAppleIdToken', () => {
     mockIsReleaseToggleEnabled.mockRejectedValue(new Error('posthog down'));
     const previousNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
-    mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
-    );
+    try {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
 
-    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
-    expect(mockCaptureMessage).not.toHaveBeenCalled();
-
-    process.env.NODE_ENV = previousNodeEnv;
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
   });
 });
 

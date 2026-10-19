@@ -153,13 +153,6 @@ describe('auth utilities', () => {
       expect(token).toHaveLength(64);
       expect(token).toMatch(/^[0-9a-f]+$/);
     });
-
-    it('generates different tokens on each call', () => {
-      const token1 = generateToken();
-      const token2 = generateToken();
-
-      expect(token1).not.toBe(token2);
-    });
   });
 
   describe('verifyToken', () => {

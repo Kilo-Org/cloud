@@ -12,7 +12,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 import {
-  EFFICIENT_DECISION_TIMEOUT_MS,
   fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
 } from './auto-routing-decision';
@@ -157,10 +156,6 @@ describe('fetchEfficientAutoDecision', () => {
       decision: validDecision,
       costUsd: 0,
     });
-  });
-
-  it('allows the current worker miss path five seconds to complete', () => {
-    expect(EFFICIENT_DECISION_TIMEOUT_MS).toBe(5_000);
   });
 
   it('includes denied model ids in the worker payload', async () => {

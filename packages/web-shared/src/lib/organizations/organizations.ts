@@ -28,6 +28,7 @@ import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, desc, eq, isNotNull, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
+import { ORGANIZATION_TRIAL_GRACE_DAYS } from '@kilocode/organization-entitlement';
 import { randomUUID } from 'crypto';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -277,7 +278,9 @@ export async function createOrganization(
         )
         .limit(1);
       if (priorTrial) {
-        freeTrialEndAt = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString();
+        freeTrialEndAt = new Date(
+          now.getTime() - (ORGANIZATION_TRIAL_GRACE_DAYS + 1) * 24 * 60 * 60 * 1000
+        ).toISOString();
       }
     }
 

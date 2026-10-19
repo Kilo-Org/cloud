@@ -4,6 +4,7 @@ export {
   getOrgTrialStatusFromDays,
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
+  ORGANIZATION_TRIAL_GRACE_DAYS,
 } from './trial';
 export type {
   OrganizationEntitlementBypassReason,

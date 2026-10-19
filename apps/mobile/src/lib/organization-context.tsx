@@ -226,15 +226,17 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     persist,
   ]);
 
-  // Detection: a settled, successful snapshot that no longer names the stored
+  // Detection: a settled, successful snapshot that does not name the stored
   // organization arms the recovery effect (declared below `setOrganizationId`,
-  // which it calls). A pick records the snapshot it was made against (above);
-  // a restored selection has no baseline, so its very first snapshot is
-  // evaluated — a cold start whose list already misses the stored org recovers
-  // instead of trusting the dead selection. Personal (null) and the default
-  // resolution (above) need no detection. The baseline updates only after the
-  // guards pass, so a snapshot observed during an error is re-evaluated once
-  // the error clears.
+  // which it calls). A restored selection has no baseline of its own, so its
+  // very first snapshot is evaluated: a cold start whose fetched list already
+  // omits the stored organization switches instead of rendering the dead
+  // selection with a generic credits name and a failed balance. A snapshot
+  // that names the selection records the baseline; from there, any later
+  // snapshot missing it means the membership vanished while the app ran.
+  // Personal (null) and the default resolution (above) need no detection. The
+  // baseline is recorded only after the guards pass, so a snapshot observed
+  // during an error is re-evaluated once the error clears.
   useEffect(() => {
     if (!state.isLoaded || !organizationsFetched || organizationsError) {
       selectionListSeen.current = undefined;
@@ -284,10 +286,9 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
 
   const setOrganizationId = useCallback(
     (id: string | null) => {
-      // A manual selection disarms the recovery switch: the user moved first.
-      // The picker only offers orgs from the current snapshot, so that
-      // snapshot is the selection's baseline; the next snapshot missing the
-      // selection means the membership vanished after the pick.
+      // A manual selection disarms the recovery switch: the user moved first,
+      // and the snapshot it was made against becomes the selection's baseline
+      // (the picker only offers organizations from that snapshot).
       recoveringRef.current = undefined;
       selectionListSeen.current = organizations;
       // An explicit selection always settles a pending default, even when it

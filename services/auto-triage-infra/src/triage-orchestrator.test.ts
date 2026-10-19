@@ -206,8 +206,21 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
     expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
   });
 
-  it('applies the auto-fix label for a maintainer at high confidence', async () => {
+  it('applies the auto-fix label for a maintain-tier author at high confidence', async () => {
     const harness = createHarness(createAutoFixTicket('repo-maintainer'));
+    const fetchMock = await stubFetchResponses([
+      { urlPart: permissionUrl, body: { permission: 'maintain' } },
+    ]);
+
+    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
+
+    const calls = labelsInFetchCalls(fetchMock.mock.calls);
+    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(true);
+    expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
+  });
+
+  it('applies the auto-fix label for a write-permission author at high confidence', async () => {
+    const harness = createHarness(createAutoFixTicket('repo-committer'));
     const fetchMock = await stubFetchResponses([
       { urlPart: permissionUrl, body: { permission: 'write' } },
     ]);

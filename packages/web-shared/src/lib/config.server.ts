@@ -69,6 +69,10 @@ export const USAGE_SHADOW_PUBLISH_ENABLED =
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.
 export const MCP_CATALOG_TOKEN_SECRET = getEnvVariable('MCP_CATALOG_TOKEN_SECRET');
+// Shared secret with internal-bot workloads (bouncer watch, auto-routing
+// benchmark). It authenticates only the mint in app/api/internal/bot-token;
+// it is never accepted as a Kilo credential.
+export const BOT_TOKEN_MINT_SECRET = getEnvVariable('BOT_TOKEN_MINT_SECRET');
 export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED') === 'true';
 }
@@ -89,6 +93,7 @@ const resourceTokenFamilyFlags = {
   'delegated-resource': 'DELEGATED_RESOURCE_TOKENS_ENABLED',
   'workflow-gateway': 'WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED',
   benchmark: 'BENCHMARK_RESOURCE_TOKENS_ENABLED',
+  'internal-bot': 'INTERNAL_BOT_RESOURCE_TOKENS_ENABLED',
 } as const;
 
 export type ResourceTokenFamily = keyof typeof resourceTokenFamilyFlags;

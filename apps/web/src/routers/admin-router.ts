@@ -51,6 +51,7 @@ import { contributorChampionsRouter } from '@/routers/admin/contributor-champion
 import { salesDemoRouter } from '@/routers/admin/sales-demo-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
+import { adminInternalBotUsersRouter } from '@/routers/admin/internal-bot-users-router';
 import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
@@ -2581,6 +2582,7 @@ export const adminRouter = createTRPCRouter({
   salesDemo: salesDemoRouter,
   bulkUserCredits: bulkUserCreditsRouter,
   creditCampaigns: creditCampaignsRouter,
+  internalBotUsers: adminInternalBotUsersRouter,
   cloudBillingSkus: cloudBillingSkusRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,

@@ -2,12 +2,20 @@ import 'server-only';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships, type User } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, like } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import crypto from 'crypto';
 import type { BotType } from './types';
-import { generateBotUserId, generateBotUserEmail, getBotDisplayName } from './types';
+import {
+  generateBotUserId,
+  generateBotUserEmail,
+  getBotDisplayName,
+  INTERNAL_BOT_SLUG_PATTERN,
+  INTERNAL_BOT_USER_ID_PREFIX,
+  internalBotUserEmail,
+  internalBotUserId,
+} from './types';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
@@ -61,28 +69,21 @@ export async function getUnblockedBotUserForOrg(
   return bot?.user ?? null;
 }
 
+type BotUserIdentity = { id: string; email: string; displayName: string };
+
 /**
- * Create a bot user for an organization
- * Returns the created user
+ * Insert a bot user row. Shared by per-org product bots and internal bots so
+ * every bot gets the same pepper, safety identifiers and billing defaults.
  */
-async function createBotUser(organizationId: string, botType: BotType): Promise<User> {
-  const botId = generateBotUserId(organizationId, botType);
-  const botEmail = generateBotUserEmail(organizationId, botType);
-  const botName = getBotDisplayName(botType);
+async function insertBotUser({ id, email, displayName }: BotUserIdentity): Promise<User> {
+  logExceptInTest('[insertBotUser] Creating bot user', { botId: id });
 
-  logExceptInTest('[createBotUser] Creating bot user', {
-    botId,
-    organizationId,
-    botType,
-  });
-
-  // Create bot user with minimal required fields
   const [botUser] = await db
     .insert(kilocode_users)
     .values({
-      id: botId,
-      google_user_email: botEmail,
-      google_user_name: botName,
+      id,
+      google_user_email: email,
+      google_user_name: displayName,
       google_user_image_url:
         'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNCIgY3k9IjI0IiByPSIyNCIgZmlsbD0iIzY2NjY2NiIvPjwvc3ZnPg==', // Gray circle placeholder
       stripe_customer_id: `bot_stripe_${crypto.randomBytes(8).toString('hex')}`,
@@ -90,17 +91,17 @@ async function createBotUser(organizationId: string, botType: BotType): Promise<
       api_token_pepper: crypto.randomBytes(32).toString('hex'), // For JWT signing
       is_admin: false,
       auto_top_up_enabled: false,
-      openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(botId),
-      openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(botId),
-      vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(botId),
+      openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(id),
+      openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(id),
+      vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(id),
     })
     .returning();
 
   if (!botUser) {
-    throw new Error(`Failed to create bot user ${botId}`);
+    throw new Error(`Failed to create bot user ${id}`);
   }
 
-  logExceptInTest('[createBotUser] Bot user created successfully', { botId });
+  logExceptInTest('[insertBotUser] Bot user created successfully', { botId: id });
   return botUser;
 }
 
@@ -169,8 +170,11 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
       });
       botUser = existingBot;
     } else {
-      // Create new bot user
-      botUser = await createBotUser(organizationId, botType);
+      botUser = await insertBotUser({
+        id: botId,
+        email: generateBotUserEmail(organizationId, botType),
+        displayName: getBotDisplayName(botType),
+      });
     }
 
     // Ensure bot is org member
@@ -189,4 +193,66 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
     });
     throw error;
   }
+}
+
+export class InternalBotIdConflictError extends Error {
+  constructor(id: string) {
+    super(`User ${id} exists but is not a bot`);
+    this.name = 'InternalBotIdConflictError';
+  }
+}
+
+/**
+ * Get or create an internal bot user (`bot-internal-<slug>`) and make it a
+ * `member` of the organization. Safe to call repeatedly: an existing user or
+ * membership is reused. Returns whether the user row was newly created.
+ */
+export async function ensureInternalBotUser(input: {
+  slug: string;
+  displayName: string;
+  organizationId: string;
+}): Promise<{ user: User; created: boolean }> {
+  if (!INTERNAL_BOT_SLUG_PATTERN.test(input.slug)) {
+    throw new Error('Invalid internal bot slug');
+  }
+  const id = internalBotUserId(input.slug);
+  const [existing] = await db
+    .select()
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, id))
+    .limit(1);
+
+  if (existing && !existing.is_bot) {
+    throw new InternalBotIdConflictError(id);
+  }
+  const user =
+    existing ??
+    (await insertBotUser({
+      id,
+      email: internalBotUserEmail(input.slug),
+      displayName: input.displayName,
+    }));
+
+  await ensureBotIsOrgMember(user.id, input.organizationId);
+  return { user, created: !existing };
+}
+
+export async function listInternalBotUsers() {
+  return db
+    .select({
+      id: kilocode_users.id,
+      name: kilocode_users.google_user_name,
+      email: kilocode_users.google_user_email,
+      createdAt: kilocode_users.created_at,
+      blockedAt: kilocode_users.blocked_at,
+      organizationId: organization_memberships.organization_id,
+      role: organization_memberships.role,
+    })
+    .from(kilocode_users)
+    .leftJoin(
+      organization_memberships,
+      eq(organization_memberships.kilo_user_id, kilocode_users.id)
+    )
+    .where(like(kilocode_users.id, `${INTERNAL_BOT_USER_ID_PREFIX}%`))
+    .orderBy(kilocode_users.id);
 }

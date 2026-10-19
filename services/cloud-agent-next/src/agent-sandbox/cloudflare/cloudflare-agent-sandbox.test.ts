@@ -968,6 +968,28 @@ describe('CloudflareAgentSandbox', () => {
     expect(deleteSession).not.toHaveBeenCalled();
   });
 
+  it('still cleans up session resources on an explicit delete of a stopped container', async () => {
+    const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
+    const getSession = vi.fn().mockResolvedValue({ exec });
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    const isContainerRunning = vi.fn().mockResolvedValue(false);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          isContainerRunning,
+          getSession,
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.delete('explicit');
+
+    expect(isContainerRunning).not.toHaveBeenCalled();
+    expect(getSession).toHaveBeenCalledWith('agent_cloudflare');
+    expect(exec).toHaveBeenCalled();
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+  });
+
   it('cleans up session resources when the container is running', async () => {
     const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
     const getSession = vi.fn().mockResolvedValue({ exec });

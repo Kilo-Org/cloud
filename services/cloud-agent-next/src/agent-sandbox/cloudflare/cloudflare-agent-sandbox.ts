@@ -559,11 +559,12 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       return;
     }
 
-    // Cleanup and session deletion are container fetches, so they boot a sleeping
-    // container. A stopped container has no exec session and an ephemeral workspace,
-    // so retention cleanup for an already-stopped shared sandbox must not wake it.
-    // Unknown stays fail-safe and keeps the existing cleanup path.
-    if ((await isSandboxContainerRunning(sandbox)) === false) {
+    // Retention cleanup and session deletion are container fetches, so they boot a
+    // sleeping container. A stopped container has no exec session and an ephemeral
+    // workspace, so retention cleanup for an already-stopped shared sandbox must not
+    // wake it. Explicit deletion is rare and still removes session data, including
+    // credentials, so it keeps the wake. Unknown state stays fail-safe too.
+    if (reason === 'retention-expired' && (await isSandboxContainerRunning(sandbox)) === false) {
       logger
         .withTags({
           logTag: 'sandbox_delete_cleanup_skipped',

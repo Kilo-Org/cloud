@@ -107,24 +107,39 @@ function owner(dirs, file) {
 
 // Whether the quoted literal at `index` is a module specifier: it follows
 // `from` or `import`, or it is the first argument of a MODULE_CALLS call, with
-// or without a type argument (`importActual<typeof import('x')>('x')`).
+// optional comments and a type argument (`importActual<typeof import('x')>('x')`).
 export function isModuleSpecifier(text, index) {
   let i = index - 1;
-  const skipSpace = () => {
-    while (i >= 0 && /\s/.test(text[i])) i--;
+  const skipTrivia = () => {
+    while (i >= 0) {
+      if (/\s/.test(text[i])) {
+        i--;
+      } else if (text[i] === '/' && text[i - 1] === '*') {
+        const start = text.lastIndexOf('/*', i - 2);
+        if (start < 0) break;
+        i = start - 1;
+      } else {
+        const start = Math.max(text.lastIndexOf('\n', i), text.lastIndexOf('\r', i)) + 1;
+        const line = text.slice(start, i + 1);
+        const tokens = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|\/\*.*?\*\/|\/\/.*/g;
+        const comment = [...line.matchAll(tokens)].find(token => token[0].startsWith('//'));
+        if (!comment) break;
+        i = start + comment.index - 1;
+      }
+    }
   };
-  skipSpace();
+  skipTrivia();
   const call = text[i] === '(';
   if (call) {
     i--;
-    skipSpace();
+    skipTrivia();
     if (text[i] === '>' && text[i - 1] !== '=') {
       for (let depth = 0; i >= 0; i--) {
         if (text[i] === '>' && text[i - 1] !== '=') depth++;
         else if (text[i] === '<' && --depth === 0) break;
       }
       i--;
-      skipSpace();
+      skipTrivia();
     }
   }
   const end = i + 1;

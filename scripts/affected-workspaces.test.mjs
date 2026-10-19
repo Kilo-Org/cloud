@@ -195,6 +195,17 @@ test('module specifiers are told apart from paths read as data', () => {
     "import { a } from '../x';",
     "export * from '../x';",
     "import '../x';",
+    "import /* comment */ '../x';",
+    "import /* first */ /* second */ '../x';",
+    "import /* multi\nline */ '../x';",
+    "import // comment\n '../x';",
+    "import /* block */ // line\n /* block */ '../x';",
+    "import { a } from /* comment */ '../x';",
+    "export * from // comment\n '../x';",
+    "const url = 'https://example.test'; import /* comment */ '../x';",
+    "const a = import /* callee */ (/* argument */ '../x');",
+    "vi.mock /* callee */ (// argument\n '../x');",
+    "const a = vi.importActual /* callee */ <typeof A> /* type */ (/* argument */ '../x');",
     "const a = await import('../x');",
     "type A = typeof import('../x');",
     "const a = require('../x');",
@@ -212,7 +223,31 @@ test('module specifiers are told apart from paths read as data', () => {
     "readFileSync('../x');",
     "it.each(['../x'])('reads %s', () => {});",
     "const a = '../x';",
+    "readFileSync(/* comment */ '../x');",
+    "const a = /* import */ '../x';",
+    "const a = // import\n '../x';",
   ]) {
     assert.equal(at(text), false, text);
+  }
+});
+
+test('commented imports keep the reader and its dependents fully affected', () => {
+  for (const text of [
+    "import /* comment */ '../x';",
+    "import // comment\n '../x';",
+    "vi.mock /* callee */ (/* argument */ '../x');",
+  ]) {
+    const result = selectData(
+      ['apps/mobile/src/app/index.tsx'],
+      [
+        [
+          'services/leaf/src/a.test.ts',
+          'apps/mobile/src/lib/sentinel',
+          !isModuleSpecifier(text, text.indexOf("'../x'")),
+        ],
+      ]
+    );
+    assert.deepEqual(result.packages, ['kilo-app', 'leaf', 'leaf-reader'], text);
+    assert.deepEqual(result.test_only_dirs, [], text);
   }
 });

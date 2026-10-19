@@ -3108,6 +3108,7 @@
     "ssoError": "Təşkilatın SSO tələb edir. “$t(login.moreSignInOptions)” seçimini aç.",
     "blocked": "Bu hesab bloklanıb. Dəstək xidməti ilə əlaqə saxla.",
     "signupRateLimited": "Həddindən çox cəhd edilib. Bir az sonra yenidən cəhd et.",
+    "signupUnavailable": "Daxil olmaq müvəqqəti olaraq mümkün deyil. Bir az sonra yenidən cəhd et.",
     "signupStepUp": "Hesabının yaradılmasını tamamlamaq üçün “$t(login.moreSignInOptions)” seçimini aç.",
     "signupStepUpApple": "Hesabının yaradılmasını tamamlamaq üçün “$t(login.signInWithApple)” seçimini aç.",
     "signupStepUpGoogle": "Hesabının yaradılmasını tamamlamaq üçün “$t(login.signInWithGoogle)” seçimini aç.",

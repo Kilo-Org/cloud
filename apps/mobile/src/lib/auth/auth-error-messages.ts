@@ -12,6 +12,7 @@ const AUTH_ERROR_KEYS = {
   // Only surfaced by Apple/Google paths; the email-OTP request returns opaque 200 for blocked domains
   BLOCKED: 'authErrors.blocked',
   'SIGNUP-RATE-LIMITED': 'authErrors.signupRateLimited',
+  'SIGNUP-UNAVAILABLE': 'authErrors.signupUnavailable',
   // Without the methods or a matching button, the browser sign-in offers Google and Apple.
   'SIGNUP-STEP-UP': 'authErrors.signupStepUp',
   INVALID_CODE: 'authErrors.invalidCode',

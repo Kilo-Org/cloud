@@ -3108,6 +3108,7 @@
     "ssoError": "Organisasi anda memerlukan SSO. Gunakan '$t(login.moreSignInOptions)'.",
     "blocked": "Akaun ini telah disekat. Sila hubungi sokongan.",
     "signupRateLimited": "Terlalu banyak percubaan. Sila cuba lagi kemudian.",
+    "signupUnavailable": "Log masuk tidak tersedia buat sementara waktu. Sila cuba lagi kemudian.",
     "signupStepUp": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.signInWithGoogle)'.",

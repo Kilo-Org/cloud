@@ -3108,6 +3108,7 @@
     "ssoError": "Òganizasyon ou mande SSO. Itilize '$t(login.moreSignInOptions)'.",
     "blocked": "Kont sa a bloke. Tanpri kontakte sèvis asistans lan.",
     "signupRateLimited": "Twòp tantativ. Tanpri eseye ankò pita.",
+    "signupUnavailable": "Sèvis pou konekte ou pa disponib pou kounye a. Tanpri eseye ankò pita.",
     "signupStepUp": "Pou fini kreye kont ou a, itilize '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Pou fini kreye kont ou a, itilize '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Pou fini kreye kont ou a, itilize '$t(login.signInWithGoogle)'.",

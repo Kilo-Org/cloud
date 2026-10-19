@@ -3108,6 +3108,7 @@
     "ssoError": "Твојата организација бара SSO. Избери „$t(login.moreSignInOptions)“.",
     "blocked": "Оваа сметка е блокирана. Контактирај ја поддршката.",
     "signupRateLimited": "Премногу обиди. Обиди се повторно подоцна.",
+    "signupUnavailable": "Најавувањето е привремено недостапно. Обиди се повторно подоцна.",
     "signupStepUp": "За да го завршиш создавањето на сметката, избери „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithGoogle)“.",

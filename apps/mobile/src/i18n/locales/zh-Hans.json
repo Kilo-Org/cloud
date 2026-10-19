@@ -3108,6 +3108,7 @@
     "ssoError": "你所在的组织要求使用单点登录（SSO）。请选择“$t(login.moreSignInOptions)”。",
     "blocked": "此账号已被封禁。请联系支持团队。",
     "signupRateLimited": "尝试次数过多。请稍后再试。",
+    "signupUnavailable": "暂时无法登录。请稍后重试。",
     "signupStepUp": "如需完成账户创建，请选择“$t(login.moreSignInOptions)”。",
     "signupStepUpApple": "如需完成账户创建，请选择“$t(login.signInWithApple)”。",
     "signupStepUpGoogle": "如需完成账户创建，请选择“$t(login.signInWithGoogle)”。",

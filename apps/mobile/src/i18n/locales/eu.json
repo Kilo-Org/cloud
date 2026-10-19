@@ -3108,6 +3108,7 @@
     "ssoError": "Zure erakundeak SSO eskatzen du. Erabili '$t(login.moreSignInOptions)'.",
     "blocked": "Kontu hau blokeatu da. Jarri harremanetan laguntza-taldearekin.",
     "signupRateLimited": "Saiakera gehiegi. Saiatu berriro geroago.",
+    "signupUnavailable": "Une honetan ezin da saioa hasi. Saiatu berriro geroago.",
     "signupStepUp": "Kontua sortzen amaitzeko, erabili '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithGoogle)'.",

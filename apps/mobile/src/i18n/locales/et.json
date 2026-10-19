@@ -3108,6 +3108,7 @@
     "ssoError": "Sinu organisatsioon nõuab SSO-d. Kasuta valikut „$t(login.moreSignInOptions)“.",
     "blocked": "See konto on blokeeritud. Võta ühendust toega.",
     "signupRateLimited": "Liiga palju katseid. Proovi hiljem uuesti.",
+    "signupUnavailable": "Sisselogimine ei ole ajutiselt saadaval. Proovi hiljem uuesti.",
     "signupStepUp": "Konto loomise lõpetamiseks kasuta valikut „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithGoogle)“.",

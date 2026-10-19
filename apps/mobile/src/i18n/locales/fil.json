@@ -3108,6 +3108,7 @@
     "ssoError": "Nangangailangan ng SSO ang iyong organisasyon. Gamitin ang '$t(login.moreSignInOptions)'.",
     "blocked": "Na-block ang account na ito. Makipag-ugnayan sa support team.",
     "signupRateLimited": "Masyado nang maraming pagsubok. Pakisubukan muli mamaya.",
+    "signupUnavailable": "Pansamantalang hindi makakapag-sign in. Pakisubukan muli mamaya.",
     "signupStepUp": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithGoogle)'.",

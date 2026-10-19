@@ -3108,6 +3108,7 @@
     "ssoError": "Tashkilotingiz SSO orqali kirishni talab qiladi. '$t(login.moreSignInOptions)' orqali davom eting.",
     "blocked": "Bu hisob bloklangan. Iltimos, qo‘llab-quvvatlash xizmatiga murojaat qiling.",
     "signupRateLimited": "Juda ko'p urinish bo'ldi. Keyinroq qayta urinib ko'ring.",
+    "signupUnavailable": "Tizimga kirish xizmati vaqtincha ishlamayapti. Keyinroq qayta urinib ko'ring.",
     "signupStepUp": "Hisob yaratishni yakunlash uchun '$t(login.moreSignInOptions)' dan foydalaning.",
     "signupStepUpApple": "Hisob yaratishni yakunlash uchun '$t(login.signInWithApple)' dan foydalaning.",
     "signupStepUpGoogle": "Hisob yaratishni yakunlash uchun '$t(login.signInWithGoogle)' dan foydalaning.",

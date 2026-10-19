@@ -3108,6 +3108,7 @@
     "ssoError": "ਤੁਹਾਡੀ ਸੰਸਥਾ ਵਿੱਚ SSO ਵਰਤਣਾ ਲਾਜ਼ਮੀ ਹੈ। '$t(login.moreSignInOptions)' ਵਰਤੋ।",
     "blocked": "ਇਹ ਖਾਤਾ ਬਲੌਕ ਕੀਤਾ ਗਿਆ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਸਹਾਇਤਾ ਟੀਮ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।",
     "signupRateLimited": "ਬਹੁਤ ਜ਼ਿਆਦਾ ਕੋਸ਼ਿਸ਼ਾਂ ਹੋ ਚੁੱਕੀਆਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "signupUnavailable": "ਇਸ ਵੇਲੇ ਸਾਈਨ-ਇਨ ਕਰਨ ਦੀ ਸਹੂਲਤ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "signupStepUp": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ '$t(login.moreSignInOptions)' ਵਰਤੋ।",
     "signupStepUpApple": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ '$t(login.signInWithApple)' ਵਰਤੋ।",
     "signupStepUpGoogle": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ '$t(login.signInWithGoogle)' ਵਰਤੋ।",

@@ -3190,6 +3190,7 @@
     "ssoError": "Tvoja organizácia vyžaduje SSO. Použi „$t(login.moreSignInOptions)“.",
     "blocked": "Tento účet bol zablokovaný. Kontaktuj podporu.",
     "signupRateLimited": "Príliš veľa pokusov. Skús to neskôr.",
+    "signupUnavailable": "Prihlásenie je dočasne nedostupné. Skús to neskôr.",
     "signupStepUp": "Na dokončenie vytvorenia účtu použi „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithGoogle)“.",

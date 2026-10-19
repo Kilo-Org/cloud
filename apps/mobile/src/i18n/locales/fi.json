@@ -3108,6 +3108,7 @@
     "ssoError": "Organisaatiosi edellyttää kertakirjautumista (SSO). Valitse ”$t(login.moreSignInOptions)”.",
     "blocked": "Tämä tili on estetty. Ota yhteyttä tukeen.",
     "signupRateLimited": "Liian monta yritystä. Yritä myöhemmin uudelleen.",
+    "signupUnavailable": "Sisäänkirjautuminen ei onnistu juuri nyt. Yritä myöhemmin uudelleen.",
     "signupStepUp": "Viimeistele tilin luominen valitsemalla ”$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithGoogle)”.",

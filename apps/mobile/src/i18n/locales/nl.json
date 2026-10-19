@@ -3108,6 +3108,7 @@
     "ssoError": "Je organisatie vereist SSO. Gebruik '$t(login.moreSignInOptions)'.",
     "blocked": "Dit account is geblokkeerd. Neem contact op met de klantenservice.",
     "signupRateLimited": "Te veel pogingen. Probeer het later opnieuw.",
+    "signupUnavailable": "We kunnen je tijdelijk niet inloggen. Probeer het later opnieuw.",
     "signupStepUp": "Gebruik '$t(login.moreSignInOptions)' om het aanmaken van je account te voltooien.",
     "signupStepUpApple": "Gebruik '$t(login.signInWithApple)' om het aanmaken van je account te voltooien.",
     "signupStepUpGoogle": "Gebruik '$t(login.signInWithGoogle)' om het aanmaken van je account te voltooien.",

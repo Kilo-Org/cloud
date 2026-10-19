@@ -3190,6 +3190,7 @@
     "ssoError": "Ваша організація вимагає SSO. Скористайтеся пунктом «$t(login.moreSignInOptions)».",
     "blocked": "Цей обліковий запис заблоковано. Зверніться до служби підтримки.",
     "signupRateLimited": "Забагато спроб. Повторіть спробу пізніше.",
+    "signupUnavailable": "Вхід тимчасово недоступний. Спробуйте ще раз пізніше.",
     "signupStepUp": "Щоб завершити створення облікового запису, виберіть «$t(login.moreSignInOptions)».",
     "signupStepUpApple": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithGoogle)».",

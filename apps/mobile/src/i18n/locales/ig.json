@@ -3108,6 +3108,7 @@
     "ssoError": "Òtù gị chọrọ SSO. Jiri '$t(login.moreSignInOptions)'.",
     "blocked": "Egbochiela akaụntụ a. Biko kpọtụrụ ndị enyemaka.",
     "signupRateLimited": "Mgbalị karịrị akarị. Biko nwaa ọzọ ma emechaa.",
+    "signupUnavailable": "Enweghị ike ịbanye ugbu a. Biko nwaa ọzọ ma emechaa.",
     "signupStepUp": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.signInWithGoogle)'.",

@@ -3108,6 +3108,7 @@
     "ssoError": "మీ సంస్థలో SSO ద్వారా సైన్ ఇన్ చేయడం తప్పనిసరి. '$t(login.moreSignInOptions)' ఉపయోగించండి.",
     "blocked": "ఈ ఖాతాను బ్లాక్ చేశారు. సహాయ బృందాన్ని సంప్రదించండి.",
     "signupRateLimited": "చాలా సార్లు ప్రయత్నించారు. కాసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
+    "signupUnavailable": "ప్రస్తుతం సైన్-ఇన్ చేయలేము. కాసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
     "signupStepUp": "మీ ఖాతా సృష్టిని పూర్తి చేయడానికి '$t(login.moreSignInOptions)' ఉపయోగించండి.",
     "signupStepUpApple": "మీ ఖాతా సృష్టిని పూర్తి చేయడానికి '$t(login.signInWithApple)' ఉపయోగించండి.",
     "signupStepUpGoogle": "మీ ఖాతా సృష్టిని పూర్తి చేయడానికి '$t(login.signInWithGoogle)' ఉపయోగించండి.",

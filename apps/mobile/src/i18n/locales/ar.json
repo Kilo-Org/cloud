@@ -3272,6 +3272,7 @@
     "ssoError": "تتطلب مؤسستك تسجيل الدخول الموحّد (SSO). استخدم «$t(login.moreSignInOptions)».",
     "blocked": "تم حظر هذا الحساب. تواصل مع الدعم.",
     "signupRateLimited": "تجاوزت الحد المسموح للمحاولات. حاول مرة أخرى لاحقًا.",
+    "signupUnavailable": "يتعذّر تسجيل الدخول مؤقتًا. حاول مرة أخرى لاحقًا.",
     "signupStepUp": "لإكمال إنشاء حسابك، استخدم \"$t(login.moreSignInOptions)\".",
     "signupStepUpApple": "لإكمال إنشاء حسابك، استخدم \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "لإكمال إنشاء حسابك، استخدم \"$t(login.signInWithGoogle)\".",

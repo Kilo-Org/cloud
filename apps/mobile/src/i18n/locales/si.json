@@ -3108,6 +3108,7 @@
     "ssoError": "ඔබේ සංවිධානයට පිවිසීමට SSO භාවිත කළ යුතුය. '$t(login.moreSignInOptions)' භාවිත කරන්න.",
     "blocked": "මෙම ගිණුම අවහිර කර ඇත. කරුණාකර සහාය කණ්ඩායම අමතන්න.",
     "signupRateLimited": "උත්සාහ කළ වාර ගණන වැඩියි. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
+    "signupUnavailable": "සයින්-ඉන් කිරීම තාවකාලිකව අක්‍රීයයි. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
     "signupStepUp": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.moreSignInOptions)' භාවිත කරන්න.",
     "signupStepUpApple": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithApple)' භාවිත කරන්න.",
     "signupStepUpGoogle": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithGoogle)' භාවිත කරන්න.",

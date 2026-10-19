@@ -3108,6 +3108,7 @@
     "ssoError": "سازمان شما استفاده از ورود یکپارچه (SSO) را الزامی کرده است. از «$t(login.moreSignInOptions)» استفاده کنید.",
     "blocked": "این حساب مسدود شده است. لطفاً با پشتیبانی تماس بگیرید.",
     "signupRateLimited": "تعداد تلاش‌ها بیش از حد مجاز است. لطفاً بعداً دوباره تلاش کنید.",
+    "signupUnavailable": "ورود موقتاً ممکن نیست. لطفاً بعداً دوباره تلاش کنید.",
     "signupStepUp": "برای تکمیل ساخت حساب خود، از «$t(login.moreSignInOptions)» استفاده کنید.",
     "signupStepUpApple": "برای تکمیل ساخت حساب خود، از «$t(login.signInWithApple)» استفاده کنید.",
     "signupStepUpGoogle": "برای تکمیل ساخت حساب خود، از «$t(login.signInWithGoogle)» استفاده کنید.",

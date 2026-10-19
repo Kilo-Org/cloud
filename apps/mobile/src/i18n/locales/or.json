@@ -3108,6 +3108,7 @@
     "ssoError": "ଆପଣଙ୍କ ସଂଗଠନରେ SSO ବ୍ୟବହାର କରିବା ଆବଶ୍ୟକ। '$t(login.moreSignInOptions)' ବ୍ୟବହାର କରନ୍ତୁ।",
     "blocked": "ଏହି ଆକାଉଣ୍ଟକୁ ବ୍ଲକ୍ କରାଯାଇଛି। ସହାୟତା ଦଳ ସହ ଯୋଗାଯୋଗ କରନ୍ତୁ।",
     "signupRateLimited": "ଅତ୍ୟଧିକ ଥର ଚେଷ୍ଟା କରିଛନ୍ତି। ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "signupUnavailable": "ଏବେ ସାଇନ୍-ଇନ୍ କରିହେଉନାହିଁ। ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "signupStepUp": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ତିଆରି ସମ୍ପୂର୍ଣ୍ଣ କରିବାକୁ '$t(login.moreSignInOptions)' ବ୍ୟବହାର କରନ୍ତୁ।",
     "signupStepUpApple": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ତିଆରି ସମ୍ପୂର୍ଣ୍ଣ କରିବାକୁ '$t(login.signInWithApple)' ବ୍ୟବହାର କରନ୍ତୁ।",
     "signupStepUpGoogle": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ତିଆରି ସମ୍ପୂର୍ଣ୍ଣ କରିବାକୁ '$t(login.signInWithGoogle)' ବ୍ୟବହାର କରନ୍ତୁ।",

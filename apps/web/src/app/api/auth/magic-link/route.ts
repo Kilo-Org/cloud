@@ -4,7 +4,10 @@ import { createMagicLinkToken } from '@kilocode/web-shared/lib/auth/magic-link-t
 import { sendMagicLinkEmail } from '@kilocode/web-shared/lib/email';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import * as z from 'zod';
-import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import {
+  checkEmailSignInEligibility,
+  checkGlobalSendBudget,
+} from '@/lib/auth/email-signin-eligibility';
 
 const requestSchema = z.object({
   email: z.string().email(),
@@ -38,6 +41,14 @@ export async function POST(request: NextRequest) {
   const eligibility = await checkEmailSignInEligibility(email, request);
   if (!eligibility.ok) {
     return NextResponse.json(eligibility.body, { status: eligibility.status });
+  }
+
+  const globalBudget = await checkGlobalSendBudget(request);
+  if (!globalBudget.ok) {
+    return NextResponse.json(
+      { success: false, error: globalBudget.errorCode },
+      { status: globalBudget.status }
+    );
   }
 
   const magicLink = await createMagicLinkToken(email);

@@ -3149,6 +3149,7 @@
     "ssoError": "Tava organizācija pieprasa SSO. Izvēlies “$t(login.moreSignInOptions)”.",
     "blocked": "Šis konts ir bloķēts. Sazinies ar atbalsta dienestu.",
     "signupRateLimited": "Pārāk daudz mēģinājumu. Mēģini vēlreiz vēlāk.",
+    "signupUnavailable": "Pierakstīšanās īslaicīgi nav pieejama. Mēģini vēlreiz vēlāk.",
     "signupStepUp": "Lai pabeigtu konta izveidi, izvēlies “$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithGoogle)”.",

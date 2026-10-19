@@ -3108,6 +3108,7 @@
     "ssoError": "Tổ chức của bạn yêu cầu SSO. Dùng '$t(login.moreSignInOptions)'.",
     "blocked": "Tài khoản này đã bị chặn. Vui lòng liên hệ bộ phận hỗ trợ.",
     "signupRateLimited": "Quá nhiều lần thử. Vui lòng thử lại sau.",
+    "signupUnavailable": "Hiện không thể đăng nhập. Vui lòng thử lại sau.",
     "signupStepUp": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.signInWithGoogle)'.",

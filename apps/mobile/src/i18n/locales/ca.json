@@ -3149,6 +3149,7 @@
     "ssoError": "La teva organització requereix SSO. Utilitza «$t(login.moreSignInOptions)».",
     "blocked": "Aquest compte s'ha bloquejat. Contacta amb el servei d'assistència.",
     "signupRateLimited": "Has fet massa intents. Torna-ho a provar més tard.",
+    "signupUnavailable": "L'inici de sessió no està disponible temporalment. Torna-ho a provar més tard.",
     "signupStepUp": "Per acabar de crear el teu compte, utilitza «$t(login.moreSignInOptions)».",
     "signupStepUpApple": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithGoogle)».",

@@ -3108,6 +3108,7 @@
     "ssoError": "Àjọ rẹ gbọ́dọ̀ lo SSO. Lo '$t(login.moreSignInOptions)'.",
     "blocked": "A ti dènà àkọọ́lẹ̀ yìí. Jọ̀wọ́ kàn sí ẹgbẹ́ ìrànlọ́wọ́.",
     "signupRateLimited": "Àwọn ìgbìyànjú pọ̀ jù. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
+    "signupUnavailable": "A kò lè wọlé fún ìgbà díẹ̀. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
     "signupStepUp": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.signInWithGoogle)'.",

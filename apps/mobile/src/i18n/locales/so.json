@@ -3108,6 +3108,7 @@
     "ssoError": "Ururkaaga waxa uu u baahan yahay SSO. Isticmaal '$t(login.moreSignInOptions)'.",
     "blocked": "Akoonkan waa la xannibay. Fadlan la xiriir taageerada.",
     "signupRateLimited": "Isku dayo aad u badan. Fadlan mar kale isku day waqti dambe.",
+    "signupUnavailable": "Gelitaanka si ku meel gaar ah lama heli karo. Fadlan mar kale isku day waqti dambe.",
     "signupStepUp": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithGoogle)'.",

@@ -3108,6 +3108,7 @@
     "ssoError": "Organizata jote kërkon SSO. Përdor '$t(login.moreSignInOptions)'.",
     "blocked": "Kjo llogari është bllokuar. Kontakto ekipin e mbështetjes.",
     "signupRateLimited": "Ke bërë shumë përpjekje. Provo përsëri më vonë.",
+    "signupUnavailable": "Hyrja është përkohësisht e padisponueshme. Provo përsëri më vonë.",
     "signupStepUp": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithGoogle)'.",

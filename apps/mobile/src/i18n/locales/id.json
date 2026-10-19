@@ -3108,6 +3108,7 @@
     "ssoError": "Organisasimu mewajibkan SSO. Gunakan '$t(login.moreSignInOptions)'.",
     "blocked": "Akun ini telah diblokir. Hubungi tim bantuan.",
     "signupRateLimited": "Terlalu banyak percobaan. Silakan coba lagi nanti.",
+    "signupUnavailable": "Untuk sementara waktu, login tidak tersedia. Silakan coba lagi nanti.",
     "signupStepUp": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithGoogle)'.",

@@ -3108,6 +3108,7 @@
     "ssoError": "A szervezeted egyszeri bejelentkezést (SSO) követel meg. Válaszd ezt: „$t(login.moreSignInOptions)”.",
     "blocked": "Ezt a fiókot letiltották. Vedd fel a kapcsolatot az ügyfélszolgálattal.",
     "signupRateLimited": "Túl sok próbálkozás történt. Próbáld újra később.",
+    "signupUnavailable": "A bejelentkezés átmenetileg nem érhető el. Próbáld újra később.",
     "signupStepUp": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithGoogle)”.",

@@ -3108,6 +3108,7 @@
     "ssoError": "你的組織規定必須使用單一登入（SSO）。請選擇「$t(login.moreSignInOptions)」。",
     "blocked": "此帳戶已封鎖。請聯絡客服。",
     "signupRateLimited": "嘗試次數過多。請稍後再試。",
+    "signupUnavailable": "目前無法登入。請稍後再試。",
     "signupStepUp": "如要完成帳戶建立，請選擇「$t(login.moreSignInOptions)」。",
     "signupStepUpApple": "如要完成帳戶建立，請選擇「$t(login.signInWithApple)」。",
     "signupStepUpGoogle": "如要完成帳戶建立，請選擇「$t(login.signInWithGoogle)」。",

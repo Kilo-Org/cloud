@@ -7,7 +7,10 @@ import {
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import * as z from 'zod';
-import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import {
+  checkEmailSignInEligibility,
+  checkGlobalSendBudget,
+} from '@/lib/auth/email-signin-eligibility';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const requestSchema = z.object({
@@ -71,6 +74,15 @@ export const POST = withRestTiming('/api/auth/native/otp', async (request: Reque
           : {}),
       },
       { status: eligibility.status }
+    );
+  }
+
+  const globalBudget = await checkGlobalSendBudget(request as NextRequest);
+  if (!globalBudget.ok) {
+    await enforceResponseFloor(startTime);
+    return NextResponse.json(
+      { success: false, error: globalBudget.errorCode },
+      { status: globalBudget.status }
     );
   }
 

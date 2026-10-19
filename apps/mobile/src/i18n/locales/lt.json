@@ -3190,6 +3190,7 @@
     "ssoError": "Tavo organizacija reikalauja prisijungti per SSO. Pasirink „$t(login.moreSignInOptions)“.",
     "blocked": "Ši paskyra užblokuota. Susisiek su pagalbos komanda.",
     "signupRateLimited": "Per daug bandymų. Bandyk dar kartą vėliau.",
+    "signupUnavailable": "Šiuo metu prisijungti negalima. Bandyk dar kartą vėliau.",
     "signupStepUp": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithGoogle)“.",

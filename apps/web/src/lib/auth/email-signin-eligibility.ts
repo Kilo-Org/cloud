@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { checkRateLimit } from '@vercel/firewall';
+import { captureMessage } from '@sentry/nextjs';
 import { createHmac } from 'node:crypto';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
@@ -36,25 +37,49 @@ function getMagicLinkEmailRateLimitKey(email: string): string {
   return `magic-link-email:${emailHash}`;
 }
 
-/** The caller address the firewall rule counts against, from the proxy headers. */
+/**
+ * The caller address the firewall rule counts against. apps/web runs behind
+ * Vercel, which overwrites `x-vercel-forwarded-for` at the edge; this is the
+ * header the edge controls, matching lib/mcp-gateway/oauth-client-service.ts.
+ */
 function clientIpAddress(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown'
-  );
+  const forwarded = request.headers.get('x-vercel-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0]?.trim() || 'unknown';
+  }
+  return request.headers.get('x-real-ip') || 'unknown';
 }
 
 type SendBudgetCheck =
   | { ok: true }
   | { ok: false; status: 429 | 503; errorCode: 'SIGNUP-RATE-LIMITED' | 'SIGNUP-UNAVAILABLE' };
 
+const missingRuleReportedAt: Record<string, number> = {};
+const MISSING_RULE_REPORT_INTERVAL_MS = 60_000;
+
 /**
- * Counts one send against the per-address, per-IP, and global firewall rules.
- * Returns 429 when any allowance is exhausted and 503 when a rule is missing
- * from the firewall configuration, so a silently disabled cap never sends.
+ * A missing rule disables the cap for every request an instance serves, so one
+ * report a minute raises the alarm just as well as one per request. Reporting
+ * per request floods Sentry at exactly the moment the cap is not working.
  */
-async function checkSendBudget(email: string, request: NextRequest): Promise<SendBudgetCheck> {
+function reportMissingRule(ruleId: string): void {
+  const now = Date.now();
+  if (now - (missingRuleReportedAt[ruleId] ?? 0) >= MISSING_RULE_REPORT_INTERVAL_MS) {
+    missingRuleReportedAt[ruleId] = now;
+    captureMessage(`Firewall rate limit '${ruleId}' is not configured`, {
+      level: 'error',
+      tags: { source: 'email_signin_eligibility' },
+    });
+  }
+}
+
+/**
+ * Counts one send against the per-address and per-caller firewall rules.
+ * Returns 429 when an allowance is exhausted and 503 when a rule is missing
+ * from the firewall configuration, so a silently disabled cap never sends.
+ * Runs before the eligibility rules: these refusals cost nothing downstream.
+ */
+async function checkCallerBudget(email: string, request: NextRequest): Promise<SendBudgetCheck> {
   const checks = [
     {
       id: MAGIC_LINK_EMAIL_RATE_LIMIT_ID,
@@ -64,10 +89,6 @@ async function checkSendBudget(email: string, request: NextRequest): Promise<Sen
       id: SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID,
       key: `${SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID}:${clientIpAddress(request)}`,
     },
-    {
-      id: SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID,
-      key: `${SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID}:total`,
-    },
   ] as const;
 
   for (const check of checks) {
@@ -76,11 +97,33 @@ async function checkSendBudget(email: string, request: NextRequest): Promise<Sen
       rateLimitKey: check.key,
     });
     if (error === 'not-found') {
+      reportMissingRule(check.id);
       return { ok: false, status: 503, errorCode: 'SIGNUP-UNAVAILABLE' };
     }
     if (rateLimited) {
       return { ok: false, status: 429, errorCode: 'SIGNUP-RATE-LIMITED' };
     }
+  }
+  return { ok: true };
+}
+
+/**
+ * Counts one approved send against the shared global firewall rule so every
+ * instance draws from one bucket. Checked only after the address passed
+ * eligibility, so refusals that never send cannot spend the allowance.
+ */
+export async function checkGlobalSendBudget(request: NextRequest): Promise<SendBudgetCheck> {
+  const { rateLimited, error } = await checkRateLimit(SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID, {
+    request,
+    rateLimitKey: `${SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID}:total`,
+  });
+
+  if (error === 'not-found') {
+    reportMissingRule(SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID);
+    return { ok: false, status: 503, errorCode: 'SIGNUP-UNAVAILABLE' };
+  }
+  if (rateLimited) {
+    return { ok: false, status: 429, errorCode: 'SIGNUP-RATE-LIMITED' };
   }
   return { ok: true };
 }
@@ -190,9 +233,9 @@ export async function checkEmailSignInEligibility(
   email: string,
   request: NextRequest
 ): Promise<EmailSignInEligibility> {
-  const sendBudget = await checkSendBudget(email, request);
-  if (!sendBudget.ok) {
-    if (sendBudget.status === 503) {
+  const callerBudget = await checkCallerBudget(email, request);
+  if (!callerBudget.ok) {
+    if (callerBudget.status === 503) {
       return {
         ok: false,
         status: 503,

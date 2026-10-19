@@ -3108,6 +3108,7 @@
     "ssoError": "Din organisation kræver SSO. Brug '$t(login.moreSignInOptions)'.",
     "blocked": "Denne konto er blokeret. Kontakt support.",
     "signupRateLimited": "For mange forsøg. Prøv igen senere.",
+    "signupUnavailable": "Det er ikke muligt at logge ind i øjeblikket. Prøv igen senere.",
     "signupStepUp": "Brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpApple": "Brug '$t(login.signInWithApple)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpGoogle": "Brug '$t(login.signInWithGoogle)' for at færdiggøre oprettelsen af din konto.",

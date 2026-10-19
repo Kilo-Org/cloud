@@ -3108,6 +3108,7 @@
     "ssoError": "Dhaabbanni kee SSO barbaada. '$t(login.moreSignInOptions)' fayyadami.",
     "blocked": "Herregni kun dhorkameera. Garee gargaarsaa qunnami.",
     "signupRateLimited": "Yaallii baay'ee godhame. Booda irra deebi'ii yaali.",
+    "signupUnavailable": "Seensa godhuun yeroodhaaf hin danda'amu. Booda irra deebi'ii yaali.",
     "signupStepUp": "Herrega kee uumuu xumuruuf '$t(login.moreSignInOptions)' fayyadami.",
     "signupStepUpApple": "Herrega kee uumuu xumuruuf '$t(login.signInWithApple)' fayyadami.",
     "signupStepUpGoogle": "Herrega kee uumuu xumuruuf '$t(login.signInWithGoogle)' fayyadami.",

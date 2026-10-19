@@ -3149,6 +3149,7 @@
     "ssoError": "Tvoja organizacija zahtijeva SSO. Odaberi „$t(login.moreSignInOptions)“.",
     "blocked": "Ovaj račun je blokiran. Obrati se podršci.",
     "signupRateLimited": "Previše pokušaja. Pokušaj ponovo kasnije.",
+    "signupUnavailable": "Prijava trenutno nije dostupna. Pokušaj ponovo kasnije.",
     "signupStepUp": "Za dovršetak kreiranja računa odaberi „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Za dovršetak kreiranja računa odaberi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Za dovršetak kreiranja računa odaberi „$t(login.signInWithGoogle)“.",

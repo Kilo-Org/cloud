@@ -3108,6 +3108,7 @@
     "ssoError": "Deine Organisation verlangt SSO. Wähle „$t(login.moreSignInOptions)“.",
     "blocked": "Dieses Konto wurde gesperrt. Bitte wende dich an den Support.",
     "signupRateLimited": "Du hast zu viele Versuche unternommen. Bitte versuche es später erneut.",
+    "signupUnavailable": "Die Anmeldung ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
     "signupStepUp": "Wähle „$t(login.moreSignInOptions)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpApple": "Wähle „$t(login.signInWithApple)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpGoogle": "Wähle „$t(login.signInWithGoogle)“, um die Erstellung deines Kontos abzuschließen.",

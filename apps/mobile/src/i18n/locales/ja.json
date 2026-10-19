@@ -3108,6 +3108,7 @@
     "ssoError": "所属する組織ではSSOでのサインインが必要です。「$t(login.moreSignInOptions)」を選択してください。",
     "blocked": "このアカウントはブロックされています。サポートにお問い合わせください。",
     "signupRateLimited": "試行回数が多すぎます。しばらくしてからもう一度お試しください。",
+    "signupUnavailable": "現在、サインインできません。しばらくしてからもう一度お試しください。",
     "signupStepUp": "アカウントの作成を完了するには、「$t(login.moreSignInOptions)」を選択してください。",
     "signupStepUpApple": "アカウントの作成を完了するには、「$t(login.signInWithApple)」を選択してください。",
     "signupStepUpGoogle": "アカウントの作成を完了するには、「$t(login.signInWithGoogle)」を選択してください。",

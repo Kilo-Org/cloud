@@ -3149,6 +3149,7 @@
     "ssoError": "Tu organización exige el inicio de sesión único (SSO). Usa «$t(login.moreSignInOptions)».",
     "blocked": "Esta cuenta está bloqueada. Contacta con el equipo de asistencia.",
     "signupRateLimited": "Demasiados intentos. Inténtalo de nuevo más tarde.",
+    "signupUnavailable": "El inicio de sesión no está disponible temporalmente. Inténtalo de nuevo más tarde.",
     "signupStepUp": "Para terminar de crear tu cuenta, usa «$t(login.moreSignInOptions)».",
     "signupStepUpApple": "Para terminar de crear tu cuenta, usa «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Para terminar de crear tu cuenta, usa «$t(login.signInWithGoogle)».",

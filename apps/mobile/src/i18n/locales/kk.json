@@ -3108,6 +3108,7 @@
     "ssoError": "Ұйымыңыз SSO арқылы кіруді талап етеді. «$t(login.moreSignInOptions)» тармағын таңдаңыз.",
     "blocked": "Бұл тіркелгі бұғатталған. Қолдау қызметіне хабарласыңыз.",
     "signupRateLimited": "Тым көп әрекет жасалды. Кейінірек қайталап көріңіз.",
+    "signupUnavailable": "Кіру мүмкіндігі уақытша қолжетімсіз. Кейінірек қайталап көріңіз.",
     "signupStepUp": "Тіркелгіні жасауды аяқтау үшін «$t(login.moreSignInOptions)» тармағын таңдаңыз.",
     "signupStepUpApple": "Тіркелгіні жасауды аяқтау үшін «$t(login.signInWithApple)» тармағын таңдаңыз.",
     "signupStepUpGoogle": "Тіркелгіні жасауды аяқтау үшін «$t(login.signInWithGoogle)» тармағын таңдаңыз.",

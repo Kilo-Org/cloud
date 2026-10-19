@@ -3108,6 +3108,7 @@
     "ssoError": "Din organisation kräver SSO. Välj ”$t(login.moreSignInOptions)”.",
     "blocked": "Det här kontot har blockerats. Kontakta supporten.",
     "signupRateLimited": "För många försök. Försök igen senare.",
+    "signupUnavailable": "Det går inte att logga in just nu. Försök igen senare.",
     "signupStepUp": "Välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
     "signupStepUpApple": "Välj ”$t(login.signInWithApple)” för att slutföra skapandet av ditt konto.",
     "signupStepUpGoogle": "Välj ”$t(login.signInWithGoogle)” för att slutföra skapandet av ditt konto.",

@@ -3108,6 +3108,7 @@
     "ssoError": "તમારી સંસ્થામાં SSO ફરજિયાત છે. '$t(login.moreSignInOptions)' વાપરો.",
     "blocked": "આ એકાઉન્ટ બ્લોક કરવામાં આવ્યું છે. કૃપા કરીને સપોર્ટનો સંપર્ક કરો.",
     "signupRateLimited": "ઘણા બધા પ્રયત્નો થયા છે. કૃપા કરીને પછીથી ફરી પ્રયત્ન કરો.",
+    "signupUnavailable": "હમણાં સાઇન-ઇન કરી શકાતું નથી. કૃપા કરીને પછીથી ફરી પ્રયત્ન કરો.",
     "signupStepUp": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.moreSignInOptions)' વાપરો.",
     "signupStepUpApple": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.signInWithApple)' વાપરો.",
     "signupStepUpGoogle": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.signInWithGoogle)' વાપરો.",

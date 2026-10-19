@@ -3108,6 +3108,7 @@
     "ssoError": "Ƙungiyarka tana buƙatar SSO. Yi amfani da '$t(login.moreSignInOptions)'.",
     "blocked": "An toshe wannan asusun. Tuntuɓi masu taimako.",
     "signupRateLimited": "An yi ƙoƙari da yawa. Sake gwadawa daga baya.",
+    "signupUnavailable": "Ba a iya shiga a yanzu. Sake gwadawa daga baya.",
     "signupStepUp": "Don kammala ƙirƙirar asusunka, yi amfani da '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Don kammala ƙirƙirar asusunka, yi amfani da '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Don kammala ƙirƙirar asusunka, yi amfani da '$t(login.signInWithGoogle)'.",

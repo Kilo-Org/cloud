@@ -3272,6 +3272,7 @@
     "ssoError": "Mae'ch sefydliad yn mynnu SSO. Defnyddiwch '$t(login.moreSignInOptions)'.",
     "blocked": "Mae'r cyfrif hwn wedi'i flocio. Cysylltwch â'r tîm cymorth.",
     "signupRateLimited": "Rydych wedi rhoi cynnig gormod o weithiau. Rhowch gynnig eto yn nes ymlaen.",
+    "signupUnavailable": "Nid yw mewngofnodi ar gael ar hyn o bryd. Rhowch gynnig eto yn nes ymlaen.",
     "signupStepUp": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithGoogle)'.",

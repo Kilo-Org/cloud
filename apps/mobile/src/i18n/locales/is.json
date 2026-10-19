@@ -3108,6 +3108,7 @@
     "ssoError": "Fyrirtækið þitt krefst samræmdrar innskráningar (SSO). Veldu „$t(login.moreSignInOptions)“.",
     "blocked": "Lokað hefur verið á þennan reikning. Hafðu samband við þjónustuver.",
     "signupRateLimited": "Of margar tilraunir. Reyndu aftur síðar.",
+    "signupUnavailable": "Tímabundið er ekki hægt að skrá sig inn. Reyndu aftur síðar.",
     "signupStepUp": "Veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpApple": "Veldu „$t(login.signInWithApple)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpGoogle": "Veldu „$t(login.signInWithGoogle)“ til að ljúka við að stofna reikninginn þinn.",

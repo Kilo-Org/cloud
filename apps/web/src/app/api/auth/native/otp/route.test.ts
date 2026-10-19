@@ -3,7 +3,10 @@ import {
   deleteSignInCode,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
-import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import {
+  checkEmailSignInEligibility,
+  checkGlobalSendBudget,
+} from '@/lib/auth/email-signin-eligibility';
 import { NextRequest } from 'next/server';
 
 jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
@@ -16,6 +19,7 @@ const mockCreateSignInCode = jest.mocked(createSignInCode);
 const mockDeleteSignInCode = jest.mocked(deleteSignInCode);
 const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
 const mockCheckEmailSignInEligibility = jest.mocked(checkEmailSignInEligibility);
+const mockCheckGlobalSendBudget = jest.mocked(checkGlobalSendBudget);
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,6 +42,7 @@ describe('POST /api/auth/native/otp', () => {
     jest.clearAllMocks();
 
     mockCheckEmailSignInEligibility.mockResolvedValue({ ok: true });
+    mockCheckGlobalSendBudget.mockResolvedValue({ ok: true });
     mockCreateSignInCode.mockResolvedValue({
       code: '123456',
       challengeId: 'c0000000-0000-0000-0000-000000000001',
@@ -91,6 +96,38 @@ describe('POST /api/auth/native/otp', () => {
         success: false,
         error: 'Sign-in is temporarily unavailable. Please try again later.',
       },
+    });
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+    expect(mockCreateSignInCode).not.toHaveBeenCalled();
+    expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 without issuing a code when the total send bucket is exhausted', async () => {
+    mockCheckGlobalSendBudget.mockResolvedValue({
+      ok: false,
+      status: 429,
+      errorCode: 'SIGNUP-RATE-LIMITED',
+    });
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data).toEqual({ success: false, error: 'SIGNUP-RATE-LIMITED' });
+    expect(mockCreateSignInCode).not.toHaveBeenCalled();
+    expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 without issuing a code when the total send rule is unavailable', async () => {
+    mockCheckGlobalSendBudget.mockResolvedValue({
+      ok: false,
+      status: 503,
+      errorCode: 'SIGNUP-UNAVAILABLE',
     });
 
     const response = await POST(createRequest({ email: 'user@example.com' }));

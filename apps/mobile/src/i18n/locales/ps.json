@@ -3108,6 +3108,7 @@
     "ssoError": "ستاسو سازمان د ننوتلو لپاره SSO غواړي. '$t(login.moreSignInOptions)' وکاروئ.",
     "blocked": "دا حساب بند شوی دی. مهرباني وکړئ له ملاتړ سره اړیکه ونیسئ.",
     "signupRateLimited": "ډېرې هڅې وشوې. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
+    "signupUnavailable": "د لنډ وخت لپاره ننوتل ممکن نه دي. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
     "signupStepUp": "د خپل حساب د جوړولو بشپړولو لپاره '$t(login.moreSignInOptions)' وکاروئ.",
     "signupStepUpApple": "د خپل حساب د جوړولو بشپړولو لپاره '$t(login.signInWithApple)' وکاروئ.",
     "signupStepUpGoogle": "د خپل حساب د جوړولو بشپړولو لپاره '$t(login.signInWithGoogle)' وکاروئ.",

@@ -3108,6 +3108,7 @@
     "ssoError": "آپ کی تنظیم میں SSO کے ذریعے سائن ان کرنا ضروری ہے۔ '$t(login.moreSignInOptions)' استعمال کریں۔",
     "blocked": "یہ اکاؤنٹ بلاک کر دیا گیا ہے۔ براہ کرم سپورٹ سے رابطہ کریں۔",
     "signupRateLimited": "بہت زیادہ کوششیں ہو چکی ہیں۔ براہ کرم کچھ دیر بعد دوبارہ کوشش کریں۔",
+    "signupUnavailable": "فی الحال سائن اِن دستیاب نہیں ہے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "signupStepUp": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.moreSignInOptions)' استعمال کریں۔",
     "signupStepUpApple": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.signInWithApple)' استعمال کریں۔",
     "signupStepUpGoogle": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.signInWithGoogle)' استعمال کریں۔",

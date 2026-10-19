@@ -3108,6 +3108,7 @@
     "ssoError": "შენი ორგანიზაცია SSO-ს მოითხოვს. გამოიყენე „$t(login.moreSignInOptions)“.",
     "blocked": "ეს ანგარიში დაბლოკილია. დაუკავშირდი მხარდაჭერის გუნდს.",
     "signupRateLimited": "მცდელობების რაოდენობა გადაჭარბებულია. მოგვიანებით სცადე.",
+    "signupUnavailable": "სისტემაში შესვლა დროებით შეუძლებელია. მოგვიანებით სცადე.",
     "signupStepUp": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.signInWithGoogle)“.",

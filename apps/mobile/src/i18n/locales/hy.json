@@ -3108,6 +3108,7 @@
     "ssoError": "Քո կազմակերպությունը պահանջում է SSO։ Ընտրիր «$t(login.moreSignInOptions)»։",
     "blocked": "Այս հաշիվն արգելափակված է։ Դիմիր աջակցության ծառայությանը։",
     "signupRateLimited": "Չափազանց շատ փորձեր են կատարվել։ Կրկին փորձիր ավելի ուշ։",
+    "signupUnavailable": "Մուտք գործելը ժամանակավորապես անհասանելի է։ Կրկին փորձիր ավելի ուշ։",
     "signupStepUp": "Հաշվի ստեղծումն ավարտելու համար ընտրիր «$t(login.moreSignInOptions)»։",
     "signupStepUpApple": "Հաշվի ստեղծումն ավարտելու համար ընտրիր «$t(login.signInWithApple)»։",
     "signupStepUpGoogle": "Հաշվի ստեղծումն ավարտելու համար ընտրիր «$t(login.signInWithGoogle)»։",

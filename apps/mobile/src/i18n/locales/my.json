@@ -3108,6 +3108,7 @@
     "ssoError": "သင့်အဖွဲ့အစည်းတွင် SSO ဖြင့် အကောင့်ဝင်ရပါမည်။ '$t(login.moreSignInOptions)' ကို သုံးပါ။",
     "blocked": "ဒီအကောင့်ကို ပိတ်ပင်ထားပါသည်။ အကူအညီပေးရေးအဖွဲ့ကို ဆက်သွယ်ပါ။",
     "signupRateLimited": "ကြိုးစားသည့်အကြိမ်ရေ များလွန်းပါသည်။ နောက်မှ ထပ်စမ်းကြည့်ပါ။",
+    "signupUnavailable": "ဆိုင်းအင်လုပ်၍ ယာယီမရပါ။ နောက်မှ ထပ်စမ်းကြည့်ပါ။",
     "signupStepUp": "သင့်အကောင့်ဖန်တီးခြင်းကို အပြီးသတ်ရန် '$t(login.moreSignInOptions)' ကို သုံးပါ။",
     "signupStepUpApple": "သင့်အကောင့်ဖန်တီးခြင်းကို အပြီးသတ်ရန် '$t(login.signInWithApple)' ကို သုံးပါ။",
     "signupStepUpGoogle": "သင့်အကောင့်ဖန်တီးခြင်းကို အပြီးသတ်ရန် '$t(login.signInWithGoogle)' ကို သုံးပါ။",

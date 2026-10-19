@@ -3190,6 +3190,7 @@
     "ssoError": "Twoja organizacja wymaga logowania SSO. Użyj opcji „$t(login.moreSignInOptions)”.",
     "blocked": "To konto zostało zablokowane. Skontaktuj się z pomocą techniczną.",
     "signupRateLimited": "Zbyt wiele prób. Spróbuj ponownie później.",
+    "signupUnavailable": "Logowanie jest chwilowo niedostępne. Spróbuj ponownie później.",
     "signupStepUp": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithGoogle)”.",

@@ -3108,6 +3108,7 @@
     "ssoError": "អង្គការរបស់អ្នកតម្រូវឱ្យប្រើ SSO។ ប្រើ '$t(login.moreSignInOptions)'។",
     "blocked": "គណនីនេះត្រូវបានរារាំង។ សូមទាក់ទងផ្នែកគាំទ្រ។",
     "signupRateLimited": "ការព្យាយាមច្រើនពេកហើយ។ សូមព្យាយាមម្ដងទៀតនៅពេលក្រោយ។",
+    "signupUnavailable": "ការចូលក្នុងប្រព័ន្ធមិនអាចប្រើបានជាបណ្ដោះអាសន្នទេ។ សូមព្យាយាមម្ដងទៀតនៅពេលក្រោយ។",
     "signupStepUp": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.moreSignInOptions)'។",
     "signupStepUpApple": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithApple)'។",
     "signupStepUpGoogle": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithGoogle)'។",

@@ -3108,6 +3108,7 @@
     "ssoError": "Shirika lako linahitaji SSO. Tumia '$t(login.moreSignInOptions)'.",
     "blocked": "Akaunti hii imezuiwa. Tafadhali wasiliana na huduma kwa wateja.",
     "signupRateLimited": "Majaribio mengi mno. Tafadhali jaribu tena baadaye.",
+    "signupUnavailable": "Huduma ya kuingia haipatikani kwa muda. Tafadhali jaribu tena baadaye.",
     "signupStepUp": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithGoogle)'.",

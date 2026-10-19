@@ -3149,6 +3149,7 @@
     "ssoError": "Organizația ta impune autentificarea unică (SSO). Folosește „$t(login.moreSignInOptions)”.",
     "blocked": "Acest cont a fost blocat. Contactează echipa de asistență.",
     "signupRateLimited": "Prea multe încercări. Încearcă din nou mai târziu.",
+    "signupUnavailable": "Autentificarea este temporar indisponibilă. Încearcă din nou mai târziu.",
     "signupStepUp": "Pentru a finaliza crearea contului, folosește „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithGoogle)”.",

@@ -3108,6 +3108,7 @@
     "ssoError": "Kuruluşun SSO gerektiriyor. '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "blocked": "Bu hesap engellendi. Lütfen destek ekibiyle iletişime geç.",
     "signupRateLimited": "Çok fazla deneme yapıldı. Lütfen daha sonra tekrar dene.",
+    "signupUnavailable": "Oturum açma geçici olarak kullanılamıyor. Lütfen daha sonra tekrar dene.",
     "signupStepUp": "Hesabını oluşturmayı tamamlamak için '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "signupStepUpApple": "Hesabını oluşturmayı tamamlamak için '$t(login.signInWithApple)' seçeneğini kullan.",
     "signupStepUpGoogle": "Hesabını oluşturmayı tamamlamak için '$t(login.signInWithGoogle)' seçeneğini kullan.",

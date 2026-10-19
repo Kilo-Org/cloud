@@ -3108,6 +3108,7 @@
     "ssoError": "ನಿಮ್ಮ ಸಂಸ್ಥೆಯಲ್ಲಿ SSO ಬಳಸುವುದು ಕಡ್ಡಾಯ. '$t(login.moreSignInOptions)' ಬಳಸಿ.",
     "blocked": "ಈ ಖಾತೆಯನ್ನು ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ. ಸಹಾಯ ತಂಡವನ್ನು ಸಂಪರ್ಕಿಸಿ.",
     "signupRateLimited": "ಅತಿಯಾಗಿ ಪ್ರಯತ್ನಿಸಿದ್ದೀರಿ. ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "signupUnavailable": "ಈಗ ಸೈನ್-ಇನ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "signupStepUp": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು '$t(login.moreSignInOptions)' ಬಳಸಿ.",
     "signupStepUpApple": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು '$t(login.signInWithApple)' ಬಳಸಿ.",
     "signupStepUpGoogle": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು '$t(login.signInWithGoogle)' ಬಳಸಿ.",

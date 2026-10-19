@@ -3108,6 +3108,7 @@
     "ssoError": "Mitaky SSO ny fikambananao. Ampiasao ny '$t(login.moreSignInOptions)'.",
     "blocked": "Voasakana ity kaonty ity. Mifandraisa amin'ny ekipa mpanampy azafady.",
     "signupRateLimited": "Betsaka loatra ny andrana. Andramo indray rehefa afaka kelikely azafady.",
+    "signupUnavailable": "Tsy azo atao vetivety ny hiditra. Andramo indray rehefa afaka kelikely azafady.",
     "signupStepUp": "Ampiasao ny '$t(login.moreSignInOptions)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpApple": "Ampiasao ny '$t(login.signInWithApple)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpGoogle": "Ampiasao ny '$t(login.signInWithGoogle)' hamitana ny famoronana ny kaontinao.",

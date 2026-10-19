@@ -29,6 +29,15 @@ vi.mock('../services/session-access', () => ({
   resolveAccessibleKiloSession: vi.fn(),
 }));
 
+const { TEST_STAGING_MAX_BYTES } = vi.hoisted(() => ({ TEST_STAGING_MAX_BYTES: 8 * 1024 * 1024 }));
+
+// Real limit constants, except the staging ceiling: an 8 MiB test value
+// covers the declared cases, so the limit fixtures stay small.
+vi.mock('../util/ingest-limits', async importOriginal => {
+  const actual = await importOriginal<typeof import('../util/ingest-limits')>();
+  return { ...actual, STAGING_MAX_BYTES: TEST_STAGING_MAX_BYTES };
+});
+
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
@@ -838,7 +847,6 @@ describe('api routes', () => {
       ['negative', '-1', 'invalid_content_length'],
       ['fractional', '1.5', 'invalid_content_length'],
       ['non-numeric', 'abc', 'invalid_content_length'],
-      ['zero', '0', 'empty_body'],
     ] as const)(
       'uses the legacy path for %s Content-Length',
       async (_name, contentLength, reason) => {
@@ -857,9 +865,9 @@ describe('api routes', () => {
         expect(response.status).toBe(200);
         expect(ingest).not.toHaveBeenCalled();
         expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
-        // The body is read through the staging byte budget before staging, so
-        // even unmeasured requests stage measured bytes.
-        expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(Uint8Array);
+        const staged = env.SESSION_INGEST_R2.put.mock.calls[0][1];
+        expect(staged).toBeInstanceOf(ReadableStream);
+        await expect(new Response(staged).text()).resolves.toBe('{}');
         expect(info).toHaveBeenCalledWith(
           expect.objectContaining({ event: 'direct_ingest_legacy', reason })
         );
@@ -867,9 +875,30 @@ describe('api routes', () => {
       }
     );
 
+    it('stages an empty body by value', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const request = new Request(
+        'http://local/session/ses_12345678901234567890123456/ingest?v=1',
+        { method: 'POST', headers: { 'content-length': '0' }, body: '{}' }
+      );
+
+      const response = await app.fetch(request, env);
+
+      expect(response.status).toBe(200);
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
+      expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(Uint8Array);
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'empty_body' })
+      );
+      info.mockRestore();
+    });
+
     it.each([
       ['declared over cap', '4194305'],
-      ['declared far over cap', String(8 * 1024 * 1024)],
+      ['declared far over cap', String(TEST_STAGING_MAX_BYTES)],
     ] as const)('stages a %s body through the queue', async (_name, contentLength) => {
       const { app, ingest } = prepareIngestRoute();
       const env = directIngestEnv();
@@ -895,7 +924,7 @@ describe('api routes', () => {
       info.mockRestore();
     });
 
-    it('rejects a body above the staging ceiling without staging', async () => {
+    it('enforces the staging ceiling without staging', async () => {
       const { app, ingest } = prepareIngestRoute();
       const env = directIngestEnv();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -903,7 +932,7 @@ describe('api routes', () => {
       const response = await app.fetch(
         new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
           method: 'POST',
-          headers: { 'content-length': String(16 * 1024 * 1024 + 1) },
+          headers: { 'content-length': String(TEST_STAGING_MAX_BYTES + 1) },
           body: 'x'.repeat(8),
         }),
         env
@@ -913,6 +942,44 @@ describe('api routes', () => {
       expect(await response.json()).toEqual({ success: false, error: 'payload_too_large' });
       expect(ingest).not.toHaveBeenCalled();
       expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'direct_ingest_reject',
+          reason: 'staging_budget_exceeded',
+        })
+      );
+      warn.mockRestore();
+    });
+
+    it('enforces the staging ceiling for a streamed body without staging', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const drained: Uint8Array[] = [];
+      env.SESSION_INGEST_R2.put.mockImplementationOnce(async (_key, body) => {
+        try {
+          drained.push(await new Response(body).arrayBuffer().then(b => new Uint8Array(b)));
+        } catch {
+          drained.length = 0;
+        }
+        return undefined;
+      });
+      const chunk = new Uint8Array(TEST_STAGING_MAX_BYTES / 4).fill(1);
+      const body = new Blob([chunk, chunk, chunk, chunk, chunk]).stream();
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          body,
+          duplex: 'half',
+        } as RequestInit),
+        env
+      );
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ success: false, error: 'payload_too_large' });
+      expect(ingest).not.toHaveBeenCalled();
       expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledWith(
         expect.objectContaining({

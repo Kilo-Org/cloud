@@ -28,8 +28,9 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   },
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+const mockRequireCustomLlmsById = jest.fn(async () => new Map([['acme/custom', {}]]));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
-  getCustomLlmsById: async () => new Map([['acme/custom', {}]]),
+  requireCustomLlmsById: () => mockRequireCustomLlmsById(),
 }));
 
 const TTL = 5 * 60 * 1000;
@@ -233,6 +234,15 @@ describe('model stats snapshot cache', () => {
     expect(await (await list()).json()).toEqual([]);
     expect((await detail()).status).toBe(404);
     expect(mockSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails a cold snapshot instead of treating an unreadable custom LLM catalog as empty', async () => {
+    mockRequireCustomLlmsById.mockRejectedValueOnce(new Error('catalog unavailable'));
+
+    const [all, benchmark] = await Promise.all([list(), catalog()]);
+
+    expect(all.status).toBe(500);
+    expect(benchmark).toBeUndefined();
   });
 
   it('invalidates fallback eligibility immediately and bypasses failure cooldown', async () => {

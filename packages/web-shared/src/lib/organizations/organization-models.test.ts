@@ -37,7 +37,7 @@ const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: s
 const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
-  getCustomLlmsById: async () => new Map(),
+  requireCustomLlmsById: async () => new Map(),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {

@@ -39,6 +39,14 @@ const CACHE_TTL_MS = 60_000;
  * not turn every lookup into a database query and a Sentry event. */
 const FAILURE_RETRY_MS = 5_000;
 
+type CustomLlmCatalog = {
+  byId: ReadonlyMap<string, CustomLlm>;
+  /** False when the catalog could not be read and nothing was cached before. */
+  available: boolean;
+};
+
+const UNAVAILABLE_CATALOG: CustomLlmCatalog = { byId: new Map(), available: false };
+
 let cache: { byId: ReadonlyMap<string, CustomLlm>; at: number } | null = null;
 let inFlight: Promise<ReadonlyMap<string, CustomLlm>> | null = null;
 let lastFailureAt: number | null = null;
@@ -60,16 +68,13 @@ async function loadCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
   }
 }
 
-/**
- * All valid custom LLMs keyed by lowercased public id. A failed refresh serves
- * the previous value; with nothing cached it serves an empty map.
- */
-export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
+/** A failed refresh serves the previous value; with nothing cached the catalog is unavailable. */
+async function getCustomLlmCatalog(): Promise<CustomLlmCatalog> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
-    return cache.byId;
+    return { byId: cache.byId, available: true };
   }
   if (lastFailureAt !== null && Date.now() - lastFailureAt < FAILURE_RETRY_MS) {
-    return cache?.byId ?? new Map();
+    return cache ? { byId: cache.byId, available: true } : UNAVAILABLE_CATALOG;
   }
   if (!inFlight) {
     const load = loadCustomLlmsById().finally(() => {
@@ -78,10 +83,33 @@ export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm
     inFlight = load;
   }
   try {
-    return await inFlight;
+    return { byId: await inFlight, available: true };
   } catch {
-    return cache?.byId ?? new Map();
+    return cache ? { byId: cache.byId, available: true } : UNAVAILABLE_CATALOG;
   }
+}
+
+/**
+ * All valid custom LLMs keyed by lowercased public id. Empty while the catalog
+ * is unavailable, which treats every id as a built-in model; code that must not
+ * expose a custom LLM by mistake uses `requireCustomLlmsById` instead.
+ */
+export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
+  return (await getCustomLlmCatalog()).byId;
+}
+
+export class CustomLlmCatalogUnavailableError extends Error {
+  constructor() {
+    super('The custom LLM catalog could not be read');
+    this.name = 'CustomLlmCatalogUnavailableError';
+  }
+}
+
+/** Like `getCustomLlmsById`, but throws instead of returning an empty map while unavailable. */
+export async function requireCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
+  const catalog = await getCustomLlmCatalog();
+  if (!catalog.available) throw new CustomLlmCatalogUnavailableError();
+  return catalog.byId;
 }
 
 /** Tests insert rows directly; production relies on `CACHE_TTL_MS` expiry. */

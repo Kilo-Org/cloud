@@ -4,7 +4,7 @@ import { ENKRYPT_PUBLICATION_ENABLED } from '@kilocode/web-shared/lib/config.ser
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { enkrypt_sync_state, modelStats, type ModelStats } from '@kilocode/db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
-import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { requireCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const FAILURE_RETRY_MS = 15 * 1000;
@@ -59,7 +59,7 @@ export async function getModelStatsSnapshot(): Promise<ModelStatsSnapshot> {
   const observedAt = Date.now();
   const thisLoad = (async () => {
     try {
-      const [entries, customLlmsById] = await Promise.all([loadEntries(), getCustomLlmsById()]);
+      const [entries, customLlmsById] = await Promise.all([loadEntries(), requireCustomLlmsById()]);
       const snapshot = {
         entries,
         observedAt,

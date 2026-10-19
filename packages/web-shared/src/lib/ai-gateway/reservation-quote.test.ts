@@ -238,6 +238,44 @@ describe('full-input-context fixed billing reservation', () => {
       ).kind
     ).toBe('quoted');
   });
+
+  const clientToolWithData = {
+    type: 'tool_use',
+    id: 'client-tool-call',
+    name: 'local',
+    input: {
+      type: 'server_tool_use',
+      image_url: 'opaque client argument',
+      schema: { type: 'object' },
+      payload: { type: 'image' },
+    },
+  };
+
+  it.each([
+    { label: 'client arguments', content: [clientToolWithData], quoted: true },
+    {
+      label: 'actual media after client arguments',
+      content: [clientToolWithData, { type: 'image', source: { type: 'base64', data: 'image' } }],
+      quoted: false,
+    },
+    {
+      label: 'actual hosted operation after client arguments',
+      content: [clientToolWithData, { type: 'server_tool_use', name: 'web_search', input: {} }],
+      quoted: false,
+    },
+  ])('distinguishes $label from tokenized tool data', async ({ content, quoted: accepted }) => {
+    const input = textInput({
+      max_tokens: 1,
+      messages: [{ role: 'assistant', content }],
+    });
+    input.apiKind = 'messages';
+    const result = await quoteInferenceReservation(input);
+    if (accepted) {
+      expect(result).toEqual({ kind: 'quoted', amountMicrodollars: 608 });
+    } else {
+      expect(result.kind).toBe('unsupported');
+    }
+  });
 });
 
 describe('fixed custom prices', () => {

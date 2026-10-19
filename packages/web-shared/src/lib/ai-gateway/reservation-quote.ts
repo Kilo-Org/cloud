@@ -107,6 +107,15 @@ const mediaFields: Record<string, true> = {
   attachments: true,
 };
 const requestBodySchema = z.record(z.string(), z.unknown());
+const outputLimitFields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens'] as const;
+const textPayloadFields = [
+  'messages',
+  'input',
+  'system',
+  'prompt',
+  'suffix',
+  'instructions',
+] as const;
 
 function unsupported(reason: string): Quote {
   return { kind: 'unsupported', reason };
@@ -126,22 +135,28 @@ function quoted(amount: number): Quote {
 function textOnly(value: unknown): boolean {
   if (Array.isArray(value)) return value.every(textOnly);
   if (value === null || typeof value !== 'object') return true;
-  if (Object.keys(value).some(key => Object.hasOwn(mediaFields, key))) return false;
-  if (
-    'type' in value &&
-    typeof value.type === 'string' &&
-    !Object.hasOwn(textPartTypes, value.type)
-  )
-    return false;
+  const keys = Object.keys(value);
+  if (keys.some(key => Object.hasOwn(mediaFields, key))) return false;
+  const partType = 'type' in value ? value.type : undefined;
+  if (typeof partType === 'string' && !Object.hasOwn(textPartTypes, partType)) return false;
+  // Client tool input is opaque tokenized JSON, not nested media or server operations.
+  if (partType === 'tool_use' && keys.includes('type')) {
+    const record = value as Record<string, unknown>;
+    for (const key of keys) {
+      if (key !== 'input' && !textOnly(record[key])) return false;
+    }
+    return true;
+  }
   return Object.values(value).every(textOnly);
 }
 
 function payloadRejection(body: Record<string, unknown>): string | undefined {
-  const unknownField = Object.keys(body).find(
-    key => body[key] !== undefined && !Object.hasOwn(safeFields, key)
-  );
-  if (unknownField) return `unbounded_request_field:${unknownField}`;
-  for (const key of ['messages', 'input', 'system', 'prompt', 'suffix', 'instructions']) {
+  for (const key in body) {
+    if (Object.hasOwn(body, key) && body[key] !== undefined && !Object.hasOwn(safeFields, key)) {
+      return `unbounded_request_field:${key}`;
+    }
+  }
+  for (const key of textPayloadFields) {
     if (!textOnly(body[key])) return `unsupported_media_or_hosted_operation:${key}`;
   }
   if (
@@ -162,10 +177,11 @@ function payloadRejection(body: Record<string, unknown>): string | undefined {
   )
     return 'invalid_provider_preferences';
   if (body.provider !== undefined && body.provider !== null && typeof body.provider === 'object') {
-    const unknownRoutingField = Object.keys(body.provider).find(
-      key => !Object.hasOwn(routingFields, key)
-    );
-    if (unknownRoutingField) return `unbounded_provider_option:${unknownRoutingField}`;
+    for (const key in body.provider) {
+      if (Object.hasOwn(body.provider, key) && !Object.hasOwn(routingFields, key)) {
+        return `unbounded_provider_option:${key}`;
+      }
+    }
   }
   if (
     body.service_tier !== undefined &&
@@ -189,16 +205,10 @@ function enforceOutputCap(
   maximum: number
 ): number | undefined {
   if (!positiveInteger(maximum)) return undefined;
-  const fields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens'];
-  if (
-    fields.some(
-      field => body[field] !== undefined && body[field] !== null && !positiveInteger(body[field])
-    )
-  )
-    return undefined;
   let outputTokens = maximum;
-  for (const field of fields) {
+  for (const field of outputLimitFields) {
     const value = body[field];
+    if (value !== undefined && value !== null && !positiveInteger(value)) return undefined;
     if (positiveInteger(value)) outputTokens = Math.min(outputTokens, value);
   }
   const field =
@@ -208,7 +218,7 @@ function enforceOutputCap(
         ? 'max_tokens'
         : 'max_completion_tokens';
   body[field] = outputTokens;
-  for (const other of fields) {
+  for (const other of outputLimitFields) {
     if (other !== field && body[other] !== undefined) body[other] = outputTokens;
   }
   return outputTokens;
@@ -224,17 +234,21 @@ function fullContextFixedPrice(
   let maxOutputRate = 0;
   for (const tier of pricing) {
     const rates = tier.pricing;
-    const inputRates = [
-      rates.prompt_per_million,
-      rates.input_cache_write_per_million ?? rates.prompt_per_million,
-      rates.input_cache_read_per_million ?? rates.prompt_per_million,
-    ];
+    const promptRate = rates.prompt_per_million;
+    const cacheWriteRate = rates.input_cache_write_per_million ?? promptRate;
+    const cacheReadRate = rates.input_cache_read_per_million ?? promptRate;
     if (
-      [...inputRates, rates.completion_per_million].some(rate => !Number.isFinite(rate) || rate < 0)
-    ) {
+      !Number.isFinite(promptRate) ||
+      promptRate < 0 ||
+      !Number.isFinite(cacheWriteRate) ||
+      cacheWriteRate < 0 ||
+      !Number.isFinite(cacheReadRate) ||
+      cacheReadRate < 0 ||
+      !Number.isFinite(rates.completion_per_million) ||
+      rates.completion_per_million < 0
+    )
       return unsupported('invalid_fixed_billing_rate');
-    }
-    maxInputRate = Math.max(maxInputRate, ...inputRates);
+    maxInputRate = Math.max(maxInputRate, promptRate, cacheWriteRate, cacheReadRate);
     maxOutputRate = Math.max(maxOutputRate, rates.completion_per_million);
   }
   // Input uses the whole configured context, including framing/system/tool tokens, not a text estimate.
@@ -321,9 +335,9 @@ export async function quoteInferenceReservation(input: QuoteInput): Promise<Quot
   const parsed = requestBodySchema.safeParse(input.body);
   if (!parsed.success) return unsupported('request_body_is_not_an_object');
   const body = parsed.data;
-  const rejection = payloadRejection(body);
-  if (rejection) return unsupported(rejection);
   if (input.apiKind === 'fim_completions' || input.apiKind === 'edit_completions') {
+    const rejection = payloadRejection(body);
+    if (rejection) return unsupported(rejection);
     return quoteDirectCompletion(input, body);
   }
   const sampleCount = samples(body);
@@ -344,6 +358,8 @@ export async function quoteInferenceReservation(input: QuoteInput): Promise<Quot
     if (input.providerId !== 'martian')
       return unsupported(`missing_total_output_cap_contract:${input.providerId}`);
     if (sampleCount !== 1) return unsupported('martian_does_not_support_multiple_samples');
+    const rejection = payloadRejection(body);
+    if (rejection) return unsupported(rejection);
     delete body.n;
     delete body.best_of;
     Reflect.deleteProperty(input.body, 'n');

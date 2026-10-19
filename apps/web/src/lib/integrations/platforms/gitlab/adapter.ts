@@ -1061,7 +1061,10 @@ export async function fetchGitLabMergeRequest(params: {
  *
  * Only notes authored by the GitLab account that owns the access token are
  * candidates, so the note Kilo reuses is always one it can attribute to its
- * own posting identity.
+ * own posting identity. The identity follows the credential in use: when a
+ * project token is replaced, the next lookup matches notes from the new
+ * identity and the pipeline composes a fresh summary note; later lookups
+ * update that note as usual.
  */
 export async function findKiloReviewNote(
   accessToken: string,

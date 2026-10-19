@@ -646,10 +646,11 @@ describe('useNativeAuth signup step-up', () => {
       const resultRef = await mountNativeAuth();
 
       await act(async () => {
-        expect(await resultRef.current?.verifyEmailCode('user@example.com', '123456')).toBe(false);
+        const outcome = await resultRef.current?.verifyEmailCode('user@example.com', '123456');
+        expect(outcome).toEqual({ ok: false, message: i18n.t(key) });
       });
 
-      expect(toast.error).toHaveBeenCalledWith(i18n.t(key));
+      expect(toast.error).not.toHaveBeenCalled();
       expect(authMock.signIn).not.toHaveBeenCalled();
     }
   );

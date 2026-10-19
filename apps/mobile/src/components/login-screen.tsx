@@ -90,6 +90,18 @@ export function LoginScreen() {
     void restoreDrafts();
     return () => {
       cancelled = true;
+      // Write the module-level drafts back before this mount's state dies, so
+      // the next mount restores what the user had typed — a device rotation
+      // that recreates the activity must not blank the email field. A failed
+      // write leaves the field empty on the next mount; the restore path
+      // already tolerates missing drafts.
+      void (async () => {
+        try {
+          await persistLoginDrafts();
+        } catch {
+          // Swallow: nothing to show on an unmounting screen.
+        }
+      })();
     };
   }, []);
 

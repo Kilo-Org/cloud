@@ -323,4 +323,106 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       renderer.unmount();
     });
   });
+
+  it('renders a wrong-code refusal inline on the code step and clears it on edit', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+
+    const renderer = await mountIdleAuth();
+
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('wrong@example.com');
+    });
+
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+    expect(otpForm.props.error).toBeUndefined();
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'INVALID_CODE',
+      ssoOrganizationId: undefined,
+    });
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('000000');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
+      'That code is incorrect. Please try again.'
+    );
+
+    // Editing the code retires the refusal message.
+    act(() => {
+      (otpForm.props.onCodeChange as () => void)();
+    });
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('signs in when the correct code verifies and stays silent on success', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+
+    const renderer = await mountIdleAuth();
+
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('correct@example.com');
+    });
+
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600 },
+    });
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });

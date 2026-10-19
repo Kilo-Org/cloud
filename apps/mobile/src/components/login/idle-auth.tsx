@@ -66,6 +66,7 @@ export function IdleAuth({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [view, setView] = useState<'main' | 'otp'>('main');
+  const [verifyError, setVerifyError] = useState<string | undefined>(undefined);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
   const emailRef = useRef(initialEmail);
@@ -133,6 +134,7 @@ export function IdleAuth({
     // reports a rejected address (`INVALID_REQUEST` / `INVALID_EMAIL`).
     const ok = await requestEmailCode(emailRef.current);
     if (ok) {
+      setVerifyError(undefined);
       setView('otp');
     }
   };
@@ -186,10 +188,21 @@ export function IdleAuth({
       <EmailOtpForm
         email={emailRef.current.trim().toLowerCase()}
         busy={busy}
+        error={verifyError}
         onVerify={code => {
-          void verifyEmailCode(emailRef.current, code);
+          void (async () => {
+            const outcome = await verifyEmailCode(emailRef.current, code);
+            if (!outcome.ok) {
+              setVerifyError(outcome.message);
+            }
+          })();
+        }}
+        onCodeChange={() => {
+          // Editing the code retires the refusal message above the field.
+          setVerifyError(undefined);
         }}
         onResend={() => {
+          setVerifyError(undefined);
           void (async () => {
             const ok = await requestEmailCode(emailRef.current);
             if (ok) {
@@ -198,6 +211,7 @@ export function IdleAuth({
           })();
         }}
         onBack={() => {
+          setVerifyError(undefined);
           setView('main');
         }}
       />

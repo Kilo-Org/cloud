@@ -95,7 +95,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/login-draft', () => ({
   clearLoginDrafts: vi.fn(),
   clearPersistedLoginDrafts: vi.fn(),
-  persistLoginDrafts: vi.fn(),
+  persistLoginDrafts: vi.fn().mockResolvedValue(undefined),
   restoreLoginDrafts: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('@/lib/picker-bridge', () => ({
@@ -512,6 +512,7 @@ describe('login-screen idle skeleton', () => {
     deviceAuth.resumed = false;
     vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
     vi.mocked(clearPersistedLoginDrafts).mockClear();
+    vi.mocked(persistLoginDrafts).mockClear();
   });
 
   it('shows a form skeleton until the draft restore finishes', async () => {
@@ -562,6 +563,22 @@ describe('login-screen idle skeleton', () => {
     expect(clearPersistedLoginDrafts).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
+  });
+
+  it('persists the drafts when the screen unmounts so a rotation remount restores them', async () => {
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(persistLoginDrafts).not.toHaveBeenCalled();
+
+    renderer.unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistLoginDrafts).toHaveBeenCalledTimes(1);
   });
 });
 

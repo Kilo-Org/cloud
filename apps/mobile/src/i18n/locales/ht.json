@@ -1654,7 +1654,14 @@
       "whereFound": "Kote yo jwenn sa ({{displayCount}})",
       "fullReport": "Rapò konplè ki pwodui a",
       "yes": "Wi",
-      "no": "Non"
+      "no": "Non",
+      "action": {
+        "analyzeCodebase": "Analize baz kòd la",
+        "dismiss": "Rejte",
+        "manualReview": "Revizyon manyèl",
+        "monitor": "Siveye",
+        "openPr": "Ouvri PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} konsta",
@@ -1873,7 +1880,24 @@
       "title": "Rapò odit",
       "unavailable": "Rapò odit la pa disponib",
       "unavailableDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka wè rapò odit yo. Mande yon pwopriyetè oswa yon responsab faktirasyon pou ba ou aksè.",
-      "queryFailed": "Rekèt pou rapò a pa t fini. Eseye ankò."
+      "queryFailed": "Rekèt pou rapò a pa t fini. Eseye ankò.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz la konplè",
+        "findingAnalysisFailed": "Analiz la echwe",
+        "findingAutoDismissed": "Rejte otomatikman",
+        "findingCreated": "Enpòte",
+        "findingDeleted": "Efase",
+        "findingDismissed": "Rejte",
+        "findingSeverityChanged": "Gravite a chanje",
+        "findingStatusChange": "Estati a chanje",
+        "findingSuperseded": "Ranplase",
+        "remediationBlocked": "Koreksyon an bloke",
+        "remediationCancelled": "Anile",
+        "remediationFailed": "Koreksyon an echwe",
+        "remediationNoChangesNeeded": "Pa gen chanjman nesesè",
+        "remediationPrOpened": "PR ouvè",
+        "remediationQueued": "Koreksyon mande"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nou pa t ka chaje paramèt notifikasyon yo.",

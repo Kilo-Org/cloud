@@ -1694,7 +1694,14 @@
       "whereFound": "Místa výskytu ({{displayCount}})",
       "fullReport": "Úplná vygenerovaná zpráva",
       "yes": "Ano",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analyzovat kódovou základnu",
+        "dismiss": "Zamítnout",
+        "manualReview": "Ruční kontrola",
+        "monitor": "Sledovat",
+        "openPr": "Otevřít pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "Počet nálezů: {{displayCount}}",
@@ -1919,7 +1926,24 @@
       "title": "Zpráva o auditu",
       "unavailable": "Zpráva o auditu není k dispozici",
       "unavailableDescription": "Zprávy o auditu mohou zobrazovat pouze vlastníci organizace a správci fakturace. Požádejte vlastníka nebo správce fakturace o udělení přístupu.",
-      "queryFailed": "Načítání zprávy se nedokončilo. Zkuste to znovu."
+      "queryFailed": "Načítání zprávy se nedokončilo. Zkuste to znovu.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analýza dokončena",
+        "findingAnalysisFailed": "Analýza selhala",
+        "findingAutoDismissed": "Automaticky zamítnuto",
+        "findingCreated": "Importováno",
+        "findingDeleted": "Smazáno",
+        "findingDismissed": "Zamítnuto",
+        "findingSeverityChanged": "Změněna závažnost",
+        "findingStatusChange": "Změněn stav",
+        "findingSuperseded": "Nahrazeno",
+        "remediationBlocked": "Náprava zablokována",
+        "remediationCancelled": "Zrušeno",
+        "remediationFailed": "Náprava selhala",
+        "remediationNoChangesNeeded": "Nejsou potřeba žádné změny",
+        "remediationPrOpened": "Pull request otevřen",
+        "remediationQueued": "Náprava vyžádána"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nastavení oznámení se nepodařilo načíst.",

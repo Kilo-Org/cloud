@@ -1654,7 +1654,14 @@
       "whereFound": "ਮਿਲਣ ਦੀਆਂ ਥਾਵਾਂ ({{displayCount}})",
       "fullReport": "ਤਿਆਰ ਕੀਤੀ ਪੂਰੀ ਰਿਪੋਰਟ",
       "yes": "ਹਾਂ",
-      "no": "ਨਹੀਂ"
+      "no": "ਨਹੀਂ",
+      "action": {
+        "analyzeCodebase": "ਕੋਡਬੇਸ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ ਕਰੋ",
+        "dismiss": "ਅਣਡਿੱਠਾ ਕਰੋ",
+        "manualReview": "ਮੈਨੂਅਲ ਸਮੀਖਿਆ",
+        "monitor": "ਨਿਗਰਾਨੀ ਕਰੋ",
+        "openPr": "ਪੁੱਲ ਰਿਕੁਐਸਟ ਖੋਲ੍ਹੋ"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ਸਮੱਸਿਆਵਾਂ",
@@ -1873,7 +1880,24 @@
       "title": "ਆਡਿਟ ਰਿਪੋਰਟ",
       "unavailable": "ਆਡਿਟ ਰਿਪੋਰਟ ਉਪਲਬਧ ਨਹੀਂ",
       "unavailableDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਆਡਿਟ ਰਿਪੋਰਟਾਂ ਦੇਖ ਸਕਦੇ ਹਨ। ਕਿਸੇ ਮਾਲਕ ਜਾਂ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਨੂੰ ਤੁਹਾਨੂੰ ਪਹੁੰਚ ਦੇਣ ਲਈ ਕਹੋ।",
-      "queryFailed": "ਰਿਪੋਰਟ ਦੀ ਕੁਐਰੀ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "queryFailed": "ਰਿਪੋਰਟ ਦੀ ਕੁਐਰੀ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "eventActions": {
+        "findingAnalysisCompleted": "ਵਿਸ਼ਲੇਸ਼ਣ ਪੂਰਾ ਹੋਇਆ",
+        "findingAnalysisFailed": "ਵਿਸ਼ਲੇਸ਼ਣ ਅਸਫਲ ਰਿਹਾ",
+        "findingAutoDismissed": "ਆਟੋਮੈਟਿਕ ਤੌਰ 'ਤੇ ਅਣਡਿੱਠਾ ਕੀਤਾ ਗਿਆ",
+        "findingCreated": "ਆਯਾਤ ਕੀਤਾ ਗਿਆ",
+        "findingDeleted": "ਮਿਟਾਇਆ ਗਿਆ",
+        "findingDismissed": "ਅਣਡਿੱਠਾ ਕੀਤਾ ਗਿਆ",
+        "findingSeverityChanged": "ਗੰਭੀਰਤਾ ਬਦਲੀ ਗਈ",
+        "findingStatusChange": "ਸਥਿਤੀ ਬਦਲੀ ਗਈ",
+        "findingSuperseded": "ਬਦਲਿਆ ਗਿਆ",
+        "remediationBlocked": "ਸੁਧਾਰ ਰੋਕਿਆ ਗਿਆ",
+        "remediationCancelled": "ਰੱਦ ਕੀਤਾ ਗਿਆ",
+        "remediationFailed": "ਸੁਧਾਰ ਅਸਫਲ ਰਿਹਾ",
+        "remediationNoChangesNeeded": "ਕੋਈ ਬਦਲਾਅ ਲੋੜੀਂਦਾ ਨਹੀਂ",
+        "remediationPrOpened": "ਪੁੱਲ ਰਿਕੁਐਸਟ ਖੋਲ੍ਹਿਆ ਗਿਆ",
+        "remediationQueued": "ਸੁਧਾਰ ਦੀ ਬੇਨਤੀ ਕੀਤੀ ਗਈ"
+      }
     },
     "notifications": {
       "couldNotLoad": "ਸੂਚਨਾਵਾਂ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",

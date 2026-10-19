@@ -1081,7 +1081,14 @@
       "triageReasoning": "Justification du triage",
       "watchInCloudAgent": "Suivre dans l'agent cloud",
       "whereFound": "Emplacements détectés ({{displayCount}})",
-      "yes": "Oui"
+      "yes": "Oui",
+      "action": {
+        "analyzeCodebase": "Analyser la base de code",
+        "dismiss": "Ignorer",
+        "manualReview": "Examen manuel",
+        "monitor": "Surveiller",
+        "openPr": "Ouvrir une PR"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modèle d'analyse",
@@ -1103,7 +1110,24 @@
       "summary": "Résumé du rapport",
       "title": "Rapport d'audit",
       "unavailable": "Rapport d'audit indisponible",
-      "unavailableDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent consulter les rapports d'audit. Demandez à l'un d'eux de vous accorder l'accès."
+      "unavailableDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent consulter les rapports d'audit. Demandez à l'un d'eux de vous accorder l'accès.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse terminée",
+        "findingAnalysisFailed": "Échec de l'analyse",
+        "findingAutoDismissed": "Ignoré automatiquement",
+        "findingCreated": "Importé",
+        "findingDeleted": "Supprimé",
+        "findingDismissed": "Ignoré",
+        "findingSeverityChanged": "Gravité modifiée",
+        "findingStatusChange": "Statut modifié",
+        "findingSuperseded": "Remplacé",
+        "remediationBlocked": "Correction bloquée",
+        "remediationCancelled": "Annulé",
+        "remediationFailed": "Échec de la correction",
+        "remediationNoChangesNeeded": "Aucune modification nécessaire",
+        "remediationPrOpened": "PR ouverte",
+        "remediationQueued": "Correction demandée"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Voir le rapport d'audit"

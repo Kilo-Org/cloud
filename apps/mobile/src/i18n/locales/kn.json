@@ -1654,7 +1654,14 @@
       "whereFound": "ಇದು ಕಂಡುಬಂದ ಸ್ಥಳಗಳು ({{displayCount}})",
       "fullReport": "ರಚಿಸಲಾದ ಸಂಪೂರ್ಣ ವರದಿ",
       "yes": "ಹೌದು",
-      "no": "ಇಲ್ಲ"
+      "no": "ಇಲ್ಲ",
+      "action": {
+        "analyzeCodebase": "ಕೋಡ್‌ಬೇಸ್ ವಿಶ್ಲೇಷಿಸಿ",
+        "dismiss": "ತಿರಸ್ಕರಿಸು",
+        "manualReview": "ಹಸ್ತಚಾಲಿತ ಪರಿಶೀಲನೆ",
+        "monitor": "ಮೇಲ್ವಿಚಾರಣೆ",
+        "openPr": "ಪುಲ್ ವಿನಂತಿಯನ್ನು ತೆರೆಯಿರಿ"
+      }
     },
     "dashboard": {
       "findingsCount": "ಪತ್ತೆಯಾದ {{displayCount}} ಸಮಸ್ಯೆಗಳು",
@@ -1873,7 +1880,24 @@
       "title": "ಆಡಿಟ್ ವರದಿ",
       "unavailable": "ಆಡಿಟ್ ವರದಿ ಲಭ್ಯವಿಲ್ಲ",
       "unavailableDescription": "ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಆಡಿಟ್ ವರದಿಗಳನ್ನು ನೋಡಬಹುದು. ನಿಮಗೆ ಪ್ರವೇಶ ನೀಡುವಂತೆ ಮಾಲೀಕರನ್ನು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ.",
-      "queryFailed": "ವರದಿಗಾಗಿ ಡೇಟಾ ಪಡೆಯುವ ಪ್ರಕ್ರಿಯೆ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "queryFailed": "ವರದಿಗಾಗಿ ಡೇಟಾ ಪಡೆಯುವ ಪ್ರಕ್ರಿಯೆ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "eventActions": {
+        "findingAnalysisCompleted": "ವಿಶ್ಲೇಷಣೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
+        "findingAnalysisFailed": "ವಿಶ್ಲೇಷಣೆ ವಿಫಲವಾಗಿದೆ",
+        "findingAutoDismissed": "ಸ್ವಯಂಚಾಲಿತವಾಗಿ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
+        "findingCreated": "ಆಮದು ಮಾಡಲಾಗಿದೆ",
+        "findingDeleted": "ಅಳಿಸಲಾಗಿದೆ",
+        "findingDismissed": "ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
+        "findingSeverityChanged": "ತೀವ್ರತೆ ಬದಲಾಗಿದೆ",
+        "findingStatusChange": "ಸ್ಥಿತಿ ಬದಲಾಗಿದೆ",
+        "findingSuperseded": "ಬದಲಾಯಿಸಲಾಗಿದೆ",
+        "remediationBlocked": "ಪರಿಹಾರ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
+        "remediationCancelled": "ರದ್ದುಮಾಡಲಾಗಿದೆ",
+        "remediationFailed": "ಪರಿಹಾರ ವಿಫಲವಾಗಿದೆ",
+        "remediationNoChangesNeeded": "ಬದಲಾವಣೆಗಳ ಅಗತ್ಯವಿಲ್ಲ",
+        "remediationPrOpened": "ಪುಲ್ ವಿನಂತಿ ತೆರೆಯಲಾಗಿದೆ",
+        "remediationQueued": "ಪರಿಹಾರಕ್ಕಾಗಿ ವಿನಂತಿಸಲಾಗಿದೆ"
+      }
     },
     "notifications": {
       "couldNotLoad": "ಅಧಿಸೂಚನೆಗಳ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",

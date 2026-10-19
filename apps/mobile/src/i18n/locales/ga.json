@@ -1714,7 +1714,14 @@
       "whereFound": "Cá bhfuarthas é seo ({{displayCount}})",
       "fullReport": "An tuarascáil iomlán a gineadh",
       "yes": "Tá",
-      "no": "Níl"
+      "no": "Níl",
+      "action": {
+        "analyzeCodebase": "Anailísigh an cód",
+        "dismiss": "Dífheidhmigh",
+        "manualReview": "Athbhreithniú láimhe",
+        "monitor": "Monatóireacht",
+        "openPr": "Oscail PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Torthaí: {{displayCount}}",
@@ -1942,7 +1949,24 @@
       "title": "Tuarascáil iniúchta",
       "unavailable": "Níl an tuarascáil iniúchta ar fáil",
       "unavailableDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála tuarascálacha iniúchta a fheiceáil. Iarr ar úinéir nó ar bhainisteoir billeála rochtain a thabhairt duit.",
-      "queryFailed": "Níor críochnaíodh iarratas na tuarascála. Bain triail as arís."
+      "queryFailed": "Níor críochnaíodh iarratas na tuarascála. Bain triail as arís.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Cuireadh an anailís i gcrích",
+        "findingAnalysisFailed": "Theip ar an anailís",
+        "findingAutoDismissed": "Dífheidhmithe go huathoibríoch",
+        "findingCreated": "Iompórtáladh",
+        "findingDeleted": "Scriosta",
+        "findingDismissed": "Dífheidhmithe",
+        "findingSeverityChanged": "Athraíodh déine",
+        "findingStatusChange": "Athraíodh stádas",
+        "findingSuperseded": "Cuireadh in ionad",
+        "remediationBlocked": "Cuireadh cosc ar an leasú",
+        "remediationCancelled": "Curtha ar ceal",
+        "remediationFailed": "Theip ar an leasú",
+        "remediationNoChangesNeeded": "Níor theastaigh aon athruithe",
+        "remediationPrOpened": "Osclaíodh PR",
+        "remediationQueued": "Iarradh leasú"
+      }
     },
     "notifications": {
       "couldNotLoad": "Níorbh fhéidir na socruithe fógraí a lódáil.",

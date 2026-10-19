@@ -1109,7 +1109,14 @@
       "triageReasoning": "トリアージの判断根拠",
       "watchInCloudAgent": "クラウドエージェントで確認",
       "whereFound": "検出場所（{{displayCount}}）",
-      "yes": "はい"
+      "yes": "はい",
+      "action": {
+        "analyzeCodebase": "コードベースを分析",
+        "dismiss": "却下",
+        "manualReview": "手動レビュー",
+        "monitor": "監視",
+        "openPr": "プルリクエストを作成"
+      }
     },
     "analysisSettings": {
       "analysisModel": "分析モデル",
@@ -1131,7 +1138,24 @@
       "summary": "レポートの概要",
       "title": "監査レポート",
       "unavailable": "監査レポートを利用できません",
-      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナーと請求管理者のみです。アクセス権の付与をオーナーまたは請求管理者に依頼してください。"
+      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナーと請求管理者のみです。アクセス権の付与をオーナーまたは請求管理者に依頼してください。",
+      "eventActions": {
+        "findingAnalysisCompleted": "分析が完了しました",
+        "findingAnalysisFailed": "分析に失敗しました",
+        "findingAutoDismissed": "自動的に却下されました",
+        "findingCreated": "インポート済み",
+        "findingDeleted": "削除されました",
+        "findingDismissed": "却下されました",
+        "findingSeverityChanged": "重要度が変更されました",
+        "findingStatusChange": "ステータスが変更されました",
+        "findingSuperseded": "置き換えられました",
+        "remediationBlocked": "修復がブロックされました",
+        "remediationCancelled": "キャンセルされました",
+        "remediationFailed": "修復に失敗しました",
+        "remediationNoChangesNeeded": "変更は不要",
+        "remediationPrOpened": "プルリクエストがオープンされました",
+        "remediationQueued": "修復リクエスト済み"
+      }
     },
     "auditReportButton": {
       "viewA11y": "監査レポートを表示"

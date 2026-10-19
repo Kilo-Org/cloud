@@ -1654,7 +1654,14 @@
       "whereFound": "ଚିହ୍ନଟ ହୋଇଥିବା ସ୍ଥାନ ({{displayCount}})",
       "fullReport": "ତିଆରି ହୋଇଥିବା ସମ୍ପୂର୍ଣ୍ଣ ରିପୋର୍ଟ",
       "yes": "ହଁ",
-      "no": "ନା"
+      "no": "ନା",
+      "action": {
+        "analyzeCodebase": "କୋଡବେସ୍ ବିଶ୍ଳେଷଣ କରନ୍ତୁ",
+        "dismiss": "ଖାରଜ କରନ୍ତୁ",
+        "manualReview": "ମାନୁଆଲ୍ ସମୀକ୍ଷା",
+        "monitor": "ନିରୀକ୍ଷଣ କରନ୍ତୁ",
+        "openPr": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲନ୍ତୁ"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}}ଟି ଚିହ୍ନଟ ସମସ୍ୟା",
@@ -1873,7 +1880,24 @@
       "title": "ଅଡିଟ୍ ରିପୋର୍ଟ",
       "unavailable": "ଅଡିଟ୍ ରିପୋର୍ଟ ଉପଲବ୍ଧ ନୁହେଁ",
       "unavailableDescription": "କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖିପାରିବେ। ଅନୁମତି ପାଇଁ ମାଲିକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।",
-      "queryFailed": "ରିପୋର୍ଟ ପାଇଁ ତଥ୍ୟ ଆଣିବା ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "queryFailed": "ରିପୋର୍ଟ ପାଇଁ ତଥ୍ୟ ଆଣିବା ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "eventActions": {
+        "findingAnalysisCompleted": "ବିଶ୍ଳେଷଣ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇଛି",
+        "findingAnalysisFailed": "ବିଶ୍ଳେଷଣ ବିଫଳ ହୋଇଛି",
+        "findingAutoDismissed": "ସ୍ୱୟଂଚାଳିତ ଭାବେ ଖାରଜ କରାଯାଇଛି",
+        "findingCreated": "ଆମଦାନୀ ହୋଇଛି",
+        "findingDeleted": "ଅପସାରିତ ହୋଇଛି",
+        "findingDismissed": "ଖାରଜ କରାଯାଇଛି",
+        "findingSeverityChanged": "ଗମ୍ଭୀରତା ବଦଳିଛି",
+        "findingStatusChange": "ସ୍ଥିତି ବଦଳିଛି",
+        "findingSuperseded": "ପ୍ରତିସ୍ଥାପିତ ହୋଇଛି",
+        "remediationBlocked": "ସମାଧାନ ଅବରୋଧିତ ହୋଇଛି",
+        "remediationCancelled": "ରଦ୍ଦ କରାଯାଇଛି",
+        "remediationFailed": "ସମାଧାନ ବିଫଳ ହୋଇଛି",
+        "remediationNoChangesNeeded": "କୌଣସି ପରିବର୍ତ୍ତନ ଆବଶ୍ୟକ ନାହିଁ",
+        "remediationPrOpened": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଯାଇଛି",
+        "remediationQueued": "ସମାଧାନ ପାଇଁ ଅନୁରୋଧ କରାଯାଇଛି"
+      }
     },
     "notifications": {
       "couldNotLoad": "ବିଜ୍ଞପ୍ତି ସେଟିଂସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",

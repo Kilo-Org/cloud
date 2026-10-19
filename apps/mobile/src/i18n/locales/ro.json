@@ -1674,7 +1674,14 @@
       "whereFound": "Locuri în care a fost identificată ({{displayCount}})",
       "fullReport": "Raport complet generat",
       "yes": "Da",
-      "no": "Nu"
+      "no": "Nu",
+      "action": {
+        "analyzeCodebase": "Analizează baza de cod",
+        "dismiss": "Respinge",
+        "manualReview": "Revizuire manuală",
+        "monitor": "Monitorizează",
+        "openPr": "Deschide pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} constatări",
@@ -1896,7 +1903,24 @@
       "title": "Raport de audit",
       "unavailable": "Raport de audit indisponibil",
       "unavailableDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot vedea rapoartele de audit. Cere unui proprietar sau unui responsabil cu facturarea să îți acorde acces.",
-      "queryFailed": "Interogarea pentru raport nu s-a finalizat. Încearcă din nou."
+      "queryFailed": "Interogarea pentru raport nu s-a finalizat. Încearcă din nou.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiză finalizată",
+        "findingAnalysisFailed": "Analiză eșuată",
+        "findingAutoDismissed": "Respins automat",
+        "findingCreated": "Importat",
+        "findingDeleted": "Șters",
+        "findingDismissed": "Respins",
+        "findingSeverityChanged": "Severitate modificată",
+        "findingStatusChange": "Stare modificată",
+        "findingSuperseded": "Înlocuit",
+        "remediationBlocked": "Remediere blocată",
+        "remediationCancelled": "Anulată",
+        "remediationFailed": "Remediere eșuată",
+        "remediationNoChangesNeeded": "Nu sunt necesare modificări",
+        "remediationPrOpened": "Pull request deschis",
+        "remediationQueued": "Remediere solicitată"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nu s-au putut încărca setările de notificare.",

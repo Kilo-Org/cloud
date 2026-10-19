@@ -1654,7 +1654,14 @@
       "whereFound": "Bakkeewwan itti argame ({{displayCount}})",
       "fullReport": "Gabaasa guutuu uumame",
       "yes": "Eeyyee",
-      "no": "Lakki"
+      "no": "Lakki",
+      "action": {
+        "analyzeCodebase": "Koodii xiinxali",
+        "dismiss": "Hambisi",
+        "manualReview": "Ilaalcha harkaatiin",
+        "monitor": "Hordofi",
+        "openPr": "Pool reekwesitii bani"
+      }
     },
     "dashboard": {
       "findingsCount": "Argamoota {{displayCount}}",
@@ -1873,7 +1880,24 @@
       "title": "Gabaasa qorannoo",
       "unavailable": "Gabaasa qorannoo hin jiru",
       "unavailableDescription": "Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa gabaasa qorannoo ilaaluu danda'u. Abbaa dhaabbataa ykn bulchaa kaffaltii hayyama akka siif kennu gaafadhu.",
-      "queryFailed": "Gaaffiin gabaasaa hin xumuramne. Irra deebi'ii yaali."
+      "queryFailed": "Gaaffiin gabaasaa hin xumuramne. Irra deebi'ii yaali.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Xiinxalli xumurameera",
+        "findingAnalysisFailed": "Xiinxalli kufeera",
+        "findingAutoDismissed": "Ofumaa hambifameera",
+        "findingCreated": "Galmeessifameera",
+        "findingDeleted": "Balleessameera",
+        "findingDismissed": "Hambifameera",
+        "findingSeverityChanged": "Ulfaatinaa jijjiirameera",
+        "findingStatusChange": "Haala jijjiirameera",
+        "findingSuperseded": "Bakka buufameera",
+        "remediationBlocked": "Sirreeffamni dhorkameera",
+        "remediationCancelled": "Dhiifameera",
+        "remediationFailed": "Sirreeffamni kufeera",
+        "remediationNoChangesNeeded": "Jijjiiramni hin barbaachisu",
+        "remediationPrOpened": "Pool reekwesitii banameera",
+        "remediationQueued": "Sirreeffamni gaafatameera"
+      }
     },
     "notifications": {
       "couldNotLoad": "Qindaa'ina beeksisaa fe'uun hin danda'amne.",

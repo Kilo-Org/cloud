@@ -1109,7 +1109,14 @@
       "triageReasoning": "初步评估依据",
       "watchInCloudAgent": "在云端智能体中查看",
       "whereFound": "发现位置（{{displayCount}}）",
-      "yes": "是"
+      "yes": "是",
+      "action": {
+        "analyzeCodebase": "分析代码库",
+        "dismiss": "忽略",
+        "manualReview": "人工审查",
+        "monitor": "监控",
+        "openPr": "打开拉取请求"
+      }
     },
     "analysisSettings": {
       "analysisModel": "分析模型",
@@ -1131,7 +1138,24 @@
       "summary": "报告摘要",
       "title": "审计报告",
       "unavailable": "审计报告不可用",
-      "unavailableDescription": "只有组织所有者和账单管理员可以查看审计报告。请联系组织所有者或账单管理员获取访问权限。"
+      "unavailableDescription": "只有组织所有者和账单管理员可以查看审计报告。请联系组织所有者或账单管理员获取访问权限。",
+      "eventActions": {
+        "findingAnalysisCompleted": "分析已完成",
+        "findingAnalysisFailed": "分析失败",
+        "findingAutoDismissed": "已自动忽略",
+        "findingCreated": "已导入",
+        "findingDeleted": "已删除",
+        "findingDismissed": "已忽略",
+        "findingSeverityChanged": "严重性已变更",
+        "findingStatusChange": "状态已更改",
+        "findingSuperseded": "已被取代",
+        "remediationBlocked": "修复被阻止",
+        "remediationCancelled": "已取消",
+        "remediationFailed": "修复失败",
+        "remediationNoChangesNeeded": "无需更改",
+        "remediationPrOpened": "已打开拉取请求",
+        "remediationQueued": "已请求修复"
+      }
     },
     "auditReportButton": {
       "viewA11y": "查看审计报告"

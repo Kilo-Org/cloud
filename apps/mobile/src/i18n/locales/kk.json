@@ -1654,7 +1654,14 @@
       "whereFound": "Табылған орындар ({{displayCount}})",
       "fullReport": "Жасалған толық есеп",
       "yes": "Иә",
-      "no": "Жоқ"
+      "no": "Жоқ",
+      "action": {
+        "analyzeCodebase": "Код базасын талдау",
+        "dismiss": "Қабылдамау",
+        "manualReview": "Қолмен тексеру",
+        "monitor": "Бақылау",
+        "openPr": "Тарту сұрауын ашу"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} мәселе",
@@ -1873,7 +1880,24 @@
       "title": "Аудит есебі",
       "unavailable": "Аудит есебі қолжетімсіз",
       "unavailableDescription": "Аудит есептерін тек ұйым иелері мен төлем менеджерлері көре алады. Ұйым иесінен немесе төлем менеджерінен кіруге рұқсат сұраңыз.",
-      "queryFailed": "Есеп сұрауы аяқталмады. Қайталап көріңіз."
+      "queryFailed": "Есеп сұрауы аяқталмады. Қайталап көріңіз.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Талдау аяқталды",
+        "findingAnalysisFailed": "Талдау сәтсіз аяқталды",
+        "findingAutoDismissed": "Автоматты түрде қабылданбады",
+        "findingCreated": "Импортталды",
+        "findingDeleted": "Жойылды",
+        "findingDismissed": "Қабылданбады",
+        "findingSeverityChanged": "Қауіптілік деңгейі өзгерді",
+        "findingStatusChange": "Күй өзгерді",
+        "findingSuperseded": "Ауыстырылды",
+        "remediationBlocked": "Түзету блокталды",
+        "remediationCancelled": "Болдырылмады",
+        "remediationFailed": "Түзету сәтсіз аяқталды",
+        "remediationNoChangesNeeded": "Өзгерістер қажет емес",
+        "remediationPrOpened": "Тарту сұрауы ашылды",
+        "remediationQueued": "Түзету сұралды"
+      }
     },
     "notifications": {
       "couldNotLoad": "Хабарландыру баптауларын жүктеу мүмкін болмады.",

@@ -1654,7 +1654,14 @@
       "whereFound": "Staðsetningar fráviks ({{displayCount}})",
       "fullReport": "Sjálfvirk skýrsla í heild",
       "yes": "Já",
-      "no": "Nei"
+      "no": "Nei",
+      "action": {
+        "analyzeCodebase": "Greina kóðagrunn",
+        "dismiss": "Hunsa",
+        "manualReview": "Handvirk endurskoðun",
+        "monitor": "Fylgjast með",
+        "openPr": "Opna togbeiðni"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} frávik",
@@ -1873,7 +1880,24 @@
       "title": "Endurskoðunarskýrsla",
       "unavailable": "Endurskoðunarskýrsla ekki tiltæk",
       "unavailableDescription": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta skoðað endurskoðunarskýrslur. Biddu eiganda eða greiðslustjóra um að veita þér aðgang.",
-      "queryFailed": "Fyrirspurn um skýrsluna lauk ekki. Reyndu aftur."
+      "queryFailed": "Fyrirspurn um skýrsluna lauk ekki. Reyndu aftur.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Greining lokið",
+        "findingAnalysisFailed": "Greining mistókst",
+        "findingAutoDismissed": "Sjálfvirkt hunsað",
+        "findingCreated": "Flutt inn",
+        "findingDeleted": "Eytt",
+        "findingDismissed": "Hunsað",
+        "findingSeverityChanged": "Mikilvægi breytt",
+        "findingStatusChange": "Staða breytt",
+        "findingSuperseded": "Skipt út",
+        "remediationBlocked": "Úrbætur hindraðar",
+        "remediationCancelled": "Hætt við",
+        "remediationFailed": "Úrbætur mistókust",
+        "remediationNoChangesNeeded": "Engar breytingar nauðsynlegar",
+        "remediationPrOpened": "Togbeiðni opnuð",
+        "remediationQueued": "Óskað eftir úrbótum"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ekki tókst að sækja tilkynningastillingar.",

@@ -1694,7 +1694,14 @@
       "whereFound": "Kur tai rasta ({{displayCount}})",
       "fullReport": "Visa sugeneruota ataskaita",
       "yes": "Taip",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analizuoti kodų bazę",
+        "dismiss": "Atmesti",
+        "manualReview": "Rankinis peržiūrėjimas",
+        "monitor": "Stebėti",
+        "openPr": "Atidaryti traukimo užklausą"
+      }
     },
     "dashboard": {
       "findingsCount": "Radinių: {{displayCount}}",
@@ -1919,7 +1926,24 @@
       "title": "Audito ataskaita",
       "unavailable": "Audito ataskaita nepasiekiama",
       "unavailableDescription": "Audito ataskaitas gali peržiūrėti tik organizacijos savininkai ir atsiskaitymų administratoriai. Paprašyk savininko arba atsiskaitymų administratoriaus suteikti tau prieigą.",
-      "queryFailed": "Nepavyko užbaigti ataskaitos užklausos. Bandyk dar kartą."
+      "queryFailed": "Nepavyko užbaigti ataskaitos užklausos. Bandyk dar kartą.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analizė atlikta",
+        "findingAnalysisFailed": "Analizė nesėkminga",
+        "findingAutoDismissed": "Atmesta automatiškai",
+        "findingCreated": "Importuota",
+        "findingDeleted": "Ištrinta",
+        "findingDismissed": "Atmesta",
+        "findingSeverityChanged": "Pakeistas sunkumo lygis",
+        "findingStatusChange": "Pakeista būsena",
+        "findingSuperseded": "Išstumta",
+        "remediationBlocked": "Taisymas užblokuotas",
+        "remediationCancelled": "Atšaukta",
+        "remediationFailed": "Taisymas nesėkmingas",
+        "remediationNoChangesNeeded": "Pakeitimų nereikia",
+        "remediationPrOpened": "Atidaryta traukimo užklausa",
+        "remediationQueued": "Pateikta taisymo užklausa"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nepavyko įkelti pranešimų nustatymų.",

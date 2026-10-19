@@ -1115,7 +1115,14 @@
       "triageReasoning": "Обоснование первичной оценки",
       "watchInCloudAgent": "Открыть в облачном агенте",
       "whereFound": "Места обнаружения ({{displayCount}})",
-      "yes": "Да"
+      "yes": "Да",
+      "action": {
+        "analyzeCodebase": "Проанализировать кодовую базу",
+        "dismiss": "Отклонить",
+        "manualReview": "Проверка вручную",
+        "monitor": "Отслеживать",
+        "openPr": "Открыть pull request"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Модель для анализа",
@@ -1137,7 +1144,24 @@
       "summary": "Сводка отчёта",
       "title": "Отчёт аудита",
       "unavailable": "Отчёт аудита недоступен",
-      "unavailableDescription": "Только владельцы организации и администраторы платежей могут просматривать отчёты аудита. Попросите владельца или администратора платежей предоставить вам доступ."
+      "unavailableDescription": "Только владельцы организации и администраторы платежей могут просматривать отчёты аудита. Попросите владельца или администратора платежей предоставить вам доступ.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Анализ завершён",
+        "findingAnalysisFailed": "Сбой анализа",
+        "findingAutoDismissed": "Отклонено автоматически",
+        "findingCreated": "Импортировано",
+        "findingDeleted": "Удалено",
+        "findingDismissed": "Отклонено",
+        "findingSeverityChanged": "Изменена серьёзность",
+        "findingStatusChange": "Изменён статус",
+        "findingSuperseded": "Заменено",
+        "remediationBlocked": "Исправление заблокировано",
+        "remediationCancelled": "Отменено",
+        "remediationFailed": "Сбой исправления",
+        "remediationNoChangesNeeded": "Изменения не требуются",
+        "remediationPrOpened": "Открыт pull request",
+        "remediationQueued": "Исправление запрошено"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Открыть отчёт аудита"

@@ -1674,7 +1674,14 @@
       "whereFound": "Konstatējuma atrašanās vietas ({{displayCount}})",
       "fullReport": "Pilns sagatavotais ziņojums",
       "yes": "Jā",
-      "no": "Nē"
+      "no": "Nē",
+      "action": {
+        "analyzeCodebase": "Analizēt koda bāzi",
+        "dismiss": "Noraidīt",
+        "manualReview": "Manuāla pārskatīšana",
+        "monitor": "Uzraudzīt",
+        "openPr": "Atvērt PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Konstatējumi: {{displayCount}}",
@@ -1896,7 +1903,24 @@
       "title": "Audita ziņojums",
       "unavailable": "Audita ziņojums nav pieejams",
       "unavailableDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var skatīt audita ziņojumus. Lūdz īpašnieku vai norēķinu pārvaldnieku piešķirt tev piekļuvi.",
-      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz."
+      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analīze pabeigta",
+        "findingAnalysisFailed": "Analīze neizdevās",
+        "findingAutoDismissed": "Automātiski noraidīts",
+        "findingCreated": "Importēts",
+        "findingDeleted": "Izdzēsts",
+        "findingDismissed": "Noraidīts",
+        "findingSeverityChanged": "Mainīta smaguma pakāpe",
+        "findingStatusChange": "Mainīts statuss",
+        "findingSuperseded": "Aizstāts",
+        "remediationBlocked": "Labošana bloķēta",
+        "remediationCancelled": "Atcelta",
+        "remediationFailed": "Labošana neizdevās",
+        "remediationNoChangesNeeded": "Izmaiņas nav nepieciešamas",
+        "remediationPrOpened": "Atvērts PR",
+        "remediationQueued": "Labošana pieprasīta"
+      }
     },
     "notifications": {
       "couldNotLoad": "Neizdevās ielādēt paziņojumu iestatījumus.",

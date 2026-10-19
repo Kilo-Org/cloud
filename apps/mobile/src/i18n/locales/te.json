@@ -1654,7 +1654,14 @@
       "whereFound": "గుర్తించిన చోటులు ({{displayCount}})",
       "fullReport": "రూపొందించిన పూర్తి నివేదిక",
       "yes": "అవును",
-      "no": "లేదు"
+      "no": "లేదు",
+      "action": {
+        "analyzeCodebase": "కోడ్‌బేస్‌ను విశ్లేషించండి",
+        "dismiss": "తిరస్కరించండి",
+        "manualReview": "మాన్యువల్ సమీక్ష",
+        "monitor": "పర్యవేక్షించండి",
+        "openPr": "PR తెరవండి"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} సమస్యలు",
@@ -1873,7 +1880,24 @@
       "title": "ఆడిట్ నివేదిక",
       "unavailable": "ఆడిట్ నివేదిక అందుబాటులో లేదు",
       "unavailableDescription": "సంస్థ యజమానులు, బిల్లింగ్ మేనేజర్లు మాత్రమే ఆడిట్ నివేదికలను చూడగలరు. వీటిని చూడటానికి అనుమతి ఇవ్వమని యజమానిని లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
-      "queryFailed": "నివేదిక కోసం చేసిన క్వెరీ పూర్తి కాలేదు. మళ్లీ ప్రయత్నించండి."
+      "queryFailed": "నివేదిక కోసం చేసిన క్వెరీ పూర్తి కాలేదు. మళ్లీ ప్రయత్నించండి.",
+      "eventActions": {
+        "findingAnalysisCompleted": "విశ్లేషణ పూర్తయింది",
+        "findingAnalysisFailed": "విశ్లేషణ విఫలమైంది",
+        "findingAutoDismissed": "స్వయంచాలకంగా తిరస్కరించబడింది",
+        "findingCreated": "దిగుమతి చేయబడింది",
+        "findingDeleted": "తొలగించబడింది",
+        "findingDismissed": "తిరస్కరించబడింది",
+        "findingSeverityChanged": "తీవ్రత మార్చబడింది",
+        "findingStatusChange": "స్థితి మార్చబడింది",
+        "findingSuperseded": "భర్తీ చేయబడింది",
+        "remediationBlocked": "పరిష్కారం నిరోధించబడింది",
+        "remediationCancelled": "రద్దు చేయబడింది",
+        "remediationFailed": "పరిష్కారం విఫలమైంది",
+        "remediationNoChangesNeeded": "మార్పులు అవసరం లేదు",
+        "remediationPrOpened": "PR తెరవబడింది",
+        "remediationQueued": "పరిష్కారం అభ్యర్థించబడింది"
+      }
     },
     "notifications": {
       "couldNotLoad": "నోటిఫికేషన్ సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము.",

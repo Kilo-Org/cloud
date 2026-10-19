@@ -1115,7 +1115,14 @@
       "triageReasoning": "Обґрунтування первинної оцінки",
       "watchInCloudAgent": "Переглянути в хмарному агенті",
       "whereFound": "Місця виявлення ({{displayCount}})",
-      "yes": "Так"
+      "yes": "Так",
+      "action": {
+        "analyzeCodebase": "Проаналізувати кодову базу",
+        "dismiss": "Відхилити",
+        "manualReview": "Перевірка вручну",
+        "monitor": "Спостерігати",
+        "openPr": "Відкрити запит на витягування"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Модель аналізу",
@@ -1137,7 +1144,24 @@
       "summary": "Підсумок звіту",
       "title": "Звіт аудиту",
       "unavailable": "Звіт аудиту недоступний",
-      "unavailableDescription": "Переглядати звіти аудиту можуть лише власники організації та менеджери з оплати. Попросіть власника або менеджера з оплати надати вам доступ."
+      "unavailableDescription": "Переглядати звіти аудиту можуть лише власники організації та менеджери з оплати. Попросіть власника або менеджера з оплати надати вам доступ.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Аналіз завершено",
+        "findingAnalysisFailed": "Помилка аналізу",
+        "findingAutoDismissed": "Відхилено автоматично",
+        "findingCreated": "Імпортовано",
+        "findingDeleted": "Видалено",
+        "findingDismissed": "Відхилено",
+        "findingSeverityChanged": "Змінено рівень серйозності",
+        "findingStatusChange": "Статус змінено",
+        "findingSuperseded": "Замінено",
+        "remediationBlocked": "Виправлення заблоковано",
+        "remediationCancelled": "Скасовано",
+        "remediationFailed": "Помилка виправлення",
+        "remediationNoChangesNeeded": "Зміни не потрібні",
+        "remediationPrOpened": "Відкрито запит на витягування",
+        "remediationQueued": "Надіслано запит на виправлення"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Переглянути звіт аудиту"

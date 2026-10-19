@@ -1674,7 +1674,14 @@
       "whereFound": "Locais onde foi detetada ({{displayCount}})",
       "fullReport": "Relatório completo gerado",
       "yes": "Sim",
-      "no": "Não"
+      "no": "Não",
+      "action": {
+        "analyzeCodebase": "Analisar base de código",
+        "dismiss": "Ignorar",
+        "manualReview": "Revisão manual",
+        "monitor": "Monitorizar",
+        "openPr": "Abrir pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ocorrências",
@@ -1896,7 +1903,24 @@
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
       "unavailableDescription": "Apenas os proprietários da organização e os gestores de faturação podem ver relatórios de auditoria. Pede a um deles que te dê acesso.",
-      "queryFailed": "A consulta do relatório não foi concluída. Tenta novamente."
+      "queryFailed": "A consulta do relatório não foi concluída. Tenta novamente.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análise concluída",
+        "findingAnalysisFailed": "Falha na análise",
+        "findingAutoDismissed": "Ignorado automaticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Eliminado",
+        "findingDismissed": "Ignorado",
+        "findingSeverityChanged": "Severidade alterada",
+        "findingStatusChange": "Estado alterado",
+        "findingSuperseded": "Substituído",
+        "remediationBlocked": "Correção bloqueada",
+        "remediationCancelled": "Cancelada",
+        "remediationFailed": "Falha na correção",
+        "remediationNoChangesNeeded": "Não são necessárias alterações",
+        "remediationPrOpened": "Pull request aberto",
+        "remediationQueued": "Correção pedida"
+      }
     },
     "notifications": {
       "couldNotLoad": "Não foi possível carregar as definições de notificações.",

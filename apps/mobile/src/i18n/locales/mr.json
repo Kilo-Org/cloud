@@ -1654,7 +1654,14 @@
       "whereFound": "आढळलेली ठिकाणे ({{displayCount}})",
       "fullReport": "तयार केलेला संपूर्ण अहवाल",
       "yes": "होय",
-      "no": "नाही"
+      "no": "नाही",
+      "action": {
+        "analyzeCodebase": "कोडबेसचे विश्लेषण करा",
+        "dismiss": "नाकारा",
+        "manualReview": "मॅन्युअल पुनरावलोकन",
+        "monitor": "निरीक्षण करा",
+        "openPr": "PR उघडा"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} निष्कर्ष",
@@ -1873,7 +1880,24 @@
       "title": "ऑडिट अहवाल",
       "unavailable": "ऑडिट अहवाल अनुपलब्ध",
       "unavailableDescription": "केवळ संस्थेचे मालक आणि बिलिंग व्यवस्थापक ऑडिट अहवाल पाहू शकतात. तुम्हाला प्रवेश देण्याची विनंती त्यांच्याकडे करा.",
-      "queryFailed": "अहवालासाठीची क्वेरी पूर्ण झाली नाही. पुन्हा प्रयत्न करा."
+      "queryFailed": "अहवालासाठीची क्वेरी पूर्ण झाली नाही. पुन्हा प्रयत्न करा.",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूर्ण झाले",
+        "findingAnalysisFailed": "विश्लेषण अयशस्वी झाले",
+        "findingAutoDismissed": "स्वयंचलितपणे नाकारले",
+        "findingCreated": "आयात केले",
+        "findingDeleted": "हटवले",
+        "findingDismissed": "नाकारले",
+        "findingSeverityChanged": "तीव्रता बदलली",
+        "findingStatusChange": "स्थिती बदलली",
+        "findingSuperseded": "जुने झाले",
+        "remediationBlocked": "निराकरण अडवले गेले",
+        "remediationCancelled": "रद्द केले",
+        "remediationFailed": "निराकरण अयशस्वी झाले",
+        "remediationNoChangesNeeded": "बदलांची गरज नाही",
+        "remediationPrOpened": "PR उघडले",
+        "remediationQueued": "निराकरणाची विनंती केली"
+      }
     },
     "notifications": {
       "couldNotLoad": "सूचनांच्या सेटिंग्ज लोड करता आल्या नाहीत.",

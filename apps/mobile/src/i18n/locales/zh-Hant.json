@@ -1109,7 +1109,14 @@
       "triageReasoning": "初步評估依據",
       "watchInCloudAgent": "在雲端代理中檢視",
       "whereFound": "發現位置（{{displayCount}}）",
-      "yes": "是"
+      "yes": "是",
+      "action": {
+        "analyzeCodebase": "分析程式碼庫",
+        "dismiss": "忽略",
+        "manualReview": "人工審查",
+        "monitor": "監控",
+        "openPr": "開啟提取要求"
+      }
     },
     "analysisSettings": {
       "analysisModel": "分析模型",
@@ -1131,7 +1138,24 @@
       "summary": "報告摘要",
       "title": "稽核報告",
       "unavailable": "無法取得稽核報告",
-      "unavailableDescription": "只有組織擁有者與帳單管理員可以檢視稽核報告。請向組織擁有者或帳單管理員申請存取權限。"
+      "unavailableDescription": "只有組織擁有者與帳單管理員可以檢視稽核報告。請向組織擁有者或帳單管理員申請存取權限。",
+      "eventActions": {
+        "findingAnalysisCompleted": "分析已完成",
+        "findingAnalysisFailed": "分析失敗",
+        "findingAutoDismissed": "已自動忽略",
+        "findingCreated": "已匯入",
+        "findingDeleted": "已刪除",
+        "findingDismissed": "已忽略",
+        "findingSeverityChanged": "嚴重性已變更",
+        "findingStatusChange": "狀態已變更",
+        "findingSuperseded": "已被取代",
+        "remediationBlocked": "修復遭封鎖",
+        "remediationCancelled": "已取消",
+        "remediationFailed": "修復失敗",
+        "remediationNoChangesNeeded": "無需變更",
+        "remediationPrOpened": "已開啟提取要求",
+        "remediationQueued": "已提出修復要求"
+      }
     },
     "auditReportButton": {
       "viewA11y": "檢視稽核報告"

@@ -1654,7 +1654,14 @@
       "whereFound": "Előfordulási helyek ({{displayCount}})",
       "fullReport": "Teljes elkészült jelentés",
       "yes": "Igen",
-      "no": "Nem"
+      "no": "Nem",
+      "action": {
+        "analyzeCodebase": "Kódbázis elemzése",
+        "dismiss": "Elutasítás",
+        "manualReview": "Manuális ellenőrzés",
+        "monitor": "Figyelés",
+        "openPr": "PR megnyitása"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} találat",
@@ -1873,7 +1880,24 @@
       "title": "Auditjelentés",
       "unavailable": "Az auditjelentés nem érhető el",
       "unavailableDescription": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők tekinthetik meg az auditjelentéseket. Kérj hozzáférést egy tulajdonostól vagy a számlázásért felelős kezelőtől.",
-      "queryFailed": "A jelentés lekérdezése nem fejeződött be. Próbáld újra."
+      "queryFailed": "A jelentés lekérdezése nem fejeződött be. Próbáld újra.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Elemzés befejezve",
+        "findingAnalysisFailed": "Elemzés sikertelen",
+        "findingAutoDismissed": "Automatikusan elutasítva",
+        "findingCreated": "Importálva",
+        "findingDeleted": "Törölve",
+        "findingDismissed": "Elutasítva",
+        "findingSeverityChanged": "Súlyosság módosítva",
+        "findingStatusChange": "Állapot módosítva",
+        "findingSuperseded": "Helyettesítve",
+        "remediationBlocked": "Hibajavítás blokkolva",
+        "remediationCancelled": "Megszakítva",
+        "remediationFailed": "Hibajavítás sikertelen",
+        "remediationNoChangesNeeded": "Nincs szükség módosításra",
+        "remediationPrOpened": "PR megnyitva",
+        "remediationQueued": "Hibajavítás kérve"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nem sikerült betölteni az értesítési beállításokat.",

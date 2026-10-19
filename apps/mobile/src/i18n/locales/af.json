@@ -1654,7 +1654,14 @@
       "whereFound": "Waar dit gevind is ({{displayCount}})",
       "fullReport": "Volledige gegenereerde verslag",
       "yes": "Ja",
-      "no": "Nee"
+      "no": "Nee",
+      "action": {
+        "analyzeCodebase": "Analiseer kodebasis",
+        "dismiss": "Wys af",
+        "manualReview": "Handmatige hersiening",
+        "monitor": "Monitor",
+        "openPr": "Maak PR oop"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} bevindings",
@@ -1873,7 +1880,24 @@
       "title": "Ouditverslag",
       "unavailable": "Ouditverslag onbeskikbaar",
       "unavailableDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan ouditverslae bekyk. Vra 'n eienaar of faktureringsbestuurder om jou toegang te gee.",
-      "queryFailed": "Die verslagnavraag is nie voltooi nie. Probeer weer."
+      "queryFailed": "Die verslagnavraag is nie voltooi nie. Probeer weer.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Ontleding voltooi",
+        "findingAnalysisFailed": "Ontleding misluk",
+        "findingAutoDismissed": "Outomaties afgewys",
+        "findingCreated": "Geïmporteer",
+        "findingDeleted": "Geskrap",
+        "findingDismissed": "Verwerp",
+        "findingSeverityChanged": "Ernstigheid verander",
+        "findingStatusChange": "Status verander",
+        "findingSuperseded": "Vervang",
+        "remediationBlocked": "Regstelling geblokkeer",
+        "remediationCancelled": "Gekanselleer",
+        "remediationFailed": "Regstelling misluk",
+        "remediationNoChangesNeeded": "Geen veranderinge nodig nie",
+        "remediationPrOpened": "PR geopen",
+        "remediationQueued": "Regstelling versoek"
+      }
     },
     "notifications": {
       "couldNotLoad": "Die kennisgewinginstellings kon nie gelaai word nie.",

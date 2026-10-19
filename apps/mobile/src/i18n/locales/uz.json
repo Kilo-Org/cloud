@@ -1654,7 +1654,14 @@
       "whereFound": "Aniqlangan joylar ({{displayCount}})",
       "fullReport": "Yaratilgan hisobotning to'liq matni",
       "yes": "Ha",
-      "no": "Yo'q"
+      "no": "Yo'q",
+      "action": {
+        "analyzeCodebase": "Kod bazasini tahlil qilish",
+        "dismiss": "Rad etish",
+        "manualReview": "Qoʻlda tekshirish",
+        "monitor": "Kuzatish",
+        "openPr": "Pull request ochish"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ta muammo",
@@ -1873,7 +1880,24 @@
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",
       "unavailableDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi yoki hisob-kitob menejeridan sizga kirish huquqini berishni so'rang.",
-      "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring."
+      "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Tahlil yakunlandi",
+        "findingAnalysisFailed": "Tahlil amalga oshmadi",
+        "findingAutoDismissed": "Avtomatik rad etildi",
+        "findingCreated": "Import qilindi",
+        "findingDeleted": "Oʻchirildi",
+        "findingDismissed": "Rad etildi",
+        "findingSeverityChanged": "Muhimlik darajasi oʻzgardi",
+        "findingStatusChange": "Holat oʻzgardi",
+        "findingSuperseded": "Almashtirildi",
+        "remediationBlocked": "Tuzatish bloklandi",
+        "remediationCancelled": "Bekor qilindi",
+        "remediationFailed": "Tuzatish amalga oshmadi",
+        "remediationNoChangesNeeded": "Oʻzgarish kerak emas",
+        "remediationPrOpened": "Pull request ochildi",
+        "remediationQueued": "Tuzatish so'raldi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Bildirishnoma sozlamalarini yuklab bo'lmadi.",

@@ -311,7 +311,7 @@ describe('shouldShowTabLabel', () => {
     const widestArabicLabel = 'الملف الشخصي';
     expect(tabLabelWidth(widestArabicLabel)).toBeLessThan(360 / 4 - 10);
     expect(shouldShowTabLabel(1, 360 / 4, arabicLabels)).toBe(true);
-    // The same labels genuinely cannot fit a five-tab box (68.6dp), so the
+    // The same labels genuinely cannot fit a five-tab box (62dp), so the
     // width rule still does its job in Arabic.
     expect(shouldShowTabLabel(1, 360 / 5, arabicLabels)).toBe(false);
   });

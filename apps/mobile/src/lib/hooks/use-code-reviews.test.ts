@@ -322,7 +322,7 @@ describe('useCreateManualReview wiring', () => {
       error: 'Insufficient balance',
     });
 
-    await opts.mutationFn?.(CREATE_VARS).catch(error => {
+    await opts.mutationFn?.(CREATE_VARS).catch((error: unknown) => {
       opts.onError?.(error);
     });
 

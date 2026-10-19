@@ -439,15 +439,39 @@ Temporary holds alone do not trigger additional automatic top-up payments.
 Run the reservation tests and `pnpm drizzle:verify-bootstrap` against disposable local PostgreSQL.
 Use a separate migrated database for `scripts/benchmark-inference-reservations.ts`.
 The benchmark requires explicit loopback addressing, a benchmark database name, and exclusively synthetic accounts.
-It compares baseline and reservation workloads for distributed and concentrated payers, then removes its own fixtures.
+
+It exercises the actual usage writer with baseline, reserved, and mixed traffic against distributed and concentrated payers.
+Repeated runs rotate scenario order and remove their own fixtures.
+
+The `denied` mode reports insufficient-credit decisions without billing or settlement.
+Use `BENCH_KILO_PASS=steady` or `BENCH_KILO_PASS=unlock` to exercise qualifying spend and bonus issuance.
+These profiles require organization scope, non-denied modes, and zero history.
 
 ```bash
 BENCHMARK_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/inference_reservation_bench_local \
-  pnpm exec tsx scripts/benchmark-inference-reservations.ts
+  pnpm exec tsx --tsconfig apps/web/tsconfig.scripts.json scripts/benchmark-inference-reservations.ts
 ```
 
-The output reports component throughput, latency, errors, connection waiting, and sampled lock waits.
-It does not measure production capacity, the complete billing pipeline, or actual cross-region admission latency.
+The output separates connection acquisition, query elapsed time, admission, and settlement.
+Query time includes server execution, lock waits, and network time; it is not a server CPU measurement.
+It also includes client query queueing; query busy-wall time counts overlapping queries once.
+Lock observations are point samples, not wait durations.
+
+Compare unsaturated and saturated pools with `BENCH_CLIENTS` and `BENCH_POOL_SIZE`.
+Use `BENCH_OPERATIONS`, `BENCH_PAYERS`, `BENCH_HISTORY`, and `BENCH_REPETITIONS` to vary load and retained history.
+Use `BENCH_MEMBERS` to vary organization membership independently of payer concentration.
+
+Filter scenarios with `BENCH_MODES`, `BENCH_SCOPES`, and `BENCH_DISTRIBUTIONS`.
+Run the same script from each measured checkout with that checkout's script configuration.
+The benchmark rejects outbound non-database traffic and keeps enforcement disabled.
+The output records source fingerprints, index definitions, the actual driver version, and native pipeline state.
+
+Use `BENCH_PIPELINE=0` and `BENCH_PIPELINE=1` to compare the same source with native pipelining disabled and enabled.
+The enabled benchmark refuses drivers that silently ignore the option.
+`POSTGRES_QUERY_PIPELINING_ENABLED` remains independently disabled by default in application pools.
+Verify the deployed connection pooler and transaction recovery before activating it.
+
+It does not establish production database headroom or actual cross-region admission latency.
 Validate those separately before enabling production admission.
 
 ### Running workers locally

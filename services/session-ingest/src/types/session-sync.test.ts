@@ -282,4 +282,43 @@ describe('SessionItemSchema storage key identity', () => {
       }).success
     ).toBe(false);
   });
+
+  it('rejects a message ID over 256 characters before persistence', () => {
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(256)}` } })
+        .success
+    ).toBe(false);
+  });
+
+  it('accepts a message ID exactly 256 characters', () => {
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(252)}` } })
+        .success
+    ).toBe(true);
+  });
+
+  it('rejects a part ID or part message ID over 256 characters before persistence', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(256)}`, messageID: 'msg_parent' },
+      }).success
+    ).toBe(false);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_child', messageID: `msg_${'a'.repeat(256)}` },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a part identity with both segments exactly 256 characters', () => {
+    // The largest derived part identity is 256 + 1 + 256 bytes.
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(252)}`, messageID: `msg_${'a'.repeat(252)}` },
+      }).success
+    ).toBe(true);
+  });
 });

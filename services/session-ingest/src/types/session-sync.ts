@@ -2,9 +2,14 @@ import { z } from 'zod';
 
 // Session ingest payload.
 // Intentionally minimal validation: enforce only identity fields needed for compaction.
+// Identity segments concatenate into `item_id` (see getItemIdentity), which is
+// persisted and range-queried in Durable Object SQLite. The cap keeps the
+// derived identity comfortably inside the platform string/row size limit
+// (part identities are at most 256 + 1 + 256 bytes).
 const storageKeySegmentSchema = z
   .string()
   .min(1)
+  .max(256)
   .refine(segment => !segment.includes('/') && !segment.includes('\u0000'), {
     message: 'storage key segments must not contain / or U+0000',
   });
@@ -78,7 +83,8 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
     type: z.literal('agent_notification'),
     data: z.object({
       // `id` participates in storage identities, so it shares the storage-key-segment
-      // restrictions (no `/`, no U+0000). The RPC pair (notificationId) is the same string.
+      // restrictions (no `/`, no U+0000) but keeps this service's tighter notification
+      // contract. The RPC pair (notificationId) is the same string.
       id: storageKeySegmentSchema.max(64),
       message: z.string().trim().min(1).max(500),
     }),

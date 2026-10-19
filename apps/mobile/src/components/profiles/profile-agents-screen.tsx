@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -8,6 +8,7 @@ import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
 import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Bot, Pencil, Trash2 } from '@/components/ui/icons';
@@ -229,7 +230,7 @@ export function ProfileAgentsScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.agents.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -237,7 +238,7 @@ export function ProfileAgentsScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {form !== null ? (
         <AgentFormSheet

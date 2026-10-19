@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import {
@@ -11,6 +11,7 @@ import {
   type ProfileOwnerChoice,
 } from '@/components/profiles/profile-owner-model';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -95,7 +96,7 @@ export function NewProfileScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.newProfile')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -158,7 +159,7 @@ export function NewProfileScreen() {
         >
           <Text>{t('profiles.createAction')}</Text>
         </Button>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

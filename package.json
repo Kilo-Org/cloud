@@ -14,6 +14,8 @@
     "test:scripts": "pnpm run test:web-rewrites && pnpm run test:web-env && pnpm run test:dev-local && pnpm run test:mobile-artifacts && pnpm run test:mobile-sbom && pnpm run test:kilo-app-release && pnpm run test:kilo-mcp-release",
     "test:web-rewrites": "node --test apps/web/ai-gateway-rewrites.test.mjs",
     "test:web-env": "tsx --tsconfig scripts/web-env/tsconfig.json --test scripts/web-env/*.test.ts",
+    "test:session-shares": "tsx --tsconfig scripts/session-shares/tsconfig.json --test --test-force-exit scripts/session-shares/cleanup.test.ts",
+    "session-shares:cleanup": "tsx --tsconfig scripts/session-shares/tsconfig.json scripts/session-shares/cleanup.ts",
     "test:setup-smoke": "pnpm --filter web run test:setup-smoke",
     "test:mobile-artifacts": "node --test scripts/inspect-mobile-artifacts.test.mjs",
     "test:mobile-sbom": "node --test scripts/mobile-sbom.test.mjs scripts/mobile-sbom-cyclonedx.test.mjs scripts/mobile-sbom-pnpm.test.mjs scripts/mobile-sbom-ipa.test.mjs scripts/mobile-sbom-aab.test.mjs scripts/mobile-sbom-workflow.test.mjs",

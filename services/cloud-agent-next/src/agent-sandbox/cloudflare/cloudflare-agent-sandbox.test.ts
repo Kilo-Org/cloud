@@ -948,6 +948,67 @@ describe('CloudflareAgentSandbox', () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
+  it('does not wake a stopped container to clean up session resources', async () => {
+    const getSession = vi.fn();
+    const deleteSession = vi.fn();
+    const isContainerRunning = vi.fn().mockResolvedValue(false);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          isContainerRunning,
+          getSession,
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.delete('retention-expired')).resolves.toBeUndefined();
+
+    expect(isContainerRunning).toHaveBeenCalledOnce();
+    expect(getSession).not.toHaveBeenCalled();
+    expect(deleteSession).not.toHaveBeenCalled();
+  });
+
+  it('cleans up session resources when the container is running', async () => {
+    const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
+    const getSession = vi.fn().mockResolvedValue({ exec });
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    const isContainerRunning = vi.fn().mockResolvedValue(true);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          isContainerRunning,
+          getSession,
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.delete('retention-expired');
+
+    expect(isContainerRunning).toHaveBeenCalledOnce();
+    expect(getSession).toHaveBeenCalledWith('agent_cloudflare');
+    expect(exec).toHaveBeenCalled();
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+  });
+
+  it('cleans up session resources when the container state is unknown', async () => {
+    const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
+    const getSession = vi.fn().mockResolvedValue({ exec });
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          getSession,
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.delete('retention-expired');
+
+    expect(getSession).toHaveBeenCalledWith('agent_cloudflare');
+    expect(exec).toHaveBeenCalled();
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+  });
+
   it('treats a missing exec session in a replaced container as deleted', async () => {
     const deleteSession = vi
       .fn()

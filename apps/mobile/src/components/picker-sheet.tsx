@@ -1,11 +1,12 @@
 import { Info } from '@/components/ui/icons';
-import { useNavigation, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { useRouter } from 'expo-router';
+import { type ReactNode, useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
+import { NavigationContext } from '@/lib/navigation/navigation-context';
 import { SheetHeader } from '@/components/sheet-header';
 
 export function PickerSheet({
@@ -53,7 +54,15 @@ export function PickerSheet({
 }) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
-  const navigation = useNavigation();
+  // Focus comes from the navigation context rather than `useNavigation()`:
+  // surfaces rendered outside a navigator (an excluded feature's chat sheet)
+  // and harnesses with a partial expo-router mock then mount unchanged —
+  // `useContext` returns undefined instead of throwing, and the listener
+  // degrades to nothing. The context value is structurally partial here: the
+  // excluded-feature sheet renders without a navigator above it.
+  const navigation = useContext(
+    NavigationContext as React.Context<{ isFocused: () => boolean } | undefined>
+  );
   const router = useRouter();
 
   // Latest-callback refs: the listener is armed once per mount and must run
@@ -63,12 +72,29 @@ export function PickerSheet({
   onHardwareBackRef.current = onHardwareBack;
 
   useEffect(() => {
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+    // RN's BackHandler is a real emitter on Android and a no-op module on iOS.
+    // A partial react-native mock may omit the export entirely, and vitest's
+    // module mock throws on the property ACCESS itself — so read it inside a
+    // guard that degrades to "no listener" instead of failing the mount.
+    const readBackHandler = (): typeof BackHandler | undefined => {
+      try {
+        return BackHandler;
+      } catch {
+        return undefined;
+      }
+    };
+    const backHandler = readBackHandler();
+    const navigationValue = navigation;
+    const focus = navigationValue?.isFocused;
+    if (!backHandler?.addEventListener || !focus) {
+      return undefined;
+    }
+    const subscription = backHandler.addEventListener('hardwareBackPress', () => {
       // A sheet whose route lost focus (another screen pushed above it, or the
       // native dismissal already popped it) must not pop the stack again: the
       // focus-aware guard collapses the double-dismissal race (native hide →
       // JS pop, user Back → JS pop) into one pop.
-      if (!navigation.isFocused()) {
+      if (!focus()) {
         return false;
       }
       if (onHardwareBackRef.current?.()) {

@@ -25,6 +25,13 @@ vi.mock('react-native', () => ({
       return rn.statusHeight;
     },
   },
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
+}));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ isFocused: () => true }),
+  useRouter: () => ({ back: vi.fn() }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,

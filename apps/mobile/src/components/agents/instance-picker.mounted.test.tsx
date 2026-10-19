@@ -43,6 +43,9 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 // The picker list renders through FlashList, whose rows/header/empty content
 // come through this mock exactly as the real list renders them (the real
@@ -65,6 +68,7 @@ vi.mock('expo-router', () => ({
       navigation.current = 'caller';
     },
   }),
+  useNavigation: () => ({ isFocused: () => true }),
   useFocusEffect: (effect: EffectCallback) => {
     useEffect(effect, [effect]);
   },

@@ -52,11 +52,15 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn() }),
+  useNavigation: () => ({ isFocused: () => true }),
   useLocalSearchParams: () => ({}),
   useFocusEffect: (effect: EffectCallback) => {
     useEffect(effect, [effect]);

@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { listDirectoriesOnConnection } from '@kilocode/cloud-agent-sdk/list-directories';
 
 import FolderPickerScreen from './folder-picker';
+import { NavigationContext } from '@/lib/navigation/navigation-context';
 
 const connection = vi.hoisted(() => ({
   isConnected: () => true,
@@ -35,7 +36,15 @@ const backHandlers = vi.hoisted(() => {
     },
   };
 });
-const navigation = vi.hoisted(() => ({ isFocused: (): boolean => true }));
+const navigation = vi.hoisted(() => {
+  // `isFocused` reads through `state` so a listener that captured the function
+  // still observes a later blur (the real context object is stable too).
+  const state = { focused: true };
+  return {
+    state,
+    isFocused: (): boolean => state.focused,
+  };
+});
 
 const flashListMock = vi.hoisted(
   () =>
@@ -144,7 +153,15 @@ async function mount(): Promise<TestRenderer.ReactTestRenderer> {
   const queryClient = createTestQueryClient();
   await act(async () => {
     ref.current = TestRenderer.create(
-      createElement(QueryClientProvider, { client: queryClient }, createElement(FolderPickerScreen))
+      createElement(
+        NavigationContext.Provider,
+        { value: navigation as never },
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(FolderPickerScreen)
+        )
+      )
     );
     await Promise.resolve();
   });
@@ -165,7 +182,7 @@ describe('FolderPickerScreen hardware Back', () => {
     router.back.mockClear();
     folderPickerSlotClear.mockClear();
     backHandlers.listeners.clear();
-    navigation.isFocused = () => true;
+    navigation.state.focused = true;
   });
 
   it('arms exactly one hardware-back listener for the mount lifetime', async () => {
@@ -229,7 +246,7 @@ describe('FolderPickerScreen hardware Back', () => {
   it('ignores hardware Back while the route is not focused', async () => {
     listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [] });
     const renderer = await mount();
-    navigation.isFocused = () => false;
+    navigation.state.focused = false;
 
     const results = backHandlers.press();
     expect(results).toEqual([false]);

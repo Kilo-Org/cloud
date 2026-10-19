@@ -1,6 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  admin_action_audit_logs,
   organizations,
   credit_transactions,
   organization_seats_purchases,
@@ -61,6 +62,38 @@ describe('organization admin router', () => {
 
   afterAll(async () => {
     await db.delete(organizations).where(eq(organizations.id, testOrganization.id));
+  });
+
+  describe('admin action audit logging', () => {
+    it('records create, trial override, and delete against the organization', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const { organization } = await caller.organizations.admin.create({ name: 'Audited Org' });
+      await caller.organizations.admin.updateFreeTrialEndAt({
+        organizationId: organization.id,
+        free_trial_end_at: '2099-01-01T00:00:00.000Z',
+      });
+      await caller.organizations.admin.delete({ organizationId: organization.id });
+
+      const audits = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.target_type, 'organization'),
+            eq(admin_action_audit_logs.target_id, organization.id)
+          )
+        );
+
+      expect(audits.map(audit => audit.action).sort()).toEqual([
+        'organization.create',
+        'organization.delete',
+        'organization.free_trial_end.set',
+      ]);
+      expect(audits.every(audit => audit.actor_id === adminUser.id)).toBe(true);
+      expect(
+        audits.find(audit => audit.action === 'organization.free_trial_end.set')?.metadata
+      ).toMatchObject({ freeTrialEndAt: '2099-01-01T00:00:00.000Z' });
+    });
   });
 
   describe('getDetails', () => {

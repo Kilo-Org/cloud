@@ -72,12 +72,6 @@ export const AutoTriageAgentConfigSchema = z
       .max(1)
       .default(AUTO_TRIAGE_CONSTANTS.DEFAULT_DUPLICATE_THRESHOLD)
       .describe('Similarity threshold for duplicate detection (0-1)'),
-    auto_fix_threshold: z
-      .number()
-      .min(0)
-      .max(1)
-      .default(AUTO_TRIAGE_CONSTANTS.DEFAULT_AUTO_PR_THRESHOLD)
-      .describe('Confidence threshold for automatically adding kilo-auto-fix label (0-1)'),
     max_concurrent_per_owner: z
       .number()
       .int()
@@ -123,7 +117,6 @@ export const SaveAutoTriageConfigSchema = z
     skip_labels: z.array(z.string()).optional(),
     required_labels: z.array(z.string()).optional(),
     duplicate_threshold: z.number().min(0).max(1).optional(),
-    auto_fix_threshold: z.number().min(0).max(1).optional(),
     max_concurrent_per_owner: z.number().int().positive().optional(),
     custom_instructions: z.string().nullable().optional(),
     model_slug: z.string().optional(),
@@ -389,7 +382,6 @@ export const DispatchTriageRequestSchema = z.object({
     issueTitle: z.string(),
     issueBody: z.string().nullable(),
     duplicateThreshold: z.number().min(0).max(1),
-    autoFixThreshold: z.number().min(0).max(1),
     customInstructions: z.string().nullable().optional(),
     modelSlug: z.string(),
     maxClassificationTimeMinutes: z.number().int().positive().min(1).max(15).optional(),

@@ -20,7 +20,6 @@ import {
   Shield,
   ListChecks,
   Key,
-  Wrench,
   Webhook,
   Factory,
   Settings,
@@ -168,10 +167,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       url: '/security-agent',
     },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          { title: 'Auto Triage', icon: ListChecks, url: '/auto-triage' },
-          { title: 'Auto Fix', icon: Wrench, url: '/auto-fix' },
-        ]
+      ? [{ title: 'Auto Triage', icon: ListChecks, url: '/auto-triage' }]
       : []),
     ...(isDeployEnabled || isDevelopment
       ? [

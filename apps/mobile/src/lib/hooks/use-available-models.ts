@@ -1,3 +1,7 @@
+import {
+  type OrganizationModelAudience,
+  organizationModelsPath,
+} from '@kilocode/app-shared/organizations';
 import { type Effort } from '@kilocode/harness-sdk';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -170,10 +174,13 @@ export const OrganizationDefaultsResponseSchema = z.object({ defaultModel: z.str
  * refused or reset connection still rejects and surfaces the error + Retry,
  * while a stalled response resolves when the backend answers.
  */
-async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
+async function fetchModels(
+  organizationId: string | undefined,
+  audience: OrganizationModelAudience
+): Promise<ModelResponse> {
   const token = await getAuthTokenForRequest();
   const url = organizationId
-    ? `${API_BASE_URL}/api/organizations/${organizationId}/models`
+    ? `${API_BASE_URL}${organizationModelsPath(organizationId, audience)}`
     : `${API_BASE_URL}/api/openrouter/models`;
   const response = await fetch(url, {
     headers: {
@@ -220,10 +227,18 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
   return { defaultModel: data?.defaultModel, isLoading };
 }
 
-export function useAvailableModels(organizationId: string | undefined) {
+/**
+ * `audience` is `shared_services` for a picker whose model a platform service
+ * runs for the organization, such as the Code Reviewer: its BYOK badge then
+ * counts only keys that run can use.
+ */
+export function useAvailableModels(
+  organizationId: string | undefined,
+  audience: OrganizationModelAudience = 'member'
+) {
   const { data, isLoading, isError, isFetching, isFetched, error, refetch } = useQuery({
-    queryKey: ['available-models', organizationId] as const,
-    queryFn: fetchModels.bind(null, organizationId),
+    queryKey: ['available-models', organizationId, audience] as const,
+    queryFn: fetchModels.bind(null, organizationId, audience),
     staleTime: 60_000,
   });
 

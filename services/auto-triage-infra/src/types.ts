@@ -27,7 +27,6 @@ export interface SessionInput {
   githubToken?: string;
   kilocodeOrganizationId?: string;
   duplicateThreshold: number;
-  autoFixThreshold: number;
   customInstructions?: string | null;
   modelSlug: string;
   baseBranch?: string;

@@ -539,12 +539,27 @@ const GOVERNANCE_EXPLANATIONS: Record<CouncilAggregationStrategy, string> = {
 };
 
 /**
- * Escapes a value for safe use inside a single markdown table cell. Backslashes are escaped
- * FIRST (before pipes), otherwise a pre-existing backslash in the input would consume the
- * escape we add to a following pipe and let the pipe break out of the cell.
+ * Escapes a value for use inside a single markdown table cell, so the cell renders the value
+ * as literal text: backslash-escaped CommonMark punctuation (including `|`), HTML-escaped
+ * `&`/`<`/`>`, and every line terminator or control character replaced with a single space.
+ * Backslashes are escaped FIRST (before the other punctuation), so each escape we add for a
+ * following character stays intact.
  */
 function escapeTableCell(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  return (
+    value
+      .replace(/\\/g, '\\\\')
+      // CommonMark backslash escapes; escaping is a no-op for plain alphanumeric text.
+      // `<` and `>` are handled by the HTML replacements below.
+      .replace(/[`*_{}[\]()#+.!|~-]/g, '\\$&')
+      // Escape `&` first so the entities introduced by the next two replacements stand.
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // Replace line terminators and control characters with a single space.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f\u2028\u2029\r\n]/g, ' ')
+  );
 }
 
 /**
@@ -599,7 +614,7 @@ export function buildCouncilReviewSection(
   const tableRows = result.specialists
     .map(
       s =>
-        `| ${escapeTableCell(s.name)} | ${s.model ? escapeTableCell(s.model) : '—'} | ${s.highestSeverity ?? '—'} | ${s.findings.length} |`
+        `| ${escapeTableCell(s.name)} | ${s.model ? escapeTableCell(s.model) : '—'} | ${s.highestSeverity ? escapeTableCell(s.highestSeverity) : '—'} | ${s.findings.length} |`
     )
     .join('\n');
 

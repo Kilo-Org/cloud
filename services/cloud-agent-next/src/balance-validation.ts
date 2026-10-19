@@ -149,7 +149,7 @@ async function readRawInputs(
 ): Promise<{ success: true; value: unknown } | { success: false }> {
   if (request.method === 'GET') {
     const inputParam = url.searchParams.get('input');
-    if (inputParam === null) return { success: true, value: undefined };
+    if (!inputParam) return { success: true, value: undefined };
     try {
       return { success: true, value: JSON.parse(inputParam) };
     } catch {

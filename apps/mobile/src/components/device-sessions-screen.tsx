@@ -1,5 +1,4 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -15,12 +14,14 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { WEB_BASE_URL } from '@/lib/config';
 import {
   classifyDeviceSessionsState,
   type DeviceSession,
   deviceSessionLabel,
   sortDeviceSessions,
 } from '@/lib/device-sessions';
+import { openExternalUrl } from '@/lib/external-link';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
@@ -80,7 +81,6 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
 }
 
 export function DeviceSessionsScreen() {
-  const router = useRouter();
   const { signOut, token } = useAuth();
   const trpc = useTRPC();
   const { t } = useTranslation();
@@ -155,15 +155,26 @@ export function DeviceSessionsScreen() {
       <EmptyState
         icon={Smartphone}
         title={t('deviceSessions.noSessions')}
-        description={t('deviceSessions.noSessionsDescription')}
+        description={
+          <View className="items-center gap-2">
+            <Text variant="muted" className="text-center">
+              {t('deviceSessions.noSessionsDescription')}
+            </Text>
+            <Text variant="muted" className="text-center">
+              {t('deviceSessions.editorCliManageOnWeb')}
+            </Text>
+          </View>
+        }
         action={
           <Button
             variant="outline"
             onPress={() => {
-              router.back();
+              void openExternalUrl(`${WEB_BASE_URL}/profile`, {
+                label: t('deviceSessions.manageOnWeb'),
+              });
             }}
           >
-            <Text>{t('deviceSessions.viewProfile')}</Text>
+            <Text>{t('deviceSessions.manageOnWeb')}</Text>
           </Button>
         }
       />
@@ -208,9 +219,14 @@ export function DeviceSessionsScreen() {
                 {t('deviceSessions.currentDeviceUnidentified')}
               </Text>
             )}
-            <Text variant="muted" className="text-xs">
-              {t('deviceSessions.onlyKiloAppSignIns')}
-            </Text>
+            <View className="gap-1">
+              <Text variant="muted" className="text-xs">
+                {t('deviceSessions.onlyKiloAppSignIns')}
+              </Text>
+              <Text variant="muted" className="text-xs">
+                {t('deviceSessions.editorCliManageOnWeb')}
+              </Text>
+            </View>
           </View>
         )}
       </DetailScreenScrollView>

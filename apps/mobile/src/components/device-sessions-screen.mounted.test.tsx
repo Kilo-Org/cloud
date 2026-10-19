@@ -1,5 +1,5 @@
 import type * as ReactQuery from '@tanstack/react-query';
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type DeviceSession } from '@/lib/device-sessions';
@@ -17,6 +17,7 @@ const query = vi.hoisted(() => ({
 }));
 const hosts = vi.hoisted(() => ({ trustedHosts: [] as string[], hasLoaded: true }));
 const imageHosts = vi.hoisted(() => ({ trustedImageHosts: [] as string[], hasLoaded: true }));
+const openExternalUrl = vi.hoisted(() => vi.fn());
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQuery: () => query,
@@ -46,6 +47,8 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ token: 'test-token', signOut: vi.fn() }),
 }));
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.test' }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   useTrustedHosts: () => hosts,
@@ -75,6 +78,7 @@ beforeEach(() => {
   query.isPending = false;
   query.isError = false;
   query.refetch.mockClear();
+  openExternalUrl.mockClear();
   hosts.hasLoaded = true;
   hosts.trustedHosts = [];
   imageHosts.hasLoaded = true;
@@ -102,6 +106,16 @@ describe('account surface states', () => {
       unmount();
     }
   );
+
+  it('opens the web profile from the empty state', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+    const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
+    // The mocked EmptyState receives the action as a prop element, not as a child.
+    const action = emptyState.props.action as ReactElement<{ onPress: () => void }>;
+    action.props.onPress();
+    expect(openExternalUrl).toHaveBeenCalledWith('https://web.test/profile', expect.anything());
+    unmount();
+  });
 
   it('keeps cached device records after a refetch failure', async () => {
     query.isError = true;

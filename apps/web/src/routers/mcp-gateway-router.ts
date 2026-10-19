@@ -1,4 +1,5 @@
 import 'server-only';
+import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import {
@@ -411,6 +412,26 @@ async function requireManagedConfig(params: {
   return resolved;
 }
 
+// Organization gateway writes (credentials, headers, assignments, routes) by a
+// Kilo admin who is not an organization owner are recorded durably.
+async function recordOrganizationGatewayWrite(
+  ctx: TRPCContext,
+  organizationId: string | undefined,
+  operation: string,
+  metadata: Record<string, unknown>
+) {
+  if (!organizationId) return;
+  await recordElevatedOrganizationAdminAction(ctx, {
+    organizationId,
+    // requireOrganizationManager accepts only a direct owner membership.
+    requiredRoles: ['owner'],
+    membershipScope: 'direct',
+    action: 'organization.mcp_gateway.update',
+    message: `MCP gateway: ${operation}`,
+    metadata: { operation, ...metadata },
+  });
+}
+
 export const mcpGatewayRouter = createTRPCRouter({
   discover: baseProcedure
     .input(z.object({ remoteUrl: RemoteUrlSchema }))
@@ -539,6 +560,9 @@ export const mcpGatewayRouter = createTRPCRouter({
           initialAssignedUserId: input.initialAssignedUserId,
           pathPassthrough: input.pathPassthrough,
         });
+        await recordOrganizationGatewayWrite(ctx, input.organizationId, 'create', {
+          configId: created.config.config_id,
+        });
         return { configId: created.config.config_id };
       })
     ),
@@ -574,6 +598,9 @@ export const mcpGatewayRouter = createTRPCRouter({
       });
       const services = createGatewayServices();
       const route = await services.configService.rotateRoute({ configId: input.configId });
+      await recordOrganizationGatewayWrite(ctx, input.organizationId, 'rotate_route', {
+        configId: input.configId,
+      });
       return { routeKey: route.route_key, canonicalUrl: route.canonical_url };
     })
   ),
@@ -587,6 +614,9 @@ export const mcpGatewayRouter = createTRPCRouter({
       const services = createGatewayServices();
       const config = await services.configService.disableConfig(input.configId);
       if (!config) throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
+      await recordOrganizationGatewayWrite(ctx, input.organizationId, 'disable', {
+        configId: input.configId,
+      });
       return { configId: config.config_id, enabled: config.enabled };
     })
   ),
@@ -600,6 +630,9 @@ export const mcpGatewayRouter = createTRPCRouter({
       const services = createGatewayServices();
       const config = await services.configService.deleteConfig(input.configId);
       if (!config) throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
+      await recordOrganizationGatewayWrite(ctx, input.organizationId, 'delete', {
+        configId: input.configId,
+      });
       return { configId: config.config_id };
     })
   ),
@@ -624,6 +657,9 @@ export const mcpGatewayRouter = createTRPCRouter({
           kind: GatewaySecretKind.StaticHeaders,
           value: { headers: input.headers },
         });
+        await recordOrganizationGatewayWrite(ctx, input.organizationId, 'upsert_static_headers', {
+          configId: input.configId,
+        });
         return { secretId: secret.config_secret_id };
       })
     ),
@@ -640,6 +676,9 @@ export const mcpGatewayRouter = createTRPCRouter({
         const config = await services.configService.updateProviderScopes({
           configId: input.configId,
           providerScopes: input.providerScopes,
+        });
+        await recordOrganizationGatewayWrite(ctx, input.organizationId, 'update_provider_scopes', {
+          configId: input.configId,
         });
         return {
           configId: config.config_id,
@@ -674,6 +713,12 @@ export const mcpGatewayRouter = createTRPCRouter({
           kind: GatewaySecretKind.StaticProviderCredentials,
           value: { clientId: input.clientId, clientSecret: input.clientSecret },
         });
+        await recordOrganizationGatewayWrite(
+          ctx,
+          input.organizationId,
+          'upsert_static_provider_credentials',
+          { configId: input.configId }
+        );
         return { secretId: secret.config_secret_id };
       })
     ),
@@ -694,6 +739,10 @@ export const mcpGatewayRouter = createTRPCRouter({
         });
         if (!assignment)
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
+        await recordOrganizationGatewayWrite(ctx, input.organizationId, 'assign_user', {
+          configId: input.configId,
+          memberKiloUserId: input.userId,
+        });
         return { assignmentId: assignment.assignment_id };
       })
     ),
@@ -714,6 +763,10 @@ export const mcpGatewayRouter = createTRPCRouter({
         });
         if (!assignment)
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Assignment not found' });
+        await recordOrganizationGatewayWrite(ctx, input.organizationId, 'revoke_assignment', {
+          configId: input.configId,
+          memberKiloUserId: input.userId,
+        });
         return { assignmentId: assignment.assignment_id };
       })
     ),

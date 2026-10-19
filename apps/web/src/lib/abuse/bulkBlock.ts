@@ -113,5 +113,5 @@ export async function unblockBulkBlockedUsers(
     )
     .returning({ id: kilocode_users.id });
 
-  return { updatedCount: rows.length };
+  return { updatedCount: rows.length, unblockedUserIds: rows.map(row => row.id) };
 }

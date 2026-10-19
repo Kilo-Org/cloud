@@ -1,4 +1,5 @@
 import 'server-only';
+import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import { createHash } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
@@ -2424,6 +2425,21 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       try {
         const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
+        if (input.organization_id) {
+          // A public snapshot exposes the transcript; record shares made by a
+          // Kilo admin who is not a member. The share token is never logged.
+          await recordElevatedOrganizationAdminAction(ctx, {
+            organizationId: input.organization_id,
+            requiredRoles: ['owner', 'admin', 'billing_manager', 'member'],
+            action: 'organization.webhook_session.share',
+            message: 'Created public share of a webhook-trigger session',
+            metadata: {
+              sessionId: input.kilo_session_id,
+              triggerId: input.trigger_id,
+              sessionOwnerKiloUserId: session.kilo_user_id,
+            },
+          });
+        }
         return { share_token: result.share_token, session_id: input.kilo_session_id };
       } catch (error) {
         if (error instanceof Error && error.message === 'Session not found') {

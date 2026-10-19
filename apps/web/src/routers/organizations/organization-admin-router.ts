@@ -50,6 +50,7 @@ import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
 import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { getAdminCreditTransactionsForOrganization } from '@kilocode/web-shared/lib/creditTransactions';
 import {
   assertOrganizationHierarchyChangeAllowed,
@@ -284,102 +285,150 @@ const AddMemberInputSchema = z.object({
 });
 
 export const organizationAdminRouter = createTRPCRouter({
-  create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async opts => {
-    const parentOrganizationId = opts.input.parentOrganizationId ?? null;
+  create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async ({ input, ctx }) => {
+    const parentOrganizationId = input.parentOrganizationId ?? null;
 
-    if (!parentOrganizationId) {
-      const organization = await createOrganization(opts.input.name);
+    let organization;
+    if (parentOrganizationId) {
+      organization = await createChildOrganization(input.name, parentOrganizationId);
+    } else {
+      organization = await createOrganization(input.name);
       await getOrCreateStripeCustomerIdForOrganization(organization.id);
-      return { organization };
     }
 
-    const organization = await createChildOrganization(opts.input.name, parentOrganizationId);
+    await recordAdminAction(ctx, {
+      action: 'organization.create',
+      target: organizationActionTarget(organization.id),
+      message: parentOrganizationId ? 'Created child organization' : 'Created organization',
+      metadata: { name: input.name, parentOrganizationId },
+    });
+
     return { organization };
   }),
 
-  setParent: adminProcedure.input(SetParentOrganizationInputSchema).mutation(async ({ input }) => {
-    try {
-      await db.transaction(async tx => {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
-        await validateParentOrganizationChange(
-          input.organizationId,
-          input.parentOrganizationId,
-          tx
-        );
+  setParent: adminProcedure
+    .input(SetParentOrganizationInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      let previous;
+      try {
+        previous = await db.transaction(async tx => {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+          await validateParentOrganizationChange(
+            input.organizationId,
+            input.parentOrganizationId,
+            tx
+          );
 
-        await assertOrganizationHierarchyChangeAllowed(
-          tx,
-          input.organizationId,
-          input.parentOrganizationId
-        );
-
-        await tx
-          .update(organizations)
-          .set(
+          await assertOrganizationHierarchyChangeAllowed(
+            tx,
+            input.organizationId,
             input.parentOrganizationId
-              ? {
-                  parent_organization_id: input.parentOrganizationId,
-                  require_seats: false,
-                  free_trial_end_at: null,
-                  settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
-                }
-              : { parent_organization_id: input.parentOrganizationId }
-          )
-          .where(eq(organizations.id, input.organizationId));
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
+          );
+
+          const [before] = await tx
+            .select({
+              parent_organization_id: organizations.parent_organization_id,
+              require_seats: organizations.require_seats,
+              free_trial_end_at: organizations.free_trial_end_at,
+            })
+            .from(organizations)
+            .where(eq(organizations.id, input.organizationId));
+
+          await tx
+            .update(organizations)
+            .set(
+              input.parentOrganizationId
+                ? {
+                    parent_organization_id: input.parentOrganizationId,
+                    require_seats: false,
+                    free_trial_end_at: null,
+                    settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
+                  }
+                : { parent_organization_id: input.parentOrganizationId }
+            )
+            .where(eq(organizations.id, input.organizationId));
+
+          return before;
         });
+      } catch (error) {
+        if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
+          });
+        }
+        throw error;
       }
-      throw error;
-    }
 
-    return successResult();
-  }),
-
-  updateCreatedBy: adminProcedure.input(UpdateCreatedByInputSchema).mutation(async ({ input }) => {
-    const { organizationId, userId } = input;
-
-    // Validate that the organization exists
-    const organization = await db.query.organizations.findFirst({
-      where: eq(organizations.id, organizationId),
-    });
-
-    if (!organization) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Organization not found',
-      });
-    }
-
-    // If userId is provided, validate that the user exists
-    if (userId !== null) {
-      const user = await db.query.kilocode_users.findFirst({
-        where: eq(kilocode_users.id, userId),
+      await recordAdminAction(ctx, {
+        action: 'organization.parent.set',
+        target: organizationActionTarget(input.organizationId),
+        message: input.parentOrganizationId
+          ? 'Set parent organization'
+          : 'Removed parent organization',
+        metadata: {
+          previousParentOrganizationId: previous?.parent_organization_id ?? null,
+          parentOrganizationId: input.parentOrganizationId,
+          previousRequireSeats: previous?.require_seats ?? null,
+          previousFreeTrialEndAt: previous?.free_trial_end_at ?? null,
+        },
       });
 
-      if (!user) {
+      return successResult();
+    }),
+
+  updateCreatedBy: adminProcedure
+    .input(UpdateCreatedByInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, userId } = input;
+
+      // Validate that the organization exists
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organizationId),
+      });
+
+      if (!organization) {
         throw new TRPCError({
           code: 'NOT_FOUND',
-          message: 'User not found',
+          message: 'Organization not found',
         });
       }
-    }
 
-    await db
-      .update(organizations)
-      .set({ created_by_kilo_user_id: userId })
-      .where(eq(organizations.id, organizationId));
+      // If userId is provided, validate that the user exists
+      if (userId !== null) {
+        const user = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, userId),
+        });
 
-    return successResult();
-  }),
+        if (!user) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'User not found',
+          });
+        }
+      }
+
+      await db
+        .update(organizations)
+        .set({ created_by_kilo_user_id: userId })
+        .where(eq(organizations.id, organizationId));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.created_by.set',
+        target: organizationActionTarget(organizationId),
+        message: userId ? 'Changed organization creator' : 'Cleared organization creator',
+        metadata: {
+          previousCreatedByKiloUserId: organization.created_by_kilo_user_id,
+          createdByKiloUserId: userId,
+        },
+      });
+
+      return successResult();
+    }),
 
   updateFreeTrialEndAt: adminProcedure
     .input(UpdateFreeTrialEndAtInputSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { organizationId, free_trial_end_at } = input;
 
       // Validate that the organization exists
@@ -395,12 +444,22 @@ export const organizationAdminRouter = createTRPCRouter({
         .set({ free_trial_end_at })
         .where(eq(organizations.id, organizationId));
 
+      await recordAdminAction(ctx, {
+        action: 'organization.free_trial_end.set',
+        target: organizationActionTarget(organizationId),
+        message: 'Changed free trial end date',
+        metadata: {
+          previousFreeTrialEndAt: organization.free_trial_end_at,
+          freeTrialEndAt: free_trial_end_at,
+        },
+      });
+
       return successResult();
     }),
 
   updateSuppressTrialMessaging: adminProcedure
     .input(UpdateSuppressTrialMessagingInputSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { organizationId, suppress_trial_messaging } = input;
 
       // Validate that the organization exists
@@ -421,6 +480,18 @@ export const organizationAdminRouter = createTRPCRouter({
         .update(organizations)
         .set({ settings: updatedSettings })
         .where(eq(organizations.id, organizationId));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.trial_messaging.set',
+        target: organizationActionTarget(organizationId),
+        message: suppress_trial_messaging
+          ? 'Suppressed trial messaging'
+          : 'Restored trial messaging',
+        metadata: {
+          previousSuppressTrialMessaging: organization.settings.suppress_trial_messaging ?? null,
+          suppressTrialMessaging: suppress_trial_messaging,
+        },
+      });
 
       return successResult();
     }),
@@ -994,7 +1065,7 @@ export const organizationAdminRouter = createTRPCRouter({
     return successResult();
   }),
 
-  delete: adminProcedure.input(OrganizationIdInputSchema).mutation(async ({ input }) => {
+  delete: adminProcedure.input(OrganizationIdInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId } = input;
 
     const existingOrg = await getOrganizationById(organizationId);
@@ -1044,6 +1115,13 @@ export const organizationAdminRouter = createTRPCRouter({
       }
       throw error;
     }
+
+    await recordAdminAction(ctx, {
+      action: 'organization.delete',
+      target: organizationActionTarget(organizationId),
+      message: 'Deleted organization',
+      metadata: { name: existingOrg.name },
+    });
 
     return successResult();
   }),

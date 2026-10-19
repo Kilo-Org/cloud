@@ -139,6 +139,8 @@ import type {
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
   KiloClawAdminAuditAction,
+  AdminActionAuditAction,
+  AdminActionAuditTargetType,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
   KiloClawScheduledActionTargetStatus,
@@ -7209,7 +7211,7 @@ export const openai_chatgpt_connections = pgTable(
     /**
      * True for the organization's shared-services connection: one row per
      * organization, used by the platform's own callers (code reviewer, Slack
-     * bot, auto-triage) instead of any member's personal connection. The
+     * bot) instead of any member's personal connection. The
      * connecting person is recorded in `kilo_user_id` and `created_by`.
      */
     is_shared_services: boolean().default(false).notNull(),
@@ -8132,267 +8134,6 @@ export const slack_bot_requests = pgTable(
 export type SlackBotRequest = typeof slack_bot_requests.$inferSelect;
 export type NewSlackBotRequest = typeof slack_bot_requests.$inferInsert;
 
-// Auto Triage
-export const auto_triage_tickets = pgTable(
-  'auto_triage_tickets',
-  {
-    id: idPrimaryKeyColumn,
-
-    // Ownership (exactly one must be set)
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-    }),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-    }),
-
-    // Platform integration
-    platform_integration_id: uuid().references(() => platform_integrations.id, {
-      onDelete: 'set null',
-    }),
-
-    // GitHub metadata
-    platform: text().notNull().default('github'),
-    repo_full_name: text().notNull(),
-    issue_number: integer().notNull(),
-    issue_url: text().notNull(),
-    issue_title: text().notNull(),
-    issue_body: text(),
-    issue_author: text().notNull(),
-    issue_type: text().notNull().$type<'issue' | 'pull_request'>(),
-    issue_labels: text()
-      .array()
-      .default(sql`'{}'`),
-
-    // Classification results
-    classification: text().$type<'bug' | 'feature' | 'question' | 'duplicate' | 'unclear'>(),
-    confidence: decimal({ precision: 3, scale: 2 }),
-    intent_summary: text(),
-    related_files: text().array(),
-
-    // Duplicate detection
-    is_duplicate: boolean().default(false),
-    duplicate_of_ticket_id: uuid().references((): AnyPgColumn => auto_triage_tickets.id),
-    similarity_score: decimal({ precision: 3, scale: 2 }),
-    qdrant_point_id: text(), // MD5 hash
-
-    // Triage session
-    session_id: text(),
-
-    // Auto Fix trigger
-    should_auto_fix: boolean().default(false),
-
-    // Status
-    status: text()
-      .notNull()
-      .default('pending')
-      .$type<'pending' | 'analyzing' | 'actioned' | 'failed' | 'skipped'>(),
-    action_taken: text().$type<
-      'pr_created' | 'comment_posted' | 'closed_duplicate' | 'needs_clarification'
-    >(),
-    action_metadata: jsonb(),
-    error_message: text(),
-
-    // Timestamps
-    started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    // Unique index on repo and issue number
-    uniqueIndex('UQ_auto_triage_tickets_repo_issue').on(table.repo_full_name, table.issue_number),
-    // Indexes for ownership lookups
-    index('IDX_auto_triage_tickets_owned_by_org').on(table.owned_by_organization_id),
-    index('IDX_auto_triage_tickets_owned_by_user').on(table.owned_by_user_id),
-    // Indexes for status and filtering
-    index('IDX_auto_triage_tickets_status').on(table.status),
-    index('IDX_auto_triage_tickets_created_at').on(table.created_at),
-    index('IDX_auto_triage_tickets_qdrant_point_id').on(table.qdrant_point_id),
-    // Composite indexes for common query patterns
-    index('IDX_auto_triage_tickets_owner_status_created').on(
-      table.owned_by_organization_id,
-      table.status,
-      table.created_at
-    ),
-    index('IDX_auto_triage_tickets_user_status_created').on(
-      table.owned_by_user_id,
-      table.status,
-      table.created_at
-    ),
-    index('IDX_auto_triage_tickets_repo_classification').on(
-      table.repo_full_name,
-      table.classification,
-      table.created_at
-    ),
-    // Owner check constraint (exactly one must be set)
-    check(
-      'auto_triage_tickets_owner_check',
-      sql`(
-        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
-        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
-      )`
-    ),
-    // CHECK constraints for enums and ranges
-    check(
-      'auto_triage_tickets_issue_type_check',
-      sql`${table.issue_type} IN ('issue', 'pull_request')`
-    ),
-    check(
-      'auto_triage_tickets_classification_check',
-      sql`${table.classification} IN ('bug', 'feature', 'question', 'duplicate', 'unclear')`
-    ),
-    check(
-      'auto_triage_tickets_confidence_check',
-      sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`
-    ),
-    check(
-      'auto_triage_tickets_similarity_score_check',
-      sql`${table.similarity_score} >= 0 AND ${table.similarity_score} <= 1`
-    ),
-    check(
-      'auto_triage_tickets_status_check',
-      sql`${table.status} IN ('pending', 'analyzing', 'actioned', 'failed', 'skipped')`
-    ),
-    check(
-      'auto_triage_tickets_action_taken_check',
-      sql`${table.action_taken} IN ('pr_created', 'comment_posted', 'closed_duplicate', 'needs_clarification')`
-    ),
-  ]
-);
-
-export type AutoTriageTicket = typeof auto_triage_tickets.$inferSelect;
-
-// Auto Fix
-export const auto_fix_tickets = pgTable(
-  'auto_fix_tickets',
-  {
-    id: idPrimaryKeyColumn,
-
-    // Ownership (exactly one must be set)
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-    }),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-    }),
-
-    // Platform integration
-    platform_integration_id: uuid().references(() => platform_integrations.id, {
-      onDelete: 'set null',
-    }),
-
-    // Link to triage ticket (optional)
-    triage_ticket_id: uuid().references(() => auto_triage_tickets.id, {
-      onDelete: 'set null',
-    }),
-
-    // GitHub metadata
-    platform: text().notNull().default('github'),
-    repo_full_name: text().notNull(),
-    issue_number: integer().notNull(),
-    issue_url: text().notNull(),
-    issue_title: text().notNull(),
-    issue_body: text(),
-    issue_author: text().notNull(),
-    issue_labels: text()
-      .array()
-      .default(sql`'{}'`),
-
-    // Trigger source: 'label' for issue label triggers, 'review_comment' for PR review comment triggers
-    trigger_source: text().notNull().default('label').$type<'label' | 'review_comment'>(),
-
-    // Review comment context (populated when trigger_source='review_comment')
-    review_comment_id: bigint({ mode: 'number' }),
-    review_comment_body: text(),
-    file_path: text(),
-    line_number: integer(),
-    diff_hunk: text(),
-    pr_head_ref: text(),
-
-    // Classification from triage (denormalized for convenience)
-    classification: text().$type<'bug' | 'feature' | 'question' | 'unclear'>(),
-    confidence: decimal({ precision: 3, scale: 2 }),
-    intent_summary: text(),
-    related_files: text().array(),
-
-    // Cloud Agent session
-    session_id: text(), // Cloud agent session ID (agent_xxx)
-    cli_session_id: uuid().references(() => cliSessions.session_id, {
-      onDelete: 'set null',
-    }),
-
-    // PR information
-    pr_number: integer(),
-    pr_url: text(),
-    pr_branch: text(),
-
-    // Status
-    status: text()
-      .notNull()
-      .default('pending')
-      .$type<'pending' | 'running' | 'completed' | 'failed' | 'cancelled'>(),
-    error_message: text(),
-
-    // Timestamps
-    started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    // Unique constraint: one fix per repo+issue combination (for label-triggered fixes)
-    uniqueIndex('UQ_auto_fix_tickets_repo_issue')
-      .on(table.repo_full_name, table.issue_number)
-      .where(sql`${table.trigger_source} = 'label'`),
-    // Unique constraint: one fix per repo+review_comment (for review-comment-triggered fixes)
-    uniqueIndex('UQ_auto_fix_tickets_repo_review_comment')
-      .on(table.repo_full_name, table.review_comment_id)
-      .where(sql`${table.review_comment_id} IS NOT NULL`),
-    // Indexes for ownership lookups
-    index('IDX_auto_fix_tickets_owned_by_org').on(table.owned_by_organization_id),
-    index('IDX_auto_fix_tickets_owned_by_user').on(table.owned_by_user_id),
-    // Indexes for status and filtering
-    index('IDX_auto_fix_tickets_status').on(table.status),
-    index('IDX_auto_fix_tickets_created_at').on(table.created_at),
-    index('IDX_auto_fix_tickets_triage_ticket_id').on(table.triage_ticket_id),
-    index('IDX_auto_fix_tickets_session_id').on(table.session_id),
-    // Owner check constraint (exactly one must be set)
-    check(
-      'auto_fix_tickets_owner_check',
-      sql`(
-        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
-        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
-      )`
-    ),
-    // CHECK constraints for enums and ranges
-    check(
-      'auto_fix_tickets_status_check',
-      sql`${table.status} IN ('pending', 'running', 'completed', 'failed', 'cancelled')`
-    ),
-    check(
-      'auto_fix_tickets_classification_check',
-      sql`${table.classification} IN ('bug', 'feature', 'question', 'unclear')`
-    ),
-    check(
-      'auto_fix_tickets_confidence_check',
-      sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`
-    ),
-    check(
-      'auto_fix_tickets_trigger_source_check',
-      sql`${table.trigger_source} IN ('label', 'review_comment')`
-    ),
-  ]
-);
-
-export type AutoFixTicket = typeof auto_fix_tickets.$inferSelect;
-
 // ============ AGENT ENVIRONMENT PROFILES ============
 // Profiles for storing reusable environment configurations for cloud-agent sessions
 
@@ -9167,6 +8908,40 @@ export const kiloclaw_admin_audit_logs = pgTable(
 );
 
 export type KiloClawAdminAuditLog = typeof kiloclaw_admin_audit_logs.$inferSelect;
+
+// Platform admin action audit log. Rows older than the retention window are
+// pruned by a cron, so the created_at index also serves deletion.
+export const admin_action_audit_logs = pgTable(
+  'admin_action_audit_logs',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    action: text().$type<AdminActionAuditAction>().notNull(),
+    actor_id: text().notNull(),
+    actor_email: text(),
+    actor_name: text(),
+    target_type: text().$type<AdminActionAuditTargetType>(),
+    target_id: text(),
+    message: text().notNull(),
+    metadata: jsonb().$type<Record<string, unknown>>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_admin_action_audit_logs_created_at').on(table.created_at),
+    index('IDX_admin_action_audit_logs_action_created_at').on(table.action, table.created_at),
+    index('IDX_admin_action_audit_logs_actor_id_created_at').on(table.actor_id, table.created_at),
+    index('IDX_admin_action_audit_logs_target_created_at').on(
+      table.target_type,
+      table.target_id,
+      table.created_at
+    ),
+  ]
+);
+
+export type AdminActionAuditLog = typeof admin_action_audit_logs.$inferSelect;
+export type NewAdminActionAuditLog = typeof admin_action_audit_logs.$inferInsert;
 
 // KiloClaw Access Codes — one-time codes for authenticating browser sessions to the worker
 export const kiloclaw_access_codes = pgTable(

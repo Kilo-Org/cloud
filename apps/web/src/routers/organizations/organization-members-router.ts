@@ -24,7 +24,15 @@ import {
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import {
+  getOrganizationMembershipRoles,
+  recordElevatedOrganizationAdminAction,
+} from '@/lib/admin/admin-action-audit';
 import {
   enqueueInviteEmail,
   resetInviteEmailForResend,
@@ -277,6 +285,16 @@ export const organizationsMembersRouter = createTRPCRouter({
         await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
       }
 
+      await recordElevatedOrganizationAdminAction(ctx, {
+        organizationId,
+        // Changing an owner or granting owner needs owner authority.
+        requiredRoles:
+          targetMember.role === 'owner' || role === 'owner' ? ['owner'] : ORGANIZATION_MANAGE_ROLES,
+        action: 'organization.member.role.update',
+        message: `Changed member role from ${targetMember.role} to ${role}`,
+        metadata: { memberKiloUserId: memberId, previousRole: targetMember.role, role },
+      });
+
       return successResult({ updated: 'role and limit' });
     }),
   setChildMemberships: organizationBillingMutationProcedure
@@ -425,6 +443,22 @@ export const organizationsMembersRouter = createTRPCRouter({
         }
       }
 
+      if (added.length > 0 || removed.length > 0) {
+        await recordElevatedOrganizationAdminAction(ctx, {
+          organizationId,
+          // Mirrors the direct-membership check above.
+          requiredRoles: ['owner', 'billing_manager'],
+          membershipScope: 'direct',
+          action: 'organization.child_memberships.set',
+          message: 'Changed child organization memberships',
+          metadata: {
+            memberKiloUserId: memberId,
+            addedOrganizationIds: added,
+            removedOrganizationIds: removed,
+          },
+        });
+      }
+
       return successResult({ added, removed });
     }),
   remove: organizationAdminMutationProcedure
@@ -466,6 +500,13 @@ export const organizationsMembersRouter = createTRPCRouter({
       );
       assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
 
+      // Self-removal deletes the actor's own membership, so read their real
+      // roles first for the audit row.
+      const actorHeldRolesBeforeRemoval =
+        user.is_admin && memberId === user.id
+          ? await getOrganizationMembershipRoles(user.id, organizationId, 'direct_or_inherited')
+          : undefined;
+
       const result = await removeUserFromOrganization(organizationId, memberId, user.id);
       if (result.rowCount === 0) {
         throw new TRPCError({
@@ -486,6 +527,22 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
       await cleanupRemovedMemberInstances(memberId, organizationId);
+
+      await recordElevatedOrganizationAdminAction(ctx, {
+        organizationId,
+        // Only Kilo admins may remove themselves, so self-removal is always a
+        // bypass regardless of the roles they held.
+        requiredRoles:
+          memberId === user.id
+            ? []
+            : targetMember.role === 'owner'
+              ? ['owner']
+              : ORGANIZATION_MANAGE_ROLES,
+        heldRoles: actorHeldRolesBeforeRemoval,
+        action: 'organization.member.remove',
+        message: memberId === user.id ? 'Removed self from organization' : 'Removed member',
+        metadata: { memberKiloUserId: memberId, previousRole: targetMember.role },
+      });
 
       return successResult({ updated: memberId });
     }),
@@ -550,6 +607,26 @@ export const organizationsMembersRouter = createTRPCRouter({
           });
 
           return { acceptInviteUrl, invitationId: invitation.id };
+        });
+
+        // The invitee's address stays out of the audit log; inviting oneself
+        // (turning elevation into lasting membership) is flagged explicitly.
+        await recordElevatedOrganizationAdminAction(ctx, {
+          organizationId,
+          requiredRoles:
+            role === 'owner'
+              ? ['owner']
+              : role === 'member'
+                ? ORGANIZATION_BILLING_ROLES
+                : ORGANIZATION_MANAGE_ROLES,
+          action: 'organization.member.invite',
+          message: `Invited a user as ${role}`,
+          metadata: {
+            invitationId: result.invitationId,
+            role,
+            invitedEmailDomain: getLowerDomainFromEmail(email),
+            invitedSelf: normalizeEmail(email) === normalizeEmail(user.google_user_email),
+          },
         });
 
         return { ...result, emailStatus: 'pending' as const };

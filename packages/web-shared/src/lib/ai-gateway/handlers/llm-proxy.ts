@@ -111,7 +111,6 @@ import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-mode
 import {
   fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
-  FRONTIER_ROUTING_FLAG,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
   AUTO_DECISION_HEADER,
@@ -120,7 +119,6 @@ import {
   type AutoRouter,
   type CustomRouterReference,
 } from '@kilocode/auto-routing-contracts';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
@@ -401,6 +399,7 @@ export async function handleLlmProxyRequest(
   // validation after resolution.
   let routingTarget: string | null = null;
   let legacyClassifierCostUsd = 0;
+  let autoRoutingUnavailable = false;
   // Efficient/balanced and custom router requests resolve through an auto-routing pool. Kept for
   // the org policy check below so a failed routing decision gets a specific
   // auto-routing error instead of the generic model-not-allowed error.
@@ -494,12 +493,6 @@ export async function handleLlmProxyRequest(
       // The classifier uses Kilo's paid credential. Unauthenticated callers
       // must never spend classification without a user to attribute it to.
       if (!user || authFailedResponse) return null;
-      if (
-        router === 'frontier' &&
-        !(await isReleaseToggleEnabled(FRONTIER_ROUTING_FLAG, user.id))
-      ) {
-        return null;
-      }
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
         policy => collectDeniedAutoRoutingModelIds(policy, owner, router),
@@ -560,7 +553,6 @@ export async function handleLlmProxyRequest(
       {
         model: requestedModelLowerCased,
         modeHeader,
-        featureHeader: feature,
         sessionId: taskId ?? null,
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
@@ -587,10 +579,8 @@ export async function handleLlmProxyRequest(
     if (autoResult.kind === 'custom_router_error') {
       return customRouterErrorResponse(autoResult.code, autoResult.message);
     }
-    if (autoResult.kind === 'auto_routing_unavailable') {
-      return autoRoutingUnavailableResponse(requestedModelLowerCased);
-    }
-    routingTarget = autoResult.routingTarget ?? null;
+    autoRoutingUnavailable = autoResult.kind === 'auto_routing_unavailable';
+    routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
@@ -775,6 +765,7 @@ export async function handleLlmProxyRequest(
       })()
     );
   }
+  if (autoRoutingUnavailable) return autoRoutingUnavailableResponse(requestedModelLowerCased);
 
   if (
     requestBodyParsed.kind === 'responses' &&

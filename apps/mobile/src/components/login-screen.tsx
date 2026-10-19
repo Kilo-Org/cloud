@@ -2,9 +2,17 @@
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, Pressable, ScrollView, View } from 'react-native';
+import {
+  I18nManager,
+  type LayoutChangeEvent,
+  PixelRatio,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
@@ -22,6 +30,7 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getCenteredStateLayout, isShortViewport } from '@/lib/centered-state-layout';
 import {
   clearLoginDrafts,
   clearPersistedLoginDrafts,
@@ -51,13 +60,110 @@ export function LoginScreen() {
   } = useDeviceAuth();
   const colors = useThemeColors();
   const insets = useScreenInsets();
+  const windowSize = useWindowDimensions();
   const { t } = useTranslation();
+  // The `KeyboardProvider` at the root measures the keyboard once in native
+  // code, so this screen reads the height instead of listening to React Native's
+  // keyboard events. The provider also clears the height when the app leaves the
+  // foreground, which the listener pair used to do itself.
+  const keyboardHeight = useKeyboardState(state => state.height);
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
     ssoRecovery: SsoRecoveryDraft | null;
   } | null>(null);
+
+  // The form centers in the viewport while it fits and top-anchors when it
+  // does not (a landscape window at a large text size): centered overflow
+  // clips the stack at both edges, hiding the code screen's heading above the
+  // top and the primary button below the bottom. The measured layout follows
+  // the same helper the centered states use (`centered-state-layout.ts`), so
+  // the geometry rules stay in one place. The viewport is the ScrollView's own
+  // frame, which already excludes the wrapper's keyboard and bottom-chrome
+  // reservation.
+  const scrollRef = useRef<ScrollView | null>(null);
+  const measureRequestRef = useRef(0);
+  const [viewportFrame, setViewportFrame] = useState<{ top: number; bottom: number } | null>(null);
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+
+  const measureViewport = useCallback(() => {
+    measureRequestRef.current += 1;
+    const request = measureRequestRef.current;
+    // Same ref contract as `CenteredState`: the harness's host element has no
+    // native scroll ref, so the measured layout stays pending there and the
+    // fallback centered geometry applies.
+    const node = scrollRef.current?.getNativeScrollRef() ?? null;
+    if (!node) {
+      setViewportFrame(null);
+      return;
+    }
+    node.measureInWindow((...bounds) => {
+      const [, top, , height] = bounds;
+      if (request !== measureRequestRef.current) {
+        return;
+      }
+      const bottom = top + height;
+      if (height <= 0 || !Number.isFinite(top) || !Number.isFinite(bottom)) {
+        setViewportFrame(null);
+        return;
+      }
+      setViewportFrame(previous =>
+        previous?.top === top && previous.bottom === bottom ? previous : { top, bottom }
+      );
+    });
+  }, []);
+
+  const captureScroll = useCallback(
+    (node: ScrollView | null) => {
+      scrollRef.current = node;
+      measureViewport();
+    },
+    [measureViewport]
+  );
+
+  useLayoutEffect(() => {
+    measureViewport();
+    return () => {
+      measureRequestRef.current += 1;
+    };
+  }, [measureViewport, windowSize.width, windowSize.height, keyboardHeight]);
+
+  const handleContentLayout = useCallback((event: LayoutChangeEvent) => {
+    setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
+  }, []);
+
+  // A phone held sideways cannot fit the full stack, so the welcome block
+  // (logo + greeting) drops there and the form alone fills the viewport.
+  // The measured layout still centers whatever remains.
+  const shortBand = isShortViewport(windowSize.width, windowSize.height);
+
+  const contentLayout = useMemo(() => {
+    if (viewportFrame === null || contentHeight === null) {
+      return undefined;
+    }
+    return getCenteredStateLayout({
+      surface: viewportFrame,
+      viewport: viewportFrame,
+      contentHeight,
+      roundToPixel: value => PixelRatio.roundToNearestPixel(value),
+    });
+  }, [viewportFrame, contentHeight]);
+
+  // While the first measurement is pending keep the previous centered
+  // geometry: the common portrait case never overflows, and the measured
+  // layout replaces this on the next frame.
+  const pendingContentStyle = { flexGrow: 1, justifyContent: 'center' as const };
+  const measuredContentStyle = useMemo(
+    () =>
+      contentLayout && {
+        flexGrow: 1,
+        minHeight: contentLayout.minHeight,
+        paddingTop: contentLayout.paddingTop,
+        paddingBottom: contentLayout.paddingBottom,
+      },
+    [contentLayout]
+  );
 
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
@@ -107,12 +213,6 @@ export function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
 
-  // The `KeyboardProvider` at the root measures the keyboard once in native
-  // code, so this screen reads the height instead of listening to React Native's
-  // keyboard events. The provider also clears the height when the app leaves the
-  // foreground, which the listener pair used to do itself.
-  const keyboardHeight = useKeyboardState(state => state.height);
-
   if (status === 'approved') {
     if (persistError) {
       return (
@@ -142,9 +242,10 @@ export function LoginScreen() {
 
   // One padded wrapper for both platforms: the bottom inset is reserved at
   // rest, and while the IME is up the provider's keyboard height is reserved
-  // instead (see `resolveKeyboardBottomPadding`). The ScrollView's centered form
-  // then re-centres in the space that stays above the keyboard, so "Continue" is
-  // never left under the keyboard, the navigation bar, or the home indicator.
+  // instead (see `resolveKeyboardBottomPadding`). The ScrollView's measured
+  // content container re-centres (or top-anchors) in the space that stays
+  // above the keyboard, so "Continue" is never left under the keyboard, the
+  // navigation bar, or the home indicator.
   const bottomPadding = resolveKeyboardBottomPadding({
     keyboardHeight,
     bottomInset: insets.bottom,
@@ -184,114 +285,136 @@ export function LoginScreen() {
       }}
     >
       <ScrollView
+        ref={captureScroll}
         className="flex-1 bg-background"
-        contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
+        onLayout={measureViewport}
+        contentContainerClassName="flex-grow items-center gap-6 px-6 py-8"
+        contentContainerStyle={measuredContentStyle ?? pendingContentStyle}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="w-full max-w-sm items-center gap-2">
-          <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
-          <Text className="text-center text-lg">{t('login.welcome')}</Text>
-        </View>
-
         {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
             iOS logout→login remounts washed out at ~50% alpha for 3+ minutes,
             recovering only on relaunch — so these branches render without
             animation; status swaps are instant. */}
-        <View className="w-full max-w-sm gap-3">
-          {/* A terminal device-auth error keeps the idle form on screen so the
-              user can retry. The banner is a sibling above one IdleAuth at one
-              JSX slot, so clearing the error when a new attempt starts does not
-              remount the form and lose an in-flight OTP challenge. */}
-          {showTerminalError && (
-            <Text className="text-center text-sm text-destructive">
-              {errorMessage(status, error)}
-            </Text>
+        {/* One measured wrapper around the whole stack (welcome block + auth
+            branches): its height decides whether the form centers or
+            top-anchors. The stack keeps the container's `items-center` and the
+            `gap-6` rhythm the ScrollView's content container carried before. */}
+        <View className="w-full max-w-sm gap-6" onLayout={handleContentLayout}>
+          {shortBand ? null : (
+            <View className="w-full items-center gap-2">
+              <Image
+                source={logo}
+                className="mb-1 h-16 w-16"
+                accessibilityLabel={t('login.logo')}
+              />
+              <Text className="text-center text-lg">{t('login.welcome')}</Text>
+            </View>
           )}
+          <View className="w-full gap-3">
+            {/* A terminal device-auth error keeps the idle form on screen so the
+                user can retry. The banner is a sibling above one IdleAuth at one
+                JSX slot, so clearing the error when a new attempt starts does not
+                remount the form and lose an in-flight OTP challenge. */}
+            {showTerminalError && (
+              <Text className="text-center text-sm text-destructive">
+                {errorMessage(status, error)}
+              </Text>
+            )}
 
-          {status === 'idle' && draft === null && (
-            <>
-              {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-11 w-full" />
-            </>
-          )}
+            {status === 'idle' && draft === null && (
+              <>
+                {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-11 w-full" />
+              </>
+            )}
 
-          {showIdleForm && (
-            <IdleAuth
-              start={start}
-              initialEmail={draft?.email ?? ''}
-              initialSsoRecovery={draft?.ssoRecovery ?? null}
-              onBusyChange={setAuthFormBusy}
-              onSignInStart={clearError}
-            />
-          )}
+            {showIdleForm && (
+              <IdleAuth
+                start={start}
+                initialEmail={draft?.email ?? ''}
+                initialSsoRecovery={draft?.ssoRecovery ?? null}
+                onBusyChange={setAuthFormBusy}
+                onSignInStart={clearError}
+              />
+            )}
 
-          {status === 'pending' && code && (
-            <View className="w-full items-center gap-4">
-              {resumed && (
+            {status === 'pending' && code && (
+              <View className="w-full items-center gap-4">
+                {resumed && (
+                  <Text variant="muted" className="text-center">
+                    {t('login.continuingSignIn')}
+                  </Text>
+                )}
                 <Text variant="muted" className="text-center">
-                  {t('login.continuingSignIn')}
+                  {t('login.signInCode')}
                 </Text>
-              )}
-              <Text variant="muted" className="text-center">
-                {t('login.signInCode')}
-              </Text>
-              <Text
-                variant="h2"
-                className="border-b-0 pb-0 text-center tracking-widest"
-                accessibilityLabel={t('login.signInCodeAccessibility', {
-                  // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
-                  code: [...code].join(' '),
-                })}
-                selectable
-              >
-                {code}
-              </Text>
-              {/* Stack actions full-width so labels never clip side-by-side at max text */}
-              <View className="w-full gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onPress={() => {
-                    void openBrowser();
-                  }}
-                  accessibilityLabel={t('login.openSignInPageInBrowser')}
+                <Text
+                  variant="h2"
+                  className="border-b-0 pb-0 text-center tracking-widest"
+                  accessibilityLabel={t('login.signInCodeAccessibility', {
+                    // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
+                    code: [...code].join(' '),
+                  })}
+                  selectable
                 >
-                  <Text className="text-center">{t('common.openInBrowser')}</Text>
-                </Button>
+                  {code}
+                </Text>
+                {/* Stack actions full-width so labels never clip side-by-side at max text */}
+                <View className="w-full gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onPress={() => {
+                      void openBrowser();
+                    }}
+                    accessibilityLabel={t('login.openSignInPageInBrowser')}
+                  >
+                    <Text className="text-center">{t('common.openInBrowser')}</Text>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onPress={() => {
+                      if (verificationUrl) {
+                        void Clipboard.setStringAsync(verificationUrl);
+                        toast(t('common.copiedToClipboard'));
+                      }
+                    }}
+                    accessibilityLabel={t('login.copySignInLink')}
+                  >
+                    <Text className="text-center">{t('common.copyLink')}</Text>
+                  </Button>
+                </View>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onPress={() => {
-                    if (verificationUrl) {
-                      void Clipboard.setStringAsync(verificationUrl);
-                      toast(t('common.copiedToClipboard'));
-                    }
-                  }}
-                  accessibilityLabel={t('login.copySignInLink')}
+                  variant="ghost"
+                  onPress={cancel}
+                  accessibilityLabel={t('login.cancelSignIn')}
                 >
-                  <Text className="text-center">{t('common.copyLink')}</Text>
+                  <Text>{t('common.cancel')}</Text>
                 </Button>
               </View>
-              <Button variant="ghost" onPress={cancel} accessibilityLabel={t('login.cancelSignIn')}>
-                <Text>{t('common.cancel')}</Text>
-              </Button>
-            </View>
-          )}
+            )}
 
-          {status === 'pending' && !code && (
-            <View className="w-full items-center gap-3">
-              <ActivityIndicator size="small" color={colors.mutedForeground} />
-              <Text variant="muted" className="text-center">
-                {t('login.startingSignIn')}
-              </Text>
-              <Button variant="ghost" onPress={cancel} accessibilityLabel={t('login.cancelSignIn')}>
-                <Text>{t('common.cancel')}</Text>
-              </Button>
-            </View>
-          )}
+            {status === 'pending' && !code && (
+              <View className="w-full items-center gap-3">
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+                <Text variant="muted" className="text-center">
+                  {t('login.startingSignIn')}
+                </Text>
+                <Button
+                  variant="ghost"
+                  onPress={cancel}
+                  accessibilityLabel={t('login.cancelSignIn')}
+                >
+                  <Text>{t('common.cancel')}</Text>
+                </Button>
+              </View>
+            )}
+          </View>
         </View>
       </ScrollView>
       <Pressable

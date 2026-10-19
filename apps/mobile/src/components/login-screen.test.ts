@@ -50,8 +50,10 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value) },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({

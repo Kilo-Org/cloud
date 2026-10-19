@@ -266,6 +266,7 @@ const HOST_REF_INERT_METHODS: Record<string, (...args: unknown[]) => unknown> = 
   clear: () => undefined,
   focus: () => undefined,
   getNativeRef: () => undefined,
+  getNativeScrollRef: () => undefined,
   getScrollableNode: () => undefined,
   isFocused: () => false,
   measure: () => undefined,

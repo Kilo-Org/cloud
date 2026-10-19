@@ -172,7 +172,7 @@ function buildStoredConfig(
       existing.environment !== undefined &&
       Object.keys(existing.environment).length === Object.keys(input.config.environment).length &&
       Object.entries(input.config.environment).every(
-        ([key, value]) => value === MASKED_SECRET_VALUE || existing.environment?.[key] !== undefined
+        ([key]) => existing.environment?.[key] !== undefined
       );
     const carriesPlaceholder =
       input.config.environment !== undefined &&

@@ -236,6 +236,34 @@ describe('updateMcpServer secret reuse', () => {
     expect(state.updateSets).toHaveLength(0);
   });
 
+  test('rejects masked environment values when a key is renamed with the same count', async () => {
+    const stored = storedEnvelope('secret-1');
+    const { db, state } = createMcpServiceDb({
+      type: 'local',
+      command: ['node', 'server.js'],
+      environment: { API_KEY: stored },
+    });
+
+    await expect(
+      updateMcpServer(
+        db,
+        PUBLIC_KEY,
+        PROFILE_ID,
+        SERVER_ID,
+        parseInput({
+          name: 'test-server',
+          type: 'local',
+          config: {
+            command: ['node', 'server.js'],
+            environment: { TOKEN: MASKED_SECRET_VALUE },
+          },
+        }),
+        OWNER
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(state.updateSets).toHaveLength(0);
+  });
+
   test('rejects masked values when the server type changes', async () => {
     const stored = storedEnvelope('secret-1');
     const { db } = createMcpServiceDb({

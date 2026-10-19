@@ -292,7 +292,7 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('keeps Run on and action text with native font scaling and unlimited action lines', async () => {
+  it('keeps Run on and action text with native font scaling and single-line labels', async () => {
     const title = 'Run on';
     const cancelLabel = 'Previous picker';
     const doneLabel = 'Confirm selection';
@@ -312,7 +312,10 @@ describe('SheetHeader', () => {
     );
     for (const text of texts) {
       if (text.props.accessibilityRole !== 'header') {
-        expect(text.props.numberOfLines).toBeUndefined();
+        // Action labels stay on one line so the buttons size to their labels;
+        // native font scaling still applies (no fit-to-width).
+        expect(text.props.numberOfLines).toBe(1);
+        expect(text.props.ellipsizeMode).toBe('clip');
       }
       expect(text.props.allowFontScaling).not.toBe(false);
       expect(text.props.maxFontSizeMultiplier).toBeUndefined();

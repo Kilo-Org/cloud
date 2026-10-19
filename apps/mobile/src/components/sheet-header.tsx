@@ -123,7 +123,11 @@ export function SheetHeader({
               accessibilityLabel={resolvedCancelLabel}
               className="min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
             >
-              <Text className="text-center text-base font-medium text-foreground">
+              <Text
+                className="text-center text-base font-medium text-foreground"
+                numberOfLines={1}
+                ellipsizeMode="clip"
+              >
                 {resolvedCancelLabel}
               </Text>
             </Pressable>
@@ -151,7 +155,11 @@ export function SheetHeader({
             accessibilityLabel={resolvedDoneLabel}
             className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
-            <Text className="text-center text-base font-medium text-foreground">
+            <Text
+              className="text-center text-base font-medium text-foreground"
+              numberOfLines={1}
+              ellipsizeMode="clip"
+            >
               {resolvedDoneLabel}
             </Text>
           </Pressable>

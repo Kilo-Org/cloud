@@ -217,17 +217,19 @@ describe('tabLabelWidth', () => {
     expect(tabLabelWidth('設定')).toBeCloseTo(2 * (11 + 0.2), 5);
   });
 
-  it('counts joined-script glyphs at the fallback-font advance, not the mono advance', () => {
-    // Arabic renders in the system fallback font (`Text` drops the mono family
-    // for RTL-script copy), whose glyphs are far narrower than JetBrains
-    // Mono's 0.6em. Measuring them at the mono advance over-estimated the
-    // width until the width rule dropped every Arabic label at phone widths.
+  it('counts RTL-script glyphs at the fallback-font advance, not the mono advance', () => {
+    // Arabic and Hebrew render in the system fallback font (`Text` drops the
+    // mono family for RTL-script copy, both scripts included), whose glyphs are
+    // far narrower than JetBrains Mono's 0.6em. Measuring them at the mono
+    // advance over-estimated the width until the width rule dropped every
+    // Arabic label at phone widths.
     expect(tabLabelWidth('الرئيسية')).toBeCloseTo(8 * (0.55 * 11 + 0.2), 5);
+    expect(tabLabelWidth('הגדרות')).toBeCloseTo(6 * (0.55 * 11 + 0.2), 5);
     expect(tabLabelWidth('الملف الشخصي')).toBeCloseTo(11 * (0.55 * 11 + 0.2) + (0.6 * 11 + 0.2), 5);
   });
 
   it('measures a mixed-script label per glyph', () => {
-    // "Home" (4 mono glyphs) + a space + "الرئيسية" (8 joined glyphs): the
+    // "Home" (4 mono glyphs) + a space + "الرئيسية" (8 RTL-script glyphs): the
     // space between the scripts stays on the one line at the mono advance.
     expect(tabLabelWidth('Home الرئيسية')).toBeCloseTo(
       5 * (0.6 * 11 + 0.2) + 8 * (0.55 * 11 + 0.2),

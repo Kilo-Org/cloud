@@ -36,25 +36,29 @@ const MONO_ADVANCE_EM = 0.6;
 /** CJK/Kana/Hangul/fullwidth glyphs render one em wide in the same stack. */
 const FULL_WIDTH_ADVANCE_EM = 1;
 /**
- * Arabic/Hebrew glyphs render in the system fallback font, not the mono family
- * (`Text` drops `font-mono*` for RTL-script copy — `withoutMonoFamily`), and a
- * proportional Arabic glyph averages roughly half an em at this size. Counting
- * those glyphs at the mono advance inflated the width estimate until the width
- * rule dropped every label in Arabic at phone widths (الملف الشخصي measured
- * wider than its tab while fitting comfortably on screen), so the bar rendered
- * icon-only with no labels. The value bounds the true advance the same way the
- * full-width class does: a stray over-estimate hides the labels slightly early
- * rather than leaving a clipped label on screen.
+ * RTL-script glyphs (Arabic and Hebrew) render in the system fallback font, not
+ * the mono family (`Text` drops `font-mono*` for RTL-script copy —
+ * `withoutMonoFamily`), and a proportional glyph of either script averages
+ * roughly half an em at this size. Counting those glyphs at the mono advance
+ * inflated the width estimate until the width rule dropped every label in
+ * Arabic at phone widths (الملف الشخصي measured wider than its tab while
+ * fitting comfortably on screen), so the bar rendered icon-only with no labels.
+ * The value bounds the true advance the same way the full-width class does: a
+ * stray over-estimate hides the labels slightly early rather than leaving a
+ * clipped label on screen.
  */
-const JOINED_SCRIPT_ADVANCE_EM = 0.55;
+const RTL_SCRIPT_ADVANCE_EM = 0.55;
 /**
- * The joined-script blocks whose glyphs take the fallback advance: Arabic and
- * its supplement/extension/presentation forms. Mirrors `JOINED_SCRIPT` in
- * `rtl-text.ts` — inlined because that module imports react-native, which this
+ * The script blocks whose glyphs take the fallback advance: the Hebrew block
+ * and its presentation forms, then Arabic, Arabic Supplement, Arabic
+ * Extended-B, Arabic Extended-A, and the Arabic Presentation Forms-A and -B.
+ * Mirrors `RTL_SCRIPT` in `rtl-text.ts` — the class `hasRtlScript` uses to drop
+ * the mono family, so the measure and the renderer agree on which copy is
+ * proportional. Inlined because that module imports react-native, which this
  * node-side module must not (`tab-bar-layout.test.ts` runs untransformed).
  */
-const JOINED_SCRIPT =
-  /[\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const RTL_SCRIPT =
+  /[\u0590-\u05FF\uFB1D-\uFB4F\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 /**
  * react-navigation's vertical tab item (`tabVerticalUiKit: { padding: 5 }` in
  * `BottomTabItem`), so a tab's label box is `tabWidth - 10`.
@@ -202,16 +206,16 @@ function isFullWidthCharacter(character: string): boolean {
  * space). The estimate is deliberately
  * conservative: it only decides whether the labels are dropped, so
  * over-estimating hides them slightly early and never leaves a clipped label
- * on screen. Per-glyph advances: full-width glyphs one em, joined-script
- * glyphs (Arabic/Hebrew — the fallback font the label renders in, see
- * `JOINED_SCRIPT_ADVANCE_EM`) about half an em, every other glyph the mono
+ * on screen. Per-glyph advances: full-width glyphs one em, RTL-script glyphs
+ * (Arabic and Hebrew — the fallback font the label renders in, see
+ * `RTL_SCRIPT_ADVANCE_EM`) about half an em, every other glyph the mono
  * advance.
  */
 function glyphAdvanceEm(character: string): number {
   if (isFullWidthCharacter(character)) {
     return FULL_WIDTH_ADVANCE_EM;
   }
-  return JOINED_SCRIPT.test(character) ? JOINED_SCRIPT_ADVANCE_EM : MONO_ADVANCE_EM;
+  return RTL_SCRIPT.test(character) ? RTL_SCRIPT_ADVANCE_EM : MONO_ADVANCE_EM;
 }
 
 export function tabLabelWidth(label: string, fontScale = 1): number {

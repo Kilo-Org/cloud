@@ -21,8 +21,10 @@ import { readBoundedStream } from './bounded-stream-reader';
 import { parseDirectIngestConfig, selectDirectIngestUser } from './direct-ingest-rollout';
 import { applyMetadataChanges } from './metadata';
 import {
+  boundedRequestBody,
   StageAndEnqueueError,
   stageAndEnqueue,
+  StagingOverflowError,
   type StageAndEnqueueFailureStage,
 } from './stage-and-enqueue';
 import { validateAndParseIngestPayload } from './validate';
@@ -69,6 +71,8 @@ type LegacyOptions = {
   reason: LegacyReason;
   metrics: DirectIngestMetrics;
   startedAt: number;
+  /** Set by the counting stream when a staged body outgrows the ceiling. */
+  overflowed?: () => boolean;
 };
 
 type DirectIngestResult =
@@ -96,27 +100,61 @@ export async function handleDirectIngestRequest(
   // Bodies entering staging are measured against a staging ceiling. When the
   // rollout config is unreadable, the same ceiling applies. Declared lengths
   // above the direct cap still stage, measured against this ceiling, and the
-  // queue consumer splits them into chunks. The ceiling sits above the direct
-  // cap so payloads that have always crossed the queue keep doing so, and low
-  // enough that the bounded read (which buffers the whole body in Worker
-  // memory before staging) stays well inside the isolate memory budget.
+  // queue consumer splits them into chunks. The ceiling matches the queue's
+  // per-item cap; large bodies cross as a counting stream with flat memory.
   const stagingCeiling = STAGING_MAX_BYTES;
   const stagingBudget = configResult.ok ? configResult.config.maxBytes : stagingCeiling;
 
+  const tooLarge = (declaredBytes: number | null): DirectIngestResponse => {
+    logEvent('warn', {
+      event: 'direct_ingest_reject',
+      ...eventBase(request, startedAt, {
+        declaredBytes,
+        actualBytes: null,
+        items: null,
+      }),
+      reason: 'staging_budget_exceeded',
+    });
+    return { status: 413, body: { success: false, error: 'payload_too_large' } };
+  };
+
+  let stagingOverflowed = false;
   const legacyWithBoundedBody = async (
     reason: LegacyReason,
     metrics: DirectIngestMetrics
   ): Promise<DirectIngestResponse> => {
-    const buffered = await readBoundedStream(request.body, stagingCeiling);
-    if (!buffered.ok) {
-      logEvent('warn', {
-        event: 'direct_ingest_reject',
-        ...eventBase(request, startedAt, { ...metrics, declaredBytes: null }),
-        reason: 'staging_budget_exceeded',
-      });
-      return { status: 413, body: { success: false, error: 'payload_too_large' } };
+    // A declared length within the RPC byte budget crosses by value; larger
+    // or unmeasured bodies cross as a counting stream capped at the ceiling.
+    stagingOverflowed = false;
+    const declared = parseContentLength(request.contentLength);
+    if (typeof declared === 'number' && declared !== 0 && declared <= INGEST_CHUNK_MAX_BYTES) {
+      const buffered = await readBoundedStream(request.body, declared);
+      if (!buffered.ok) {
+        return tooLarge(declared);
+      }
+      return legacy(request, r2Key, buffered.bytes, { reason, metrics, startedAt });
     }
-    return legacy(request, r2Key, buffered.bytes, { reason, metrics, startedAt });
+    try {
+      const response = await legacy(
+        request,
+        r2Key,
+        boundedRequestBody(request.body, stagingCeiling, () => {
+          stagingOverflowed = true;
+        }),
+        { reason, metrics, startedAt, overflowed: () => stagingOverflowed }
+      );
+      // A tripped flag overrides the staging outcome: the body, not the
+      // storage write, was the problem.
+      if (stagingOverflowed) {
+        return tooLarge(null);
+      }
+      return response;
+    } catch (error) {
+      if (stagingOverflowed) {
+        return tooLarge(null);
+      }
+      throw error;
+    }
   };
 
   if (!configResult.ok) {
@@ -339,12 +377,21 @@ async function legacy(
         request.env,
         legacyQueueParams(request, r2Key),
         body,
-        declaredBodyBytes(request)
+        declaredBodyBytes(request),
+        options.overflowed
       ))
     ) {
       return { status: 404, body: { success: false, error: 'session_not_found' } };
     }
   } catch (error) {
+    if (error instanceof StagingOverflowError) {
+      logEvent('warn', {
+        event: 'direct_ingest_reject',
+        ...eventBase(request, options.startedAt, options.metrics),
+        reason: 'staging_budget_exceeded',
+      });
+      return { status: 413, body: { success: false, error: 'payload_too_large' } };
+    }
     logEvent('warn', {
       event: 'direct_ingest_legacy',
       ...eventBase(request, options.startedAt, options.metrics),

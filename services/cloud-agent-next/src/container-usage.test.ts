@@ -1605,6 +1605,31 @@ describe('MeteredSandbox container capacity', () => {
     expect(rpc.recordStop).not.toHaveBeenCalled();
   });
 
+  it('replaces an acknowledged unmeasured allocation without billing its reservation wait', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+    const input = { ...billingInput, enforcementRequested: true };
+    await sandbox.ensureBillingAdmission({ ...input, allocationId: 'allocation-a' });
+    const first = await getBillingContext(storage);
+    if (!first) throw new Error('Expected first reservation');
+    vi.spyOn(Date, 'now').mockReturnValue(first.startEpochMs + 60_000);
+
+    await sandbox.ensureBillingAdmission({ ...input, allocationId: 'allocation-b' });
+
+    expect(sandbox.startCalls).toBe(0);
+    expect(rpc.recordStop).toHaveBeenCalledOnce();
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startEpochMs: first.startEpochMs,
+        usageSinceLast: 0,
+      })
+    );
+    const next = await getBillingContext(storage);
+    expect(next?.generation).not.toBe(first.generation);
+    expect(next?.metadata?.allocation_id).toBe('allocation-b');
+    expect(next?.measurementStarted).toBe(false);
+  });
+
   it('releases only the failed allocation with a zero-usage stop', async () => {
     const rpc = createRpc();
     const { sandbox, storage } = createSandbox(rpc);

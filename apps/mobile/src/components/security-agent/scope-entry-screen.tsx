@@ -89,31 +89,39 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   // A failed mint must not replace the setup screen with an error-only page:
   // the setup state (with the audit-report action) stays usable and the press
-  // retries the mint before opening. Resolves to whether a URL is available
-  // afterwards so the button handler can open immediately.
-  const performMint = useCallback(async (): Promise<boolean> => {
-    setMintUrl(null);
-    mintUrlRef.current = null;
-    setIsMinting(true);
-    try {
-      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-        organizationId: orgId ?? undefined,
-        returnTo: '/cloud/sessions',
-      });
-      const url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token);
-      mintUrlRef.current = url;
-      if (!cancelledRef.current) {
-        setMintUrl(url);
+  // retries the mint before opening. The mount-time mint (`isInitial`) clears
+  // any previous URL and drives the skeleton; a press-time re-mint leaves the
+  // setup mounted — its own connecting spinner covers the wait, and unmounting
+  // it would drop that state mid-press. Resolves to whether a URL is
+  // available afterwards so the button handler can open immediately.
+  const performMint = useCallback(
+    async (isInitial = false): Promise<boolean> => {
+      if (isInitial) {
+        setMintUrl(null);
+        mintUrlRef.current = null;
+        setIsMinting(true);
       }
-      return true;
-    } catch {
-      return false;
-    } finally {
-      if (!cancelledRef.current) {
-        setIsMinting(false);
+      try {
+        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+          organizationId: orgId ?? undefined,
+          returnTo: '/cloud/sessions',
+        });
+        const url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token);
+        mintUrlRef.current = url;
+        if (!cancelledRef.current) {
+          setMintUrl(url);
+        }
+        return true;
+      } catch {
+        return false;
+      } finally {
+        if (isInitial && !cancelledRef.current) {
+          setIsMinting(false);
+        }
       }
-    }
-  }, [orgId]);
+    },
+    [orgId]
+  );
 
   const reauthUrl = permission.data?.reauthorizeUrl;
 
@@ -127,7 +135,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   useEffect(() => {
     cancelledRef.current = false;
     if (shouldMint) {
-      void performMint();
+      void performMint(true);
     }
     return () => {
       cancelledRef.current = true;

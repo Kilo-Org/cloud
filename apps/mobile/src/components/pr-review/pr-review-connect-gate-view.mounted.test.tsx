@@ -64,6 +64,9 @@ const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
 vi.mock('expo-router', () => ({
   usePathname: () => '/pr-review/github/owner/repo/1',
   useRouter: () => router,
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    React.useEffect(effect, [effect]);
+  },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),

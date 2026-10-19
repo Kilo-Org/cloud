@@ -3,7 +3,7 @@
 // deep link that renders on top of the tab anchor cannot pop out to Home, and
 // the hardware event is consumed so the navigator does not also pop.
 
-import { createElement } from 'react';
+import { createElement, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
@@ -27,7 +27,16 @@ const backHandler = vi.hoisted(() => {
   };
 });
 
-vi.mock('expo-router', () => ({ useRouter: () => router }));
+const focus = vi.hoisted(() => ({ focused: true }));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => router,
+  // The real hook binds the effect to the screen's focus; the test drives the
+  // bound effect directly so it can observe registration and cleanup.
+  useFocusEffect: (effect: () => () => void) => {
+    useEffect(() => (focus.focused ? effect() : undefined), [effect]);
+  },
+}));
 vi.mock('react-native', () => ({ BackHandler: backHandler }));
 
 function Screen() {
@@ -61,6 +70,7 @@ function pressHardwareBack(): boolean {
 beforeEach(() => {
   vi.resetAllMocks();
   backHandler.handlers.clear();
+  focus.focused = true;
 });
 
 afterEach(() => {
@@ -86,7 +96,7 @@ describe('PR-review inbox back', () => {
     expect(router.dismissTo).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
   });
 
-  it('drops the hardware listener on unmount', () => {
+  it('drops the hardware listener when the screen unmounts', () => {
     const renderer = mount();
     expect(backHandler.handlers.size).toBe(1);
 

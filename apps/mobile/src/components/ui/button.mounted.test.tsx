@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
 import { createElement, type ReactElement, useState } from 'react';
-import { Text as NativeText, Pressable } from 'react-native';
+import { Text as NativeText, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
@@ -205,6 +205,27 @@ describe('Button native target contract', () => {
     const button = renderButton({});
     expect(button.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS })).toHaveLength(0);
     expect(button.findByType(NativeText).children).toEqual(['Retry']);
+  });
+
+  it.each(['Retry', 3])('wraps a bare %p child in the themed label Text', child => {
+    // Pressable is a View: a raw scalar child draws nothing on device, so the
+    // button collapses to padding while the accessibility tree still names it.
+    const button = renderButton({ children: child });
+    const label = button.findByType(NativeText);
+    // Test renderer stringifies a number child; the host text is identical.
+    expect(label.children).toEqual([String(child)]);
+    // The wrapped label carries the button's themed label classes, not the
+    // plain Text default (variant ink varies, so assert the shared base).
+    expect(label.props.className).toContain('font-semibold');
+    expect(label.props.className).toContain('text-sm');
+  });
+
+  it('leaves element children unwrapped', () => {
+    const button = renderButton({
+      children: createElement(View, null, 'Retry'),
+    });
+    // No themed label Text is added around an element the caller provided.
+    expect(button.findAllByType(NativeText)).toHaveLength(0);
   });
 
   it('keeps an explicitly disabled control disabled after loading ends', () => {

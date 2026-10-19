@@ -498,10 +498,7 @@ export function useAgentAttachmentUpload(
             // warn; the original URI is never used as an attachment.
             // eslint-disable-next-line no-await-in-loop -- each candidate's strip must complete before its size is measured
             const stripped = await stripImageMetadata(candidate.uri, ext);
-            // The URI equality check is a second guard beside the typed
-            // result: a manipulator that resolves while pointing at the input
-            // file must not pass as sanitized either.
-            if (stripped.ok && stripped.uri !== candidate.uri) {
+            if (stripped.ok) {
               ext = stripped.extension;
               localUri = stripped.uri;
               localFileOwned = true;

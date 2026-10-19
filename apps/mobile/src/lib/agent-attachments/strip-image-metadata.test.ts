@@ -118,4 +118,14 @@ describe('stripImageMetadata', () => {
     const [reported] = mocks.captureException.mock.calls[0] as [Error];
     expect(reported.cause).toMatchObject({ message: 'jpeg encode failed' });
   });
+
+  it('treats a re-encode that resolves to the input URI as a failure', async () => {
+    mocks.manipulateAsync.mockResolvedValue({ uri: 'file:///cache/original.png' });
+
+    const result = await stripImageMetadata('file:///cache/original.png', 'png');
+
+    expect(result).toEqual({ ok: false });
+    const [reported] = mocks.captureException.mock.calls[0] as [Error];
+    expect(reported.cause).toMatchObject({ message: 'Re-encode resolved to the input URI' });
+  });
 });

@@ -21,7 +21,6 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
-import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   classifyProviderState,
   useBitbucketReadiness,
@@ -29,6 +28,7 @@ import {
   useSaveReviewConfig,
   type useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
+import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
@@ -50,7 +50,7 @@ export function BitbucketOverview({
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
-  const { models, isLoading: modelsLoading } = useAvailableModels(scope);
+  const { models, isLoading: modelsLoading } = useReviewerModels(scope);
   const providerState = classifyProviderState({
     isLoading: readiness.isLoading,
     isError: readiness.isError,

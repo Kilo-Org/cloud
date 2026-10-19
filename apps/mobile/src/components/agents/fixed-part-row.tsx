@@ -15,8 +15,9 @@ import { useMessageLongPress } from './message-long-press-context';
 /**
  * The localized translation-failure indicator at the row's end: a text badge,
  * or an icon-only glyph for assembled labels whose single line must not lose
- * width to the badge text. Either variant carries the localized copy as its
- * accessibility label.
+ * width to the badge text. The spoken failure state is carried by the row's
+ * `accessibilityLabel` — this indicator sits inside the accessible Pressable,
+ * whose descendants are not exposed to screen readers on iOS.
  */
 function TranslationFailureIndicator({ iconOnly }: { iconOnly: boolean }) {
   const colors = useThemeColors();
@@ -25,19 +26,15 @@ function TranslationFailureIndicator({ iconOnly }: { iconOnly: boolean }) {
     return (
       <View
         className="shrink-0"
-        accessibilityLabel={t('agentChat.toolCard.translationFailed')}
-        accessibilityRole="image"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
       >
         <AlertTriangle size={12} color={colors.mutedForeground} />
       </View>
     );
   }
   return (
-    <Text
-      className="text-xs text-muted-foreground"
-      numberOfLines={1}
-      accessibilityLabel={t('agentChat.toolCard.translationFailed')}
-    >
+    <Text className="text-xs text-muted-foreground" numberOfLines={1}>
       {t('agentChat.toolCard.translationFailed')}
     </Text>
   );
@@ -118,10 +115,17 @@ export function FixedPartRow({
   const failed = ownFailed || translationFailed === true;
   // Keep the spoken summary in step with the visible one without a second
   // translation request: only the embedded label changes.
-  const shownAccessibilityLabel =
+  const baseAccessibilityLabel =
     label !== '' && shownLabel !== label
       ? accessibilityLabel.split(label).join(shownLabel)
       : accessibilityLabel;
+  // The failure indicator sits inside this accessible Pressable, and an
+  // accessible container does not expose its descendants on iOS
+  // (message-bubble-a11y), so its label would never be announced. The failure
+  // copy is folded into the row's spoken label instead, for both variants.
+  const shownAccessibilityLabel = failed
+    ? `${baseAccessibilityLabel}, ${t('agentChat.toolCard.translationFailed')}`
+    : baseAccessibilityLabel;
 
   return (
     <View

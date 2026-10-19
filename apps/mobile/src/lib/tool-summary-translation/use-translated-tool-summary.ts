@@ -19,7 +19,8 @@ export type ToolSummaryTranslation = {
   /**
    * True when the translation failed enough times to exhaust the shared retry
    * budget: the row keeps the original text and may surface the localized
-   * failure state. Not final — a reconnect edge resets the budget.
+   * failure state. Not final — a resolution, the surface releasing the
+   * summary, or a config change clears it.
    */
   failed: boolean;
 };
@@ -159,7 +160,8 @@ function armTranslationRetry(): () => void {
  * retries it rather than reporting the missing summary as final — until the
  * budget is exhausted (`failed`): then `pending` drops, the caller shows the
  * original text plus the localized failure state instead of an unbounded wait,
- * and a reconnect edge or a later resolution re-arms the normal cadence. A row
+ * and a later resolution (or the row releasing and re-asking) re-arms the
+ * normal cadence. A row
  * that embeds the summary in a sentence of its own (`CondensedToolRunRow`) has
  * nowhere to put the original English while it waits, so it reads `pending`
  * instead of the fallback text.

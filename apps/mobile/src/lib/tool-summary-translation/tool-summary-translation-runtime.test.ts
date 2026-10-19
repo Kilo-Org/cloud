@@ -1240,6 +1240,42 @@ describe('translation failure exhaustion', () => {
     }
   });
 
+  it('does not count a batch outcome for a summary whose surface released mid-flight', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValue(new Error('gateway down'));
+
+    // The attempt is in flight when the row unmounts: the release drops the
+    // key from the retry memory, and the failed outcome must not re-create a
+    // count (or re-charge a fast remount's fresh budget).
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    mod.releaseTranslationInterest({
+      itemId: 'part-1',
+      text: 'hello',
+      language: 'de',
+      model: MODEL,
+    });
+    // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
+    await flushBatch();
+    expect(mod.isTranslationFailed('part-1', 'hello', 'de', MODEL.id)).toBe(false);
+
+    // A fast remount starts from zero: two further failures do not exhaust.
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+      // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
+      await flushBatch();
+      if (attempt < 2) {
+        mod.releaseTranslationInterest({
+          itemId: 'part-1',
+          text: 'hello',
+          language: 'de',
+          model: MODEL,
+        });
+      }
+    }
+    expect(mod.isTranslationFailed('part-1', 'hello', 'de', MODEL.id)).toBe(false);
+    expect(requestMock).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the failure state across a reconnect retry until a batch resolves', async () => {
     const mod = await loadRuntime();
     requestMock.mockRejectedValue(new Error('gateway down'));

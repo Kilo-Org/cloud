@@ -234,8 +234,9 @@ describe('CondensedToolRunRow label', () => {
     expect(textWithContent(renderer.root, '3 items; exhausted.ts')).toHaveLength(1);
     expect(textWithContent(renderer.root, 'Translation failed')).toHaveLength(0);
     expect(findHost(renderer.root, 'AlertTriangle')).toHaveLength(1);
+    // The spoken failure state rides the row's accessible label.
     const pressable = renderer.root.findByProps({ accessibilityRole: 'button' });
-    expect(pressable.props.accessibilityLabel).toBe('3 items; exhausted.ts');
+    expect(pressable.props.accessibilityLabel).toBe('3 items; exhausted.ts, Translation failed');
     renderer.unmount();
   });
 

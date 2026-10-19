@@ -145,8 +145,9 @@ const retryable = new Map<string, QueueItem>();
 // key's count when the batch produced no translation for it and clears it on
 // success. A count reaching {@link TOOL_SUMMARY_TRANSLATION_MAX_FAILURES}
 // marks the key exhausted: mounted rows render the localized failure state
-// instead of an unbounded silent wait. Cleared on success, config change,
-// sign-out, and each re-queue from a reconnect edge.
+// instead of an unbounded silent wait. Cleared on success, on the surface
+// releasing the summary (remount or supersede), on a config change, and on
+// sign-out — a reconnect re-queue does not reset the budget.
 const failureCounts = new Map<string, number>();
 // The keys the queue currently holds. A mounted row re-asks on its own cadence
 // while its summary is unresolved, and a summary parked behind the batch window
@@ -646,11 +647,20 @@ async function runBatch(batch: FlushBatch): Promise<void> {
   // step toward exhaustion. Runs on every path — the success path and a
   // thrown or unreachable request — so a gateway outage reaches exhaustion
   // like a malformed reply does. Keys in `resolved` are skipped: `remember`
-  // cleared them.
+  // cleared them. Keys whose surface released while the attempt was in flight
+  // (row unmounted, scrolled away, or superseded) are skipped too: the release
+  // dropped them from `retryable`, so counting them would leave a count — and
+  // a full summary string — behind for the rest of the session, and would
+  // charge the stale attempt to a fast remount instead of starting its fresh
+  // budget at zero.
   const countFailures = (resolvedKeys: ReadonlySet<string>): void => {
     let exhausted = false;
     for (const item of batch.items) {
-      if (item.generation === generation && !resolvedKeys.has(item.key)) {
+      if (
+        item.generation === generation &&
+        retryable.has(item.key) &&
+        !resolvedKeys.has(item.key)
+      ) {
         const next = (failureCounts.get(item.key) ?? 0) + 1;
         failureCounts.set(item.key, next);
         if (next >= TOOL_SUMMARY_TRANSLATION_MAX_FAILURES) {

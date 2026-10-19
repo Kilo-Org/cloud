@@ -476,12 +476,16 @@ describe('FixedPartRow tool-summary translation', () => {
       expect(requestMock).toHaveBeenCalledTimes(3);
       expect(rowLabel(renderer)).toBe('Exhausted summary');
       expect(textWithContent(renderer.root, 'Translation failed')).toHaveLength(1);
+      expect(rowAccessibilityLabel(renderer)).toBe(
+        'Exhausted summary tool, completed, Translation failed'
+      );
 
       // The gateway recovers: the next resolution clears the badge.
       requestMock.mockResolvedValue(['Résumé épuisé']);
       await advanceClock(4 * TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
       expect(rowLabel(renderer)).toBe('Résumé épuisé');
       expect(textWithContent(renderer.root, 'Translation failed')).toHaveLength(0);
+      expect(rowAccessibilityLabel(renderer)).toBe('Résumé épuisé tool, completed');
       act(() => {
         renderer.unmount();
       });
@@ -517,6 +521,11 @@ describe('FixedPartRow tool-summary translation', () => {
       expect(rowLabel(renderer)).toBe('Icon row summary');
       expect(textWithContent(renderer.root, 'Translation failed')).toHaveLength(0);
       expect(findHost(renderer.root, 'AlertTriangle')).toHaveLength(1);
+      // The spoken failure state rides the row's accessible label: descendants
+      // of an accessible container are not exposed on iOS.
+      expect(rowAccessibilityLabel(renderer)).toBe(
+        'Icon row summary tool, completed, Translation failed'
+      );
       act(() => {
         renderer.unmount();
       });

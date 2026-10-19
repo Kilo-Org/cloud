@@ -2564,6 +2564,7 @@
       "title": "Sesijų filtras",
       "platformCloud": "Debesija",
       "platformExtension": "Plėtinys",
+      "platformDesktop": "Darbalaukio programa",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

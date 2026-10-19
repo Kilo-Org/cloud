@@ -1972,6 +1972,7 @@
       "title": "Filtrar sessões",
       "platformCloud": "Nuvem",
       "platformExtension": "Extensão",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

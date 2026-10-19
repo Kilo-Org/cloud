@@ -137,6 +137,7 @@ import {
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
+import { userAuthMiddleware } from './middleware/user-auth.middleware';
 import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
 import { useWorkersLogger } from 'workers-tagged-logger';
@@ -879,6 +880,7 @@ app.post('/api/towns/:townId/container-events', async c => {
 app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
+app.use('/api/users/:userId/*', userAuthMiddleware);
 // Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
 // Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {

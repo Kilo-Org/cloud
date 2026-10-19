@@ -2581,6 +2581,7 @@
       "title": "Filter sessions",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

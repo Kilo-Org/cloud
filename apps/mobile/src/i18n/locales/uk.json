@@ -2020,6 +2020,7 @@
       "title": "Фільтри сеансів",
       "platformCloud": "Хмара",
       "platformExtension": "Розширення",
+      "platformDesktop": "Десктоп",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

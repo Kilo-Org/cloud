@@ -2498,6 +2498,7 @@
       "title": "সেশন ফিল্টার",
       "platformCloud": "ক্লাউড",
       "platformExtension": "এক্সটেনশন",
+      "platformDesktop": "ডেস্কটপ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

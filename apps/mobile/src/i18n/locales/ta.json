@@ -2498,6 +2498,7 @@
       "title": "அமர்வுகளை வடிகட்டவும்",
       "platformCloud": "மேகக் கணினி",
       "platformExtension": "நீட்சி",
+      "platformDesktop": "டெஸ்க்டாப்",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

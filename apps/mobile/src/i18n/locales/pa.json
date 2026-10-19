@@ -2498,6 +2498,7 @@
       "title": "ਸੈਸ਼ਨ ਫਿਲਟਰ ਕਰੋ",
       "platformCloud": "ਕਲਾਉਡ",
       "platformExtension": "ਐਕਸਟੈਂਸ਼ਨ",
+      "platformDesktop": "ਡੈਸਕਟਾਪ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

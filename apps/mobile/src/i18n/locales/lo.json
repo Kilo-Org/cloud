@@ -2498,6 +2498,7 @@
       "title": "ກັ່ນຕອງເຊດຊັນ",
       "platformCloud": "ຄລາວ",
       "platformExtension": "ສ່ວນຂະຫຍາຍ",
+      "platformDesktop": "ຄອມພິວເຕີ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

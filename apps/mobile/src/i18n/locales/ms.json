@@ -2498,6 +2498,7 @@
       "title": "Tapis sesi",
       "platformCloud": "Awan",
       "platformExtension": "Sambungan",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

@@ -962,6 +962,9 @@ export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
 export const ORGANIZATION_AUTO_MODEL_ID = 'kilo-auto/org';
 export const MAX_ORGANIZATION_AUTO_ROUTES = 100;
+// Custom router model ID prefixes from @kilocode/auto-routing-contracts (ADR 0005).
+const CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/';
+const ORG_CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/org/';
 
 const OrganizationAutoModelRouteSlugSchema = z
   .string()
@@ -981,7 +984,13 @@ const OrganizationAutoModelTargetSchema = z
   })
   .refine(value => value !== ORGANIZATION_AUTO_MODEL_ID, {
     message: 'Organization Auto cannot target itself',
-  });
+  })
+  .refine(
+    value =>
+      !value.startsWith(CUSTOM_ROUTER_MODEL_PREFIX) ||
+      value.startsWith(ORG_CUSTOM_ROUTER_MODEL_PREFIX),
+    { message: 'Organization Auto can only target organization custom routers' }
+  );
 
 export const OrganizationAutoModelSettingsSchema = z.object({
   routes: z

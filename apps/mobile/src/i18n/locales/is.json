@@ -2498,6 +2498,7 @@
       "title": "Sía lotur",
       "platformCloud": "Ský",
       "platformExtension": "Viðbót",
+      "platformDesktop": "Skjáborð",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

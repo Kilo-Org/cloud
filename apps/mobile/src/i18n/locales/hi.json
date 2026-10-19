@@ -1960,6 +1960,7 @@
       "title": "सत्र फ़िल्टर करें",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्सटेंशन",
+      "platformDesktop": "डेस्कटॉप",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

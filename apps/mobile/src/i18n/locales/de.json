@@ -1986,6 +1986,7 @@
       "title": "Sitzungen filtern",
       "platformCloud": "Cloud-Umgebung",
       "platformExtension": "Erweiterung",
+      "platformDesktop": "Desktop-App",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

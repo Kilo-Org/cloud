@@ -1986,6 +1986,7 @@
       "title": "筛选会话",
       "platformCloud": "云端",
       "platformExtension": "扩展",
+      "platformDesktop": "桌面端",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

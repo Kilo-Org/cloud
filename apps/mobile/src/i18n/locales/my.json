@@ -2498,6 +2498,7 @@
       "title": "စက်ရှင်စစ်ထုတ်ခြင်း",
       "platformCloud": "ကလောက်",
       "platformExtension": "တိုးချဲ့ပရိုဂရမ်",
+      "platformDesktop": "ကွန်ပျူတာ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

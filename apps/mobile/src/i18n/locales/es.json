@@ -2003,6 +2003,7 @@
       "title": "Filtrar sesiones",
       "platformCloud": "Nube",
       "platformExtension": "Extensión",
+      "platformDesktop": "Escritorio",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

@@ -2498,6 +2498,7 @@
       "title": "กรองเซสชัน",
       "platformCloud": "คลาวด์",
       "platformExtension": "ส่วนขยาย",
+      "platformDesktop": "เดสก์ท็อป",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

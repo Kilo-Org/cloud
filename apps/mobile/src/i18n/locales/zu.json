@@ -2498,6 +2498,7 @@
       "title": "Hlunga iziseshini",
       "platformCloud": "Ifu",
       "platformExtension": "Isandiso",
+      "platformDesktop": "Ikhompyutha",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

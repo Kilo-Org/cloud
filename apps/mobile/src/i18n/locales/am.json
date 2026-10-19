@@ -2498,6 +2498,7 @@
       "title": "የክፍለ ጊዜ ማጣሪያ",
       "platformCloud": "ክላውድ",
       "platformExtension": "ቅጥያ",
+      "platformDesktop": "ዴስክቶፕ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

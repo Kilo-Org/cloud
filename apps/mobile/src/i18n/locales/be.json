@@ -2564,6 +2564,7 @@
       "title": "Фільтр сеансаў",
       "platformCloud": "Воблака",
       "platformExtension": "Пашырэнне",
+      "platformDesktop": "Дэсктоп",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

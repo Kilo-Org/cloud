@@ -2531,6 +2531,7 @@
       "title": "Filtriraj sesije",
       "platformCloud": "Oblak",
       "platformExtension": "Proširenje",
+      "platformDesktop": "Stolna aplikacija",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

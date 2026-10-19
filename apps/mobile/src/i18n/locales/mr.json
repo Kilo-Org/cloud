@@ -2498,6 +2498,7 @@
       "title": "सत्रे फिल्टर करा",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्स्टेन्शन",
+      "platformDesktop": "डेस्कटॉप",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

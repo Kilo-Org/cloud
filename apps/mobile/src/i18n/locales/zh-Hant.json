@@ -1986,6 +1986,7 @@
       "title": "篩選工作階段",
       "platformCloud": "雲端",
       "platformExtension": "擴充功能",
+      "platformDesktop": "桌面版",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

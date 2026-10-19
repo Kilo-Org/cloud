@@ -2498,6 +2498,7 @@
       "title": "Filtrar sesións",
       "platformCloud": "Nube",
       "platformExtension": "Extensión",
+      "platformDesktop": "Escritorio",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

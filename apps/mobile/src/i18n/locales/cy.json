@@ -2630,6 +2630,7 @@
       "title": "Hidlo sesiynau",
       "platformCloud": "Cwmwl",
       "platformExtension": "Estyniad",
+      "platformDesktop": "Bwrdd gwaith",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

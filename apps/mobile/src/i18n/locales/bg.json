@@ -2498,6 +2498,7 @@
       "title": "Филтриране на сесии",
       "platformCloud": "Облак",
       "platformExtension": "Разширение",
+      "platformDesktop": "Настолно приложение",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

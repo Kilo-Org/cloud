@@ -2498,6 +2498,7 @@
       "title": "Сессияларды сүзу",
       "platformCloud": "Бұлт",
       "platformExtension": "Кеңейтім",
+      "platformDesktop": "Жұмыс үстелі",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

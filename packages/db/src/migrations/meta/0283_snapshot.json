@@ -1,650 +1,9 @@
 {
-  "id": "ec40d619-f146-4262-bd09-4a2885dff23c",
+  "id": "d48371da-3faf-40a7-b7b0-8deaef61ed7b",
   "prevId": "3817863b-1d7c-4d90-a0d1-4b8da3398992",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.agent_briefing_context_preferences": {
-      "name": "agent_briefing_context_preferences",
-      "schema": "",
-      "columns": {
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "context_key": {
-          "name": "context_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ai_enabled": {
-          "name": "ai_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "max_duration_seconds": {
-          "name": "max_duration_seconds",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 600
-        },
-        "max_spend_microdollars": {
-          "name": "max_spend_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 2000000
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "agent_briefing_context_preferences_kilo_user_id_kilocode_users_id_fk": {
-          "name": "agent_briefing_context_preferences_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "agent_briefing_context_preferences",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "agent_briefing_context_preferences_organization_id_organizations_id_fk": {
-          "name": "agent_briefing_context_preferences_organization_id_organizations_id_fk",
-          "tableFrom": "agent_briefing_context_preferences",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "agent_briefing_context_preferences_kilo_user_id_context_key_pk": {
-          "name": "agent_briefing_context_preferences_kilo_user_id_context_key_pk",
-          "columns": [
-            "kilo_user_id",
-            "context_key"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "agent_briefing_context_limits": {
-          "name": "agent_briefing_context_limits",
-          "value": "\"agent_briefing_context_preferences\".\"max_duration_seconds\" BETWEEN 1 AND 600 AND \"agent_briefing_context_preferences\".\"max_spend_microdollars\" > 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.agent_briefing_events": {
-      "name": "agent_briefing_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "occurred_at": {
-          "name": "occurred_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recorded_at": {
-          "name": "recorded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payload": {
-          "name": "payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "agent_briefing_events_user_window": {
-          "name": "agent_briefing_events_user_window",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "occurred_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "agent_briefing_events_session_window": {
-          "name": "agent_briefing_events_session_window",
-          "columns": [
-            {
-              "expression": "session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "occurred_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "agent_briefing_events_session_fk": {
-          "name": "agent_briefing_events_session_fk",
-          "tableFrom": "agent_briefing_events",
-          "tableTo": "cli_sessions_v2",
-          "columnsFrom": [
-            "session_id",
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "session_id",
-            "kilo_user_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.agent_briefing_preferences": {
-      "name": "agent_briefing_preferences",
-      "schema": "",
-      "columns": {
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "night_start": {
-          "name": "night_start",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'22:00'"
-        },
-        "morning_start": {
-          "name": "morning_start",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'08:00'"
-        },
-        "morning_end": {
-          "name": "morning_end",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'12:00'"
-        },
-        "language": {
-          "name": "language",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'en'"
-        },
-        "notifications_enabled": {
-          "name": "notifications_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "next_run_at": {
-          "name": "next_run_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "agent_briefing_preferences_due": {
-          "name": "agent_briefing_preferences_due",
-          "columns": [
-            {
-              "expression": "next_run_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "agent_briefing_preferences_kilo_user_id_kilocode_users_id_fk": {
-          "name": "agent_briefing_preferences_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "agent_briefing_preferences",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.agent_briefing_reports": {
-      "name": "agent_briefing_reports",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "context_key": {
-          "name": "context_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "local_date": {
-          "name": "local_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "night_start_at": {
-          "name": "night_start_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cutoff_at": {
-          "name": "cutoff_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "morning_end_at": {
-          "name": "morning_end_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "published_at": {
-          "name": "published_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "next_refresh_at": {
-          "name": "next_refresh_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        },
-        "next_charge_check_at": {
-          "name": "next_charge_check_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dismissed_at": {
-          "name": "dismissed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "evidence_hash": {
-          "name": "evidence_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "facts": {
-          "name": "facts",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "summary": {
-          "name": "summary",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "generation_id": {
-          "name": "generation_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "generation_started_at": {
-          "name": "generation_started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "generation_finished_at": {
-          "name": "generation_finished_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "generation_deadline_at": {
-          "name": "generation_deadline_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "generation_revision": {
-          "name": "generation_revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "generation_max_cost": {
-          "name": "generation_max_cost",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notification_sent_at": {
-          "name": "notification_sent_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "agent_briefing_reports_window": {
-          "name": "agent_briefing_reports_window",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "context_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "local_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "agent_briefing_reports_user_history": {
-          "name": "agent_briefing_reports_user_history",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "cutoff_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "agent_briefing_reports_active": {
-          "name": "agent_briefing_reports_active",
-          "columns": [
-            {
-              "expression": "morning_end_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "agent_briefing_reports_refresh_due": {
-          "name": "agent_briefing_reports_refresh_due",
-          "columns": [
-            {
-              "expression": "next_refresh_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "agent_briefing_reports_charge_due": {
-          "name": "agent_briefing_reports_charge_due",
-          "columns": [
-            {
-              "expression": "next_charge_check_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "agent_briefing_reports_kilo_user_id_kilocode_users_id_fk": {
-          "name": "agent_briefing_reports_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "agent_briefing_reports",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "agent_briefing_reports_organization_id_organizations_id_fk": {
-          "name": "agent_briefing_reports_organization_id_organizations_id_fk",
-          "tableFrom": "agent_briefing_reports",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.agent_configs": {
       "name": "agent_configs",
       "schema": "",
@@ -3506,6 +2865,209 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.auto_routing_custom_routers": {
+      "name": "auto_routing_custom_routers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_router": {
+          "name": "base_router",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entries": {
+          "name": "entries",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "default_entry_key": {
+          "name": "default_entry_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_auto_routing_custom_routers_org_slug": {
+          "name": "UQ_auto_routing_custom_routers_org_slug",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"auto_routing_custom_routers\".\"owned_by_organization_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_auto_routing_custom_routers_user_slug": {
+          "name": "UQ_auto_routing_custom_routers_user_slug",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"auto_routing_custom_routers\".\"owned_by_user_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_auto_routing_custom_routers_org_id": {
+          "name": "IDX_auto_routing_custom_routers_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_auto_routing_custom_routers_user_id": {
+          "name": "IDX_auto_routing_custom_routers_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auto_routing_custom_routers_owned_by_organization_id_organizations_id_fk": {
+          "name": "auto_routing_custom_routers_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "auto_routing_custom_routers",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "auto_routing_custom_routers_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "auto_routing_custom_routers_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "auto_routing_custom_routers",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "auto_routing_custom_routers_owner_check": {
+          "name": "auto_routing_custom_routers_owner_check",
+          "value": "(\n        (\"auto_routing_custom_routers\".\"owned_by_user_id\" IS NOT NULL AND \"auto_routing_custom_routers\".\"owned_by_organization_id\" IS NULL) OR\n        (\"auto_routing_custom_routers\".\"owned_by_user_id\" IS NULL AND \"auto_routing_custom_routers\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        },
+        "auto_routing_custom_routers_base_router_check": {
+          "name": "auto_routing_custom_routers_base_router_check",
+          "value": "\"auto_routing_custom_routers\".\"base_router\" IN ('efficient', 'frontier')"
+        },
+        "auto_routing_custom_routers_mode_check": {
+          "name": "auto_routing_custom_routers_mode_check",
+          "value": "\"auto_routing_custom_routers\".\"mode\" IN ('cost_per_accuracy', 'best_accuracy')"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.auto_top_up_configs": {
       "name": "auto_top_up_configs",
       "schema": "",
@@ -5444,12 +5006,6 @@
         "status_updated_at": {
           "name": "status_updated_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_transition_id": {
-          "name": "status_transition_id",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

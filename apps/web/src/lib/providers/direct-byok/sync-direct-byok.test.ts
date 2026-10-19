@@ -271,6 +271,73 @@ describe('parseModelsDevProviderModels', () => {
       expect.objectContaining({ id: 'nvidia/unknown' }),
     ]);
   });
+
+  test('excludes models served only over the native Gemini API', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          'glm-5.3': {
+            id: 'glm-5.3',
+            provider: { api: 'https://opencode.ai/inference/go/openai/v1' },
+          },
+          'qwen3.7-plus': {
+            id: 'qwen3.7-plus',
+            provider: {
+              npm: '@ai-sdk/anthropic',
+              api: 'https://opencode.ai/inference/go/anthropic/v1',
+            },
+          },
+          'gpt-6-luna': {
+            id: 'gpt-6-luna',
+            provider: { npm: '@ai-sdk/openai', api: 'https://opencode.ai/inference/go/openai/v1' },
+          },
+          'compatible-model': {
+            id: 'compatible-model',
+            provider: { npm: '@ai-sdk/openai-compatible' },
+          },
+          'gemini-4-argon-contributor': {
+            id: 'gemini-4-argon-contributor',
+            provider: {
+              npm: '@ai-sdk/google',
+              api: 'https://opencode.ai/inference/go/google/v1beta',
+            },
+          },
+          'vertex-gemini': {
+            id: 'vertex-gemini',
+            provider: { npm: '@ai-sdk/google-vertex' },
+          },
+          'mistral-alias': {
+            id: 'mistral-alias',
+            provider: { npm: '@ai-sdk/mistral', api: 'https://opencode.ai/inference/openai/v1' },
+          },
+          'openrouter-alias': {
+            id: 'openrouter-alias',
+            provider: { npm: '@openrouter/ai-sdk-provider' },
+          },
+        },
+      },
+      'opencode-go',
+      new Set([
+        'glm-5.3',
+        'qwen3.7-plus',
+        'gpt-6-luna',
+        'compatible-model',
+        'gemini-4-argon-contributor',
+        'vertex-gemini',
+        'mistral-alias',
+        'openrouter-alias',
+      ])
+    );
+
+    expect(models.map(model => model.id)).toEqual([
+      'glm-5.3',
+      'qwen3.7-plus',
+      'gpt-6-luna',
+      'compatible-model',
+      'mistral-alias',
+      'openrouter-alias',
+    ]);
+  });
 });
 
 describe('syncDirectByokModels database snapshots', () => {
@@ -306,6 +373,7 @@ describe('syncDirectByokModels database snapshots', () => {
     },
   ];
   let providerModels: Record<string, { id: string } & Record<string, unknown>>;
+  let openCodeGoModels: Record<string, { id: string } & Record<string, unknown>>;
   let fetchAvailableModels: () => Promise<Response>;
 
   beforeEach(async () => {
@@ -318,6 +386,7 @@ describe('syncDirectByokModels database snapshots', () => {
         )
       );
     providerModels = downloadedModels;
+    openCodeGoModels = {};
     fetchAvailableModels = async () =>
       Response.json({ data: Object.values(providerModels).map(({ id }) => ({ id })) });
     jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
@@ -328,13 +397,16 @@ describe('syncDirectByokModels database snapshots', () => {
           edenai: { models: {} },
           'zai-coding-plan': { models: {} },
           'ollama-cloud': { models: {} },
-          'opencode-go': { models: {} },
+          'opencode-go': { models: openCodeGoModels },
           'xiaomi-token-plan-ams': { models: {} },
           'xiaomi-token-plan-sgp': { models: {} },
         });
       }
       if (input === 'https://integrate.api.nvidia.com/v1/models') {
         return fetchAvailableModels();
+      }
+      if (input === 'https://opencode.ai/zen/go/v1/models') {
+        return Response.json({ data: Object.values(openCodeGoModels).map(({ id }) => ({ id })) });
       }
       return Response.json({ data: [] });
     });
@@ -421,6 +493,40 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(snapshot.models).toStrictEqual([]);
     expect(new Date(snapshot.synced_at).toISOString()).not.toBe(oldSyncedAt);
     expect(counts[providerId]).toBe(0);
+  });
+
+  test('re-sync removes previously synced OpenCode Go models served only over the Gemini API', async () => {
+    await db.insert(direct_byok_model_lists).values({
+      provider_id: 'opencode-go',
+      models: [
+        {
+          id: 'gemini-4-argon-contributor',
+          name: 'Gemini 4 Argon Contributor',
+          context_length: 1_048_576,
+          max_completion_tokens: 65_536,
+        },
+      ],
+      synced_at: oldSyncedAt,
+    });
+    openCodeGoModels = {
+      'glm-5.3': { id: 'glm-5.3', name: 'GLM-5.3' },
+      'gemini-4-argon-contributor': {
+        id: 'gemini-4-argon-contributor',
+        name: 'Gemini 4 Argon Contributor',
+        provider: { npm: '@ai-sdk/google', api: 'https://opencode.ai/inference/go/google/v1beta' },
+      },
+    };
+
+    const counts = await syncDirectByokModels();
+    const [snapshot] = await db
+      .select()
+      .from(direct_byok_model_lists)
+      .where(eq(direct_byok_model_lists.provider_id, 'opencode-go'));
+
+    expect(snapshot.models).toStrictEqual([
+      { id: 'glm-5.3', name: 'GLM-5.3', context_length: 200_000, max_completion_tokens: 32_000 },
+    ]);
+    expect(counts['opencode-go']).toBe(1);
   });
 
   test('rejects an upstream failure without replacing the last successful snapshot', async () => {

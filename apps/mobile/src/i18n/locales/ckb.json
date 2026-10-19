@@ -2498,6 +2498,7 @@
       "title": "پاڵاوتنی سێشنەکان",
       "platformCloud": "هەور",
       "platformExtension": "پێوەکراو",
+      "platformDesktop": "دێسکتۆپ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

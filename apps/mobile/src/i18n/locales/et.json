@@ -2498,6 +2498,7 @@
       "title": "Filtreeri seansse",
       "platformCloud": "Pilv",
       "platformExtension": "Laiendus",
+      "platformDesktop": "Töölaud",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

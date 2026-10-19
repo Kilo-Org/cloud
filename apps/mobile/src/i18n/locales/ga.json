@@ -2597,6 +2597,7 @@
       "title": "Scag seisiúin",
       "platformCloud": "Scamall",
       "platformExtension": "Eisínteacht",
+      "platformDesktop": "Deasc",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

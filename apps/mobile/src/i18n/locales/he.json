@@ -2003,6 +2003,7 @@
       "title": "סינון סשנים",
       "platformCloud": "ענן",
       "platformExtension": "תוסף",
+      "platformDesktop": "שולחן עבודה",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

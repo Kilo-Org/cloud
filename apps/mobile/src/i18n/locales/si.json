@@ -2498,6 +2498,7 @@
       "title": "සැසි පෙරහන් කරන්න",
       "platformCloud": "ක්ලවුඩ්",
       "platformExtension": "දිගුව",
+      "platformDesktop": "ඩෙස්ක්ටොප්",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

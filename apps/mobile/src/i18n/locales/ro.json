@@ -2531,6 +2531,7 @@
       "title": "Filtre pentru sesiuni",
       "platformCloud": "În cloud",
       "platformExtension": "Extensie",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

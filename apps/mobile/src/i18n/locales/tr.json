@@ -1986,6 +1986,7 @@
       "title": "Oturum filtresi",
       "platformCloud": "Bulut",
       "platformExtension": "Eklenti",
+      "platformDesktop": "Masaüstü",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

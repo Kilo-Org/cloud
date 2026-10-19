@@ -1986,6 +1986,7 @@
       "title": "Saring sesi",
       "platformCloud": "Komputasi awan",
       "platformExtension": "Ekstensi",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

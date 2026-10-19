@@ -63,15 +63,10 @@ async function processMessage(
   const body = await getStagingObjectBody(env, msg.r2Key);
   const mergedChanges = new Map<string, string | null>();
   const mergedAttentionSignals: AttentionSignal[] = [];
+  const chunker = createIngestChunker(env, msg, mergedChanges, mergedAttentionSignals);
 
   try {
-    const accepted = await ingestStagedSessionItems(
-      env,
-      msg,
-      body,
-      mergedChanges,
-      mergedAttentionSignals
-    );
+    const accepted = await ingestStagedSessionItems(chunker, msg, body);
     if (accepted) {
       await applyMetadataChanges(env, msg.kiloUserId, msg.sessionId, mergedChanges, ctx);
     }
@@ -93,8 +88,10 @@ async function processMessage(
       ctx
     );
     if (err instanceof StagingParseError) {
-      // A staged payload that does not parse is completed rather than retried;
-      // the staging object is removed and earlier chunks above may be persisted.
+      // Items that parsed before the malformed tail may still be buffered in
+      // the chunker; flush them so the valid prefix is persisted, then remove
+      // the staging object and complete the message.
+      await chunker.flushChunkToSessionDO();
       console.error('Removing staging object after an incomplete parse', {
         r2Key: msg.r2Key,
         sessionId: msg.sessionId,
@@ -157,13 +154,10 @@ async function getStagingObjectBody(env: Env, r2Key: string): Promise<ReadableSt
 }
 
 async function ingestStagedSessionItems(
-  env: Env,
+  chunker: IngestChunker,
   msg: IngestQueueMessage,
-  body: ReadableStream<Uint8Array>,
-  mergedChanges: Map<string, string | null>,
-  mergedAttentionSignals: AttentionSignal[]
+  body: ReadableStream<Uint8Array>
 ): Promise<boolean> {
-  const chunker = createIngestChunker(env, msg, mergedChanges, mergedAttentionSignals);
   const parseError = await streamSessionItems(msg.r2Key, body, rawItem => chunker.stage(rawItem));
 
   if (parseError) {
@@ -247,12 +241,18 @@ function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
   }
 }
 
+type IngestChunker = {
+  stage(rawItem: Record<string, unknown>): Promise<boolean>;
+  flushChunkToSessionDO(): Promise<void>;
+  wasAccepted(): boolean;
+};
+
 function createIngestChunker(
   env: Env,
   msg: IngestQueueMessage,
   mergedChanges: Map<string, string | null>,
   mergedAttentionSignals: AttentionSignal[]
-) {
+): IngestChunker {
   const { r2Key, kiloUserId, sessionId, ingestVersion, ingestedAt } = msg;
   const encoder = new TextEncoder();
   const chunk: SessionDataItem[] = [];

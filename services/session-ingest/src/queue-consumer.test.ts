@@ -759,7 +759,8 @@ describe('queue', () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
-  it('completes the message and removes staging after an incomplete parse', async () => {
+  it('persists the valid prefix and removes staging after an incomplete parse', async () => {
+    const items = [{ type: 'message', data: { id: 'msg_1' } }];
     const ingest = vi.fn(async () => ({ changes: [] }));
     mockIngestWithR2(ingest);
 
@@ -770,7 +771,7 @@ describe('queue', () => {
     const select = vi.fn(() => ({ from }));
     vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
 
-    const body = '{"data":[{"type":"message","data":{"id":"msg_1"}},broken';
+    const body = `{"data":[${items.map(item => JSON.stringify(item)).join(',')},broken`;
     const deleteObject = vi.fn(async () => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
@@ -803,10 +804,10 @@ describe('queue', () => {
       { waitUntil: vi.fn() } as unknown as ExecutionContext
     );
 
-    // No item parses from the broken body, so nothing reaches the DO and no
-    // metadata flush has anything to flush.
-    expect(ingest).not.toHaveBeenCalled();
-    expect(transaction).not.toHaveBeenCalled();
+    // Items that parsed before the malformed tail are flushed to the DO so the
+    // valid prefix is persisted.
+    expect(ingest).toHaveBeenCalledTimes(1);
+    expect(ingest).toHaveBeenCalledWith(items, 'usr_malformed', 'ses_malformed', 1, 1, undefined);
     // The message completes and the staging object is removed.
     expect(retry).not.toHaveBeenCalled();
     expect(ack).toHaveBeenCalledTimes(1);

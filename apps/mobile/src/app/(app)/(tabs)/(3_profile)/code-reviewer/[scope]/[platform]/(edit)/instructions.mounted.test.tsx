@@ -4,9 +4,9 @@
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import InstructionsRoute from './instructions';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
@@ -80,5 +80,23 @@ describe('InstructionsRoute editor field', () => {
       renderer.unmount();
     });
   });
+
+  it('follows the active catalog instead of an English literal', async () => {
+    await i18n.changeLanguage('ar');
+    const renderer = mountRoute();
+
+    const editors = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'TextInput'
+    );
+    expect(editors[0]?.props.accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
+    expect(editors[0]?.props.accessibilityLabel).not.toBe('Custom instructions');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });
 
+afterEach(async () => {
+  await i18n.changeLanguage('en');
+});

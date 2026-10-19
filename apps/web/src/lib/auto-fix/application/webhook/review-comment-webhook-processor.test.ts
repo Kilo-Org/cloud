@@ -1,22 +1,22 @@
 /**
  * Unit tests for the auto-fix review-comment webhook processor's
- * admission branch. Focuses on the previously-buggy local-regex check
- * (which rejected the product-advertised "@kilocode-bot fix it" command)
- * and the new shared `parseFixCommand` admission.
+ * admission branch. Covers the shared `parseFixCommand` admission
+ * (including the product-advertised "@kilocode-bot fix it" command) and
+ * the repository permission gate: every commenter is resolved through
+ * the collaborator permission API, and only a write-capable result
+ * (admin, write, maintain) proceeds.
  *
- * The downstream dispatch path (permission, agent config, ticket
- * creation, dispatch) is intentionally NOT exercised here — it has its
- * own coverage and would require many more mocks. The single side
- * effect we observe is the first function called after admission
- * (`getAgentConfigForOwner`), so when admission is rejected the
- * function returns silently with no further calls; when admission is
- * granted, the mock throws and the test catches the throw.
+ * When admission is denied the processor reacts with thumbs-down and
+ * returns; when it is granted the mocks throw ("admitted") so the test
+ * observes how far processing reached.
  */
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 
 const mockGetAgentConfigForOwner = jest.fn();
 const mockFindExistingReviewCommentFixTicket = jest.fn();
+const mockCreateFixTicket = jest.fn();
+const mockTryDispatchPendingFixes = jest.fn();
 const mockParseFixCommand = jest.fn();
 const mockAddReactionToPRReviewComment = jest.fn().mockResolvedValue(undefined);
 const mockGetCollaboratorPermissionLevel = jest.fn();
@@ -27,14 +27,14 @@ jest.mock('@/lib/agent-config/db/agent-configs', () => ({
 }));
 
 jest.mock('../../db/fix-tickets', () => ({
-  createFixTicket: jest.fn(),
+  createFixTicket: (...args: unknown[]) => mockCreateFixTicket(...args),
   findExistingReviewCommentFixTicket: (...args: unknown[]) =>
     mockFindExistingReviewCommentFixTicket(...args),
   resetFixTicketForRetry: jest.fn(),
 }));
 
 jest.mock('../../dispatch/dispatch-pending-fixes', () => ({
-  tryDispatchPendingFixes: jest.fn().mockResolvedValue(undefined),
+  tryDispatchPendingFixes: (...args: unknown[]) => mockTryDispatchPendingFixes(...args),
 }));
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -172,6 +172,8 @@ describe('ReviewCommentWebhookProcessor admission', () => {
       );
       expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
       expect(mockFindExistingReviewCommentFixTicket).not.toHaveBeenCalled();
+      expect(mockCreateFixTicket).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingFixes).not.toHaveBeenCalled();
     }
   );
 
@@ -195,6 +197,8 @@ describe('ReviewCommentWebhookProcessor admission', () => {
       );
       expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
       expect(mockFindExistingReviewCommentFixTicket).not.toHaveBeenCalled();
+      expect(mockCreateFixTicket).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingFixes).not.toHaveBeenCalled();
     }
   );
 
@@ -218,6 +222,8 @@ describe('ReviewCommentWebhookProcessor admission', () => {
       );
       expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
       expect(mockFindExistingReviewCommentFixTicket).not.toHaveBeenCalled();
+      expect(mockCreateFixTicket).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingFixes).not.toHaveBeenCalled();
     }
   );
 

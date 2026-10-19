@@ -26,6 +26,10 @@ describe('previewReturnPath', () => {
     ['over-length path', `/${'a'.repeat(2_048)}`],
     ['preview hop path', '/.kilo-preview/enter?ticket=x'],
     ['preview hop path after dot segments', '/a/../.kilo-preview/enter'],
+    ['dot segments resolving to a double-slash path', '/a/..//evil.example'],
+    ['single dot resolving to a double-slash path', '/.//evil.example'],
+    ['encoded dot resolving to a double-slash path', '/%2e//evil.example'],
+    ['backslash reached through dot segments', '/a/..\\evil.example'],
   ])('lands on / for a %s', (_name, raw) => {
     expect(previewReturnPath(raw)).toBe('/');
   });
@@ -33,6 +37,10 @@ describe('previewReturnPath', () => {
   it('keeps a path at the length limit', () => {
     const path = `/${'a'.repeat(2_047)}`;
     expect(previewReturnPath(path)).toBe(path);
+  });
+
+  it('keeps a path whose dot segments normalize inside one slash', () => {
+    expect(previewReturnPath('/a/../b')).toBe('/b');
   });
 });
 

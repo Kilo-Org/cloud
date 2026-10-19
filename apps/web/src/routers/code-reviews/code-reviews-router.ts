@@ -462,6 +462,15 @@ export const codeReviewRouter = createTRPCRouter({
       if (error instanceof TRPCError) {
         throw error;
       }
+      // A non-TRPC failure here resolves to the client as a generic, retryable
+      // `success: false`. Without this line the real cause is invisible in
+      // production: the resolved failure never reaches Sentry and the request
+      // logs show only a 200/207. reviewId identifies the row; the line
+      // carries no user data.
+      logExceptInTest('[codeReviews.get] Failed to load review', {
+        reviewId: input.reviewId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return failureResult(error instanceof Error ? error.message : 'Failed to get code review');
     }
   }),

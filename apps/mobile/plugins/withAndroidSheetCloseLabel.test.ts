@@ -62,7 +62,11 @@ async function runMod(): Promise<{ resPath: string }> {
   // the strings mod and writes modResults back afterwards (the base-mod
   // provider's read/write); simulate both around the plugin's mod.
   await mods.strings(config);
-  const { XMLParser: Parser, XMLBuilder } = require('fast-xml-parser') as {
+  // fast-xml-parser is expo config-plugins' own dependency, not the app's, so
+  // resolve it from config-plugins' own module context.
+  const { Module } = require('node:module');
+  const configPluginsRequire = Module.createRequire(require.resolve('expo/config-plugins'));
+  const { XMLParser: Parser, XMLBuilder } = configPluginsRequire('fast-xml-parser') as {
     XMLParser: new (o: object) => XmlParser;
     XMLBuilder: new (o: object) => XmlBuilderLike;
   };
@@ -86,7 +90,9 @@ function readStrings(file: string): StringsXml {
   // The plugin writes plain XML; parse it into the shape expo's
   // withStringsXml modResults use, normalizing single-entry collections and
   // fast-xml-parser's `$name` prefix for one-attribute elements.
-  const { XMLParser: Parser } = require('fast-xml-parser') as {
+  const { Module } = require('node:module');
+  const configPluginsRequire = Module.createRequire(require.resolve('expo/config-plugins'));
+  const { XMLParser: Parser } = configPluginsRequire('fast-xml-parser') as {
     XMLParser: new (o: object) => XmlParser;
   };
   const parser = new Parser({

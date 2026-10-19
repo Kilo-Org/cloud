@@ -1202,7 +1202,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(state.kind).not.toBe('stopped');
   });
 
-  it('honours CREDENTIAL_CONTAINMENT_ENABLED=false with a containment-off selection', async () => {
+  it('denies a containment-off selection with a legacy user token', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
@@ -1214,42 +1214,62 @@ describe('SandboxControlV2 credentials (B3)', () => {
       ...prepareInput(SESSION, source),
       sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
     });
-    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
 
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      containmentEnabled?: boolean;
-      outboundContainerId?: string;
-      kilo?: { alias?: string };
-    };
-    // Uncontained: no alias is minted and the grant opts out of containment.
-    expect(grant.containmentEnabled).toBe(false);
-    expect(grant.kilo?.alias).toBeUndefined();
-    expect(grant.outboundContainerId).toBeUndefined();
-    await waitFor(() => expect(provider.intents).toHaveLength(1));
-    expect(provider.intents[0]?.containment).toEqual({ kilocode: false, github: false });
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.state).toBe('failed');
+    expect(provider.intents).toHaveLength(0);
+    expect(JSON.stringify(row)).not.toContain(NATIVE_KILO_TOKEN);
   });
 
-  it('prepares with a containment-off selection when no containment namespaces are bound', async () => {
+  it('prepares a containment-off selection with a session runtime proxy when no containment namespaces are bound', async () => {
     // Reproduces the deployed e2e Worker: containment is off and the containment
-    // container classes are stripped from the config, so resolving a containment
-    // proxy container would throw during prepare.
+    // container classes are stripped from the config. A session-bound runtime
+    // proxy is the only safe Kilo credential path here.
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
+    const stub = await setup(provider, broker, {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+      WORKER_URL: 'https://api.kilo.ai',
+    });
     await runInDurableObject(stub, instance => {
       const mutableEnv = instance.env as Record<string, unknown>;
       delete mutableEnv.SandboxContainment;
       delete mutableEnv.SandboxSmallContainment;
     });
     const source = credentialsSource(SESSION, {
+      kiloToken: runtimeAuthorizedKiloToken(),
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
     });
 
-    const view = await stub.prepare({
+    const input = {
       ...prepareInput(SESSION, source),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
-    });
-    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+      sandboxSelection: {
+        provider: 'cloudflare' as const,
+        containment: { kilocode: false, github: false },
+      },
+    };
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
+    expect(prepareFrame?.type).toBe('session.prepare');
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.credentials.kilo.token).toMatch(/^kcp1\./);
+    expect(prepareFrame.credentials.proxy?.handle).toBeDefined();
+    expect(prepareFrame.spec.env?.KILOCODE_TOKEN).toBe(prepareFrame.credentials.kilo.token);
+    expect(JSON.stringify(prepareFrame)).not.toContain(NATIVE_KILO_TOKEN);
+    expect(JSON.stringify(prepareFrame)).not.toContain('runtimeAuthorization');
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      containmentEnabled?: boolean;
+      outboundContainerId?: string;
+      kilo?: { alias?: string; runtimeProxy?: unknown; token?: string };
+    };
+    expect(grant.containmentEnabled).toBe(false);
+    expect(grant.kilo?.alias).toBe(prepareFrame.credentials.kilo.token);
+    expect(grant.kilo?.runtimeProxy).toBeDefined();
+    expect(grant.kilo?.token).toBe(runtimeAuthorizedKiloToken());
+    expect(grant.outboundContainerId).toBeUndefined();
+    await waitFor(() => expect(provider.intents).toHaveLength(1));
+    expect(provider.intents[0]?.containment).toEqual({ kilocode: false, github: false });
   });
 
   it('stays contained when the selection carries containment on', async () => {
@@ -1275,7 +1295,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(provider.intents[0]?.containment).toEqual({ kilocode: true, github: true });
   });
 
-  it('falls back to CREDENTIAL_CONTAINMENT_ENABLED when the selection omits containment', async () => {
+  it('denies the containment default with a legacy user token instead of issuing direct credentials', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
@@ -1283,22 +1303,16 @@ describe('SandboxControlV2 credentials (B3)', () => {
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
     });
 
-    await stub.prepare(prepareInput(SESSION, source));
+    const view = await stub.prepare(prepareInput(SESSION, source));
 
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      containmentEnabled?: boolean;
-      outboundContainerId?: string;
-    };
-    expect(grant.containmentEnabled).toBe(false);
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.state).toBe('failed');
     // Containment off must not resolve a containment proxy container, which the
-    // e2e Worker does not bind and which would otherwise throw during prepare.
-    expect(grant.outboundContainerId).toBeUndefined();
-    await waitFor(() => expect(provider.intents).toHaveLength(1));
-    expect(provider.intents[0]?.containment).toEqual({
-      kilocode: false,
-      github: false,
-      worktreeScoped: true,
-    });
+    // e2e Worker does not bind, and must not fall back to a native user token.
+    expect(row?.grant?.containmentEnabled).toBeUndefined();
+    expect(provider.intents).toHaveLength(0);
+    expect(JSON.stringify(row)).not.toContain(NATIVE_KILO_TOKEN);
   });
 
   it('derives the outbound container id from a custom allocation name while stopped', async () => {

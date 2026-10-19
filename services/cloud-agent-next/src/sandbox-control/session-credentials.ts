@@ -1,8 +1,6 @@
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
-import { kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { resolveSecret } from '../auth.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
 import {
@@ -55,16 +53,6 @@ import {
 const WORKTREE_LEASE_MS = 4 * 60 * 60 * 1000;
 const CAPABILITY_CACHE_MS = 3 * 60 * 60 * 1000;
 const timestampSchema = z.number().int().nonnegative();
-const KILO_TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
-const cloudAgentTokenSchema = kiloTokenPayload
-  .pick({ version: true, kiloUserId: true, env: true })
-  .extend({
-    apiTokenPepper: z.string().nullable(),
-    tokenSource: z.literal('cloud-agent'),
-    iat: timestampSchema,
-    exp: timestampSchema,
-  })
-  .strict();
 const tokenSchema = z
   .string()
   .min(1)
@@ -234,8 +222,12 @@ export const sessionCredentialGrantSchema = z
       reject();
     }
     if (grant.containmentEnabled === false) {
+      // A direct grant may only carry the session-bound runtime proxy. Without
+      // containment there is no outbound broker boundary for a Kilo capability,
+      // and a native user token must never be projected into a sandbox.
       if (
-        (grant.kilo.alias !== undefined && grant.kilo.runtimeProxy === undefined) ||
+        grant.kilo.alias === undefined ||
+        grant.kilo.runtimeProxy === undefined ||
         Object.keys(grant.kilo.capabilities).length > 0
       )
         reject();
@@ -376,6 +368,21 @@ type PreparedSessionAttachPayload = SessionAttachPayload & {
 
 function invalidCredentials(): never {
   throw new Error('Invalid contained worktree credentials');
+}
+
+/**
+ * The persisted session carries no safe Kilo credential path: its sandbox is
+ * not contained and it has no modern runtime authorization. Callers must deny
+ * the start/restore instead of projecting the session's native user token.
+ */
+export const SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE =
+  'This session is missing a required credential upgrade. Start a new session to continue.';
+
+export class SessionCredentialUpgradeRequiredError extends Error {
+  constructor() {
+    super(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
+    this.name = 'SessionCredentialUpgradeRequiredError';
+  }
 }
 
 function validateGrant(value: unknown, diagnostic?: GrantDiagnostic): SessionCredentialGrant {
@@ -785,61 +792,6 @@ async function refreshScmCapability(
   return { ...grant, scm };
 }
 
-async function selectDirectKiloToken(
-  env: CredentialEnv,
-  token: string,
-  existing: SessionCredentialGrant | undefined,
-  now: number,
-  diagnostic?: GrantDiagnostic
-): Promise<string> {
-  const decoded = jwt.decode(token);
-  if (decoded !== null && typeof decoded === 'object') {
-    if ('runtimeAdmission' in decoded) {
-      diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'direct_token_rejected' });
-      invalidCredentials();
-    }
-    if ('runtimeAuthorization' in decoded) {
-      diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'direct_token_rejected' });
-      invalidCredentials();
-    }
-    if ('aud' in decoded || 'tokenPurpose' in decoded || 'credentialExchange' in decoded) {
-      diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'direct_token_rejected' });
-      invalidCredentials();
-    }
-  }
-  if (
-    !existing ||
-    existing.kilo.token === token ||
-    existing.expiresAt <= now ||
-    now >= (existing.kilo.tokenSelectedAt ?? existing.preparedAt) + WORKTREE_LEASE_MS
-  ) {
-    return token;
-  }
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
-  if (!secret) return token;
-  try {
-    const options: jwt.VerifyOptions = { algorithms: ['HS256'], clockTimestamp: now / 1000 };
-    const current = cloudAgentTokenSchema.parse(jwt.verify(existing.kilo.token, secret, options));
-    const incoming = cloudAgentTokenSchema.parse(jwt.verify(token, secret, options));
-    if (
-      current.kiloUserId !== existing.userId ||
-      current.iat * 1000 > now ||
-      incoming.iat * 1000 > now ||
-      current.exp <= current.iat ||
-      incoming.exp <= incoming.iat ||
-      current.exp * 1000 <= now + KILO_TOKEN_REFRESH_MARGIN_MS
-    ) {
-      return token;
-    }
-    const authorization = cloudAgentTokenSchema.omit({ iat: true, exp: true }).strip();
-    return JSON.stringify(authorization.parse(current)) ===
-      JSON.stringify(authorization.parse(incoming))
-      ? existing.kilo.token
-      : token;
-  } catch {
-    return token;
-  }
-}
 
 /**
  * The environment key names the grant projection in `preparedPayload` owns. The
@@ -1322,10 +1274,12 @@ export async function prepareCredentialGrant(
     });
     invalidCredentials();
   }
-  const kiloToken =
-    containmentEnabled || modernRuntimeProxy
-      ? token.data
-      : await selectDirectKiloToken(env, token.data, existing, now, diagnostic);
+  if (!containmentEnabled && !modernRuntimeProxy) {
+    // Direct containment has no broker boundary to hold a raw user token. Only
+    // the session-bound runtime proxy may back an uncontained grant.
+    throw new SessionCredentialUpgradeRequiredError();
+  }
+  const kiloToken = token.data;
   let grant: SessionCredentialGrant = {
     version: 1,
     ...(!containmentEnabled ? { containmentEnabled: false as const } : {}),
@@ -1345,14 +1299,6 @@ export async function prepareCredentialGrant(
         ? { alias: existing?.kilo.alias ?? createControlPlaneCredential(sandboxId, 'kilo') }
         : {}),
       token: kiloToken,
-      ...(!containmentEnabled
-        ? {
-            tokenSelectedAt:
-              existing?.kilo.token === kiloToken
-                ? (existing.kilo.tokenSelectedAt ?? existing.preparedAt)
-                : now,
-          }
-        : {}),
       targets: targets.targets,
       ...(modernRuntimeProxy
         ? {

@@ -65,7 +65,7 @@ import {
   createFakeCredentialBroker,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
-import { FakeSessionPeer } from './helpers/fake-session-peer.js';
+import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
 
@@ -2984,9 +2984,20 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'worker.example.com',
   ];
 
-  async function configureEgressSandbox(provider: FakeProvider, id = sandboxId) {
+  async function configureEgressSandbox(
+    provider: FakeProvider,
+    id = sandboxId,
+    extraEnv: Record<string, unknown> = {}
+  ) {
     const stub = sandboxNamespace.getByName(id);
     const peer = new FakeSessionPeer();
+    const mintsRuntimeProxy = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'owner-1',
+      kiloSessionId:
+        sessionId === firstSessionId
+          ? 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+          : 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+    }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
@@ -2995,11 +3006,20 @@ describe('SandboxControlV2 allocation egress policy', () => {
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
         KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
         CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+        ...extraEnv,
       });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
-        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+        sessionPeerFor: (_ownerId: string, sessionId: string) => {
+          const recording = peer.forSession(sessionId);
+          const minting = mintsRuntimeProxy(sessionId);
+          return {
+            ...recording,
+            getRuntimeProxyDelegationExpiresAt: minting.getRuntimeProxyDelegationExpiresAt,
+            issueRuntimeCredentialProxyGrant: minting.issueRuntimeCredentialProxyGrant,
+          };
+        },
       });
     });
     return { stub, peer };
@@ -3024,7 +3044,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
       credentials: {
         userId: 'owner-1',
         kiloSessionId,
-        kiloToken: 'native-kilo-token',
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
         scopeId: sessionId,
         repository: { type: 'git', url: repositoryUrl },
       },
@@ -3064,11 +3084,12 @@ describe('SandboxControlV2 allocation egress policy', () => {
     }
   );
 
-  it('pins the provider origin from the session token during prepare', async () => {
+  it('pins the configured provider origin during prepare', async () => {
     const provider = createFakeProvider();
-    const { stub } = await configureEgressSandbox(provider);
+    const { stub } = await configureEgressSandbox(provider, sandboxId, {
+      KILO_OPENROUTER_BASE: 'https://token-provider.example.com/api',
+    });
     const input = prepareInput(firstSessionId, { egressMode: 'allowlist' });
-    input.credentials.kiloToken = 'https://token-provider.example.com/api:session-token';
     expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
     await awaitStarting(provider, stub);
     expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toEqual(

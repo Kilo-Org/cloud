@@ -11,6 +11,7 @@ import { validateWrapperDispatchTicket } from './auth.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import jwt from 'jsonwebtoken';
 import { ExecutionError } from './execution/errors.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from './sandbox-control/session-credentials.js';
 import { encryptWithPublicKey } from './utils/encryption.js';
 import {
   createPendingSessionMessage,
@@ -635,7 +636,7 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
   } satisfies PersistenceEnv;
 }
 
-function createMetadata(overrides: Record<string, unknown> = {}): CloudAgentSessionState {
+function createBaseMetadata(overrides: Record<string, unknown> = {}): CloudAgentSessionState {
   const metadata = parseSessionMetadata({
     version: 1,
     sessionId: 'agent_test',
@@ -663,6 +664,8 @@ function createMetadata(overrides: Record<string, unknown> = {}): CloudAgentSess
   };
 }
 
+const createMetadata = createBaseMetadata;
+
 function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -688,7 +691,7 @@ function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
   });
 }
 
-function createBitbucketMetadata(
+function createBaseBitbucketMetadata(
   isCodeReview: boolean,
   orgId: string | null = '123e4567-e89b-12d3-a456-426614174030',
   credentialContainment?: CredentialContainment
@@ -739,6 +742,8 @@ function createBitbucketMetadata(
   });
 }
 
+const createBitbucketMetadata = createBaseBitbucketMetadata;
+
 const BITBUCKET_SANDBOX_ID = 'ses-bitbucket' as SandboxId;
 
 const INSTRUCTION_PROFILE_ID = '11111111-1111-4111-8111-111111111111';
@@ -779,7 +784,7 @@ function createProfileMergeDb(instructions: Array<{ name: string; content: strin
   return { select, transaction } as unknown as WorkerDb;
 }
 
-function createCloneMetadata(): CloudAgentSessionState {
+function createBaseCloneMetadata(): CloudAgentSessionState {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
     identity: {
@@ -1265,6 +1270,48 @@ describe('writeRuntimeInstructions', () => {
 });
 
 describe('SessionService.prepareWorkspace', () => {
+  // Workspace setup tests exercise Kilo credential selection only incidentally.
+  // Keep Kilo contained so the retired direct-token fallback is not the subject
+  // of every unrelated assertion; explicit overrides still win.
+  const createMetadata = (overrides: Record<string, unknown> = {}) => {
+    const metadata = createBaseMetadata(overrides);
+    const containment = metadata.workspace?.credentialContainment;
+    return {
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        credentialContainment: containment
+          ? { ...containment, kilocode: true }
+          : { github: false, gitlab: false, bitbucket: false, kilocode: true },
+      },
+    };
+  };
+  const createCloneMetadata = (): CloudAgentSessionState => {
+    const metadata = createBaseCloneMetadata();
+    return {
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+      },
+    };
+  };
+  const createBitbucketMetadata: typeof createBaseBitbucketMetadata = (
+    isCodeReview,
+    orgId,
+    credentialContainment
+  ) => {
+    const metadata = createBaseBitbucketMetadata(isCodeReview, orgId, credentialContainment);
+    if (credentialContainment) return metadata;
+    return {
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+      },
+    };
+  };
+
   it.each([false, true])(
     'rejects retired workspace on the %s warm-path fixture before provisioning',
     async warm => {
@@ -2227,6 +2274,47 @@ describe('SessionService.prepareWorkspace', () => {
 });
 
 describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
+  // Kilo credential selection is not the subject of most dispatch tests. Keep
+  // it contained by default; uncontained cases override or use the base helper.
+  const createMetadata = (overrides: Record<string, unknown> = {}) => {
+    const metadata = createBaseMetadata(overrides);
+    const containment = metadata.workspace?.credentialContainment;
+    return {
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        credentialContainment: containment
+          ? { ...containment, kilocode: true }
+          : { github: false, gitlab: false, bitbucket: false, kilocode: true },
+      },
+    };
+  };
+  const createCloneMetadata = (): CloudAgentSessionState => {
+    const metadata = createBaseCloneMetadata();
+    return {
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+      },
+    };
+  };
+  const createBitbucketMetadata: typeof createBaseBitbucketMetadata = (
+    isCodeReview,
+    orgId,
+    credentialContainment
+  ) => {
+    const metadata = createBaseBitbucketMetadata(isCodeReview, orgId, credentialContainment);
+    if (credentialContainment) return metadata;
+    return {
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+      },
+    };
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValue({
@@ -2582,7 +2670,20 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_SUBFOLDER).toBe('gitlab');
   });
 
-  it('uses a GitHub capability and raw Kilo token for GitHub-only containment', async () => {
+  it('reconstructs containment from legacy managed-SCM metadata and issues a Kilo capability', async () => {
+    const base = createBaseMetadata();
+    const metadata = {
+      ...base,
+      workspace: { ...base.workspace, managedScmContainment: true },
+    } satisfies CloudAgentSessionState;
+
+    const result = await buildPromptWrapperRequests(metadata);
+
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kka1.default');
+    expect(JSON.stringify(result.readyRequest)).not.toContain('kilo-token');
+  });
+
+  it('uses a GitHub capability and a session Kilo capability for GitHub-only containment', async () => {
     const result = await buildPromptWrapperRequests({
       ...createMetadata({
         githubRepo: 'acme/repo',
@@ -2610,7 +2711,8 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     );
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({ token: 'kgh2.default' });
-    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kka1.default');
+    expect(JSON.stringify(result.readyRequest)).not.toContain('kilo-token');
   });
 
   it('forwards persisted GitHub integration identity to contained capability issuance', async () => {
@@ -3002,42 +3104,52 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
-  it('falls back to the raw Kilo token for an uncontained session', async () => {
-    const service = new SessionService();
-    const env = createEnv();
-    env.WORKER_URL = 'https://cloud-agent.example.com';
-    const issueKiloSessionCapability = vi.fn();
-    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
-    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
-    const metadata = createMetadata();
+  it.each([
+    ['no stored metadata', createBaseMetadata()],
+    [
+      'explicitly uncontained metadata',
+      createBaseMetadata({
+        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+      }),
+    ],
+  ])(
+    'denies an old session with %s instead of exposing the raw Kilo token',
+    async (_description, metadata) => {
+      const service = new SessionService();
+      const env = createEnv();
+      env.WORKER_URL = 'https://cloud-agent.example.com';
+      const issueKiloSessionCapability = vi.fn();
+      if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+      env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
 
-    const result = await service.buildWrapperSessionReadyAndPromptRequests({
-      env,
-      plan: {
-        scope: { sessionId: 'agent_test', userId: 'user_test' },
-        turn: {
-          type: 'prompt',
-          messageId: 'msg_018f1e2d3c4bContainmentFallbackAA',
-          prompt: 'Do the work',
-        },
-        agent: { mode: 'code', model: 'test-model' },
-        workspace: { sandboxId: 'ses-abcdef', metadata },
-        wrapper: {
-          fence: {
-            wrapperRunId: 'wr_containment_fallback',
-            wrapperGeneration: 1,
-            wrapperConnectionId: 'conn_cf',
-          },
-        },
-      } satisfies FencedWrapperDispatchRequest,
-    });
-
-    expect(issueKiloSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
-    expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
-      kilo: { type: 'api', key: 'kilo-token' },
-    });
-  });
+      await expect(
+        service.buildWrapperSessionReadyAndPromptRequests({
+          env,
+          plan: {
+            scope: { sessionId: 'agent_test', userId: 'user_test' },
+            turn: {
+              type: 'prompt',
+              messageId: 'msg_018f1e2d3c4bContainmentDeniedAA',
+              prompt: 'Do the work',
+            },
+            agent: { mode: 'code', model: 'test-model' },
+            workspace: { sandboxId: 'ses-abcdef', metadata },
+            wrapper: {
+              fence: {
+                wrapperRunId: 'wr_containment_denied',
+                wrapperGeneration: 1,
+                wrapperConnectionId: 'conn_denied',
+              },
+            },
+          } satisfies FencedWrapperDispatchRequest,
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_REQUEST',
+        message: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
+      });
+      expect(issueKiloSessionCapability).not.toHaveBeenCalled();
+    }
+  );
 
   it('allows every external directory', async () => {
     const result = await buildPromptWrapperRequests(createMetadata());

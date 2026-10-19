@@ -11,7 +11,10 @@ import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlaneSandboxSelection,
 } from './sandbox-selection.js';
-import { credentialSourceFromMetadata } from '../../sandbox-control/session-credentials.js';
+import {
+  credentialSourceFromMetadata,
+  SessionCredentialUpgradeRequiredError,
+} from '../../sandbox-control/session-credentials.js';
 import {
   buildSessionAttachPayload,
   isReadOnlyBitbucketReview,
@@ -226,6 +229,11 @@ export function buildControlPlaneSessionRegistration(
     getWorktreeCredentialContainment(runtimeConfiguration?.containmentEnabled ?? true);
   if (sandboxProvider === 'vercel' && !containment.kilocode && !containment.github) {
     throw new Error('Vercel requires credential containment');
+  }
+  if (!containment.kilocode && !containment.github && !hasModernRuntimeAuthorization(metadata)) {
+    // Direct sandboxes have no broker boundary for Kilo credentials. A session
+    // without modern runtime authorization cannot be prepared safely.
+    throw new SessionCredentialUpgradeRequiredError();
   }
   if (
     hasModernRuntimeAuthorization(metadata) &&

@@ -45,29 +45,34 @@ When enabled, Cloudflare uses contained sandbox classes and the existing credent
 broker; Vercel uses native network policies. Each worktree has stable credential
 aliases shared by its registered Kilo roots, while different worktrees have
 separate Kilo authentication contexts. Containment failures never fall back to
-raw credentials. When disabled, authorized Kilo and repository credentials are
-provided directly to the sandbox without alias redemption or credential injection.
-Control-plane ownership, attachment scope, terminal authorization, and billing
-checks still apply; direct API credentials retain their underlying access scope.
-Expired direct-credential terminal leases require a session reattachment rather
-than renewing only the server-side grant.
+raw credentials. When disabled, a session whose token has modern runtime
+authorization uses the session-bound runtime credential proxy; managed SCM
+credentials may still be resolved directly for the repository scope. A session
+without either safe Kilo path is refused rather than receiving a native user
+token. Control-plane ownership, attachment scope, terminal authorization, and
+billing checks still apply.
 
 Cloudflare's native outbound handler intercepts ports 80 and 443. With containment
 enabled, local targets such as `http://host.docker.internal:<offset-port>` can
 bypass interception and reject aliases with HTTP 401. Contained E2E runs therefore
 need sandbox-facing endpoints that traverse the native handler, plus the running
-`cloudflare-git-token-service` and its capability-encryption configuration. The
-local-dev direct-credential mode supports the generated high-port HTTP endpoints.
+`cloudflare-git-token-service` and its capability-encryption configuration. For
+local development without containment, enable modern resource-token issuance so
+sessions receive a runtime credential proxy; direct Kilo tokens are not a
+supported local-dev path.
 
 For new legacy sessions (`agent_*`), `CREDENTIAL_CONTAINMENT_ENABLED` controls
 GitHub, GitLab, Bitbucket, and Kilo credential containment together. Containment
 is enabled unless this variable is set to `false`. Local `dev` defaults to
 `false`; set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` when using
-proxy-compatible upstreams. Devcontainer support is retired; existing sessions
+proxy-compatible upstreams, or enable modern resource-token issuance for the
+runtime credential proxy. Devcontainer support is retired; existing sessions
 can be stopped or deleted but cannot start or resume.
 
 Legacy containment flags are persisted at session creation, so changing the
-variable affects new legacy sessions, not existing ones.
+variable affects new legacy sessions, not existing ones. Existing sessions with
+neither containment metadata nor modern runtime authorization fail closed on
+start/restore/resume with a credential-upgrade message; start a new session.
 
 ## Running
 

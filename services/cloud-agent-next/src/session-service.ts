@@ -77,6 +77,7 @@ import {
 import { withDORetry } from './utils/do-retry.js';
 import { resolveLegacySessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
 import { hasModernRuntimeAuthorization } from './session/runtime-authorization-persistence.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from './sandbox-control/session-credentials.js';
 import { mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import { codeReviewIdFromCallbackTarget } from './router/schemas.js';
 import { materializeMcpServers } from './mcp-config.js';
@@ -1827,9 +1828,11 @@ export class SessionService {
    * Kilo token (env vars, auth files, provider config). The outbound interceptor
    * redeems it per-request; the sandbox never sees `userToken`.
    *
-   * For uncontained sessions, or DIND sandboxes (`SandboxDIND`) which don't set
-   * `interceptHttps`/`outboundHandlers`, fall back to the real token so the
-   * sandbox can authenticate directly.
+   * A sandbox is contained when any credential requirement is contained, not
+   * only Kilo, because the contained sandbox class and its outbound interceptor
+   * are selected by the combined requirement. Uncontained sessions must use the
+   * session-bound runtime credential proxy instead; there is no raw-token
+   * fallback.
    */
   private async issueKiloSessionCapability(
     env: PersistenceEnv,
@@ -1838,7 +1841,7 @@ export class SessionService {
       cloudAgentSessionId: string;
       kiloSessionId: string;
       sandboxId: string;
-      kilocodeContainment: boolean;
+      sandboxContained: boolean;
       userToken: string;
     }
   ): Promise<{
@@ -1847,11 +1850,8 @@ export class SessionService {
     providerBaseUrl?: string;
     sessionIngestBaseUrl?: string;
   }> {
-    if (!params.kilocodeContainment) {
-      logger
-        .withFields({ sandboxId: params.sandboxId })
-        .info('Using raw Kilo token; session does not use managed containment');
-      return { capability: params.userToken };
+    if (!params.sandboxContained) {
+      throw ExecutionError.invalidRequest(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
     }
 
     const derivedTargets = deriveKiloSandboxTargets(env, params.userToken);
@@ -1907,7 +1907,7 @@ export class SessionService {
       cloudAgentSessionId: params.cloudAgentSessionId,
       kiloSessionId: params.kiloSessionId,
       sandboxId: params.sandboxId,
-      kilocodeContainment: getEffectiveCredentialContainment(metadata).kilocode,
+      sandboxContained: requiresContainmentSandbox(metadata),
       userToken: params.userToken,
     });
   }

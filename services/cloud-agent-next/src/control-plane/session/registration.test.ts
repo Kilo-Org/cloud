@@ -2,6 +2,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../sandbox-control/session-credentials.js';
 import {
   controlPlaneCredentialSourceSchema,
   controlPlanePrepareInputSchema,
@@ -311,6 +312,18 @@ describe('runtime authorization admission', () => {
       kilocode: false,
       github: false,
     });
+  });
+
+  it('rejects an old uncontained session without modern runtime authorization', () => {
+    const legacy = metadata();
+    expect(() =>
+      buildControlPlaneSessionRegistration(
+        legacy,
+        { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+        undefined,
+        { containmentEnabled: false, workerUrl: undefined }
+      )
+    ).toThrow(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
   });
 
   it('rejects unsupported Vercel direct mode and invalid modern proxy configuration at registration', () => {

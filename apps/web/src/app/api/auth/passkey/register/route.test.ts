@@ -20,6 +20,7 @@ import {
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
+import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockCreateRegistrationOptions = jest.mocked(createRegistrationOptions);
@@ -42,6 +43,7 @@ function createRequest(body: unknown): NextRequest {
 describe('POST /api/auth/passkey/register', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    rateLimitTest.resetReportThrottle();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
     mockGetUserFromAuth.mockResolvedValue({
       user: fakeUser,
@@ -108,6 +110,21 @@ describe('POST /api/auth/passkey/register', () => {
       );
     }
   );
+
+  it('reports a not-found registration rule only once per interval', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+    const params = { level: 'error', tags: { source: 'passkey_register_options' } };
+
+    await POST(createRequest({ action: 'options' }));
+    await POST(createRequest({ action: 'options' }));
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'passkey-registration-options' is not configured",
+      params
+    );
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+  });
 
   it('binds the credential to the session user, ignoring the request body', async () => {
     mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);

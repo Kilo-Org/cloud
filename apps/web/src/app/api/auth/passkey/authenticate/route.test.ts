@@ -18,6 +18,7 @@ import {
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
+import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
 const mockCreateAuthenticationOptions = jest.mocked(createAuthenticationOptions);
 const mockVerifyAuthentication = jest.mocked(verifyAuthentication);
@@ -37,6 +38,7 @@ function createRequest(body: unknown): NextRequest {
 describe('POST /api/auth/passkey/authenticate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    rateLimitTest.resetReportThrottle();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
   });
 
@@ -112,6 +114,21 @@ describe('POST /api/auth/passkey/authenticate', () => {
       "Firewall rate limit 'passkey-authentication-verify' is not configured",
       { level: 'error', tags: { source: 'passkey_authenticate_verify' } }
     );
+  });
+
+  it('reports a not-found options rule only once per interval', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+    const params = { level: 'error', tags: { source: 'passkey_authenticate_options' } };
+
+    await POST(createRequest({ action: 'options' }));
+    await POST(createRequest({ action: 'options' }));
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'passkey-authentication-options' is not configured",
+      params
+    );
+    expect(mockCreateAuthenticationOptions).not.toHaveBeenCalled();
   });
 
   it('returns a sign-in ticket for a verified assertion', async () => {

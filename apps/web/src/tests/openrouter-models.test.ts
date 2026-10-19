@@ -10,7 +10,7 @@ import {
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type * as FreeModel from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import type * as ModelSettings from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
@@ -118,7 +118,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => {
   const actual = jest.requireActual<typeof FreeModel>(
     '@kilocode/web-shared/lib/ai-gateway/is-free-model'
   );
-  return { ...actual, isFreeModel: jest.fn(actual.isFreeModel) };
+  return {
+    ...actual,
+    isFreeModelExcludingCustomLlms: jest.fn(actual.isFreeModelExcludingCustomLlms),
+  };
 });
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => {
@@ -225,7 +228,10 @@ beforeEach(() => {
   mockPublicationEnabled = true;
   mockAuth = { user: { id: 'test-user-id' }, organizationId: null };
   jest.clearAllMocks();
-  jest.mocked(isFreeModel).mockReset().mockImplementation(realFreeModel.isFreeModel);
+  jest
+    .mocked(isFreeModelExcludingCustomLlms)
+    .mockReset()
+    .mockImplementation(realFreeModel.isFreeModelExcludingCustomLlms);
   jest
     .mocked(getGatewayOpenCodeSettings)
     .mockReset()

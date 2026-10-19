@@ -12,7 +12,7 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   captureProxyError,
   getOrganizationProviderPrivacy,
@@ -174,7 +174,7 @@ export async function handleEmbeddingsRequest(
       return invalidTokenResponse();
     }
 
-    if (!isFreeModel(requestedModelLowerCased)) {
+    if (!isFreeModelExcludingCustomLlms(requestedModelLowerCased)) {
       return NextResponse.json(
         {
           error: {
@@ -272,7 +272,11 @@ export async function handleEmbeddingsRequest(
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
-    if (!canSpendPaidUsage(balance) && !isFreeModel(requestedModelLowerCased) && !userByok) {
+    if (
+      !canSpendPaidUsage(balance) &&
+      !isFreeModelExcludingCustomLlms(requestedModelLowerCased) &&
+      !userByok
+    ) {
       return await creditsBlockedResponse({
         user,
         balance,

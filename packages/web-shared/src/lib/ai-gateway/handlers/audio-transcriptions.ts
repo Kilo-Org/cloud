@@ -27,7 +27,7 @@ import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
@@ -289,7 +289,11 @@ export async function handleAudioTranscriptionsRequest(
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
-  if (!canSpendPaidUsage(balance) && !isFreeModel(requestedModelLowerCased) && !userByok) {
+  if (
+    !canSpendPaidUsage(balance) &&
+    !isFreeModelExcludingCustomLlms(requestedModelLowerCased) &&
+    !userByok
+  ) {
     return await creditsBlockedResponse({
       user,
       balance,

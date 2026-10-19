@@ -102,6 +102,9 @@ jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
   })),
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  isCustomLlm: async () => false,
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/unavailable-models') as Record<
     string,

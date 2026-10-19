@@ -1,7 +1,7 @@
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type { AutoFreeModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { ai_gateway_config } from '@kilocode/db/schema';
@@ -23,7 +23,9 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
  */
 export function isAutoFreeEligibleModelId(model: string): boolean {
   return (
-    isFreeModel(model) && !isKiloAutoModel(model) && getAiSdkProvider(model, null) === undefined
+    isFreeModelExcludingCustomLlms(model) &&
+    !isKiloAutoModel(model) &&
+    getAiSdkProvider(model, null) === undefined
   );
 }
 

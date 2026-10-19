@@ -660,7 +660,7 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeModel(effectiveModelIdLowerCased)) {
+    if (!(await isFreeModel(effectiveModelIdLowerCased))) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -902,7 +902,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeModel(effectiveModelIdLowerCased) &&
+      !(await isFreeModel(effectiveModelIdLowerCased)) &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {

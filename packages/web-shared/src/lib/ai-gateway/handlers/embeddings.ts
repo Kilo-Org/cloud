@@ -307,6 +307,15 @@ export async function handleEmbeddingsRequest(
     }
   }
 
+  const effectivePrivacy = getEffectiveProviderPrivacy(
+    requestPrivacy.data,
+    organizationDataCollection
+  );
+
+  if (isZeroDataRetentionUnsupportedForByok(provider.id, userByok, effectivePrivacy)) {
+    return zeroDataRetentionByokResponse();
+  }
+
   sentryRootSpan()?.setAttribute(
     'embedding.time_to_request_start_ms',
     performance.now() - requestStartedAt
@@ -356,15 +365,6 @@ export async function handleEmbeddingsRequest(
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
     requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
-  }
-
-  const effectivePrivacy = getEffectiveProviderPrivacy(
-    requestPrivacy.data,
-    organizationDataCollection
-  );
-
-  if (isZeroDataRetentionUnsupportedForByok(provider.id, userByok, effectivePrivacy)) {
-    return zeroDataRetentionByokResponse();
   }
 
   const upstreamBody = buildUpstreamBody(

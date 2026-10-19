@@ -16,7 +16,6 @@ import {
   Factory,
   Key,
   List,
-  ListChecks,
   MessageSquare,
   Plus,
   Receipt,
@@ -171,11 +170,6 @@ const cloudItems: SidebarStoryItem[] = [
     title: 'Security Agent',
     icon: Shield,
     url: '/security-agent',
-  },
-  {
-    title: 'Auto Triage',
-    icon: ListChecks,
-    url: '/auto-triage',
   },
   {
     title: 'Deploy',

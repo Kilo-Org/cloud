@@ -27,8 +27,6 @@ import { openAiChatGptRouter } from '@/routers/openai-chatgpt-router';
 import { appBuilderRouter } from '@/routers/app-builder-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
-import { autoTriageRouter } from '@/routers/auto-triage/auto-triage-router';
-import { personalAutoTriageRouter } from '@/routers/personal-auto-triage-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
@@ -83,8 +81,6 @@ export const rootRouter = createTRPCRouter({
   appBuilder: appBuilderRouter,
   securityAgent: securityAgentRouter,
   securityAuditLog: securityAuditLogRouter,
-  autoTriage: autoTriageRouter,
-  personalAutoTriage: personalAutoTriageRouter,
   appReportedMessages: appReportedMessagesRouter,
   kiloPass: kiloPassRouter,
   credits: creditsRouter,

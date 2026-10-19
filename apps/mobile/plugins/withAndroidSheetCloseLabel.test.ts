@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 type StringItem = { $: { name: string }; _?: string; '#text'?: string };
 type StringsXml = { resources: { string: StringItem[] } };
@@ -34,6 +34,16 @@ const { LOCALE_FILE, RESOURCE_NAME, readCloseCopy } = pluginModule;
 
 const PLUGINS_DIR = path.dirname(require.resolve('./withAndroidSheetCloseLabel.js'));
 
+// One suite run creates several throwaway android trees; the afterEach sweep
+// removes them, the same pattern plugins/branded-splash.test.ts uses.
+const temporaryProjects: string[] = [];
+
+afterEach(() => {
+  for (const root of temporaryProjects.splice(0)) {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 /** The minimal surface of fast-xml-parser the harness uses. */
 interface XmlParser {
   parse: (xml: string) => unknown;
@@ -45,6 +55,7 @@ interface XmlBuilderLike {
 /** Run the plugin's full android mod pipeline against a throwaway prebuilt android tree. */
 async function runMod(): Promise<{ resPath: string }> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sheet-close-label-'));
+  temporaryProjects.push(root);
   const projectRoot = path.join(root, 'android');
   const resPath = path.join(projectRoot, 'app', 'src', 'main', 'res');
   fs.mkdirSync(path.join(resPath, 'values'), { recursive: true });
@@ -130,6 +141,7 @@ describe('readCloseCopy', () => {
 
   it('throws for a catalog without common.close', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sheet-close-copy-'));
+    temporaryProjects.push(root);
     const locales = path.join(root, 'src', 'i18n', 'locales');
     fs.mkdirSync(locales, { recursive: true });
     fs.writeFileSync(path.join(locales, 'en.json'), JSON.stringify({ common: { close: 'Close' } }));

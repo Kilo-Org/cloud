@@ -1714,6 +1714,7 @@
       "startSession": "Rozpocznij sesję",
       "selectRepositoryToStart": "Wybierz repozytorium, aby rozpocząć.",
       "connectProviderToStart": "Połącz dostawcę, aby rozpocząć.",
+      "connectProviderAction": "Połącz dostawcę",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",
       "prefillRepoAndModelUnavailable": "Repozytorium i model z pierwotnej sesji nie są już dostępne. Wybierz je poniżej.",

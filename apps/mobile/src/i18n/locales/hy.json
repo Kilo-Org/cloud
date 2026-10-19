@@ -2202,6 +2202,7 @@
       "startSession": "Սկսել նիստը",
       "selectRepositoryToStart": "Սկսելու համար ընտրեք պահոց։",
       "connectProviderToStart": "Սկսելու համար միացրեք մատակարար։",
+      "connectProviderAction": "Միացրեք մատակարար",
       "promptPlaceholder": "Ինչի՞ վրա եք ուզում աշխատել",
       "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",
       "prefillRepoAndModelUnavailable": "Սկզբնական նիստի պահոցն ու մոդելն այլևս հասանելի չեն։ Ստորև ընտրեք պահոց և մոդել։",

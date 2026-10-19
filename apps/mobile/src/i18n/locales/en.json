@@ -2202,6 +2202,7 @@
       "startSession": "Start session",
       "selectRepositoryToStart": "Select a repository to start.",
       "connectProviderToStart": "Connect a provider to start.",
+      "connectProviderAction": "Connect a provider",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",
       "prefillRepoAndModelUnavailable": "The original session's repository and model are no longer available. Pick them below.",

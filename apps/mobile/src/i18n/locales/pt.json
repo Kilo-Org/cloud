@@ -2230,6 +2230,7 @@
       "startSession": "Iniciar sessão",
       "selectRepositoryToStart": "Seleciona um repositório para começar.",
       "connectProviderToStart": "Liga um fornecedor para começar.",
+      "connectProviderAction": "Liga um fornecedor",
       "promptPlaceholder": "Em que quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositório e o modelo da sessão original já não estão disponíveis. Escolha outros abaixo.",

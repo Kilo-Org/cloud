@@ -2202,6 +2202,7 @@
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",
       "selectRepositoryToStart": "ለመጀመር ማከማቻ ይምረጡ።",
       "connectProviderToStart": "ለመጀመር አቅራቢ ያገናኙ።",
+      "connectProviderAction": "አቅራቢ ያገናኙ",
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
       "prefillRepoAndModelUnavailable": "የመጀመሪያው ክፍለ ጊዜ ማከማቻና ሞዴል ከእንግዲህ አይገኙም። ከታች ሌሎችን ይምረጡ።",

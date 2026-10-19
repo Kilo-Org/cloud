@@ -2202,6 +2202,7 @@
       "startSession": "Byrja lotu",
       "selectRepositoryToStart": "Veldu kóðasafn til að byrja.",
       "connectProviderToStart": "Tengdu þjónustuveitanda til að byrja.",
+      "connectProviderAction": "Tengdu þjónustuveitanda",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",
       "prefillRepoAndModelUnavailable": "Kóðasafn og líkan upprunalegu lotunnar eru ekki lengur tiltæk. Veldu ný hér að neðan.",

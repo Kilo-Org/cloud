@@ -2258,6 +2258,7 @@
       "startSession": "Pradėti sesiją",
       "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
       "connectProviderToStart": "Norėdami pradėti, prijunkite paslaugų teikėją.",
+      "connectProviderAction": "Prijungti paslaugų teikėją",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",

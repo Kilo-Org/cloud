@@ -2202,6 +2202,7 @@
       "startSession": "Alusta seanssi",
       "selectRepositoryToStart": "Alustamiseks vali hoidla.",
       "connectProviderToStart": "Alustamiseks ühenda teenusepakkuja.",
+      "connectProviderAction": "Ühenda teenusepakkuja",
       "promptPlaceholder": "Mille kallal tahaksid töötada?",
       "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
       "prefillRepoAndModelUnavailable": "Algse seansi hoidla ja mudel pole enam saadaval. Vali allpool uus hoidla ja mudel.",

@@ -1714,6 +1714,7 @@
       "startSession": "Розпочати сеанс",
       "selectRepositoryToStart": "Виберіть репозиторій, щоб почати.",
       "connectProviderToStart": "Підключіть сервіс, щоб почати.",
+      "connectProviderAction": "Підключіть сервіс",
       "promptPlaceholder": "Над чим хочете попрацювати?",
       "couldNotLoadModels": "Не вдалося завантажити моделі.",
       "prefillRepoAndModelUnavailable": "Репозиторій і модель початкового сеансу більше недоступні. Виберіть інші нижче.",

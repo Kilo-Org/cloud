@@ -2202,6 +2202,7 @@
       "startSession": "Сессияны бастау",
       "selectRepositoryToStart": "Бастау үшін репозиторий таңдаңыз.",
       "connectProviderToStart": "Бастау үшін провайдерді қосыңыз.",
+      "connectProviderAction": "Провайдерді қосыңыз",
       "promptPlaceholder": "Немен жұмыс істегіңіз келеді?",
       "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",
       "prefillRepoAndModelUnavailable": "Бастапқы сессияның репозиторийі мен моделі енді қолжетімсіз. Оларды төменде таңдаңыз.",

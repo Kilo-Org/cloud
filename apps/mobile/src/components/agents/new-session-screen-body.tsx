@@ -863,6 +863,11 @@ export function NewSessionScreenBody() {
   const hasRepositories = repositories.length > 0;
   const hasConnectableProvider = groups.some(group => group.status === 'connect');
   const isLoadingRepositories = groups.some(group => group.status === 'loading');
+  // The provider the footer's connect action opens: the first group still in
+  // the `connect` state, in the section's fixed github/gitlab/bitbucket order.
+  // Only read when `startBlockedReasonKey` is `connect-provider`, which
+  // requires at least one connectable group.
+  const connectProviderPlatform = groups.find(group => group.status === 'connect')?.key ?? null;
 
   const startBlockedReasonKey = resolveNewSessionStartBlockedReason(
     isCloneEntry
@@ -906,10 +911,27 @@ export function NewSessionScreenBody() {
   );
 
   let startBlockedReason: string | null = null;
+  let startBlockedAction: { label: string; onPress: () => void } | null = null;
   if (startBlockedReasonKey === 'connect-provider') {
     startBlockedReason = t('agentChat.newSession.connectProviderToStart');
+    // `connect-provider` requires at least one connectable group, so the first
+    // one exists exactly when this branch runs; fall back to no action if it
+    // ever does not, rather than opening a broken connect flow.
+    const connectPlatform = connectProviderPlatform;
+    if (connectPlatform !== null) {
+      startBlockedAction = {
+        label: t('agentChat.newSession.connectProviderAction'),
+        onPress: () => {
+          openIntegration(connectPlatform);
+        },
+      };
+    }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
     startBlockedReason = t('agentChat.newSession.refreshRepositories');
+    startBlockedAction = {
+      label: t('agentChat.newSession.refreshRepositories'),
+      onPress: () => void refreshReposForceFresh(),
+    };
   } else if (startBlockedReasonKey === 'select-repository') {
     startBlockedReason = t('agentChat.newSession.selectRepositoryToStart');
   }
@@ -1075,6 +1097,7 @@ export function NewSessionScreenBody() {
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
         startBlockedReason={startBlockedReason}
+        startBlockedAction={startBlockedAction}
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}

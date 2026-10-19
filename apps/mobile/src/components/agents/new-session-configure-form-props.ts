@@ -96,6 +96,12 @@ export type NewSessionConfigureFormProps = {
    * it (translated), or null when no such reason applies.
    */
   startBlockedReason?: string | null;
+  /**
+   * The footer recovery action for `startBlockedReason` — open the provider
+   * connect flow, or force-refresh the repository lists — or null when the
+   * reason needs no footer control.
+   */
+  startBlockedAction?: { label: string; onPress: () => void } | null;
   onStartSession: () => void;
   /** The last cloud-create rejection, or null before one. */
   cloudCreateError?: CloudCreateFailure | null;

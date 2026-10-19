@@ -1690,6 +1690,7 @@
       "startSession": "Sessie starten",
       "selectRepositoryToStart": "Selecteer een repository om te starten.",
       "connectProviderToStart": "Koppel een platform om te starten.",
+      "connectProviderAction": "Platform koppelen",
       "promptPlaceholder": "Waar wil je aan werken?",
       "couldNotLoadModels": "De modellen konden niet worden geladen.",
       "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies hieronder een andere repository en een ander model.",

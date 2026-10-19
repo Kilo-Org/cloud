@@ -2230,6 +2230,7 @@
       "startSession": "Započni sesiju",
       "selectRepositoryToStart": "Odaberi repozitorij za početak.",
       "connectProviderToStart": "Poveži platformu za početak.",
+      "connectProviderAction": "Poveži platformu",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
       "prefillRepoAndModelUnavailable": "Repozitorij i model iz izvorne sesije više nisu dostupni. Odaberi ih u nastavku.",

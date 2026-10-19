@@ -53,6 +53,7 @@ async function mountButton(props: {
   isStartDisabled?: boolean;
   isStarting?: boolean;
   startBlockedReason?: string | null;
+  startBlockedAction?: { label: string; onPress: () => void } | null;
 }): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -63,6 +64,7 @@ async function mountButton(props: {
         isStartDisabled: props.isStartDisabled ?? false,
         isStarting: props.isStarting ?? false,
         startBlockedReason: props.startBlockedReason ?? null,
+        startBlockedAction: props.startBlockedAction ?? null,
         onStartSession: vi.fn<() => void>(),
       })
     );
@@ -162,6 +164,65 @@ describe('NewSessionStartButton', () => {
     const statuses = hostByType(renderer.root, 'AccessibleStatus');
     expect(statuses).toHaveLength(1);
     expect(statuses[0]?.props.message).toBe('Connect a provider to start.');
+
+    renderer.unmount();
+  });
+
+  it('renders the recovery action between the reason and Start and fires onPress once', async () => {
+    const onPress = vi.fn<() => void>();
+    const renderer = await mountButton({
+      isStartDisabled: true,
+      startBlockedReason: 'Connect a provider to start.',
+      startBlockedAction: { label: 'Connect a provider', onPress },
+    });
+
+    // Outline recovery button sits between the announced reason and Start.
+    const order = renderer.root
+      .findAll(node => {
+        if (typeof node.type !== 'string') {
+          return false;
+        }
+        const type = node.type as string;
+        return type === 'AccessibleStatus' || type === 'Pressable';
+      })
+      .map(node => node.type as string);
+    expect(order).toEqual(['AccessibleStatus', 'Pressable', 'Pressable']);
+
+    const buttons = hostByType(renderer.root, 'Pressable');
+    const actionButton = buttons[0];
+    if (!actionButton) {
+      throw new Error('recovery action button was not rendered');
+    }
+    expect(actionButton.props.accessibilityLabel).toBe('Connect a provider');
+    expect(hasTextLabel(renderer.root, 'Connect a provider')).toBe(true);
+    await act(async () => {
+      (actionButton.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('renders no action while the reason is present but no action is supplied', async () => {
+    const renderer = await mountButton({
+      isStartDisabled: true,
+      startBlockedReason: 'Select a repository to start.',
+    });
+
+    expect(hostByType(renderer.root, 'Pressable')).toHaveLength(1);
+    expect(hasTextLabel(renderer.root, 'Connect a provider')).toBe(false);
+
+    renderer.unmount();
+  });
+
+  it('renders no action without a reason even when one is supplied', async () => {
+    const renderer = await mountButton({
+      startBlockedAction: { label: 'Connect a provider', onPress: vi.fn<() => void>() },
+    });
+
+    expect(hostByType(renderer.root, 'AccessibleStatus')).toHaveLength(0);
+    expect(hostByType(renderer.root, 'Pressable')).toHaveLength(1);
 
     renderer.unmount();
   });

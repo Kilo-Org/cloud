@@ -7,6 +7,9 @@ import {
   routingTableKvKey,
   AUTO_ROUTERS,
   type AutoRouter,
+  type BenchmarkIdentity,
+  BenchmarkIdentityError,
+  type BenchmarkIdentityOverrides,
   resolveBenchmarkIdentity,
   resolveEffectivePolicy,
   ComplexityLabelsSchema,
@@ -639,6 +642,17 @@ export class BenchmarkRunConfigError extends Error {
   }
 }
 
+// A saved non-bot identity override is an admin configuration error (400),
+// resolved before any claim or run row so nothing has to be rolled back.
+export function resolveRunIdentity(config: BenchmarkIdentityOverrides): BenchmarkIdentity {
+  try {
+    return resolveBenchmarkIdentity(config);
+  } catch (error) {
+    if (error instanceof BenchmarkIdentityError) throw new BenchmarkRunConfigError(error.message);
+    throw error;
+  }
+}
+
 export type StartRunOptions = {
   router?: AutoRouter;
   /** Classifier only: re-measure models that already have current results. */
@@ -672,6 +686,7 @@ export async function startRun(
   if (!config) {
     throw new Error('benchmark config not set: save it in the admin panel before starting a run');
   }
+  const benchmarkIdentity = resolveRunIdentity(config);
 
   // One active run per (kind, purpose). The unique partial index is the atomic
   // backstop; this pre-check turns the common case (a run already going) into a
@@ -720,8 +735,6 @@ export async function startRun(
   const carriedSummaries = skippedEntries.flatMap(
     e => priorByPair.get(exactPairKey(e.model, e.variant))?.summaries ?? []
   );
-
-  const benchmarkIdentity = resolveBenchmarkIdentity(config);
 
   const laneBudget = kind === 'classifier' ? BENCHMARK_CLASSIFIER_PARALLELISM : 0;
 
@@ -1555,11 +1568,10 @@ async function processDeciderJob(
   if (cases.length !== message.caseIds.length) throw new Error('Scheduler chunk has unknown cases');
 
   const { benchmarkUserId, benchmarkOrgId } = state;
-  if (!benchmarkUserId || !benchmarkOrgId) {
+  if (!benchmarkUserId) {
     // startRun snapshots the effective default/override identity, so this only
-    // happens for a run row written before the org snapshot existed or one
-    // that was tampered with. The bot-token mint requires both.
-    throw new Error(`run ${message.runId} has no benchmarkUserId or benchmarkOrgId`);
+    // happens if the run row was tampered with; throwing lets the queue retry.
+    throw new Error(`run ${message.runId} has no benchmarkUserId`);
   }
 
   const rep = message.rep ?? 0;
@@ -1631,6 +1643,10 @@ async function processDeciderJob(
     let cli: Promise<string> | undefined;
     const cliToken = () =>
       (cli ??= (async () => {
+        // The bot-token mint requires an org. Only run rows written before the
+        // org snapshot existed lack one; checked here so chunks whose cases are
+        // all recorded still finish without a mint.
+        if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
         const kiloToken = await fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId);
         await warmUpCliContainer(env, {
           instanceName,

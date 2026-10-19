@@ -16,7 +16,7 @@ import {
   RegisterBenchmarkProfilesRequestSchema,
   RequeueBenchmarkRegistryRequestSchema,
   type BenchmarkRegistryQueue,
-  resolveBenchmarkIdentity,
+  type BenchmarkIdentity,
   resolvePolicySettings,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
@@ -42,6 +42,7 @@ import {
   computeEngineIdentity,
   drainQueues,
   fetchBenchmarkUserToken,
+  resolveRunIdentity,
   publishPlatformRoutingTable,
   RunAlreadyActiveError,
   startRun,
@@ -346,7 +347,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       if (!config) {
         return c.json({ error: 'benchmark config is not configured' }, 400);
       }
-      const benchmarkIdentity = resolveBenchmarkIdentity(config);
+      let benchmarkIdentity: BenchmarkIdentity;
+      try {
+        benchmarkIdentity = resolveRunIdentity(config);
+      } catch (error) {
+        if (error instanceof BenchmarkRunConfigError) return c.json({ error: error.message }, 400);
+        throw error;
+      }
       const kiloToken = await fetchBenchmarkUserToken(
         c.env,
         benchmarkIdentity.benchmarkUserId,

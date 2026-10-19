@@ -209,12 +209,24 @@ export const BenchmarkConfigSchema = z
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
-export function resolveBenchmarkIdentity(
-  config: Pick<BenchmarkConfig, 'benchmarkUserId' | 'benchmarkOrgId'>
-): { benchmarkUserId: string; benchmarkOrgId: string } {
+export type BenchmarkIdentity = { benchmarkUserId: string; benchmarkOrgId: string };
+export type BenchmarkIdentityOverrides = Pick<
+  BenchmarkConfig,
+  'benchmarkUserId' | 'benchmarkOrgId'
+>;
+
+/** A saved identity override the bot-token mint would refuse. */
+export class BenchmarkIdentityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BenchmarkIdentityError';
+  }
+}
+
+export function resolveBenchmarkIdentity(config: BenchmarkIdentityOverrides): BenchmarkIdentity {
   const benchmarkUserId = config.benchmarkUserId ?? DEFAULT_BENCHMARK_USER_ID;
   if (!benchmarkUserId.startsWith(INTERNAL_BOT_USER_ID_PREFIX)) {
-    throw new Error(
+    throw new BenchmarkIdentityError(
       `benchmarkUserId override "${benchmarkUserId}" is not an internal bot user; ` +
         `use a ${INTERNAL_BOT_USER_ID_PREFIX}* user or clear the override`
     );

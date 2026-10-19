@@ -633,6 +633,20 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
+  it('returns 400 before claiming anything when the saved user override is not an internal bot', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'human-user' },
+    });
+    const res = await authedPost('/admin/runs', { kind: 'classifier' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('is not an internal bot user'),
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
   it('starts a classifier run and returns runId + enqueuedModels', async () => {
     // No prior summaries → every configured model is enqueued.
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);

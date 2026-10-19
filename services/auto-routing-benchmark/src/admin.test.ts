@@ -272,7 +272,8 @@ beforeEach(() => {
     );
     CREATE TABLE benchmark_runs (id TEXT, kind TEXT, status TEXT);
     CREATE TABLE scheduler_runs (run_id TEXT);
-    CREATE TABLE scheduler_chunks (run_id TEXT, status TEXT);
+    CREATE TABLE scheduler_chunks (run_id TEXT, model TEXT, variant TEXT, rep INTEGER, status TEXT);
+    CREATE TABLE run_lane_failures (run_id TEXT, model TEXT, variant TEXT, rep INTEGER);
   `);
   for (const router of ['efficient', 'frontier']) {
     for (const model of TEST_CONFIG.deciderModels) {

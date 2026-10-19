@@ -211,6 +211,7 @@ import {
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -276,6 +277,7 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  const { openNewSessionHref } = useNewSessionNavigator();
   const { confirm, dialog } = useConfirmDialog();
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
@@ -2164,7 +2166,7 @@ export function SessionDetailContent({
 
   const pushContinue = useCallback(
     (cut: ForkCut | null) => {
-      router.push(
+      openNewSessionHref(
         buildContinueHref({
           organizationId,
           cloneFromKiloSessionId: sessionId,
@@ -2182,7 +2184,7 @@ export function SessionDetailContent({
       );
     },
     [
-      router,
+      openNewSessionHref,
       organizationId,
       sessionId,
       rename.title,

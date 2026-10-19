@@ -49,6 +49,7 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
@@ -3979,6 +3980,36 @@ describe('session detail read-only composer', () => {
     expect(renderedText(continueControl)).toContain(
       i18n.t('agentChat.session.continueInNewSession')
     );
+  });
+
+  it('opens the new-session composer once on a repeated continue press', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    onTestFinished(() => {
+      nowSpy.mockRestore();
+    });
+
+    act(() => {
+      (continueControl.props.onPress as () => void)();
+      (continueControl.props.onPress as () => void)();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(1);
+
+    nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
+    act(() => {
+      (continueControl.props.onPress as () => void)();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(2);
   });
 });
 

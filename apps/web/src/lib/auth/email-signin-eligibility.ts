@@ -13,12 +13,76 @@ import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/li
 import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
+const SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID = 'sign-in-code-email-ip';
+const SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID = 'sign-in-code-email-global';
 
+/**
+ * Vercel Firewall rate limits that bound sign-in code email volume. Each rule
+ * lives in the project's firewall configuration; `checkRateLimit` reports an
+ * unknown id as "not rate limited", so a missing rule is treated as an
+ * unavailable eligibility check and fails closed with 503 instead of sending.
+ *
+ * - `magic-link-email` caps sends per normalized address, so one inbox cannot
+ *   be hammered.
+ * - `sign-in-code-email-ip` caps sends per caller address, so one client cannot
+ *   iterate many addresses.
+ * - `sign-in-code-email-global` caps total sends, keying every instance onto
+ *   one shared bucket.
+ */
 function getMagicLinkEmailRateLimitKey(email: string): string {
   const emailHash = createHmac('sha256', NEXTAUTH_SECRET)
     .update(normalizeEmail(email))
     .digest('base64url');
   return `magic-link-email:${emailHash}`;
+}
+
+/** The caller address the firewall rule counts against, from the proxy headers. */
+function clientIpAddress(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  );
+}
+
+type SendBudgetCheck =
+  | { ok: true }
+  | { ok: false; status: 429 | 503; errorCode: 'SIGNUP-RATE-LIMITED' | 'SIGNUP-UNAVAILABLE' };
+
+/**
+ * Counts one send against the per-address, per-IP, and global firewall rules.
+ * Returns 429 when any allowance is exhausted and 503 when a rule is missing
+ * from the firewall configuration, so a silently disabled cap never sends.
+ */
+async function checkSendBudget(email: string, request: NextRequest): Promise<SendBudgetCheck> {
+  const checks = [
+    {
+      id: MAGIC_LINK_EMAIL_RATE_LIMIT_ID,
+      key: getMagicLinkEmailRateLimitKey(email),
+    },
+    {
+      id: SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID,
+      key: `${SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID}:${clientIpAddress(request)}`,
+    },
+    {
+      id: SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID,
+      key: `${SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID}:total`,
+    },
+  ] as const;
+
+  for (const check of checks) {
+    const { rateLimited, error } = await checkRateLimit(check.id, {
+      request,
+      rateLimitKey: check.key,
+    });
+    if (error === 'not-found') {
+      return { ok: false, status: 503, errorCode: 'SIGNUP-UNAVAILABLE' };
+    }
+    if (rateLimited) {
+      return { ok: false, status: 429, errorCode: 'SIGNUP-RATE-LIMITED' };
+    }
+  }
+  return { ok: true };
 }
 
 export type DomainSignInEligibility =
@@ -86,7 +150,12 @@ export type EmailSignInEligibility =
   | {
       ok: false;
       status: number;
-      errorCode: 'BLOCKED' | 'INVALID_EMAIL' | 'SIGNUP-RATE-LIMITED' | 'SSO_ERROR';
+      errorCode:
+        | 'BLOCKED'
+        | 'INVALID_EMAIL'
+        | 'SIGNUP-RATE-LIMITED'
+        | 'SIGNUP-UNAVAILABLE'
+        | 'SSO_ERROR';
       body: Record<string, unknown>;
     };
 
@@ -121,12 +190,19 @@ export async function checkEmailSignInEligibility(
   email: string,
   request: NextRequest
 ): Promise<EmailSignInEligibility> {
-  const { rateLimited } = await checkRateLimit(MAGIC_LINK_EMAIL_RATE_LIMIT_ID, {
-    request,
-    rateLimitKey: getMagicLinkEmailRateLimitKey(email),
-  });
-
-  if (rateLimited) {
+  const sendBudget = await checkSendBudget(email, request);
+  if (!sendBudget.ok) {
+    if (sendBudget.status === 503) {
+      return {
+        ok: false,
+        status: 503,
+        errorCode: 'SIGNUP-UNAVAILABLE',
+        body: {
+          success: false,
+          error: 'Sign-in is temporarily unavailable. Please try again later.',
+        },
+      };
+    }
     return {
       ok: false,
       status: 429,

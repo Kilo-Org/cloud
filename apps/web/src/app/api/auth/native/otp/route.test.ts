@@ -82,6 +82,26 @@ describe('POST /api/auth/native/otp', () => {
     expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
   });
 
+  it('returns 503 SIGNUP-UNAVAILABLE without issuing a code when the eligibility check is unavailable', async () => {
+    mockCheckEmailSignInEligibility.mockResolvedValue({
+      ok: false,
+      status: 503,
+      errorCode: 'SIGNUP-UNAVAILABLE',
+      body: {
+        success: false,
+        error: 'Sign-in is temporarily unavailable. Please try again later.',
+      },
+    });
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+    expect(mockCreateSignInCode).not.toHaveBeenCalled();
+    expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+  });
+
   it('keeps signup-only email rejection opaque to prevent account enumeration', async () => {
     mockCheckEmailSignInEligibility.mockResolvedValue({
       ok: false,

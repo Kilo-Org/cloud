@@ -25,6 +25,7 @@ const config = vi.hoisted(() => ({
 const provider = vi.hoisted(() => ({ status: 'connected' }));
 const connectivity = vi.hoisted(() => ({ known: true }));
 const platformError = vi.hoisted(() => ({ variants: [] as string[] }));
+const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 const centeredState = vi.hoisted(() => vi.fn());
 const scrollView = vi.hoisted(() => vi.fn());
 
@@ -82,7 +83,12 @@ vi.mock('@/components/security-agent/settings-toggle-row', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: () => null }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: () => {
+    skeletonRenders.count += 1;
+    return null;
+  },
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => {
@@ -200,6 +206,7 @@ beforeEach(() => {
   provider.status = 'connected';
   connectivity.known = true;
   platformError.variants = [];
+  skeletonRenders.count = 0;
   centeredState.mockClear();
   scrollView.mockClear();
 });
@@ -225,6 +232,7 @@ describe('PlatformOverviewScreen connected with unavailable config', () => {
     await renderScreen();
 
     expect(platformError.variants).toEqual(['offline']);
+    expect(skeletonRenders.count).toBe(0);
   });
 
   it('keeps the skeleton while the query is paused and connectivity is unsettled', async () => {
@@ -234,9 +242,10 @@ describe('PlatformOverviewScreen connected with unavailable config', () => {
 
     const texts = await renderScreen();
 
-    // Connectivity not yet settled: no confirmed-offline signal, the loading
-    // skeleton branch renders while the query waits.
+    // Connectivity not yet settled: no confirmed-offline signal, so the
+    // loading skeleton renders while the query waits instead of a blank body.
     expect(platformError.variants).toEqual([]);
+    expect(skeletonRenders.count).toBeGreaterThan(0);
     expect(texts).not.toContain('Automatic reviews');
   });
 
@@ -247,6 +256,7 @@ describe('PlatformOverviewScreen connected with unavailable config', () => {
     const texts = await renderScreen();
 
     expect(platformError.variants).toEqual([]);
+    expect(skeletonRenders.count).toBe(0);
     expect(texts).toContain('Automatic reviews');
   });
 
@@ -257,6 +267,7 @@ describe('PlatformOverviewScreen connected with unavailable config', () => {
     await renderScreen();
 
     expect(platformError.variants).toEqual(['server']);
+    expect(skeletonRenders.count).toBe(0);
   });
 });
 

@@ -122,11 +122,13 @@ export function PlatformOverviewScreen({
   // surfaces a retry instead. A paused query with cached config data, and a
   // background refetch failure with data already cached, both fall through to
   // the normal content below, unaffected.
-  const configUnavailable =
-    !isLoading &&
-    connected &&
-    config.data == null &&
-    (config.isError || (config.fetchStatus === 'paused' && isConnectivityKnown));
+  const configError = !isLoading && connected && config.data == null && config.isError;
+  const configPaused =
+    !isLoading && connected && config.data == null && config.fetchStatus === 'paused';
+  const configUnavailable = configError || (configPaused && isConnectivityKnown);
+  // While connectivity is unsettled a pause might clear at any moment, so the
+  // body keeps the skeleton instead of deciding between error and content.
+  const configPausedUnknown = configPaused && !isConnectivityKnown;
   if (configUnavailable) {
     return (
       <PlatformErrorScreen
@@ -207,7 +209,10 @@ export function PlatformOverviewScreen({
       <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
-          {isLoading && <PlatformOverviewSkeleton />}
+          {/* A paused query with no cached data still waits: while connectivity is
+             unsettled the error branch above cannot know the pause is real, so the
+             skeleton keeps the body honest instead of rendering blank. */}
+          {(isLoading || configPausedUnknown) && <PlatformOverviewSkeleton />}
 
           {!isLoading && connected && config.data != null && rows != null && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-6">

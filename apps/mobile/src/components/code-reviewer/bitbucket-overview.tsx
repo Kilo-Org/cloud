@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Switch, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
@@ -15,8 +15,8 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -86,11 +86,11 @@ export function BitbucketOverview({
   // blank space) surfaces a retry instead. A paused query with cached config
   // data, and a background refetch failure with data already cached, both
   // fall through to the normal content below, unaffected.
-  const configUnavailable =
-    !isLoading &&
-    connected &&
-    config.data == null &&
-    (config.isError || (config.fetchStatus === 'paused' && isConnectivityKnown));
+  const configError = !isLoading && connected && config.data == null && config.isError;
+  const configPaused =
+    !isLoading && connected && config.data == null && config.fetchStatus === 'paused';
+  const configUnavailable = configError || (configPaused && isConnectivityKnown);
+  const configPausedUnknown = configPaused && !isConnectivityKnown;
   if (configUnavailable) {
     return (
       <View className="flex-1 bg-background">
@@ -165,16 +165,10 @@ export function BitbucketOverview({
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition}>
-          {isLoading && (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <View className="gap-2">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <Skeleton key={index} className="h-12 w-full rounded-lg" />
-                ))}
-              </View>
-            </Animated.View>
-          )}
+          {/* A paused query with no cached data still waits: while connectivity is
+             unsettled the error branch above cannot know the pause is real, so the
+             skeleton keeps the body honest instead of rendering blank. */}
+          {(isLoading || configPausedUnknown) && <PlatformOverviewSkeleton />}
 
           {!isLoading && connected && config.data != null && rows != null && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-6">

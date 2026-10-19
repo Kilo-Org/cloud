@@ -1126,6 +1126,8 @@ describe('iosSink Approve gate', () => {
     organizationId: null,
     userId: 'u1',
     recordedAt: NOW,
+    // The captured request id gates Approve, exactly as the live record.
+    permissionId: 'perm_1',
     ...overrides,
   });
 
@@ -1142,6 +1144,11 @@ describe('iosSink Approve gate', () => {
     // A legacy wrapper session has no single approval either.
     recordWaitingAsk(recordedAsk({ isCloudAgent: false }));
     iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 2), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    // A capture that has not landed leaves nothing the press could bind to.
+    recordWaitingAsk(recordedAsk({ permissionId: null }));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 4), CTX);
     expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
 
     recordWaitingAsk(null);
@@ -1172,6 +1179,7 @@ describe('iosSink approve-failed notice', () => {
     organizationId: null,
     userId: 'u1',
     recordedAt: NOW,
+    permissionId: 'perm_1',
     ...overrides,
   });
 

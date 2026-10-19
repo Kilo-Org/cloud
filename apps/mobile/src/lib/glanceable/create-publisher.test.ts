@@ -20,6 +20,16 @@ import {
   getWaitingAsk,
 } from './waiting-ask';
 
+// The wiring imports the binding module, whose live capture path reaches
+// react-native through the control-plane reads; the store cases here assert
+// the ask record itself, so the capture reads are stubbed out to a resolved
+// absent projection (no attach, one cooldown entry, no stream).
+vi.mock('./pending-permission', () => ({
+  NotApprovableError: class extends Error {},
+  resolveCloudAgentSessionId: vi.fn<() => Promise<string>>().mockResolvedValue('agent_1'),
+  resolvePendingPermissionId: vi.fn<() => Promise<string | null>>().mockResolvedValue(null),
+}));
+
 const NOW = 1_750_000_000_000;
 const CTX = { userId: 'u1', organizationId: null };
 const ASK_KEY = 'glanceable-waiting-ask';

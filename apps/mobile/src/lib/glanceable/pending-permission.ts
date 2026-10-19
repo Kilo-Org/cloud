@@ -5,6 +5,10 @@ import { fetchCloudAgentStreamTicket } from '@/lib/cloud-agent-stream-ticket';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 
+import { NotApprovableError, resolveCloudAgentSessionId } from './not-approvable';
+
+export { NotApprovableError, resolveCloudAgentSessionId };
+
 /**
  * The one read of the cloud-agent pending permission's id. The id lives only in
  * the control plane's pending-interaction projection and is sent on stream
@@ -14,6 +18,8 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
  * classification is the only thing the two share.
  *
  * Its cases live in `approve-ask.test.ts`, beside the flow that calls it.
+ * `NotApprovableError` and the session-id resolution live beside it in
+ * `not-approvable.ts`.
  */
 
 /** The interaction identity the control plane's projection guarantees. */

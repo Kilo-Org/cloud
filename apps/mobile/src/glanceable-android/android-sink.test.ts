@@ -198,10 +198,12 @@ function waitingAsk(overrides: Partial<WaitingAsk> = {}): WaitingAsk {
     kiloSessionId: 'ses_waiting',
     status: 'permission',
     isCloudAgent: true,
-    scopeKey: 'scope-u1',
+    scopeKey: 'scope',
     organizationId: null,
     userId: 'u1',
     recordedAt: NOW,
+    // The captured request id gates the Approve label, exactly as the live record.
+    permissionId: 'perm_1',
     ...overrides,
   };
 }

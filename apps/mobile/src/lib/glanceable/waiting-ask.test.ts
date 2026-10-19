@@ -13,6 +13,7 @@ import {
   _flushWaitingAskMirrorForTests,
   _resetWaitingAskForTests,
   _setSecureStoreForTests,
+  attachWaitingAskPermission,
   getWaitingAsk,
   readWaitingAsk,
   recordWaitingAsk,
@@ -242,6 +243,50 @@ describe('waiting ask store', () => {
     expect(getWaitingAsk()).toEqual(second);
     await _flushWaitingAskMirrorForTests();
     expect(store.get(ASK_KEY)).toBe(JSON.stringify(second));
+  });
+
+  describe('attachWaitingAskPermission', () => {
+    it('attaches and mirrors the captured id while the ask is unchanged', async () => {
+      const ask = askFor();
+      recordWaitingAsk(ask);
+      expect(attachWaitingAskPermission(ask, 'perm_1')).toBe(true);
+      expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 's1', permissionId: 'perm_1' });
+      await _flushWaitingAskMirrorForTests();
+      expect(JSON.parse(store.get(ASK_KEY) ?? '{}')).toMatchObject({ permissionId: 'perm_1' });
+    });
+
+    it('refuses the attach once the ask names a different request', () => {
+      const ask = askFor();
+      recordWaitingAsk(ask);
+      // Same session, but the permission was re-asked: a new status time, so
+      // the recorded ask is a different displayed request than the capture's.
+      expect(
+        attachWaitingAskPermission(
+          { ...ask, statusUpdatedAt: '2026-01-02T00:00:00.000Z' },
+          'perm_1'
+        )
+      ).toBe(false);
+      expect(getWaitingAsk()?.permissionId).toBeUndefined();
+    });
+
+    it('refuses the attach after the record was cleared or replaced', () => {
+      const ask = askFor();
+      recordWaitingAsk(ask);
+      recordWaitingAsk(null);
+      expect(attachWaitingAskPermission(ask, 'perm_1')).toBe(false);
+      recordWaitingAsk(askFor({ kiloSessionId: 's2' }));
+      expect(attachWaitingAskPermission(ask, 'perm_1')).toBe(false);
+      expect(getWaitingAsk()?.kiloSessionId).toBe('s2');
+    });
+
+    it('clears a capture with null and keeps the ask', async () => {
+      const ask = askFor();
+      recordWaitingAsk({ ...ask, permissionId: 'perm_1' });
+      expect(attachWaitingAskPermission(ask, null)).toBe(true);
+      expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 's1', permissionId: null });
+      await _flushWaitingAskMirrorForTests();
+      expect(JSON.parse(store.get(ASK_KEY) ?? '{}')).toMatchObject({ permissionId: null });
+    });
   });
 
   it('serializes the mirror writes so the last record wins on disk', async () => {

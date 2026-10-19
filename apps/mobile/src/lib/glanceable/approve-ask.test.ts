@@ -120,6 +120,9 @@ const PERMISSION_ASK = {
   organizationId: null,
   userId: 'user_1',
   recordedAt: 1,
+  // The displayed request the aggregate path binds its answer to.
+  statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+  permissionId: 'perm_1',
 };
 
 function withCode(code: string): Error {
@@ -381,6 +384,30 @@ describe('runGlanceableApprove', () => {
     createConnection.mockImplementation(fakeStream([connectedFrame([])]).open);
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
     expect(answerPermissionMutate).not.toHaveBeenCalled();
+  });
+
+  it('is gone when the live permission replaced the one the ask displayed', async () => {
+    // The ask was recorded while perm_1 waited; by the time the tap is
+    // processed the projection's front permission is a different request
+    // (answered elsewhere, then re-asked). The answer must name the request
+    // the surface showed, so the tap resolves as gone instead.
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    createConnection.mockImplementation(fakeStream([connectedFrame(['perm_2'])]).open);
+    answerPermissionMutate.mockResolvedValue(undefined);
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
+    expect(answerPermissionMutate).not.toHaveBeenCalled();
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+  });
+
+  it('answers nothing while the recorded ask carries no captured request', async () => {
+    // The capture had not landed (or its read failed) when the tap arrived:
+    // the record names no request to answer, so the tap resolves as retryable
+    // and never reaches the answer mutation or the ack.
+    readWaitingAsk.mockResolvedValue({ ...PERMISSION_ASK, permissionId: null });
+    answerPermissionMutate.mockResolvedValue(undefined);
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(answerPermissionMutate).not.toHaveBeenCalled();
+    expect(isAttentionAcked('ses_1', null)).toBe(false);
   });
 
   it('is retryable, not gone, when the pending-permission read times out', async () => {

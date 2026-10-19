@@ -37,6 +37,18 @@ export type WaitingAsk = {
   organizationId: string | null;
   userId: string;
   recordedAt: number;
+  /**
+   * The row's status time, as the tray reported it. It is the ask-identity
+   * field: a permission re-asked on the same session gets a new
+   * `statusUpdatedAt`, and the binding must not survive that change.
+   */
+  statusUpdatedAt?: string;
+  /**
+   * The control-plane permission id the recorded ask displayed, captured while
+   * the ask was current, or null while the capture has not landed. Absent on
+   * records written before the field existed; those read as unbound too.
+   */
+  permissionId?: string | null;
 };
 
 /**
@@ -68,6 +80,9 @@ const waitingAskSchema = z.object({
   organizationId: z.string().nullable(),
   userId: z.string(),
   recordedAt: z.number(),
+  // Optional: records written before these fields existed must still parse.
+  statusUpdatedAt: z.string().optional(),
+  permissionId: z.string().min(1).nullable().optional(),
 });
 
 /**
@@ -137,7 +152,34 @@ export function selectWaitingAsk(
     organizationId: ctx.organizationId,
     userId: ctx.userId,
     recordedAt: now,
+    // The row's status time; part of the ask identity the binding carries on
+    // (see `WaitingAsk.statusUpdatedAt`).
+    ...(chosen.statusUpdatedAt === undefined ? {} : { statusUpdatedAt: chosen.statusUpdatedAt }),
   };
+}
+
+/**
+ * Attach a captured permission id to the recorded ask. The attach lands only
+ * while the recorded ask is the same displayed request — same session, status
+ * and status time — so a capture that resolves after the tray moved on
+ * attaches to nothing. `null` clears a capture from the ask; both outcomes
+ * mirror like any other record change.
+ */
+export function attachWaitingAskPermission(ask: WaitingAsk, permissionId: string | null): boolean {
+  const current = currentAsk;
+  if (
+    current === null ||
+    current.kiloSessionId !== ask.kiloSessionId ||
+    current.status !== ask.status ||
+    current.statusUpdatedAt !== ask.statusUpdatedAt
+  ) {
+    return false;
+  }
+  if ((current.permissionId ?? null) === permissionId) {
+    return true;
+  }
+  recordWaitingAsk({ ...current, permissionId });
+  return true;
 }
 
 // ── Store ───────────────────────────────────────────────────────────────────

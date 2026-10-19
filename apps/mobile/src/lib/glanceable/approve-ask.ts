@@ -1,5 +1,4 @@
 import type * as ExpoCrypto from 'expo-crypto';
-import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
@@ -11,7 +10,11 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { createGlanceablePublisher } from './create-publisher';
 import { resolveAnsweredRaises } from './attention-rows';
-import { resolvePendingPermissionId } from './pending-permission';
+import {
+  NotApprovableError,
+  resolveCloudAgentSessionId,
+  resolvePendingPermissionId,
+} from './pending-permission';
 import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
 
 /**
@@ -44,39 +47,10 @@ export type GlanceableApproveResult =
   | { kind: 'gone' }
   | { kind: 'none' };
 
-/**
- * The session the ask names has no cloud-agent (control-plane) permission to
- * answer. Carries the tRPC-shaped `data.code` so the shared code reader
- * classifies it like any other terminal rejection.
- */
-export class NotApprovableError extends Error {
-  readonly data = { code: 'NOT_APPROVABLE' };
-
-  constructor() {
-    super('The session has no cloud-agent permission to answer');
-    this.name = 'NotApprovableError';
-  }
-}
-
 /** Permission answers must not be batched into a composed request. */
 const skipBatchOptions = { context: { skipBatch: true } };
 
-/**
- * Resolve the cloud-agent (control-plane) session id from the kilo session id.
- * The same `cliSessionsV2.get` read `resolveSession` uses; a row without a
- * cloud-agent id is not approvable.
- */
-async function resolveCloudAgentSessionId(kiloSessionId: string): Promise<string> {
-  // The row id is a Kilo session id; the brand is only a compile-time marker.
-  const session = await trpcClient.cliSessionsV2.get.query({
-    session_id: kiloSessionId as KiloSessionId,
-  });
-  const cloudAgentSessionId = session.cloud_agent_session_id;
-  if (!cloudAgentSessionId) {
-    throw new NotApprovableError();
-  }
-  return cloudAgentSessionId;
-}
+export { NotApprovableError };
 
 export type AnswerSessionPermissionInput = {
   /**
@@ -194,7 +168,11 @@ async function classifyUnauthorized(): Promise<GlanceableApproveResult> {
 /**
  * The flow both platforms run on an Approve tap. A question ask and a legacy
  * wrapper session have no single approval, so both are `none` and the caller
- * drops the action; an answered-elsewhere ask is `gone`.
+ * drops the action; an answered-elsewhere ask is `gone`. The aggregate branch
+ * answers only the request the recorded ask displays: its captured permission
+ * id must still be the projection's live first permission, or the ask reads
+ * as `gone`, and a record whose capture never landed reads as `retryable`
+ * without answering anything.
  *
  * A terminal outcome acks session attention, exactly as the other answer paths
  * do (`notification-action-interaction.ts`, `approve-front-agent.ts`): the
@@ -222,7 +200,17 @@ export async function runGlanceableApprove(
   if (ask?.status !== 'permission' || !ask.isCloudAgent) {
     return { kind: 'none' };
   }
-  const result = await answerPendingPermission({ ...ask, approvalKey: null }, options);
+  if (ask.permissionId == null) {
+    // The displayed request was never captured (too fresh, or its capture
+    // read failed), so no tap here can prove what it would answer. Nothing
+    // has been answered: the ask stays recorded and the next tap — after the
+    // binding landed or its retry window passed — answers the bound request.
+    return { kind: 'retryable' };
+  }
+  const result = await answerPendingPermission(
+    { ...ask, approvalKey: null, permissionId: ask.permissionId },
+    options
+  );
   if (result.kind === 'approved') {
     recordWaitingAsk(null);
   }
@@ -257,10 +245,18 @@ async function approvalKeyOf(kiloSessionId: string, permissionId: string): Promi
 /**
  * The answer body, whose terminal outcome the caller acks. With an approval
  * key, only the exact request that key names is answered: a newer request on
- * the same session is not the one the user saw, so it reads as `gone`.
+ * the same session is not the one the user saw, so it reads as `gone`. With a
+ * recorded permission id (the aggregate path's binding), a live id that
+ * differs reads as `gone` the same way.
  */
 async function answerPendingPermission(
-  target: { kiloSessionId: string; organizationId: string | null; approvalKey: string | null },
+  target: {
+    kiloSessionId: string;
+    organizationId: string | null;
+    approvalKey: string | null;
+    /** The recorded request id; a live id that differs reads as `gone`. */
+    permissionId?: string | null;
+  },
   options: { now?: () => number }
 ): Promise<GlanceableApproveResult> {
   try {
@@ -276,6 +272,9 @@ async function answerPendingPermission(
       target.approvalKey !== null &&
       (await approvalKeyOf(target.kiloSessionId, permissionId)) !== target.approvalKey
     ) {
+      return { kind: 'gone' };
+    }
+    if (target.permissionId != null && permissionId !== target.permissionId) {
       return { kind: 'gone' };
     }
     await answerSessionPermission({

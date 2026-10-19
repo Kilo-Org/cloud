@@ -47,7 +47,7 @@ import { getLastGlanceableSnapshot } from './persist';
 import { type GlanceablePublisherContext } from './publisher';
 import { forEachSink, getGlanceableSinks, writeGlanceableFrame } from './sink-registry';
 import { setSurfaceExtras } from './surface-extras';
-import { recordWaitingAsk, selectWaitingAsk } from './waiting-ask';
+import { attachWaitingAskPermission, recordWaitingAsk, selectWaitingAsk } from './waiting-ask';
 
 /**
  * Dev-only glanceable fixture harness. `kiloapp:///dev/glanceable-fixture/<name>`
@@ -241,7 +241,16 @@ async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContex
     newestSessionTitle: newestSessionTitle(rows),
     actionFeedback: fixture.actionFeedback ?? null,
   });
-  recordWaitingAsk(eligible ? selectWaitingAsk(rows, ctx, now) : null);
+  const ask = eligible ? selectWaitingAsk(rows, ctx, now) : null;
+  recordWaitingAsk(ask);
+  const approvableRow = rows[approvableIndex];
+  if (ask?.status === 'permission' && ask.isCloudAgent && approvableRow !== undefined) {
+    // The fixture's permission row id is the request id the ask displays; the
+    // live capture path runs against the real control plane and would find
+    // nothing for a fixture session, so the displayed id is attached through
+    // the same attach helper the live path uses. No fixture-only answer path.
+    attachWaitingAskPermission(ask, approvableRow.id);
+  }
   // Before the frame: the aggregate card counts a followed row out.
   if (Platform.OS === 'ios' || Platform.OS === 'android') {
     await applySessionCardFixture({ fixture, rows, ctx, now });

@@ -162,7 +162,9 @@ function translate(key: string): string {
 }
 
 /**
- * True while the recorded ask is one Approve can answer. The count this
+ * True while the recorded ask is one Approve can answer: a cloud-agent
+ * permission ask whose displayed request's captured id is present — without
+ * the capture the press could not prove what it would answer. The count this
  * content state carries includes questions and retried asks, which
  * `runGlanceableApprove` resolves to `none`, so the layout needs this fact to
  * avoid offering a control that cannot act. The read is synchronous and the
@@ -171,7 +173,7 @@ function translate(key: string): string {
  */
 function isApprovableAskRecorded(): boolean {
   const ask = getWaitingAsk();
-  return ask?.status === 'permission' && ask.isCloudAgent;
+  return ask?.status === 'permission' && ask.isCloudAgent && ask.permissionId != null;
 }
 
 /**

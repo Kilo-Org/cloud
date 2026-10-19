@@ -89,6 +89,7 @@ import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/pi
 import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import {
   PRESELECT_CLOUD_RUN_ON,
+  PRESELECT_COMPUTER_RUN_ON,
   readPreselectRunOn,
   resolvePersistedRunOn,
   shouldRestorePersistedRunOn,
@@ -154,12 +155,25 @@ export function NewSessionScreenBody() {
   const forkSourceIsCloudAgent =
     cloneUpToMessageId !== '' && readForkSourceIsCloudAgent(searchParams);
   // The route's explicit Run-on preselection: the tour's cloud path names the
-  // Cloud Agent sentinel, the computer path names the tapped connection id.
+  // Cloud Agent sentinel, the computer path names the computer sentinel, and
+  // an in-app computer entry names the tapped connection id.
   const preselectRunOn = readPreselectRunOn(searchParams.preselectRunOn);
   const preselectConnectionId =
-    preselectRunOn !== null && preselectRunOn !== PRESELECT_CLOUD_RUN_ON ? preselectRunOn : null;
+    preselectRunOn !== null &&
+    preselectRunOn !== PRESELECT_CLOUD_RUN_ON &&
+    preselectRunOn !== PRESELECT_COMPUTER_RUN_ON
+      ? preselectRunOn
+      : null;
+  // The tour's computer path: the computer target is selected from the first
+  // frame; the restore effect below binds the first connected computer.
+  const preselectComputer = preselectRunOn === PRESELECT_COMPUTER_RUN_ON;
 
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
+  // The computer target selected with no instance bound yet (the tour's
+  // computer path, before the instance list resolves a computer or while none
+  // is connected). Cleared only by an explicit in-form pick of Cloud Agent;
+  // the route param never re-arms it.
+  const [computerTargetSelected, setComputerTargetSelected] = useState(preselectComputer);
   const [remoteOverride, setRemoteOverride] = useState<RemoteModelOverride | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -239,7 +253,10 @@ export function NewSessionScreenBody() {
   const modelView = useMemo(
     () =>
       resolveNewSessionModelView({
-        isRemoteTarget: runOnInstance !== null,
+        // The unbound computer target shares the remote model surface: the
+        // catalog is empty (no connection id yet) and the view falls back to
+        // the gateway-shaped options until a computer binds.
+        isRemoteTarget: runOnInstance !== null || computerTargetSelected,
         catalog: instanceCatalog.catalog,
         catalogLoading: instanceCatalog.isLoading,
         gatewayModels: models,
@@ -250,6 +267,7 @@ export function NewSessionScreenBody() {
       }),
     [
       runOnInstance,
+      computerTargetSelected,
       instanceCatalog.catalog,
       instanceCatalog.isLoading,
       models,
@@ -441,6 +459,19 @@ export function NewSessionScreenBody() {
       setRunOnInstance(resolvePersistedRunOn(preselectConnectionId, instanceList));
       return;
     }
+    // The tour's computer path: bind the first connected computer (either
+    // instance kind is a computer) once the list arrives; zero connected
+    // leaves the target selected but unbound — Start stays disabled with the
+    // setup hint and the Cloud Agent is never substituted. The stored
+    // preference is never consulted or written.
+    if (preselectComputer) {
+      if (instancesData === undefined) {
+        return;
+      }
+      runOnRestoredRef.current = true;
+      setRunOnInstance(instanceList[0] ?? null);
+      return;
+    }
     // The tour's cloud path asks for the Cloud Agent target explicitly: start
     // with no remote target so the form opens on Cloud Agent, and never restore
     // the stored preference (which the tour must not touch). `runOnUserPickedRef`
@@ -459,9 +490,27 @@ export function NewSessionScreenBody() {
     instanceList,
     instancesData,
     storedConnectionId,
+    preselectComputer,
     preselectConnectionId,
     preselectRunOn,
   ]);
+
+  // The tour's computer target with no connected computer yet: bind the first
+  // one the moment a CLI connects (poll tick, Refresh, or focus refetch). The
+  // one-shot restore above cannot do this — it seals after the first resolved
+  // list, which may have been empty. A deliberate in-form pick wins and stops
+  // the auto-bind (`runOnUserPickedRef`); binding here is transient and never
+  // touches the stored preference.
+  useEffect(() => {
+    if (!computerTargetSelected || runOnUserPickedRef.current) {
+      return;
+    }
+    const first = instanceList[0];
+    if (runOnInstance !== null || first === undefined) {
+      return;
+    }
+    setRunOnInstance(first);
+  }, [computerTargetSelected, instanceList, runOnInstance]);
 
   // A successful session creation owns clearing the new-session draft; a
   // failure must preserve it for the retry. The success path navigates via
@@ -661,6 +710,9 @@ export function NewSessionScreenBody() {
       saveRunOn(next?.connectionId ?? null);
       setRemoteOverride(null);
       setCloneImportFailureKey(null);
+      // An explicit Cloud Agent pick is the one thing that leaves the tour's
+      // computer target: from here the form behaves like the ordinary entry.
+      setComputerTargetSelected(false);
       // The inline cloud-create failure belongs to the previous target: it
       // would render stale above Start after switching to a computer. A fresh
       // cloud attempt clears it again at press time.
@@ -669,7 +721,6 @@ export function NewSessionScreenBody() {
     },
     [handleRunOnInstanceChange, saveRunOn]
   );
-
   function handlePromptChange(text: string) {
     promptEditedRef.current = true;
     promptRef.current = text;
@@ -791,7 +842,7 @@ export function NewSessionScreenBody() {
     [retryAttachment]
   );
 
-  const isRemoteTargetSelected = runOnInstance !== null;
+  const isRemoteTargetSelected = runOnInstance !== null || computerTargetSelected;
   // Clone CLI-capability gate: a full clone is optimistic (only an explicit
   // `sessionClone: false` refuses it); a fork cut needs
   // `sessionCloneAtMessage: true`. A refused CLI shows its inline reason
@@ -833,6 +884,12 @@ export function NewSessionScreenBody() {
       });
     }
     if (isRemoteTargetSelected) {
+      // The computer target with no connected computer yet cannot start: the
+      // spawn has no live instance to fire on. The visible blocked reason
+      // below names the setup hint.
+      if (runOnInstance === null) {
+        return true;
+      }
       return (
         remoteSpawn.isSpawningRemote ||
         isSubmitting ||
@@ -906,7 +963,9 @@ export function NewSessionScreenBody() {
   );
 
   let startBlockedReason: string | null = null;
-  if (startBlockedReasonKey === 'connect-provider') {
+  if (runOnInstance === null && computerTargetSelected) {
+    startBlockedReason = t('agentChat.instancePicker.noCliInstancesDescription');
+  } else if (startBlockedReasonKey === 'connect-provider') {
     startBlockedReason = t('agentChat.newSession.connectProviderToStart');
   } else if (startBlockedReasonKey === 'refresh-repositories') {
     startBlockedReason = t('agentChat.newSession.refreshRepositories');
@@ -959,7 +1018,13 @@ export function NewSessionScreenBody() {
       })();
       return;
     }
-    if (runOnInstance !== null) {
+    if (isRemoteTargetSelected) {
+      // The computer target with no connected computer yet cannot spawn: the
+      // gate above keeps Start disabled, so this is a defensive guard, never
+      // a cloud-create fall-through.
+      if (runOnInstance === null) {
+        return;
+      }
       void submitWithVoiceSettled(async () => {
         remoteSpawn.onStart();
         await Promise.resolve();
@@ -972,6 +1037,7 @@ export function NewSessionScreenBody() {
     void submitWithVoiceSettled(createSessionFromDraft);
   }, [
     isCloneEntry,
+    isRemoteTargetSelected,
     runOnInstance,
     cloneFromKiloSessionId,
     cloneUpToMessageId,
@@ -1043,6 +1109,7 @@ export function NewSessionScreenBody() {
         isFetchingInstances={isFetchingInstances}
         onRefreshInstances={() => void refetchInstances()}
         onChangeRunOnInstance={handleRunOnChange}
+        pendingComputer={computerTargetSelected && runOnInstance === null}
         showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
         folderPath={folderPath}
         onChangeFolderPath={setFolderPath}

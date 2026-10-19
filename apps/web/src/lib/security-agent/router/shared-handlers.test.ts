@@ -95,6 +95,7 @@ jest.mock('../services/manual-dismiss-client', () => ({
 }));
 jest.mock('../services/manual-analysis-client', () => ({
   submitManualAnalysisStart: mockSubmitManualAnalysisStart,
+  WorkerTransportError: class WorkerTransportError extends Error {},
 }));
 jest.mock('../services/manual-remediation-client', () => ({
   submitApplyAutoRemediation: mockSubmitApplyAutoRemediation,

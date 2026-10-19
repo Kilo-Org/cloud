@@ -29,6 +29,17 @@ type ManualAnalysisResponse = {
   error?: string;
 };
 
+/** A transport-level failure: the Worker may still have received the request. */
+export class WorkerTransportError extends Error {
+  readonly status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'WorkerTransportError';
+    this.status = status;
+  }
+}
+
 export async function submitManualAnalysisStart(
   params: ManualAnalysisStartParams
 ): Promise<{ queued: true; commandId: string }> {
@@ -39,9 +50,9 @@ export async function submitManualAnalysisStart(
     throw new Error('INTERNAL_API_SECRET is not configured');
   }
 
-  const response = await fetch(
-    `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/manual-analysis-start`,
-    {
+  let response: Response;
+  try {
+    response = await fetch(`${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/manual-analysis-start`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -57,16 +68,36 @@ export async function submitManualAnalysisStart(
         retrySandboxOnly: params.retrySandboxOnly,
         restartActive: params.restartActive,
       }),
-    }
-  );
-  const body = (await response.json()) as ManualAnalysisResponse;
+    });
+  } catch (error) {
+    throw new WorkerTransportError(
+      `Security analysis Worker request failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  let body: ManualAnalysisResponse;
+  try {
+    body = (await response.json()) as ManualAnalysisResponse;
+  } catch {
+    throw new WorkerTransportError(
+      'Security analysis Worker returned a non-JSON response',
+      response.status
+    );
+  }
   if (!response.ok) {
+    if (response.status >= 500) {
+      throw new WorkerTransportError(
+        body.error ?? `Security analysis Worker request failed with ${response.status}`,
+        response.status
+      );
+    }
     throw new Error(
       body.error ?? `Security analysis Worker request failed with ${response.status}`
     );
   }
   if (body.success !== true || body.accepted !== true || typeof body.commandId !== 'string') {
-    throw new Error('Security analysis Worker returned an invalid accepted response');
+    throw new WorkerTransportError(
+      'Security analysis Worker returned an invalid accepted response'
+    );
   }
   return { queued: true, commandId: body.commandId };
 }

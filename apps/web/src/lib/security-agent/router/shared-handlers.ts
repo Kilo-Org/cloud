@@ -59,7 +59,10 @@ import {
 import { checkDependabotAlertsAvailability } from '@/lib/security-agent/github/dependabot-api';
 import { submitManualSecuritySync } from '@/lib/security-agent/services/manual-sync-client';
 import { submitManualFindingDismissal } from '@/lib/security-agent/services/manual-dismiss-client';
-import { submitManualAnalysisStart } from '@/lib/security-agent/services/manual-analysis-client';
+import {
+  submitManualAnalysisStart,
+  WorkerTransportError,
+} from '@/lib/security-agent/services/manual-analysis-client';
 import {
   submitApplyAutoRemediation,
   submitManualRemediationStart,
@@ -453,8 +456,11 @@ async function executeSecurityCommandSubmit(args: {
   try {
     accepted = await args.submit();
   } catch (error) {
-    if (error instanceof TRPCError && error.code === 'BAD_GATEWAY') {
-      // The ambiguous CONFLICT promises same-key reconciliation, so it is
+    const isAmbiguous =
+      (error instanceof TRPCError && error.code === 'BAD_GATEWAY') ||
+      error instanceof WorkerTransportError;
+    if (isAmbiguous) {
+      // An ambiguous outcome promises same-key reconciliation, so it is
       // surfaced only once `reconcile_pending` is durable.
       await requireLedgerWrite(
         'We could not record this action. Please try again later.',

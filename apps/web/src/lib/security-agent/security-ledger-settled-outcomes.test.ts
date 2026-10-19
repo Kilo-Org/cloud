@@ -35,6 +35,7 @@ const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
 jest.mock('./services/manual-analysis-client', () => ({
   submitManualAnalysisStart: mockSubmitManualAnalysisStart,
+  WorkerTransportError: class WorkerTransportError extends Error {},
 }));
 jest.mock('./services/manual-remediation-client', () => ({
   submitApplyAutoRemediation: jest.fn(),

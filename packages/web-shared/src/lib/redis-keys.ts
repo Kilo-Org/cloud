@@ -50,3 +50,23 @@ export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
 
 export const githubConnectionPkceRedisKey = (verifierRef: string) =>
   redisKey(`auth-pkce:github-connection:${verifierRef}`);
+
+/**
+ * Organization ids are UUIDs and never contain `:`, and the user id is always
+ * last, so the three owner scopes cannot collide.
+ */
+export const openAiChatGptConnectionPresenceRedisKey = (
+  owner:
+    | { scope: 'shared_services'; organizationId: string }
+    | { scope?: undefined; kiloUserId: string; organizationId: string | null }
+) => {
+  if (owner.scope === 'shared_services') {
+    return redisKey(`openai-chatgpt-connection:v1:org:${owner.organizationId}:shared-services`);
+  }
+  if (owner.organizationId === null) {
+    return redisKey(`openai-chatgpt-connection:v1:user:${owner.kiloUserId}`);
+  }
+  return redisKey(
+    `openai-chatgpt-connection:v1:org:${owner.organizationId}:user:${owner.kiloUserId}`
+  );
+};

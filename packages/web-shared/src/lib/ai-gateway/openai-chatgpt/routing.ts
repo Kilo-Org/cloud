@@ -11,6 +11,7 @@ import {
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
+  type OpenAiChatGptStoredConnection,
 } from './store';
 import { isOpenAiModelServed } from './served-models';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
@@ -161,18 +162,21 @@ function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiC
 export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput): Promise<boolean> {
   const [owner] = openAiChatGptOwnerCandidates(input);
   if (!owner) return false;
-  return isOpenAiChatGptEligibleForOwner(input, owner);
+  return (await eligibleOpenAiChatGptConnection(input, owner)) !== null;
 }
 
-/** Eligibility of one specific owner's connection. */
-async function isOpenAiChatGptEligibleForOwner(
+/**
+ * One specific owner's connection when it makes the request eligible, or null.
+ * The returned connection is handed to token resolution so the row is read once.
+ */
+async function eligibleOpenAiChatGptConnection(
   input: OpenAiChatGptRoutingInput,
   owner: OpenAiChatGptOwner
-): Promise<boolean> {
+): Promise<OpenAiChatGptStoredConnection | null> {
   const { request, requestedModel } = input;
 
-  if (request.kind !== 'responses') return false;
-  if (!isOpenAiChatGptModel(requestedModel)) return false;
+  if (request.kind !== 'responses') return null;
+  if (!isOpenAiChatGptModel(requestedModel)) return null;
 
   // The catalog can list an OpenAI model the plain API does not serve. A
   // `-pro` slug such as `openai/gpt-5.6-luna-pro` is a reasoning mode on the
@@ -180,14 +184,14 @@ async function isOpenAiChatGptEligibleForOwner(
   // Only a model this project actually serves may take the delegated route.
   const upstreamModel = requestedModel.trim().replace(OPENAI_MODEL_PREFIX, '');
   if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
-    return false;
+    return null;
   }
 
   const stored = await getOpenAiChatGptStoredConnection(owner);
   // The payload's `status` mirrors a save or a terminal failure, but a person
   // can also disable the row through the ordinary BYOK toggle, which leaves the
   // payload saying `connected`. Both must hold for the route to be eligible.
-  return stored?.isEnabled === true && stored.connection.status === 'connected';
+  return stored?.isEnabled === true && stored.connection.status === 'connected' ? stored : null;
 }
 
 /**
@@ -307,9 +311,10 @@ export async function checkOpenAiChatGptByok(
   const candidates = openAiChatGptOwnerCandidates(input);
 
   for (const owner of candidates) {
-    if (!(await isOpenAiChatGptEligibleForOwner(input, owner))) continue;
+    const stored = await eligibleOpenAiChatGptConnection(input, owner);
+    if (!stored) continue;
 
-    const outcome = await resolveOpenAiChatGptAccessToken(owner);
+    const outcome = await resolveOpenAiChatGptAccessToken(owner, stored);
 
     // A terminally dead credential must fail readably instead of falling back
     // to the next connection or another billing path.

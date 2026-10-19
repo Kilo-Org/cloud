@@ -6,7 +6,11 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
-import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import {
+  clearOpenAiChatGptConnection,
+  recordOpenAiChatGptConnectionPresence,
+  type OpenAiChatGptOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -1025,18 +1029,21 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   instances, AND on any other instances where this user was the admin
  *   actor — since their email and any reason text they wrote is their PII
  *   regardless of which instance the override targeted)
+ *
+ * Returns the owners of the deleted ChatGPT connections: the caller records
+ * their cached absence once the transaction has committed.
  */
 export async function anonymizeCloudUserData(
   tx: DrizzleTransaction,
   userId: string
-): Promise<void> {
+): Promise<{ deletedOpenAiChatGptOwners: OpenAiChatGptOwner[] }> {
   const [user] = await tx
     .select()
     .from(kilocode_users)
     .where(eq(kilocode_users.id, userId))
     .for('update')
     .limit(1);
-  if (!user) return;
+  if (!user) return { deletedOpenAiChatGptOwners: [] };
   await tx
     .delete(provider_oauth_attempts)
     .where(
@@ -1451,14 +1458,15 @@ export async function anonymizeCloudUserData(
   // row is the organization's connection, so it stays behind and only loses the
   // reference to the connector who is being deleted. `created_by` keeps the
   // record of who connected it, and the next reconnect names the new connector.
-  await tx
+  const deletedOpenAiChatGptConnections = await tx
     .delete(openai_chatgpt_connections)
     .where(
       and(
         eq(openai_chatgpt_connections.kilo_user_id, userId),
         eq(openai_chatgpt_connections.is_shared_services, false)
       )
-    );
+    )
+    .returning({ organization_id: openai_chatgpt_connections.organization_id });
   await tx
     .update(openai_chatgpt_connections)
     .set({ kilo_user_id: null })
@@ -1871,6 +1879,19 @@ export async function anonymizeCloudUserData(
     .update(security_advisor_scans)
     .set({ kilo_user_id: 'deleted', public_ip: null })
     .where(eq(security_advisor_scans.kilo_user_id, userId));
+
+  return {
+    deletedOpenAiChatGptOwners: deletedOpenAiChatGptConnections.map(row => ({
+      kiloUserId: userId,
+      organizationId: row.organization_id,
+    })),
+  };
+}
+
+export async function recordOpenAiChatGptConnectionsAbsent(
+  owners: OpenAiChatGptOwner[]
+): Promise<void> {
+  await Promise.all(owners.map(owner => recordOpenAiChatGptConnectionPresence(owner, 'absent')));
 }
 
 export type UsagePromptPrefixCursor = {
@@ -1963,9 +1984,10 @@ export async function softDeleteUser(userId: string) {
     cursor = page.lastCursor;
   }
 
-  await db.transaction(async tx => {
-    await anonymizeCloudUserData(tx, userId);
-  });
+  const { deletedOpenAiChatGptOwners } = await db.transaction(tx =>
+    anonymizeCloudUserData(tx, userId)
+  );
+  await recordOpenAiChatGptConnectionsAbsent(deletedOpenAiChatGptOwners);
 }
 
 // We always stytch approve users who accept organization invites

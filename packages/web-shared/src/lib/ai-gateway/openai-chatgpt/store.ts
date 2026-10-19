@@ -9,6 +9,8 @@ import {
   type EncryptedData,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { openAiChatGptConnectionPresenceRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 import { isChatGptUsageLimitCurrent, type ChatGptUsageLimit } from './usage-limit';
 
@@ -120,6 +122,84 @@ export async function getOpenAiChatGptConnection(
 }
 
 /**
+ * Whether the owner has a connection row, enabled or not. Only this is cached in
+ * Redis: the row, its payload and its tokens never are.
+ */
+export type OpenAiChatGptConnectionPresence = 'present' | 'absent';
+
+const CONNECTION_PRESENCE_TTL_SECONDS = 60 * 60;
+
+function logConnectionPresenceFailure(
+  operation: string,
+  owner: OpenAiChatGptOwner,
+  error: unknown
+): void {
+  console.warn(
+    '[openai-chatgpt] connection presence %s failed: %s (%s)',
+    operation,
+    error instanceof Error ? error.name : 'UnknownError',
+    openAiChatGptOwnerKey(owner)
+  );
+}
+
+async function readCachedConnectionPresence(
+  owner: OpenAiChatGptOwner
+): Promise<OpenAiChatGptConnectionPresence | null> {
+  try {
+    const cached = await redisClient.get<string>(openAiChatGptConnectionPresenceRedisKey(owner));
+    return cached === 'present' || cached === 'absent' ? cached : null;
+  } catch (error) {
+    logConnectionPresenceFailure('read', owner, error);
+    return null;
+  }
+}
+
+/**
+ * Fills a miss from a replica read without delaying the request. `NX` keeps a
+ * lagging replica from overwriting the value a writer set after its commit.
+ */
+function populateCachedConnectionPresence(
+  owner: OpenAiChatGptOwner,
+  presence: OpenAiChatGptConnectionPresence
+): void {
+  void redisClient
+    .set(openAiChatGptConnectionPresenceRedisKey(owner), presence, {
+      nx: true,
+      ex: CONNECTION_PRESENCE_TTL_SECONDS,
+    })
+    .catch((error: unknown) => logConnectionPresenceFailure('populate', owner, error));
+}
+
+/**
+ * Records the authoritative presence after a committed write that created or
+ * deleted the owner's row. A plain `SET` overrides any value a reader cached
+ * from a lagging replica. When it fails the key is deleted instead, so a stale
+ * `absent` cannot hide a new connection; if that fails too, the TTL bounds it.
+ * Never throws: the database write already succeeded.
+ */
+export async function recordOpenAiChatGptConnectionPresence(
+  owner: OpenAiChatGptOwner,
+  presence: OpenAiChatGptConnectionPresence
+): Promise<void> {
+  const key = openAiChatGptConnectionPresenceRedisKey(owner);
+  try {
+    await redisClient.set(key, presence, { ex: CONNECTION_PRESENCE_TTL_SECONDS });
+  } catch (error) {
+    logConnectionPresenceFailure('write', owner, error);
+    try {
+      await redisClient.del(key);
+    } catch (deleteError) {
+      logConnectionPresenceFailure('delete', owner, deleteError);
+    }
+  }
+}
+
+export type OpenAiChatGptStoredConnection = {
+  connection: OpenAiChatGptConnection;
+  isEnabled: boolean;
+};
+
+/**
  * The stored payload together with the row's own enabled flag. Routing must use
  * this: a person can disable the row through the ordinary BYOK toggle, and the
  * payload keeps saying `connected` because the toggle does not rewrite it. The
@@ -128,11 +208,18 @@ export async function getOpenAiChatGptConnection(
  *
  * Reads the replica: it runs before inference on gateway requests, which also
  * execute in sfo1. Token refresh re-reads the row on the primary under a lock.
+ * Most callers have no connection, so a cached `absent` skips the query.
  */
 export async function getOpenAiChatGptStoredConnection(
   owner: OpenAiChatGptOwner
-): Promise<{ connection: OpenAiChatGptConnection; isEnabled: boolean } | null> {
+): Promise<OpenAiChatGptStoredConnection | null> {
+  const cachedPresence = await readCachedConnectionPresence(owner);
+  if (cachedPresence === 'absent') return null;
+
   const row = await readOpenAiChatGptConnectionRow(readDb, owner);
+  if (cachedPresence === null) {
+    populateCachedConnectionPresence(owner, row ? 'present' : 'absent');
+  }
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
   return connection ? { connection, isEnabled: row.is_enabled } : null;
@@ -210,11 +297,13 @@ export async function saveOpenAiChatGptConnection(
         usage_limit_error_code: null,
       },
     });
+  await recordOpenAiChatGptConnectionPresence(owner, 'present');
 }
 
 /** Deletes the owner's stored connection. */
 export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
   await db.delete(openai_chatgpt_connections).where(openAiChatGptOwnerWhere(owner));
+  await recordOpenAiChatGptConnectionPresence(owner, 'absent');
 }
 
 /**

@@ -12,7 +12,13 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
 }));
 
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
+}));
+
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { openAiChatGptConnectionPresenceRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import {
   encryptApiKey,
   type EncryptedData,
@@ -23,6 +29,8 @@ import {
   getOpenAiChatGptConnection,
   getOpenAiChatGptStoredConnection,
   markOpenAiChatGptError,
+  openAiChatGptSharedServicesOwner,
+  recordOpenAiChatGptConnectionPresence,
   saveOpenAiChatGptConnection,
   type OpenAiChatGptOwner,
 } from './store';
@@ -67,10 +75,19 @@ function buildConnection(
   };
 }
 
+const mockedRedisGet = jest.mocked(redisClient.get);
+const mockedRedisSet = jest.mocked(redisClient.set);
+const mockedRedisDel = jest.mocked(redisClient.del);
+
+function flushPromises(): Promise<void> {
+  return new Promise(resolve => setImmediate(resolve));
+}
+
 describe('openai-chatgpt connection store', () => {
   const mockDb = db as unknown as MockDb;
   let rows: StoredRow[] = [];
   let activeOwner: OpenAiChatGptOwner = USER_OWNER;
+  let cache = new Map<string, string>();
 
   function matchesActiveOwner(row: StoredRow): boolean {
     return (
@@ -84,6 +101,23 @@ describe('openai-chatgpt connection store', () => {
   beforeEach(() => {
     rows = [];
     activeOwner = USER_OWNER;
+    cache = new Map();
+
+    mockedRedisGet.mockReset();
+    mockedRedisGet.mockImplementation((async (key: string) => cache.get(key) ?? null) as never);
+    mockedRedisSet.mockReset();
+    mockedRedisSet.mockImplementation((async (
+      key: string,
+      value: string,
+      options?: { nx?: boolean }
+    ) => {
+      if (options?.nx && cache.has(key)) return null;
+      cache.set(key, value);
+      return 'OK';
+    }) as never);
+    mockedRedisDel.mockReset();
+    mockedRedisDel.mockImplementation((async (key: string) =>
+      cache.delete(key) ? 1 : 0) as never);
 
     mockDb.select.mockReset();
     mockDb.select.mockImplementation(() => ({
@@ -291,5 +325,148 @@ describe('openai-chatgpt connection store', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].organization_id).toBe(TEST_ORG_ID);
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toBeNull();
+  });
+
+  describe('connection presence cache', () => {
+    const userKey = openAiChatGptConnectionPresenceRedisKey(USER_OWNER);
+
+    it('returns null without a database query when the owner is cached as absent', async () => {
+      cache.set(userKey, 'absent');
+
+      await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toBeNull();
+      expect(mockDb.select).not.toHaveBeenCalled();
+      expect(mockedRedisSet).not.toHaveBeenCalled();
+    });
+
+    it('reads the row when the owner is cached as present, without repopulating', async () => {
+      await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
+      rows = rows.map(row => ({ ...row, is_enabled: false }));
+      mockedRedisSet.mockClear();
+
+      await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toEqual({
+        connection: buildConnection(),
+        isEnabled: false,
+      });
+      expect(mockDb.select).toHaveBeenCalledTimes(1);
+      expect(mockedRedisSet).not.toHaveBeenCalled();
+    });
+
+    it('populates a miss with NX and a one-hour TTL from the row it read', async () => {
+      await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toBeNull();
+      expect(mockedRedisSet).toHaveBeenCalledWith(userKey, 'absent', { nx: true, ex: 3600 });
+
+      cache.clear();
+      mockedRedisSet.mockClear();
+      rows.push({
+        kilo_user_id: TEST_USER_ID,
+        organization_id: null,
+        encrypted_connection: encryptApiKey(JSON.stringify(buildConnection()), BYOK_ENCRYPTION_KEY),
+        is_enabled: true,
+        created_by: TEST_USER_ID,
+      });
+
+      await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toMatchObject({
+        isEnabled: true,
+      });
+      expect(mockedRedisSet).toHaveBeenCalledWith(userKey, 'present', { nx: true, ex: 3600 });
+    });
+
+    it('does not let a populating reader overwrite the value a writer recorded', async () => {
+      await recordOpenAiChatGptConnectionPresence(USER_OWNER, 'present');
+      mockedRedisGet.mockResolvedValueOnce(null);
+
+      await getOpenAiChatGptStoredConnection(USER_OWNER);
+
+      expect(cache.get(userKey)).toBe('present');
+    });
+
+    it('treats an unreadable cached value as a miss', async () => {
+      cache.set(userKey, 'maybe');
+
+      await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toBeNull();
+      expect(mockDb.select).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to the database when Redis fails, without an unhandled rejection', async () => {
+      await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
+      mockedRedisGet.mockRejectedValue(new Error('redis timeout'));
+      mockedRedisSet.mockRejectedValue(new Error('redis timeout'));
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toMatchObject({
+        isEnabled: true,
+      });
+      await flushPromises();
+
+      expect(warn).toHaveBeenCalledTimes(2);
+      warn.mockRestore();
+    });
+
+    it('records present after a save and absent after a disconnect, overriding the cache', async () => {
+      cache.set(userKey, 'absent');
+
+      await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
+      expect(mockedRedisSet).toHaveBeenLastCalledWith(userKey, 'present', { ex: 3600 });
+      expect(cache.get(userKey)).toBe('present');
+
+      await clearOpenAiChatGptConnection(USER_OWNER);
+      expect(mockedRedisSet).toHaveBeenLastCalledWith(userKey, 'absent', { ex: 3600 });
+      expect(cache.get(userKey)).toBe('absent');
+    });
+
+    it('deletes the key when the authoritative write fails', async () => {
+      cache.set(userKey, 'absent');
+      mockedRedisSet.mockRejectedValue(new Error('redis timeout'));
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
+
+      expect(rows).toHaveLength(1);
+      expect(mockedRedisDel).toHaveBeenCalledWith(userKey);
+      expect(cache.has(userKey)).toBe(false);
+      warn.mockRestore();
+    });
+
+    it('never throws from the authoritative write when Redis is down', async () => {
+      mockedRedisSet.mockRejectedValue(new Error('redis timeout'));
+      mockedRedisDel.mockRejectedValue(new Error('redis timeout'));
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      await expect(
+        recordOpenAiChatGptConnectionPresence(USER_OWNER, 'absent')
+      ).resolves.toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(2);
+      warn.mockRestore();
+    });
+
+    it('stores only the presence marker, never token material', async () => {
+      await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
+      cache.clear();
+      await getOpenAiChatGptStoredConnection(USER_OWNER);
+
+      expect([...cache.values()]).toEqual(['present']);
+    });
+
+    it('encodes each owner scope under a distinct key', () => {
+      expect(openAiChatGptConnectionPresenceRedisKey(USER_OWNER)).toBe(
+        `openai-chatgpt-connection:v1:user:${TEST_USER_ID}`
+      );
+      expect(openAiChatGptConnectionPresenceRedisKey(ORG_OWNER)).toBe(
+        `openai-chatgpt-connection:v1:org:${TEST_ORG_ID}:user:${TEST_USER_ID}`
+      );
+      expect(
+        openAiChatGptConnectionPresenceRedisKey(openAiChatGptSharedServicesOwner(TEST_ORG_ID))
+      ).toBe(`openai-chatgpt-connection:v1:org:${TEST_ORG_ID}:shared-services`);
+
+      const adversarialUserIds = ['shared-services', `org:${TEST_ORG_ID}`, 'personal'];
+      const keys = [
+        openAiChatGptConnectionPresenceRedisKey(openAiChatGptSharedServicesOwner(TEST_ORG_ID)),
+        ...adversarialUserIds.flatMap(kiloUserId => [
+          openAiChatGptConnectionPresenceRedisKey({ kiloUserId, organizationId: null }),
+          openAiChatGptConnectionPresenceRedisKey({ kiloUserId, organizationId: TEST_ORG_ID }),
+        ]),
+      ];
+      expect(new Set(keys).size).toBe(keys.length);
+    });
   });
 });

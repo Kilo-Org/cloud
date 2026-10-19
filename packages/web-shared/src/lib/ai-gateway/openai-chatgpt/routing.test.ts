@@ -83,7 +83,7 @@ import {
   type OpenAiChatGptRoutingInput,
 } from './routing';
 import type { OpenAiChatGptConnection } from './types';
-import type { OpenAiChatGptOwner } from './store';
+import type { OpenAiChatGptOwner, OpenAiChatGptStoredConnection } from './store';
 
 const PARTNER_KEY = 'partner-project-key';
 const DELEGATED_TOKEN = 'delegated-access-token';
@@ -114,6 +114,10 @@ function connectedConnection(): OpenAiChatGptConnection {
     connected_at: '2026-09-16T00:00:00.000Z',
     status: 'connected',
   };
+}
+
+function enabledStoredConnection(): OpenAiChatGptStoredConnection {
+  return { connection: connectedConnection(), isEnabled: true };
 }
 
 function responsesRequest(model: string): GatewayRequest {
@@ -175,7 +179,7 @@ beforeEach(() => {
   jest
     .mocked(getOpenAiChatGptStoredConnection)
     .mockReset()
-    .mockResolvedValue({ connection: connectedConnection(), isEnabled: true });
+    .mockResolvedValue(enabledStoredConnection());
   jest
     .mocked(resolveOpenAiChatGptAccessToken)
     .mockReset()
@@ -540,11 +544,27 @@ describe('checkOpenAiChatGptByok', () => {
     expect(JSON.parse(init.body as string)).not.toHaveProperty('provider');
   });
 
+  it('reads the connection once and hands that read to token resolution', async () => {
+    const stored = enabledStoredConnection();
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(stored);
+
+    await expect(checkOpenAiChatGptByok(routingInput())).resolves.toMatchObject({
+      kind: 'provider',
+    });
+
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledTimes(1);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(resolveOpenAiChatGptAccessToken).mock.calls[0]?.[1]).toBe(stored);
+  });
+
   it('resolves the organization credential for an organization request', async () => {
     const result = await checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID }));
 
     expect(result?.kind).toBe('provider');
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(
+      ORG_OWNER,
+      enabledStoredConnection()
+    );
   });
 
   it('requires a reconnect instead of another billing path when the credential is terminal', async () => {
@@ -572,7 +592,10 @@ describe('checkOpenAiChatGptByok', () => {
     process.env.OPENAI_CHATGPT_API_KEY = '   ';
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(USER_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(
+      USER_OWNER,
+      enabledStoredConnection()
+    );
   });
 
   it('builds no provider without the deployment partner key', () => {
@@ -636,7 +659,10 @@ describe('shared-services routing', () => {
 
     expect(result?.kind).toBe('provider');
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(
+      SHARED_OWNER,
+      enabledStoredConnection()
+    );
   });
 
   it('falls back to the caller own connection when the organization has no shared connection', async () => {
@@ -655,7 +681,10 @@ describe('shared-services routing', () => {
     expect(result?.kind).toBe('provider');
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(ORG_OWNER);
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(
+      ORG_OWNER,
+      enabledStoredConnection()
+    );
   });
 
   it('falls back to the caller own connection when the shared connection is disabled', async () => {
@@ -672,7 +701,10 @@ describe('shared-services routing', () => {
     );
 
     expect(result?.kind).toBe('provider');
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(
+      ORG_OWNER,
+      enabledStoredConnection()
+    );
   });
 
   it('fails readably when the shared connection credential is terminally dead', async () => {
@@ -688,7 +720,10 @@ describe('shared-services routing', () => {
       kind: 'reconnect',
       message: 'Your ChatGPT connection has expired. Reconnect to continue.',
     });
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(
+      SHARED_OWNER,
+      enabledStoredConnection()
+    );
   });
 
   it('keeps a member request on the member connection', async () => {

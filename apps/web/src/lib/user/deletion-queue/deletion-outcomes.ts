@@ -16,7 +16,8 @@ import {
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { anonymizeCloudUserData } from '@/lib/user';
+import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { anonymizeCloudUserData, recordOpenAiChatGptConnectionsAbsent } from '@/lib/user';
 import { disableUserAccessForDeletion } from '@/lib/user/deletion-queue/deletion-access';
 import { catalogEntryFor, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
 import { deletionRequestAuditHmac } from '@/lib/user/deletion-queue/deletion-hmac';
@@ -107,7 +108,8 @@ async function persistAnonymizeSuccessTx(params: {
   outcome: DeletionHandlerOutcome;
   handlerDeadlineAt?: number;
 }): Promise<PersistTaskOutcomeResult> {
-  return db.transaction(async tx => {
+  let deletedOpenAiChatGptOwners: OpenAiChatGptOwner[] = [];
+  const result = await db.transaction(async (tx): Promise<PersistTaskOutcomeResult> => {
     const locked = await lockClaimedStep(tx, params);
     if (locked.kind !== 'running') return locked;
 
@@ -181,7 +183,7 @@ async function persistAnonymizeSuccessTx(params: {
       return { kind: 'applied', effectiveOutcome: outcome };
     }
 
-    await anonymizeCloudUserData(tx, userId);
+    ({ deletedOpenAiChatGptOwners } = await anonymizeCloudUserData(tx, userId));
     await tx
       .update(user_deletion_requests)
       .set({
@@ -206,6 +208,8 @@ async function persistAnonymizeSuccessTx(params: {
       anonymizedUserId: userId,
     };
   });
+  await recordOpenAiChatGptConnectionsAbsent(deletedOpenAiChatGptOwners);
+  return result;
 }
 
 async function lockClaimedStep(

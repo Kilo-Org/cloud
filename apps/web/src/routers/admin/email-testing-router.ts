@@ -22,6 +22,8 @@ import { securityFindingTemplateVars } from '@/lib/security-notification-email-v
 import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import * as z from 'zod';
 import { format } from 'date-fns';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import { addCalendarYearUtc } from '@kilocode/web-shared/lib/paidCreditPolicy';
 
 const templateNames = Object.keys(subjects) as [TemplateName, ...TemplateName[]];
 
@@ -242,7 +244,9 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         }),
         purchase_date: formatDate(new Date()),
         credit_expiry_section: buildCreditsTopUpExpirySection(
-          new Date(Date.now() + 365 * 86_400_000)
+          getPaidCreditTerms('stripe') === 'one_year'
+            ? new Date(addCalendarYearUtc(new Date()))
+            : null
         ),
         credits_url: `${NEXTAUTH_URL}/credits`,
         receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),

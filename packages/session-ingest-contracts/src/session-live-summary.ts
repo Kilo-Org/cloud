@@ -96,7 +96,8 @@ function isFormatControl(code: number): boolean {
  * layout format controls are removed, the joiners that shape adjacent
  * characters are kept, runs of white space collapse, and text longer than
  * `limit` ends with an ellipsis inside the limit. The cut never splits a UTF-16
- * surrogate pair. Empty text, or text that draws nothing, gives null.
+ * surrogate pair. Empty text, white space, and text made only of joiners give
+ * null.
  */
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;

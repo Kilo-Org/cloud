@@ -43,7 +43,7 @@ describe('sessionLiveText', () => {
     expect(sessionLiveText('  a\u2028\u2029b  ', 40)).toBe('a b');
   });
 
-  it('returns null for non-strings and text that draws nothing', () => {
+  it('returns null for non-strings, blanks, and joiner-only text', () => {
     expect(sessionLiveText(null, 40)).toBeNull();
     expect(sessionLiveText('\u200B\uFEFF\n', 40)).toBeNull();
     expect(sessionLiveText('\u200C\u200D', 40)).toBeNull();

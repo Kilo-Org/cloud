@@ -194,9 +194,10 @@ export function PrReviewOverview({
       );
     }
     // retryable / service-unavailable: the review read path could not serve
-    // the request. A BAD_GATEWAY (service-unavailable) names its own cause —
-    // the review service is temporarily unavailable, not GitHub — while every
-    // other failure keeps the generic server-error copy. Both offer Retry.
+    // the request. A BAD_GATEWAY (service-unavailable) — the authorization
+    // layer in front of GitHub, a GitHub 5xx, or a provider transport
+    // failure — names its own cause, while every other failure keeps the
+    // generic server-error copy. Both offer Retry.
     let errorTitle = t('prReview.couldNotLoadPullRequest');
     if (state.kind === 'service-unavailable') {
       errorTitle = t('prReview.reviewServiceUnavailable');

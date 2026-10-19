@@ -51,7 +51,7 @@ describe('classifyPrReviewQueryState', () => {
     });
   });
 
-  it('classifies BAD_GATEWAY as a service-unavailable state (review service down, retry)', () => {
+  it('classifies BAD_GATEWAY as a service-unavailable state (retryable gateway failure, retry)', () => {
     expect(classifyPrReviewQueryState(makeTrpcError('BAD_GATEWAY'))).toEqual({
       kind: 'service-unavailable',
     });

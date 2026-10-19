@@ -48,12 +48,12 @@ type PrReviewQueryState =
     }
   | {
       /**
-       * The read failed with BAD_GATEWAY: the review read path could not
-       * reach GitHub through its authorization layer (the token service
-       * is temporarily unavailable), so this is not a GitHub failure and
-       * not a connection problem on the user's side. The caller should
-       * render its own unavailable state with a retry CTA instead of the
-       * generic server-error copy.
+       * The read failed with BAD_GATEWAY: the review read path returned a
+       * retryable gateway failure — the authorization layer in front of
+       * GitHub is temporarily unavailable, GitHub itself answered 5xx, or
+       * the provider read layer reported a retryable transport failure.
+       * The caller should render its own unavailable state with a retry
+       * CTA instead of the generic server-error copy.
        */
       kind: 'service-unavailable';
     };

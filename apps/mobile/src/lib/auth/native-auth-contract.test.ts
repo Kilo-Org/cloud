@@ -190,9 +190,10 @@ describe('buildChallengeEntry', () => {
   });
 
   it('stores the email with the challenge id', () => {
-    expect(
-      buildChallengeEntry({ success: true, challengeId: 'c-1' }, 'a@b.co')
-    ).toEqual({ email: 'a@b.co', challengeId: 'c-1' });
+    expect(buildChallengeEntry({ success: true, challengeId: 'c-1' }, 'a@b.co')).toEqual({
+      email: 'a@b.co',
+      challengeId: 'c-1',
+    });
   });
 });
 

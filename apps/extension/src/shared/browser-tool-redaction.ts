@@ -190,23 +190,29 @@ const redactFormBody = (text: string): string | undefined => {
 };
 
 const MULTIPART_FIELD_NAME_PATTERN = /name="([^"]*)"/u;
-const MULTIPART_BOUNDARY_PREFIX = '--';
 
 const redactMultipartBody = (text: string): string | undefined => {
   const lines = text.split('\r\n');
+
+  // The first `--<token>` line defines the boundary; later lines match it,
+  // Optionally followed by the closing `--`, so values that merely begin with
+  // `--` are not mistaken for delimiters.
+  const boundaryToken = lines.find(line => /^--[^\r\n]*\r?$/u.test(line)) ?? '';
+  const isDelimiter = (line: string): boolean =>
+    boundaryToken !== '' && (line === boundaryToken || line.startsWith(`${boundaryToken}--`));
+
   let changed = false;
   let index = 0;
 
   while (index < lines.length) {
     const line = lines[index];
     const disposition = line === undefined ? null : line.match(MULTIPART_FIELD_NAME_PATTERN);
+    const isMatch =
+      disposition !== null && matchesAnyFragment(disposition[1] ?? '', REPLACED_BODY_KEY_FRAGMENTS);
 
-    if (
-      disposition !== null &&
-      matchesAnyFragment(disposition[1] ?? '', REPLACED_BODY_KEY_FRAGMENTS)
-    ) {
+    if (isMatch) {
       // Skip the part's header lines to the blank separator, then replace the
-      // Value line; stop before the next delimiter line.
+      // Whole value region up to the next delimiter line, keeping the delimiter.
       let valueIndex = index + 1;
 
       while (valueIndex < lines.length && lines[valueIndex] !== '') {
@@ -214,17 +220,26 @@ const redactMultipartBody = (text: string): string | undefined => {
       }
       valueIndex += 1;
 
-      const value = lines[valueIndex];
+      let endIndex = valueIndex;
 
-      if (value !== undefined && value !== '' && !value.startsWith(MULTIPART_BOUNDARY_PREFIX)) {
-        lines[valueIndex] = BODY_MASK;
-        changed = true;
+      while (
+        endIndex < lines.length &&
+        lines[endIndex] !== '' &&
+        !isDelimiter(lines[endIndex] ?? '')
+      ) {
+        endIndex += 1;
       }
 
-      index = valueIndex;
+      if (endIndex > valueIndex) {
+        lines.splice(valueIndex, endIndex - valueIndex, BODY_MASK);
+        index = valueIndex;
+        changed = true;
+      } else {
+        index = valueIndex;
+      }
+    } else {
+      index += 1;
     }
-
-    index += 1;
   }
 
   return changed ? lines.join('\r\n') : undefined;

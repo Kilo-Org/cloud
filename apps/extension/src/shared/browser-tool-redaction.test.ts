@@ -180,6 +180,51 @@ describe('body redaction', () => {
     expect(redactSensitiveBody(body)).toBeUndefined();
   });
 
+  it('replaces a multi-line multipart value region up to the delimiter', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="password"',
+      '',
+      'hunter2',
+      'more-of-the-value',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="password"',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
+  it('replaces multipart values that begin with the delimiter prefix', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="password"',
+      '',
+      '--hunter2',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="password"',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
   it('returns undefined for free-text bodies', () => {
     expect(redactSensitiveBody('plain text body')).toBeUndefined();
   });

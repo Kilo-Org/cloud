@@ -65,7 +65,6 @@ import {
   security_remediations,
   security_audit_log,
   auto_triage_tickets,
-  auto_fix_tickets,
   slack_bot_requests,
   bot_requests,
   cloud_agent_pending_uploads,
@@ -85,6 +84,7 @@ import {
   security_agent_repository_sync_state,
   kiloclaw_subscriptions,
   kiloclaw_admin_audit_logs,
+  admin_action_audit_logs,
   kiloclaw_cli_runs,
   user_push_tokens,
   user_activity_tokens,
@@ -130,6 +130,10 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
+  agent_briefing_reports,
+  agent_briefing_events,
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
@@ -969,6 +973,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - organization_user_limits/usage
  * - organization_audit_logs (actor PII nulled)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
+ * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
  * - model_eval_ingestions (promoter email anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
@@ -1492,7 +1497,6 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(security_remediations).where(eq(security_remediations.owned_by_user_id, userId));
   await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
-  await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
   await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
   await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
   await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
@@ -1563,6 +1567,14 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
+  await tx.delete(agent_briefing_reports).where(eq(agent_briefing_reports.kilo_user_id, userId));
+  await tx.delete(agent_briefing_events).where(eq(agent_briefing_events.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_context_preferences)
+    .where(eq(agent_briefing_context_preferences.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_preferences)
+    .where(eq(agent_briefing_preferences.kilo_user_id, userId));
   // Spend alerts are account-owned configuration, counters, and delivery
   // payloads; delivery recipients carry billing contact PII. Personal scope
   // keys use `user:<id>`, and deleting the settings row cascades to its rules
@@ -1726,6 +1738,21 @@ export async function anonymizeCloudUserData(
     .update(kiloclaw_admin_audit_logs)
     .set({ target_user_id: 'deleted-user' })
     .where(eq(kiloclaw_admin_audit_logs.target_user_id, userId));
+
+  await tx
+    .update(admin_action_audit_logs)
+    .set({ actor_email: null, actor_name: null })
+    .where(eq(admin_action_audit_logs.actor_id, userId));
+
+  await tx
+    .update(admin_action_audit_logs)
+    .set({ target_id: 'deleted-user' })
+    .where(
+      and(
+        eq(admin_action_audit_logs.target_type, 'user'),
+        eq(admin_action_audit_logs.target_id, userId)
+      )
+    );
 
   await tx
     .update(model_eval_ingestions)

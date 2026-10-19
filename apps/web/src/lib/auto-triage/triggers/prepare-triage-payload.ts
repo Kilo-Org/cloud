@@ -72,8 +72,6 @@ export async function prepareTriagePayload(
       issueBody: ticket.issue_body,
       duplicateThreshold:
         config.duplicate_threshold || AUTO_TRIAGE_CONSTANTS.DEFAULT_DUPLICATE_THRESHOLD,
-      autoFixThreshold:
-        config.auto_fix_threshold || AUTO_TRIAGE_CONSTANTS.DEFAULT_AUTO_PR_THRESHOLD,
       autoCreatePrThreshold:
         config.auto_create_pr_threshold || AUTO_TRIAGE_CONSTANTS.DEFAULT_AUTO_PR_THRESHOLD,
       customInstructions: config.custom_instructions || null,

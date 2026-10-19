@@ -29,8 +29,6 @@ import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
 import { autoTriageRouter } from '@/routers/auto-triage/auto-triage-router';
 import { personalAutoTriageRouter } from '@/routers/personal-auto-triage-router';
-import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
-import { personalAutoFixRouter } from '@/routers/personal-auto-fix-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
@@ -56,6 +54,7 @@ import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
+import { agentBriefingRouter } from '@/routers/agent-briefing-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -86,8 +85,6 @@ export const rootRouter = createTRPCRouter({
   securityAuditLog: securityAuditLogRouter,
   autoTriage: autoTriageRouter,
   personalAutoTriage: personalAutoTriageRouter,
-  autoFix: autoFixRouter,
-  personalAutoFix: personalAutoFixRouter,
   appReportedMessages: appReportedMessagesRouter,
   kiloPass: kiloPassRouter,
   credits: creditsRouter,
@@ -113,6 +110,7 @@ export const rootRouter = createTRPCRouter({
   moderation: moderationRouter,
   userExports: userExportsRouter,
   spendAlerts: spendAlertRouter,
+  agentBriefing: agentBriefingRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

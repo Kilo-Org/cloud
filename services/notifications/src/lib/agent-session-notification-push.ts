@@ -132,10 +132,13 @@ export function mapAgentDispatchOutcomeToResult(
       return { dispatched: true };
     case 'suppressed_presence':
     case 'suppressed_rate_limit':
+    case 'suppressed_preference':
     case 'no_tokens':
     case 'duplicate':
       return { dispatched: false, reason: outcome.kind };
     case 'failed':
+    case 'suppressed_expired':
+    case 'suppressed_access':
       return { dispatched: false, reason: 'failed' };
   }
 }

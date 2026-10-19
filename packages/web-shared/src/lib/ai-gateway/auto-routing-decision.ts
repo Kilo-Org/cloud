@@ -19,7 +19,6 @@ import {
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const EFFICIENT_DECISION_TIMEOUT_MS = 5_000;
-export const FRONTIER_ROUTING_FLAG = 'kilo-auto-frontier-routing';
 
 export type EfficientDecisionParams = {
   router?: AutoRouter;

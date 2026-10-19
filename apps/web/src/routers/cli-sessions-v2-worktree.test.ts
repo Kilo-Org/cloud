@@ -150,6 +150,7 @@ const ownershipRow = {
   pr_link_verified_at: null,
   status: null,
   status_updated_at: null,
+  status_transition_id: null,
   last_activity_at: null,
   total_cost_microdollars: null,
   live_summary: null,

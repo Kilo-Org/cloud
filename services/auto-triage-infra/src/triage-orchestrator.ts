@@ -411,16 +411,11 @@ export class TriageOrchestrator extends DurableObject<Env> {
     } else if (classification.classification === 'unclear') {
       await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
       await this.requestClarification(classification);
-    } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
+    } else {
       const labelsApplied = await this.buildAndApplyLabels(
-        ['kilo-triaged', 'kilo-auto-fix'],
+        ['kilo-triaged'],
         classification.selectedLabels
       );
-      if (!labelsApplied) {
-        console.error('[TriageOrchestrator] kilo-auto-fix label may not have been applied', {
-          ticketId: this.state.ticketId,
-        });
-      }
       await this.updateStatus('actioned', {
         classification: classification.classification,
         confidence: classification.confidence,
@@ -428,9 +423,6 @@ export class TriageOrchestrator extends DurableObject<Env> {
         relatedFiles: classification.relatedFiles,
         actionMetadata: labelsApplied ? undefined : { labelWarning: 'Failed to apply labels' },
       });
-    } else {
-      await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
-      await this.requestClarification(classification);
     }
   }
 

@@ -572,10 +572,14 @@ describe('container usage PostgreSQL application', () => {
 
   it('reports a zero balance in stop verdicts when a settlement overdraws an organization wallet', async () => {
     const startEpochMs = Date.now();
-    const overdrawContext = { ...context, instanceId: `overdraw-org-${suffix}`, sku: paidSkuId };
-    overdrawContext.subject = { type: 'org', id: organizationId };
-    overdrawContext.actor = { type: 'bot', id: `meter-bot-${suffix}` };
-    overdrawContext.onBehalfOf = { type: 'org', id: organizationId };
+    const overdrawContext = {
+      service: context.service,
+      instanceId: `overdraw-org-${suffix}`,
+      sku: paidSkuId,
+      subject: { type: 'org' as const, id: organizationId },
+      actor: { type: 'bot' as const, id: `meter-bot-${suffix}` },
+      onBehalfOf: { type: 'org' as const, id: organizationId },
+    };
     const overdrawFingerprint = await usageContextFingerprint(overdrawContext);
     const overdrawIntervalId = `cloud-agent-next:${overdrawContext.instanceId}:${startEpochMs}`;
     await client.db

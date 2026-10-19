@@ -220,7 +220,7 @@ describe('installBillingHeartbeat', () => {
         intervalId: 'instance-1:123',
         durable: 'pg',
         dedup: false,
-        budget: { verdict: 'continue', remaining: -5 },
+        budget: { verdict: 'stop', remainingMicrodollars: -5 },
       }));
       const client = new ContainerUsageClient(
         {

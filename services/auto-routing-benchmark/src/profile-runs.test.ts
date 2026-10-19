@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
 import type * as SchedulerModule from './scheduler';
@@ -895,6 +895,33 @@ describe('drainQueue', () => {
     expect(result!.entryCount).toBe(1);
     expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual(['platform/a']);
     expect(syncSubscriptionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('fails a model with an explicit empty capability list instead of scheduling it', async () => {
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue({
+      data: [{ id: 'platform/a' }, { id: 'platform/no-parameters', supported_parameters: [] }],
+    });
+    const requestedAt = '2026-06-01T00:00:00.000Z';
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/no-parameters', variant: '', requested_at: requestedAt },
+      { model: 'platform/a', variant: '', requested_at: requestedAt },
+    ]);
+
+    const result = await drainQueue(env, 'user');
+
+    expect(result!.entryCount).toBe(1);
+    expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual(['platform/a']);
+    const db = env.BENCH_DB as unknown as { prepare: Mock<() => { bind: Mock }> };
+    const statement = db.prepare.mock.results.at(-1)?.value;
+    expect(statement?.bind).toHaveBeenCalledWith(
+      expect.stringContaining('unavailable'),
+      expect.any(String),
+      'efficient',
+      'platform/no-parameters',
+      '',
+      expect.any(String),
+      expect.any(Number)
+    );
   });
 
   it('fails an unresolved alias without inserting a run or dispatching CLI work', async () => {

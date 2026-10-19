@@ -39,8 +39,7 @@ export const BenchmarkModelCatalogSchema = z.object({
 type CatalogModel = z.infer<typeof BenchmarkModelCatalogSchema>['data'][number];
 
 export function catalogModelSupportsTools(model: CatalogModel): boolean {
-  const parameters = model.supported_parameters;
-  return !parameters?.length || parameters.includes('tools');
+  return model.supported_parameters?.includes('tools') ?? true;
 }
 
 export function catalogSupportsBenchmarkPair(

@@ -228,7 +228,7 @@ describe('platform catalog expansion', () => {
       data: [
         { id: 'tools/model', supported_parameters: ['tools'] },
         { id: 'text/model', supported_parameters: ['temperature'] },
-        { id: 'unknown/model', supported_parameters: [] },
+        { id: 'no-parameters/model', supported_parameters: [] },
         { id: '~vendor/latest', alias_target: 'tools/model' },
         {
           id: 'reasoning/model',
@@ -240,8 +240,8 @@ describe('platform catalog expansion', () => {
       true
     );
     expect(
-      catalogSupportsBenchmarkPair(executable, { model: 'unknown/model', variant: null })
-    ).toBe(true);
+      catalogSupportsBenchmarkPair(executable, { model: 'no-parameters/model', variant: null })
+    ).toBe(false);
     expect(catalogSupportsBenchmarkPair(executable, { model: 'text/model', variant: null })).toBe(
       false
     );

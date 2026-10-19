@@ -30,7 +30,7 @@ function catalogFetch() {
         data: [
           { id: 'candidate/model', supported_parameters: ['tools', 'temperature'] },
           { id: 'text/model', supported_parameters: ['temperature'] },
-          { id: 'unknown/model', supported_parameters: [] },
+          { id: 'no-parameters/model', supported_parameters: [] },
           { id: 'legacy/model' },
         ],
       })
@@ -63,11 +63,7 @@ describe('executable benchmark catalog', () => {
         'X-KiloCode-OrganizationId': 'benchmark-org',
       },
     });
-    expect(catalog.data.map(model => model.id)).toEqual([
-      'candidate/model',
-      'unknown/model',
-      'legacy/model',
-    ]);
+    expect(catalog.data.map(model => model.id)).toEqual(['candidate/model', 'legacy/model']);
   });
 
   it('uses the effective default identity instead of treating null organization as personal scope', async () => {

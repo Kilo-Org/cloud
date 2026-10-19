@@ -62,7 +62,11 @@ const EVENT_ACTION_LABEL_KEYS: Record<string, string> = Object.freeze({
 });
 
 function eventLabel(action: string, serverLabel: string): string {
-  const key = EVENT_ACTION_LABEL_KEYS[action];
+  // Object.hasOwn: a bare index would return inherited members like
+  // `constructor` or `toString` instead of undefined for an unknown action.
+  const key = Object.hasOwn(EVENT_ACTION_LABEL_KEYS, action)
+    ? EVENT_ACTION_LABEL_KEYS[action]
+    : undefined;
   return key === undefined ? serverLabel : i18n.t(key);
 }
 

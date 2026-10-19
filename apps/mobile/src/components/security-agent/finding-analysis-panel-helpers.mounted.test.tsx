@@ -20,6 +20,11 @@ describe('formatConfidence', () => {
   it('falls back to the humanized code for an unknown value', () => {
     expect(formatConfidence('very_high')).toBe('very high');
   });
+
+  it('does not return inherited members for prototype names', () => {
+    expect(formatConfidence('constructor')).toBe('constructor');
+    expect(formatConfidence('toString')).toBe('toString');
+  });
 });
 
 describe('formatSuggestedAction', () => {
@@ -35,6 +40,11 @@ describe('formatSuggestedAction', () => {
 
   it('falls back to the humanized code for an unknown value', () => {
     expect(formatSuggestedAction('escalate_now')).toBe('escalate now');
+  });
+
+  it('does not return inherited members for prototype names', () => {
+    expect(formatSuggestedAction('constructor')).toBe('constructor');
+    expect(formatSuggestedAction('__proto__')).toBe('  proto  ');
   });
 
   it('re-reads the catalog after a language change', async () => {

@@ -26,12 +26,16 @@ function humanize(value: string): string {
 }
 
 export function formatConfidence(confidence: string): string {
-  const key = CONFIDENCE_LABEL_KEYS[confidence];
+  // Object.hasOwn: a bare index would return inherited members like
+  // `constructor` for an unknown code instead of falling through to humanize.
+  const key = Object.hasOwn(CONFIDENCE_LABEL_KEYS, confidence)
+    ? CONFIDENCE_LABEL_KEYS[confidence]
+    : undefined;
   return key === undefined ? humanize(confidence) : i18n.t(key);
 }
 
 export function formatSuggestedAction(action: string): string {
-  const key = ACTION_LABEL_KEYS[action];
+  const key = Object.hasOwn(ACTION_LABEL_KEYS, action) ? ACTION_LABEL_KEYS[action] : undefined;
   return key === undefined ? humanize(action) : i18n.t(key);
 }
 

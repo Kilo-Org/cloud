@@ -108,7 +108,9 @@ const organizationsListMock = vi.hoisted(() => ({
   current: {
     data: [{ organizationId: 'org-selected' }] as { organizationId: string }[] | undefined,
     isFetched: true,
+    isFetching: false,
     isError: false,
+    isRefetchError: false,
   },
 }));
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
@@ -447,15 +449,27 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
 });
 
 describe('ShareGateSheet new-session organization', () => {
+  function memberships(input: {
+    data: { organizationId: string }[] | undefined;
+    isFetched?: boolean;
+    isFetching?: boolean;
+    isError?: boolean;
+    isRefetchError?: boolean;
+  }) {
+    organizationsListMock.current = {
+      isFetched: true,
+      isFetching: false,
+      isError: false,
+      isRefetchError: false,
+      ...input,
+    };
+  }
+
   beforeEach(() => {
     routerBack.mockClear();
     shareDestinationListProps.current = null;
     organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
-    organizationsListMock.current = {
-      data: [{ organizationId: 'org-selected' }],
-      isFetched: true,
-      isError: false,
-    };
+    memberships({ data: [{ organizationId: 'org-selected' }] });
     sessionsMock.current = {
       ...sessionsMock.current,
       storedErrorCode: undefined,
@@ -500,11 +514,9 @@ describe('ShareGateSheet new-session organization', () => {
 
   it('commits into the account default when the selected organization denies access', async () => {
     organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
-    organizationsListMock.current = {
+    memberships({
       data: [{ organizationId: 'org-first' }, { organizationId: 'org-second' }],
-      isFetched: true,
-      isError: false,
-    };
+    });
     sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
     const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
 
@@ -516,7 +528,7 @@ describe('ShareGateSheet new-session organization', () => {
 
   it('commits personal when the account holds no other organization', async () => {
     organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
-    organizationsListMock.current = { data: [], isFetched: true, isError: false };
+    memberships({ data: [] });
     sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'FORBIDDEN' };
     const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
 
@@ -528,7 +540,7 @@ describe('ShareGateSheet new-session organization', () => {
 
   it('keeps the selection on a membership list miss without an access denial', async () => {
     organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
-    organizationsListMock.current = { data: [], isFetched: true, isError: false };
+    memberships({ data: [] });
     sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'INTERNAL_SERVER_ERROR' };
     const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
 
@@ -539,7 +551,29 @@ describe('ShareGateSheet new-session organization', () => {
 
   it('keeps the selection while the membership list is unsettled', async () => {
     organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
-    organizationsListMock.current = { data: undefined, isFetched: false, isError: false };
+    memberships({ data: undefined, isFetched: false });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
+  });
+
+  it('keeps the selection while the membership list is refetching', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: [{ organizationId: 'org-first' }], isFetching: true });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
+  });
+
+  it('keeps the selection after a failed background refresh of the list', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: [{ organizationId: 'org-first' }], isRefetchError: true });
     sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
     const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
 

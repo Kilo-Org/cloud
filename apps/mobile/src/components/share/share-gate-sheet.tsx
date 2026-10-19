@@ -68,7 +68,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const {
     data: memberships,
     isFetched: membershipsFetched,
+    isFetching: membershipsFetching,
     isError: membershipsFailed,
+    isRefetchError: membershipsRefetchFailed,
   } = useOrganizationsList();
   // Org-scoped stored page (cloud-agent + cli) narrowed to live sessions:
   // a session that is not live cannot receive the share, so it is never
@@ -275,8 +277,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     const selectedOrganizationId = resolveShareNewSessionOrganization({
       organizationId,
       membershipIds: memberships?.map(membership => membership.organizationId),
-      membershipsSettled: membershipsFetched,
-      membershipsFailed,
+      // An earlier success is not proof the list is current: a refetch in
+      // flight or a failed background refresh (cached data keeps `isError`
+      // false) is only the previous answer, so it cannot name a target.
+      membershipsSettled: membershipsFetched && !membershipsFetching,
+      membershipsFailed: membershipsFailed || membershipsRefetchFailed,
       // The selected organization's own org-scoped read is the only proof it is
       // unusable: the org list can be a stale, earlier-successful page.
       selectedOrganizationAccessDenied:
@@ -289,7 +294,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     isSpawning,
     memberships,
     membershipsFailed,
+    membershipsFetching,
     membershipsFetched,
+    membershipsRefetchFailed,
     organizationId,
     sessions.storedErrorCode,
     shareId,

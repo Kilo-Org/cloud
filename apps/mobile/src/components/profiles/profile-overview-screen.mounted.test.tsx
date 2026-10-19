@@ -38,6 +38,12 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+const permissionState = vi.hoisted(() => ({ canManage: true }));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => permissionState.canManage,
+}));
+
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
@@ -140,6 +146,31 @@ describe('ProfileOverviewScreen', () => {
     expect(findAll(scroll, 'Button')).toHaveLength(buttons.length);
 
     unmount();
+  });
+
+  it('renders a read-only overview for an organization profile without manage rights', async () => {
+    permissionState.canManage = false;
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    try {
+      const { renderer, unmount } = await mountScreen('org-1');
+
+      // No destructive delete action for a non-manager.
+      expect(findAll(renderer.root, 'Button')).toHaveLength(1);
+
+      // The metadata save button stays in the tree but disabled.
+      const save = findAll(renderer.root, 'Button')[0];
+      expect(save?.props.disabled).toBe(true);
+
+      // The default toggle is disabled.
+      const toggle = findAll(renderer.root, 'PreferenceRow')[0];
+      expect(toggle?.props.disabled).toBe(true);
+
+      unmount();
+    } finally {
+      permissionState.canManage = true;
+    }
   });
 
   it('error: renders QueryError and Retry refetches', async () => {

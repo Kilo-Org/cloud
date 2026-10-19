@@ -40,6 +40,7 @@ import {
   useAgentProfile,
   useAgentProfileMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getProfileAgentsPath,
@@ -82,6 +83,7 @@ type MetadataFormProps = Readonly<{
   profile: AgentProfileDetail;
   isSaving: boolean;
   onSave: (values: { name: string; description: string }) => void;
+  disabled?: boolean;
 }>;
 
 /**
@@ -90,7 +92,7 @@ type MetadataFormProps = Readonly<{
  * only when that metadata changed; the refs live here, so the remount resets
  * them alongside the inputs.
  */
-function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
+function ProfileMetadataForm({ profile, isSaving, onSave, disabled = false }: MetadataFormProps) {
   const { t } = useTranslation();
   const nameRef = useRef(profile.name);
   const descriptionRef = useRef(profile.description ?? '');
@@ -123,7 +125,7 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
         placeholder={t('profiles.namePlaceholder')}
         defaultValue={profile.name}
         error={nameError ?? undefined}
-        disabled={isSaving}
+        disabled={disabled || isSaving}
         required
         returnKeyType="next"
         onChangeText={value => {
@@ -141,7 +143,7 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
         multiline
         textAlignVertical="top"
         className="min-h-20 leading-5"
-        disabled={isSaving}
+        disabled={disabled || isSaving}
         onChangeText={value => {
           descriptionRef.current = value;
           if (descriptionError !== null && validateProfileDescription(value) === null) {
@@ -149,7 +151,7 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
           }
         }}
       />
-      <Button loading={isSaving} disabled={isSaving} onPress={submit}>
+      <Button loading={isSaving} disabled={disabled || isSaving} onPress={submit}>
         <Text>{t('common.save')}</Text>
       </Button>
     </View>
@@ -167,6 +169,7 @@ export function ProfileOverviewScreen({
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { update, deleteProfile, setAsDefault, clearDefault } =
     useAgentProfileMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
@@ -239,6 +242,7 @@ export function ProfileOverviewScreen({
               onSave={values => {
                 void saveMetadata(values);
               }}
+              disabled={!canManage}
             />
 
             <PreferenceRow
@@ -246,7 +250,7 @@ export function ProfileOverviewScreen({
               title={t('profiles.defaultSectionTitle')}
               subtitle={t(defaultDescriptionKey(isOrgOwned))}
               value={profile.isDefault}
-              disabled={defaultPending}
+              disabled={!canManage || defaultPending}
               busy={defaultPending}
               switchAccessibilityLabel={t(defaultControlLabel(profile.isDefault))}
               onValueChange={next => {
@@ -280,17 +284,19 @@ export function ProfileOverviewScreen({
               </View>
             </View>
 
-            <Button
-              variant="destructive"
-              loading={deleteProfile.isPending}
-              disabled={deleteProfile.isPending}
-              onPress={() => {
-                confirmDelete(profile.name);
-              }}
-            >
-              <Trash2 size={16} color={colors.destructiveForeground} />
-              <Text>{t('common.delete')}</Text>
-            </Button>
+            {!canManage ? null : (
+              <Button
+                variant="destructive"
+                loading={deleteProfile.isPending}
+                disabled={deleteProfile.isPending}
+                onPress={() => {
+                  confirmDelete(profile.name);
+                }}
+              >
+                <Trash2 size={16} color={colors.destructiveForeground} />
+                <Text>{t('common.delete')}</Text>
+              </Button>
+            )}
           </>
         ) : null}
       </TabScreenScrollView>

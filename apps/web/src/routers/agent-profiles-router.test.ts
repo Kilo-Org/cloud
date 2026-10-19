@@ -11,7 +11,7 @@ import {
   agent_environment_profile_repo_bindings,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { bindProfileToRepo } from '@kilocode/cloud-agent-profile';
+import { bindProfileToRepo, MASKED_SECRET_VALUE } from '@kilocode/cloud-agent-profile';
 import type { User, Organization } from '@kilocode/db/schema';
 
 describe('Agent Profiles Router', () => {
@@ -562,15 +562,17 @@ describe('Agent Profiles Router', () => {
         expect(dbProfile.owned_by_user_id).toBeNull();
       });
 
-      test('should allow org members to create profiles', async () => {
+      test('should require an organization manager role to create profiles', async () => {
         const caller = await createCallerForUser(memberUser.id);
 
-        const result = await caller.agentProfiles.create({
-          organizationId: organizationA.id,
-          name: 'Member Created Profile',
-        });
-
-        expect(result.id).toBeDefined();
+        await expect(
+          caller.agentProfiles.create({
+            organizationId: organizationA.id,
+            name: 'Member Created Profile',
+          })
+        ).rejects.toThrow(
+          'You do not have the required organizational role to access this feature'
+        );
       });
 
       test('should throw UNAUTHORIZED for non-members', async () => {
@@ -635,7 +637,7 @@ describe('Agent Profiles Router', () => {
     });
 
     describe('access control', () => {
-      test('should allow all org members to access org profiles', async () => {
+      test('should allow all org members to read org profiles', async () => {
         const ownerCaller = await createCallerForUser(ownerUser.id);
         const memberCaller = await createCallerForUser(memberUser.id);
 
@@ -651,6 +653,12 @@ describe('Agent Profiles Router', () => {
         });
 
         expect(result.name).toBe('Shared Org Profile');
+
+        // Member can list org profiles
+        const listed = await memberCaller.agentProfiles.list({
+          organizationId: organizationA.id,
+        });
+        expect(listed.some(profile => profile.id === profileId)).toBe(true);
       });
 
       test('should prevent non-members from accessing org profiles', async () => {
@@ -668,6 +676,210 @@ describe('Agent Profiles Router', () => {
             profileId,
           })
         ).rejects.toThrow('You do not have access to this organization');
+      });
+
+      describe('profile mutations are reserved for organization managers', () => {
+        async function createOrgProfile(): Promise<string> {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const { id } = await ownerCaller.agentProfiles.create({
+            organizationId: organizationA.id,
+            name: 'Managed Org Profile',
+          });
+          return id;
+        }
+
+        async function expectMemberRejected(attempt: Promise<unknown>): Promise<void> {
+          await expect(attempt).rejects.toThrow(
+            'You do not have the required organizational role to access this feature'
+          );
+        }
+
+        test('update: rejects a member and allows an admin', async () => {
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.update({
+              organizationId: organizationA.id,
+              profileId,
+              name: 'Renamed by member',
+            })
+          );
+        });
+
+        test('delete: rejects a member and allows an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId })
+          );
+
+          await ownerCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
+        });
+
+        test('setAsDefault and clearDefault: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setAsDefault({ organizationId: organizationA.id, profileId })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.clearDefault({
+              organizationId: organizationA.id,
+              profileId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.setAsDefault({
+            organizationId: organizationA.id,
+            profileId,
+          });
+          await ownerCaller.agentProfiles.clearDefault({
+            organizationId: organizationA.id,
+            profileId,
+          });
+        });
+
+        test('setVar and setCommands: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setVar({
+              organizationId: organizationA.id,
+              profileId,
+              key: 'MEMBER_VAR',
+              value: 'member-value',
+              isSecret: false,
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setCommands({
+              organizationId: organizationA.id,
+              profileId,
+              commands: ['echo member'],
+            })
+          );
+
+          await ownerCaller.agentProfiles.setVar({
+            organizationId: organizationA.id,
+            profileId,
+            key: 'ADMIN_VAR',
+            value: 'admin-value',
+            isSecret: false,
+          });
+          await ownerCaller.agentProfiles.setCommands({
+            organizationId: organizationA.id,
+            profileId,
+            commands: ['echo admin'],
+          });
+        });
+
+        test('MCP server create and update: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createMcp({
+              organizationId: organizationA.id,
+              profileId,
+              server: {
+                name: 'member-server',
+                type: 'remote',
+                enabled: true,
+                config: { type: 'remote', url: 'https://member.example.com/mcp' },
+              } as never,
+            })
+          );
+
+          const { id: mcpServerId } = await ownerCaller.agentProfiles.createMcp({
+            organizationId: organizationA.id,
+            profileId,
+            server: {
+              name: 'admin-server',
+              type: 'remote',
+              enabled: true,
+              config: { type: 'remote', url: 'https://admin.example.com/mcp' },
+            } as never,
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateMcp({
+              organizationId: organizationA.id,
+              profileId,
+              mcpServerId,
+              server: {
+                name: 'admin-server',
+                type: 'remote',
+                enabled: true,
+                config: { type: 'remote', url: 'https://member.example.com/mcp' },
+              } as never,
+            })
+          );
+        });
+
+        test('MCP masked header values survive an unchanged URL and are refused on a URL change', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const profileId = await createOrgProfile();
+
+          const { id: mcpServerId } = await ownerCaller.agentProfiles.createMcp({
+            organizationId: organizationA.id,
+            profileId,
+            server: {
+              name: 'secret-server',
+              type: 'remote',
+              enabled: true,
+              config: {
+                type: 'remote',
+                url: 'https://gateway.example.com/mcp',
+                headers: { Authorization: 'Bearer original-value' },
+              } as never,
+            },
+          });
+
+          // Same URL with the masked placeholder round-trips the stored value.
+          await ownerCaller.agentProfiles.updateMcp({
+            organizationId: organizationA.id,
+            profileId,
+            mcpServerId,
+            server: {
+              name: 'secret-server',
+              type: 'remote',
+              enabled: true,
+              config: {
+                type: 'remote',
+                url: 'https://gateway.example.com/mcp',
+                headers: { Authorization: MASKED_SECRET_VALUE },
+              } as never,
+            },
+          });
+
+          // A different URL with the masked placeholder is refused; the value
+          // must be submitted again for the new destination.
+          await expect(
+            ownerCaller.agentProfiles.updateMcp({
+              organizationId: organizationA.id,
+              profileId,
+              mcpServerId,
+              server: {
+                name: 'secret-server',
+                type: 'remote',
+                enabled: true,
+                config: {
+                  type: 'remote',
+                  url: 'https://other.example.com/mcp',
+                  headers: { Authorization: MASKED_SECRET_VALUE },
+                } as never,
+              },
+            })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        });
       });
     });
   });
@@ -754,25 +966,10 @@ describe('Agent Profiles Router', () => {
 
       await expect(
         memberCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
 
       await ownerCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
       expect(await orgBindings()).toHaveLength(0);
-      const profile = await db
-        .select()
-        .from(agent_environment_profiles)
-        .where(eq(agent_environment_profiles.id, profileId));
-      expect(profile).toHaveLength(0);
-    });
-
-    test('lets a member delete an unbound profile', async () => {
-      const memberCaller = await createCallerForUser(memberUser.id);
-      const { id: profileId } = await memberCaller.agentProfiles.create({
-        organizationId: organizationA.id,
-        name: 'Unbound Org Profile',
-      });
-
-      await memberCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
       const profile = await db
         .select()
         .from(agent_environment_profiles)
@@ -795,36 +992,38 @@ describe('Agent Profiles Router', () => {
       expect(await orgBindings()).toHaveLength(0);
     });
 
-    test('serializes a member delete behind a concurrent admin bind on the profile row lock', async () => {
-      const memberCaller = await createCallerForUser(memberUser.id);
+    test('serializes an admin delete behind a concurrent bind on the profile row lock', async () => {
+      const adminCaller = await createCallerForUser(ownerUser.id);
       const profileId = await createOrgProfile();
       const owner = { type: 'organization' as const, id: organizationA.id };
 
       let pendingDelete: Promise<unknown> | undefined;
       await db.transaction(async tx => {
-        // The admin bind holds the profile row lock for the whole transaction.
+        // The bind holds the profile row lock for the whole transaction.
         await bindProfileToRepo(tx, owner, 'acme/race', 'github', profileId);
-        // Start the member delete while the binding is still uncommitted; the
-        // row lock makes it wait instead of observing zero bindings.
-        pendingDelete = memberCaller.agentProfiles.delete({
+        // Start the delete while the binding is still uncommitted; the row
+        // lock makes it wait instead of observing zero bindings.
+        pendingDelete = adminCaller.agentProfiles.delete({
           organizationId: organizationA.id,
           profileId,
         });
+        // Real wall-clock pause, deliberate: the pending delete must observe
+        // the uncommitted binding, and fake timers do not control Postgres.
         await new Promise(resolve => setTimeout(resolve, 200));
       });
 
-      await expect(pendingDelete).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await pendingDelete;
 
       const bindings = await db
         .select()
         .from(agent_environment_profile_repo_bindings)
         .where(eq(agent_environment_profile_repo_bindings.profile_id, profileId));
-      expect(bindings).toHaveLength(1);
+      expect(bindings).toHaveLength(0);
       const profile = await db
         .select()
         .from(agent_environment_profiles)
         .where(eq(agent_environment_profiles.id, profileId));
-      expect(profile).toHaveLength(1);
+      expect(profile).toHaveLength(0);
     });
   });
 });

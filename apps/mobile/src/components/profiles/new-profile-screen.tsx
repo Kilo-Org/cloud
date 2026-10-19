@@ -17,6 +17,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useOrganization } from '@/lib/organization-context';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 
@@ -53,6 +54,7 @@ export function NewProfileScreen() {
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
   const { create } = useAgentProfileMutations();
+  const canManage = useCanManageOrganizationProfiles(organizationId ?? undefined);
   const nameRef = useRef('');
   const descriptionRef = useRef('');
   const [owner, setOwner] = useState<ProfileOwnerChoice>('personal');
@@ -138,7 +140,7 @@ export function NewProfileScreen() {
             <SegmentedControl
               // The create carries the organization only when Organization is
               // chosen; the options come from the active context.
-              options={ownerChoices(organizationId).map(choice => ({
+              options={ownerChoices(organizationId, canManage).map(choice => ({
                 value: choice,
                 label: t(OWNER_CHOICE_LABEL_KEYS[choice], {
                   defaultValue: t(OWNER_CHOICE_FALLBACK_KEYS[choice]),

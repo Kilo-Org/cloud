@@ -17,6 +17,12 @@ const mutationState = vi.hoisted(() => ({
   create: { mutateAsync: createMutate, isPending: false },
 }));
 
+const permissionState = vi.hoisted(() => ({ canManage: true }));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => permissionState.canManage,
+}));
+
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => mutationState,
 }));

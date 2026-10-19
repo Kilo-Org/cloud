@@ -18,6 +18,7 @@ import {
   useAgentProfile,
   useAgentProfileMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -28,9 +29,9 @@ type SkillTarget = { id: string; name: string; rawMarkdown: string };
 
 type SkillRowProps = Readonly<{
   skill: AgentProfileDetail['skills'][number];
-  onToggle: (enabled: boolean) => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onToggle?: (enabled: boolean) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /**
@@ -60,23 +61,32 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           {skillRowSubtitle(skill)}
         </Text>
       </View>
-      <Switch value={skill.enabled} accessibilityLabel={skill.name} onValueChange={onToggle} />
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.skillEditTitle')}
-        onPress={onEdit}
-      >
-        <Pencil size={18} color={colors.mutedForeground} />
-      </Pressable>
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('common.delete')}
-        onPress={onDelete}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
+      <Switch
+        value={skill.enabled}
+        accessibilityLabel={skill.name}
+        disabled={onToggle === undefined}
+        onValueChange={onToggle}
+      />
+      {onEdit !== undefined ? (
+        <Pressable
+          className="h-11 w-11 items-center justify-center active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.skillEditTitle')}
+          onPress={onEdit}
+        >
+          <Pencil size={18} color={colors.mutedForeground} />
+        </Pressable>
+      ) : null}
+      {onDelete !== undefined ? (
+        <Pressable
+          className="h-11 w-11 items-center justify-center active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.delete')}
+          onPress={onDelete}
+        >
+          <Trash2 size={18} color={colors.destructive} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -101,6 +111,7 @@ export function ProfileSkillsScreen({
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { createCustomSkill, updateSkill, deleteSkill, setSkillEnabled } =
     useAgentProfileMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const skills = profileQuery.data?.skills ?? NO_SKILLS;
   // `null` = closed, `{ skill: null }` = add, `{ skill }` = edit that skill.
@@ -175,9 +186,11 @@ export function ProfileSkillsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.addSkill')}</Text>
-          </Button>
+          canManage ? (
+            <Button onPress={startAdd}>
+              <Text>{t('profiles.addSkill')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -188,35 +201,49 @@ export function ProfileSkillsScreen({
           <SkillRow
             key={skill.id}
             skill={skill}
-            onToggle={enabled => {
-              setSkillEnabled.mutate(
-                { profileId, skillId: skill.id, enabled },
-                {
-                  onError: error => {
-                    if (!hasUsableMessage(error)) {
-                      toast.error(t('profiles.skillSaveFailed'));
-                    }
-                  },
-                }
-              );
-            }}
-            onEdit={() => {
-              setForm({
-                skill: { id: skill.id, name: skill.name, rawMarkdown: skill.rawMarkdown },
-              });
-            }}
-            onDelete={() => {
-              confirmDelete({
-                id: skill.id,
-                name: skill.name,
-                rawMarkdown: skill.rawMarkdown,
-              });
-            }}
+            onToggle={
+              canManage
+                ? enabled => {
+                    setSkillEnabled.mutate(
+                      { profileId, skillId: skill.id, enabled },
+                      {
+                        onError: error => {
+                          if (!hasUsableMessage(error)) {
+                            toast.error(t('profiles.skillSaveFailed'));
+                          }
+                        },
+                      }
+                    );
+                  }
+                : undefined
+            }
+            onEdit={
+              canManage
+                ? () => {
+                    setForm({
+                      skill: { id: skill.id, name: skill.name, rawMarkdown: skill.rawMarkdown },
+                    });
+                  }
+                : undefined
+            }
+            onDelete={
+              canManage
+                ? () => {
+                    confirmDelete({
+                      id: skill.id,
+                      name: skill.name,
+                      rawMarkdown: skill.rawMarkdown,
+                    });
+                  }
+                : undefined
+            }
           />
         ))}
-        <Button onPress={startAdd}>
-          <Text>{t('profiles.addSkill')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={startAdd}>
+            <Text>{t('profiles.addSkill')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }

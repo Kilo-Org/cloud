@@ -18,6 +18,7 @@ import { ProfileAgentsTab } from './ProfileAgentsTab';
 import { KiloCommandsTab } from './KiloCommandsTab';
 import { InstructionsTab } from './InstructionsTab';
 import { ImportConfigTab } from './ImportConfigTab';
+import { useCloudAgentSettingsCanManage } from '@/hooks/useCloudAgentSettings';
 
 type ProfileDetailPaneProps = {
   profileId: string;
@@ -43,6 +44,14 @@ export function ProfileDetailPane({
   mutations,
 }: ProfileDetailPaneProps) {
   const { data: profile, isLoading, error } = useProfile(profileId, { organizationId });
+  const { data: permissions } = useCloudAgentSettingsCanManage(
+    ownerType === 'organization' ? { organizationId } : {}
+  );
+  // A personal profile is always editable by its owner; for an organization
+  // profile the server rejects non-manager writes, so hide the controls too.
+  // Defaults to editable while the permission query loads, matching the
+  // repository-bindings dialog.
+  const readOnly = ownerType === 'organization' && permissions?.canManage === false;
 
   if (isLoading) {
     return (
@@ -72,6 +81,11 @@ export function ProfileDetailPane({
           </Button>
         )}
       </div>
+      {readOnly && (
+        <p className="text-muted-foreground shrink-0 border-b px-4 py-2 text-xs" role="note">
+          Only organization owners and admins can edit this profile.
+        </p>
+      )}
 
       {/* Tabs */}
       <div className="shrink-0 overflow-x-auto border-b px-2 py-1">
@@ -127,6 +141,7 @@ export function ProfileDetailPane({
             mutations={mutations}
             onDelete={onDelete}
             isDeleting={isDeleting}
+            readOnly={readOnly}
           />
         </TabsContent>
         <TabsContent value="vars" className="mt-0">
@@ -135,6 +150,7 @@ export function ProfileDetailPane({
             organizationId={organizationId}
             vars={profile.vars}
             mutations={mutations}
+            readOnly={readOnly}
           />
         </TabsContent>
         <TabsContent value="commands" className="mt-0">
@@ -143,6 +159,7 @@ export function ProfileDetailPane({
             organizationId={organizationId}
             commands={profile.commands}
             mutations={mutations}
+            readOnly={readOnly}
           />
         </TabsContent>
         <TabsContent value="mcps" className="mt-0">
@@ -150,6 +167,7 @@ export function ProfileDetailPane({
             profileId={profileId}
             organizationId={organizationId}
             mcpServers={profile.mcpServers}
+            readOnly={readOnly}
           />
         </TabsContent>
         <TabsContent value="skills" className="mt-0">
@@ -157,6 +175,7 @@ export function ProfileDetailPane({
             profileId={profileId}
             organizationId={organizationId}
             skills={profile.skills}
+            readOnly={readOnly}
           />
         </TabsContent>
         <TabsContent value="agents" className="mt-0">
@@ -164,6 +183,7 @@ export function ProfileDetailPane({
             profileId={profileId}
             organizationId={organizationId}
             agents={profile.agents}
+            readOnly={readOnly}
           />
         </TabsContent>
         <TabsContent value="kilo-commands" className="mt-0">
@@ -171,13 +191,19 @@ export function ProfileDetailPane({
             profileId={profileId}
             organizationId={organizationId}
             kiloCommands={profile.kiloCommands}
+            readOnly={readOnly}
           />
         </TabsContent>
         <TabsContent value="instructions" className="mt-0">
           <InstructionsTab instructions={profile.instructions} />
         </TabsContent>
         <TabsContent value="import" className="mt-0">
-          <ImportConfigTab key={profileId} profileId={profileId} organizationId={organizationId} />
+          <ImportConfigTab
+            key={profileId}
+            profileId={profileId}
+            organizationId={organizationId}
+            readOnly={readOnly}
+          />
         </TabsContent>
       </div>
     </Tabs>

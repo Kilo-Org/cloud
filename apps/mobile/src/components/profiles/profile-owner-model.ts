@@ -27,9 +27,12 @@ type OwnerBearing = { ownerType?: ProfileOwnerType };
  * (`ProfilesListDialog.tsx:431-459`).
  */
 export function ownerChoices(
-  organizationId: string | null | undefined
+  organizationId: string | null | undefined,
+  canCreateOrganizationProfiles = true
 ): readonly ProfileOwnerChoice[] {
-  return hasOrganizationContext(organizationId) ? ['personal', 'organization'] : ['personal'];
+  return hasOrganizationContext(organizationId) && canCreateOrganizationProfiles
+    ? ['personal', 'organization']
+    : ['personal'];
 }
 
 /** Whether an organization context is active, i.e. ownership is a choice. */

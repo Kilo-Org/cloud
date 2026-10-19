@@ -22,6 +22,7 @@ import { waitFor } from '@/test/render-with-providers';
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
+  canManage: true,
   query: {
     data: undefined as TestProfileDetail | undefined,
     isError: false,
@@ -33,6 +34,10 @@ const h = vi.hoisted(() => ({
     setVar: { mutateAsync: vi.fn(), isPending: false },
     deleteVar: { mutateAsync: vi.fn(), isPending: false },
   },
+}));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => h.canManage,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -84,6 +89,7 @@ function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['ren
 describe('ProfileVariablesScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.canManage = true;
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -293,22 +299,15 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('happy: a new variable marked secret says its value is encrypted', async () => {
-    h.query.data = testProfile();
+  it('read-only: a member of the owning organization sees rows without edit or delete', async () => {
+    h.canManage = false;
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
-
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
-    // Until it is marked secret, the value field keeps the plain placeholder.
-    expect(findField(renderer.root, 'Value').props.placeholder).toBe('Value');
-
-    act(() => {
-      (
-        findOne(renderer.root, 'Switch').props as { onValueChange: (value: boolean) => void }
-      ).onValueChange(true);
-    });
-    expect(findField(renderer.root, 'Value').props.placeholder).toBe('Secret value (encrypted)');
-
+    expect(findAll(renderer.root, 'EmptyState')).toHaveLength(0);
+    expect(
+      findAll(renderer.root, 'Pressable').some(node => node.props.accessibilityLabel === 'Delete')
+    ).toBe(false);
     unmount();
   });
 
@@ -316,7 +315,6 @@ describe('ProfileVariablesScreen', () => {
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     h.mutations.deleteVar.mutateAsync.mockResolvedValue({ success: true });
-
     const { renderer, unmount } = await mountScreen();
     pressPressable(renderer.root, 'Delete');
     await act(async () => {
@@ -358,7 +356,6 @@ describe('ProfileVariablesScreen', () => {
   it('keeps the rows while a refetch is in flight', async () => {
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
-
     const { renderer, queryClient, unmount } = await mountScreen();
 
     h.query.isRefetching = true;

@@ -66,8 +66,8 @@ type VariableRowViewProps = Readonly<{
   revealed?: boolean;
   isDeleting?: boolean;
   onToggleReveal?: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /**
@@ -92,6 +92,7 @@ export function VariableRowView({
         className="min-h-14 flex-1 flex-row items-center gap-2 py-2 active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={row.key}
+        disabled={onEdit === undefined}
         onPress={onEdit}
       >
         <Text className="flex-1 font-mono text-sm text-foreground" numberOfLines={1}>
@@ -129,16 +130,18 @@ export function VariableRowView({
           )}
         </Pressable>
       ) : null}
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('common.delete')}
-        disabled={isDeleting}
-        accessibilityState={{ disabled: isDeleting }}
-        onPress={onDelete}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
+      {onDelete !== undefined ? (
+        <Pressable
+          className="h-11 w-11 items-center justify-center active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.delete')}
+          disabled={isDeleting}
+          accessibilityState={{ disabled: isDeleting }}
+          onPress={onDelete}
+        >
+          <Trash2 size={18} color={colors.destructive} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

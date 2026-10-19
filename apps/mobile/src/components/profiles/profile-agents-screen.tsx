@@ -18,6 +18,7 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -34,8 +35,8 @@ type AgentRowViewProps = Readonly<{
   visibility: string;
   description: string;
   model: string;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /** One agent row: name, slug, visibility, optional model and description, edit/delete. */
@@ -76,22 +77,26 @@ function AgentRowView({
           </Text>
         ) : null}
       </View>
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.agents.edit')}
-        onPress={onEdit}
-      >
-        <Pencil size={18} color={colors.mutedForeground} />
-      </Pressable>
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('common.delete')}
-        onPress={onDelete}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
+      {onEdit !== undefined ? (
+        <Pressable
+          className="h-11 w-11 items-center justify-center active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.agents.edit')}
+          onPress={onEdit}
+        >
+          <Pencil size={18} color={colors.mutedForeground} />
+        </Pressable>
+      ) : null}
+      {onDelete !== undefined ? (
+        <Pressable
+          className="h-11 w-11 items-center justify-center active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.delete')}
+          onPress={onDelete}
+        >
+          <Trash2 size={18} color={colors.destructive} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -115,6 +120,7 @@ export function ProfileAgentsScreen({
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { createAgent, updateAgent, deleteAgent } = useAgentProfileSectionMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const agents = profileQuery.data?.agents ?? NO_AGENTS;
   const rows = agentRows(agents);
@@ -188,9 +194,11 @@ export function ProfileAgentsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.agents.add')}</Text>
-          </Button>
+          canManage ? (
+            <Button onPress={startAdd}>
+              <Text>{t('profiles.agents.add')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -210,18 +218,28 @@ export function ProfileAgentsScreen({
               visibility={row.visibility}
               description={row.description}
               model={row.model}
-              onEdit={() => {
-                setForm({ source });
-              }}
-              onDelete={() => {
-                confirmDelete(source);
-              }}
+              onEdit={
+                canManage
+                  ? () => {
+                      setForm({ source });
+                    }
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? () => {
+                      confirmDelete(source);
+                    }
+                  : undefined
+              }
             />
           );
         })}
-        <Button onPress={startAdd}>
-          <Text>{t('profiles.agents.add')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={startAdd}>
+            <Text>{t('profiles.agents.add')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }

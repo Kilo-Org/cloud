@@ -15,6 +15,7 @@ import {
   useCombinedProfileMutations,
   type ProfileSummaryWithOwner,
 } from '@/hooks/useCloudAgentProfiles';
+import { useCloudAgentSettingsCanManage } from '@/hooks/useCloudAgentSettings';
 import { ProfileDetailPane } from './ProfileDetailPane';
 
 type ProfilesManagerProps = {
@@ -53,6 +54,12 @@ export function ProfilesManager({
   const combinedMutations = useCombinedProfileMutations({ organizationId: organizationId ?? '' });
   const regularMutations = useProfileMutations({ organizationId: undefined });
   const mutations = organizationId ? combinedMutations : regularMutations;
+  const { data: permissions } = useCloudAgentSettingsCanManage(
+    organizationId ? { organizationId } : {}
+  );
+  // Defaults to allowed while the permission query loads, matching the
+  // repository-bindings dialog; the server stays authoritative.
+  const canManage = permissions?.canManage !== false;
 
   const [selectedId, setSelectedId] = useState<string | null>(
     openToNewProfile ? null : (initialSelectedProfileId ?? null)
@@ -217,6 +224,7 @@ export function ProfilesManager({
         {isCreating ? (
           <NewProfilePane
             organizationId={organizationId}
+            canCreateOrganizationProfiles={canManage}
             name={newProfileName}
             description={newProfileDescription}
             ownerType={newProfileOwnerType}
@@ -331,6 +339,7 @@ function ProfileListItem({
 
 type NewProfilePaneProps = {
   organizationId?: string;
+  canCreateOrganizationProfiles?: boolean;
   name: string;
   description: string;
   ownerType: 'personal' | 'organization';
@@ -344,6 +353,7 @@ type NewProfilePaneProps = {
 
 function NewProfilePane({
   organizationId,
+  canCreateOrganizationProfiles = true,
   name,
   description,
   ownerType,
@@ -365,7 +375,9 @@ function NewProfilePane({
             {(
               [
                 { value: 'personal', label: 'Personal', Icon: User },
-                { value: 'organization', label: 'Organization', Icon: Building },
+                ...(canCreateOrganizationProfiles
+                  ? [{ value: 'organization' as const, label: 'Organization', Icon: Building }]
+                  : []),
               ] as const
             ).map(({ value, label, Icon }) => (
               <button

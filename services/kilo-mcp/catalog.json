@@ -6848,43 +6848,6 @@
     ],
     "searchBlob": "cloudAgentNext.interruptSession Stop a running cloud agent session and cancel its active work. cloudagentnext interruptsession sessionid sessionId"
   },
-  "cloudAgentNext.linkPendingUploads": {
-    "path": "cloudAgentNext.linkPendingUploads",
-    "kind": "mutation",
-    "summary": "Mark uploaded files as attached so they are kept and sent with the message.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "objectKeys": {
-          "minItems": 1,
-          "maxItems": 5,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          }
-        }
-      },
-      "required": [
-        "messageUuid",
-        "objectKeys"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "linkpendinguploads",
-      "messageuuid",
-      "objectkeys"
-    ],
-    "searchBlob": "cloudAgentNext.linkPendingUploads Mark uploaded files as attached so they are kept and sent with the message. cloudagentnext linkpendinguploads messageuuid objectkeys messageUuid objectKeys"
-  },
   "cloudAgentNext.listGitHubRepositories": {
     "path": "cloudAgentNext.listGitHubRepositories",
     "kind": "query",
@@ -19383,51 +19346,6 @@
       "sessionid"
     ],
     "searchBlob": "organizations.cloudAgentNext.interruptSession Stop a running cloud agent session. Use to cancel the agent's current work. organizations cloudagentnext interruptsession organizationid sessionid organizationId sessionId"
-  },
-  "organizations.cloudAgentNext.linkPendingUploads": {
-    "path": "organizations.cloudAgentNext.linkPendingUploads",
-    "kind": "mutation",
-    "summary": "Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "objectKeys": {
-          "minItems": 1,
-          "maxItems": 5,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "messageUuid",
-        "objectKeys"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "linkpendinguploads",
-      "organizationid",
-      "messageuuid",
-      "objectkeys"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.linkPendingUploads Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files. organizations cloudagentnext linkpendinguploads organizationid messageuuid objectkeys organizationId messageUuid objectKeys"
   },
   "organizations.cloudAgentNext.listBitbucketRepositories": {
     "path": "organizations.cloudAgentNext.listBitbucketRepositories",

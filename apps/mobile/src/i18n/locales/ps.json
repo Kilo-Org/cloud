@@ -1905,7 +1905,6 @@
       "installApp": "د GitHub اپ نصب کړئ",
       "reauthorizeButton": "د GitHub اپ ته بیا اجازه ورکړئ",
       "reauthorizeDescription": "امنیتي اجنټ د Dependabot خبرتیاوو ته د لاسرسي لپاره د vulnerability_alerts اجازې ته اړتیا لري. د دې اجازې د ورکولو لپاره د GitHub اپ ته بیا اجازه ورکړئ.",
-      "reauthorizeFailed": "بیا اجازه ورکول پیل نه شول. مهرباني وکړئ بیا هڅه وکړئ.",
       "reauthorizeTitle": "نورو اجازو ته اړتیا ده",
       "setupFailed": "د GitHub ترتیب پیل نه شو. مهرباني وکړئ بیا هڅه وکړئ."
     },

@@ -1905,7 +1905,6 @@
       "installApp": "Sakinisha programu ya GitHub",
       "reauthorizeButton": "Idhinisha upya programu ya GitHub",
       "reauthorizeDescription": "Wakala wa usalama anahitaji ruhusa ya vulnerability_alerts ili kufikia arifa za Dependabot. Idhinisha upya programu ya GitHub ili kutoa ruhusa hii.",
-      "reauthorizeFailed": "Imeshindikana kuanza uidhinishaji upya. Tafadhali jaribu tena.",
       "reauthorizeTitle": "Ruhusa za ziada zinahitajika",
       "setupFailed": "Imeshindikana kuanza usanidi wa GitHub. Tafadhali jaribu tena."
     },

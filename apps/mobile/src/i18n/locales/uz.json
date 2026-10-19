@@ -1905,7 +1905,6 @@
       "installApp": "GitHub ilovasini o'rnatish",
       "reauthorizeButton": "GitHub ilovasiga qayta ruxsat berish",
       "reauthorizeDescription": "Xavfsizlik agentiga Dependabot ogohlantirishlarini olish uchun vulnerability_alerts ruxsati kerak. Bu ruxsatni berish uchun GitHub ilovasiga qayta ruxsat bering.",
-      "reauthorizeFailed": "Qayta ruxsat berishni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "reauthorizeTitle": "Qo'shimcha ruxsatlar talab qilinadi",
       "setupFailed": "GitHubni sozlashni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring."
     },

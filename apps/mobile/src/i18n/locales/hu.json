@@ -1905,7 +1905,6 @@
       "installApp": "GitHub-alkalmazás telepítése",
       "reauthorizeButton": "GitHub-alkalmazás újbóli engedélyezése",
       "reauthorizeDescription": "A biztonsági ügynöknek a vulnerability_alerts engedélyre van szüksége a Dependabot-riasztások eléréséhez. Az engedély megadásához engedélyezd újra a GitHub-alkalmazást.",
-      "reauthorizeFailed": "Nem sikerült elindítani az újbóli engedélyezést. Próbáld újra.",
       "reauthorizeTitle": "További engedélyek szükségesek",
       "setupFailed": "Nem sikerült elindítani a GitHub beállítását. Próbáld újra."
     },

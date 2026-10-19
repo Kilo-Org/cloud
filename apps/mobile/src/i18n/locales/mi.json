@@ -1905,7 +1905,6 @@
       "installApp": "Tāutahia te taupānga GitHub",
       "reauthorizeButton": "Whakamanahia anō te taupānga GitHub",
       "reauthorizeDescription": "Me whai te Kaiāwhina haumarutanga i te whakaaetanga vulnerability_alerts kia uru ki ngā matohi Dependabot. Whakamanahia anō te taupānga GitHub hei tuku i tēnei whakaaetanga.",
-      "reauthorizeFailed": "Kāore i taea te tīmata i te whakamana anō. Whakamātau anō.",
       "reauthorizeTitle": "E hiahiatia ana ētahi atu whakaaetanga",
       "setupFailed": "Kāore i taea te tīmata i te whakarite i GitHub. Whakamātau anō."
     },

@@ -1951,7 +1951,6 @@
       "installApp": "Nainstalovat aplikaci GitHub",
       "reauthorizeButton": "Znovu autorizovat aplikaci GitHub",
       "reauthorizeDescription": "Bezpečnostní agent potřebuje k přístupu k upozorněním Dependabot oprávnění vulnerability_alerts. Udělte ho opětovnou autorizací aplikace GitHub.",
-      "reauthorizeFailed": "Opětovnou autorizaci se nepodařilo zahájit. Zkuste to znovu.",
       "reauthorizeTitle": "Jsou vyžadována další oprávnění",
       "setupFailed": "Nastavení GitHubu se nepodařilo spustit. Zkuste to znovu."
     },

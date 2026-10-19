@@ -1905,7 +1905,6 @@
       "installApp": "Faka uhlelo lokusebenza lwe-GitHub",
       "reauthorizeButton": "Phinda unike uhlelo lokusebenza lwe-GitHub imvume",
       "reauthorizeDescription": "I-ejenti yezokuphepha idinga imvume ye-vulnerability_alerts ukuze ifinyelele izexwayiso ze-Dependabot. Phinda unike uhlelo lokusebenza lwe-GitHub imvume ukuze luyithole.",
-      "reauthorizeFailed": "Asikwazanga ukuqala ukunikeza imvume kabusha. Sicela uzame futhi.",
       "reauthorizeTitle": "Ezinye izimvume ziyadingeka",
       "setupFailed": "Asikwazanga ukuqala ukusetha i-GitHub. Sicela uzame futhi."
     },

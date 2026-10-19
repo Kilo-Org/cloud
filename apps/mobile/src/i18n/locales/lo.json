@@ -1905,7 +1905,6 @@
       "installApp": "ຕິດຕັ້ງແອັບ GitHub",
       "reauthorizeButton": "ໃຫ້ສິດແອັບ GitHub ອີກຄັ້ງ",
       "reauthorizeDescription": "ຕົວຊ່ວຍດ້ານຄວາມປອດໄພຕ້ອງໃຊ້ສິດ vulnerability_alerts ເພື່ອເຂົ້າເຖິງການແຈ້ງເຕືອນ Dependabot. ໃຫ້ສິດແອັບ GitHub ອີກຄັ້ງເພື່ອເພີ່ມສິດນີ້.",
-      "reauthorizeFailed": "ບໍ່ສາມາດເລີ່ມການໃຫ້ສິດອີກຄັ້ງໄດ້. ກະລຸນາລອງໃໝ່.",
       "reauthorizeTitle": "ຕ້ອງການສິດເພີ່ມເຕີມ",
       "setupFailed": "ບໍ່ສາມາດເລີ່ມການຕັ້ງຄ່າ GitHub. ກະລຸນາລອງໃໝ່."
     },

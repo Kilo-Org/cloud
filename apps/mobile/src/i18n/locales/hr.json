@@ -1928,7 +1928,6 @@
       "installApp": "Instaliraj aplikaciju GitHub",
       "reauthorizeButton": "Ponovno autoriziraj aplikaciju GitHub",
       "reauthorizeDescription": "Sigurnosni agent treba dopuštenje vulnerability_alerts za pristup upozorenjima iz Dependabota. Ponovno autoriziraj aplikaciju GitHub da joj dodijeliš to dopuštenje.",
-      "reauthorizeFailed": "Nije moguće pokrenuti ponovnu autorizaciju. Pokušaj ponovno.",
       "reauthorizeTitle": "Potrebna dodatna dopuštenja",
       "setupFailed": "Nije moguće pokrenuti postavljanje za GitHub. Pokušaj ponovno."
     },

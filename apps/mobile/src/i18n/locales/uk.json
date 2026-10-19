@@ -1363,7 +1363,6 @@
       "installApp": "Установити застосунок GitHub",
       "reauthorizeButton": "Повторно авторизувати застосунок GitHub",
       "reauthorizeDescription": "Агент безпеки потребує дозволу vulnerability_alerts для доступу до сповіщень Dependabot. Повторно авторизуйте застосунок GitHub, щоб надати цей дозвіл.",
-      "reauthorizeFailed": "Не вдалося розпочати повторну авторизацію. Спробуйте ще раз.",
       "reauthorizeTitle": "Потрібні додаткові дозволи",
       "setupFailed": "Не вдалося розпочати налаштування GitHub. Спробуйте ще раз."
     },

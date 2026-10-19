@@ -1905,7 +1905,6 @@
       "installApp": "Fi ohun èlò GitHub sí ẹ̀rọ",
       "reauthorizeButton": "Tún fún ohun èlò GitHub ní àṣẹ",
       "reauthorizeDescription": "Aṣojú ààbò nílò àṣẹ vulnerability_alerts láti wọlé sí àwọn ìkìlọ̀ Dependabot. Tún fún ohun èlò GitHub ní àṣẹ láti fi àṣẹ yìí kún un.",
-      "reauthorizeFailed": "A kò lè bẹ̀rẹ̀ fífúnni ní àṣẹ lẹ́ẹ̀kan sí i. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "reauthorizeTitle": "Àwọn àṣẹ sí i nílò",
       "setupFailed": "A kò lè bẹ̀rẹ̀ ìṣètò GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
     },

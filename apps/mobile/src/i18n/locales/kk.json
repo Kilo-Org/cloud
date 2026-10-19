@@ -1905,7 +1905,6 @@
       "installApp": "GitHub қолданбасын орнату",
       "reauthorizeButton": "GitHub қолданбасына қайта рұқсат беру",
       "reauthorizeDescription": "Қауіпсіздік агентіне Dependabot ескертулерін алу үшін vulnerability_alerts рұқсаты қажет. Бұл рұқсатты беру үшін GitHub қолданбасына қайта рұқсат беріңіз.",
-      "reauthorizeFailed": "Қайта рұқсат беруді бастау мүмкін болмады. Қайталап көріңіз.",
       "reauthorizeTitle": "Қосымша рұқсаттар қажет",
       "setupFailed": "GitHub-ты баптауды бастау мүмкін болмады. Қайталап көріңіз."
     },

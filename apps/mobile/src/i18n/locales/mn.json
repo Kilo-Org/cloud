@@ -1905,7 +1905,6 @@
       "installApp": "GitHub апп суулгах",
       "reauthorizeButton": "GitHub аппад дахин эрх олгох",
       "reauthorizeDescription": "Аюулгүй байдлын агент Dependabot мэдэгдэлд хандахын тулд vulnerability_alerts эрх шаарддаг. Энэ эрхийг олгохын тулд GitHub аппад дахин эрх олгоно уу.",
-      "reauthorizeFailed": "Дахин эрх олгох үйлдлийг эхлүүлж чадсангүй. Дахин оролдоно уу.",
       "reauthorizeTitle": "Нэмэлт эрх шаардлагатай",
       "setupFailed": "GitHub-ыг тохируулах үйлдлийг эхлүүлж чадсангүй. Дахин оролдоно уу."
     },

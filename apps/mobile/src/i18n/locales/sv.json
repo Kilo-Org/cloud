@@ -1905,7 +1905,6 @@
       "installApp": "Installera GitHub-appen",
       "reauthorizeButton": "Godkänn GitHub-appen på nytt",
       "reauthorizeDescription": "Säkerhetsagenten behöver behörigheten vulnerability_alerts för att komma åt Dependabot-varningar. Godkänn GitHub-appen på nytt för att ge den behörigheten.",
-      "reauthorizeFailed": "Kunde inte starta ett nytt godkännande. Försök igen.",
       "reauthorizeTitle": "Ytterligare behörigheter krävs",
       "setupFailed": "Kunde inte starta GitHub-konfigurationen. Försök igen."
     },

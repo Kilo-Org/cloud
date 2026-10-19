@@ -1905,7 +1905,6 @@
       "installApp": "Instalo aplikacionin GitHub",
       "reauthorizeButton": "Riautorizo aplikacionin GitHub",
       "reauthorizeDescription": "Agjenti i sigurisë kërkon lejen vulnerability_alerts për të pasur qasje në njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
-      "reauthorizeFailed": "Nuk u nis riautorizimi. Provo përsëri.",
       "reauthorizeTitle": "Kërkohen leje shtesë",
       "setupFailed": "Nuk u nis konfigurimi i GitHub. Provo përsëri."
     },

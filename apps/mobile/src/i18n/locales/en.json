@@ -1905,7 +1905,6 @@
       "installApp": "Install GitHub App",
       "reauthorizeButton": "Re-authorize GitHub App",
       "reauthorizeDescription": "Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
-      "reauthorizeFailed": "Could not start re-authorization. Please try again.",
       "reauthorizeTitle": "Additional permissions required",
       "setupFailed": "Could not start GitHub setup. Please try again."
     },

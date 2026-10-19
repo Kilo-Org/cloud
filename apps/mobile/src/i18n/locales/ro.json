@@ -1928,7 +1928,6 @@
       "installApp": "Instalează aplicația GitHub",
       "reauthorizeButton": "Autorizează din nou aplicația GitHub",
       "reauthorizeDescription": "Agentul de securitate are nevoie de permisiunea vulnerability_alerts pentru a accesa alertele Dependabot. Autorizează din nou aplicația GitHub pentru a acorda această permisiune.",
-      "reauthorizeFailed": "Nu s-a putut începe reautorizarea. Încearcă din nou.",
       "reauthorizeTitle": "Sunt necesare permisiuni suplimentare",
       "setupFailed": "Nu s-a putut începe configurarea GitHub. Încearcă din nou."
     },

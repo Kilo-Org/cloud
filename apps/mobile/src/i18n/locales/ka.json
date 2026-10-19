@@ -1905,7 +1905,6 @@
       "installApp": "GitHub აპის დაყენება",
       "reauthorizeButton": "GitHub აპის ხელახალი ავტორიზაცია",
       "reauthorizeDescription": "უსაფრთხოების აგენტს Dependabot-ის გაფრთხილებებზე წვდომისთვის vulnerability_alerts ნებართვა სჭირდება. ამ ნებართვის მისანიჭებლად ხელახლა გაიარე GitHub აპის ავტორიზაცია.",
-      "reauthorizeFailed": "ხელახალი ავტორიზაციის დაწყება ვერ მოხერხდა. სცადე ხელახლა.",
       "reauthorizeTitle": "საჭიროა დამატებითი ნებართვები",
       "setupFailed": "GitHub-ის გამართვის დაწყება ვერ მოხერხდა. სცადე ხელახლა."
     },

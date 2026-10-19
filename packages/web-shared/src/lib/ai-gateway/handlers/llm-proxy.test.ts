@@ -2780,17 +2780,16 @@ describe('custom LLM requests', () => {
     expect(response.status).toBe(200);
   });
 
-  it('answers an anonymous caller of a private custom LLM with model not found', async () => {
+  it('asks an anonymous caller of a private custom LLM to sign in, as for any paid model', async () => {
     setAnonymousAuth();
     mockCustomLlm(customLlm('acme/private-model', false));
-    mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-unavailable' });
 
     const response = await handleLlmProxyRequest(
       makeRequest(makeBody('acme/private-model')) as never
     );
 
-    expect(response.status).toBe(404);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    expect(mockedGetProvider).not.toHaveBeenCalled();
   });
 
   it('returns model not found instead of falling back when the caller is not eligible', async () => {

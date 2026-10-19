@@ -1,6 +1,8 @@
 import 'server-only';
 import { type db } from '@kilocode/web-shared/lib/drizzle';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { canUseCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getModelUserByokProviders,
@@ -42,8 +44,19 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   modelId: string;
   organizationId?: string;
 }): Promise<BalanceCheckModelEligibility> {
-  const isFree = await isFreeModel(params.modelId);
-  if (isFree) {
+  // A custom LLM is free only to users who may call it; the model id is
+  // caller-supplied, so naming someone else's custom LLM must not skip the check.
+  const customLlm = await findCustomLlm(params.modelId);
+  if (customLlm) {
+    const isFree = await canUseCustomLlm(
+      customLlm.definition,
+      params.user.id,
+      params.organizationId
+    );
+    return { isFree, hasUserByokAvailable: false };
+  }
+
+  if (isFreeModelExcludingCustomLlms(params.modelId)) {
     return { isFree: true, hasUserByokAvailable: false };
   }
 

@@ -675,8 +675,13 @@ export async function handleLlmProxyRequest(
       return invalidTokenResponse();
     }
 
-    // No valid auth
-    if (!isFreeRequestedModel) {
+    // No valid auth. Anonymous callers can only use public custom LLMs, so a
+    // private custom LLM id must look like any paid id: that hides whether it exists.
+    if (
+      !(customLlm
+        ? isPublicCustomLlm(customLlm.definition)
+        : isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased))
+    ) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -868,7 +873,8 @@ export async function handleLlmProxyRequest(
     return chatGptReconnectResponse(providerResult.message);
   }
   if (providerResult.kind === 'custom-llm-unavailable') {
-    return modelDoesNotExistResponse();
+    // Same response as an unknown model id, so callers cannot probe for custom LLMs.
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   if (providerResult.kind === 'custom-llm-temporarily-unavailable') {
     return temporarilyUnavailableResponse();

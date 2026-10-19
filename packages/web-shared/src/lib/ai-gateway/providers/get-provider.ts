@@ -32,7 +32,7 @@ import {
   type DirectUpstreamAuth,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
-import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
+import { canUseCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -105,8 +105,8 @@ async function isEligibleForCustomLlm(
   organizationId: string | undefined
 ) {
   if (isPublicCustomLlm(customLlm.definition)) return true;
-  if (!organizationId || isAnonymousContext(user)) return false;
-  return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
+  if (isAnonymousContext(user)) return false;
+  return await canUseCustomLlm(customLlm.definition, user.id, organizationId);
 }
 
 function readCustomLlmCredentials(customLlm: CustomLlm): CustomLlmCredentials | null {

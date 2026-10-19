@@ -530,6 +530,24 @@ describe('adminCustomLlmRouter', () => {
       expect(result.public_id).toBe(exclusiveModelId);
     });
 
+    it('rejects an id that differs only in case from an existing custom LLM', async () => {
+      await db
+        .insert(custom_llm2)
+        .values({ public_id: 'kilo-internal/Legacy-Model', definition: validDefinition });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'kilo-internal/legacy-model',
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('differs only in case'),
+      });
+    });
+
     it('rejects copying to an OpenRouter model id', async () => {
       const caller = await createCallerForUser(admin.id);
       await caller.admin.customLlm.upsert({

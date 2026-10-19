@@ -7,7 +7,7 @@ import {
   CustomLlmPublicIdSchema,
   type EncryptedData,
 } from '@kilocode/db/schema-types';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -33,6 +33,21 @@ async function assertPublicIdIsClaimable(publicId: string) {
     });
   }
   const modelId = parsedPublicId.data;
+  // The custom LLM catalog matches ids case-insensitively, so a case variant of
+  // an existing id would make the two rows shadow each other.
+  const [caseVariant] = await db
+    .select({ public_id: custom_llm2.public_id })
+    .from(custom_llm2)
+    .where(
+      and(sql`lower(${custom_llm2.public_id}) = ${modelId}`, ne(custom_llm2.public_id, modelId))
+    )
+    .limit(1);
+  if (caseVariant) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `public_id "${modelId}" differs only in case from the existing custom LLM "${caseVariant.public_id}"`,
+    });
+  }
   const directByokProvider = DirectUserByokInferenceProviderIdSchema.options.find(providerId =>
     modelId.startsWith(`${providerId}/`)
   );

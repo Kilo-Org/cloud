@@ -6,6 +6,7 @@ import {
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -158,6 +159,7 @@ export async function deniedAutoRoutingModelIdsForMember(
   const policy = await resolveOrganizationMemberModelPolicy({
     organizationId: request.organizationId,
     kiloUserId: request.userId,
+    fromDb: readDb,
   });
   const candidateIds = [...new Set(request.modelIds.filter(id => !isVirtualAutoModelId(id)))];
   const [deniedByPolicy, deniedByPrivacy] = await Promise.all([

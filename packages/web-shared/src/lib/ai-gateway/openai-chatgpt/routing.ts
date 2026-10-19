@@ -1,8 +1,5 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import {
-  findKiloExclusiveModel,
-  isDisabledKiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import type {
   GatewayRequest,
@@ -124,14 +121,7 @@ export type OpenAiChatGptRoutingResult =
 
 function isOpenAiChatGptModel(requestedModel: string): boolean {
   const model = requestedModel.trim().toLowerCase();
-  // Disabling a Kilo-only alias must not turn it into a delegated OpenAI model;
-  // retired Kilo aliases are not upstream model IDs either.
-  return (
-    OPENAI_MODEL_PREFIX.test(model) &&
-    !isGptOssModel(model) &&
-    !findKiloExclusiveModel(model) &&
-    !isDisabledKiloExclusiveModel(model)
-  );
+  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model) && !findKiloExclusiveModel(model);
 }
 
 /**

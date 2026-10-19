@@ -1008,6 +1008,7 @@ export type AssociatedPullRequest = {
   title: string;
   headSha: string;
   updatedAt: string; // ISO
+  createdAt?: string;
   /**
    * `owner/name` of the PR's base repository, as reported by GitHub. Used to
    * verify that a session's stored link actually names this repository rather
@@ -1203,6 +1204,7 @@ export async function fetchPullRequestByNumber(params: {
       title: pr.title,
       headSha: pr.head.sha,
       updatedAt: pr.updated_at,
+      createdAt: pr.created_at,
       baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
       headRepoFullName: pr.head.repo?.full_name ?? '',
       headRef: pr.head.ref,

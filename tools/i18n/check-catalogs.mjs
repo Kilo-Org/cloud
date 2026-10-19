@@ -556,10 +556,7 @@ for (const catalog of CATALOGS) {
         continue;
       }
       const parts = pluralParts(key);
-      if (
-        parts &&
-        (englishFamilies.has(parts.base) || englishCountedBases.has(parts.base))
-      ) {
+      if (parts && (englishFamilies.has(parts.base) || englishCountedBases.has(parts.base))) {
         continue;
       }
       fail(`${label}: extra key "${key}" is not in en.json`);
@@ -594,7 +591,11 @@ for (const catalog of CATALOGS) {
         english.get(`${parts.base}_${parts.category}`) ??
         english.get(`${parts.base}_other`) ??
         english.get(parts.base);
-      const allowed = new Set(placeholders(englishRef ?? '').split(',').filter(Boolean));
+      const allowed = new Set(
+        placeholders(englishRef ?? '')
+          .split(',')
+          .filter(Boolean)
+      );
       for (const ph of placeholders(value).split(',').filter(Boolean)) {
         if (!allowed.has(ph)) {
           fail(`${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`);

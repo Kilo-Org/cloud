@@ -146,6 +146,14 @@ describe('a Hugging Face model detail', () => {
     expect(detail.quants.map(quant => quant.label)).toEqual(['Q8_0']);
   });
 
+  it('drops an auxiliary embedding file that carries a quantization suffix', () => {
+    const detail = readModelDetail(info(), [
+      file('Aux-27B-embedding-F16.gguf', 1_500_000_000, '1'),
+    ]);
+    expect(detail.quants).toEqual([]);
+    expect(detail.hasGgufFiles).toBe(true);
+  });
+
   it('drops a file far smaller than its quantization needs for the stated parameters', () => {
     const detail = readModelDetail(info({ gguf: { total: 27_000_000_000 } }), [
       file('Model-27B-Q4_0.gguf', 1_610_000_000, '1'),

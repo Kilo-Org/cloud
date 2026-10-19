@@ -16,7 +16,9 @@ const QUANT =
   /(?:^|[-_.])((?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|TQ\d_\d|MXFP4(?:_MOE)?|BF16|FP16|F16|F32))(?=[-_.]|$)/i;
 /** Auxiliary weights: not a quantization of the repository's model. */
 const AUXILIARY_FILE =
-  /(?:^|\/)(?:mtp-|dflash-|draft-|adapter-|imatrix-|lilicorr-)|\.imatrix\.|embeddings?\.gguf$/i;
+  /(?:^|\/)(?:mtp-|dflash-|draft-|adapter-|imatrix-|lilicorr-)|\.imatrix\.|embeddings?[-_.][^/]*\.gguf$|embeddings?\.gguf$/i;
+/** An embedding model quantization: "embedding" sits mid-name, before the model size. */
+const EMBEDDING_MODEL = /-embedding-\d/i;
 
 const count = z.number().nonnegative().default(0);
 const entries = z.array(z.unknown());
@@ -274,7 +276,10 @@ function projectorFor(label: string, projectors: readonly HfFile[]): HfFile | un
  */
 function quantFiles(files: readonly HfFile[], parameters: number | undefined): readonly HfFile[] {
   const models = files.filter(file => {
-    if (PROJECTOR_FILE.test(file.path) || AUXILIARY_FILE.test(file.path)) {
+    const auxiliary =
+      (PROJECTOR_FILE.test(file.path) || AUXILIARY_FILE.test(file.path)) &&
+      !EMBEDDING_MODEL.test(file.path);
+    if (auxiliary) {
       return false;
     }
     if (parameters === undefined) {

@@ -26,6 +26,15 @@ describe('prepareFailureMessage', () => {
     expect(prepareFailureMessage(errorWith(code, message), false)).toBe(message);
   });
 
+  it('keeps the fixed model-unavailable refusal even though it rides BAD_REQUEST', () => {
+    expect(
+      prepareFailureMessage(
+        errorWith('BAD_REQUEST', 'Selected model is not available for this cloud agent session'),
+        false
+      )
+    ).toBe('Selected model is not available for this cloud agent session');
+  });
+
   it.each([
     ['BAD_REQUEST', 'Runtime credential proxy configuration is unavailable'],
     ['INTERNAL_SERVER_ERROR', 'NEXTAUTH_SECRET is not configured on the worker'],

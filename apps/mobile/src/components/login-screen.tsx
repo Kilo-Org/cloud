@@ -146,9 +146,12 @@ export function LoginScreen() {
       surface: viewportFrame,
       viewport: viewportFrame,
       contentHeight,
+      // The overflow path anchors at the band's top; without the inset the
+      // first row would start under a notch or status bar overlay.
+      topInset: insets.top,
       roundToPixel: value => PixelRatio.roundToNearestPixel(value),
     });
-  }, [viewportFrame, contentHeight]);
+  }, [viewportFrame, contentHeight, insets.top]);
 
   // While the first measurement is pending keep the previous centered
   // geometry: the common portrait case never overflows, and the measured
@@ -288,7 +291,9 @@ export function LoginScreen() {
         ref={captureScroll}
         className="flex-1 bg-background"
         onLayout={measureViewport}
-        contentContainerClassName="flex-grow items-center gap-6 px-6 py-8"
+        // No `contentContainerClassName`: setting `contentContainerStyle`
+        // makes NativeWind drop the caller's class (see `tab-screen.tsx`), so
+        // the gutter padding and centering live on the measured wrapper.
         contentContainerStyle={measuredContentStyle ?? pendingContentStyle}
         keyboardShouldPersistTaps="handled"
       >
@@ -298,9 +303,10 @@ export function LoginScreen() {
             animation; status swaps are instant. */}
         {/* One measured wrapper around the whole stack (welcome block + auth
             branches): its height decides whether the form centers or
-            top-anchors. The stack keeps the container's `items-center` and the
-            `gap-6` rhythm the ScrollView's content container carried before. */}
-        <View className="w-full max-w-sm gap-6" onLayout={handleContentLayout}>
+            top-anchors. The wrapper carries the gutter padding, the centered
+            column, and the `gap-6` rhythm the content container carried
+            before. */}
+        <View className="mx-auto w-full max-w-sm gap-6 px-6" onLayout={handleContentLayout}>
           {shortBand ? null : (
             <View className="w-full items-center gap-2">
               <Image

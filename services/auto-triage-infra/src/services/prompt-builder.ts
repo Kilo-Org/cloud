@@ -18,7 +18,7 @@ type ClassificationConfig = {
 const MAX_ISSUE_TEXT_LENGTH = 4000;
 const MAX_CUSTOM_INSTRUCTIONS_LENGTH = 2000;
 
-const ENVELOPE_TAG_PATTERN = /<\s*(\/?)\s*(issue_title|issue_body|custom_instructions)\s*>/gi;
+const ENVELOPE_TAG_PATTERN = /<\s*\/?\s*(?:issue_title|issue_body|custom_instructions)\b[^>]*>/gi;
 const FENCED_CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
 const OVERRIDE_PHRASE_PATTERN =
   /(?:ignore|disregard|forget|override|bypass)\s+(?:all\s+)?(?:previous|above|prior)\s+(?:instructions?|rules?|guidelines?)/gi;
@@ -51,7 +51,13 @@ const conditionExternalText = (
     OVERRIDE_PHRASE_PATTERN,
     '[instruction override attempt removed]'
   );
-  return capByCodePoints(withoutOverrides.replace(ENVELOPE_TAG_PATTERN, '&lt;$1$2&gt;'), maxLength);
+  return capByCodePoints(
+    withoutOverrides.replace(
+      ENVELOPE_TAG_PATTERN,
+      match => `&lt;${match.slice(1, -1).trimEnd()}&gt;`
+    ),
+    maxLength
+  );
 };
 
 /**

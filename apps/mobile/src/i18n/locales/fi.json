@@ -661,7 +661,8 @@
       "description": "Yhdistä GitHub-tilisi, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
-      "bitbucketOrgOnlyDescription": "Valitse profiilissasi organisaatio, niin voit katselmoida sen Bitbucket-muutospyyntöjä."
+      "bitbucketOrgOnlyDescription": "Valitse profiilissasi organisaatio, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
+      "contextLine": "{{organization}}-organisaatiolle"
     },
     "screen": {
       "title": "#{{number}}",

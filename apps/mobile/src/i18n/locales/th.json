@@ -661,7 +661,8 @@
       "description": "เชื่อมต่อบัญชี GitHub ของคุณเพื่อรีวิว PR บนมือถือ",
       "gitlabDescription": "เชื่อมต่อบัญชี GitLab ของคุณเพื่อรีวิว merge request บนมือถือ",
       "bitbucketDescription": "เชื่อมต่อ Bitbucket กับองค์กรนี้เพื่อรีวิวพูลรีเควสต์บนมือถือ",
-      "bitbucketOrgOnlyDescription": "เลือกองค์กรในโปรไฟล์ของคุณเพื่อรีวิวพูลรีเควสต์ Bitbucket ขององค์กรนั้น"
+      "bitbucketOrgOnlyDescription": "เลือกองค์กรในโปรไฟล์ของคุณเพื่อรีวิวพูลรีเควสต์ Bitbucket ขององค์กรนั้น",
+      "contextLine": "สำหรับ {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

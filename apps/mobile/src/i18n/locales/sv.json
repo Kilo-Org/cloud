@@ -661,7 +661,8 @@
       "description": "Anslut ditt GitHub-konto för att granska PR:er i mobilen.",
       "gitlabDescription": "Anslut ditt GitLab-konto för att granska merge requests i mobilen.",
       "bitbucketDescription": "Anslut Bitbucket till den här organisationen för att granska PR:er i mobilen.",
-      "bitbucketOrgOnlyDescription": "Välj en organisation i din profil för att granska dess Bitbucket-PR:er."
+      "bitbucketOrgOnlyDescription": "Välj en organisation i din profil för att granska dess Bitbucket-PR:er.",
+      "contextLine": "För {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

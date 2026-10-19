@@ -661,7 +661,8 @@
       "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
-      "bitbucketOrgOnlyDescription": "اپنے پروفائل میں ایک تنظیم منتخب کریں تاکہ اس کی Bitbucket پل ریکویسٹس کا جائزہ لیا جا سکے۔"
+      "bitbucketOrgOnlyDescription": "اپنے پروفائل میں ایک تنظیم منتخب کریں تاکہ اس کی Bitbucket پل ریکویسٹس کا جائزہ لیا جا سکے۔",
+      "contextLine": "{{organization}} کے لیے"
     },
     "screen": {
       "title": "#{{number}}",

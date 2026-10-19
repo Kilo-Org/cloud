@@ -673,7 +673,8 @@
       "description": "Poveži svoj GitHub račun da pregledaš zahtjeve za spajanje na mobitelu.",
       "gitlabDescription": "Poveži svoj GitLab račun da pregledaš merge requeste na mobitelu.",
       "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom da pregledaš zahtjeve za spajanje na mobitelu.",
-      "bitbucketOrgOnlyDescription": "Odaberi organizaciju u svom profilu da pregledaš njene zahtjeve za spajanje na Bitbucketu."
+      "bitbucketOrgOnlyDescription": "Odaberi organizaciju u svom profilu da pregledaš njene zahtjeve za spajanje na Bitbucketu.",
+      "contextLine": "Za {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

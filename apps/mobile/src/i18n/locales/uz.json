@@ -661,7 +661,8 @@
       "description": "Mobil qurilmada PRlarni ko'rib chiqish uchun GitHub hisobingizni ulang.",
       "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
-      "bitbucketOrgOnlyDescription": "Profilida tashkilot tanlang va uning Bitbucket PRlarini ko‘rib chiqing."
+      "bitbucketOrgOnlyDescription": "Profilida tashkilot tanlang va uning Bitbucket PRlarini ko‘rib chiqing.",
+      "contextLine": "{{organization}} uchun"
     },
     "screen": {
       "title": "#{{number}}",

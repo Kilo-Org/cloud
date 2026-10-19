@@ -661,7 +661,8 @@
       "description": "برای بازبینی درخواست‌های ادغام در موبایل، حساب GitHub خود را متصل کنید.",
       "gitlabDescription": "حساب GitLab خود را وصل کنید تا درخواست‌های ادغام را در موبایل بازبینی کنید.",
       "bitbucketDescription": "Bitbucket را به این سازمان وصل کنید تا پول ریکوئست‌ها را در موبایل بازبینی کنید.",
-      "bitbucketOrgOnlyDescription": "یک سازمان در نمایه خود انتخاب کنید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید."
+      "bitbucketOrgOnlyDescription": "یک سازمان در نمایه خود انتخاب کنید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
+      "contextLine": "برای {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

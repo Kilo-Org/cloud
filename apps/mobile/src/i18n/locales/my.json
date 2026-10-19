@@ -661,7 +661,8 @@
       "description": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် သင့် GitHub အကောင့်ကို ချိတ်ဆက်ပါ။",
       "gitlabDescription": "ဖုန်းပေါ်တွင် merge request များကို သုံးသပ်ရန် သင့် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
       "bitbucketDescription": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် ဤအဖွဲ့ကို Bitbucket နှင့် ချိတ်ဆက်ပါ။",
-      "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် သင့်ပရိုဖိုင်တွင် အဖွဲ့တစ်ခုကို ရွေးချယ်ပါ။"
+      "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် သင့်ပရိုဖိုင်တွင် အဖွဲ့တစ်ခုကို ရွေးချယ်ပါ။",
+      "contextLine": "{{organization}} အတွက်"
     },
     "screen": {
       "title": "#{{number}}",

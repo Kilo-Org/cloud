@@ -2527,7 +2527,8 @@
       "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
       "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
-      "bitbucketOrgOnlyDescription": "בחרו ארגון בפרופיל שלכם כדי לסקור את בקשות המשיכה של Bitbucket שלו."
+      "bitbucketOrgOnlyDescription": "בחרו ארגון בפרופיל שלכם כדי לסקור את בקשות המשיכה של Bitbucket שלו.",
+      "contextLine": "עבור {{organization}}"
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",

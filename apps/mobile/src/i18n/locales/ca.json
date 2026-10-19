@@ -673,7 +673,8 @@
       "description": "Connecta el teu compte de GitHub per revisar sol·licituds d'integració al mòbil.",
       "gitlabDescription": "Connecta el teu compte de GitLab per revisar sol·licituds de fusió des del mòbil.",
       "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",
-      "bitbucketOrgOnlyDescription": "Selecciona una organització al teu perfil per revisar-ne les sol·licituds d'integració de Bitbucket."
+      "bitbucketOrgOnlyDescription": "Selecciona una organització al teu perfil per revisar-ne les sol·licituds d'integració de Bitbucket.",
+      "contextLine": "Per a {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

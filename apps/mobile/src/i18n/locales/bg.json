@@ -661,7 +661,8 @@
       "description": "Свържи акаунта си в GitHub, за да преглеждаш заявки за обединяване от телефона си.",
       "gitlabDescription": "Свържете акаунта си в GitLab, за да преглеждате merge заявки на мобилно устройство.",
       "bitbucketDescription": "Свържете Bitbucket с тази организация, за да преглеждате заявки за сливане на мобилно устройство.",
-      "bitbucketOrgOnlyDescription": "Изберете организация в профила си, за да преглеждате нейните Bitbucket заявки за сливане."
+      "bitbucketOrgOnlyDescription": "Изберете организация в профила си, за да преглеждате нейните Bitbucket заявки за сливане.",
+      "contextLine": "За {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

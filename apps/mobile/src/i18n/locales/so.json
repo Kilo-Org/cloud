@@ -661,7 +661,8 @@
       "description": "Ku xir akoonkaaga GitHub si aad taleefanka uga eegto codsiyada isku-darka.",
       "gitlabDescription": "Ku xir xisaabtaada GitLab si aad mobilka ugu eegto merge request-yada.",
       "bitbucketDescription": "Bitbucket ku xir hay'addan si aad mobilka ugu eegto PR-yada.",
-      "bitbucketOrgOnlyDescription": "Ka dooro hay'ad profile-kaaga si aad ugu eegto PR-yada Bitbucket ee hay'addaas."
+      "bitbucketOrgOnlyDescription": "Ka dooro hay'ad profile-kaaga si aad ugu eegto PR-yada Bitbucket ee hay'addaas.",
+      "contextLine": "{{organization}} u"
     },
     "screen": {
       "title": "#{{number}}",

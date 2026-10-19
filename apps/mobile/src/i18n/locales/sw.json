@@ -661,7 +661,8 @@
       "description": "Unganisha akaunti yako ya GitHub ili ukague maombi ya kuunganisha kwenye simu.",
       "gitlabDescription": "Unganisha akaunti yako ya GitLab ili kukagua maombi ya kuunganisha kwenye simu.",
       "bitbucketDescription": "Unganisha Bitbucket na shirika hili ili kukagua maombi ya kuunganisha kwenye simu.",
-      "bitbucketOrgOnlyDescription": "Chagua shirika kwenye wasifu wako ili kukagua maombi ya kuunganisha ya Bitbucket yake."
+      "bitbucketOrgOnlyDescription": "Chagua shirika kwenye wasifu wako ili kukagua maombi ya kuunganisha ya Bitbucket yake.",
+      "contextLine": "Kwa {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

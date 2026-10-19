@@ -2527,7 +2527,8 @@
       "description": "Connectez votre compte GitHub pour examiner des demandes de fusion sur mobile.",
       "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
       "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
-      "bitbucketOrgOnlyDescription": "Sélectionnez une organisation dans votre profil pour examiner ses PR Bitbucket sur mobile."
+      "bitbucketOrgOnlyDescription": "Sélectionnez une organisation dans votre profil pour examiner ses PR Bitbucket sur mobile.",
+      "contextLine": "Pour {{organization}}"
     },
     "connectionExpired": "La connexion à GitHub a expiré.",
     "couldNotLoadPullRequest": "Impossible de charger la demande de fusion.",

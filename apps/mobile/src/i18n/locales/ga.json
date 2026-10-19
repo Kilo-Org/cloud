@@ -697,7 +697,8 @@
       "description": "Nasc do chuntas GitHub chun iarratais tarraingthe a athbhreithniú ar do ghuthán.",
       "gitlabDescription": "Ceangail do chuntas GitLab chun iarratais chumaisc a athbhreithniú ar an ngléas soghluaiste.",
       "bitbucketDescription": "Ceangail Bitbucket leis an eagraíocht seo chun iarratais tharraingthe a athbhreithniú ar an ngléas soghluaiste.",
-      "bitbucketOrgOnlyDescription": "Roghnaigh eagraíocht i do phróifíl chun a hiarratais tharraingthe Bitbucket a athbhreithniú."
+      "bitbucketOrgOnlyDescription": "Roghnaigh eagraíocht i do phróifíl chun a hiarratais tharraingthe Bitbucket a athbhreithniú.",
+      "contextLine": "Do {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

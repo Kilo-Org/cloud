@@ -661,7 +661,8 @@
       "description": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા તમારું GitHub એકાઉન્ટ કનેક્ટ કરો.",
       "gitlabDescription": "મોબાઇલ પર મર્જ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારું GitLab ખાતું કનેક્ટ કરો.",
       "bitbucketDescription": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે આ સંસ્થાને Bitbucket સાથે કનેક્ટ કરો.",
-      "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારી પ્રોફાઇલમાં એક સંસ્થા પસંદ કરો."
+      "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારી પ્રોફાઇલમાં એક સંસ્થા પસંદ કરો.",
+      "contextLine": "{{organization}} માટે"
     },
     "screen": {
       "title": "#{{number}}",

@@ -661,7 +661,8 @@
       "description": "Gaaffiiwwan walitti makuu bilbilaan gamaaggamuuf herrega GitHub kee walqabsiisi.",
       "gitlabDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf herrega GitLab kee walqabsiisi.",
       "bitbucketDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf Bitbucket dhaabbata kana waliin walqabsiisi.",
-      "bitbucketOrgOnlyDescription": "Gaaffiiwwan walitti makuu Bitbucket isaa gamaaggamuuf profaayilii kee keessatti dhaabbata filadhu."
+      "bitbucketOrgOnlyDescription": "Gaaffiiwwan walitti makuu Bitbucket isaa gamaaggamuuf profaayilii kee keessatti dhaabbata filadhu.",
+      "contextLine": "{{organization}}iif"
     },
     "screen": {
       "title": "#{{number}}",

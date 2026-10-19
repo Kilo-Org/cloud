@@ -661,7 +661,8 @@
       "description": "Konekte kont GitHub ou a pou revize demann fizyon sou mobil.",
       "gitlabDescription": "Konekte kont GitLab ou pou w revize merge request sou mobil ou.",
       "bitbucketDescription": "Konekte Bitbucket ak òganizasyon sa a pou w revize demann fizyon sou mobil ou.",
-      "bitbucketOrgOnlyDescription": "Chwazi yon òganizasyon nan pwofil ou pou w revize demann fizyon Bitbucket li yo."
+      "bitbucketOrgOnlyDescription": "Chwazi yon òganizasyon nan pwofil ou pou w revize demann fizyon Bitbucket li yo.",
+      "contextLine": "Pou {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

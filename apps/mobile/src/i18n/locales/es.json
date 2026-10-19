@@ -2527,7 +2527,8 @@
       "description": "Conecta tu cuenta de GitHub para revisar PR en el móvil.",
       "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",
-      "bitbucketOrgOnlyDescription": "Selecciona una organización en tu perfil para revisar sus PR de Bitbucket."
+      "bitbucketOrgOnlyDescription": "Selecciona una organización en tu perfil para revisar sus PR de Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "connectionExpired": "La conexión con GitHub ha caducado.",
     "couldNotLoadPullRequest": "No se pudo cargar la PR.",

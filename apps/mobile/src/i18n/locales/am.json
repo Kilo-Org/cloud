@@ -661,7 +661,8 @@
       "description": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitHub መለያህን አገናኝ።",
       "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
-      "bitbucketOrgOnlyDescription": "የBitbucket የማዋሃድ ጥያቄዎቹን ለመገምገም በመገለጫዎ ውስጥ አንድ ድርጅት ይምረጡ።"
+      "bitbucketOrgOnlyDescription": "የBitbucket የማዋሃድ ጥያቄዎቹን ለመገምገም በመገለጫዎ ውስጥ አንድ ድርጅት ይምረጡ።",
+      "contextLine": "ለ{{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

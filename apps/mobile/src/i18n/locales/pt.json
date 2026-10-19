@@ -673,7 +673,8 @@
       "description": "Liga a tua conta do GitHub para rever PRs no telemóvel.",
       "gitlabDescription": "Liga a tua conta do GitLab para rever merge requests no telemóvel.",
       "bitbucketDescription": "Liga o Bitbucket a esta organização para rever PRs no telemóvel.",
-      "bitbucketOrgOnlyDescription": "Seleciona uma organização no teu perfil para rever os PRs dessa organização no Bitbucket."
+      "bitbucketOrgOnlyDescription": "Seleciona uma organização no teu perfil para rever os PRs dessa organização no Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

@@ -2502,7 +2502,8 @@
       "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
-      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
+      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。",
+      "contextLine": "{{organization}}用"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",

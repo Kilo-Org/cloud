@@ -697,7 +697,8 @@
       "description": "Ikkonnetta l-kont ta' GitHub tiegħek biex tirrevedi t-talbiet għall-għaqda fuq il-mowbajl.",
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
-      "bitbucketOrgOnlyDescription": "Agħżel organizzazzjoni fil-profil tiegħek biex tirrevedi l-PRs tagħha fuq Bitbucket."
+      "bitbucketOrgOnlyDescription": "Agħżel organizzazzjoni fil-profil tiegħek biex tirrevedi l-PRs tagħha fuq Bitbucket.",
+      "contextLine": "Għal {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

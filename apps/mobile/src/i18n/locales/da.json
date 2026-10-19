@@ -661,7 +661,8 @@
       "description": "Tilslut din GitHub-konto for at gennemgå pull requests på mobilen.",
       "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
-      "bitbucketOrgOnlyDescription": "Vælg en organisation i din profil for at gennemgå dens Bitbucket-pull requests."
+      "bitbucketOrgOnlyDescription": "Vælg en organisation i din profil for at gennemgå dens Bitbucket-pull requests.",
+      "contextLine": "Til {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

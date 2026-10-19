@@ -685,7 +685,8 @@
       "description": "Падключы свой уліковы запіс GitHub, каб правяраць запыты на зліццё з мабільнай прылады.",
       "gitlabDescription": "Падключыце ўліковы запіс GitLab, каб разглядаць merge-запыты з мабільнай прылады.",
       "bitbucketDescription": "Падключыце Bitbucket да гэтай арганізацыі, каб разглядаць запыты на зліццё з мабільнай прылады.",
-      "bitbucketOrgOnlyDescription": "Выберыце арганізацыю ў профілі, каб разглядаць яе запыты на зліццё Bitbucket."
+      "bitbucketOrgOnlyDescription": "Выберыце арганізацыю ў профілі, каб разглядаць яе запыты на зліццё Bitbucket.",
+      "contextLine": "Для {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

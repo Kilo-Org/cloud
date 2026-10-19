@@ -661,7 +661,8 @@
       "description": "Koppel jou GitHub-rekening om trekversoeke op jou foon te hersien.",
       "gitlabDescription": "Koppel jou GitLab-rekening om merge requests op jou foon te hersien.",
       "bitbucketDescription": "Koppel Bitbucket aan hierdie organisasie om trekversoeke op jou foon te hersien.",
-      "bitbucketOrgOnlyDescription": "Kies 'n organisasie in jou profiel om sy Bitbucket-trekversoeke te hersien."
+      "bitbucketOrgOnlyDescription": "Kies 'n organisasie in jou profiel om sy Bitbucket-trekversoeke te hersien.",
+      "contextLine": "Vir {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

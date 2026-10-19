@@ -6,7 +6,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
   convertFromKiloExclusiveModel,
-  getInferenceProvider,
+  getInferenceProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
   NormalizedOpenRouterResponse,
@@ -188,15 +188,10 @@ async function syncProviders(params: {
   injectExtraProviderModels(vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
+    .filter(kfm => !unavailableModelIds.has(kfm.public_id))
     .flatMap(kfm => {
-      if (unavailableModelIds.has(kfm.public_id)) return [];
-      const inferenceProvider = getInferenceProvider(kfm);
-      if (!inferenceProvider) return [];
-      return [{ kfm, inferenceProvider }];
-    })
-    .map(({ kfm, inferenceProvider }) => {
       const model = convertFromKiloExclusiveModel(kfm);
-      return {
+      return getInferenceProviders(kfm).map(inferenceProvider => ({
         model: {
           slug: normalizeModelId(model.id),
           name: model.name,
@@ -221,7 +216,7 @@ async function syncProviders(params: {
           },
         },
         provider: inferenceProvider,
-      };
+      }));
     });
 
   for (const extraModel of mappedExtraModels) {

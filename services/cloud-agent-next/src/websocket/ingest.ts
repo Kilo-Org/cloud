@@ -134,8 +134,8 @@ function sanitizeKilocodeEventData(data: unknown): unknown {
         ...properties,
         part: {
           ...part,
-          // The classify fallback covers unrecognized shapes so no raw
-          // provider error object survives the projection either way.
+          // The classify fallback keeps the field a bounded public message
+          // even when the shape is not recognized.
           error:
             projectSafeAssistantError(part.error) ?? classifyAssistantFailureMessage(part.error),
         },

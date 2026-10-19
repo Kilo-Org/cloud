@@ -11,12 +11,14 @@
  * keeps its fresh token instead of being overwritten by this run's older metadata
  * snapshot.
  *
- * The scrub pass (on by default with --execute; opt out with --no-scrub) deletes
- * `metadata.access_token` for every Slack integration that has a credential row,
- * preserving all other metadata keys. Rows without a credential row keep their
- * plaintext token and are reported, so the operation is safe to re-run after fixing
- * them. Run this only after the cutover that reads tokens from the credential store
- * is deployed.
+ * The scrub pass (on by default with --execute; opt out with --no-scrub) removes
+ * the token key from metadata for every eligible Slack integration, preserving all
+ * other metadata keys. A row is eligible only when its stored credential is
+ * current: the credential was written by this run's copy pass, or an existing
+ * credential decrypts to exactly the metadata token. Every other row keeps its
+ * metadata unchanged and is reported, so the operation is safe to re-run after
+ * the reported rows are resolved. Run this only after the cutover that reads
+ * tokens from the credential store is deployed.
  *
  * Requires SLACK_CREDENTIAL_KEYSET_JSON. Never prints token material.
  *
@@ -131,7 +133,7 @@ async function main(): Promise<void> {
 
     // Cheap pre-filter only: it avoids opening a transaction per already-migrated
     // integration. `createSlackCredentialIfAbsent` is what actually guarantees we never
-    // replace a row, since this snapshot can go stale before the write.
+    // replace a row, since the metadata can change between this read and the write.
     const existingRows = await db
       .select({ integrationId: slack_oauth_credentials.platform_integration_id })
       .from(slack_oauth_credentials)
@@ -255,8 +257,8 @@ async function main(): Promise<void> {
   console.log('\n--- Summary ---');
   console.log(`Eligible for backfill:       ${eligible}`);
   console.log(`Migrated:                    ${migrated}`);
-  console.log(`Scrubbed plaintext tokens:   ${scrubbed}`);
-  console.log(`Kept (no credential row):    ${skipped.scrub_no_credential}`);
+  console.log(`Token fields removed:        ${scrubbed}`);
+  console.log(`Kept (credential not current): ${skipped.scrub_no_credential}`);
   console.log(`Failed scrubs:               ${skipped.scrub_failed}`);
   console.log(`Skipped (already migrated):  ${skipped.already_migrated}`);
   console.log(`Skipped (no plaintext):      ${skipped.no_plaintext_token}`);

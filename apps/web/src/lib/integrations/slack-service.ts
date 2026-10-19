@@ -274,8 +274,8 @@ export async function upsertSlackInstallation({
 
   // Non-secret workspace identifiers only. The bot token lives solely in the
   // encrypted `slack_oauth_credentials` store; dropping `access_token` here also
-  // scrubs a stale copy from rows that predate the credential store (a reinstall
-  // refreshes the whole metadata object).
+  // removes any leftover copy from rows written before the credential store
+  // existed (a reinstall refreshes the whole metadata object).
   const existingMetadata =
     existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};
   const metadata = {

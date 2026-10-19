@@ -347,7 +347,7 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
-  it('preserves the selected model and scrubs any stale metadata token when refreshing an existing installation', async () => {
+  it('preserves the selected model when refreshing an existing installation', async () => {
     mockLimit.mockResolvedValue([
       buildSlackIntegration({
         metadata: {

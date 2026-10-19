@@ -18,8 +18,8 @@ import {
  * System of record for Slack bot credentials.
  *
  * Install writes go through here and all server read paths decrypt from here; the
- * legacy plaintext `platform_integrations.metadata.access_token` copy is no longer
- * written and is removed from existing rows by the backfill script
+ * legacy metadata copy on `platform_integrations` is no longer written and is
+ * removed from existing rows by the backfill script
  * (`src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts`).
  */
 

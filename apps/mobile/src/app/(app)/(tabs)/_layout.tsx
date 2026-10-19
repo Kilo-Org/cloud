@@ -13,7 +13,6 @@ import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
-import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -334,13 +333,7 @@ export default function TabsLayout() {
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: event => {
-              void Haptics.selectionAsync();
-              event.preventDefault();
-              router.navigate(PROFILE_TAB_ROOT);
-            },
-          }}
+          listeners={TAB_PRESS_HAPTICS}
         />
       </Tabs>
     </StateSurfaceInsets>

@@ -73,9 +73,14 @@ describe('finding detail back control wiring', () => {
 
 describe('profile tab anchor', () => {
   // The profile tab stack anchors its initial route to `index` so a cold
-  // push-open builds the stack with the profile root underneath, and a tab
-  // re-press returns to the profile root. Pin the anchor by reading the layout
-  // source; this fails if `initialRouteName: 'index'` is removed.
+  // push-open builds the stack with the profile root underneath. Tab re-press
+  // relies on react-navigation's own re-press-to-root behavior: the custom
+  // preventDefault+navigate listener raced concurrent navigation (an action
+  // sheet dismissal) and left the tab selection desynced from the scene
+  // (explorer finding, perfil-tab), so the tab press is back to the default.
+  // Pin the anchor AND the absence of the racing handler by reading the layout
+  // source; this fails if `initialRouteName: 'index'` is removed or the custom
+  // navigate returns.
   const layoutPath = fileURLToPath(
     new URL('../app/(app)/(tabs)/(3_profile)/_layout.tsx', import.meta.url)
   );
@@ -87,10 +92,11 @@ describe('profile tab anchor', () => {
     expect(layoutSource).toMatch(/initialRouteName:\s*'index'/);
   });
 
-  it('returns to the profile root when the profile tab is pressed', () => {
+  it('lets the default tab press own the profile tab', () => {
     const profileTab = tabsLayoutSource.split('name="(3_profile)"')[1];
 
-    expect(profileTab).toContain('event.preventDefault()');
-    expect(profileTab).toContain('router.navigate(PROFILE_TAB_ROOT)');
+    expect(profileTab).not.toContain('event.preventDefault()');
+    expect(profileTab).not.toContain('router.navigate');
+    expect(profileTab).toContain('listeners={TAB_PRESS_HAPTICS}');
   });
 });

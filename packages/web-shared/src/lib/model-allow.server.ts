@@ -1,5 +1,5 @@
 import 'server-only';
-import { getKiloExclusiveInferenceProviderRestriction } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getKiloExclusiveInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   KILO_AUTO_MODEL_PREFIX,
   normalizeModelId,
@@ -51,7 +51,7 @@ export function createAllowPredicateFromProviderAllowList(
       return false;
     }
     const providerSlugs =
-      getKiloExclusiveInferenceProviderRestriction(modelId) ?? (await providerLookup(modelId));
+      getKiloExclusiveInferenceProviders(modelId) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));

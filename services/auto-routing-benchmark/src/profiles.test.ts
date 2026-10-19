@@ -25,7 +25,7 @@ type PendingStmt =
   | {
       kind: 'profile';
       values: ProfileRow;
-      onConflict: 'update_if_failed' | 'do_nothing' | 'replace';
+      onConflict: 'update_if_failed' | 'do_nothing';
     };
 
 const store = vi.hoisted(() => {
@@ -128,6 +128,7 @@ vi.mock('drizzle-orm/d1', () => {
       status: row.status as ProfileRow['status'],
       run_id: (row.run_id as string | null) ?? null,
       failure_reason: (row.failure_reason as string | null) ?? null,
+      invalidated_at: (row.invalidated_at as string | null) ?? null,
       requested_at: String(row.requested_at),
       updated_at: String(row.updated_at),
       completed_at: (row.completed_at as string | null) ?? null,
@@ -210,16 +211,11 @@ vi.mock('drizzle-orm/d1', () => {
             }
             const profileValues = profileValuesFromRow(row);
             return {
-              onConflictDoUpdate(config?: { where?: { type?: string; value?: string } }) {
-                // Register path: WHERE status = 'failed'
-                const whereFailed =
-                  !!config?.where &&
-                  (config.where as { type?: string; value?: string }).type === 'eq' &&
-                  (config.where as { value?: string }).value === 'failed';
+              onConflictDoUpdate() {
                 const stmt: PendingStmt = {
                   kind: 'profile',
                   values: profileValues,
-                  onConflict: whereFailed ? 'update_if_failed' : 'replace',
+                  onConflict: 'update_if_failed',
                 };
                 return wrapStmt(stmt);
               },
@@ -394,6 +390,7 @@ function profileRow(
     repetitions: REPS,
     run_id: null,
     failure_reason: null,
+    invalidated_at: null,
     requested_at: '2026-07-27T00:00:00.000Z',
     updated_at: '2026-07-27T00:00:00.000Z',
     completed_at: null,

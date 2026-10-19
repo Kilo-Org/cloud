@@ -74,11 +74,14 @@ async function processMessage(
     if (err instanceof StagingParseError) {
       // Items that parsed before the malformed tail may still be buffered in
       // the chunker; flush them so the catch-up below observes their changes.
-      // The flush is best-effort: a flush failure must not skip the catch-up,
-      // which then still runs with whatever was collected before the failure.
+      // The flush splices the buffered items out before its DO RPC, so a failed
+      // flush leaves those items only in the staging object: keep it and retry
+      // the message so the buffered prefix is replayed, instead of removing it.
+      let flushed = true;
       try {
         await chunker.flushChunkToSessionDO();
       } catch (flushError) {
+        flushed = false;
         console.error('Failed to flush buffered items after an incomplete parse', {
           r2Key: msg.r2Key,
           sessionId: msg.sessionId,
@@ -94,6 +97,9 @@ async function processMessage(
         mergedAttentionSignals,
         ctx
       );
+      if (!flushed) {
+        throw err;
+      }
       console.error('Removing staging object after an incomplete parse', {
         r2Key: msg.r2Key,
         sessionId: msg.sessionId,

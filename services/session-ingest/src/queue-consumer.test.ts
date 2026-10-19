@@ -814,6 +814,64 @@ describe('queue', () => {
     expect(deleteObject).toHaveBeenCalledWith('staging/malformed');
   });
 
+  it('keeps staging and retries when the buffered flush fails after an incomplete parse', async () => {
+    const items = [{ type: 'message', data: { id: 'msg_1' } }];
+    const ingest = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('do rpc failed'))
+      .mockResolvedValueOnce({ changes: [] });
+    mockIngestWithR2(ingest);
+
+    const transaction = vi.fn(async () => null);
+    const limit = vi.fn(async () => [{ session_id: 'ses_malformed' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
+
+    const body = `{"data":[${items.map(item => JSON.stringify(item)).join(',')},broken`;
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/malformed',
+              kiloUserId: 'usr_malformed',
+              sessionId: 'ses_malformed',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    // The buffered flush failed, so the staging object is kept for replay and
+    // the message retries; the collected metadata catch-up still ran.
+    expect(ingest).toHaveBeenCalledTimes(1);
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it('flushes already-committed metadata changes when a later chunk fails', async () => {
     // First chunk (128 items) commits and reports a metadata change; the second
     // chunk's ingest fails. The committed change must reach Postgres before the

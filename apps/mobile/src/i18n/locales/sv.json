@@ -20,7 +20,7 @@
     "openInBrowser": "Öppna i webbläsaren",
     "openSettings": "Öppna inställningar",
     "copiedToClipboard": "Kopierat till urklipp",
-    "couldNotCopyToClipboard": "Kunde inte kopiera till urklipp.",
+    "couldNotCopyToClipboard": "Kunde inte kopiera till urklipp",
     "required": "obligatorisk",
     "error": "fel: {{error}}",
     "back": "Tillbaka",
@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Inte ansluten",
     "notifications": "Aviseringar",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Kodarkiv",
     "securityAgent": "Säkerhetsagent",
     "unknown": "Okänd",
@@ -97,7 +97,7 @@
     "file": "Fil",
     "gitlab": "GitLab",
     "goBack": "Gå tillbaka",
-    "idle": "Väntar",
+    "idle": "Vilande",
     "scheduled": "Schemalagd",
     "keepEditing": "Fortsätt redigera",
     "keepRunning": "Fortsätt köra",
@@ -105,7 +105,7 @@
     "newSession": "Ny session",
     "noKiloclawInstances": "Inga KiloClaw-instanser",
     "noModelsAvailable": "Inga modeller tillgängliga",
-    "notFound": "Innehållet hittades inte.",
+    "notFound": "Hittades inte",
     "online": "Uppkopplad",
     "open": "Öppna {{name}}",
     "openPullRequest": "Öppna PR",
@@ -130,14 +130,14 @@
     "sendMessage": "Skicka meddelande",
     "sessionExited": "Sessionen har avslutats.",
     "starting": "Startar…",
-    "status": "Läge",
+    "status": "Status",
     "truncated": "Avkortat",
     "updated": "Uppdaterad",
     "generating": "Genererar…",
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
     "dismissed": "Avskriven",
-    "agent": "Ombud",
+    "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Ändringar"
@@ -185,7 +185,7 @@
     "passkeyCancelled": "Inloggning med passnyckel avbröts. Försök igen.",
     "passkeyNotFound": "Ingen passnyckel är sparad för den här enheten. Logga in med Apple, Google eller din e-post i stället.",
     "passkeyUnsupported": "Passnycklar är inte tillgängliga på den här enheten. Logga in med Apple, Google eller din e-post i stället.",
-    "passkeyFailed": "Det gick inte att logga in med en passnyckel. Försök igen.",
+    "passkeyFailed": "Det gick inte att logga in med en passnyckel. Logga in med Apple, Google eller din e-post i stället.",
     "couldNotCompleteSignIn": "Kunde inte slutföra inloggningen. Försök igen.",
     "sessionEnded": "Din session avslutades. Logga in igen.",
     "signInCodeExpired": "Din inloggningskod har upphört att gälla. Försök igen.",
@@ -274,14 +274,14 @@
     "appearanceLight": "Ljust",
     "appearanceDark": "Mörkt",
     "account": "Konto",
-    "accountSubtitle": "Språk, betrodda webbplatser och enhetssessioner",
+    "accountSubtitle": "Språk, betrodda värdar och enhetssessioner",
     "prReviewAttribution": "Ange appen i PR-granskningar",
     "prReviewAttributionSubtitle": "Lägg till en sidfot som anger att granskningen gjordes via Kilo när du skickar den.",
     "returnSendsMessage": "Returtangenten skickar meddelanden",
     "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält.",
     "biometricUnlock": "Lås upp med biometri",
     "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden.",
-    "gatewayTranscription": "Transkribering via Kilo Gateway",
+    "gatewayTranscription": "Gateway-transkribering",
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Komprimera verktygsanrop",
@@ -2685,7 +2685,7 @@
       "loadWithHost": "Läs in från {{host}}",
       "httpsOnly": "Endast bilder via HTTPS kan läsas in.",
       "trustTitle": "Läs in bild från {{host}}?",
-      "trustMessage": "Om du betror {{host}} läses dess bilder in utan att fråga varje gång. Du kan återkalla det senare under Betrodda webbplatser.",
+      "trustMessage": "Om du litar på {{host}} läses dess bilder in utan att fråga varje gång. Du kan återkalla det senare under Betrodda värdar.",
       "loadOnce": "Läs in en gång"
     },
     "markdownLink": {
@@ -2693,7 +2693,7 @@
       "hostConfirmTitle": "Öppna extern länk?",
       "hostConfirmMessage": "Den här länken öppnar {{host}} i din webbläsare.",
       "open": "Öppna",
-      "trustThisHost": "Lita på den här webbplatsen"
+      "trustThisHost": "Lita på den här värden"
     },
     "folderPicker": {
       "accessibility": "Mapp: {{label}}",
@@ -2773,12 +2773,12 @@
     "scroll": "Rullning"
   },
   "offline": {
-    "noInternet": "Du saknar internetanslutning.",
+    "noInternet": "Ingen internetanslutning",
     "internetRestored": "Internetanslutningen återställd"
   },
   "queryError": {
     "neutralDescription": "Försök igen.",
-    "offlineTitle": "Kunde inte läsa in innehållet.",
+    "offlineTitle": "Kunde inte läsa in",
     "permissionDescription": "Du har inte behörighet att se det här.",
     "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
     "serverTitle": "Kunde inte läsa in innehållet.",
@@ -2813,7 +2813,7 @@
     "busy": "Röstinmatningen är upptagen. Försök igen.",
     "stopped": "Röstinmatningen stoppades. Tryck på mikrofonen för att försöka igen.",
     "unavailableDevice": "Röstinmatning är inte tillgänglig på den här enheten.",
-    "unavailableLanguage": "Röstinmatning stöds inte för det språk som är valt på enheten.",
+    "unavailableLanguage": "Röstinmatning stöds inte för det språk som är valt på den enheten. Installera språkets inbyggda talfiler eller använd ett annat app-språk.",
     "languageNotInstalledTitle": "Röstinmatning för {{language}} är inte klar ännu",
     "languageNotInstalledMessage": "De offlinebaserade talfilerna för {{language}} är inte installerade på den här telefonen. Ladda ned dem och prova röstinmatning igen.",
     "downloadOfflineModel": "Ladda ned",
@@ -2847,15 +2847,15 @@
     "cliCantReceiveFilesMessage": "Kilo CLI som kör den här sessionen kan inte ta emot filer. Uppdatera CLI-verktyget på den datorn eller dela till en ny session i stället.",
     "contentlessMessage": "Det finns inget att dela. Varken text eller filer följde med.",
     "couldNotReadContent": "Kunde inte läsa det delade innehållet.",
-    "onlyFirstFilesAttached_one": "Endast de första {{displayCount}} fil bifogas.",
+    "onlyFirstFilesAttached_one": "Endast den första {{displayCount}} filen bifogas.",
     "onlyFirstFilesAttached_other": "Endast de första {{displayCount}} filerna bifogas."
   },
   "kiloPass": {
     "title": "Kilo Pass",
-    "unavailable": "Kilo Pass är inte tillgängligt.",
+    "unavailable": "Det gick inte att läsa in Kilo Pass.",
     "couldNotLoad": "Kilo Pass kunde inte läsas in. Försök igen.",
     "retryLoading": "Försök läsa in Kilo Pass igen",
-    "productsUnavailable": "Produkterna i App Store är inte tillgängliga.",
+    "productsUnavailable": "Produkterna i App Store är inte tillgängliga",
     "completingPurchase": "Slutför köpet…",
     "subscriptionLoading": "Läser in Kilo Pass-prenumerationen",
     "retryHint": "Försöker läsa in Kilo Pass-status igen.",
@@ -2871,7 +2871,7 @@
     "legalTermsOfUse": "Användarvillkor (EULA)",
     "purchaseDifferentAccount": "Det här App Store-köpet är inte kopplat till ditt Kilo-konto. Logga in på det Apple-konto som användes för köpet och försök sedan igen.",
     "purchaseFailed": "Det gick inte att slutföra köpet.",
-    "couldNotConnectToAppStore": "Kunde inte ansluta till App Store. Kontrollera anslutningen och försök igen.",
+    "couldNotConnectToAppStore": "Det gick inte att ansluta till App Store. Kontrollera din anslutning och försök igen.",
     "purchaseMissingSignedTransaction": "App Store-köpet saknade en signerad transaktion i JWS-format.",
     "couldNotConnectToPlay": "Det gick inte att ansluta till Google Play. Kontrollera din anslutning och försök igen.",
     "productsUnavailablePlay": "Google Play-produkter är inte tillgängliga",
@@ -2974,8 +2974,8 @@
     "boundary": {
       "backToProfile": "Tillbaka till profilen",
       "loadErrorMessage": "Kontrollera anslutningen och försök igen.",
-      "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
-      "organizationUnavailable": "Organisationen är inte tillgänglig.",
+      "loadErrorTitle": "Det gick inte att läsa in dina organisationer",
+      "organizationUnavailable": "Organisationen är inte tillgänglig",
       "selectDescription": "Välj en organisation i din profil för att fortsätta.",
       "selectOrganization": "Välj en organisation",
       "unavailableDescription": "Den här organisationen är inte längre tillgänglig. Välj en annan i din profil för att fortsätta.",
@@ -2983,9 +2983,9 @@
     },
     "creditActivity": {
       "emptyDescription": "Här visas organisationens köp, användning och kreditjusteringar efter hand.",
-      "emptyTitle": "Inga kredittransaktioner",
+      "emptyTitle": "Ingen kreditaktivitet",
       "expires": "Går ut {{date}}",
-      "title": "Kredithistorik",
+      "title": "Kreditaktivitet",
       "transactionFallback": "Kredittransaktion",
       "category": {
         "organization_custom": "Organisationsanpassad",
@@ -2997,13 +2997,13 @@
         "accounting_adjustment": "Redovisningsjustering",
         "credits_expired": "Utgångna krediter"
       },
-      "truncated": "Det finns äldre kredittransaktioner att visa."
+      "truncated": "Det finns äldre kreditaktivitet att visa."
     },
     "inviteMember": {
-      "emailError": "Ange en giltig e-postadress.",
+      "emailError": "Ange en giltig e-postadress",
       "emailPlaceholder": "namn@foretag.se",
       "permissionDenied": "Du har inte behörighet att bjuda in medlemmar.",
-      "roleMember": "Du bjuder in personen som medlem.",
+      "roleMember": "Roll: Medlem",
       "sendInvite": "Skicka inbjudan",
       "title": "Bjud in medlem"
     },
@@ -3017,7 +3017,7 @@
       "sharingUnavailable": "Delning är inte tillgänglig på den här enheten.",
       "status": {
         "paid": "Betald",
-        "open": "Öppna",
+        "open": "Öppen",
         "void": "Makulerad",
         "uncollectible": "Oindrivbar"
       },
@@ -3100,7 +3100,7 @@
       "processingBlocked": "Bearbetningen blockerad",
       "processingNeedsReview": "Bearbetningen kräver granskning",
       "retryHint": "Försöker läsa in Kilo Pass-status igen.",
-      "setupHint": "Öppnar inställningarna för Kilo Pass i webbläsaren."
+      "setupHint": "Öppnar konfigureringen av Kilo Pass i webbläsaren."
     }
   },
   "authErrors": {
@@ -3131,11 +3131,11 @@
   },
   "models": {
     "auto": {
-      "frontier": "Automatisk Avancerad",
-      "balanced": "Automatisk Balanserad",
-      "efficient": "Automatisk Effektiv",
-      "small": "Automatisk Liten",
-      "free": "Automatisk Gratis",
+      "frontier": "Auto Avancerad",
+      "balanced": "Auto Balanserad",
+      "efficient": "Auto Effektiv",
+      "small": "Auto Liten",
+      "free": "Auto Gratis",
       "organization": "Organisations-Auto"
     },
     "dataCollected": "Data samlas in",
@@ -3152,16 +3152,16 @@
     }
   },
   "trustedHosts": {
-    "title": "Betrodda webbplatser",
-    "subtitle": "Webbplatser som öppnas utan att du behöver bekräfta",
-    "emptyTitle": "Inga betrodda webbplatser",
-    "emptyDescription": "Om du anger att du litar på en webbplats öppnas länkar dit utan att du behöver bekräfta igen.",
-    "imagesSectionTitle": "Betrodda bildwebbplatser",
-    "imagesSectionDescription": "Bilder från dessa webbplatser läses in utan att fråga igen.",
-    "imagesSectionEmpty": "Inga betrodda bildwebbplatser",
+    "title": "Betrodda värdar",
+    "subtitle": "Värdar som öppnas utan att du behöver bekräfta",
+    "emptyTitle": "Inga betrodda värdar",
+    "emptyDescription": "Om du anger att du litar på en värd öppnas länkar dit utan att du behöver bekräfta igen.",
+    "imagesSectionTitle": "Betrodda bildvärdar",
+    "imagesSectionDescription": "Bilder från dessa värdar läses in utan att fråga igen.",
+    "imagesSectionEmpty": "Inga betrodda bildvärdar",
     "revoke": "Sluta lita på {{host}}",
-    "revokeMessage": "Länkar till den här webbplatsen kommer att be om bekräftelse igen.",
-    "revokeImageMessage": "Bilder från den här webbplatsen kommer att be om bekräftelse igen.",
+    "revokeMessage": "Länkar till den här värden kommer att be om bekräftelse igen.",
+    "revokeImageMessage": "Bilder från den här värden kommer att be om bekräftelse igen.",
     "backToPreferences": "Tillbaka till inställningarna"
   },
   "glanceable": {
@@ -3209,7 +3209,7 @@
       "provider": "Stoppad: leverantörsfel",
       "tool": "Stoppad: verktygsfel",
       "cancelled": "Stoppad: avbruten",
-      "other": "STOPPAD"
+      "other": "Stoppad"
     }
   },
   "transcriptionModel": {
@@ -3291,7 +3291,7 @@
       "sheetTitle": "Chattverktyg",
       "addServerTitle": "Lägg till en MCP-server",
       "editServerTitle": "Redigera denna MCP-server",
-      "fieldName": "Visat namn",
+      "fieldName": "Visningsnamn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Ange en giltig server-URL.",
       "enableServer": "Aktivera denna server: {{name}}",
@@ -3302,7 +3302,7 @@
       "retryServerA11y": "Försök igen med denna server: {{name}}",
       "deleteTitle": "Ta bort denna server?",
       "deleteMessage": "Dess verktyg lämnar varje chatt.",
-      "kiloBuiltIn": "Inbyggd. Slå på eller av den för denna chatt; den kan inte redigeras eller tas bort.",
+      "kiloBuiltIn": "Inbyggd. Slå på eller av den för den här chatten; den kan inte redigeras eller tas bort.",
       "serversEmptyTitle": "Inga fjärrservrar ännu",
       "serversEmptyDescription": "Lägg till en för att erbjuda dess verktyg i dina chattar.",
       "settingsToolsTitle": "Låt Kilo ändra appinställningar",
@@ -3390,7 +3390,7 @@
     },
     "gguf": {
       "title": "Nedladdningsbara modeller",
-      "help": "Ladda ner en öppen modell och kör den på den här telefonen med llama.cpp. Dina frågor och svar stannar på enheten. Modellerna är stora, så använd Wi-Fi.",
+      "help": "Ladda ner en öppen modell och kör den på den här telefonen med llama.cpp. Dina prompter och svar stannar på enheten. Modellerna är stora, så använd Wi-Fi.",
       "download": "Ladda ner modell",
       "pause": "Pausa nedladdningen",
       "resume": "Återuppta nedladdningen",
@@ -3436,7 +3436,7 @@
         "unknown": "Passning okänd"
       },
       "recommendationsHelp": "En kortlista som appen fäster: en fil per modell, från en utgivare som anger en licens. Inget annat rangordnas.",
-      "compatibilityHelp": "Passning jämför modellfilen med den här enhetens minne och lediga lagringsutrymme. Minnesvärdet är en uppskattning, inte en mätning.",
+      "compatibilityHelp": "Passning jämför modellfilen med den här enhetens minne och ledigt lagringsutrymme. Minnesvärdet är en uppskattning, inte en mätning.",
       "text": "Text",
       "listTextPurpose": "Endast textprompter.",
       "listImagePurpose": "Läser bilder liksom text.",
@@ -3470,7 +3470,7 @@
       "help": "Modeller på enheten körs på den här telefonen. Dina frågor och svar stannar på enheten.",
       "systemPurpose": "Modellen som är inbyggd i enhetens system. Den körs på enheten.",
       "apple": "Apple Intelligence (på enheten)",
-      "checking": "Kontrollerar tillgänglighet …",
+      "checking": "Kontrollerar tillgänglighet…",
       "ready": "Redo att använda",
       "notAvailable": "Inte tillgänglig",
       "reasons": {
@@ -3515,9 +3515,9 @@
   "spendAlerts": {
     "subtitle": "Skicka en varning via e-post eller push till faktureringskontakterna när detta områdes utgifter överskrider en gräns eller stiger över den vanliga timtakten.",
     "thresholdTitle": "Gränsöverskridande",
-    "thresholdSubtitle": "Löpande utgifter överskrider din gräns",
+    "thresholdSubtitle": "Detta områdes löpande utgifter under det valda fönstret överskrider din gräns",
     "anomalyTitle": "Topp per timme",
-    "anomalySubtitle": "En timme ligger långt över detta områdes vanliga takt",
+    "anomalySubtitle": "Detta områdes timkostnad ligger långt över dess egen p95-nivå",
     "limitLabel": "Gräns (USD)",
     "windowLabel": "Fönster",
     "window24h": "24 timmar",
@@ -3733,7 +3733,7 @@
       "couldNotLoad": "Kunde inte läsa in listorna",
       "noRepository": "Inget kodarkiv",
       "rowA11y": "{{name}}, {{openCount}}",
-      "openCount_one": "{{count}} öppna",
+      "openCount_one": "{{count}} öppen",
       "openCount_other": "{{count}} öppna",
       "archived_one": "Arkiverade ({{count}})",
       "archived_other": "Arkiverade ({{count}})",
@@ -3767,7 +3767,7 @@
       "runCount_one": "{{count}} körning",
       "runCount_other": "{{count}} körningar",
       "startNow": "Starta utan granskning",
-      "startNowHint": "Håll nedtryckt för att starta utan granskning",
+      "startNowHint": "Håll in för att starta utan granskning",
       "titleLabel": "Uppgiftens titel",
       "renameTitle": "Byt namn på uppgift",
       "notes": "Anteckningar",

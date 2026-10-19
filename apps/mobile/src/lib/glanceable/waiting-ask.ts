@@ -37,6 +37,19 @@ export type WaitingAsk = {
   organizationId: string | null;
   userId: string;
   recordedAt: number;
+  /**
+   * The selected row's status time, the ask's identity beside the session and
+   * status: a changed wait carries a new time, so a binding is never carried
+   * onto a different request.
+   */
+  statusUpdatedAt: string | null;
+  /**
+   * The pending permission id this ask's surface names, or null while the ask
+   * has no binding (a record made before the control-plane read lands, a read
+   * that failed, or a mirror written by a release without bindings). Approve is
+   * offered only with one, and an answer is sent only for it.
+   */
+  boundPermissionId: string | null;
 };
 
 /**
@@ -68,6 +81,11 @@ const waitingAskSchema = z.object({
   organizationId: z.string().nullable(),
   userId: z.string(),
   recordedAt: z.number(),
+  // Both are absent from a mirror a release without bindings wrote: it parses,
+  // and it reads as an ask with no identity time and no binding, so Approve
+  // stays hidden until a live select binds it.
+  statusUpdatedAt: z.string().nullable().default(null),
+  boundPermissionId: z.string().nullable().default(null),
 });
 
 /**
@@ -137,6 +155,10 @@ export function selectWaitingAsk(
     organizationId: ctx.organizationId,
     userId: ctx.userId,
     recordedAt: now,
+    statusUpdatedAt: chosen.statusUpdatedAt ?? null,
+    // Selection is pure: the answer path's binding comes from the control-plane
+    // read the recording step runs, never from the trace.
+    boundPermissionId: null,
   };
 }
 

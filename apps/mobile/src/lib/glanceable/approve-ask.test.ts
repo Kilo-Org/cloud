@@ -55,17 +55,18 @@ const buildActiveSessionsTrayInput = vi.fn((organizationId: string | null) => ({
 vi.mock('@/lib/active-sessions-live', () => ({ buildActiveSessionsTrayInput }));
 const readWaitingAsk = vi.fn();
 const recordWaitingAsk = vi.fn();
-vi.mock('./waiting-ask', () => ({ readWaitingAsk, recordWaitingAsk }));
+const getWaitingAsk = vi.fn(() => null);
+vi.mock('./waiting-ask', () => ({ readWaitingAsk, recordWaitingAsk, getWaitingAsk }));
 const createGlanceablePublisher = vi.fn();
 vi.mock('./create-publisher', () => ({ createGlanceablePublisher }));
 
 const { trpcClient } = await import('@/lib/trpc');
 const {
   answerSessionPermission,
-  NotApprovableError,
   refreshGlanceableSnapshot,
   runGlanceableApprove,
 } = await import('@/lib/glanceable/approve-ask');
+const { NotApprovableError } = await import('@/lib/glanceable/cloud-agent-session');
 // The pending-permission read is its own module; this suite owns its cases too.
 const { PendingPermissionTimeoutError, resolvePendingPermissionId } =
   await import('@/lib/glanceable/pending-permission');
@@ -120,6 +121,8 @@ const PERMISSION_ASK = {
   organizationId: null,
   userId: 'user_1',
   recordedAt: 1,
+  statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+  boundPermissionId: 'perm_1',
 };
 
 function withCode(code: string): Error {
@@ -325,6 +328,28 @@ describe('runGlanceableApprove', () => {
     expect(recordWaitingAsk).toHaveBeenCalledWith(null);
   });
 
+  it('is gone, and answers nothing, when the live request is not the bound one', async () => {
+    // The ask names `perm_1`; the live projection names `perm_2`. Only the
+    // request the ask names is answered, so this tap answers nothing.
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    createConnection.mockImplementation(fakeStream([connectedFrame(['perm_2'])]).open);
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
+    expect(answerPermissionMutate).not.toHaveBeenCalled();
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+  });
+
+  it('is retryable, with no request read, while the ask names no request', async () => {
+    // A record with no binding cannot name a request, so the tap resolves
+    // nothing and answers nothing.
+    readWaitingAsk.mockResolvedValue({ ...PERMISSION_ASK, boundPermissionId: null });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(getSessionQuery).not.toHaveBeenCalled();
+    expect(fetchCloudAgentStreamTicket).not.toHaveBeenCalled();
+    expect(answerPermissionMutate).not.toHaveBeenCalled();
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+    expect(isAttentionAcked('ses_1', null)).toBe(false);
+  });
+
   it('acks the answered raise so the republish counts it as answered', async () => {
     // The tray row keeps reading permission until the control plane's status
     // sync lands, and the caller republishes immediately after this resolves.
@@ -506,7 +531,7 @@ describe('refreshGlanceableSnapshot', () => {
   const ctx = { userId: 'user_1', organizationId: null };
 
   function makePublisher() {
-    return { handleSessions: vi.fn() };
+    return { handleSessions: vi.fn(), redraw: vi.fn() };
   }
 
   beforeEach(() => {
@@ -525,6 +550,10 @@ describe('refreshGlanceableSnapshot', () => {
     expect(fetchRows).toHaveBeenCalledTimes(1);
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
     expect(publisher.handleSessions).toHaveBeenCalledWith(rows, ctx);
+    // The frame is written again after the ask's request binding settles, so
+    // the card the headless process leaves behind offers Approve for the ask it
+    // names.
+    expect(publisher.redraw).toHaveBeenCalledTimes(1);
   });
 
   it('counts a raise the answer acked as answered while its tray row still trails', async () => {
@@ -653,6 +682,9 @@ describe('refreshGlanceableSnapshot', () => {
     // discarding it after selection left a second waiting session unrecorded.
     expect(createGlanceablePublisher).toHaveBeenCalledWith({
       skipWaitingAskSessionId: 'ses_1',
+      // The refresh awaits the binding itself and redraws; its publisher is
+      // thrown away, so it must not leave a listener behind.
+      redrawOnAskBound: false,
     });
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
   });
@@ -673,6 +705,7 @@ describe('refreshGlanceableSnapshot', () => {
     // the same session, so the refresh passes no skip at all.
     expect(createGlanceablePublisher).toHaveBeenCalledWith({
       skipWaitingAskSessionId: undefined,
+      redrawOnAskBound: false,
     });
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
   });

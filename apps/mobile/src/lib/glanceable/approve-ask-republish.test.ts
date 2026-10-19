@@ -1,5 +1,5 @@
 /* eslint-disable require-await -- the fake tray fetch settles without await */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * The republish that follows an answered ask runs on the *tray*, and the tray's
@@ -40,6 +40,7 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 const { refreshGlanceableSnapshot } = await import('./approve-ask');
+const { _resetAskBindingForTests, _setAskBindingForTests } = await import('./ask-binding');
 const { _resetGlanceablePersistForTests } = await import('./persist');
 const { _resetWaitingAskForTests, getWaitingAsk, recordWaitingAsk } = await import('./waiting-ask');
 
@@ -58,6 +59,8 @@ const RETRYABLE_ASK = {
   organizationId: null,
   userId: 'u1',
   recordedAt: 1,
+  statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+  boundPermissionId: 'perm_1',
 };
 
 /** One tick only: the poll's own cadence and budget are covered in approve-ask.test.ts. */
@@ -66,6 +69,13 @@ const oneTick = { sleep: vi.fn(), deadlineMs: 0 };
 beforeEach(() => {
   _resetWaitingAskForTests();
   _resetGlanceablePersistForTests();
+  // The republish selects the ask and reads its request binding; the read is a
+  // control-plane call, so the case supplies it.
+  _setAskBindingForTests({ read: async () => 'perm_1' });
+});
+
+afterEach(() => {
+  _resetAskBindingForTests();
 });
 
 describe('the republish after an answered ask', () => {
@@ -99,6 +109,8 @@ describe('the republish after an answered ask', () => {
       status: 'permission',
       userId: 'u1',
       organizationId: null,
+      // Bound for the row it re-selected, so the card keeps offering Approve.
+      boundPermissionId: 'perm_1',
     });
   });
 

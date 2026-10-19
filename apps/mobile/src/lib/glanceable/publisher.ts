@@ -86,6 +86,14 @@ export type GlanceablePublisherOptions = {
    * and the retry has to answer that same session.
    */
   skipWaitingAskSessionId?: string;
+  /**
+   * Subscribe to the events that change a fact a sink reads at draw time rather
+   * than from the frame (the recorded ask's request binding). The publisher
+   * redraws the frame it already emits on each one, so a surface can offer
+   * Approve the moment the ask is bound instead of on the next heartbeat.
+   * Returns the unsubscribe, run from `dispose()`.
+   */
+  subscribeAskBound?: (listener: () => void) => () => void;
 };
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -131,6 +139,9 @@ export class GlanceablePublisher {
   private readonly orgLost: () => boolean;
   private readonly onWaitingAskChange?: (ask: WaitingAsk | null) => void;
   private readonly skipWaitingAskSessionId?: string;
+  private readonly unsubscribeAskBound: (() => void) | null;
+  /** The context of the last emit, so `redraw` can write the frame again. */
+  private lastEmitContext: GlanceableSinkContext | null = null;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
   /** Home-only details from this publisher's previous tray read. */
@@ -173,8 +184,28 @@ export class GlanceablePublisher {
     this.orgLost = options.orgLost ?? (() => false);
     this.onWaitingAskChange = options.onWaitingAskChange;
     this.skipWaitingAskSessionId = options.skipWaitingAskSessionId;
+    this.unsubscribeAskBound =
+      options.subscribeAskBound?.(() => {
+        this.redraw();
+      }) ?? null;
     this.current = options.initial ?? null;
     this.activityStarted = false;
+  }
+
+  /**
+   * Write the frame the sinks already hold once more. A sink reads some facts at
+   * draw time instead of from the frame — the recorded ask's request binding,
+   * which decides whether Approve is offered — and those can settle after the
+   * frame that recorded the ask. The content is unchanged, but the revision moves
+   * on: every sink drops a frame at or below the revision it last applied, so a
+   * redraw that kept it would never reach the surface.
+   */
+  redraw(): void {
+    if (this.current === null || this.lastEmitContext === null || this.isGated()) {
+      return;
+    }
+    this.current = { ...this.current, revision: this.current.revision + 1 };
+    this.emit(this.current, this.lastEmitContext);
   }
 
   /**
@@ -413,6 +444,7 @@ export class GlanceablePublisher {
   dispose(): void {
     this.cancelCoalesce();
     this.cancelTerminal();
+    this.unsubscribeAskBound?.();
   }
 
   private isGated(): boolean {
@@ -493,6 +525,9 @@ export class GlanceablePublisher {
    */
   private writeFrame(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext | null): void {
     this.lastWriteAttemptAt = this.now();
+    if (ctx !== null) {
+      this.lastEmitContext = ctx;
+    }
     if (writeGlanceableFrame(this.sinks, snapshot, ctx)) {
       this.lastPublishedAt = Date.parse(snapshot.updatedAt);
       this.writeFailures = 0;

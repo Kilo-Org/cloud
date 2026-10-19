@@ -1,6 +1,7 @@
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { trpcClient } from '@/lib/trpc';
 
+import { whenAskBindingSettled } from './ask-binding';
 import { resolveAnsweredRaises } from './attention-rows';
 import { createGlanceablePublisher } from './create-publisher';
 import { type GlanceablePublisherContext } from './publisher';
@@ -24,11 +25,18 @@ import { getGlanceableSinks } from './sink-registry';
  * task reports to the OS as a failed run.
  */
 export async function publishTrayOnce(ctx: GlanceablePublisherContext): Promise<void> {
-  const publisher = createGlanceablePublisher();
+  // One publisher per run: the binding wait below redraws it, and a
+  // subscription would outlive the process in the module-level listener set.
+  const publisher = createGlanceablePublisher({ redrawOnAskBound: false });
   const { sessions } = await trpcClient.activeSessions.list.query(
     buildActiveSessionsTrayInput(ctx.organizationId)
   );
   publisher.handleSessions(resolveAnsweredRaises(sessions), ctx);
+  // The surface reads the ask's request binding when it draws, and the select
+  // above starts that read: wait for it and draw again, so the card this run
+  // leaves behind offers Approve for the ask it names.
+  await whenAskBindingSettled();
+  publisher.redraw();
   await Promise.all(
     getGlanceableSinks().flatMap(sink => [
       sink.waitForNativeStart?.(),

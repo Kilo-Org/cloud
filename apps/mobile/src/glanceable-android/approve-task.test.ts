@@ -20,6 +20,8 @@ const ASK: WaitingAsk = {
   organizationId: 'org_1',
   userId: 'u1',
   recordedAt: 1_750_000_000_000,
+  statusUpdatedAt: null,
+  boundPermissionId: 'perm_1',
 };
 
 const mocks = vi.hoisted(() => {

@@ -62,6 +62,12 @@ const FIXTURE_PATH = /(?:^|\/)dev\/glanceable-fixture\/([\w-]+)\/?(?:[?#].*)?$/;
 const RELEASE = 'release';
 /** Shape-valid hex approval key (`homeWidgetDetailsSchema`); it matches no live permission. */
 const FIXTURE_APPROVAL_KEY = 'a'.repeat(64);
+/**
+ * The request the fixture's permission row is bound to. A fixture session has
+ * no control-plane row, so its ask is recorded already bound instead of reading
+ * one; the id names no live request, so a fixture tap ends `gone` at the read.
+ */
+const FIXTURE_PERMISSION_ID = 'perm_fixture';
 
 /** The signed-in scope the publisher mount runs under, or null while none. */
 let scope: GlanceablePublisherContext | null = null;
@@ -241,7 +247,15 @@ async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContex
     newestSessionTitle: newestSessionTitle(rows),
     actionFeedback: fixture.actionFeedback ?? null,
   });
-  recordWaitingAsk(eligible ? selectWaitingAsk(rows, ctx, now) : null);
+  const selectedAsk = eligible ? selectWaitingAsk(rows, ctx, now) : null;
+  // The fixture row is drawn as the request it names, the state production
+  // reaches once its binding lands: a fixture session has no control-plane row
+  // to read one from.
+  recordWaitingAsk(
+    selectedAsk?.status === 'permission' && selectedAsk.isCloudAgent
+      ? { ...selectedAsk, boundPermissionId: FIXTURE_PERMISSION_ID }
+      : selectedAsk
+  );
   // Before the frame: the aggregate card counts a followed row out.
   if (Platform.OS === 'ios' || Platform.OS === 'android') {
     await applySessionCardFixture({ fixture, rows, ctx, now });

@@ -82,6 +82,8 @@ const ASK: WaitingAsk = {
   organizationId: 'org-1',
   userId: 'user-1',
   recordedAt: 1_750_000_000_000,
+  statusUpdatedAt: null,
+  boundPermissionId: 'perm_1',
 };
 
 function event(source: string, target: string): UserInteractionEvent {

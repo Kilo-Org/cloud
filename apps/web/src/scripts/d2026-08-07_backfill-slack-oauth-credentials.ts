@@ -31,6 +31,7 @@ import '../lib/load-env';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations, slack_oauth_credentials } from '@kilocode/db/schema';
+import type { SlackOAuthCredential } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { SlackCredentialOwner } from '@kilocode/worker-utils/slack-credential';
 import {
@@ -148,14 +149,20 @@ async function main(): Promise<void> {
         // The metadata token and the stored credential must agree before the
         // metadata copy is removed. The comparison below admits the row for
         // scrubbing only on an exact match; any other result keeps it unchanged.
-        if (execute && scrub) {
+        if (execute && scrub && readPlaintextToken(integration.metadata)) {
           const fresh = await storedCredentialMatches(integration.id, integration);
           if (fresh === true) {
             scrubCandidateIds.add(integration.id);
           } else if (fresh === false) {
             skipped.scrub_no_credential += 1;
+            console.warn(
+              `Kept metadata token for integration ${integration.id}: stored credential does not match it`
+            );
           } else {
             skipped.scrub_failed += 1;
+            console.warn(
+              `Kept metadata token for integration ${integration.id}: stored credential could not be read`
+            );
           }
         }
         continue;
@@ -306,7 +313,12 @@ async function storedCredentialMatches(
   const owner = readOwner(integration);
   if (!owner) return false;
 
-  const credential = await getSlackCredentialByIntegrationId(integrationId);
+  let credential: SlackOAuthCredential | null;
+  try {
+    credential = await getSlackCredentialByIntegrationId(integrationId);
+  } catch {
+    return null;
+  }
   if (!credential) return false;
 
   try {

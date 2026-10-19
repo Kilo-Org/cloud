@@ -30,6 +30,7 @@ jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens', () => ({
 jest.mock('@kilocode/web-shared/lib/email', () => ({ sendSignInCodeEmail: jest.fn() }));
 jest.mock('@/lib/auth/email-signin-eligibility', () => ({
   checkEmailSignInEligibility: jest.fn(),
+  checkGlobalSendBudget: jest.fn(),
   checkDomainSignInEligibility: jest.fn(),
 }));
 jest.mock('@/lib/auth/device-sessions', () => ({
@@ -77,13 +78,14 @@ import { issueAdmissionChallenge } from '@/lib/auth/native-admission';
 import { rotateRefreshToken } from '@/lib/auth/device-sessions';
 import { createSignInCode } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
-import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import { checkEmailSignInEligibility, checkGlobalSendBudget } from '@/lib/auth/email-signin-eligibility';
 
 const mockIssueAdmissionChallenge = jest.mocked(issueAdmissionChallenge);
 const mockRotateRefreshToken = jest.mocked(rotateRefreshToken);
 const mockCreateSignInCode = jest.mocked(createSignInCode);
 const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
 const mockCheckEmailSignInEligibility = jest.mocked(checkEmailSignInEligibility);
+const mockCheckGlobalSendBudget = jest.mocked(checkGlobalSendBudget);
 
 const MOBILE_HEADERS = {
   'x-kilo-client': 'mobile',
@@ -220,6 +222,7 @@ describe('REST timing on the native auth and min-version routes', () => {
 
   test('POST /api/auth/native/otp emits one api_timing line', async () => {
     mockCheckEmailSignInEligibility.mockResolvedValue({ ok: true });
+    mockCheckGlobalSendBudget.mockResolvedValue({ ok: true });
     mockCreateSignInCode.mockResolvedValue({ code: '123456', challengeId: 'challenge-1' });
     mockSendSignInCodeEmail.mockResolvedValue({ sent: true });
 

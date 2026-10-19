@@ -16,6 +16,7 @@ import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
+import { checkTownCreationEligibility } from '../util/town-creation.util';
 import { TownConfigSchema, TownConfigUpdateSchema, RigOverrideConfigSchema } from '../types';
 import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
@@ -347,6 +348,9 @@ export const gastownRouter = router({
     .input(z.object({ name: z.string().min(1).max(64) }))
     .output(RpcTownOutput)
     .mutation(async ({ ctx, input }) => {
+      const eligibility = await checkTownCreationEligibility(ctx.env, ctx.userId);
+      if (!eligibility.allowed) throw new TRPCError(eligibility);
+
       const user = userFromCtx(ctx);
       const userStub = getGastownUserStub(ctx.env, user.id);
       const town = await userStub.createTown({ name: input.name, owner_user_id: user.id });
@@ -1561,6 +1565,9 @@ export const gastownRouter = router({
       const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role === 'billing_manager')
         throw new TRPCError({ code: 'FORBIDDEN' });
+      const eligibility = await checkTownCreationEligibility(ctx.env, ctx.userId);
+      if (!eligibility.allowed) throw new TRPCError(eligibility);
+
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       const town = await stub.createTown({
         name: input.name,

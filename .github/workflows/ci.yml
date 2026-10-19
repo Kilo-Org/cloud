@@ -550,10 +550,6 @@ jobs:
       - name: Run web tests
         run: pnpm --filter web test --shard=${{ matrix.shard }}/8
 
-      - name: Run inference reservation PostgreSQL tests
-        if: matrix.shard == 1
-        run: pnpm --filter @kilocode/db test --runInBand --testPathIgnorePatterns /node_modules/ --runTestsByPath src/inference-reservations.test.ts
-
   test-scripts:
     needs: changes
     if: needs.changes.outputs.kilocode_backend == 'true'
@@ -635,6 +631,9 @@ jobs:
         # The meter suite connects to POSTGRES_URL directly. Avoid the Jest worker
         # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter container-usage-meter test:postgres
+
+      - name: Run inference reservation PostgreSQL tests
+        run: NODE_ENV=development pnpm drizzle migrate && NODE_ENV=development pnpm --filter @kilocode/db test --runInBand --testPathIgnorePatterns /node_modules/ --runTestsByPath src/inference-reservations.test.ts
 
       - name: Run Session Ingest Durable Object regressions
         run: pnpm --filter cloudflare-session-ingest run test:integration

@@ -111,13 +111,13 @@ export function SheetHeader({
   const remeasureWindowTop = useCallback(() => {
     // A detent change (user drag) re-lays the sheet; re-measure so the
     // clearance follows the surface to the window top.
-    containerRef.current?.measureInWindow((x, y) => {
+    containerRef.current?.measureInWindow((_x, y) => {
       setReachesWindowTop(y <= (StatusBar.currentHeight ?? 0) + 1);
     });
   }, []);
   const setContainerRef = useCallback((view: View | null) => {
     containerRef.current = view;
-    view?.measureInWindow((x, y) => {
+    view?.measureInWindow((_x, y) => {
       setReachesWindowTop(y <= (StatusBar.currentHeight ?? 0) + 1);
     });
   }, []);

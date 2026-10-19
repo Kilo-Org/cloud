@@ -196,7 +196,8 @@ const redactMultipartBody = (text: string): string | undefined => {
   let index = 0;
 
   while (index < lines.length) {
-    const disposition = lines[index]!.match(MULTIPART_FIELD_NAME_PATTERN);
+    const line = lines[index];
+    const disposition = line === undefined ? null : line.match(MULTIPART_FIELD_NAME_PATTERN);
 
     if (
       disposition !== null &&

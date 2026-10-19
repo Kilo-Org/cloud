@@ -47,17 +47,14 @@ export async function stripImageMetadata(
 ): Promise<StripImageMetadataResult> {
   let lastError: Error = new Error('Attachment image metadata strip failed');
   const report = (cause: Error): void => {
-    Sentry.captureException(
-      new Error('Attachment image metadata strip failed', { cause }),
-      {
-        tags: {
-          'error.subsystem': 'agent-attachments',
-          'error.operation': 'strip-image-metadata',
-        },
-        extra: { inputExtension: extension },
-        fingerprint: ['agent-attachments-strip-image-metadata', extension],
-      }
-    );
+    Sentry.captureException(new Error('Attachment image metadata strip failed', { cause }), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'strip-image-metadata',
+      },
+      extra: { inputExtension: extension },
+      fingerprint: ['agent-attachments-strip-image-metadata', extension],
+    });
   };
   const failure = (): StripImageMetadataResult => {
     report(lastError);

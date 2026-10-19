@@ -330,9 +330,11 @@ describe('runGlanceableApprove', () => {
     // request the ask names is answered, so this tap answers nothing.
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     createConnection.mockImplementation(fakeStream([connectedFrame(['perm_2'])]).open);
-    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone', replaced: true });
     expect(answerPermissionMutate).not.toHaveBeenCalled();
     expect(recordWaitingAsk).not.toHaveBeenCalled();
+    // The session still waits on the live request, so its raise is not acked.
+    expect(isAttentionAcked('ses_1', null)).toBe(false);
   });
 
   it('is retryable, with no request read, while the ask names no request', async () => {

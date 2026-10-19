@@ -317,6 +317,23 @@ describe('handleApproveTask', () => {
     });
   });
 
+  it('clears a replaced request and keeps its session row in the republish', async () => {
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'gone', replaced: true });
+
+    await handleApproveTask();
+
+    expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
+    expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
+    // The session still waits on the live request, so its row is not a stale
+    // one to skip.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+      answeredKiloSessionId: 'ses_1',
+      askEnded: false,
+    });
+  });
+
   it('republishes with no notice when there is no approvable ask', async () => {
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'none' });
 

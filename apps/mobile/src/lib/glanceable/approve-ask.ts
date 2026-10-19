@@ -42,7 +42,12 @@ type PermissionResponse = 'once' | 'always' | 'reject';
 export type GlanceableApproveResult =
   | { kind: 'approved' }
   | { kind: 'retryable' }
-  | { kind: 'gone' }
+  /**
+   * Nothing was answered. `replaced` marks the case the caller proved locally:
+   * the ask named a request, and the live request is a different one, so the
+   * session is still waiting and must keep counting as needs-input.
+   */
+  | { kind: 'gone'; replaced?: true }
   | { kind: 'none' };
 
 /** Permission answers must not be batched into a composed request. */
@@ -189,7 +194,9 @@ export async function runGlanceableApprove(
       { ...options.target, permissionId: null },
       options
     );
-    if (result.kind === 'approved' || result.kind === 'gone') {
+    // A request replaced by another one leaves the session waiting, so its
+    // raise is not the one that ended: only the terminal outcomes ack.
+    if (result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)) {
       ackSessionAttention(options.target.kiloSessionId);
     }
     return result;
@@ -211,7 +218,8 @@ export async function runGlanceableApprove(
   if (result.kind === 'approved') {
     recordWaitingAsk(null);
   }
-  if (result.kind === 'approved' || result.kind === 'gone') {
+  // As on the card path: a replaced request is not an answered raise.
+  if (result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)) {
     ackSessionAttention(ask.kiloSessionId);
   }
   return result;
@@ -265,13 +273,13 @@ async function answerPendingPermission(
       return { kind: 'gone' };
     }
     if (target.permissionId !== null && permissionId !== target.permissionId) {
-      return { kind: 'gone' };
+      return { kind: 'gone', replaced: true };
     }
     if (
       target.approvalKey !== null &&
       (await approvalKeyOf(target.kiloSessionId, permissionId)) !== target.approvalKey
     ) {
-      return { kind: 'gone' };
+      return { kind: 'gone', replaced: true };
     }
     await answerSessionPermission({
       kiloSessionId: target.kiloSessionId,

@@ -304,6 +304,24 @@ describe('handleGlanceableInteraction', () => {
     expect(mocks.toastError).not.toHaveBeenCalled();
   });
 
+  it('drops a replaced request without ending the raise', async () => {
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'gone', replaced: true });
+
+    await expect(approveFromCard()).resolves.toEqual({ kind: 'gone', replaced: true });
+
+    // The record goes so the card re-reads the live request.
+    expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
+    // The session still waits on that live request, so its tray row is not a
+    // stale one to skip.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'user-1',
+      organizationId: 'org-1',
+      answeredKiloSessionId: 'session-7',
+      askEnded: false,
+    });
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
   it('refreshes without touching the record when nothing is approvable', async () => {
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'none' });
 

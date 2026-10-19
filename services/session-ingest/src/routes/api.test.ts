@@ -868,19 +868,43 @@ describe('api routes', () => {
     );
 
     it.each([
-      ['declared over cap', '4194305', 8],
-      ['undeclared over cap', undefined, 4_194_305],
-    ] as const)('rejects a %s body without staging', async (_name, contentLength, size) => {
+      ['declared over cap', '4194305'],
+      ['declared far over cap', String(8 * 1024 * 1024)],
+    ] as const)('stages a %s body through the queue', async (_name, contentLength) => {
       const { app, ingest } = prepareIngestRoute();
       const env = directIngestEnv();
-      const headers = contentLength === undefined ? undefined : { 'content-length': contentLength };
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const body = JSON.stringify({ data: [] });
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          headers: { 'content-length': contentLength },
+          body,
+        }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
+      expect(env.INGEST_QUEUE.send).toHaveBeenCalledTimes(1);
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'oversized_body' })
+      );
+      info.mockRestore();
+    });
+
+    it('rejects a body above the staging ceiling without staging', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const response = await app.fetch(
         new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
           method: 'POST',
-          headers,
-          body: 'x'.repeat(size),
+          headers: { 'content-length': String(16 * 1024 * 1024 + 1) },
+          body: 'x'.repeat(8),
         }),
         env
       );
@@ -893,7 +917,7 @@ describe('api routes', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.objectContaining({
           event: 'direct_ingest_reject',
-          reason: expect.stringMatching(/declared_bytes_exceeded|staging_budget_exceeded/),
+          reason: 'staging_budget_exceeded',
         })
       );
       warn.mockRestore();

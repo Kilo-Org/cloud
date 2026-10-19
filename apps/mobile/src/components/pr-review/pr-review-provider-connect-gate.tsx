@@ -22,10 +22,11 @@ import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-revi
 import { useTRPC } from '@/lib/trpc';
 
 /**
- * The provider arm's exit when no gate state applies — the shared back-fallback
- * every arm renders in its header (see `pr-review-connect-gate.tsx`).
+ * Cold deep links land straight on a gate state with no navigation history,
+ * so `ScreenHeader` would render without a back control. The provider-neutral
+ * inbox is the one exit every PR-review surface shares.
  */
-export const PR_REVIEW_ENTRY_HREF = '/(app)/pr-review' as const;
+const PR_REVIEW_ENTRY_HREF = '/(app)/pr-review' as const;
 
 /**
  * The pasted MR URL's origin, when the deep link carried one and it is worth

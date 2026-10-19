@@ -59,17 +59,6 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.example' }));
-// Mutable so the instance-hint tests can publish a GitLab scope with a hint.
-const scopeState = vi.hoisted(() => ({
-  value: null as { ref: unknown } | null,
-}));
-vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    useProviderPrScopeOrNull: () => scopeState.value,
-  };
-});
 vi.mock('expo-router', () => ({ usePathname: () => '/pr-review/github/owner/repo/1' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
@@ -179,7 +168,6 @@ function mount(provider: ProviderPrPlatform, organizationId: string | null = 'or
 
 beforeEach(() => {
   vi.resetAllMocks();
-  scopeState.value = null;
   appState.subscriptions.length = 0;
   appState.addEventListener.mockImplementation(
     (_event: string, listener: (state: string) => void) => {

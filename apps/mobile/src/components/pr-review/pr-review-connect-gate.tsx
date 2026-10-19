@@ -22,8 +22,6 @@ import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-v
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 
-export { PR_REVIEW_ENTRY_HREF } from '@/components/pr-review/pr-review-provider-connect-gate';
-
 /**
  * Cold deep links land straight on a gate state with no navigation history,
  * so `ScreenHeader` would render without a back control. The provider-neutral

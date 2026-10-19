@@ -21,7 +21,9 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
  * The caller supplies its cached memberships; the picker does not fetch data.
  * Returns the opener for its control plus the sheet element the caller renders,
  * so the sheet lives in the caller's tree (a portal-free `Modal`) instead of a
- * process-wide action-sheet provider.
+ * process-wide action-sheet provider. `onSelectionChange` fires only for a
+ * picked account that differs from the active one, so a caller that reloads its
+ * screen can leave a re-pick of the current account a no-op.
  */
 export function useContextPicker(
   orgs: OrgListEntry[] | undefined,

@@ -756,6 +756,7 @@
       "truncationBanner_other": "બદલાયેલી કુલ {{total}} ફાઇલોમાંથી પહેલી {{limit}} દેખાય છે — આ GitHub APIની મર્યાદા છે."
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે.",
+    "linkPasteDenied": "પેસ્ટની ઍક્સેસ નકારવામાં આવી. પેસ્ટની પરવાનગી આપો અને ફરી પ્રયાસ કરો.",
     "linkPasteNotAPullRequest": "આ પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો લિંક નથી",
     "announce": {
       "commentPosted": "ટિપ્પણી પોસ્ટ થઈ",

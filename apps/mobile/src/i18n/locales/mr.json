@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHub API च्या मर्यादेमुळे बदललेल्या {{total}} फाइल्सपैकी पहिल्या {{limit}} फाइल्स दाखवल्या आहेत."
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे.",
+    "linkPasteDenied": "पेस्टचा प्रवेश नाकारला. पेस्टला परवानगी द्या आणि पुन्हा प्रयत्न करा.",
     "linkPasteNotAPullRequest": "ही पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्टची लिंक नाही",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट केली",

@@ -756,6 +756,7 @@
       "truncationBanner_other": "Viser de første {{limit}} av {{total}} endrede filene på grunn av en grense i GitHub sitt API."
     },
     "linkPasteClipboardEmpty": "Utklippstavlen er tom.",
+    "linkPasteDenied": "Tilgang til innliming ble avvist. Tillat innliming og prøv igjen.",
     "linkPasteNotAPullRequest": "Dette er ikke en lenke til en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publisert",

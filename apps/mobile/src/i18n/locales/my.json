@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHub API ကန့်သတ်ချက်ကြောင့် ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမ {{limit}} ခုကိုသာ ပြသထားပါသည်။"
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ်တွင် ဘာမျှမရှိပါ။",
+    "linkPasteDenied": "ကပ်ရန် ခွင့်ပြုချက် ငြင်းပယ်ခံရသည်။ ကပ်ရန် ခွင့်ပြုပြီး ထပ်မံကြိုးစားပါ။",
     "linkPasteNotAPullRequest": "ဤသည် PR သို့မဟုတ် merge request လင့်ခ် မဟုတ်ပါ",
     "announce": {
       "commentPosted": "မှတ်ချက် တင်ပြီးပါပြီ",

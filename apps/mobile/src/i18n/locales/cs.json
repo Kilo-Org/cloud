@@ -788,6 +788,7 @@
       "truncationBanner_many": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}."
     },
     "linkPasteClipboardEmpty": "Schránka je prázdná.",
+    "linkPasteDenied": "Přístup ke vložení byl zamítnut. Povolte vložení a zkuste to znovu.",
     "linkPasteNotAPullRequest": "Tohle není odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentář odeslán",

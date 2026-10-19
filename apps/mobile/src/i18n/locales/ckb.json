@@ -756,6 +756,7 @@
       "truncationBanner_other": "یەکەم {{limit}} لە {{total}} فایلی گۆڕدراو پیشان دەدرێت — سنووری API ـی GitHub."
     },
     "linkPasteClipboardEmpty": "کلیپبۆردەکە بەتاڵە.",
+    "linkPasteDenied": "دەستگەیشتن بە لکاندن ڕەتکرایەوە. ڕێگە بە لکاندن بدە و دووبارە هەوڵبدەرەوە.",
     "linkPasteNotAPullRequest": "ئەمە بەستەری داواکاری ڕاکێشان یان تێکەڵکردن نییە.",
     "announce": {
       "commentPosted": "بۆچوون بڵاوکرایەوە",

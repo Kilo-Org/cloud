@@ -2916,6 +2916,7 @@
       "truncationBanner_other": "GitHub APIの制限により、変更された{{total}}件のファイルのうち、最初の{{limit}}件を表示しています。"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です。",
+    "linkPasteDenied": "ペーストのアクセスが拒否されました。ペーストを許可して、もう一度お試しください。",
     "linkPasteNotAPullRequest": "プルリクエストまたはマージリクエストのリンクではありません",
     "announce": {
       "commentPosted": "コメントを投稿しました",

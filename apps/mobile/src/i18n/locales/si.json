@@ -756,6 +756,7 @@
       "truncationBanner_other": "වෙනස් කළ ගොනු {{total}} න් පළමු {{limit}} ක් පෙන්වයි — GitHub API සීමාව."
     },
     "linkPasteClipboardEmpty": "පසුරු පුවරුව හිස්ය.",
+    "linkPasteDenied": "අලවීමට ප්‍රවේශය ප්‍රතික්ෂේප විය. අලවීමට ඉඩ දී නැවත උත්සාහ කරන්න.",
     "linkPasteNotAPullRequest": "මෙය පුල් ඉල්ලීමක හෝ මර්ජ ඉල්ලීමක සබැඳියක් නොවේ",
     "announce": {
       "commentPosted": "අදහස පළ කරන ලදී",

@@ -2996,6 +2996,7 @@
       "truncationBanner_many": "Показано лише перші файли: {{limit}} з {{total}} змінених. Це обмеження API GitHub."
     },
     "linkPasteClipboardEmpty": "Буфер обміну порожній.",
+    "linkPasteDenied": "Доступ до вставлення відхилено. Дозвольте вставлення і спробуйте ще раз.",
     "linkPasteNotAPullRequest": "Це не посилання на запит на злиття або merge-запит",
     "announce": {
       "commentPosted": "Коментар опубліковано",

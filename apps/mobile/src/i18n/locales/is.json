@@ -756,6 +756,7 @@
       "truncationBanner_other": "Fyrstu {{limit}} af {{total}} breyttum skrám eru sýndar — þetta eru takmörk API hjá GitHub."
     },
     "linkPasteClipboardEmpty": "Klippiborðið er tómt.",
+    "linkPasteDenied": "Aðgangur að límingu var neitaður. Leyfðu límingu og reyndu aftur.",
     "linkPasteNotAPullRequest": "Þetta er ekki tengill á samrunabeiðni eða merge request",
     "announce": {
       "commentPosted": "Athugasemd birt",

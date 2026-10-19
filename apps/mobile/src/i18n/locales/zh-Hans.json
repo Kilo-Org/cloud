@@ -2916,6 +2916,7 @@
       "truncationBanner_other": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。"
     },
     "linkPasteClipboardEmpty": "剪贴板为空。",
+    "linkPasteDenied": "粘贴权限被拒绝。请允许粘贴并重试。",
     "linkPasteNotAPullRequest": "不是拉取请求或合并请求链接",
     "announce": {
       "commentPosted": "评论已发布",

@@ -756,6 +756,7 @@
       "truncationBanner_other": "Näytetään {{limit}} ensimmäistä tiedostoa kaikkiaan {{total}} muutetusta tiedostosta GitHubin API-rajoituksen vuoksi."
     },
     "linkPasteClipboardEmpty": "Leikepöytä on tyhjä.",
+    "linkPasteDenied": "Liittämisen käyttöoikeus evättiin. Salli liittäminen ja yritä uudelleen.",
     "linkPasteNotAPullRequest": "Tämä ei ole muutospyynnön tai yhdistämispyynnön linkki",
     "announce": {
       "commentPosted": "Kommentti julkaistu",

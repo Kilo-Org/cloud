@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHub API പരിധി കാരണം മാറ്റമുള്ള {{total}} ഫയലുകളിൽ ആദ്യത്തെ {{limit}} മാത്രം കാണിക്കുന്നു."
     },
     "linkPasteClipboardEmpty": "ക്ലിപ്പ്ബോർഡ് ശൂന്യമാണ്.",
+    "linkPasteDenied": "ഒട്ടിക്കാനുള്ള ആക്സസ് നിരസിച്ചു. ഒട്ടിക്കാൻ അനുവദിച്ച് വീണ്ടും ശ്രമിക്കുക.",
     "linkPasteNotAPullRequest": "ഇത് പുൾ റിക്വസ്റ്റിന്റെയോ മെർജ് റിക്വസ്റ്റിന്റെയോ ലിങ്ക് അല്ല",
     "announce": {
       "commentPosted": "അഭിപ്രായം പോസ്റ്റ് ചെയ്തു",

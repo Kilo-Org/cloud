@@ -2956,6 +2956,7 @@
       "truncationBanner_two": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub."
     },
     "linkPasteClipboardEmpty": "לוח ההעתקה ריק.",
+    "linkPasteDenied": "הגישה להדבקה נדחתה. אפשרו הדבקה ונסו שוב.",
     "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה או מיזוג",
     "announce": {
       "commentPosted": "התגובה פורסמה",

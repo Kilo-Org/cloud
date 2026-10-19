@@ -756,6 +756,7 @@
       "truncationBanner_other": "À ń fi fáìlì {{limit}} àkọ́kọ́ hàn nínú fáìlì {{total}} tí a yí padà — ààlà API GitHub."
     },
     "linkPasteClipboardEmpty": "Àtẹ àdàkọ ṣófo.",
+    "linkPasteDenied": "Wọ́n kọ̀ ìwọlé sí lílẹ. Gba ààyè lílẹ kí o sì tún gbìyànjú.",
     "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
     "announce": {
       "commentPosted": "A ti fi àsọyé ránṣẹ́",

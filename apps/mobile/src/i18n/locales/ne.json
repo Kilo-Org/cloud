@@ -756,6 +756,7 @@
       "truncationBanner_other": "परिवर्तन भएका {{total}} फाइलमध्ये सुरुका {{limit}} मात्र देखाइएका छन् — GitHub API को सीमाका कारण।"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली छ।",
+    "linkPasteDenied": "टाँस्ने पहुँच अस्वीकृत भयो। टाँस्न अनुमति दिनुहोस् र फेरि प्रयास गर्नुहोस्।",
     "linkPasteNotAPullRequest": "यो पुल रिक्वेस्ट वा मर्ज रिक्वेस्टको लिङ्क होइन",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट गरियो",

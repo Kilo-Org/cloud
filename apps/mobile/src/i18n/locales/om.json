@@ -756,6 +756,7 @@
       "truncationBanner_other": "Faayiloota jijjiiraman {{total}} keessaa {{limit}} jalqabaa agarsiisaa jirra — kun daangaa API GitHub ti."
     },
     "linkPasteClipboardEmpty": "Gabateen waraabbii duwwaadha.",
+    "linkPasteDenied": "Hayyamni maxxansuu didameera. Maxxansuuf hayyama kenniitii irra deebi'ii yaali.",
     "linkPasteNotAPullRequest": "Liinkii gaaffii walitti makuu miti",
     "announce": {
       "commentPosted": "Yaadni maxxanfameera",

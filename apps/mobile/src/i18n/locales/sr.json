@@ -772,6 +772,7 @@
       "truncationBanner_few": "Prikazane su samo prve izmenjene datoteke zbog ograničenja GitHub API-ja: {{limit}} od {{total}}."
     },
     "linkPasteClipboardEmpty": "Ostava je prazna.",
+    "linkPasteDenied": "Pristup lepljenju je odbijen. Dozvolite lepljenje i pokušajte ponovo.",
     "linkPasteNotAPullRequest": "Ovo nije veza do zahteva za spajanje ili merge requesta",
     "announce": {
       "commentPosted": "Komentar objavljen",

@@ -2916,6 +2916,7 @@
       "truncationBanner_other": "GitHub API sınırı nedeniyle değiştirilen {{total}} dosyanın ilk {{limit}} tanesi gösteriliyor."
     },
     "linkPasteClipboardEmpty": "Pano boş.",
+    "linkPasteDenied": "Yapıştırma erişimi reddedildi. Yapıştırmaya izin verip tekrar deneyin.",
     "linkPasteNotAPullRequest": "Bu bir çekme isteği veya birleştirme isteği bağlantısı değil",
     "announce": {
       "commentPosted": "Yorum gönderildi",

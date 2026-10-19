@@ -10,6 +10,7 @@ import { join } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { clearPrLinkFieldDraft } from '@/lib/pr-review/pr-link-field-draft';
 import {
   find,
   findAll,
@@ -30,7 +31,9 @@ const ENTRY_SCREEN_SOURCE = readFileSync(join(__dirname, 'pr-review-entry-screen
 beforeEach(() => {
   vi.clearAllMocks();
   resetHookSlots();
+  clearPrLinkFieldDraft();
   mocks.clipboard.current = '';
+  mocks.clipboard.hasString = true;
   seedRecents([]);
 });
 
@@ -175,5 +178,69 @@ describe('provider-neutral URL field', () => {
     (propsOf(input).onChangeText as (value: string) => void)('anything');
     const after = render();
     expect(find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link')).toBeTruthy();
+  });
+
+  it('reports denied paste access instead of an empty clipboard', async () => {
+    mocks.clipboard.current = 'https://gitlab.com/acme/api/-/merge_requests/3';
+    mocks.clipboard.hasString = false;
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'Paste access was denied. Allow paste and try again.'
+    );
+    expect(mocks.toastError).not.toHaveBeenCalledWith('Clipboard is empty');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the empty-clipboard copy for a truly empty clipboard', async () => {
+    mocks.clipboard.current = '';
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledWith('Clipboard is empty');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('restores the pasted link on the next mount after a cancelled open', async () => {
+    // First mount: paste a valid link (screen navigates), then the remount the
+    // back gesture produces — resetHookSlots drops all hook state like a fresh
+    // mount, and the retained draft must refill the field.
+    mocks.clipboard.current = 'https://gitlab.com/acme/api/-/merge_requests/3';
+    const first = await renderLoaded();
+    const paste = find(
+      first,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    resetHookSlots();
+    // The restore writes hook state during the mount render; a second render
+    // re-reads the slots, like every setter in this harness.
+    render();
+    const second = render();
+    const input = find(second, 'Input', () => true);
+    expect(propsOf(input).defaultValue).toBe('');
+    // The draft restore runs in the focus effect the harness invokes during
+    // render; the field placeholder must be gone and Open re-enabled.
+    expect(findAll(second, 'PrLinkPlaceholder')).toHaveLength(0);
+    const open = find(
+      second,
+      'Button',
+      p => p.accessibilityLabel === 'Open pull request or merge request'
+    );
+    const openProps: Record<string, unknown> = propsOf(open);
+    expect(openProps.disabled).toBe(false);
   });
 });

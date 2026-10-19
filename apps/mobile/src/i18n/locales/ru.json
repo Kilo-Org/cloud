@@ -2996,6 +2996,7 @@
       "truncationBanner_many": "Из-за ограничения API GitHub показана только часть изменённых файлов: {{limit}} из {{total}}."
     },
     "linkPasteClipboardEmpty": "Буфер обмена пуст.",
+    "linkPasteDenied": "Доступ к вставке запрещён. Разрешите вставку и повторите попытку.",
     "linkPasteNotAPullRequest": "Это не ссылка на пул-реквест или запрос на слияние",
     "announce": {
       "commentPosted": "Комментарий опубликован",

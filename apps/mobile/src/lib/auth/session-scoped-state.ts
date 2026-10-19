@@ -15,6 +15,7 @@ import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
+import { clearPrLinkFieldDraft } from '@/lib/pr-review/pr-link-field-draft';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
@@ -108,6 +109,9 @@ export function clearSessionScopedState(): void {
   runClear(clearToolCardImageCache);
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
+  // The retained PR-review link draft is session-scoped: a paste is account
+  // input, so the next account starts with an empty field.
+  runClear(clearPrLinkFieldDraft);
   runClear(clearSessionAutoApprove);
   runClear(forgetRemoteMcp);
   runClear(clearRemoteMcpServers);

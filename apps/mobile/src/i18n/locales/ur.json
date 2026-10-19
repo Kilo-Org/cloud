@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHub API کی حد کے باعث کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں۔"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے۔",
+    "linkPasteDenied": "چسپاں کرنے تک رسائی مسترد ہو گئی۔ چسپاں کرنے کی اجازت دیں اور دوبارہ کوشش کریں۔",
     "linkPasteNotAPullRequest": "یہ پل ریکویسٹ یا مرج ریکویسٹ کا لنک نہیں ہے۔",
     "announce": {
       "commentPosted": "تبصرہ پوسٹ ہو گیا",

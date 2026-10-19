@@ -756,6 +756,7 @@
       "truncationBanner_other": "Aldatutako {{total}} fitxategietatik lehenengo {{limit}} erakusten dira, GitHub APIaren muga dela eta."
     },
     "linkPasteClipboardEmpty": "Arbela hutsik dago.",
+    "linkPasteDenied": "Itsasteko sarbidea ukatu da. Baimendu itsastea eta saiatu berriro.",
     "linkPasteNotAPullRequest": "Ez da bateratze-eskaera edo merge-eskaera baten esteka",
     "announce": {
       "commentPosted": "Iruzkina argitaratuta",

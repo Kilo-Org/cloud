@@ -756,6 +756,7 @@
       "truncationBanner_other": "A na-egosi faịlụ {{limit}} mbụ n'ime faịlụ {{total}} agbanwere — oke API GitHub."
     },
     "linkPasteClipboardEmpty": "Ebe nchekwa nwa oge tọgbọ chakoo.",
+    "linkPasteDenied": "A jụrụ ikike ịmado. Kwe ka ịmado ma nwaa ọzọ.",
     "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
     "announce": {
       "commentPosted": "Ebipụtala okwu",

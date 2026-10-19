@@ -20,11 +20,13 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
+import { popPrLinkFieldDraft, setPrLinkFieldDraft } from '@/lib/pr-review/pr-link-field-draft';
 import {
   decidePrLinkOpen,
   decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
   prLinkToastInvalidCopy,
+  prLinkToastPasteDeniedCopy,
   selectPrLinkClearButtonVisible,
 } from '@/lib/pr-review/pr-link-paste';
 import {
@@ -54,9 +56,27 @@ export function PrReviewEntryScreen() {
   const [hasInput, setHasInput] = useState(false);
   const [recent, setRecent] = useState<RecentPr[] | null>(null);
 
+  const applyFieldText = (text: string) => {
+    setPrLinkFieldDraft(text);
+    pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
+      pendingProgrammaticTextsRef.current,
+      text
+    );
+    inputValueRef.current = text;
+    inputRef.current?.setNativeProps({ text });
+    setHasInput(text.length > 0);
+  };
+
   useFocusEffect(
     useCallback(() => {
       const state = { cancelled: false };
+      // A back-remount (cancelled open, gate loading) lands here with the
+      // uncontrolled field reset; restore the retained draft through the
+      // paste path so the native echo is consumed, not treated as an edit.
+      const draft = popPrLinkFieldDraft();
+      if (draft.length > 0) {
+        applyFieldText(draft);
+      }
       void (async () => {
         const list = await getRecentPrs();
         if (!state.cancelled) {
@@ -66,18 +86,9 @@ export function PrReviewEntryScreen() {
       return () => {
         state.cancelled = true;
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- applyFieldText is stable per mount and defined above
     }, [])
   );
-
-  const applyFieldText = (text: string) => {
-    pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
-      pendingProgrammaticTextsRef.current,
-      text
-    );
-    inputValueRef.current = text;
-    inputRef.current?.setNativeProps({ text });
-    setHasInput(text.length > 0);
-  };
 
   const handleSubmit = () => {
     const decision = decidePrLinkOpen(inputValueRef.current);
@@ -95,6 +106,14 @@ export function PrReviewEntryScreen() {
   };
 
   const handlePaste = async () => {
+    // Probe before reading: a denied iOS paste read returns '' from
+    // getStringAsync, and hasStringAsync inspects only the content type
+    // without raising the paste prompt. Denial gets its own message; the
+    // empty-clipboard copy stays for a truly empty clipboard.
+    if (!(await Clipboard.hasStringAsync())) {
+      announcingToast.error(prLinkToastPasteDeniedCopy());
+      return;
+    }
     const clipboard = await Clipboard.getStringAsync();
     const decision = decidePrLinkPaste(clipboard);
     if (decision.kind === 'empty') {
@@ -262,6 +281,7 @@ export function PrReviewEntryScreen() {
                 return;
               }
               inputValueRef.current = value;
+              setPrLinkFieldDraft(value);
               setHasInput(value.length > 0);
             }}
             // The shared single-line box (`@/components/ui/input`) supplies the
@@ -286,6 +306,7 @@ export function PrReviewEntryScreen() {
                 // applyFieldText('') (paste-only path) and do not push an
                 // echo for '' — a non-arriving echo would stale the FIFO.
                 inputValueRef.current = '';
+                setPrLinkFieldDraft('');
                 setHasInput(false);
                 inputRef.current?.clear();
                 inputRef.current?.focus();

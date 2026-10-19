@@ -756,6 +756,7 @@
       "truncationBanner_other": "E whakaaturia ana ngā kōnae {{limit}} tuatahi o ngā kōnae {{total}} kua whakarerekētia — koinei te tepenga o te API GitHub."
     },
     "linkPasteClipboardEmpty": "Kei te pātea te papa tārua.",
+    "linkPasteDenied": "Kua whakakāhoretia te urunga whakapiri. Whakaaetia te whakapiri ka ngana anō.",
     "linkPasteNotAPullRequest": "Ehara tēnei i te hono tono kume, tono whakakotahi rānei",
     "announce": {
       "commentPosted": "Kua tukuna te kōrero",

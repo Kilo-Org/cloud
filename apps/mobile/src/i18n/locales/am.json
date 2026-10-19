@@ -756,6 +756,7 @@
       "truncationBanner_other": "ከተለወጡት {{total}} ፋይሎች ውስጥ የመጀመሪያዎቹ {{limit}} ብቻ ይታያሉ — የGitHub API ገደብ ነው።"
     },
     "linkPasteClipboardEmpty": "ቅንጥብ ሰሌዳው ባዶ ነው።",
+    "linkPasteDenied": "የመለጠፍ ፈቃድ ተከልክሏል። መለጠፍን ፈቅደው እንደገና ይሞክሩ።",
     "linkPasteNotAPullRequest": "የማዋሃድ ጥያቄ አገናኝ አይደለም",
     "announce": {
       "commentPosted": "አስተያየት ተለጥፏል",

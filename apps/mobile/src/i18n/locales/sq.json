@@ -756,6 +756,7 @@
       "truncationBanner_other": "Po shfaqen {{limit}} skedarët e parë nga {{total}} skedarë të ndryshuar, për shkak të kufirit të API-së së GitHub."
     },
     "linkPasteClipboardEmpty": "Kujtesa e kopjimit është bosh.",
+    "linkPasteDenied": "Aksesi për ngjitje u refuzua. Lejo ngjitjen dhe provo përsëri.",
     "linkPasteNotAPullRequest": "Kjo nuk është lidhje për një kërkesë për bashkim ose kërkesë integrimi",
     "announce": {
       "commentPosted": "Komenti u postua",

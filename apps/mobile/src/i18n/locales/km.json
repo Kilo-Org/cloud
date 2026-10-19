@@ -756,6 +756,7 @@
       "truncationBanner_other": "កំពុងបង្ហាញឯកសារដែលបានកែប្រែ {{limit}} ដំបូង ក្នុងចំណោម {{total}} ដោយសារដែនកំណត់របស់ GitHub API។"
     },
     "linkPasteClipboardEmpty": "ក្ដារតម្បៀតខ្ទាស់ទទេ។",
+    "linkPasteDenied": "ការចូលប្រើបិទភ្ជាប់ត្រូវបានបដិសេធ។ អនុញ្ញាតបិទភ្ជាប់ ហើយព្យាយាមម្ដងទៀត។",
     "linkPasteNotAPullRequest": "មិនមែនជាតំណសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូលទេ",
     "announce": {
       "commentPosted": "បានបង្ហោះមតិយោបល់",

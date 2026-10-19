@@ -756,6 +756,7 @@
       "truncationBanner_other": "ສະແດງໄຟລ໌ທີ່ປ່ຽນແປງ {{limit}} ໄຟລ໌ທຳອິດຈາກທັງໝົດ {{total}} ໄຟລ໌ — ຕາມຂີດຈຳກັດຂອງ GitHub API."
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ.",
+    "linkPasteDenied": "ການເຂົ້າເຖິງການວາງຖືກປະຕິເສດ. ອະນຸຍາດການວາງແລ້ວລອງໃໝ່.",
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
     "announce": {
       "commentPosted": "ໂພດຄຳເຫັນແລ້ວ",

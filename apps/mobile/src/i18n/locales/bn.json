@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHub API-এর সীমার কারণে পরিবর্তিত {{total}}টি ফাইলের মধ্যে প্রথম {{limit}}টি দেখানো হচ্ছে।"
     },
     "linkPasteClipboardEmpty": "ক্লিপবোর্ড খালি।",
+    "linkPasteDenied": "পেস্টের অনুমতি প্রত্যাখ্যাত হয়েছে। পেস্ট করার অনুমতি দিন এবং আবার চেষ্টা করুন।",
     "linkPasteNotAPullRequest": "এটি পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের লিংক নয়",
     "announce": {
       "commentPosted": "মন্তব্য পোস্ট হয়েছে",

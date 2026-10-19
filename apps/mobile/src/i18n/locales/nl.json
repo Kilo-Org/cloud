@@ -2916,6 +2916,7 @@
       "truncationBanner_other": "Je ziet de eerste {{limit}} van {{total}} gewijzigde bestanden vanwege de limiet van de GitHub-API."
     },
     "linkPasteClipboardEmpty": "Het klembord is leeg.",
+    "linkPasteDenied": "Toegang tot plakken geweigerd. Sta plakken toe en probeer opnieuw.",
     "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of merge request",
     "announce": {
       "commentPosted": "Opmerking geplaatst",

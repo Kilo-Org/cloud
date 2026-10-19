@@ -2956,6 +2956,7 @@
       "truncationBanner_many": "Seuls les {{limit}} premiers fichiers modifiés sur {{total}} sont affichés, en raison d'une limite de l'API GitHub."
     },
     "linkPasteClipboardEmpty": "Le presse-papiers est vide.",
+    "linkPasteDenied": "L'accès au collage a été refusé. Autorisez le collage et réessayez.",
     "linkPasteNotAPullRequest": "Ce n'est pas un lien de PR ou de merge request",
     "announce": {
       "commentPosted": "Commentaire publié",

@@ -756,6 +756,7 @@
       "truncationBanner_other": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub."
     },
     "linkPasteClipboardEmpty": "Sabuuradda nuqulladu waa madhan tahay.",
+    "linkPasteDenied": "Gelitaanka dhejinta waa la diiday. Oggolow dhejinta oo mar kale isku day.",
     "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama merge request ah",
     "announce": {
       "commentPosted": "Faallada waa la daabacay",

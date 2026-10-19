@@ -788,6 +788,7 @@
       "truncationBanner_many": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}."
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia.",
+    "linkPasteDenied": "Prieiga prie įklijavimo atmesta. Leiskite įklijuoti ir bandykite dar kartą.",
     "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
     "announce": {
       "commentPosted": "Komentaras paskelbtas",

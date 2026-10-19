@@ -57,6 +57,10 @@ export function selectPrLinkClearButtonVisible(input: PrLinkClearButtonInput): b
 export function prLinkToastClipboardEmptyCopy(): string {
   return i18n.t('prReview.linkPasteClipboardEmpty');
 }
+/** Toast copy when the OS denied the clipboard read. */
+export function prLinkToastPasteDeniedCopy(): string {
+  return i18n.t('prReview.linkPasteDenied');
+}
 /** Toast copy when paste or Open gets a link no provider serves. */
 export function prLinkToastInvalidCopy(): string {
   // Reuses the pre-s7 key: it exists in all 86 catalogs, and renaming it in

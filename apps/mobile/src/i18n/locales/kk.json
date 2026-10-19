@@ -756,6 +756,7 @@
       "truncationBanner_other": "Өзгертілген {{total}} файлдың алғашқы {{limit}} файлы көрсетілуде — бұл GitHub API шектеуі."
     },
     "linkPasteClipboardEmpty": "Алмасу буфері бос.",
+    "linkPasteDenied": "Қоюға рұқсат берілмеді. Қоюға рұқсат беріп, қайталап көріңіз.",
     "linkPasteNotAPullRequest": "Бұл тарту немесе біріктіру сұрауының сілтемесі емес.",
     "announce": {
       "commentPosted": "Пікір жарияланды",

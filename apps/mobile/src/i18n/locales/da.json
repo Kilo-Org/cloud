@@ -756,6 +756,7 @@
       "truncationBanner_other": "Kun de første {{limit}} af {{total}} ændrede filer vises på grund af en begrænsning i GitHub API."
     },
     "linkPasteClipboardEmpty": "Udklipsholderen er tom.",
+    "linkPasteDenied": "Adgang til indsættelse blev afvist. Tillad indsættelse, og prøv igen.",
     "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller merge request",
     "announce": {
       "commentPosted": "Kommentar sendt",

@@ -772,6 +772,7 @@
       "truncationBanner_few": "Se afișează primele {{limit}} din {{total}} fișiere modificate, din cauza limitei API-ului GitHub."
     },
     "linkPasteClipboardEmpty": "Clipboardul este gol.",
+    "linkPasteDenied": "Accesul la lipire a fost refuzat. Permiteți lipirea și încercați din nou.",
     "linkPasteNotAPullRequest": "Aceasta nu este o legătură către un PR sau un merge request",
     "announce": {
       "commentPosted": "Comentariu publicat",

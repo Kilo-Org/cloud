@@ -804,6 +804,7 @@
       "truncationBanner_many": "Tá na chéad {{limit}} chomhad as {{total}} comhad athraithe á dtaispeáint — teorainn API GitHub."
     },
     "linkPasteClipboardEmpty": "Tá an ghearrthaisce folamh.",
+    "linkPasteDenied": "Diúltaíodh rochtain ar ghreamú. Ceadaigh greamú agus bain triail eile as.",
     "linkPasteNotAPullRequest": "Ní nasc d’iarratas tarraingthe ná d’iarratas cumaisc é seo",
     "announce": {
       "commentPosted": "Trácht postáilte",

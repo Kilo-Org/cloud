@@ -756,6 +756,7 @@
       "truncationBanner_other": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir."
     },
     "linkPasteClipboardEmpty": "Mübadilə buferi boşdur.",
+    "linkPasteDenied": "Yapışdırma icazəsi rədd edildi. Yapışdırmağa icazə verin və yenidən cəhd edin.",
     "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
     "announce": {
       "commentPosted": "Şərh göndərildi",

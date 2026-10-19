@@ -57,6 +57,7 @@ import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { activeOrganizationAccessSql } from '@kilocode/web-shared/lib/organizations/active-organization-access';
 import {
   recordKiloAdminElevation,
   UNSCOPED_TARGET,
@@ -893,15 +894,9 @@ async function addOrganizationCondition(
         target: UNSCOPED_TARGET,
       });
     } else {
-      whereConditions.push(sql`(
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${ctx.user.id}
-        )
-      )`);
+      whereConditions.push(
+        activeOrganizationAccessSql(cli_sessions_v2.organization_id, ctx.user.id)
+      );
     }
     return;
   }

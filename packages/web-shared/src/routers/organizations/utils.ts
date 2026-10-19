@@ -17,8 +17,12 @@ import {
   recordKiloAdminElevation,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
+import { activeOrganizationJoinCondition } from '@kilocode/worker-utils';
+
+const parentOrganizations = alias(organizations, 'parent_organizations');
 
 export const OrganizationIdInputSchema = z.object({
   organizationId: z.uuid(),
@@ -52,6 +56,10 @@ export async function ensureOrganizationAccess(
   const directRows = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
+    .innerJoin(
+      organizations,
+      activeOrganizationJoinCondition(organization_memberships.organization_id)
+    )
     .where(
       and(
         eq(organization_memberships.kilo_user_id, ctx.user.id),
@@ -63,6 +71,13 @@ export async function ensureOrganizationAccess(
     .select({ role: organization_memberships.role })
     .from(organizations)
     .innerJoin(
+      parentOrganizations,
+      and(
+        eq(parentOrganizations.id, organizations.parent_organization_id),
+        isNull(parentOrganizations.deleted_at)
+      )
+    )
+    .innerJoin(
       organization_memberships,
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
@@ -70,7 +85,7 @@ export async function ensureOrganizationAccess(
         inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
-    .where(eq(organizations.id, organizationId));
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
 
   const rows = [...directRows, ...inheritedRows];
 
@@ -123,6 +138,10 @@ export async function getOrganizationsAccessRoles(
       role: organization_memberships.role,
     })
     .from(organization_memberships)
+    .innerJoin(
+      organizations,
+      activeOrganizationJoinCondition(organization_memberships.organization_id)
+    )
     .where(
       and(
         eq(organization_memberships.kilo_user_id, ctx.user.id),
@@ -137,6 +156,13 @@ export async function getOrganizationsAccessRoles(
     })
     .from(organizations)
     .innerJoin(
+      parentOrganizations,
+      and(
+        eq(parentOrganizations.id, organizations.parent_organization_id),
+        isNull(parentOrganizations.deleted_at)
+      )
+    )
+    .innerJoin(
       organization_memberships,
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
@@ -144,7 +170,7 @@ export async function getOrganizationsAccessRoles(
         inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
-    .where(inArray(organizations.id, uniqueIds));
+    .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at)));
 
   const rolesByOrg = new Map<string, OrganizationRole[]>();
   for (const row of [...directRows, ...inheritedRows]) {
@@ -211,7 +237,10 @@ export async function ensureOrganizationAccessAndFetchOrg(
       organization: organizations,
     })
     .from(organization_memberships)
-    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+    .innerJoin(
+      organizations,
+      activeOrganizationJoinCondition(organization_memberships.organization_id)
+    )
     .where(
       and(
         eq(organization_memberships.kilo_user_id, ctx.user.id),
@@ -226,6 +255,13 @@ export async function ensureOrganizationAccessAndFetchOrg(
     })
     .from(organizations)
     .innerJoin(
+      parentOrganizations,
+      and(
+        eq(parentOrganizations.id, organizations.parent_organization_id),
+        isNull(parentOrganizations.deleted_at)
+      )
+    )
+    .innerJoin(
       organization_memberships,
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
@@ -233,7 +269,7 @@ export async function ensureOrganizationAccessAndFetchOrg(
         inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
-    .where(eq(organizations.id, organizationId));
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
 
   const rows = [...directRows, ...inheritedRows];
 

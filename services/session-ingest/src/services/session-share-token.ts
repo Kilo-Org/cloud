@@ -1,8 +1,18 @@
 import { jwtVerify, SignJWT } from 'jose';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  kilocode_users,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+  personalOrActiveOrganizationCondition,
+} from '@kilocode/worker-utils';
 import { z } from 'zod';
 
 import type { Env } from '../env';
@@ -137,11 +147,20 @@ export async function resolveSessionShareToken(
     })
     .from(cli_sessions_v2)
     .leftJoin(kilocode_users, eq(cli_sessions_v2.kilo_user_id, kilocode_users.id))
+    .leftJoin(
+      organization_memberships,
+      organizationMembershipJoinCondition(
+        cli_sessions_v2.kilo_user_id,
+        cli_sessions_v2.organization_id
+      )
+    )
+    .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
     .where(
       and(
         eq(cli_sessions_v2.session_id, payload.sub),
         isNotNull(cli_sessions_v2.public_id),
-        eq(cli_sessions_v2.public_id, payload.jti)
+        eq(cli_sessions_v2.public_id, payload.jti),
+        personalOrActiveOrganizationCondition(cli_sessions_v2.organization_id)
       )
     )
     .limit(1);

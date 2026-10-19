@@ -13,6 +13,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { organization_memberships, organizations, type User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * `is_admin` on these helpers is the escape hatch that lets a Kilo employee read
@@ -158,6 +159,94 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     expect(events[0]).toMatchObject({
       reason: 'organization_fetch',
       target: `organization:${missingId}`,
+    });
+  });
+
+  test('denies direct membership in a soft-deleted organization', async () => {
+    const member = await insertTestUser();
+    const organization = await createTestOrganization(
+      `deleted-direct-${crypto.randomUUID()}`,
+      member.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    await expect(ensureOrganizationAccess(ctxFor(member), organization.id)).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+    const roles = await getOrganizationsAccessRoles(ctxFor(member), [organization.id]);
+    expect(roles.has(organization.id)).toBe(false);
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(ctxFor(member), organization.id)
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  test('keeps parent-inherited access while the target and parent are live', async () => {
+    const parentOwner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createTestOrganization(
+      `live-parent-${crypto.randomUUID()}`,
+      parentOwner.id,
+      0
+    );
+    const child = await createTestOrganization(
+      `live-child-${crypto.randomUUID()}`,
+      childOwner.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+
+    await expect(ensureOrganizationAccess(ctxFor(parentOwner), child.id)).resolves.toBe('owner');
+    await expect(getOrganizationsAccessRoles(ctxFor(parentOwner), [child.id])).resolves.toEqual(
+      new Map([[child.id, 'owner']])
+    );
+  });
+
+  test('denies inherited access when the target organization is soft-deleted', async () => {
+    const parentOwner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createTestOrganization(`parent-${crypto.randomUUID()}`, parentOwner.id, 0);
+    const child = await createTestOrganization(
+      `deleted-child-${crypto.randomUUID()}`,
+      childOwner.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id, deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, child.id));
+
+    await expect(ensureOrganizationAccess(ctxFor(parentOwner), child.id)).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+  });
+
+  test('denies inherited access when the parent organization is soft-deleted', async () => {
+    const parentOwner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createTestOrganization(
+      `deleted-parent-${crypto.randomUUID()}`,
+      parentOwner.id,
+      0
+    );
+    const child = await createTestOrganization(`child-${crypto.randomUUID()}`, childOwner.id, 0);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, parent.id));
+
+    await expect(ensureOrganizationAccess(ctxFor(parentOwner), child.id)).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
     });
   });
 });

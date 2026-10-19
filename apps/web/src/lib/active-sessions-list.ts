@@ -12,6 +12,7 @@ import {
   github_branch_pull_requests,
 } from '@kilocode/db/schema';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { activeOrganizationAccessSql } from '@kilocode/web-shared/lib/organizations/active-organization-access';
 import {
   associatedPrSchema,
   formatAssociatedPr,
@@ -475,7 +476,13 @@ export async function listActiveSessions({
         .from(cli_sessions_v2)
         .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
         .where(
-          and(eq(cli_sessions_v2.kilo_user_id, userId), inArray(cli_sessions_v2.session_id, ids))
+          and(
+            eq(cli_sessions_v2.kilo_user_id, userId),
+            inArray(cli_sessions_v2.session_id, ids),
+            organizationId === undefined
+              ? activeOrganizationAccessSql(cli_sessions_v2.organization_id, userId)
+              : undefined
+          )
         );
     } catch (error) {
       console.warn('[active-sessions] enrichment db query failed:', error);
@@ -585,6 +592,9 @@ export async function listActiveSessions({
             isNull(cli_sessions_v2.parent_session_id),
             isNotNull(cli_sessions_v2.cloud_agent_session_id),
             orgPredicate,
+            organizationId === undefined
+              ? activeOrganizationAccessSql(cli_sessions_v2.organization_id, userId)
+              : undefined,
             livePredicate
           )
         )

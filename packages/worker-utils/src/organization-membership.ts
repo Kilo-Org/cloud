@@ -1,8 +1,58 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 
 type OrganizationMembershipDb = Pick<WorkerDb, 'select'>;
+
+type OrganizationIdColumn = AnyPgColumn;
+
+/**
+ * Join condition for the caller's membership in the row's organization.
+ * Pair it with {@link activeOrganizationJoinCondition} so a soft-deleted
+ * organization cannot satisfy the membership join.
+ */
+export function organizationMembershipJoinCondition(
+  kiloUserId: string | AnyPgColumn,
+  organizationIdColumn: OrganizationIdColumn
+): SQL {
+  return (
+    and(
+      eq(organization_memberships.organization_id, organizationIdColumn),
+      eq(organization_memberships.kilo_user_id, kiloUserId)
+    ) ?? sql`false`
+  );
+}
+
+/**
+ * Join condition for the row's live organization. The `deleted_at IS NULL`
+ * check is what makes an "active" membership decision deny a soft-deleted
+ * target organization.
+ */
+export function activeOrganizationJoinCondition(organizationIdColumn: OrganizationIdColumn): SQL {
+  return (
+    and(eq(organizations.id, organizationIdColumn), isNull(organizations.deleted_at)) ?? sql`false`
+  );
+}
+
+/**
+ * True for personal rows or org rows whose organization membership joined
+ * through the conditions above. Callers must add both left joins.
+ */
+export function personalOrActiveOrganizationCondition(
+  organizationIdColumn: OrganizationIdColumn
+): SQL {
+  return (
+    or(
+      isNull(organizationIdColumn),
+      and(
+        isNotNull(organization_memberships.id),
+        isNotNull(organizations.id),
+        isNull(organizations.deleted_at)
+      )
+    ) ?? sql`false`
+  );
+}
 
 /**
  * True when the user has a direct membership row for the organization and the
@@ -12,10 +62,8 @@ type OrganizationMembershipDb = Pick<WorkerDb, 'select'>;
  * Deliberately excluded:
  * - Parent-organization inherited roles — honoured only by the tRPC path
  *   (`packages/web-shared/src/routers/organizations/utils.ts`), restricted to
- *   owner/billing_manager. No worker-side check considers them; adding
- *   inheritance here would make this the single most permissive worker check in
- *   the repo, in a security fix. The pre-existing gap is uniform across every
- *   worker path and is not this PR's to change.
+ *   owner/admin/billing_manager. Worker-side session checks do not consider
+ *   them.
  * - `kilocode_users.is_admin` — no worker session-access path consults it, and
  *   session-ingest JWT auth deliberately discards every JWT claim except
  *   `kiloUserId`.
@@ -29,10 +77,7 @@ export async function hasOrganizationAccess(
     .from(organization_memberships)
     .innerJoin(
       organizations,
-      and(
-        eq(organizations.id, organization_memberships.organization_id),
-        isNull(organizations.deleted_at)
-      )
+      activeOrganizationJoinCondition(organization_memberships.organization_id)
     )
     .where(
       and(

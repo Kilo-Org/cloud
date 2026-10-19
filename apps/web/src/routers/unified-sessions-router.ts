@@ -6,6 +6,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { activeOrganizationAccessSql } from '@kilocode/web-shared/lib/organizations/active-organization-access';
 
 const PAGE_SIZE = 10;
 const RECENT_DAYS_LIMIT = 200;
@@ -119,6 +120,11 @@ function buildScopeFragments(
     } else {
       fragments.push(sql`${table.organization_id} = ${opts.organizationId}`);
     }
+  } else {
+    // Unfiltered lists span every organization the user has owned sessions in.
+    // Keep only personal rows and rows whose organization still grants the
+    // caller access, so former-org metadata disappears after removal/deletion.
+    fragments.push(activeOrganizationAccessSql(table.organization_id, opts.userId));
   }
 
   if (!opts.includeSubSessions) {

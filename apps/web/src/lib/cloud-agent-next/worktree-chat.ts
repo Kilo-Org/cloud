@@ -1,6 +1,10 @@
 import 'server-only';
 import type { User } from '@kilocode/db/schema';
-import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+} from '@kilocode/worker-utils';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
@@ -128,7 +132,8 @@ export async function createWorktreeChat({
   const organizationCondition = organizationId
     ? and(
         eq(cli_sessions_v2.organization_id, organizationId),
-        isNotNull(organization_memberships.id)
+        isNotNull(organization_memberships.id),
+        isNotNull(organizations.id)
       )
     : isNull(cli_sessions_v2.organization_id);
 
@@ -140,11 +145,9 @@ export async function createWorktreeChat({
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-        eq(organization_memberships.kilo_user_id, user.id)
-      )
+      organizationMembershipJoinCondition(user.id, cli_sessions_v2.organization_id)
     )
+    .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
     .where(
       and(
         eq(cli_sessions_v2.session_id, sourceKiloSessionId),

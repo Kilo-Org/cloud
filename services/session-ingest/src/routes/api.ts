@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { sql, eq, and, inArray, isNull, or, isNotNull } from 'drizzle-orm';
+import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
 import {
@@ -15,7 +15,13 @@ import {
 } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';
-import { zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+  personalOrActiveOrganizationCondition,
+  zodJsonValidator,
+  withDORetry,
+} from '@kilocode/worker-utils';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
@@ -614,16 +620,14 @@ api.get('/session/:sessionId/messages', async c => {
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-        eq(organization_memberships.kilo_user_id, kiloUserId)
-      )
+      organizationMembershipJoinCondition(kiloUserId, cli_sessions_v2.organization_id)
     )
+    .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
     .where(
       and(
         eq(cli_sessions_v2.session_id, inputParse.data.kiloSessionId),
         eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-        or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id))
+        personalOrActiveOrganizationCondition(cli_sessions_v2.organization_id)
       )
     )
     .limit(1);

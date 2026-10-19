@@ -1575,6 +1575,27 @@ describe('cli-sessions-v2-router', () => {
       }
     });
 
+    it('list omits organization sessions after the organization is soft-deleted', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ deleted_at: new Date().toISOString() })
+          .where(eq(organizations.id, testOrganization.id));
+
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(
+          organizationSessionId
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ deleted_at: null })
+          .where(eq(organizations.id, testOrganization.id));
+      }
+    });
+
     it('list preserves platform-admin access without organization membership', async () => {
       const adminSessionId = 'ses_read_auth_admin_1234';
       await db.insert(cli_sessions_v2).values({

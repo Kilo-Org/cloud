@@ -1080,26 +1080,13 @@ app.put(
       return projectSessionAccessHttpError(error);
     }
 
-    if (logUploadContentLengthTooLarge(c.req.header('Content-Length'))) {
-      return c.text('Request body too large', 413);
-    }
-
-    // Apply the size cap while the body streams in.
-    const body = await readBoundedBodyBytes(c.req.raw, MAX_LOG_UPLOAD_BYTES);
-    if (body === null) {
-      return c.text('Request body too large', 413);
-    }
-    if (body.byteLength === 0) {
-      return c.text('Missing request body', 400);
-    }
-
     const safeUserId = encodeURIComponent(userId);
     const safeSessionId = encodeURIComponent(sessionId);
     const safeExecutionId = encodeURIComponent(executionId);
     const objectKey = `logs/${safeUserId}/${safeSessionId}/${safeExecutionId}/${filename}`;
 
     // Keep the number of archives a session prefix holds within the cap.
-    // Re-uploading an existing archive key stays allowed at the cap, and a
+    // Re-uploading an existing archive key stays allowed at any count, and a
     // count-check outage fails closed.
     let existing: { objects: Array<{ key: string }> };
     try {
@@ -1113,9 +1100,27 @@ app.put(
         .error('R2 list failed for log upload');
       return c.text('Log archive limit check failed', 500);
     }
-    const atCap = existing.objects.length > MAX_LOG_OBJECTS_PER_SESSION;
-    if (atCap && !existing.objects.some(obj => obj.key === objectKey)) {
+    // list() returns a truncated page, so whether this request re-uploads an
+    // existing key is resolved with a direct object lookup instead of page
+    // membership; the lookup runs only when the count reaches the boundary.
+    const atCap =
+      existing.objects.length >= MAX_LOG_OBJECTS_PER_SESSION &&
+      !(await c.env.R2_BUCKET.head(objectKey));
+    if (atCap) {
       return c.text('Too many log archives for this session', 429);
+    }
+
+    if (logUploadContentLengthTooLarge(c.req.header('Content-Length'))) {
+      return c.text('Request body too large', 413);
+    }
+
+    // Apply the size cap while the body streams in.
+    const body = await readBoundedBodyBytes(c.req.raw, MAX_LOG_UPLOAD_BYTES);
+    if (body === null) {
+      return c.text('Request body too large', 413);
+    }
+    if (body.byteLength === 0) {
+      return c.text('Missing request body', 400);
     }
 
     try {

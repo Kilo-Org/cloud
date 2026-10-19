@@ -64,6 +64,14 @@ it('accepts a single chunk larger than the current buffer when it fits the cap',
   expect(result?.at(699)).toBe(5);
 });
 
+it('applies the empty-read bound to a long run of empty chunks', async () => {
+  const chunks: Array<Uint8Array | 'stall'> = [];
+  for (let i = 0; i < 5000; i++) chunks.push(new Uint8Array(0));
+  chunks.push(chunkOf(4, 1));
+  const request = body(chunks);
+  await expect(readBoundedRequestBodyBytes(request, CAP)).resolves.toBeUndefined();
+});
+
 it('gives up at the read deadline when the body stalls mid-read', async () => {
   vi.useFakeTimers();
   try {

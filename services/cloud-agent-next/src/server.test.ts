@@ -2423,6 +2423,7 @@ describe('server wrapper log upload route', () => {
       R2_BUCKET: {
         put: vi.fn().mockResolvedValue(undefined),
         list: vi.fn().mockResolvedValue({ objects: [] }),
+        head: vi.fn().mockResolvedValue(null),
       },
     });
   }
@@ -2665,7 +2666,6 @@ describe('server wrapper log upload route', () => {
 
     expect(response.status).toBe(413);
     expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
-    expect(env.R2_BUCKET.list).not.toHaveBeenCalled();
   });
 
   it('rejects a declared Content-Length above the size cap', async () => {
@@ -2739,12 +2739,13 @@ describe('server wrapper log upload route', () => {
     expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
   });
 
-  it('rejects a new archive once the session prefix holds the object cap', async () => {
+  it('stops a new archive at the object-count boundary', async () => {
     const env = createLogEnv();
-    const objects = Array.from({ length: 501 }, (_, i) => ({
-      key: `logs/usr_feed/agent_live/session-${i}/logs.tar.gz`,
-    }));
-    env.R2_BUCKET.list.mockResolvedValue({ objects });
+    env.R2_BUCKET.list.mockResolvedValue({
+      objects: Array.from({ length: 500 }, (_, i) => ({
+        key: `logs/usr_feed/agent_live/session-${i}/logs.tar.gz`,
+      })),
+    });
 
     const response = await fetchWorker(
       new Request(
@@ -2759,16 +2760,43 @@ describe('server wrapper log upload route', () => {
     );
 
     expect(response.status).toBe(429);
+    expect(env.R2_BUCKET.head).toHaveBeenCalledOnce();
     expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+  });
+
+  it('skips the head lookup while the prefix is below the object cap', async () => {
+    const env = createLogEnv();
+    env.R2_BUCKET.list.mockResolvedValue({
+      objects: Array.from({ length: 499 }, (_, i) => ({
+        key: `logs/usr_feed/agent_live/session-${i}/logs.tar.gz`,
+      })),
+    });
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
+          body: new Uint8Array([1, 2, 3]),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.R2_BUCKET.head).not.toHaveBeenCalled();
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
   });
 
   it('still overwrites an existing archive at the object cap', async () => {
     const env = createLogEnv();
-    const objects = Array.from({ length: 501 }, (_, i) => ({
-      key: `logs/usr_feed/agent_live/session-${i}/logs.tar.gz`,
-    }));
-    objects[0] = { key: 'logs/usr_feed/agent_live/session/logs.tar.gz' };
-    env.R2_BUCKET.list.mockResolvedValue({ objects });
+    env.R2_BUCKET.list.mockResolvedValue({
+      objects: Array.from({ length: 500 }, (_, i) => ({
+        key: `logs/usr_feed/agent_live/session-${i}/logs.tar.gz`,
+      })),
+    });
+    env.R2_BUCKET.head.mockResolvedValue({ key: 'logs/usr_feed/agent_live/session/logs.tar.gz' });
 
     const response = await fetchWorker(
       new Request(
@@ -2784,6 +2812,63 @@ describe('server wrapper log upload route', () => {
 
     expect(response.status).toBe(204);
     expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+  });
+
+  it('overwrites an existing archive even when the prefix holds more keys than the cap', async () => {
+    const env = createLogEnv();
+    env.R2_BUCKET.list.mockResolvedValue({
+      objects: Array.from({ length: 501 }, (_, i) => ({
+        key: `logs/usr_feed/agent_live/session-${i}/logs.tar.gz`,
+      })),
+    });
+    env.R2_BUCKET.head.mockResolvedValue({ key: 'logs/usr_feed/agent_live/session/logs.tar.gz' });
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
+          body: new Uint8Array([1, 2, 3]),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+  });
+
+  it('evaluates the archive count before reading the body', async () => {
+    const env = createLogEnv();
+    env.R2_BUCKET.list.mockResolvedValue({
+      objects: Array.from({ length: 500 }, (_, i) => ({
+        key: `logs/usr_feed/agent_live/session-${i}/logs.tar.gz`,
+      })),
+    });
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+        controller.close();
+      },
+    });
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
+          body: stream,
+          // @ts-expect-error -- Node fetch needs duplex for streaming request bodies
+          duplex: 'half',
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(429);
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
   });
 
   it('fails closed when the archive limit check errors', async () => {

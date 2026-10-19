@@ -56,7 +56,9 @@ export async function resolveActiveRouteCached(params: {
   const nowMs = params.nowMs ?? Date.now();
   const entry = readEntry(params.route, nowMs);
   if (entry) {
-    return entry.connectResourceId === null ? null : { connect_resource_id: entry.connectResourceId };
+    return entry.connectResourceId === null
+      ? null
+      : { connect_resource_id: entry.connectResourceId };
   }
   const resolved = await resolveActiveRoute({ env: params.env, route: params.route });
   writeEntry(params.route, resolved ? resolved.route.connect_resource_id : null, nowMs);

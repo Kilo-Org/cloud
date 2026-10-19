@@ -159,7 +159,10 @@ describe('proxyUpstream', () => {
     } as const;
 
     const first = await proxyUpstream({ ...baseParams, remoteUrl: 'https://cached.example/mcp' });
-    const second = await proxyUpstream({ ...baseParams, remoteUrl: 'https://cached.example/other' });
+    const second = await proxyUpstream({
+      ...baseParams,
+      remoteUrl: 'https://cached.example/other',
+    });
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);

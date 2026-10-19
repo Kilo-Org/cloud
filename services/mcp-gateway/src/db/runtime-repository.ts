@@ -125,7 +125,10 @@ export async function resolveRuntimeState(params: {
   route: ScopedConnectRoute;
   userId: string;
   /** Route already resolved for this request; skips the duplicate route query. */
-  resolvedRoute?: { route: typeof mcp_gateway_connect_resources.$inferSelect; config: typeof mcp_gateway_configs.$inferSelect };
+  resolvedRoute?: {
+    route: typeof mcp_gateway_connect_resources.$inferSelect;
+    config: typeof mcp_gateway_configs.$inferSelect;
+  };
 }): Promise<RuntimeResolution | null> {
   const db = getRuntimeDb(params.env);
   const resolved = params.resolvedRoute ?? (await resolveActiveRoute(params));

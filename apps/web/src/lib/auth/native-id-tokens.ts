@@ -23,10 +23,11 @@ export class NonceStoreUnavailableError extends Error {}
 const NONCE_TTL_CAP_SECONDS = 10 * 60;
 
 /**
- * End instant for the relaxed path: Apple sign-ins without a nonce are
- * accepted only strictly before this instant, and only while the deployment
- * toggle is on. Unset (or passed) ⇒ the nonce is always required. Read per
- * call so a deployment can change it without a redeploy.
+ * End instant for the transition window: the nonce requirement applies from
+ * this instant onward. Before it, the deployment can enable a runtime toggle
+ * (below) to keep accepting earlier request shapes. Unset (or passed) ⇒ the
+ * requirement applies unconditionally. Read per call so a deployment can
+ * change it without a redeploy.
  */
 function relaxedPathEnd(): Date | null {
   const raw = getEnvVariable('NATIVE_APPLE_NONCE_REQUIRED_SINCE');
@@ -36,10 +37,11 @@ function relaxedPathEnd(): Date | null {
 }
 
 /**
- * Deployment switch for the relaxed path. It reads as false whenever the
- * check cannot complete, so the nonce requirement stays active by default.
+ * Deployment switch for the transition window: while enabled and before the
+ * end instant, the nonce requirement is deferred. It reads as false whenever
+ * the check cannot complete, so the requirement stays active by default.
  */
-const RELAXED_NONCE_PATH_TOGGLE = 'native-apple-signin-nonce-required';
+const RELAXED_NONCE_PATH_TOGGLE = 'native-apple-signin-nonce-relaxed-path';
 
 async function relaxedNoncePathAllowed(): Promise<boolean> {
   const end = relaxedPathEnd();

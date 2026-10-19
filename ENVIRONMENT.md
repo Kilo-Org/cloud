@@ -204,6 +204,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NATIVE_ADMISSION_MODE` - Native admission enforcement mode: `off` (default), `report`, or `enforce`. [SERVER]
 - `NATIVE_ADMISSION_SIMULATOR_BYPASS` - When `true` in non-production, bypasses Play Integrity API verification. [SERVER]
 - `APPLE_JWKS_URL_OVERRIDE` - Apple JWKS endpoint override for local verification runs; applies only outside production deployments. [SERVER]
+- `NATIVE_APPLE_NONCE_REQUIRED_SINCE` - ISO 8601 instant; the native Apple sign-in nonce requirement applies from this instant onward. Before it, requests are accepted without the field while the `native-apple-signin-nonce-relaxed-path` release toggle is enabled. Unset, invalid, or past ⇒ the requirement applies unconditionally. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
 - `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]

@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Kōwhiria ngā pūranga hei aroturuki mā te Kaiāwhina haumarutanga",
       "analysisModeSubtitle": "Tātari {{mode}}",
       "automationAllOff": "Kua weto katoa",
-      "automationCount": "{{displayCount}} o te 3 kua whakahohea",
-      "notificationsCount": "{{displayCount}} o te 2 kua whakahohea",
+      "automationCount": "{{displayCount}} o te {{total}} kua whakahohea",
+      "notificationsCount": "{{displayCount}} o te {{total}} kua whakahohea",
       "disabledNoManage": "Kua monoa te Kaiāwhina haumarutanga. Ko ngā rangatira o te rōpū me ngā kaiwhakahaere nama anake ka āhei ki te whakahohe.",
       "disabledNoRepo": "Kōwhiria kia kotahi neke atu te pūranga i mua i te whakahohe i te Kaiāwhina haumarutanga.",
       "disabledPrompt": "Whakahohea te Kaiāwhina haumarutanga hei tukutahi i ngā matohi Dependabot, hei kōwhiri i ngā pūranga, hei whirihora hoki i te aunoatanga."
@@ -1817,9 +1817,9 @@
       "highDescription": "Ka whākina pea te nui o ngā raraunga.",
       "mediumDescription": "He iti te pānga, he āhuatanga motuhake rānei.",
       "lowDescription": "He iti rawa te pānga ki te haumarutanga.",
-      "invalidDayCount": "me 1–365 rā; me tau tōpū anake.",
+      "invalidDayCount": "me {{min}}–{{max}} rā; me tau tōpū anake.",
       "remediationDeadlineA11y": "Te wā kati whakatika mō te taumata {{label}}, i ngā rā",
-      "enterWholeNumber": "Whakaurua he tau tōpū i waenga i te 1 me te 365",
+      "enterWholeNumber": "Whakaurua he tau tōpū i waenga i te {{min}} me te {{max}}",
       "permissionNote": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere nama anake ka āhei ki te huri i ēnei tautuhinga.",
       "enableTracking": "Whakahohea te aroturuki SLA",
       "enableTrackingSubtitle": "Whakaritea ngā wā kati whakatika e ai ki te taumata kino o te kitenga.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Te taumata kino iti rawa mō ngā kitenga hou",
       "newFindingSubtitle": "Ka tukuna ina tukutahitia he kitenga hou, tae atu ki te tukutahi tuatahi.",
       "slaLeadTimeAccessibility": "Ngā rā i mua i te wā kati SLA hei tuku whakatūpato",
-      "slaLeadTimeError": "Whakaurua te maha o ngā rā hei tau tōpū mai i te 1 ki te 365.",
+      "slaLeadTimeError": "Whakaurua te maha o ngā rā hei tau tōpū mai i te {{min}} ki te {{max}}.",
       "slaLeadTimeLabel": "Te wā whakatūpato i mua i te wā kati SLA (rā)",
       "slaPersonalTitle": "Tukuna he īmēra ki ahau mō ngā whakatūpato SLA",
       "slaSection": "Te whakamōhiotanga whakatūpato SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Kāore i angitu te tuku. Tēnā whakamātau anō.",
       "questionAnnouncement": "E hiahia ana te māngai ki tō whakautu. Ka whakatārewatia te pouaka karere i a koe e whakautu ana.",
       "permissionAnnouncement": "Me whai whakaaetanga te māngai kia haere tonu. Ka whakatārewatia te pouaka karere i a koe e whakatau ana.",
-      "positionHint": "(1 o {{displayCount}})",
+      "positionHint": "({{index}} o {{displayCount}})",
       "movedPastPrompt": "Kua hipa te māngai i tēnei tono. Ka kati tēnei kāri ina haere tonu te wātū.",
       "waitingForAnswer": "Kei te tatari te māngai ki tō whakautu. Ka whakatārewatia tō karere ki te māngai i te wā e tuwhera ana tēnei pātai.",
       "waitingForPermission": "Kei te tatari te māngai ki te whakaaetanga. Ka whakatārewatia tō karere ki te māngai i te wā e tuwhera ana tēnei tono."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Whakatūpato ina iti iho i te (USD)",
       "title": "Te whakatūpato toenga iti",
       "emailsError": "Whakaurua kia kotahi neke atu rānei ngā wāhitau īmēra tika. Wehewehea ki ngā piko.",
-      "thresholdError": "Whakaurua he moni nui ake i te 0."
+      "thresholdError": "Whakaurua he moni nui ake i te {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Te tepe (USD ia rā)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Tangohia te tepe",
       "title": "Te tepe whakamahinga ā-rā",
       "blankError": "Whakaurua he moni, tangohia rānei te tepe mā te pātene i raro nei.",
-      "rangeError": "Whakaurua he moni i waenga i te 0 me te {{max}}."
+      "rangeError": "Whakaurua he moni i waenga i te {{min}} me te {{max}}."
     },
     "members": {
       "changeRole": "Hurihia te tūranga",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",
-      "last30Days": "Ngā rā e 30 kua hipa",
+      "last30Days": "Ngā rā e {{days}} kua hipa",
       "outputTokens": "Ngā tōkena tāputa",
       "requests": "Ngā tono"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Kei runga rawa tētahi hāora i te tere noa o tēnei rohe",
     "limitLabel": "Paepae (USD)",
     "windowLabel": "Matapihi",
-    "window24h": "24 hāora",
-    "window7d": "7 rā",
-    "window30d": "30 rā",
+    "window24h": "{{hours}} hāora",
+    "window7d": "{{days}} rā",
+    "window30d": "{{days}} rā",
     "multiplierLabel": "Whakarea pikinga",
     "saved": "Kua tiakina ngā tautuhinga matohi whakapaunga",
     "loadError": "Kāore i taea ngā matohi whakapaunga te uta.",
     "saveError": "Kāore i taea ngā matohi whakapaunga te tiaki.",
     "empty": "Kua weto ngā matohi whakapaunga. Whakahohea kia mōhio ai ngā hoapā nama o tēnei rohe.",
     "noSpend": "Kāore anō kia tuhia he whakapaunga",
-    "spend24h": "Whakapaunga i ngā 24 hāora kua hipa",
-    "multiplierError": "Whakaurua he whakarea 1, nui ake rānei",
+    "spend24h": "Whakapaunga i ngā {{hours}} hāora kua hipa",
+    "multiplierError": "Whakaurua he whakarea {{min}}, nui ake rānei",
     "permissionDenied": "Kāore ō whakaaetanga ki te whakahaere i ngā matohi whakapaunga.",
     "pushOffByCategory": "Weto i roto i Ngā whakamōhiotanga"
   },

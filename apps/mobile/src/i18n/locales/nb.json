@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Velg hvilke kodelagre sikkerhetsagenten overvåker",
       "analysisModeSubtitle": "Analyse: {{mode}}",
       "automationAllOff": "Alt er deaktivert",
-      "automationCount": "{{displayCount}} av 3 aktivert",
-      "notificationsCount": "{{displayCount}} av 2 aktivert",
+      "automationCount": "{{displayCount}} av {{total}} aktivert",
+      "notificationsCount": "{{displayCount}} av {{total}} aktivert",
       "disabledNoManage": "Sikkerhetsagenten er deaktivert. Bare organisasjonseiere og faktureringsansvarlige kan aktivere den.",
       "disabledNoRepo": "Velg minst ett kodelager før du aktiverer sikkerhetsagenten.",
       "disabledPrompt": "Aktiver sikkerhetsagenten for å synkronisere Dependabot-varsler, velge kodelagre og sette opp automatisering."
@@ -1817,9 +1817,9 @@
       "highDescription": "Kan eksponere betydelige mengder data.",
       "mediumDescription": "Har begrensede konsekvenser eller krever bestemte forhold.",
       "lowDescription": "Har minimale konsekvenser for sikkerheten.",
-      "invalidDayCount": "angi et helt antall dager fra 1 til 365.",
+      "invalidDayCount": "angi et helt antall dager fra {{min}} til {{max}}.",
       "remediationDeadlineA11y": "Utbedringsfrist i dager for alvorlighetsgrad {{label}}",
-      "enterWholeNumber": "Skriv inn et heltall mellom 1 og 365",
+      "enterWholeNumber": "Skriv inn et heltall mellom {{min}} og {{max}}",
       "permissionNote": "Bare organisasjonseiere og faktureringsansvarlige kan endre disse innstillingene.",
       "enableTracking": "Aktiver SLA-oppfølging",
       "enableTrackingSubtitle": "Angi utbedringsfrister ut fra funnenes alvorlighetsgrad.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Laveste alvorlighetsgrad for nye funn",
       "newFindingSubtitle": "Sendes hver gang et nytt funn synkroniseres, også ved første synkronisering.",
       "slaLeadTimeAccessibility": "Antall dager før SLA-fristen det skal varsles",
-      "slaLeadTimeError": "Skriv inn et helt antall dager mellom 1 og 365.",
+      "slaLeadTimeError": "Skriv inn et helt antall dager mellom {{min}} og {{max}}.",
       "slaLeadTimeLabel": "Varsle før SLA-fristen (dager)",
       "slaPersonalTitle": "Send meg e-post om SLA-varsler",
       "slaSection": "Varsling om SLA-frister",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Innsendingen mislyktes. Prøv igjen.",
       "questionAnnouncement": "Agenten trenger svar fra deg. Meldingsfeltet er deaktivert mens du svarer.",
       "permissionAnnouncement": "Agenten trenger tillatelse for å fortsette. Meldingsfeltet er deaktivert mens du bestemmer deg.",
-      "positionHint": "(1 av {{displayCount}})",
+      "positionHint": "({{index}} av {{displayCount}})",
       "movedPastPrompt": "Agenten har gått videre fra denne forespørselen. Kortet lukkes når økten fortsetter.",
       "waitingForAnswer": "Agenten venter på svaret ditt. Mens dette spørsmålet er åpent, er meldingen din til agenten satt på pause.",
       "waitingForPermission": "Agenten venter på tillatelse. Mens denne forespørselen er åpen, er meldingen din til agenten satt på pause."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Varsle under (USD)",
       "title": "Varsel om lav saldo",
       "emailsError": "Angi minst én gyldig e-postadresse. Skill flere adresser med komma.",
-      "thresholdError": "Angi et beløp større enn 0."
+      "thresholdError": "Angi et beløp større enn {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Grense (USD per dag)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Fjern grense",
       "title": "Daglig bruksgrense",
       "blankError": "Angi et beløp, eller fjern grensen med knappen nedenfor.",
-      "rangeError": "Angi et beløp mellom 0 og {{max}}."
+      "rangeError": "Angi et beløp mellom {{min}} og {{max}}."
     },
     "members": {
       "changeRole": "Endre rolle",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",
-      "last30Days": "Siste 30 dager",
+      "last30Days": "Siste {{days}} dager",
       "outputTokens": "Utdatatokener",
       "requests": "Forespørsler"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Én time er langt over dette områdets vanlige rate",
     "limitLabel": "Grense (USD)",
     "windowLabel": "Vindu",
-    "window24h": "24 timer",
-    "window7d": "7 dager",
-    "window30d": "30 dager",
+    "window24h": "{{hours}} timer",
+    "window7d": "{{days}} dager",
+    "window30d": "{{days}} dager",
     "multiplierLabel": "Topp-multiplikator",
     "saved": "Innstillingene for forbruksvarsler er lagret",
     "loadError": "Forbruksvarslene kunne ikke lastes.",
     "saveError": "Forbruksvarslene kunne ikke lagres.",
     "empty": "Forbruksvarsler er av. Slå dem på for å varsle faktureringskontaktene i dette området.",
     "noSpend": "Ingen forbruk registrert ennå",
-    "spend24h": "Forbruk de siste 24 timene",
-    "multiplierError": "Angi en multiplikator på 1 eller mer",
+    "spend24h": "Forbruk de siste {{hours}} timene",
+    "multiplierError": "Angi en multiplikator på {{min}} eller mer",
     "permissionDenied": "Du har ikke tillatelse til å administrere forbruksvarsler.",
     "pushOffByCategory": "Av i Varsler"
   },

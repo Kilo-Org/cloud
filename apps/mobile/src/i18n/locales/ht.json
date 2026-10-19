@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Chwazi depo Ajan sekirite a ap siveye yo",
       "analysisModeSubtitle": "Analiz {{mode}}",
       "automationAllOff": "Tout dezaktive",
-      "automationCount": "{{displayCount}} sou 3 aktive",
-      "notificationsCount": "{{displayCount}} sou 2 aktive",
+      "automationCount": "{{displayCount}} sou {{total}} aktive",
+      "notificationsCount": "{{displayCount}} sou {{total}} aktive",
       "disabledNoManage": "Ajan sekirite a dezaktive. Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka aktive li.",
       "disabledNoRepo": "Chwazi omwen yon depo anvan ou aktive Ajan sekirite a.",
       "disabledPrompt": "Aktive Ajan sekirite a pou senkronize alèt Dependabot yo, chwazi depo yo epi konfigire otomatizasyon an."
@@ -1817,9 +1817,9 @@
       "highDescription": "Risk pou yon gwo kantite done ekspoze.",
       "mediumDescription": "Enpak limite oswa kondisyon espesifik.",
       "lowDescription": "Enpak minimòm sou sekirite.",
-      "invalidDayCount": "antre ant 1 ak 365 jou, ak yon nonb antye sèlman.",
+      "invalidDayCount": "antre ant {{min}} ak {{max}} jou, ak yon nonb antye sèlman.",
       "remediationDeadlineA11y": "Delè koreksyon pou gravite {{label}}, an jou",
-      "enterWholeNumber": "Antre yon nonb antye ant 1 ak 365",
+      "enterWholeNumber": "Antre yon nonb antye ant {{min}} ak {{max}}",
       "permissionNote": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka chanje paramèt sa yo.",
       "enableTracking": "Aktive swivi SLA",
       "enableTrackingSubtitle": "Fikse dat limit koreksyon yo selon gravite konsta yo.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Gravite minimòm pou nouvo konsta",
       "newFindingSubtitle": "Yo voye li chak fwa yon nouvo konsta senkronize, menm nan premye senkronizasyon an.",
       "slaLeadTimeAccessibility": "Kantite jou davans pou alèt SLA yo",
-      "slaLeadTimeError": "Antre kantite jou a kòm yon nonb antye ant 1 ak 365.",
+      "slaLeadTimeError": "Antre kantite jou a kòm yon nonb antye ant {{min}} ak {{max}}.",
       "slaLeadTimeLabel": "Alèt SLA davans (jou)",
       "slaPersonalTitle": "Voye imèl ban mwen sou alèt SLA yo",
       "slaSection": "Notifikasyon alèt SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Nou pa t ka soumèt repons ou a. Tanpri eseye ankò.",
       "questionAnnouncement": "Ajan an bezwen yon repons nan men ou. Chan mesaj la dezaktive pandan ou ap reponn.",
       "permissionAnnouncement": "Ajan an bezwen pèmisyon pou kontinye. Chan mesaj la dezaktive pandan ou ap deside.",
-      "positionHint": "(1 sou {{displayCount}})",
+      "positionHint": "({{index}} sou {{displayCount}})",
       "movedPastPrompt": "Ajan an deja pase etap demann sa a. Kat sa a ap fèmen lè sesyon an kontinye.",
       "waitingForAnswer": "Ajan an ap tann repons ou a. Pandan kesyon sa a louvri, mesaj ou pou ajan an rete annatant.",
       "waitingForPermission": "Ajan an ap tann pèmisyon. Pandan demann sa a louvri, mesaj ou pou ajan an rete annatant."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Voye alèt si balans lan pi ba pase (USD)",
       "title": "Alèt pou balans ki ba",
       "emailsError": "Antre omwen yon adrès imel ki valab. Si gen plizyè, separe yo ak vigil.",
-      "thresholdError": "Antre yon montan ki pi gran pase 0."
+      "thresholdError": "Antre yon montan ki pi gran pase {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Limit (USD pa jou)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Retire limit la",
       "title": "Limit itilizasyon chak jou",
       "blankError": "Antre yon montan, oswa peze Retire limit la anba a.",
-      "rangeError": "Antre yon montan ant 0 ak {{max}}."
+      "rangeError": "Antre yon montan ant {{min}} ak {{max}}."
     },
     "members": {
       "changeRole": "Chanje wòl",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Jeton antre",
-      "last30Days": "Dènye 30 jou",
+      "last30Days": "Dènye {{days}} jou",
       "outputTokens": "Jeton sòti",
       "requests": "Demann"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Yon èdtan byen pi wo pase vitès abityèl sektè sa a",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Fenèt",
-    "window24h": "24 èdtan",
-    "window7d": "7 jou",
-    "window30d": "30 jou",
+    "window24h": "{{hours}} èdtan",
+    "window7d": "{{days}} jou",
+    "window30d": "{{days}} jou",
     "multiplierLabel": "Miltiplikatè ogmantasyon",
     "saved": "Paramèt alèt depans yo anrejistre",
     "loadError": "Pa t kapab chaje alèt depans yo.",
     "saveError": "Pa t kapab anrejistre alèt depans yo.",
     "empty": "Alèt depans yo fèmen. Limen yo pou avèti kontak fakti sektè sa a.",
     "noSpend": "Poko gen depans ki anrejistre",
-    "spend24h": "Depans nan 24 èdtan ki sot pase yo",
-    "multiplierError": "Antre yon miltiplikatè 1 oswa plis",
+    "spend24h": "Depans nan {{hours}} èdtan ki sot pase yo",
+    "multiplierError": "Antre yon miltiplikatè {{min}} oswa plis",
     "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
     "pushOffByCategory": "Fèmen nan Notifikasyon"
   },

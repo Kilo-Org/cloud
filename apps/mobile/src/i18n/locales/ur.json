@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "وہ ریپوزٹریز منتخب کریں جن کی نگرانی سکیورٹی ایجنٹ کرے گا",
       "analysisModeSubtitle": "تجزیہ: {{mode}}",
       "automationAllOff": "سب بند",
-      "automationCount": "3 میں سے {{displayCount}} فعال",
-      "notificationsCount": "2 میں سے {{displayCount}} فعال",
+      "automationCount": "{{total}} میں سے {{displayCount}} فعال",
+      "notificationsCount": "{{total}} میں سے {{displayCount}} فعال",
       "disabledNoManage": "سکیورٹی ایجنٹ غیر فعال ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے فعال کر سکتے ہیں۔",
       "disabledNoRepo": "سکیورٹی ایجنٹ فعال کرنے سے پہلے کم از کم ایک ریپوزٹری منتخب کریں۔",
       "disabledPrompt": "Dependabot کی اطلاعات ہم آہنگ کرنے، ریپوزٹریز منتخب کرنے اور خودکار کارروائیوں کی ترتیبات طے کرنے کے لیے سکیورٹی ایجنٹ فعال کریں۔"
@@ -1817,9 +1817,9 @@
       "highDescription": "بڑی مقدار میں ڈیٹا افشا ہونے کا امکان۔",
       "mediumDescription": "محدود اثر یا مخصوص شرائط۔",
       "lowDescription": "حفاظت پر معمولی اثر۔",
-      "invalidDayCount": "دنوں کی تعداد 1 سے 365 تک صحیح عدد میں درج کریں۔",
+      "invalidDayCount": "دنوں کی تعداد {{min}} سے {{max}} تک صحیح عدد میں درج کریں۔",
       "remediationDeadlineA11y": "{{label}} کی اصلاح کی مہلت، دنوں میں",
-      "enterWholeNumber": "1 سے 365 تک کوئی صحیح عدد درج کریں",
+      "enterWholeNumber": "{{min}} سے {{max}} تک کوئی صحیح عدد درج کریں",
       "permissionNote": "صرف تنظیم کے مالکان اور بلنگ مینیجر یہ ترتیبات تبدیل کر سکتے ہیں۔",
       "enableTracking": "SLA کی نگرانی فعال کریں",
       "enableTrackingSubtitle": "مسئلے کی شدت کے لحاظ سے اصلاح کی آخری تاریخ مقرر کریں۔",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "نئے مسئلے کی کم از کم شدت",
       "newFindingSubtitle": "ہر نیا مسئلہ ہم آہنگ ہونے پر اطلاع بھیجی جاتی ہے، پہلی ہم آہنگی کے وقت بھی۔",
       "slaLeadTimeAccessibility": "SLA کی آخری تاریخ سے کتنے دن پہلے انتباہ بھیجنا ہے",
-      "slaLeadTimeError": "دنوں کی تعداد 1 سے 365 تک صحیح عدد میں درج کریں۔",
+      "slaLeadTimeError": "دنوں کی تعداد {{min}} سے {{max}} تک صحیح عدد میں درج کریں۔",
       "slaLeadTimeLabel": "SLA کی آخری تاریخ سے پہلے انتباہ (دن)",
       "slaPersonalTitle": "مجھے SLA کے انتباہات کے بارے میں ای میل کریں",
       "slaSection": "SLA کے انتباہ کی اطلاع",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "جواب نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں۔",
       "questionAnnouncement": "ایجنٹ کو آپ کا جواب درکار ہے۔ جواب دینے تک پیغام لکھنے کا خانہ غیر فعال رہے گا۔",
       "permissionAnnouncement": "ایجنٹ کو آگے بڑھنے کے لیے اجازت درکار ہے۔ آپ کے فیصلے تک پیغام لکھنے کا خانہ غیر فعال رہے گا۔",
-      "positionHint": "({{displayCount}} میں سے 1)",
+      "positionHint": "({{displayCount}} میں سے {{index}})",
       "movedPastPrompt": "ایجنٹ اس درخواست سے آگے بڑھ چکا ہے۔ سیشن دوبارہ جاری ہونے پر یہ کارڈ بند ہو جائے گا۔",
       "waitingForAnswer": "ایجنٹ آپ کے جواب کا انتظار کر رہا ہے۔ جب تک یہ سوال کھلا ہے، ایجنٹ کو آپ کا پیغام بھیجنے کا عمل رکا رہے گا۔",
       "waitingForPermission": "ایجنٹ اجازت کا انتظار کر رہا ہے۔ جب تک یہ درخواست کھلی ہے، ایجنٹ کو آپ کا پیغام بھیجنے کا عمل رکا رہے گا۔"
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "اس رقم سے کم ہونے پر اطلاع دیں (USD)",
       "title": "بیلنس کم ہونے کی اطلاع",
       "emailsError": "کم از کم ایک درست ای میل پتہ درج کریں۔ ایک سے زیادہ پتے ہوں تو انہیں کوما سے الگ کریں۔",
-      "thresholdError": "0 سے زیادہ رقم درج کریں۔"
+      "thresholdError": "{{min}} سے زیادہ رقم درج کریں۔"
     },
     "memberLimit": {
       "limitLabel": "حد (USD فی دن)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "حد ہٹائیں",
       "title": "روزانہ استعمال کی حد",
       "blankError": "رقم درج کریں یا نیچے «حد ہٹائیں» پر ٹیپ کریں۔",
-      "rangeError": "0 اور {{max}} کے درمیان رقم درج کریں۔"
+      "rangeError": "{{min}} اور {{max}} کے درمیان رقم درج کریں۔"
     },
     "members": {
       "changeRole": "کردار تبدیل کریں",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",
-      "last30Days": "پچھلے 30 دن",
+      "last30Days": "پچھلے {{days}} دن",
       "outputTokens": "آؤٹ پٹ ٹوکن",
       "requests": "درخواستیں"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "ایک گھنٹہ اس دائرے کی معمول کی شرح سے بہت زیادہ ہے",
     "limitLabel": "حد (USD)",
     "windowLabel": "وقت کی حد",
-    "window24h": "24 گھنٹے",
-    "window7d": "7 دن",
-    "window30d": "30 دن",
+    "window24h": "{{hours}} گھنٹے",
+    "window7d": "{{days}} دن",
+    "window30d": "{{days}} دن",
     "multiplierLabel": "اضافے کا ضرب",
     "saved": "اخراجات کی تنبیہ کی ترتیبات محفوظ ہو گئیں",
     "loadError": "اخراجات کی تنبیہات لوڈ نہیں ہو سکیں۔",
     "saveError": "اخراجات کی تنبیہات محفوظ نہیں ہو سکیں۔",
     "empty": "اخراجات کی تنبیہات بند ہیں۔ اس دائرے کے بلنگ رابطوں کو آگاہ کرنے کے لیے انہیں آن کریں۔",
     "noSpend": "ابھی تک کوئی خرچ درج نہیں ہوا",
-    "spend24h": "گزشتہ 24 گھنٹوں کا خرچ",
-    "multiplierError": "1 یا اس سے زیادہ کا ضرب درج کریں",
+    "spend24h": "گزشتہ {{hours}} گھنٹوں کا خرچ",
+    "multiplierError": "{{min}} یا اس سے زیادہ کا ضرب درج کریں",
     "permissionDenied": "آپ کو اخراجات کی تنبیہات کا انتظام کرنے کی اجازت نہیں ہے۔",
     "pushOffByCategory": "اطلاعات میں بند"
   },

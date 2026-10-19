@@ -1311,7 +1311,7 @@
       "newFindingSeverityLabel": "חומרה מינימלית להתראה על ממצא חדש",
       "newFindingSubtitle": "נשלחת בכל פעם שממצא חדש מסונכרן, כולל בסנכרון הראשון.",
       "slaLeadTimeAccessibility": "מספר הימים להתראה מראש על מועד ה-SLA",
-      "slaLeadTimeError": "יש להזין מספר ימים שלם בין 1 ל-365.",
+      "slaLeadTimeError": "יש להזין מספר ימים שלם בין {{min}} ל-{{max}}.",
       "slaLeadTimeLabel": "התראה מראש על מועד ה-SLA (בימים)",
       "slaPersonalTitle": "קבלת דוא״ל על אזהרות SLA",
       "slaSection": "התראת SLA",
@@ -1364,13 +1364,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "ניתוח {{mode}}",
       "automationAllOff": "הכול כבוי",
-      "automationCount": "{{displayCount}} מתוך 3 מופעלים",
+      "automationCount": "{{displayCount}} מתוך {{total}} מופעלים",
       "couldNotLoadPermissions": "לא ניתן לטעון את ההרשאות.",
       "couldNotLoadSettings": "לא ניתן לטעון את הגדרות סוכן האבטחה.",
       "disabledNoManage": "סוכן האבטחה מושבת. רק בעלי הארגון ומנהלי החיוב יכולים להפעיל אותו.",
       "disabledNoRepo": "יש לבחור לפחות מאגר אחד לפני הפעלת סוכן האבטחה.",
       "disabledPrompt": "הפעל את סוכן האבטחה כדי לסנכרן התראות Dependabot, לבחור מאגרים ולהגדיר אוטומציה.",
-      "notificationsCount": "{{displayCount}} מתוך 2 מופעלים",
+      "notificationsCount": "{{displayCount}} מתוך {{total}} מופעלים",
       "on": "מופעל",
       "repositoriesCount": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_other": "נבחרו {{displayCount}} מאגרים",
@@ -1392,10 +1392,10 @@
       "deadlinesHeading": "זמן לתיקון (בימים)",
       "enableTracking": "הפעלת מעקב אחר SLA",
       "enableTrackingSubtitle": "קביעת מועדים אחרונים לתיקון לפי חומרת הממצא.",
-      "enterWholeNumber": "יש להזין מספר שלם בין 1 ל-365",
+      "enterWholeNumber": "יש להזין מספר שלם בין {{min}} ל-{{max}}",
       "high": "גבוהה",
       "highDescription": "סיכון לחשיפה משמעותית של נתונים.",
-      "invalidDayCount": "יש להזין מספר ימים שלם בין 1 ל-365.",
+      "invalidDayCount": "יש להזין מספר ימים שלם בין {{min}} ל-{{max}}.",
       "low": "נמוכה",
       "lowDescription": "השפעה מזערית על האבטחה.",
       "medium": "בינונית",
@@ -1953,7 +1953,7 @@
       "submissionFailed": "השליחה נכשלה. נסה שוב.",
       "questionAnnouncement": "הסוכן ממתין לתשובה שלך. שדה ההודעה אינו זמין עד שתענה.",
       "permissionAnnouncement": "הסוכן זקוק להרשאה כדי להמשיך. שדה ההודעה אינו זמין עד שתחליט.",
-      "positionHint": "(1 מתוך {{displayCount}})",
+      "positionHint": "({{index}} מתוך {{displayCount}})",
       "movedPastPrompt": "הסוכן כבר עבר לשלב הבא. הכרטיס הזה ייסגר כשהסשן יימשך.",
       "waitingForAnswer": "הסוכן ממתין לתשובה שלך. שליחת ההודעה שלך לסוכן מושהית עד שתענה על השאלה הזו.",
       "waitingForPermission": "הסוכן ממתין להרשאה. שליחת ההודעה שלך לסוכן מושהית כל עוד הבקשה הזו פתוחה."
@@ -3070,7 +3070,7 @@
       "thresholdLabel": "סף ההתראה (USD)",
       "title": "התראה על יתרה נמוכה",
       "emailsError": "הזן לפחות כתובת דוא״ל תקינה אחת. אם יש כמה כתובות, הפרד ביניהן בפסיקים.",
-      "thresholdError": "הזן סכום גדול מ-0."
+      "thresholdError": "הזן סכום גדול מ-{{min}}."
     },
     "memberLimit": {
       "limitLabel": "מגבלה (USD ליום)",
@@ -3080,7 +3080,7 @@
       "removeLimit": "הסרת המגבלה",
       "title": "מגבלת שימוש יומית",
       "blankError": "הזן סכום, או הקש על הסרת המגבלה למטה.",
-      "rangeError": "הזן סכום בין 0 ל-{{max}}."
+      "rangeError": "הזן סכום בין {{min}} ל-{{max}}."
     },
     "members": {
       "changeRole": "שינוי תפקיד",
@@ -3112,7 +3112,7 @@
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",
-      "last30Days": "30 הימים האחרונים",
+      "last30Days": "{{days}} הימים האחרונים",
       "outputTokens": "טוקני פלט",
       "requests": "בקשות"
     },
@@ -3561,17 +3561,17 @@
     "anomalySubtitle": "שעה אחת גבוהה בהרבה מהקצב הרגיל של תחום זה",
     "limitLabel": "מגבלה (USD)",
     "windowLabel": "חלון",
-    "window24h": "24 שעות",
-    "window7d": "7 ימים",
-    "window30d": "30 ימים",
+    "window24h": "{{hours}} שעות",
+    "window7d": "{{days}} ימים",
+    "window30d": "{{days}} ימים",
     "multiplierLabel": "מכפיל הזינוק",
     "saved": "הגדרות התראות ההוצאות נשמרו",
     "loadError": "לא ניתן לטעון את התראות ההוצאות.",
     "saveError": "לא ניתן לשמור את התראות ההוצאות.",
     "empty": "התראות ההוצאות כבויות. הפעל אותן כדי ליידע את אנשי הקשר לחיוב של תחום זה.",
     "noSpend": "עדיין לא נרשמה הוצאה",
-    "spend24h": "הוצאה ב־24 השעות האחרונות",
-    "multiplierError": "הזן מכפיל של 1 או יותר",
+    "spend24h": "הוצאה ב־{{hours}} השעות האחרונות",
+    "multiplierError": "הזן מכפיל של {{min}} או יותר",
     "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
     "pushOffByCategory": "כבוי בהתראות"
   },

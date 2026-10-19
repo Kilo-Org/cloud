@@ -1791,8 +1791,8 @@
       "selectRepositoriesSubtitle": "Izaberi repozitorijume koje bezbednosni agent prati",
       "analysisModeSubtitle": "Režim analize: {{mode}}",
       "automationAllOff": "Sve isključeno",
-      "automationCount": "Uključeno: {{displayCount}} od 3",
-      "notificationsCount": "Uključeno: {{displayCount}} od 2",
+      "automationCount": "Uključeno: {{displayCount}} od {{total}}",
+      "notificationsCount": "Uključeno: {{displayCount}} od {{total}}",
       "disabledNoManage": "Bezbednosni agent je isključen. Samo vlasnici organizacije i menadžeri naplate mogu da ga uključe.",
       "disabledNoRepo": "Izaberi bar jedan repozitorijum pre uključivanja bezbednosnog agenta.",
       "disabledPrompt": "Uključi bezbednosnog agenta da sinhronizuješ Dependabot upozorenja, izabereš repozitorijume i podesiš automatizaciju.",
@@ -1840,9 +1840,9 @@
       "highDescription": "Moguće ozbiljno otkrivanje podataka.",
       "mediumDescription": "Ograničen uticaj ili specifični uslovi.",
       "lowDescription": "Minimalan uticaj na bezbednost.",
-      "invalidDayCount": "broj dana mora biti ceo broj od 1 do 365.",
+      "invalidDayCount": "broj dana mora biti ceo broj od {{min}} do {{max}}.",
       "remediationDeadlineA11y": "Rok za otklanjanje u danima: {{label}}",
-      "enterWholeNumber": "Unesi ceo broj između 1 i 365",
+      "enterWholeNumber": "Unesi ceo broj između {{min}} i {{max}}",
       "permissionNote": "Samo vlasnici organizacije i menadžeri naplate mogu da promene ova podešavanja.",
       "enableTracking": "Uključi praćenje rokova prema SLA",
       "enableTrackingSubtitle": "Postavi rokove za otklanjanje na osnovu ozbiljnosti nalaza.",
@@ -1906,7 +1906,7 @@
       "newFindingSeverityLabel": "Minimalna ozbiljnost novog nalaza za obaveštenje",
       "newFindingSubtitle": "Šalje se kad god se novi nalaz sinhronizuje, uključujući prvu sinhronizaciju.",
       "slaLeadTimeAccessibility": "Broj dana pre roka prema SLA za slanje upozorenja",
-      "slaLeadTimeError": "Unesi ceo broj dana između 1 i 365.",
+      "slaLeadTimeError": "Unesi ceo broj dana između {{min}} i {{max}}.",
       "slaLeadTimeLabel": "Upozori pre roka prema SLA (u danima)",
       "slaPersonalTitle": "Šalji mi e-poštu sa upozorenjima o rokovima prema SLA",
       "slaSection": "Upozorenja o rokovima prema SLA",
@@ -2481,7 +2481,7 @@
       "submissionFailed": "Slanje nije uspelo. Pokušaj ponovo.",
       "questionAnnouncement": "Agent čeka tvoj odgovor. Polje za poruku je privremeno onemogućeno dok odgovaraš.",
       "permissionAnnouncement": "Agentu je potrebna dozvola da nastavi. Polje za poruku je privremeno onemogućeno dok odlučuješ.",
-      "positionHint": "(1 od {{displayCount}})",
+      "positionHint": "({{index}} od {{displayCount}})",
       "movedPastPrompt": "Agent je već nastavio dalje od ovog upita. Ova kartica će se zatvoriti kada se sesija nastavi.",
       "waitingForAnswer": "Agent čeka tvoj odgovor. Dok je ovo pitanje otvoreno, slanje tvoje poruke agentu je pauzirano.",
       "waitingForPermission": "Agent čeka dozvolu. Dok je ovaj zahtev otvoren, slanje tvoje poruke agentu je pauzirano."
@@ -3071,7 +3071,7 @@
       "thresholdLabel": "Prag upozorenja (USD)",
       "title": "Upozorenje o niskom saldu",
       "emailsError": "Unesi bar jednu važeću adresu e-pošte. Ako ih ima više, odvoji ih zapetama.",
-      "thresholdError": "Unesi iznos veći od 0."
+      "thresholdError": "Unesi iznos veći od {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Limit (USD dnevno)",
@@ -3081,7 +3081,7 @@
       "removeLimit": "Ukloni limit",
       "title": "Dnevni limit potrošnje",
       "blankError": "Unesi iznos ili dodirni „Ukloni limit“ ispod.",
-      "rangeError": "Unesi iznos između 0 i {{max}}."
+      "rangeError": "Unesi iznos između {{min}} i {{max}}."
     },
     "members": {
       "changeRole": "Promeni ulogu",
@@ -3113,7 +3113,7 @@
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
-      "last30Days": "Poslednjih 30 dana",
+      "last30Days": "Poslednjih {{days}} dana",
       "outputTokens": "Izlazni tokeni",
       "requests": "Zahtevi"
     },
@@ -3561,17 +3561,17 @@
     "anomalySubtitle": "Jedan sat je daleko iznad uobičajene stope ovog opsega",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Prozor",
-    "window24h": "24 sata",
-    "window7d": "7 dana",
-    "window30d": "30 dana",
+    "window24h": "{{hours}} sata",
+    "window7d": "{{days}} dana",
+    "window30d": "{{days}} dana",
     "multiplierLabel": "Množilac skoka",
     "saved": "Podešavanja obaveštenja o potrošnji su sačuvana",
     "loadError": "Obaveštenja o potrošnji nisu učitana.",
     "saveError": "Obaveštenja o potrošnji nisu sačuvana.",
     "empty": "Obaveštenja o potrošnji su isključena. Uključi ih da upozoriš kontakte za naplatu ovog opsega.",
     "noSpend": "Još nema zabeležene potrošnje",
-    "spend24h": "Potrošnja u poslednja 24 sata",
-    "multiplierError": "Unesi množilac 1 ili veći",
+    "spend24h": "Potrošnja u poslednja {{hours}} sata",
+    "multiplierError": "Unesi množilac {{min}} ili veći",
     "permissionDenied": "Nemaš dozvolu da upravljaš obaveštenjima o potrošnji.",
     "pushOffByCategory": "Isključeno u Obaveštenjima"
   },

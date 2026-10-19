@@ -31,6 +31,9 @@ type OrgUsageStatsProps = {
   organizationId: string;
 };
 
+/** The server's `organizations.usageStats` window, which the eyebrow names. */
+const USAGE_WINDOW_DAYS = 30;
+
 /** "Last 30 days" eyebrow + 2x2 usage stat tile grid. Visible to all org roles. */
 export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
@@ -82,7 +85,9 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
   return (
     <Animated.View layout={LinearTransition} className="gap-3">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('organization.usageStats.last30Days')}
+        {t('organization.usageStats.last30Days', {
+          days: formatNumber(USAGE_WINDOW_DAYS, i18n.language),
+        })}
       </Text>
       {body}
     </Animated.View>

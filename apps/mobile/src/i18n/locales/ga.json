@@ -1835,8 +1835,8 @@
       "selectRepositoriesSubtitle": "Roghnaigh na stórtha a ndéanann an Gníomhaire slándála monatóireacht orthu",
       "analysisModeSubtitle": "Anailís: {{mode}}",
       "automationAllOff": "Gach ceann múchta",
-      "automationCount": "{{displayCount}} as 3 cumasaithe",
-      "notificationsCount": "{{displayCount}} as 2 cumasaithe",
+      "automationCount": "{{displayCount}} as {{total}} cumasaithe",
+      "notificationsCount": "{{displayCount}} as {{total}} cumasaithe",
       "disabledNoManage": "Tá an Gníomhaire slándála díchumasaithe. Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála é a chumasú.",
       "disabledNoRepo": "Roghnaigh stór amháin ar a laghad sula gcumasaíonn tú an Gníomhaire slándála.",
       "disabledPrompt": "Cumasaigh an Gníomhaire slándála chun foláirimh Dependabot a shioncronú, stórtha a roghnú agus uathoibriú a chumrú.",
@@ -1886,9 +1886,9 @@
       "highDescription": "Baol go nochtfaí cuid mhór sonraí.",
       "mediumDescription": "Tionchar teoranta nó coinníollacha sonracha.",
       "lowDescription": "Tionchar slándála íosta.",
-      "invalidDayCount": "cuir isteach idir 1 agus 365 lá, in uimhreacha slána amháin.",
+      "invalidDayCount": "cuir isteach idir {{min}} agus {{max}} lá, in uimhreacha slána amháin.",
       "remediationDeadlineA11y": "Spriocdháta leasaithe i laethanta: {{label}}",
-      "enterWholeNumber": "Cuir isteach slánuimhir idir 1 agus 365",
+      "enterWholeNumber": "Cuir isteach slánuimhir idir {{min}} agus {{max}}",
       "permissionNote": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála na socruithe seo a athrú.",
       "enableTracking": "Cumasaigh rianú SLA",
       "enableTrackingSubtitle": "Socraigh spriocdhátaí leasaithe bunaithe ar dhéine an toraidh.",
@@ -1952,7 +1952,7 @@
       "newFindingSeverityLabel": "Déine íosta do thorthaí nua",
       "newFindingSubtitle": "Seoltar fógra gach uair a shioncronaítear toradh nua, ar an gcéad sioncronú san áireamh.",
       "slaLeadTimeAccessibility": "Líon na laethanta roimh ré le haghaidh rabhadh SLA",
-      "slaLeadTimeError": "Cuir isteach líon laethanta idir 1 agus 365, mar uimhir shlán.",
+      "slaLeadTimeError": "Cuir isteach líon laethanta idir {{min}} agus {{max}}, mar uimhir shlán.",
       "slaLeadTimeLabel": "Rabhadh SLA roimh ré (laethanta)",
       "slaPersonalTitle": "Seol ríomhphost chugam faoi rabhaidh SLA",
       "slaSection": "Fógra rabhaidh SLA",
@@ -2545,7 +2545,7 @@
       "submissionFailed": "Theip ar an seoladh. Bain triail as arís.",
       "questionAnnouncement": "Tá d'ionchur ag teastáil ón ngníomhaire. Ní féidir an bosca teachtaireachta a úsáid agus tú ag freagairt.",
       "permissionAnnouncement": "Tá cead ag teastáil ón ngníomhaire chun leanúint ar aghaidh. Ní féidir an bosca teachtaireachta a úsáid agus tú ag cinneadh.",
-      "positionHint": "(1 de {{displayCount}})",
+      "positionHint": "({{index}} de {{displayCount}})",
       "movedPastPrompt": "Tá an gníomhaire tar éis dul ar aghaidh ón leid seo. Dúnfaidh an cárta seo nuair a leanfaidh an seisiún ar aghaidh.",
       "waitingForAnswer": "Tá an gníomhaire ag fanacht le do fhreagra. Fanfaidh do theachtaireacht chuig an ngníomhaire ar sos fad a bheidh an cheist seo oscailte.",
       "waitingForPermission": "Tá an gníomhaire ag fanacht le cead. Fanfaidh do theachtaireacht chuig an ngníomhaire ar sos fad a bheidh an t-iarratas seo oscailte."
@@ -3151,7 +3151,7 @@
       "thresholdLabel": "Foláireamh faoi bhun (USD)",
       "title": "Foláireamh faoi iarmhéid íseal",
       "emailsError": "Iontráil seoladh ríomhphoist bailí amháin ar a laghad. Scar seoltaí breise le camóga.",
-      "thresholdError": "Iontráil méid níos mó ná 0."
+      "thresholdError": "Iontráil méid níos mó ná {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Teorainn (USD in aghaidh an lae)",
@@ -3161,7 +3161,7 @@
       "removeLimit": "Bain an teorainn",
       "title": "Teorainn úsáide laethúil",
       "blankError": "Iontráil méid nó tapáil Bain an teorainn thíos.",
-      "rangeError": "Iontráil méid idir 0 agus {{max}}."
+      "rangeError": "Iontráil méid idir {{min}} agus {{max}}."
     },
     "members": {
       "changeRole": "Athraigh ról",
@@ -3193,7 +3193,7 @@
     },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",
-      "last30Days": "Na 30 lá deireanacha",
+      "last30Days": "Na {{days}} lá deireanacha",
       "outputTokens": "Comharthaí aschuir",
       "requests": "Iarratais"
     },
@@ -3643,17 +3643,17 @@
     "anomalySubtitle": "Tá uair an chloig i bhfad os cionn gnáthráta an raoin seo",
     "limitLabel": "Teorainn (USD)",
     "windowLabel": "Fuinneog",
-    "window24h": "24 uair an chloig",
-    "window7d": "7 lá",
-    "window30d": "30 lá",
+    "window24h": "{{hours}} uair an chloig",
+    "window7d": "{{days}} lá",
+    "window30d": "{{days}} lá",
     "multiplierLabel": "Iolraitheoir na spuaice",
     "saved": "Sábháladh socruithe foláirimh chaiteachais",
     "loadError": "Níorbh fhéidir foláirimh chaiteachais a lódáil.",
     "saveError": "Níorbh fhéidir foláirimh chaiteachais a shábháil.",
     "empty": "Tá foláirimh chaiteachais as. Cuir ar siúl iad chun teagmhálaithe billeála an raoin seo a chur ar an eolas.",
     "noSpend": "Níor taifeadadh aon chaiteachas fós",
-    "spend24h": "Caiteachas sna 24 uair an chloig seo caite",
-    "multiplierError": "Iontráil iolraitheoir 1 nó níos mó",
+    "spend24h": "Caiteachas sna {{hours}} uair an chloig seo caite",
+    "multiplierError": "Iontráil iolraitheoir {{min}} nó níos mó",
     "permissionDenied": "Níl cead agat foláirimh chaiteachais a bhainistiú.",
     "pushOffByCategory": "As i bhFógraí"
   },

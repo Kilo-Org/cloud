@@ -1835,8 +1835,8 @@
       "selectRepositoriesSubtitle": "Agħżel liema repożitorji jissorvelja l-aġent tas-sigurtà",
       "analysisModeSubtitle": "Analiżi {{mode}}",
       "automationAllOff": "Kollha diżattivati",
-      "automationCount": "{{displayCount}} minn 3 attivati",
-      "notificationsCount": "{{displayCount}} minn 2 attivati",
+      "automationCount": "{{displayCount}} minn {{total}} attivati",
+      "notificationsCount": "{{displayCount}} minn {{total}} attivati",
       "disabledNoManage": "L-aġent tas-sigurtà huwa diżattivat. Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jattivawh.",
       "disabledNoRepo": "Agħżel mill-inqas repożitorju wieħed qabel ma tattiva l-aġent tas-sigurtà.",
       "disabledPrompt": "Attiva l-aġent tas-sigurtà biex tissinkronizza l-allerti ta' Dependabot, tagħżel ir-repożitorji u tikkonfigura l-awtomazzjoni.",
@@ -1886,9 +1886,9 @@
       "highDescription": "Possibbiltà ta' espożizzjoni sinifikanti tad-dejta.",
       "mediumDescription": "Impatt limitat jew kundizzjonijiet speċifiċi.",
       "lowDescription": "Impatt minimu fuq is-sigurtà.",
-      "invalidDayCount": "daħħal minn 1 sa 365 jum, b'numri sħaħ biss.",
+      "invalidDayCount": "daħħal minn {{min}} sa {{max}} jum, b'numri sħaħ biss.",
       "remediationDeadlineA11y": "Skadenza tar-rimedju għal {{label}}, f'jiem",
-      "enterWholeNumber": "Daħħal numru sħiħ bejn 1 u 365",
+      "enterWholeNumber": "Daħħal numru sħiħ bejn {{min}} u {{max}}",
       "permissionNote": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jibdlu dan l-issettjar.",
       "enableTracking": "Attiva t-traċċar tas-SLA",
       "enableTrackingSubtitle": "Issettja skadenzi ta' rimedju bbażati fuq is-severità tas-sejba.",
@@ -1952,7 +1952,7 @@
       "newFindingSeverityLabel": "Severità minima għan-notifiki ta' sejbiet ġodda",
       "newFindingSubtitle": "Tintbagħat kull darba li tiġi sinkronizzata sejba ġdida, inkluż waqt l-ewwel sinkronizzazzjoni.",
       "slaLeadTimeAccessibility": "Numru ta' jiem ta' avviż minn qabel għat-twissija tas-SLA",
-      "slaLeadTimeError": "Daħħal numru sħiħ ta' ġranet bejn 1 u 365.",
+      "slaLeadTimeError": "Daħħal numru sħiħ ta' ġranet bejn {{min}} u {{max}}.",
       "slaLeadTimeLabel": "Avviż minn qabel għat-twissija tas-SLA (jiem)",
       "slaPersonalTitle": "Ibgħatli email dwar twissijiet tas-SLA",
       "slaSection": "Notifika ta' twissija tas-SLA",
@@ -2545,7 +2545,7 @@
       "submissionFailed": "Ma setgħetx tintbagħat it-tweġiba. Erġa' pprova.",
       "questionAnnouncement": "L-aġent jeħtieġ it-tweġiba tiegħek. Il-qasam tal-messaġġ mhux attiv waqt li twieġeb.",
       "permissionAnnouncement": "L-aġent jeħtieġ permess biex ikompli. Il-qasam tal-messaġġ mhux attiv waqt li tiddeċiedi.",
-      "positionHint": "(1 minn {{displayCount}})",
+      "positionHint": "({{index}} minn {{displayCount}})",
       "movedPastPrompt": "L-aġent diġà għadda għal wara din l-istruzzjoni. Din il-karta se tingħalaq meta s-sessjoni tkompli.",
       "waitingForAnswer": "L-aġent qed jistenna t-tweġiba tiegħek. Il-messaġġ tiegħek lill-aġent jibqa' jistenna sakemm twieġeb din il-mistoqsija.",
       "waitingForPermission": "L-aġent qed jistenna l-permess. Il-messaġġ tiegħek lill-aġent jibqa' jistenna sakemm tiddeċiedi dwar din it-talba."
@@ -3151,7 +3151,7 @@
       "thresholdLabel": "Avża taħt (USD)",
       "title": "Twissija ta' bilanċ baxx",
       "emailsError": "Daħħal mill-inqas indirizz tal-posta elettronika validu wieħed. Ifred l-indirizzi b'virgoli.",
-      "thresholdError": "Daħħal ammont akbar minn 0."
+      "thresholdError": "Daħħal ammont akbar minn {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Limitu (USD kuljum)",
@@ -3161,7 +3161,7 @@
       "removeLimit": "Neħħi l-limitu",
       "title": "Limitu tal-użu ta' kuljum",
       "blankError": "Daħħal ammont jew tektek Neħħi l-limitu hawn taħt.",
-      "rangeError": "Daħħal ammont bejn 0 u {{max}}."
+      "rangeError": "Daħħal ammont bejn {{min}} u {{max}}."
     },
     "members": {
       "changeRole": "Ibdel ir-rwol",
@@ -3193,7 +3193,7 @@
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
-      "last30Days": "L-aħħar 30 ġurnata",
+      "last30Days": "L-aħħar {{days}} ġurnata",
       "outputTokens": "Unitajiet tat-test tar-riżultat",
       "requests": "Talbiet"
     },
@@ -3643,17 +3643,17 @@
     "anomalySubtitle": "Siegħa hija 'l fuq ħafna mir-rata tas-soltu ta' dan il-kamp",
     "limitLabel": "Limitu (USD)",
     "windowLabel": "Tieqa",
-    "window24h": "24 siegħa",
-    "window7d": "7 ijiem",
-    "window30d": "30 jum",
+    "window24h": "{{hours}} siegħa",
+    "window7d": "{{days}} ijiem",
+    "window30d": "{{days}} jum",
     "multiplierLabel": "Multiplikatur taż-żieda",
     "saved": "Is-settings tat-twissijiet tal-infiq ġew salvati",
     "loadError": "It-twissijiet tal-infiq ma setgħux jitgħabbew.",
     "saveError": "It-twissijiet tal-infiq ma setgħux jiġu salvati.",
     "empty": "It-twissijiet tal-infiq huma mitfija. Xegħelhom biex tavża lill-kuntatti tal-ħlasijiet ta' dan il-kamp.",
     "noSpend": "Għadu ma ġie rreġistrat l-ebda infiq",
-    "spend24h": "Infiq fl-aħħar 24 siegħa",
-    "multiplierError": "Daħħal multiplikatur ta' 1 jew aktar",
+    "spend24h": "Infiq fl-aħħar {{hours}} siegħa",
+    "multiplierError": "Daħħal multiplikatur ta' {{min}} jew aktar",
     "permissionDenied": "M'għandekx permess biex timmaniġġja t-twissijiet tal-infiq.",
     "pushOffByCategory": "Mitfi fin-Notifiki"
   },

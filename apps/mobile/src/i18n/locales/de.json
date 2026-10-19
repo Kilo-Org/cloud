@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "Mindestschweregrad für neue Befunde",
       "newFindingSubtitle": "Die Benachrichtigung wird bei jedem neu synchronisierten Befund gesendet, auch bei der ersten Synchronisierung.",
       "slaLeadTimeAccessibility": "Vorlauf für SLA-Warnungen in Tagen",
-      "slaLeadTimeError": "Gib die Anzahl der Tage als ganze Zahl zwischen 1 und 365 ein.",
+      "slaLeadTimeError": "Gib die Anzahl der Tage als ganze Zahl zwischen {{min}} und {{max}} ein.",
       "slaLeadTimeLabel": "Vorlauf für SLA-Warnungen (Tage)",
       "slaPersonalTitle": "Mich bei SLA-Warnungen per E-Mail benachrichtigen",
       "slaSection": "Benachrichtigung bei SLA-Warnungen",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "Analyse: {{mode}}",
       "automationAllOff": "Alle deaktiviert",
-      "automationCount": "{{displayCount}} von 3 aktiviert",
+      "automationCount": "{{displayCount}} von {{total}} aktiviert",
       "couldNotLoadPermissions": "Die Berechtigungen konnten nicht geladen werden.",
       "couldNotLoadSettings": "Die Einstellungen für Security Agent konnten nicht geladen werden.",
       "disabledNoManage": "Security Agent ist deaktiviert. Nur Organisationsinhaber und Abrechnungsmanager können ihn aktivieren.",
       "disabledNoRepo": "Wähle mindestens ein Repository aus, bevor du Security Agent aktivierst.",
       "disabledPrompt": "Aktiviere Security Agent, um Dependabot-Warnungen zu synchronisieren, Repositories auszuwählen und die Automatisierung einzurichten.",
-      "notificationsCount": "{{displayCount}} von 2 aktiviert",
+      "notificationsCount": "{{displayCount}} von {{total}} aktiviert",
       "on": "Ein",
       "repositoriesCount": "{{displayCount}} Code-Repositories ausgewählt",
       "repositoriesCount_other": "{{displayCount}} Code-Repositories ausgewählt",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "Behebungsfristen (Tage)",
       "enableTracking": "SLA-Überwachung aktivieren",
       "enableTrackingSubtitle": "Behebungsfristen werden anhand des Schweregrads der Befunde festgelegt.",
-      "enterWholeNumber": "Gib eine ganze Zahl zwischen 1 und 365 ein",
+      "enterWholeNumber": "Gib eine ganze Zahl zwischen {{min}} und {{max}} ein",
       "high": "Hoch",
       "highDescription": "Erhebliches Risiko einer Offenlegung von Daten.",
-      "invalidDayCount": "gib eine ganze Zahl zwischen 1 und 365 Tagen ein.",
+      "invalidDayCount": "gib eine ganze Zahl zwischen {{min}} und {{max}} Tagen ein.",
       "low": "Niedrig",
       "lowDescription": "Minimale Auswirkungen auf die Sicherheit.",
       "medium": "Mittel",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "Senden fehlgeschlagen. Bitte versuche es erneut.",
       "questionAnnouncement": "Der Agent braucht deine Antwort. Während du antwortest, ist das Eingabefeld für Nachrichten deaktiviert.",
       "permissionAnnouncement": "Der Agent braucht eine Berechtigung, um fortzufahren. Während du dich entscheidest, ist das Eingabefeld für Nachrichten deaktiviert.",
-      "positionHint": "(1 von {{displayCount}})",
+      "positionHint": "({{index}} von {{displayCount}})",
       "movedPastPrompt": "Der Agent hat diese Anfrage bereits hinter sich gelassen. Diese Karte wird geschlossen, sobald die Sitzung fortgesetzt wird.",
       "waitingForAnswer": "Der Agent wartet auf deine Antwort. Solange diese Frage offen ist, wird deine Nachricht an den Agenten zurückgehalten.",
       "waitingForPermission": "Der Agent wartet auf eine Berechtigung. Solange diese Anfrage offen ist, wird deine Nachricht an den Agenten zurückgehalten."
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "Warnung unter (USD)",
       "title": "Warnung bei niedrigem Guthaben",
       "emailsError": "Gib mindestens eine gültige E-Mail-Adresse ein. Trenne mehrere Adressen durch Kommas.",
-      "thresholdError": "Gib einen Betrag größer als 0 ein."
+      "thresholdError": "Gib einen Betrag größer als {{min}} ein."
     },
     "memberLimit": {
       "limitLabel": "Limit (USD pro Tag)",
@@ -3040,7 +3040,7 @@
       "removeLimit": "Limit entfernen",
       "title": "Tägliches Nutzungslimit",
       "blankError": "Gib einen Betrag ein oder tippe unten auf „Limit entfernen“.",
-      "rangeError": "Gib einen Betrag zwischen 0 und {{max}} ein."
+      "rangeError": "Gib einen Betrag zwischen {{min}} und {{max}} ein."
     },
     "members": {
       "changeRole": "Rolle ändern",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",
-      "last30Days": "Letzte 30 Tage",
+      "last30Days": "Letzte {{days}} Tage",
       "outputTokens": "Ausgabe-Tokens",
       "requests": "Anfragen"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Eine Stunde liegt weit über der üblichen Rate dieses Bereichs",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Zeitfenster",
-    "window24h": "24 Stunden",
-    "window7d": "7 Tage",
-    "window30d": "30 Tage",
+    "window24h": "{{hours}} Stunden",
+    "window7d": "{{days}} Tage",
+    "window30d": "{{days}} Tage",
     "multiplierLabel": "Spitzen-Multiplikator",
     "saved": "Einstellungen für Ausgaben-Warnungen gespeichert",
     "loadError": "Ausgaben-Warnungen konnten nicht geladen werden.",
     "saveError": "Ausgaben-Warnungen konnten nicht gespeichert werden.",
     "empty": "Ausgaben-Warnungen sind aus. Schalte sie ein, um die Abrechnungskontakte dieses Bereichs zu warnen.",
     "noSpend": "Noch keine Ausgaben erfasst",
-    "spend24h": "Ausgaben der letzten 24 Stunden",
-    "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
+    "spend24h": "Ausgaben der letzten {{hours}} Stunden",
+    "multiplierError": "Gib einen Multiplikator von {{min}} oder mehr ein",
     "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
     "pushOffByCategory": "In Benachrichtigungen aus"
   },

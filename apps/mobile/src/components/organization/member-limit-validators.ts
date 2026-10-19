@@ -2,6 +2,7 @@ import { i18n } from '@/i18n';
 import { formatNumber, parseLocalizedNumber } from '@/lib/format';
 
 const MAX_DAILY_LIMIT_USD = 2000;
+const MIN_DAILY_LIMIT_USD = 0;
 
 // A blank field disables Save — it does NOT remove the limit. Removal only
 // happens via the explicit "Remove limit" button, so clearing the input by
@@ -14,6 +15,7 @@ export function limitError(value: string): string | null {
   const parsed = parseLocalizedNumber(trimmed, i18n.language);
   if (parsed === null || parsed < 0 || parsed > MAX_DAILY_LIMIT_USD) {
     return i18n.t('organization.memberLimit.rangeError', {
+      min: formatNumber(MIN_DAILY_LIMIT_USD, i18n.language),
       max: formatNumber(MAX_DAILY_LIMIT_USD, i18n.language),
     });
   }

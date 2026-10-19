@@ -1317,7 +1317,7 @@
       "newFindingSeverityLabel": "Minimalna krytyczność nowych problemów",
       "newFindingSubtitle": "Powiadomienie jest wysyłane przy synchronizacji każdego nowego problemu, także podczas pierwszej synchronizacji.",
       "slaLeadTimeAccessibility": "Liczba dni przed terminem SLA, kiedy ma zostać wysłane ostrzeżenie",
-      "slaLeadTimeError": "Wpisz całkowitą liczbę dni od 1 do 365.",
+      "slaLeadTimeError": "Wpisz całkowitą liczbę dni od {{min}} do {{max}}.",
       "slaLeadTimeLabel": "Ostrzeżenie przed terminem SLA (dni)",
       "slaPersonalTitle": "Wysyłaj mi e-maile o ostrzeżeniach SLA",
       "slaSection": "Powiadomienia o terminach SLA",
@@ -1370,13 +1370,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "Analiza: {{mode}}",
       "automationAllOff": "Wszystko wyłączone",
-      "automationCount": "Włączono {{displayCount}} z 3",
+      "automationCount": "Włączono {{displayCount}} z {{total}}",
       "couldNotLoadPermissions": "Nie udało się wczytać uprawnień.",
       "couldNotLoadSettings": "Nie udało się wczytać ustawień agenta bezpieczeństwa.",
       "disabledNoManage": "Agent bezpieczeństwa jest wyłączony. Tylko właściciele organizacji i administratorzy rozliczeń mogą go włączyć.",
       "disabledNoRepo": "Wybierz co najmniej jedno repozytorium przed włączeniem agenta bezpieczeństwa.",
       "disabledPrompt": "Włącz agenta bezpieczeństwa, aby synchronizować alerty Dependabot, wybierać repozytoria i konfigurować automatyzację.",
-      "notificationsCount": "Włączono {{displayCount}} z 2",
+      "notificationsCount": "Włączono {{displayCount}} z {{total}}",
       "on": "Wł.",
       "repositoriesCount": "Wybrano {{displayCount}} repozytorium",
       "repositoriesCount_other": "Wybrano {{displayCount}} repozytorium",
@@ -1399,10 +1399,10 @@
       "deadlinesHeading": "Terminy naprawy (dni)",
       "enableTracking": "Włącz śledzenie SLA",
       "enableTrackingSubtitle": "Ustaw terminy naprawy na podstawie krytyczności problemów.",
-      "enterWholeNumber": "Wpisz liczbę całkowitą od 1 do 365",
+      "enterWholeNumber": "Wpisz liczbę całkowitą od {{min}} do {{max}}",
       "high": "Poziom wysoki",
       "highDescription": "Ryzyko poważnego wycieku danych.",
-      "invalidDayCount": "podaj liczbę dni od 1 do 365, bez części ułamkowej.",
+      "invalidDayCount": "podaj liczbę dni od {{min}} do {{max}}, bez części ułamkowej.",
       "low": "Poziom niski",
       "lowDescription": "Minimalny wpływ na bezpieczeństwo.",
       "medium": "Poziom średni",
@@ -1969,7 +1969,7 @@
       "submissionFailed": "Wysyłanie nie powiodło się. Spróbuj ponownie.",
       "questionAnnouncement": "Agent czeka na twoją odpowiedź. Pole wiadomości jest nieaktywne, dopóki nie odpowiesz.",
       "permissionAnnouncement": "Agent potrzebuje zgody, aby kontynuować. Pole wiadomości jest nieaktywne, dopóki nie podejmiesz decyzji.",
-      "positionHint": "(1 z {{displayCount}})",
+      "positionHint": "({{index}} z {{displayCount}})",
       "movedPastPrompt": "Agent nie czeka już na odpowiedź na ten komunikat. Ta karta zamknie się po wznowieniu sesji.",
       "waitingForAnswer": "Agent czeka na twoją odpowiedź. Wysyłanie wiadomości do agenta jest wstrzymane, dopóki nie odpowiesz na to pytanie.",
       "waitingForPermission": "Agent czeka na zgodę. Wysyłanie wiadomości do agenta jest wstrzymane, dopóki nie odpowiesz na tę prośbę."
@@ -3110,7 +3110,7 @@
       "thresholdLabel": "Powiadom, gdy saldo spadnie poniżej (USD)",
       "title": "Powiadomienie o niskim saldzie",
       "emailsError": "Wpisz co najmniej jeden prawidłowy adres e-mail. Jeśli podajesz kilka adresów, oddziel je przecinkami.",
-      "thresholdError": "Wpisz kwotę większą niż 0."
+      "thresholdError": "Wpisz kwotę większą niż {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Limit (USD dziennie)",
@@ -3120,7 +3120,7 @@
       "removeLimit": "Usuń limit",
       "title": "Dzienny limit wydatków",
       "blankError": "Wpisz kwotę lub wybierz „Usuń limit” poniżej.",
-      "rangeError": "Wpisz kwotę od 0 do {{max}}."
+      "rangeError": "Wpisz kwotę od {{min}} do {{max}}."
     },
     "members": {
       "changeRole": "Zmień rolę",
@@ -3152,7 +3152,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
-      "last30Days": "Ostatnie 30 dni",
+      "last30Days": "Ostatnie {{days}} dni",
       "outputTokens": "Tokeny wyjściowe",
       "requests": "Żądania"
     },
@@ -3602,17 +3602,17 @@
     "anomalySubtitle": "Godzina jest znacznie powyżej zwykłego tempa tego zakresu",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Okno",
-    "window24h": "24 godziny",
-    "window7d": "7 dni",
-    "window30d": "30 dni",
+    "window24h": "{{hours}} godziny",
+    "window7d": "{{days}} dni",
+    "window30d": "{{days}} dni",
     "multiplierLabel": "Mnożnik skoku",
     "saved": "Zapisano ustawienia alertów o wydatkach",
     "loadError": "Nie udało się wczytać alertów o wydatkach.",
     "saveError": "Nie udało się zapisać alertów o wydatkach.",
     "empty": "Alerty o wydatkach są wyłączone. Włącz je, aby ostrzegać kontakty rozliczeniowe tego zakresu.",
     "noSpend": "Nie zarejestrowano jeszcze żadnych wydatków",
-    "spend24h": "Wydatki z ostatnich 24 godzin",
-    "multiplierError": "Podaj mnożnik równy 1 lub większy",
+    "spend24h": "Wydatki z ostatnich {{hours}} godzin",
+    "multiplierError": "Podaj mnożnik równy {{min}} lub większy",
     "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
     "pushOffByCategory": "Wyłączone w Powiadomieniach"
   },

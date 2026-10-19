@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Valitse tietoturva-agentin valvomat tietovarastot",
       "analysisModeSubtitle": "Analyysitila: {{mode}}",
       "automationAllOff": "Kaikki pois käytöstä",
-      "automationCount": "{{displayCount}}/3 käytössä",
-      "notificationsCount": "{{displayCount}}/2 käytössä",
+      "automationCount": "{{displayCount}}/{{total}} käytössä",
+      "notificationsCount": "{{displayCount}}/{{total}} käytössä",
       "disabledNoManage": "Tietoturva-agentti on pois käytöstä. Vain organisaation omistajat ja laskutusvastaavat voivat ottaa sen käyttöön.",
       "disabledNoRepo": "Valitse vähintään yksi tietovarasto ennen tietoturva-agentin käyttöönottoa.",
       "disabledPrompt": "Ota tietoturva-agentti käyttöön, niin voit synkronoida Dependabot-hälytykset, valita tietovarastot ja määrittää automaation."
@@ -1817,9 +1817,9 @@
       "highDescription": "Merkittävän tietovuodon riski.",
       "mediumDescription": "Rajallinen vaikutus tai hyväksikäyttö vain tietyissä olosuhteissa.",
       "lowDescription": "Vähäinen tietoturvavaikutus.",
-      "invalidDayCount": "anna päivien määrä kokonaislukuna väliltä 1–365.",
+      "invalidDayCount": "anna päivien määrä kokonaislukuna väliltä {{min}}–{{max}}.",
       "remediationDeadlineA11y": "Vakavuus: {{label}}. Korjauksen määräaika päivinä",
-      "enterWholeNumber": "Anna kokonaisluku välillä 1–365",
+      "enterWholeNumber": "Anna kokonaisluku välillä {{min}}–{{max}}",
       "permissionNote": "Vain organisaation omistajat ja laskutusvastaavat voivat muuttaa näitä asetuksia.",
       "enableTracking": "Ota SLA-seuranta käyttöön",
       "enableTrackingSubtitle": "Korjausten määräajat asetetaan havaintojen vakavuuden mukaan.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Uusien havaintojen vähimmäisvakavuus",
       "newFindingSubtitle": "Lähetetään aina, kun uusi havainto synkronoidaan, myös ensimmäisessä synkronoinnissa.",
       "slaLeadTimeAccessibility": "SLA-varoituksen ennakkoaika päivinä",
-      "slaLeadTimeError": "Anna päivien määrä kokonaislukuna väliltä 1–365.",
+      "slaLeadTimeError": "Anna päivien määrä kokonaislukuna väliltä {{min}}–{{max}}.",
       "slaLeadTimeLabel": "SLA-varoituksen ennakkoaika (päivää)",
       "slaPersonalTitle": "Lähetä minulle sähköpostia SLA-varoituksista",
       "slaSection": "SLA-varoitusilmoitus",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Lähetys epäonnistui. Yritä uudelleen.",
       "questionAnnouncement": "Agentti tarvitsee vastauksesi. Viestikenttä ei ole käytettävissä, kunnes olet vastannut.",
       "permissionAnnouncement": "Agentti tarvitsee luvan jatkaakseen. Viestikenttä ei ole käytettävissä, kunnes olet tehnyt päätöksen.",
-      "positionHint": "(1/{{displayCount}})",
+      "positionHint": "({{index}}/{{displayCount}})",
       "movedPastPrompt": "Agentti on jo siirtynyt tämän kehotteen ohi. Tämä kortti sulkeutuu, kun istunto jatkuu.",
       "waitingForAnswer": "Agentti odottaa vastaustasi. Viestisi lähetys agentille odottaa, kunnes olet vastannut tähän kysymykseen.",
       "waitingForPermission": "Agentti odottaa lupaa. Viestisi lähetys agentille odottaa, kunnes olet vastannut tähän pyyntöön."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Saldon alaraja (USD)",
       "title": "Saldohälytys",
       "emailsError": "Anna vähintään yksi kelvollinen sähköpostiosoite. Erota useat osoitteet pilkuilla.",
-      "thresholdError": "Anna nollaa suurempi summa."
+      "thresholdError": "Anna summa, joka on suurempi kuin {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Raja (USD päivässä)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Poista raja",
       "title": "Päivittäinen käyttöraja",
       "blankError": "Anna summa tai poista raja alla olevalla Poista raja -painikkeella.",
-      "rangeError": "Anna summa väliltä 0–{{max}}."
+      "rangeError": "Anna summa väliltä {{min}}–{{max}}."
     },
     "members": {
       "changeRole": "Vaihda rooli",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
-      "last30Days": "Viimeiset 30 päivää",
+      "last30Days": "Viimeiset {{days}} päivää",
       "outputTokens": "Tulostetokenit",
       "requests": "Pyynnöt"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Yksi tunti on selvästi tämän alueen tavanomaista tahtia korkeampi",
     "limitLabel": "Raja (USD)",
     "windowLabel": "Aikaikkuna",
-    "window24h": "24 tuntia",
-    "window7d": "7 päivää",
-    "window30d": "30 päivää",
+    "window24h": "{{hours}} tuntia",
+    "window7d": "{{days}} päivää",
+    "window30d": "{{days}} päivää",
     "multiplierLabel": "Piikin kerroin",
     "saved": "Kulutusvaroitusten asetukset tallennettu",
     "loadError": "Kulutusvaroituksia ei voitu ladata.",
     "saveError": "Kulutusvaroituksia ei voitu tallentaa.",
     "empty": "Kulutusvaroitukset ovat pois päältä. Ota ne käyttöön, jotta voit varoittaa tämän alueen laskutusyhteyshenkilöitä.",
     "noSpend": "Kulutusta ei ole vielä kirjattu",
-    "spend24h": "Kulutus viimeisten 24 tunnin aikana",
-    "multiplierError": "Anna kerroin, joka on 1 tai suurempi",
+    "spend24h": "Kulutus viimeisten {{hours}} tunnin aikana",
+    "multiplierError": "Anna kerroin, joka on {{min}} tai suurempi",
     "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
     "pushOffByCategory": "Pois päältä Ilmoituksissa"
   },

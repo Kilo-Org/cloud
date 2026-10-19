@@ -1280,7 +1280,7 @@
       "newFindingSeverityLabel": "Gravidade mínima das novas ocorrências",
       "newFindingSubtitle": "Enviada sempre que uma nova ocorrência é sincronizada, inclusive na primeira sincronização.",
       "slaLeadTimeAccessibility": "Antecedência do aviso de SLA em dias",
-      "slaLeadTimeError": "Digite um número inteiro de dias entre 1 e 365.",
+      "slaLeadTimeError": "Digite um número inteiro de dias entre {{min}} e {{max}}.",
       "slaLeadTimeLabel": "Antecedência do aviso de SLA (dias)",
       "slaPersonalTitle": "Receber avisos de SLA por e-mail",
       "slaSection": "Notificações de prazo de SLA",
@@ -1333,13 +1333,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "Análise {{mode}}",
       "automationAllOff": "Tudo desativado",
-      "automationCount": "{{displayCount}} de 3 ativadas",
+      "automationCount": "{{displayCount}} de {{total}} ativadas",
       "couldNotLoadPermissions": "Não foi possível carregar as permissões.",
       "couldNotLoadSettings": "Não foi possível carregar as configurações do agente de segurança.",
       "disabledNoManage": "O agente de segurança está desativado. Somente proprietários da organização e gerentes de cobrança podem ativá-lo.",
       "disabledNoRepo": "Selecione pelo menos um repositório antes de ativar o agente de segurança.",
       "disabledPrompt": "Ative o agente de segurança para sincronizar alertas do Dependabot, escolher repositórios e configurar a automação.",
-      "notificationsCount": "{{displayCount}} de 2 ativadas",
+      "notificationsCount": "{{displayCount}} de {{total}} ativadas",
       "on": "Ativado",
       "repositoriesCount": "{{displayCount}} repositórios selecionados",
       "repositoriesCount_other": "{{displayCount}} repositórios selecionados",
@@ -1361,10 +1361,10 @@
       "deadlinesHeading": "Prazos de correção (dias)",
       "enableTracking": "Ativar acompanhamento de SLA",
       "enableTrackingSubtitle": "Define prazos de correção com base na gravidade da ocorrência.",
-      "enterWholeNumber": "Digite um número inteiro entre 1 e 365",
+      "enterWholeNumber": "Digite um número inteiro entre {{min}} e {{max}}",
       "high": "Nível alto",
       "highDescription": "Possível exposição significativa de dados.",
-      "invalidDayCount": "informe um número inteiro de dias entre 1 e 365.",
+      "invalidDayCount": "informe um número inteiro de dias entre {{min}} e {{max}}.",
       "low": "Nível baixo",
       "lowDescription": "Impacto mínimo na segurança.",
       "medium": "Nível médio",
@@ -1922,7 +1922,7 @@
       "submissionFailed": "Falha no envio. Tente novamente.",
       "questionAnnouncement": "O agente precisa da sua resposta. O campo de mensagem fica desativado enquanto você responde.",
       "permissionAnnouncement": "O agente precisa de permissão para continuar. O campo de mensagem fica desativado enquanto você decide.",
-      "positionHint": "(1 de {{displayCount}})",
+      "positionHint": "({{index}} de {{displayCount}})",
       "movedPastPrompt": "O agente já passou desta solicitação. Este cartão será fechado quando a sessão continuar.",
       "waitingForAnswer": "O agente está aguardando sua resposta. O envio da sua mensagem ao agente fica pausado enquanto esta pergunta estiver aberta.",
       "waitingForPermission": "O agente está aguardando permissão. O envio da sua mensagem ao agente fica pausado enquanto esta solicitação estiver aberta."
@@ -3070,7 +3070,7 @@
       "thresholdLabel": "Alertar abaixo de (USD)",
       "title": "Alerta de saldo baixo",
       "emailsError": "Digite pelo menos um e-mail válido. Separe os endereços com vírgulas.",
-      "thresholdError": "Digite um valor maior que 0."
+      "thresholdError": "Digite um valor maior que {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Limite (USD por dia)",
@@ -3080,7 +3080,7 @@
       "removeLimit": "Remover limite",
       "title": "Limite de uso diário",
       "blankError": "Digite um valor ou toque em Remover limite abaixo.",
-      "rangeError": "Digite um valor entre 0 e {{max}}."
+      "rangeError": "Digite um valor entre {{min}} e {{max}}."
     },
     "members": {
       "changeRole": "Alterar função",
@@ -3112,7 +3112,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 dias",
+      "last30Days": "Últimos {{days}} dias",
       "outputTokens": "Tokens de saída",
       "requests": "Solicitações"
     },
@@ -3561,17 +3561,17 @@
     "anomalySubtitle": "Uma hora está muito acima do ritmo habitual deste escopo",
     "limitLabel": "Limite (USD)",
     "windowLabel": "Janela",
-    "window24h": "24 horas",
-    "window7d": "7 dias",
-    "window30d": "30 dias",
+    "window24h": "{{hours}} horas",
+    "window7d": "{{days}} dias",
+    "window30d": "{{days}} dias",
     "multiplierLabel": "Multiplicador do pico",
     "saved": "Configurações dos alertas de gastos salvas",
     "loadError": "Não foi possível carregar os alertas de gastos.",
     "saveError": "Não foi possível salvar os alertas de gastos.",
     "empty": "Os alertas de gastos estão desativados. Ative-os para avisar os contatos de cobrança deste escopo.",
     "noSpend": "Nenhum gasto registrado ainda",
-    "spend24h": "Gastos nas últimas 24 horas",
-    "multiplierError": "Insira um multiplicador de 1 ou mais",
+    "spend24h": "Gastos nas últimas {{hours}} horas",
+    "multiplierError": "Insira um multiplicador de {{min}} ou mais",
     "permissionDenied": "Você não tem permissão para gerenciar os alertas de gastos.",
     "pushOffByCategory": "Desativado em Notificações"
   },

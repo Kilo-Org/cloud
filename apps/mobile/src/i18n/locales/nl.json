@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "Minimale ernst voor meldingen over nieuwe bevindingen",
       "newFindingSubtitle": "Je ontvangt een e-mail zodra een nieuwe bevinding wordt gesynchroniseerd, ook bij de eerste synchronisatie.",
       "slaLeadTimeAccessibility": "Aantal dagen voor de SLA-deadline waarop je een waarschuwing ontvangt",
-      "slaLeadTimeError": "Voer een geheel aantal dagen in tussen 1 en 365.",
+      "slaLeadTimeError": "Voer een geheel aantal dagen in tussen {{min}} en {{max}}.",
       "slaLeadTimeLabel": "Dagen voor de SLA-deadline waarschuwen",
       "slaPersonalTitle": "E-mails met SLA-waarschuwingen ontvangen",
       "slaSection": "SLA-waarschuwingen",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "Analyse: {{mode}}",
       "automationAllOff": "Alles uit",
-      "automationCount": "{{displayCount}} van de 3 ingeschakeld",
+      "automationCount": "{{displayCount}} van de {{total}} ingeschakeld",
       "couldNotLoadPermissions": "De rechten konden niet worden geladen.",
       "couldNotLoadSettings": "De instellingen van Security Agent konden niet worden geladen.",
       "disabledNoManage": "Security Agent is uitgeschakeld. Alleen organisatie-eigenaren en factureringsbeheerders kunnen Security Agent inschakelen.",
       "disabledNoRepo": "Selecteer minimaal één repository voordat je Security Agent inschakelt.",
       "disabledPrompt": "Schakel Security Agent in om Dependabot-waarschuwingen te synchroniseren, repositories te kiezen en automatisering te configureren.",
-      "notificationsCount": "{{displayCount}} van de 2 ingeschakeld",
+      "notificationsCount": "{{displayCount}} van de {{total}} ingeschakeld",
       "on": "Aan",
       "repositoriesCount": "{{displayCount}} coderepository's geselecteerd",
       "repositoriesCount_other": "{{displayCount}} coderepository's geselecteerd",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "Hersteldeadlines (dagen)",
       "enableTracking": "SLA-bewaking inschakelen",
       "enableTrackingSubtitle": "Stel hersteldeadlines in op basis van de ernst van de bevinding.",
-      "enterWholeNumber": "Voer een geheel getal in tussen 1 en 365",
+      "enterWholeNumber": "Voer een geheel getal in tussen {{min}} en {{max}}",
       "high": "Hoog",
       "highDescription": "Risico op een groot datalek.",
-      "invalidDayCount": "voer een geheel aantal dagen in tussen 1 en 365.",
+      "invalidDayCount": "voer een geheel aantal dagen in tussen {{min}} en {{max}}.",
       "low": "Laag",
       "lowDescription": "Minimale gevolgen voor de beveiliging.",
       "medium": "Gemiddeld",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "Het verzenden is mislukt. Probeer het opnieuw.",
       "questionAnnouncement": "De agent heeft je antwoord nodig. Het berichtveld is tijdelijk uitgeschakeld terwijl je antwoord geeft.",
       "permissionAnnouncement": "De agent heeft toestemming nodig om door te gaan. Het berichtveld is tijdelijk uitgeschakeld terwijl je een keuze maakt.",
-      "positionHint": "(1 van {{displayCount}})",
+      "positionHint": "({{index}} van {{displayCount}})",
       "movedPastPrompt": "De agent is al verdergegaan. Deze kaart sluit zodra de sessie verdergaat.",
       "waitingForAnswer": "De agent wacht op je antwoord. Zolang je deze vraag niet beantwoordt, wordt je bericht aan de agent niet verzonden.",
       "waitingForPermission": "De agent wacht op toestemming. Zolang je niet op dit verzoek reageert, wordt je bericht aan de agent niet verzonden."
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "Waarschuwen onder (USD)",
       "title": "Waarschuwing voor laag saldo",
       "emailsError": "Voer minstens één geldig e-mailadres in. Scheid meerdere adressen met komma's.",
-      "thresholdError": "Voer een bedrag groter dan 0 in."
+      "thresholdError": "Voer een bedrag groter dan {{min}} in."
     },
     "memberLimit": {
       "limitLabel": "Limiet (USD per dag)",
@@ -3040,7 +3040,7 @@
       "removeLimit": "Limiet verwijderen",
       "title": "Dagelijkse gebruikslimiet",
       "blankError": "Voer een bedrag in of tik hieronder op Limiet verwijderen.",
-      "rangeError": "Voer een bedrag tussen 0 en {{max}} in."
+      "rangeError": "Voer een bedrag tussen {{min}} en {{max}} in."
     },
     "members": {
       "changeRole": "Rol wijzigen",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "Invoertokens",
-      "last30Days": "Laatste 30 dagen",
+      "last30Days": "Laatste {{days}} dagen",
       "outputTokens": "Uitvoertokens",
       "requests": "Verzoeken"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Een uur ligt ver boven het gebruikelijke tarief van dit bereik",
     "limitLabel": "Limiet (USD)",
     "windowLabel": "Venster",
-    "window24h": "24 uur",
-    "window7d": "7 dagen",
-    "window30d": "30 dagen",
+    "window24h": "{{hours}} uur",
+    "window7d": "{{days}} dagen",
+    "window30d": "{{days}} dagen",
     "multiplierLabel": "Piekvermenigvuldiger",
     "saved": "Instellingen voor bestedingswaarschuwingen opgeslagen",
     "loadError": "Bestedingswaarschuwingen konden niet worden geladen.",
     "saveError": "Bestedingswaarschuwingen konden niet worden opgeslagen.",
     "empty": "Bestedingswaarschuwingen staan uit. Zet ze aan om de factuurcontacten van dit bereik te waarschuwen.",
     "noSpend": "Nog geen besteding geregistreerd",
-    "spend24h": "Besteding in de afgelopen 24 uur",
-    "multiplierError": "Voer een vermenigvuldiger van 1 of meer in",
+    "spend24h": "Besteding in de afgelopen {{hours}} uur",
+    "multiplierError": "Voer een vermenigvuldiger van {{min}} of meer in",
     "permissionDenied": "Je hebt geen toestemming om bestedingswaarschuwingen te beheren.",
     "pushOffByCategory": "Uit in Meldingen"
   },

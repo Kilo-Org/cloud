@@ -68,6 +68,10 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
+  [
+    '{{days}} days',
+    'the 7-day and 30-day spend windows: one phrase, but a language whose plural form changes between 7 and 30 needs a form per window',
+  ],
 ]);
 
 /**
@@ -401,6 +405,14 @@ function wording(value, language = 'en') {
     .replace(/[.!:。！：]+$/u, '');
 }
 
+/**
+ * A decimal digit outside `0-9`. Numbers the app shows are described by a
+ * `{{placeholder}}` the call site formats in the reader's language, so copy
+ * holds digits only for a literal it cannot move — a URL, a version, a size —
+ * which stays the way English writes it.
+ */
+const FOREIGN_DIGIT = /[^\P{Nd}0-9]/u;
+
 const PLURAL_SUFFIX_RE = /_(zero|one|two|few|many|other)$/;
 
 function pluralBaseKey(key) {
@@ -589,6 +601,15 @@ for (const catalog of CATALOGS) {
       }
       if (/ {2}/.test(value) && !/ {2}/.test(englishValue)) {
         fail(`${label}: "${key}" has a double space`);
+      }
+      // One numbering system per catalog. A number the reader sees belongs to a
+      // `{{placeholder}}` the call site formats in their language; only a
+      // literal the catalog cannot move keeps a digit of its own, and English
+      // holds that digit too.
+      if (FOREIGN_DIGIT.test(value) && !/[0-9]/.test(englishValue)) {
+        fail(
+          `${label}: "${key}" spells a number in non-Latin digits; pass it to the call site as a {{placeholder}}`
+        );
       }
       if (/[\u200e\u200f\u202a-\u202e]/.test(value)) {
         fail(`${label}: "${key}" carries a direction mark; write plain text`);

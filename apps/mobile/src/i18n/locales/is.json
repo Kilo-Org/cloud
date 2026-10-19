@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Veldu hvaða geymslum öryggisvakinn fylgist með",
       "analysisModeSubtitle": "Greining: {{mode}}",
       "automationAllOff": "Allt óvirkt",
-      "automationCount": "Virkt: {{displayCount}} af 3",
-      "notificationsCount": "Virkt: {{displayCount}} af 2",
+      "automationCount": "Virkt: {{displayCount}} af {{total}}",
+      "notificationsCount": "Virkt: {{displayCount}} af {{total}}",
       "disabledNoManage": "Öryggisvakinn er óvirkur. Aðeins eigendur fyrirtækisins og greiðslustjórar geta virkjað hann.",
       "disabledNoRepo": "Veldu að minnsta kosti eina geymslu áður en þú virkjar öryggisvakann.",
       "disabledPrompt": "Virkjaðu öryggisvakann til að samstilla Dependabot-viðvaranir, velja geymslur og stilla sjálfvirkni."
@@ -1817,9 +1817,9 @@
       "highDescription": "Hætta á verulegum gagnaleka.",
       "mediumDescription": "Takmörkuð áhrif eða sérstök skilyrði.",
       "lowDescription": "Óveruleg áhrif á öryggi.",
-      "invalidDayCount": "fjöldi daga verður að vera heil tala frá 1 til 365.",
+      "invalidDayCount": "fjöldi daga verður að vera heil tala frá {{min}} til {{max}}.",
       "remediationDeadlineA11y": "Úrbótafrestur í dögum fyrir {{label}}",
-      "enterWholeNumber": "Sláðu inn heila tölu milli 1 og 365",
+      "enterWholeNumber": "Sláðu inn heila tölu milli {{min}} og {{max}}",
       "permissionNote": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta breytt þessum stillingum.",
       "enableTracking": "Virkja SLA-eftirlit",
       "enableTrackingSubtitle": "Úrbótafrestir eru ákveðnir út frá alvarleika frávika.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Lágmarksalvarleiki nýrra frávika",
       "newFindingSubtitle": "Tilkynning er send í hvert sinn sem nýtt frávik er samstillt, líka við fyrstu samstillingu.",
       "slaLeadTimeAccessibility": "Fyrirvari SLA-viðvarana í dögum",
-      "slaLeadTimeError": "Sláðu inn fjölda daga sem heila tölu frá 1 til 365.",
+      "slaLeadTimeError": "Sláðu inn fjölda daga sem heila tölu frá {{min}} til {{max}}.",
       "slaLeadTimeLabel": "Fyrirvari SLA-viðvarana (dagar)",
       "slaPersonalTitle": "Senda mér tölvupóst um SLA-viðvaranir",
       "slaSection": "Tilkynningar um SLA-viðvaranir",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Sending mistókst. Reyndu aftur.",
       "questionAnnouncement": "Fulltrúinn þarf svar frá þér. Ritillinn er óvirkur meðan þú svarar.",
       "permissionAnnouncement": "Fulltrúinn þarf heimild til að halda áfram. Ritillinn er óvirkur meðan þú tekur ákvörðun.",
-      "positionHint": "(1 af {{displayCount}})",
+      "positionHint": "({{index}} af {{displayCount}})",
       "movedPastPrompt": "Fulltrúinn hefur þegar haldið áfram frá þessari beiðni. Þetta spjald lokast þegar lotan heldur áfram.",
       "waitingForAnswer": "Fulltrúinn bíður eftir svari frá þér. Skilaboðin þín til fulltrúans bíða á meðan þessi spurning er opin.",
       "waitingForPermission": "Fulltrúinn bíður eftir heimild. Skilaboðin þín til fulltrúans bíða á meðan þessi beiðni er opin."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Viðvörun þegar inneign fer undir (USD)",
       "title": "Viðvörun um lága inneign",
       "emailsError": "Sláðu inn að minnsta kosti eitt gilt tölvupóstfang. Aðgreindu mörg föng með kommum.",
-      "thresholdError": "Sláðu inn upphæð sem er hærri en 0."
+      "thresholdError": "Sláðu inn upphæð sem er hærri en {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Hámark (USD á dag)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Fjarlægja hámark",
       "title": "Daglegt notkunarhámark",
       "blankError": "Sláðu inn upphæð eða fjarlægðu hámarkið hér að neðan.",
-      "rangeError": "Sláðu inn upphæð milli 0 og {{max}}."
+      "rangeError": "Sláðu inn upphæð milli {{min}} og {{max}}."
     },
     "members": {
       "changeRole": "Breyta hlutverki",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",
-      "last30Days": "Síðustu 30 dagar",
+      "last30Days": "Síðustu {{days}} dagar",
       "outputTokens": "Úttakstókar",
       "requests": "Beiðnir"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Klukkustund er langt yfir venjulegum hraða þessa svæðis",
     "limitLabel": "Mörk (USD)",
     "windowLabel": "Gluggi",
-    "window24h": "24 klukkustundir",
-    "window7d": "7 dagar",
-    "window30d": "30 dagar",
+    "window24h": "{{hours}} klukkustundir",
+    "window7d": "{{days}} dagar",
+    "window30d": "{{days}} dagar",
     "multiplierLabel": "Margfaldari uppsveiflunnar",
     "saved": "Stillingar útgjaldaviðvarana vistaðar",
     "loadError": "Ekki tókst að hlaða útgjaldaviðvörunum.",
     "saveError": "Ekki tókst að vista útgjaldaviðvaranir.",
     "empty": "Útgjaldaviðvaranir eru af. Kveiktu á þeim til að vara innheimtutengiliði þessa svæðis við.",
     "noSpend": "Engin útgjöld skráð ennþá",
-    "spend24h": "Útgjöld síðustu 24 klukkustundir",
-    "multiplierError": "Sláðu inn margfaldara sem er 1 eða meira",
+    "spend24h": "Útgjöld síðustu {{hours}} klukkustundir",
+    "multiplierError": "Sláðu inn margfaldara sem er {{min}} eða meira",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
     "pushOffByCategory": "Af í Tilkynningum"
   },

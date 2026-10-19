@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Fidio ny tahirin-kaody harahin'ny Security Agent maso",
       "analysisModeSubtitle": "Famakafakana {{mode}}",
       "automationAllOff": "Tsy mandeha avokoa",
-      "automationCount": "{{displayCount}} amin'ny 3 no mandeha",
-      "notificationsCount": "{{displayCount}} amin'ny 2 no mandeha",
+      "automationCount": "{{displayCount}} amin'ny {{total}} no mandeha",
+      "notificationsCount": "{{displayCount}} amin'ny {{total}} no mandeha",
       "disabledNoManage": "Tsy mandeha ny Security Agent. Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mandefa azy.",
       "disabledNoRepo": "Mifidiana tahirin-kaody iray farafahakeliny alohan'ny handefasana ny Security Agent.",
       "disabledPrompt": "Alefaso ny Security Agent mba hampifanarahana ny fampandrenesan'ny Dependabot, hifidianana tahirin-kaody ary hametrahana ny fikirana ho an'ny asa mandeha ho azy."
@@ -1817,9 +1817,9 @@
       "highDescription": "Mety haharihary angona betsaka.",
       "mediumDescription": "Fiantraikany voafetra na fepetra manokana.",
       "lowDescription": "Fiantraikany tena kely amin'ny fiarovana.",
-      "invalidDayCount": "tokony ho 1–365 andro ny fe-potoana, ary isa feno ihany no ekena.",
+      "invalidDayCount": "tokony ho {{min}}–{{max}} andro ny fe-potoana, ary isa feno ihany no ekena.",
       "remediationDeadlineA11y": "Fe-potoana fanarenana ho an'ny hamafy {{label}}, refesina amin'ny andro",
-      "enterWholeNumber": "Ampidiro ny isa feno eo anelanelan'ny 1 sy 365",
+      "enterWholeNumber": "Ampidiro ny isa feno eo anelanelan'ny {{min}} sy {{max}}",
       "permissionNote": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka manova ireo fikirana ireo.",
       "enableTracking": "Alefaso ny fanaraha-maso ny SLA",
       "enableTrackingSubtitle": "Farito araka ny hamafin'ny olana hita ny fe-potoana fanarenana.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Hamafy farany ambany ho an'ny olana hita vaovao",
       "newFindingSubtitle": "Alefa isaky ny misy olana hita vaovao ampidirina amin'ny fampifanarahana, anisan'izany ny fampifanarahana voalohany.",
       "slaLeadTimeAccessibility": "Isan'ny andro mialoha handefasana fampitandremana SLA",
-      "slaLeadTimeError": "Ampidiro ny isan'ny andro, isa feno manomboka amin'ny 1 ka hatramin'ny 365.",
+      "slaLeadTimeError": "Ampidiro ny isan'ny andro, isa feno manomboka amin'ny {{min}} ka hatramin'ny {{max}}.",
       "slaLeadTimeLabel": "Fampitandremana mialoha momba ny SLA (andro)",
       "slaPersonalTitle": "Andefaso mailaka aho rehefa misy fampitandremana SLA",
       "slaSection": "Fampandrenesana fampitandremana SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Tsy nahomby ny fandefasana. Andramo indray azafady.",
       "questionAnnouncement": "Mila valiny avy aminao ny mpanampy. Miato ny fanoratana hafatra mandritra ny famalianao.",
       "permissionAnnouncement": "Mila alalana ny mpanampy mba hanohizana. Miato ny fanoratana hafatra mandritra ny fanapahan-kevitrao.",
-      "positionHint": "(1 amin'ny {{displayCount}})",
+      "positionHint": "({{index}} amin'ny {{displayCount}})",
       "movedPastPrompt": "Efa nihoatra ity fangatahana ity ny mpanampy. Hikatona ity karatra ity rehefa mitohy ny fotoam-piasana.",
       "waitingForAnswer": "Miandry ny valinteninao ny mpanampy. Miato ny fandefasana ny hafatrao ho azy raha mbola misokatra ity fanontaniana ity.",
       "waitingForPermission": "Miandry alalana ny mpanampy. Miato ny fandefasana ny hafatrao ho azy raha mbola misokatra ity fangatahana ity."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Ampandreneso raha latsaky ny (USD)",
       "title": "Fampandrenesana ambim-bola kely",
       "emailsError": "Mampidira adiresy mailaka manan-kery iray farafahakeliny. Raha maromaro dia saraho amin'ny faingo.",
-      "thresholdError": "Mampidira vola mihoatra ny 0."
+      "thresholdError": "Mampidira vola mihoatra ny {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Fetra (USD isan'andro)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Esory ny fetra",
       "title": "Fetran'ny fampiasana isan'andro",
       "blankError": "Mampidira vola, na tsindrio ny Esory ny fetra etsy ambany.",
-      "rangeError": "Mampidira vola eo anelanelan'ny 0 sy {{max}}."
+      "rangeError": "Mampidira vola eo anelanelan'ny {{min}} sy {{max}}."
     },
     "members": {
       "changeRole": "Ovao ny andraikitra",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",
-      "last30Days": "30 Andro farany lasa",
+      "last30Days": "{{days}} Andro farany lasa",
       "outputTokens": "Sombin-tsoratra mivoaka",
       "requests": "Fangatahana"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Ny adiny iray dia ambony lavitra noho ny taha mahazatra amin'ity faritra ity",
     "limitLabel": "Fetra (USD)",
     "windowLabel": "Fe-potoana",
-    "window24h": "Adiny 24",
-    "window7d": "7 andro",
-    "window30d": "30 andro",
+    "window24h": "Adiny {{hours}}",
+    "window7d": "{{days}} andro",
+    "window30d": "{{days}} andro",
     "multiplierLabel": "Mpamaro ny fitsambikinana",
     "saved": "Voatahiry ny fikirakirana ny fampitandremana momba ny fandaniana",
     "loadError": "Tsy afaka nampiditra ny fampitandremana momba ny fandaniana.",
     "saveError": "Tsy afaka nitahiry ny fampitandremana momba ny fandaniana.",
     "empty": "Mihidy ny fampitandremana momba ny fandaniana. Velomy izy ireo hampandre ny mpifandray amin'ny faktiora amin'ity faritra ity.",
     "noSpend": "Mbola tsy misy fandaniana voarakitra",
-    "spend24h": "Fandaniana tao anatin'ny 24 ora farany",
-    "multiplierError": "Ampidiro mpamaro 1 na mihoatra",
+    "spend24h": "Fandaniana tao anatin'ny {{hours}} ora farany",
+    "multiplierError": "Ampidiro mpamaro {{min}} na mihoatra",
     "permissionDenied": "Tsy manana alalana hitantana ny fampitandremana momba ny fandaniana ianao.",
     "pushOffByCategory": "Mihidy ao amin'ny Fampandrenesana"
   },

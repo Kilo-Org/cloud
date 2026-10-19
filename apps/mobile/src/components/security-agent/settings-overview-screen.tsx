@@ -152,15 +152,14 @@ export function SettingsOverviewScreen({
   if (data.repositorySelectionMode === 'all') {
     repoCountLabel = t('common.allRepositories');
   }
-  const automationEnabledCount = [
+  const automationFlags = [
     data.autoAnalysisEnabled,
     data.autoRemediationEnabled,
     data.autoDismissEnabled,
-  ].filter(Boolean).length;
-  const notificationsEnabledCount = [
-    data.newFindingNotificationsEnabled,
-    data.slaNotificationsEnabled,
-  ].filter(Boolean).length;
+  ];
+  const automationEnabledCount = automationFlags.filter(Boolean).length;
+  const notificationFlags = [data.newFindingNotificationsEnabled, data.slaNotificationsEnabled];
+  const notificationsEnabledCount = notificationFlags.filter(Boolean).length;
   const analysisModeLabel = Object.hasOwn(ANALYSIS_MODE_KEYS, data.analysisMode)
     ? t(ANALYSIS_MODE_KEYS[data.analysisMode])
     : data.analysisMode;
@@ -296,6 +295,7 @@ export function SettingsOverviewScreen({
                     : t('securityAgent.settingsOverview.automationCount', {
                         count: automationEnabledCount,
                         displayCount: formatNumber(automationEnabledCount, i18n.language),
+                        total: formatNumber(automationFlags.length, i18n.language),
                       })
                 }
                 onPress={() => {
@@ -311,6 +311,7 @@ export function SettingsOverviewScreen({
                     : t('securityAgent.settingsOverview.notificationsCount', {
                         count: notificationsEnabledCount,
                         displayCount: formatNumber(notificationsEnabledCount, i18n.language),
+                        total: formatNumber(notificationFlags.length, i18n.language),
                       })
                 }
                 onPress={() => {

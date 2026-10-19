@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Họrọ ebe nchekwa onye nnọchi anya nchebe ga-elekọta",
       "analysisModeSubtitle": "Nyocha {{mode}}",
       "automationAllOff": "Niile gbanyụrụ",
-      "automationCount": "{{displayCount}} n'ime 3 gbanyere",
-      "notificationsCount": "{{displayCount}} n'ime 2 gbanyere",
+      "automationCount": "{{displayCount}} n'ime {{total}} gbanyere",
+      "notificationsCount": "{{displayCount}} n'ime {{total}} gbanyere",
       "disabledNoManage": "A gbanyụrụ onye nnọchi anya nchebe. Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ịgbanye ya.",
       "disabledNoRepo": "Họrọ opekata mpe otu ebe nchekwa tupu ịgbanye onye nnọchi anya nchebe.",
       "disabledPrompt": "Gbanye onye nnọchi anya nchebe iji mekọrịta data ọkwa Dependabot, họrọ ebe nchekwa ma hazie ọrụ akpaaka."
@@ -1817,9 +1817,9 @@
       "highDescription": "Enwere ike ikpughe data dị mkpa.",
       "mediumDescription": "Mmetụta dị ntakịrị ma ọ bụ ọnọdụ akọwapụtara.",
       "lowDescription": "Mmetụta nchebe pere mpe.",
-      "invalidDayCount": "tinye ụbọchị 1–365; jiri naanị ọnụọgụ zuru ezu.",
+      "invalidDayCount": "tinye ụbọchị {{min}}–{{max}}; jiri naanị ọnụọgụ zuru ezu.",
       "remediationDeadlineA11y": "Oge njedebe ndozi {{label}} n'ụbọchị",
-      "enterWholeNumber": "Tinye ọnụọgụ zuru ezu n'etiti 1 na 365",
+      "enterWholeNumber": "Tinye ọnụọgụ zuru ezu n'etiti {{min}} na {{max}}",
       "permissionNote": "Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ịgbanwe ntọala ndị a.",
       "enableTracking": "Gbanye nsochi SLA",
       "enableTrackingSubtitle": "Debe oge njedebe ndozi dabere n'ogo njọ ihe achọpụtara.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Ogo njọ kacha nta maka ihe achọpụtara ọhụrụ",
       "newFindingSubtitle": "A na-eziga ya mgbe ọ bụla e mekọrịtara data ihe achọpụtara ọhụrụ, gụnyere mgbe e mere mmekọrịta data mbụ.",
       "slaLeadTimeAccessibility": "Ụbọchị ole tupu oge njedebe SLA a ga-enye ịdọ aka ná ntị",
-      "slaLeadTimeError": "Tinye ọnụọgụ zuru ezu nke ụbọchị n'etiti 1 na 365.",
+      "slaLeadTimeError": "Tinye ọnụọgụ zuru ezu nke ụbọchị n'etiti {{min}} na {{max}}.",
       "slaLeadTimeLabel": "Oge ịdọ aka ná ntị tupu njedebe SLA (ụbọchị)",
       "slaPersonalTitle": "Zigara m ozi-e gbasara ịdọ aka ná ntị SLA",
       "slaSection": "Ngosi ọkwa ịdọ aka ná ntị SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Enweghị ike iziga. Biko nwaa ọzọ.",
       "questionAnnouncement": "Onye nnọchi anya chọrọ azịza gị. A kwụsịtụrụ ebe ide ozi ka ị zaa.",
       "permissionAnnouncement": "Onye nnọchi anya chọrọ ikike ịga n'ihu. A kwụsịtụrụ ebe ide ozi ka ị kpebie.",
-      "positionHint": "(1 n'ime {{displayCount}})",
+      "positionHint": "({{index}} n'ime {{displayCount}})",
       "movedPastPrompt": "Onye nnọchi anya agafeela ihe ị dere a. Kaadị a ga-emechi mgbe nnọkọ ga-aga n'ihu.",
       "waitingForAnswer": "Onye nnọchi anya na-eche azịza gị. A kwụsịtụrụ ozi gị nye onye nnọchi anya ruo mgbe a zara ajụjụ a.",
       "waitingForPermission": "Onye nnọchi anya na-eche ikike. A kwụsịtụrụ ozi gị nye onye nnọchi anya ruo mgbe a zara arịrịọ a."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Dọọ aka na ntị ma ego erughị (USD)",
       "title": "Ịdọ aka na ntị maka ego fọdụrụ",
       "emailsError": "Tinye opekata mpe otu adreesị ozi ịntanetị ziri ezi. Jiri rịkọm kewaa ha.",
-      "thresholdError": "Tinye ego karịrị 0."
+      "thresholdError": "Tinye ego karịrị {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Oke (USD kwa ụbọchị)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Wepụ oke",
       "title": "Oke ojiji kwa ụbọchị",
       "blankError": "Tinye ego, ma ọ bụ pịa Wepụ oke n'okpuru.",
-      "rangeError": "Tinye ego dị n'etiti 0 na {{max}}."
+      "rangeError": "Tinye ego dị n'etiti {{min}} na {{max}}."
     },
     "members": {
       "changeRole": "Gbanwee ọrụ",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",
-      "last30Days": "Ụbọchị 30 gara aga",
+      "last30Days": "Ụbọchị {{days}} gara aga",
       "outputTokens": "Tokin mmepụta",
       "requests": "Arịrịọ"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Otu awa dị nnọọ elu karịa ọnụ ọgụgụ mpaghara a",
     "limitLabel": "Oke (USD)",
     "windowLabel": "Oge",
-    "window24h": "Awa 24",
-    "window7d": "Ụbọchị 7",
-    "window30d": "Ụbọchị 30",
+    "window24h": "Awa {{hours}}",
+    "window7d": "Ụbọchị {{days}}",
+    "window30d": "Ụbọchị {{days}}",
     "multiplierLabel": "Ọnụọgụ mmụba",
     "saved": "Echekwara ntọala ọkwa gbasara mmefu",
     "loadError": "Enweghị ike ibudata ọkwa gbasara mmefu.",
     "saveError": "Enweghị ike ichekwa ọkwa gbasara mmefu.",
     "empty": "Ọkwa gbasara mmefu gbanyụrụ. Gbanye ya iji kwaa ndị kọntaktị ịgba ụgwọ nke mpaghara a aka na ntị.",
     "noSpend": "Edebebeghị mmefu ọ bụla",
-    "spend24h": "Mmefu n'ime awa 24 gara aga",
-    "multiplierError": "Tinye ọnụọgụ mmụba nke 1 ma ọ bụ karịa",
+    "spend24h": "Mmefu n'ime awa {{hours}} gara aga",
+    "multiplierError": "Tinye ọnụọgụ mmụba nke {{min}} ma ọ bụ karịa",
     "permissionDenied": "Ị nweghị ikike ijikwa ọkwa gbasara mmefu.",
     "pushOffByCategory": "Gbanyụrụ n'ime Ọkwa"
   },

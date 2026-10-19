@@ -220,6 +220,7 @@ export function formatBlockingCardTitle(baseTitle: string, count: number): strin
     ? `${baseTitle} ${i18n.t('agentChat.blockingCard.positionHint', {
         count,
         displayCount: formatNumber(count, i18n.language),
+        index: formatNumber(1, i18n.language),
       })}`
     : baseTitle;
 }

@@ -44,13 +44,26 @@ import { useTRPC } from '@/lib/trpc';
 /** The Notifications screen owns the push gate the channel rows point at. */
 const NOTIFICATIONS_HREF = '/(app)/(tabs)/(3_profile)/notifications' as Href;
 
-const WINDOW_LABEL_KEYS = {
-  '24': 'spendAlerts.window24h',
-  '168': 'spendAlerts.window7d',
-  '720': 'spendAlerts.window30d',
-} as const;
+/** The windows the segmented control offers, in hours on the wire. */
+const WINDOW_OPTIONS = [
+  {
+    value: '24',
+    label: (language: string) =>
+      i18n.t('spendAlerts.window24h', { hours: formatNumber(24, language) }),
+  },
+  {
+    value: '168',
+    label: (language: string) =>
+      i18n.t('spendAlerts.window7d', { days: formatNumber(7, language) }),
+  },
+  {
+    value: '720',
+    label: (language: string) =>
+      i18n.t('spendAlerts.window30d', { days: formatNumber(30, language) }),
+  },
+] as const;
 
-type WindowOption = keyof typeof WINDOW_LABEL_KEYS;
+type WindowOption = (typeof WINDOW_OPTIONS)[number]['value'];
 
 /** The option matching a stored window; an unsaved scope starts at 24 hours. */
 function windowOptionFor(value: number | null | undefined): WindowOption {
@@ -285,11 +298,9 @@ function SpendAlertsForm({
       ? formatMoney(fromMicrodollars(spend24h), i18n.language)
       : t('spendAlerts.noSpend');
 
-  const windowOptions: readonly { value: WindowOption; label: string }[] = [
-    { value: '24', label: t(WINDOW_LABEL_KEYS['24']) },
-    { value: '168', label: t(WINDOW_LABEL_KEYS['168']) },
-    { value: '720', label: t(WINDOW_LABEL_KEYS['720']) },
-  ];
+  const windowOptions: readonly { value: WindowOption; label: string }[] = WINDOW_OPTIONS.map(
+    option => ({ value: option.value, label: option.label(i18n.language) })
+  );
 
   // What a hidden rule field falls back to when its draft is unusable: the last
   // saved value, kept rather than clobbered by the stand-in. The server's schema
@@ -426,7 +437,12 @@ function SpendAlertsForm({
 
       <View className="rounded-lg bg-secondary px-3">
         <KvRow label={scopeLabel} value={scopeName} selectable />
-        <KvRow label={t('spendAlerts.spend24h')} value={spendValue} last selectable />
+        <KvRow
+          label={t('spendAlerts.spend24h', { hours: formatNumber(24, i18n.language) })}
+          value={spendValue}
+          last
+          selectable
+        />
       </View>
 
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">

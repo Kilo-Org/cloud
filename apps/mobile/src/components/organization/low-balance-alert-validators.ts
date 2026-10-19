@@ -1,6 +1,9 @@
 import { i18n } from '@/i18n';
-import { parseLocalizedNumber } from '@/lib/format';
+import { formatNumber, parseLocalizedNumber } from '@/lib/format';
 import { EMAIL_PATTERN } from '@/lib/utils';
+
+/** The smallest balance the field accepts, which the error copy names. */
+const MIN_THRESHOLD_USD = 0;
 
 export function parseThreshold(value: string): number | null {
   const trimmed = value.trim();
@@ -20,7 +23,9 @@ export function parseEmails(value: string): string[] {
 
 export function thresholdError(value: string): string | null {
   return parseThreshold(value) == null
-    ? i18n.t('organization.lowBalanceAlert.thresholdError')
+    ? i18n.t('organization.lowBalanceAlert.thresholdError', {
+        min: formatNumber(MIN_THRESHOLD_USD, i18n.language),
+      })
     : null;
 }
 

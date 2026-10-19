@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Piliin kung aling mga repository ang susubaybayan ng Security Agent",
       "analysisModeSubtitle": "Pagsusuri: {{mode}}",
       "automationAllOff": "Lahat ay hindi pinagana",
-      "automationCount": "{{displayCount}} sa 3 ang pinagana",
-      "notificationsCount": "{{displayCount}} sa 2 ang pinagana",
+      "automationCount": "{{displayCount}} sa {{total}} ang pinagana",
+      "notificationsCount": "{{displayCount}} sa {{total}} ang pinagana",
       "disabledNoManage": "Hindi pinagana ang Security Agent. Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magpagana nito.",
       "disabledNoRepo": "Pumili ng kahit isang repository bago paganahin ang Security Agent.",
       "disabledPrompt": "Paganahin ang Security Agent para i-sync ang mga alerto ng Dependabot, pumili ng mga repository, at itakda ang mga awtomatikong proseso."
@@ -1817,9 +1817,9 @@
       "highDescription": "Maaaring malantad ang malaking halaga ng data.",
       "mediumDescription": "Limitado ang epekto o kailangan ng mga partikular na kondisyon.",
       "lowDescription": "Napakaliit ng epekto sa seguridad.",
-      "invalidDayCount": "maglagay ng 1–365 araw gamit ang buong bilang lang.",
+      "invalidDayCount": "maglagay ng {{min}}–{{max}} araw gamit ang buong bilang lang.",
       "remediationDeadlineA11y": "Bilang ng araw bago ang takdang petsa ng pag-aayos para sa {{label}}",
-      "enterWholeNumber": "Maglagay ng buong bilang mula 1 hanggang 365",
+      "enterWholeNumber": "Maglagay ng buong bilang mula {{min}} hanggang {{max}}",
       "permissionNote": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magbago ng mga setting na ito.",
       "enableTracking": "Paganahin ang pagsubaybay sa SLA",
       "enableTrackingSubtitle": "Magtakda ng mga petsa ng pag-aayos batay sa kalubhaan ng natukoy na isyu.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Minimum na kalubhaan ng bagong natukoy na isyu",
       "newFindingSubtitle": "Ipinapadala tuwing may bagong natukoy na isyung na-sync, kasama ang unang pag-sync.",
       "slaLeadTimeAccessibility": "Bilang ng araw bago ang takdang petsa para magbabala tungkol sa SLA",
-      "slaLeadTimeError": "Maglagay ng buong bilang ng araw mula 1 hanggang 365.",
+      "slaLeadTimeError": "Maglagay ng buong bilang ng araw mula {{min}} hanggang {{max}}.",
       "slaLeadTimeLabel": "Paunang babala sa SLA (araw bago ang takdang petsa)",
       "slaPersonalTitle": "I-email ako tungkol sa mga babala ng SLA",
       "slaSection": "Abiso ng babala sa SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Hindi maisumite. Subukang muli.",
       "questionAnnouncement": "Kailangan ng ahente ng sagot mo. Hindi muna magagamit ang sulatan ng mensahe habang sumasagot ka.",
       "permissionAnnouncement": "Kailangan ng ahente ng pahintulot para magpatuloy. Hindi muna magagamit ang sulatan ng mensahe habang nagpapasya ka.",
-      "positionHint": "(1 sa {{displayCount}})",
+      "positionHint": "({{index}} sa {{displayCount}})",
       "movedPastPrompt": "Nalampasan na ng ahente ang prompt na ito. Magsasara ang card na ito kapag nagpatuloy ang sesyon.",
       "waitingForAnswer": "Naghihintay ang ahente ng sagot mo. Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang tanong na ito.",
       "waitingForPermission": "Naghihintay ang ahente ng pahintulot. Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang kahilingang ito."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Magbabala kapag mas mababa sa (USD)",
       "title": "Babala sa mababang balanse",
       "emailsError": "Maglagay ng kahit isang wastong email address. Kung higit sa isa, paghiwalayin ang mga ito ng kuwit.",
-      "thresholdError": "Maglagay ng halagang mas malaki sa 0."
+      "thresholdError": "Maglagay ng halagang mas malaki sa {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Limitasyon (USD bawat araw)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Alisin ang limitasyon",
       "title": "Pang-araw-araw na limitasyon sa paggamit",
       "blankError": "Maglagay ng halaga, o piliin ang Alisin ang limitasyon sa ibaba.",
-      "rangeError": "Maglagay ng halagang nasa pagitan ng 0 at {{max}}."
+      "rangeError": "Maglagay ng halagang nasa pagitan ng {{min}} at {{max}}."
     },
     "members": {
       "changeRole": "Baguhin ang tungkulin",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
-      "last30Days": "Huling 30 araw",
+      "last30Days": "Huling {{days}} araw",
       "outputTokens": "Mga palabas na token",
       "requests": "Mga kahilingan"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Ang isang oras ay malayo sa itaas ng karaniwang rate ng saklaw na ito",
     "limitLabel": "Limitasyon (USD)",
     "windowLabel": "Panahon",
-    "window24h": "24 na oras",
-    "window7d": "7 araw",
-    "window30d": "30 araw",
+    "window24h": "{{hours}} na oras",
+    "window7d": "{{days}} araw",
+    "window30d": "{{days}} araw",
     "multiplierLabel": "Multiplier ng pagtaas",
     "saved": "Nai-save ang mga setting ng babala sa gastos",
     "loadError": "Hindi ma-load ang mga babala sa gastos.",
     "saveError": "Hindi mai-save ang mga babala sa gastos.",
     "empty": "Naka-off ang mga babala sa gastos. I-on ang mga ito para abisuhan ang mga contact sa pagsingil ng saklaw na ito.",
     "noSpend": "Wala pang naitalang gastos",
-    "spend24h": "Gastos sa nakalipas na 24 na oras",
-    "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
+    "spend24h": "Gastos sa nakalipas na {{hours}} na oras",
+    "multiplierError": "Maglagay ng multiplier na {{min}} o higit pa",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
     "pushOffByCategory": "Naka-off sa Mga abiso"
   },

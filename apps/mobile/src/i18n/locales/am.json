@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "የደህንነት ወኪል የሚከታተላቸውን ማከማቻዎች ይምረጡ",
       "analysisModeSubtitle": "{{mode}} ትንታኔ",
       "automationAllOff": "ሁሉም ተሰናክለዋል",
-      "automationCount": "ከ3 ውስጥ {{displayCount}} ነቅተዋል",
-      "notificationsCount": "ከ2 ውስጥ {{displayCount}} ነቅተዋል",
+      "automationCount": "ከ{{total}} ውስጥ {{displayCount}} ነቅተዋል",
+      "notificationsCount": "ከ{{total}} ውስጥ {{displayCount}} ነቅተዋል",
       "disabledNoManage": "የደህንነት ወኪሉ ተሰናክሏል። የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ ሊያነቁት ይችላሉ።",
       "disabledNoRepo": "የደህንነት ወኪሉን ከማንቃት በፊት ቢያንስ አንድ ማከማቻ ይምረጡ።",
       "disabledPrompt": "የDependabot ማስጠንቀቂያዎችን ለማመሳሰል፣ ማከማቻዎችን ለመምረጥ እና ራስ-ሰር አሠራርን ለማዋቀር የደህንነት ወኪሉን ያንቁ።"
@@ -1817,9 +1817,9 @@
       "highDescription": "ከፍተኛ የውሂብ መጋለጥ ሊያስከትል ይችላል።",
       "mediumDescription": "ውስን ተጽእኖ አለው ወይም በተወሰኑ ሁኔታዎች ብቻ ይከሰታል።",
       "lowDescription": "በደህንነት ላይ ያለው ተጽእኖ አነስተኛ ነው።",
-      "invalidDayCount": "ከ1 እስከ 365 ያለ ሙሉ የቀናት ቁጥር ያስገቡ።",
+      "invalidDayCount": "ከ{{min}} እስከ {{max}} ያለ ሙሉ የቀናት ቁጥር ያስገቡ።",
       "remediationDeadlineA11y": "የ{{label}} ጥገና ጊዜ ገደብ በቀናት",
-      "enterWholeNumber": "ከ1 እስከ 365 ያለ ሙሉ ቁጥር አስገባ",
+      "enterWholeNumber": "ከ{{min}} እስከ {{max}} ያለ ሙሉ ቁጥር አስገባ",
       "permissionNote": "የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ እነዚህን ቅንብሮች መቀየር ይችላሉ።",
       "enableTracking": "የSLA ክትትልን ያንቁ",
       "enableTrackingSubtitle": "በግኝት ክብደት ላይ በመመስረት የጥገና ጊዜ ገደቦችን ያዘጋጁ።",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "ለአዲስ ግኝት ማሳወቂያ ዝቅተኛው ክብደት",
       "newFindingSubtitle": "የመጀመሪያውን ማመሳሰል ጨምሮ፣ አዲስ ግኝት በተመሳሰለ ቁጥር ማሳወቂያ ይላካል።",
       "slaLeadTimeAccessibility": "ከSLA ጊዜ ገደብ በፊት ማስጠንቀቂያ የሚላክባቸው ቀናት ብዛት",
-      "slaLeadTimeError": "ከ1 እስከ 365 ያለ ሙሉ የቀናት ቁጥር ያስገቡ።",
+      "slaLeadTimeError": "ከ{{min}} እስከ {{max}} ያለ ሙሉ የቀናት ቁጥር ያስገቡ።",
       "slaLeadTimeLabel": "ከSLA ጊዜ ገደብ በፊት የማስጠንቀቂያ ጊዜ (ቀናት)",
       "slaPersonalTitle": "ስለ SLA ማስጠንቀቂያዎች በኢሜይል ያሳውቁኝ",
       "slaSection": "የSLA ማስጠንቀቂያ ማሳወቂያ",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "ማስገባት አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
       "questionAnnouncement": "ወኪሉ መልስዎን ይፈልጋል። እስኪመልሱ ድረስ የመልእክት ማስገቢያው ለጊዜው ቆሟል።",
       "permissionAnnouncement": "ወኪሉ ለመቀጠል ፈቃድ ይፈልጋል። እስኪወስኑ ድረስ የመልእክት ማስገቢያው ለጊዜው ቆሟል።",
-      "positionHint": "(ከ{{displayCount}} 1ኛ)",
+      "positionHint": "(ከ{{displayCount}} {{index}}ኛ)",
       "movedPastPrompt": "ወኪሉ ይህን ጥያቄ አልፎታል። ክፍለ ጊዜው ሲቀጥል ይህ ካርድ ይዘጋል።",
       "waitingForAnswer": "ወኪሉ መልስዎን እየጠበቀ ነው። ይህ ጥያቄ ክፍት ሆኖ እስካለ ድረስ፣ ወደ ወኪሉ መልእክት መላክ ለጊዜው ቆሟል።",
       "waitingForPermission": "ወኪሉ ፈቃድ እየጠበቀ ነው። ይህ ጥያቄ ክፍት ሆኖ እስካለ ድረስ፣ ወደ ወኪሉ መልእክት መላክ ለጊዜው ቆሟል።"
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "ማንቂያ የሚላክበት ዝቅተኛ መጠን (USD)",
       "title": "የዝቅተኛ ቀሪ ሂሳብ ማንቂያ",
       "emailsError": "ቢያንስ አንድ ትክክለኛ የኢሜይል አድራሻ ያስገቡ። ብዙ አድራሻዎችን በነጠላ ሰረዝ ይለዩ።",
-      "thresholdError": "ከ0 የሚበልጥ መጠን ያስገቡ።"
+      "thresholdError": "ከ{{min}} የሚበልጥ መጠን ያስገቡ።"
     },
     "memberLimit": {
       "limitLabel": "የቀን ገደብ (USD)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "ገደቡን ያስወግዱ",
       "title": "የዕለት አጠቃቀም ገደብ",
       "blankError": "መጠን ያስገቡ፣ ወይም ከታች «ገደቡን ያስወግዱ»ን ይንኩ።",
-      "rangeError": "በ0 እና {{max}} መካከል ያለ መጠን ያስገቡ።"
+      "rangeError": "በ{{min}} እና {{max}} መካከል ያለ መጠን ያስገቡ።"
     },
     "members": {
       "changeRole": "ሚናውን ይቀይሩ",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
-      "last30Days": "ያለፉት 30 ቀናት",
+      "last30Days": "ያለፉት {{days}} ቀናት",
       "outputTokens": "የውጤት ቶከኖች",
       "requests": "ጥያቄዎች"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "አንድ ሰዓት ከዚህ አካባቢ የተለመደው መጠን በጣም ከፍ ይላል",
     "limitLabel": "ገደብ (USD)",
     "windowLabel": "የጊዜ መስኮት",
-    "window24h": "24 ሰዓታት",
-    "window7d": "7 ቀናት",
-    "window30d": "30 ቀናት",
+    "window24h": "{{hours}} ሰዓታት",
+    "window7d": "{{days}} ቀናት",
+    "window30d": "{{days}} ቀናት",
     "multiplierLabel": "የጭማሪ ብዜት",
     "saved": "የወጪ ማስጠንቀቂያ ቅንብሮች ተቀምጠዋል",
     "loadError": "የወጪ ማስጠንቀቂያዎችን መጫን አልተቻለም።",
     "saveError": "የወጪ ማስጠንቀቂያዎችን ማስቀመጥ አልተቻለም።",
     "empty": "የወጪ ማስጠንቀቂያዎች ጠፍተዋል። የዚህን አካባቢ የሂሳብ ተጠሪዎች ለማስጠንቀቅ ያብራቸው።",
     "noSpend": "እስካሁን ምንም ወጪ አልተመዘገበም",
-    "spend24h": "ባለፉት 24 ሰዓታት የወጣ ወጪ",
-    "multiplierError": "ከ1 ወይም ከዚያ በላይ የሆነ ብዜት ያስገቡ",
+    "spend24h": "ባለፉት {{hours}} ሰዓታት የወጣ ወጪ",
+    "multiplierError": "ከ{{min}} ወይም ከዚያ በላይ የሆነ ብዜት ያስገቡ",
     "permissionDenied": "የወጪ ማስጠንቀቂያዎችን ለማስተዳደር ፈቃድ የለዎትም።",
     "pushOffByCategory": "በማሳወቂያዎች ውስጥ ተሰናክሏል"
   },

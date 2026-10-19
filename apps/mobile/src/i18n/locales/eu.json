@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Hautatu segurtasun-agenteak zein biltegiren jarraipena egingo duen",
       "analysisModeSubtitle": "Azterketa: {{mode}}",
       "automationAllOff": "Guztiak desgaituta",
-      "automationCount": "3tik {{displayCount}} gaituta",
-      "notificationsCount": "2tik {{displayCount}} gaituta",
+      "automationCount": "{{total}}tik {{displayCount}} gaituta",
+      "notificationsCount": "{{total}}tik {{displayCount}} gaituta",
       "disabledNoManage": "Segurtasun-agentea desgaituta dago. Erakundeko jabeek eta fakturazio-kudeatzaileek soilik gaitu dezakete.",
       "disabledNoRepo": "Hautatu gutxienez biltegi bat segurtasun-agentea gaitu aurretik.",
       "disabledPrompt": "Gaitu segurtasun-agentea Dependabot-en abisuak sinkronizatzeko, biltegiak hautatzeko eta automatizazioa konfiguratzeko."
@@ -1817,9 +1817,9 @@
       "highDescription": "Datu kopuru handia agerian geratzeko arriskua.",
       "mediumDescription": "Eragin mugatua edo baldintza zehatzak.",
       "lowDescription": "Segurtasunean eragin oso txikia.",
-      "invalidDayCount": "egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
+      "invalidDayCount": "egun kopuruak {{min}} eta {{max}} arteko zenbaki osoa izan behar du.",
       "remediationDeadlineA11y": "Konponketa-epea egunetan, larritasuna: {{label}}",
-      "enterWholeNumber": "Sartu 1etik 365era bitarteko zenbaki oso bat",
+      "enterWholeNumber": "Sartu {{min}}etik {{max}}era bitarteko zenbaki oso bat",
       "permissionNote": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",
       "enableTracking": "Gaitu SLAren jarraipena",
       "enableTrackingSubtitle": "Ezarri konponketa-epeak aurkikuntzen larritasunaren arabera.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Aurkikuntza berrien gutxieneko larritasuna",
       "newFindingSubtitle": "Aurkikuntza berri bat sinkronizatzen den bakoitzean bidaltzen da, lehen sinkronizazioan ere bai.",
       "slaLeadTimeAccessibility": "SLAren abisua zenbat egun lehenago bidali",
-      "slaLeadTimeError": "Sartu 1 eta 365 arteko zenbaki oso bat egun kopururako.",
+      "slaLeadTimeError": "Sartu {{min}} eta {{max}} arteko zenbaki oso bat egun kopururako.",
       "slaLeadTimeLabel": "SLAren abisuaren aurrerapena (egunak)",
       "slaPersonalTitle": "Bidali niri SLAren abisuak posta elektronikoz",
       "slaSection": "SLAren abisuen jakinarazpena",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Bidalketak huts egin du. Saiatu berriro.",
       "questionAnnouncement": "Agenteak zure erantzuna behar du. Mezu-eremua desgaituta dago erantzuten duzun bitartean.",
       "permissionAnnouncement": "Agenteak baimena behar du jarraitzeko. Mezu-eremua desgaituta dago erabakitzen duzun bitartean.",
-      "positionHint": "(1 / {{displayCount}})",
+      "positionHint": "({{index}} / {{displayCount}})",
       "movedPastPrompt": "Agenteak eskaera hau atzean utzi du. Txartel hau saioak aurrera egiten duenean itxiko da.",
       "waitingForAnswer": "Agentea zure erantzunaren zain dago. Galdera hau irekita dagoen bitartean, agenteari bidali nahi diozun mezua zain geratuko da.",
       "waitingForPermission": "Agentea baimenaren zain dago. Eskaera hau irekita dagoen bitartean, agenteari bidali nahi diozun mezua zain geratuko da."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Alerta atalase honen azpitik (USD)",
       "title": "Saldo baxuko alerta",
       "emailsError": "Sartu baliozko helbide elektroniko bat gutxienez. Bat baino gehiago sartuz gero, bereizi komaz.",
-      "thresholdError": "Sartu 0 baino handiagoa den zenbateko bat."
+      "thresholdError": "Sartu {{min}} baino handiagoa den zenbateko bat."
     },
     "memberLimit": {
       "limitLabel": "Muga (USD eguneko)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Kendu muga",
       "title": "Eguneko erabilera-muga",
       "blankError": "Sartu zenbateko bat edo sakatu beheko Kendu muga botoia.",
-      "rangeError": "Sartu 0 eta {{max}} arteko zenbateko bat."
+      "rangeError": "Sartu {{min}} eta {{max}} arteko zenbateko bat."
     },
     "members": {
       "changeRole": "Aldatu rola",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
-      "last30Days": "Azken 30 egunak",
+      "last30Days": "Azken {{days}} egunak",
       "outputTokens": "Irteerako tokenak",
       "requests": "Eskaerak"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Ordu bat eremu honen ohiko tasatik oso gainetik dago",
     "limitLabel": "Muga (USD)",
     "windowLabel": "Leihoa",
-    "window24h": "24 ordu",
-    "window7d": "7 egun",
-    "window30d": "30 egun",
+    "window24h": "{{hours}} ordu",
+    "window7d": "{{days}} egun",
+    "window30d": "{{days}} egun",
     "multiplierLabel": "Gorakadaren biderkatzailea",
     "saved": "Gastu-alerten ezarpenak gorde dira",
     "loadError": "Ezin izan dira gastu-alertak kargatu.",
     "saveError": "Ezin izan dira gastu-alertak gorde.",
     "empty": "Gastu-alertak itzalita daude. Piztu itzazu eremu honetako fakturatze-kontaktuei abisatzeko.",
     "noSpend": "Oraindik ez da gasturik erregistratu",
-    "spend24h": "Azken 24 orduetako gastua",
-    "multiplierError": "Sartu 1 edo handiagoa den biderkatzaile bat",
+    "spend24h": "Azken {{hours}} orduetako gastua",
+    "multiplierError": "Sartu {{min}} edo handiagoa den biderkatzaile bat",
     "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
     "pushOffByCategory": "Jakinarazpenetan itzalita"
   },

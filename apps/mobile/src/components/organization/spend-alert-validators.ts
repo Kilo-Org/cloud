@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { parseLocalizedNumber } from '@/lib/format';
+import { formatNumber, parseLocalizedNumber } from '@/lib/format';
 
 /**
  * Bounds the save payload's schema enforces, mirrored here so the form shows an
@@ -79,13 +79,18 @@ export function toWindowHours(value: number | null | undefined): SpendAlertWindo
 /** Inline error for the limit field, or `null` while the value is valid. */
 export function thresholdError(value: string): string | null {
   // Reuses the billing alert's copy: the same sentence, so the two fields can
-  // never drift apart in a translation.
+  // never drift apart in a translation. The copy names zero, which is also what
+  // the smallest sub-microdollar limit rounds to at the formatter's digits.
   return parseThreshold(value) == null
-    ? i18n.t('organization.lowBalanceAlert.thresholdError')
+    ? i18n.t('organization.lowBalanceAlert.thresholdError', {
+        min: formatNumber(0, i18n.language),
+      })
     : null;
 }
 
 /** Inline error for the multiplier field, or `null` while the value is valid. */
 export function multiplierError(value: string): string | null {
-  return parseMultiplier(value) == null ? i18n.t('spendAlerts.multiplierError') : null;
+  return parseMultiplier(value) == null
+    ? i18n.t('spendAlerts.multiplierError', { min: formatNumber(1, i18n.language) })
+    : null;
 }

@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "Tingkat keparahan minimum temuan baru",
       "newFindingSubtitle": "Dikirim setiap kali temuan baru disinkronkan, termasuk pada sinkronisasi pertama.",
       "slaLeadTimeAccessibility": "Jumlah hari sebelum tenggat SLA untuk mengirim peringatan",
-      "slaLeadTimeError": "Masukkan jumlah hari berupa bilangan bulat dari 1 hingga 365.",
+      "slaLeadTimeError": "Masukkan jumlah hari berupa bilangan bulat dari {{min}} hingga {{max}}.",
       "slaLeadTimeLabel": "Peringatan sebelum tenggat SLA (hari)",
       "slaPersonalTitle": "Kirim peringatan SLA melalui email kepada saya",
       "slaSection": "Notifikasi peringatan SLA",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "Analisis {{mode}}",
       "automationAllOff": "Semua nonaktif",
-      "automationCount": "{{displayCount}} dari 3 aktif",
+      "automationCount": "{{displayCount}} dari {{total}} aktif",
       "couldNotLoadPermissions": "Tidak dapat memuat izin.",
       "couldNotLoadSettings": "Tidak dapat memuat pengaturan Agen keamanan.",
       "disabledNoManage": "Agen keamanan dinonaktifkan. Hanya pemilik organisasi dan manajer penagihan yang dapat mengaktifkannya.",
       "disabledNoRepo": "Pilih setidaknya satu repositori sebelum mengaktifkan Agen keamanan.",
       "disabledPrompt": "Aktifkan Agen keamanan untuk menyinkronkan peringatan Dependabot, memilih repositori, dan mengatur otomatisasi.",
-      "notificationsCount": "{{displayCount}} dari 2 aktif",
+      "notificationsCount": "{{displayCount}} dari {{total}} aktif",
       "on": "Aktif",
       "repositoriesCount": "{{displayCount}} repositori dipilih",
       "repositoriesCount_other": "{{displayCount}} repositori dipilih",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "Tenggat perbaikan (hari)",
       "enableTracking": "Aktifkan pelacakan SLA",
       "enableTrackingSubtitle": "Tetapkan tenggat perbaikan berdasarkan tingkat keparahan temuan.",
-      "enterWholeNumber": "Masukkan bilangan bulat antara 1 dan 365",
+      "enterWholeNumber": "Masukkan bilangan bulat antara {{min}} dan {{max}}",
       "high": "Tinggi",
       "highDescription": "Berpotensi menyebabkan kebocoran data yang signifikan.",
-      "invalidDayCount": "jumlah hari harus berupa bilangan bulat dari 1 hingga 365.",
+      "invalidDayCount": "jumlah hari harus berupa bilangan bulat dari {{min}} hingga {{max}}.",
       "low": "Rendah",
       "lowDescription": "Dampak terhadap keamanan minimal.",
       "medium": "Sedang",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "Pengiriman gagal. Coba lagi.",
       "questionAnnouncement": "Agen membutuhkan masukanmu. Kolom pesan dinonaktifkan sementara sampai kamu menjawab.",
       "permissionAnnouncement": "Agen membutuhkan izin untuk melanjutkan. Kolom pesan dinonaktifkan sementara sampai kamu memutuskan.",
-      "positionHint": "(1 dari {{displayCount}})",
+      "positionHint": "({{index}} dari {{displayCount}})",
       "movedPastPrompt": "Agen telah melewati permintaan ini. Kartu ini akan ditutup saat sesi berlanjut.",
       "waitingForAnswer": "Agen sedang menunggu jawabanmu. Pengiriman pesanmu ke agen ditunda selama pertanyaan ini masih terbuka.",
       "waitingForPermission": "Agen sedang menunggu izin. Pengiriman pesanmu ke agen ditunda selama permintaan ini masih terbuka."
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "Beri peringatan jika saldo di bawah (USD)",
       "title": "Peringatan saldo rendah",
       "emailsError": "Masukkan setidaknya satu alamat email yang valid. Pisahkan dengan koma jika lebih dari satu.",
-      "thresholdError": "Masukkan jumlah yang lebih besar dari 0."
+      "thresholdError": "Masukkan jumlah yang lebih besar dari {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Batas (USD per hari)",
@@ -3040,7 +3040,7 @@
       "removeLimit": "Hapus batas",
       "title": "Batas penggunaan harian",
       "blankError": "Masukkan jumlah atau ketuk Hapus batas di bawah.",
-      "rangeError": "Masukkan jumlah antara 0 dan {{max}}."
+      "rangeError": "Masukkan jumlah antara {{min}} dan {{max}}."
     },
     "members": {
       "changeRole": "Ubah peran",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "Token masukan",
-      "last30Days": "30 Hari terakhir",
+      "last30Days": "{{days}} Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Satu jam jauh di atas laju biasanya cakupan ini",
     "limitLabel": "Batas (USD)",
     "windowLabel": "Jendela",
-    "window24h": "24 jam",
-    "window7d": "7 hari",
-    "window30d": "30 hari",
+    "window24h": "{{hours}} jam",
+    "window7d": "{{days}} hari",
+    "window30d": "{{days}} hari",
     "multiplierLabel": "Pengali lonjakan",
     "saved": "Setelan peringatan pengeluaran disimpan",
     "loadError": "Tidak dapat memuat peringatan pengeluaran.",
     "saveError": "Tidak dapat menyimpan peringatan pengeluaran.",
     "empty": "Peringatan pengeluaran nonaktif. Aktifkan untuk memberi tahu kontak penagihan cakupan ini.",
     "noSpend": "Belum ada pengeluaran yang tercatat",
-    "spend24h": "Pengeluaran dalam 24 jam terakhir",
-    "multiplierError": "Masukkan pengali 1 atau lebih",
+    "spend24h": "Pengeluaran dalam {{hours}} jam terakhir",
+    "multiplierError": "Masukkan pengali {{min}} atau lebih",
     "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan pengeluaran.",
     "pushOffByCategory": "Nonaktif di Notifikasi"
   },

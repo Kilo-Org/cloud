@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "新安全问题通知的最低严重程度",
       "newFindingSubtitle": "每次同步到新安全问题时发送通知，首次同步也会发送。",
       "slaLeadTimeAccessibility": "SLA 预警提前天数",
-      "slaLeadTimeError": "请输入 1 到 365 之间的整数天数。",
+      "slaLeadTimeError": "请输入 {{min}} 到 {{max}} 之间的整数天数。",
       "slaLeadTimeLabel": "SLA 预警提前时间（天）",
       "slaPersonalTitle": "有 SLA 预警时通过邮件通知我",
       "slaSection": "SLA 预警通知",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "{{mode}} 分析",
       "automationAllOff": "全部关闭",
-      "automationCount": "已启用 {{displayCount}}/3 项",
+      "automationCount": "已启用 {{displayCount}}/{{total}} 项",
       "couldNotLoadPermissions": "无法加载权限信息。",
       "couldNotLoadSettings": "无法加载安全智能体设置。",
       "disabledNoManage": "安全智能体已禁用。只有组织所有者和账单管理员可以启用。",
       "disabledNoRepo": "启用安全智能体前，请至少选择一个仓库。",
       "disabledPrompt": "启用安全智能体，即可同步 Dependabot 警报、选择仓库并配置自动化。",
-      "notificationsCount": "已启用 {{displayCount}}/2 项",
+      "notificationsCount": "已启用 {{displayCount}}/{{total}} 项",
       "on": "已开启",
       "repositoriesCount": "已选择 {{displayCount}} 个仓库",
       "repositoriesCount_other": "已选择 {{displayCount}} 个仓库",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "修复期限（天）",
       "enableTracking": "启用 SLA 跟踪",
       "enableTrackingSubtitle": "根据安全问题的严重程度设置修复截止时间。",
-      "enterWholeNumber": "请输入 1 到 365 之间的整数",
+      "enterWholeNumber": "请输入 {{min}} 到 {{max}} 之间的整数",
       "high": "高",
       "highDescription": "可能导致严重的数据泄露。",
-      "invalidDayCount": "天数必须为 1 至 365 之间的整数。",
+      "invalidDayCount": "天数必须为 {{min}} 至 {{max}} 之间的整数。",
       "low": "低",
       "lowDescription": "对安全的影响极小。",
       "medium": "中",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "提交失败。请重试。",
       "questionAnnouncement": "智能体需要你的回答。回答期间，消息输入框暂不可用。",
       "permissionAnnouncement": "智能体需要授权才能继续。做出决定前，消息输入框暂不可用。",
-      "positionHint": "（第 1 项，共 {{displayCount}} 项）",
+      "positionHint": "（第 {{index}} 项，共 {{displayCount}} 项）",
       "movedPastPrompt": "智能体已不再等待此处的输入。会话继续后，此卡片将关闭。",
       "waitingForAnswer": "智能体正在等待你的回答。在你回答此问题前，发给智能体的消息将暂停发送。",
       "waitingForPermission": "智能体正在等待授权。在你处理此请求前，发给智能体的消息将暂停发送。"
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "余额低于此金额时提醒（USD）",
       "title": "余额不足提醒",
       "emailsError": "请输入至少一个有效的邮箱地址，多个地址用逗号分隔。",
-      "thresholdError": "请输入大于 0 的金额。"
+      "thresholdError": "请输入大于 {{min}} 的金额。"
     },
     "memberLimit": {
       "limitLabel": "每日用量上限（USD）",
@@ -3040,7 +3040,7 @@
       "removeLimit": "取消限制",
       "title": "每日用量上限",
       "blankError": "请输入金额，或点击下方的“取消限制”。",
-      "rangeError": "请输入 0 到 {{max}} 之间的金额。"
+      "rangeError": "请输入 {{min}} 到 {{max}} 之间的金额。"
     },
     "members": {
       "changeRole": "更改角色",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "输入词元",
-      "last30Days": "最近 30 天",
+      "last30Days": "最近 {{days}} 天",
       "outputTokens": "输出词元",
       "requests": "请求"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "某一小时的支出远高于此范围的平时速率",
     "limitLabel": "限额 (USD)",
     "windowLabel": "时间窗口",
-    "window24h": "24 小时",
-    "window7d": "7 天",
-    "window30d": "30 天",
+    "window24h": "{{hours}} 小时",
+    "window7d": "{{days}} 天",
+    "window30d": "{{days}} 天",
     "multiplierLabel": "激增倍数",
     "saved": "支出提醒设置已保存",
     "loadError": "无法加载支出提醒。",
     "saveError": "无法保存支出提醒。",
     "empty": "支出提醒已关闭。开启后会通知此范围的账单联系人。",
     "noSpend": "尚无支出记录",
-    "spend24h": "过去 24 小时的支出",
-    "multiplierError": "请输入 1 或更大的倍数",
+    "spend24h": "过去 {{hours}} 小时的支出",
+    "multiplierError": "请输入 {{min}} 或更大的倍数",
     "permissionDenied": "你没有管理支出提醒的权限。",
     "pushOffByCategory": "已在通知中关闭"
   },

@@ -59,8 +59,9 @@ export function getSecurityRepositoriesInScope<T extends SecurityRepository>(
  */
 type SettingsDirtyState = 'clean' | 'dirty-valid' | 'dirty-invalid';
 
-const MIN_SLA_DAYS = 1;
-const MAX_SLA_DAYS = 365;
+/** The whole-day bounds every SLA day field accepts, so copy can name them. */
+export const MIN_SLA_DAYS = 1;
+export const MAX_SLA_DAYS = 365;
 
 /**
  * Parses a raw numeric `TextInput` string into a whole-day count, or `NaN`

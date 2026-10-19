@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "新しい検出結果の通知対象となる重大度の下限",
       "newFindingSubtitle": "初回同期を含め、新しい検出結果が同期されるたびに通知します。",
       "slaLeadTimeAccessibility": "SLA警告の事前通知日数",
-      "slaLeadTimeError": "日数は1〜365の整数で入力してください。",
+      "slaLeadTimeError": "日数は{{min}}〜{{max}}の整数で入力してください。",
       "slaLeadTimeLabel": "SLA警告の事前通知日数",
       "slaPersonalTitle": "SLA警告を自分にメールで通知",
       "slaSection": "SLA警告の通知",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "{{mode}}分析",
       "automationAllOff": "すべてオフ",
-      "automationCount": "3件中{{displayCount}}件が有効",
+      "automationCount": "{{total}}件中{{displayCount}}件が有効",
       "couldNotLoadPermissions": "権限情報を読み込めませんでした。",
       "couldNotLoadSettings": "セキュリティエージェントの設定を読み込めませんでした。",
       "disabledNoManage": "セキュリティエージェントは無効です。有効にできるのは、組織のオーナーと請求管理者のみです。",
       "disabledNoRepo": "セキュリティエージェントを有効にする前に、リポジトリを1つ以上選択してください。",
       "disabledPrompt": "セキュリティエージェントを有効にして、Dependabotアラートの同期、リポジトリの選択、自動化の設定を行ってください。",
-      "notificationsCount": "2件中{{displayCount}}件が有効",
+      "notificationsCount": "{{total}}件中{{displayCount}}件が有効",
       "on": "オン",
       "repositoriesCount": "{{displayCount}}件のリポジトリを選択中",
       "repositoriesCount_other": "{{displayCount}}件のリポジトリを選択中",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "修復期限（日数）",
       "enableTracking": "SLAの追跡を有効化",
       "enableTrackingSubtitle": "検出結果の重大度に応じて修復期限を設定します。",
-      "enterWholeNumber": "1から365までの整数を入力してください",
+      "enterWholeNumber": "{{min}}から{{max}}までの整数を入力してください",
       "high": "高",
       "highDescription": "重大なデータ漏えいにつながる可能性があります。",
-      "invalidDayCount": "日数は1〜365の整数で入力してください。",
+      "invalidDayCount": "日数は{{min}}〜{{max}}の整数で入力してください。",
       "low": "低",
       "lowDescription": "セキュリティへの影響はごくわずかです。",
       "medium": "中",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "送信に失敗しました。もう一度お試しください。",
       "questionAnnouncement": "エージェントが回答を求めています。回答中はメッセージ入力欄を利用できません。",
       "permissionAnnouncement": "エージェントが続行するには許可が必要です。許可するかどうかを選択する間は、メッセージ入力欄を利用できません。",
-      "positionHint": "（{{displayCount}}件中1件目）",
+      "positionHint": "（{{displayCount}}件中{{index}}件目）",
       "movedPastPrompt": "エージェントはすでにこの確認を終えて、先に進んでいます。セッションが再開すると、このカードは閉じます。",
       "waitingForAnswer": "エージェントが回答を待っています。この質問に回答するまで、エージェントへのメッセージ送信は一時停止します。",
       "waitingForPermission": "エージェントが許可を待っています。このリクエストに応答するまで、エージェントへのメッセージ送信は一時停止します。"
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "通知する残高の下限（USD）",
       "title": "残高アラート",
       "emailsError": "有効なメールアドレスを1つ以上入力してください。複数ある場合はカンマで区切ってください。",
-      "thresholdError": "0より大きい金額を入力してください。"
+      "thresholdError": "{{min}}より大きい金額を入力してください。"
     },
     "memberLimit": {
       "limitLabel": "1日の上限額（USD）",
@@ -3040,7 +3040,7 @@
       "removeLimit": "上限を解除",
       "title": "1日の利用上限額",
       "blankError": "金額を入力するか、下の「上限を解除」をタップしてください。",
-      "rangeError": "0から{{max}}までの金額を入力してください。"
+      "rangeError": "{{min}}から{{max}}までの金額を入力してください。"
     },
     "members": {
       "changeRole": "役割を変更",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "入力トークン",
-      "last30Days": "過去30日間",
+      "last30Days": "過去{{days}}日間",
       "outputTokens": "出力トークン",
       "requests": "リクエスト"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "1時間の支出がこのスコープの通常のペースを大きく上回っています",
     "limitLabel": "上限 (USD)",
     "windowLabel": "期間",
-    "window24h": "24時間",
-    "window7d": "7日間",
-    "window30d": "30日間",
+    "window24h": "{{hours}}時間",
+    "window7d": "{{days}}日間",
+    "window30d": "{{days}}日間",
     "multiplierLabel": "急増の倍率",
     "saved": "支出アラートの設定を保存しました",
     "loadError": "支出アラートを読み込めませんでした。",
     "saveError": "支出アラートを保存できませんでした。",
     "empty": "支出アラートはオフです。このスコープの請求担当者に通知するにはオンにしてください。",
     "noSpend": "まだ支出が記録されていません",
-    "spend24h": "過去24時間の支出",
-    "multiplierError": "1以上の倍率を入力してください",
+    "spend24h": "過去{{hours}}時間の支出",
+    "multiplierError": "{{min}}以上の倍率を入力してください",
     "permissionDenied": "支出アラートを管理する権限がありません。",
     "pushOffByCategory": "通知でオフ"
   },

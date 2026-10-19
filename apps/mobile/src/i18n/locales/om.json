@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Kuusaawwan koodii Gargaaraan nageenyaa hordofu filadhu",
       "analysisModeSubtitle": "Xiinxala {{mode}}",
       "automationAllOff": "Hundi cufamaniiru",
-      "automationCount": "3 keessaa {{displayCount}} banamaniiru",
-      "notificationsCount": "2 keessaa {{displayCount}} banamaniiru",
+      "automationCount": "{{total}} keessaa {{displayCount}} banamaniiru",
+      "notificationsCount": "{{total}} keessaa {{displayCount}} banamaniiru",
       "disabledNoManage": "Gargaaraan nageenyaa cufameera. Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa isa banuu danda'u.",
       "disabledNoRepo": "Gargaaraa nageenyaa banuu dura yoo xiqqaate kuusaa koodii tokko filadhu.",
       "disabledPrompt": "Akeekkachiisa Dependabot walsimsiisuuf, kuusaawwan koodii filachuuf fi hojii ofumaan raawwatamu qindeessuuf Gargaaraa nageenyaa bani."
@@ -1817,9 +1817,9 @@
       "highDescription": "Daataan baay'een saaxilamuu danda'a.",
       "mediumDescription": "Miidhaa daangeffame ykn haalota addaa.",
       "lowDescription": "Miidhaa nageenyaa baay'ee xiqqaa.",
-      "invalidDayCount": "lakkoofsa guutuu guyyaa 1–365 galchi.",
+      "invalidDayCount": "lakkoofsa guutuu guyyaa {{min}}–{{max}} galchi.",
       "remediationDeadlineA11y": "Daangaa yeroo sirreeffamaa {{label}} guyyaadhaan",
-      "enterWholeNumber": "Lakkoofsa guutuu 1 fi 365 gidduu jiru galchi",
+      "enterWholeNumber": "Lakkoofsa guutuu {{min}} fi {{max}} gidduu jiru galchi",
       "permissionNote": "Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa qindaa'ina kana jijjiiruu danda'u.",
       "enableTracking": "Hordoffii SLA bani",
       "enableTrackingSubtitle": "Cimina argamootaa irratti hundaa'ii daangaa yeroo sirreeffamaa murteessi.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Cimina isa xiqqaa argama haaraa",
       "newFindingSubtitle": "Yeroo jalqabaa dabalatee, yeroo argamni haaraan walsimsiifamu hundatti ergama.",
       "slaLeadTimeAccessibility": "Akeekkachiisni SLA guyyaa meeqa dursee akka ergamu",
-      "slaLeadTimeError": "Baay'ina guyyootaa lakkoofsa guutuu 1 hanga 365tti galchi.",
+      "slaLeadTimeError": "Baay'ina guyyootaa lakkoofsa guutuu {{min}} hanga {{max}}tti galchi.",
       "slaLeadTimeLabel": "Yeroo akeekkachiisa SLA dursee erguu (guyyaa)",
       "slaPersonalTitle": "Waa'ee akeekkachiisa SLA imeelii naaf ergi",
       "slaSection": "Beeksisa akeekkachiisa SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Erguun hin milkoofne. Deebi'ii yaali.",
       "questionAnnouncement": "Ergamaan deebii kee barbaada. Hanga deebii kennitutti iddoo ergaa barreessuu fayyadamuu hin dandeessu.",
       "permissionAnnouncement": "Ergamaan itti fufuuf hayyama barbaada. Hanga murteessitutti iddoo ergaa barreessuu fayyadamuu hin dandeessu.",
-      "positionHint": "({{displayCount}} keessaa 1)",
+      "positionHint": "({{displayCount}} keessaa {{index}})",
       "movedPastPrompt": "Ergamaan gaaffii kana irra darbeera. Yeroo turtiin itti fufu kaardiin kun ni cufama.",
       "waitingForAnswer": "Ergamaan deebii kee eegaa jira. Hanga gaaffiin kun banaa jirutti ergaan ergamaaf ergitu ni tura.",
       "waitingForPermission": "Ergamaan hayyama eegaa jira. Hanga gaaffiin kun banaa jirutti ergaan ergamaaf ergitu ni tura."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Hamma kana gadi yoo ta'e akeekkachiisi (USD)",
       "title": "Akeekkachiisa haftee xiqqaa",
       "emailsError": "Yoo xiqqaate teessoo imeelii sirrii tokko galchi. Yoo hedduu ta'an, qoodduudhaan adda baasi.",
-      "thresholdError": "Hamma 0 caalu galchi."
+      "thresholdError": "Hamma {{min}} caalu galchi."
     },
     "memberLimit": {
       "limitLabel": "Daangaa (USD guyyaatti)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Daangaa baasi",
       "title": "Daangaa fayyadama guyyaa",
       "blankError": "Hamma galchi yookaan gadiitti Daangaa baasi tuqi.",
-      "rangeError": "Hamma 0 fi {{max}} gidduu jiru galchi."
+      "rangeError": "Hamma {{min}} fi {{max}} gidduu jiru galchi."
     },
     "members": {
       "changeRole": "Gahee jijjiiri",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",
-      "last30Days": "Guyyoota 30 dhumaa",
+      "last30Days": "Guyyoota {{days}} dhumaa",
       "outputTokens": "Tookanoota bu'aa",
       "requests": "Gaaffiiwwan"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Sa'aanni tokko sadarkaa baramaa naannoo kanaa caalaa baay'ee ol jira",
     "limitLabel": "Daangaa (USD)",
     "windowLabel": "Yeroo",
-    "window24h": "Sa'aatii 24",
-    "window7d": "Guyyaa 7",
-    "window30d": "Guyyaa 30",
+    "window24h": "Sa'aatii {{hours}}",
+    "window7d": "Guyyaa {{days}}",
+    "window30d": "Guyyaa {{days}}",
     "multiplierLabel": "Baay'isaa olka'iinsaa",
     "saved": "Qindaa'inni akeekkachiisa baasii olkaa'ame",
     "loadError": "Akeekkachiisa baasii fiduun hin danda'amne.",
     "saveError": "Akeekkachiisa baasii olkaa'uun hin danda'amne.",
     "empty": "Akeekkachiisni baasii cufaa jira. Qunnamtiiwwan kaffaltii naannoo kanaa akeekkachiisuuf isa bansi.",
     "noSpend": "Amma ammaatti baasiin galmeeffame hin jiru",
-    "spend24h": "Baasii sa'aatii 24 darban keessatti",
-    "multiplierError": "Baay'isaa 1 ykn isaa ol galchi",
+    "spend24h": "Baasii sa'aatii {{hours}} darban keessatti",
+    "multiplierError": "Baay'isaa {{min}} ykn isaa ol galchi",
     "permissionDenied": "Akeekkachiisa baasii bulchuuf hayyamni sitti hin jiru.",
     "pushOffByCategory": "Beeksisota keessatti cufaa"
   },

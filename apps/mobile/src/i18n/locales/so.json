@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Dooro kaydadka uu Wakiilka amnigu la soconayo",
       "analysisModeSubtitle": "Falanqaynta {{mode}}",
       "automationAllOff": "Dhammaan way dansan yihiin",
-      "automationCount": "{{displayCount}} oo ka mid ah 3 ayaa shidan",
-      "notificationsCount": "{{displayCount}} oo ka mid ah 2 ayaa shidan",
+      "automationCount": "{{displayCount}} oo ka mid ah {{total}} ayaa shidan",
+      "notificationsCount": "{{displayCount}} oo ka mid ah {{total}} ayaa shidan",
       "disabledNoManage": "Wakiilka amniga waa la damiyay. Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa shidi kara.",
       "disabledNoRepo": "Dooro ugu yaraan hal kayd ka hor intaadan shidin Wakiilka amniga.",
       "disabledPrompt": "Shid Wakiilka amniga si aad u isku waafajiso digniinaha Dependabot, u doorato kaydadka, una dejiso hawlaha otomaatigga ah."
@@ -1817,9 +1817,9 @@
       "highDescription": "Xog badan ayaa halis ugu jirta inay bannaanka u baxdo.",
       "mediumDescription": "Saamayn xaddidan ama xaalado gaar ah.",
       "lowDescription": "Saamayn amni oo aad u yar.",
-      "invalidDayCount": "geli 1 ilaa 365 maalmood, adigoo isticmaalaya tirooyin dhan oo keliya.",
+      "invalidDayCount": "geli {{min}} ilaa {{max}} maalmood, adigoo isticmaalaya tirooyin dhan oo keliya.",
       "remediationDeadlineA11y": "Muddada hagaajinta ee {{label}}, oo maalmo ah",
-      "enterWholeNumber": "Geli tiro dhan oo u dhaxaysa 1 iyo 365",
+      "enterWholeNumber": "Geli tiro dhan oo u dhaxaysa {{min}} iyo {{max}}",
       "permissionNote": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
       "enableTracking": "Shid la socodka SLA",
       "enableTrackingSubtitle": "Deji waqtiyada kama dambaysta ah ee hagaajinta adigoo ku salaynaya heerka halista natiijada.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Heerka halista ugu hooseeya ee natiijooyinka cusub",
       "newFindingSubtitle": "Waxaa la diraa mar kasta oo natiijo cusub la isku waafajiyo, oo ay ku jirto isku waafajinta koowaad.",
       "slaLeadTimeAccessibility": "Tirada maalmaha digniinta SLA la sii hormarinayo",
-      "slaLeadTimeError": "Geli tirada maalmaha oo u dhaxaysa 1 iyo 365, adigoo isticmaalaya tiro dhan.",
+      "slaLeadTimeError": "Geli tirada maalmaha oo u dhaxaysa {{min}} iyo {{max}}, adigoo isticmaalaya tiro dhan.",
       "slaLeadTimeLabel": "Muddada digniinta SLA la sii hormarinayo (maalmo)",
       "slaPersonalTitle": "Iimayl iiga soo dir digniinaha SLA",
       "slaSection": "Ogeysiinta digniinta SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Gudbintu way fashilantay. Fadlan mar kale isku day.",
       "questionAnnouncement": "Wakiilku wuxuu u baahan yahay jawaabtaada. Goobta farriinta lagu qoro waa la hakiyay inta aad jawaabayso.",
       "permissionAnnouncement": "Wakiilku wuxuu u baahan yahay oggolaansho si uu u sii socdo. Goobta farriinta lagu qoro waa la hakiyay inta aad go'aan ka gaarayso.",
-      "positionHint": "(1 ka mid ah {{displayCount}})",
+      "positionHint": "({{index}} ka mid ah {{displayCount}})",
       "movedPastPrompt": "Wakiilku wuu dhaafay codsigan. Kaadhkan wuu xirmi doonaa marka kalfadhigu sii socdo.",
       "waitingForAnswer": "Wakiilku wuxuu sugayaa jawaabtaada. Inta su'aashani furan tahay, dirista farriintaada wakiilka waa la hakiyay.",
       "waitingForPermission": "Wakiilku wuxuu sugayaa oggolaansho. Inta codsigani furan yahay, dirista farriintaada wakiilka waa la hakiyay."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Ka dig hadhaag ka yar (USD)",
       "title": "Digniinta hadhaaga yar",
       "emailsError": "Geli ugu yaraan hal cinwaan iimayl oo sax ah. Haddii ay badan yihiin, ku kala saar hakadyo.",
-      "thresholdError": "Geli qaddar ka weyn 0."
+      "thresholdError": "Geli qaddar ka weyn {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Xadka (USD maalintii)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Ka saar xadka",
       "title": "Xadka isticmaalka maalinlaha ah",
       "blankError": "Geli qaddar, ama hoos ka taabo Ka saar xadka.",
-      "rangeError": "Geli qaddar u dhexeeya 0 iyo {{max}}."
+      "rangeError": "Geli qaddar u dhexeeya {{min}} iyo {{max}}."
     },
     "members": {
       "changeRole": "Beddel doorka",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",
-      "last30Days": "30-Kii maalmood ee la soo dhaafay",
+      "last30Days": "{{days}}-Kii maalmood ee la soo dhaafay",
       "outputTokens": "Halbeegyada qoraalka la soo saaray",
       "requests": "Codsiyada"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Hal saac aad ayuu uga sarreeyaa heerka caadiga ah ee goobtan",
     "limitLabel": "Xad (USD)",
     "windowLabel": "Muddo",
-    "window24h": "24 saac",
-    "window7d": "7 maalmood",
-    "window30d": "30 maalmood",
+    "window24h": "{{hours}} saac",
+    "window7d": "{{days}} maalmood",
+    "window30d": "{{days}} maalmood",
     "multiplierLabel": "Isku-dhufashada kor u kaca",
     "saved": "Dejinta digniinaha kharashka waa la kaydiyay",
     "loadError": "Digniinaha kharashka lama soo dejin karin.",
     "saveError": "Digniinaha kharashka lama kaydin karin.",
     "empty": "Digniinaha kharashka waa damman yihiin. Daar si aad uga digniiso xiriirka biilasha goobtan.",
     "noSpend": "Weli lama diiwaangelin kharash",
-    "spend24h": "Kharashka 24-kii saacadood ee ugu dambeeyay",
-    "multiplierError": "Geli isku-dhufasho 1 ama ka badan",
+    "spend24h": "Kharashka {{hours}}-kii saacadood ee ugu dambeeyay",
+    "multiplierError": "Geli isku-dhufasho {{min}} ama ka badan",
     "permissionDenied": "Ma lihid oggolaansho aad ku maamusho digniinaha kharashka.",
     "pushOffByCategory": "Waa damman Ogeysiisyada"
   },

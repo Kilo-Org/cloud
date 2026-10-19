@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Zaɓi ma'ajiyoyin da Wakilin tsaro zai sa ido a kansu",
       "analysisModeSubtitle": "Nazarin {{mode}}",
       "automationAllOff": "Duk a kashe",
-      "automationCount": "An kunna {{displayCount}} daga cikin 3",
-      "notificationsCount": "An kunna {{displayCount}} daga cikin 2",
+      "automationCount": "An kunna {{displayCount}} daga cikin {{total}}",
+      "notificationsCount": "An kunna {{displayCount}} daga cikin {{total}}",
       "disabledNoManage": "An kashe Wakilin tsaro. Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya kunna shi.",
       "disabledNoRepo": "Zaɓi aƙalla ma'ajiya ɗaya kafin kunna Wakilin tsaro.",
       "disabledPrompt": "Kunna Wakilin tsaro don daidaita faɗakarwar Dependabot, zaɓar ma'ajiyoyi da saita aiki na atomatik."
@@ -1817,9 +1817,9 @@
       "highDescription": "Akwai yiwuwar fallasa muhimman bayanai.",
       "mediumDescription": "Tasiri mai iyaka ko sharuɗɗa na musamman.",
       "lowDescription": "Ƙaramin tasiri kan tsaro.",
-      "invalidDayCount": "shigar da kwanaki 1–365, da lambobi cikakku kawai.",
+      "invalidDayCount": "shigar da kwanaki {{min}}–{{max}}, da lambobi cikakku kawai.",
       "remediationDeadlineA11y": "Wa'adin gyaran {{label}} a kwanaki",
-      "enterWholeNumber": "Shigar da cikakkiyar lamba tsakanin 1 da 365",
+      "enterWholeNumber": "Shigar da cikakkiyar lamba tsakanin {{min}} da {{max}}",
       "permissionNote": "Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya canza waɗannan saitunan.",
       "enableTracking": "Kunna bin diddigin SLA",
       "enableTrackingSubtitle": "Saita wa'adin gyara bisa tsananin matsalar da aka gano.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Mafi ƙarancin tsananin sabuwar matsala",
       "newFindingSubtitle": "Ana aika sanarwa duk lokacin da aka daidaita sabuwar matsalar da aka gano, har a daidaitawar farko.",
       "slaLeadTimeAccessibility": "Kwanakin gargaɗi kafin cikar wa'adin SLA",
-      "slaLeadTimeError": "Shigar da cikakken adadin kwanaki tsakanin 1 da 365.",
+      "slaLeadTimeError": "Shigar da cikakken adadin kwanaki tsakanin {{min}} da {{max}}.",
       "slaLeadTimeLabel": "Gargaɗi kafin cikar wa'adin SLA (kwanaki)",
       "slaPersonalTitle": "Aika mini imel game da gargaɗin SLA",
       "slaSection": "Sanarwar gargaɗin SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "An kasa aikawa. Sake gwadawa.",
       "questionAnnouncement": "Wakili yana buƙatar bayaninka. An dakatar da wurin rubuta saƙo yayin da kake amsawa.",
       "permissionAnnouncement": "Wakili yana buƙatar izini don ci gaba. An dakatar da wurin rubuta saƙo yayin da kake yanke shawara.",
-      "positionHint": "(1 cikin {{displayCount}})",
+      "positionHint": "({{index}} cikin {{displayCount}})",
       "movedPastPrompt": "Wakilin ya wuce wannan tambaya. Wannan katin zai rufe idan zaman ya ci gaba.",
       "waitingForAnswer": "Wakilin yana jiran amsarka. An dakatar da saƙonka zuwa wakilin har sai ka amsa wannan tambayar.",
       "waitingForPermission": "Wakilin yana jiran izini. An dakatar da saƙonka zuwa wakilin har sai ka amsa wannan buƙatar."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Faɗakar idan kuɗi sun yi ƙasa da (USD)",
       "title": "Faɗakarwar ƙarancin kuɗi",
       "emailsError": "Shigar da aƙalla adireshin imel guda ɗaya mai inganci. Idan sun fi ɗaya, raba su da waƙafi.",
-      "thresholdError": "Shigar da adadin kuɗin da ya fi 0."
+      "thresholdError": "Shigar da adadin kuɗin da ya fi {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Iyaka (USD kowace rana)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Cire iyaka",
       "title": "Iyakar amfani a rana",
       "blankError": "Shigar da adadin kuɗi, ko danna Cire iyaka a ƙasa.",
-      "rangeError": "Shigar da adadin kuɗi tsakanin 0 da {{max}}."
+      "rangeError": "Shigar da adadin kuɗi tsakanin {{min}} da {{max}}."
     },
     "members": {
       "changeRole": "Canza matsayi",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",
-      "last30Days": "Kwanaki 30 da suka gabata",
+      "last30Days": "Kwanaki {{days}} da suka gabata",
       "outputTokens": "Guntayen rubutun fitarwa",
       "requests": "Buƙatu"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Sa'a ɗaya ta fi yawan da wannan yanki ya saba nisa",
     "limitLabel": "Iyaka (USD)",
     "windowLabel": "Taga",
-    "window24h": "Sa'o'i 24",
-    "window7d": "Kwanaki 7",
-    "window30d": "Kwanaki 30",
+    "window24h": "Sa'o'i {{hours}}",
+    "window7d": "Kwanaki {{days}}",
+    "window30d": "Kwanaki {{days}}",
     "multiplierLabel": "Mai ninka hauhawa",
     "saved": "An adana saitunan faɗakarwar kashe kuɗi",
     "loadError": "An kasa loda faɗakarwar kashe kuɗi.",
     "saveError": "An kasa adana faɗakarwar kashe kuɗi.",
     "empty": "Faɗakarwar kashe kuɗi a kashe take. Kunna ta domin faɗakar da abokan hulɗar biyan kuɗi na wannan yanki.",
     "noSpend": "Ba a rubuta wani kashe kuɗi ba tukuna",
-    "spend24h": "Kashe kuɗi a cikin sa'o'i 24 da suka gabata",
-    "multiplierError": "Shigar da mai ninka 1 ko fiye",
+    "spend24h": "Kashe kuɗi a cikin sa'o'i {{hours}} da suka gabata",
+    "multiplierError": "Shigar da mai ninka {{min}} ko fiye",
     "permissionDenied": "Ba ka da izinin sarrafa faɗakarwar kashe kuɗi.",
     "pushOffByCategory": "A kashe a cikin Sanarwa"
   },

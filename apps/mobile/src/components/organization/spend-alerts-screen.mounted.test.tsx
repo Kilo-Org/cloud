@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
-import { formatList } from '@/lib/format';
+import { formatList, formatNumber } from '@/lib/format';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -287,7 +287,12 @@ describe('SpendAlertsScreen happy state', () => {
 
     expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('25');
     expect(fieldByLabel(renderer, MULTIPLIER).props.defaultValue).toBe('2');
-    expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.value).toBe('$1.5');
+    expect(
+      kvRowByLabel(
+        renderer,
+        i18n.t('spendAlerts.spend24h', { hours: formatNumber(24, i18n.language) })
+      )?.props.value
+    ).toBe('$1.5');
     expect(switchByLabel(renderer, i18n.t('notifications.channel.spend'))?.props.value).toBe(true);
     expect(switchByLabel(renderer, i18n.t('spendAlerts.thresholdTitle'))?.props.value).toBe(true);
     expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
@@ -369,9 +374,12 @@ describe('SpendAlertsScreen happy state', () => {
       spend: { spend24hMicrodollars: 0, spend7dMicrodollars: 0, baselineHourlyMicrodollars: null },
     });
 
-    expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.value).toBe(
-      i18n.t('spendAlerts.noSpend')
-    );
+    expect(
+      kvRowByLabel(
+        renderer,
+        i18n.t('spendAlerts.spend24h', { hours: formatNumber(24, i18n.language) })
+      )?.props.value
+    ).toBe(i18n.t('spendAlerts.noSpend'));
   });
 });
 
@@ -386,7 +394,9 @@ describe('SpendAlertsScreen scope line', () => {
     // The owner row is not the group's last, so the divider separates it from
     // the spend row that closes the group.
     expect(rows[0]?.props.last).toBeFalsy();
-    expect(rows[1]?.props.label).toBe(i18n.t('spendAlerts.spend24h'));
+    expect(rows[1]?.props.label).toBe(
+      i18n.t('spendAlerts.spend24h', { hours: formatNumber(24, i18n.language) })
+    );
     expect(rows[1]?.props.last).toBe(true);
   });
 
@@ -524,7 +534,9 @@ describe('SpendAlertsScreen non-retryable states', () => {
 
     expect(fieldByLabel(renderer, LIMIT).props.validate).toBe(thresholdError);
     expect((fieldByLabel(renderer, LIMIT).props.validate as (value: string) => string)('0')).toBe(
-      i18n.t('organization.lowBalanceAlert.thresholdError')
+      i18n.t('organization.lowBalanceAlert.thresholdError', {
+        min: formatNumber(0, i18n.language),
+      })
     );
 
     type(renderer, LIMIT, '0');

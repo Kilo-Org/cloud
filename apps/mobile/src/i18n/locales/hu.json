@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Válaszd ki, mely kódtárakat figyelje a biztonsági ügynök",
       "analysisModeSubtitle": "{{mode}} elemzés",
       "automationAllOff": "Mind kikapcsolva",
-      "automationCount": "3 közül {{displayCount}} engedélyezve",
-      "notificationsCount": "2 közül {{displayCount}} engedélyezve",
+      "automationCount": "{{total}} közül {{displayCount}} engedélyezve",
+      "notificationsCount": "{{total}} közül {{displayCount}} engedélyezve",
       "disabledNoManage": "A biztonsági ügynök ki van kapcsolva. Csak a szervezet tulajdonosai és a számlázásért felelős kezelők kapcsolhatják be.",
       "disabledNoRepo": "A biztonsági ügynök engedélyezése előtt válassz ki legalább egy kódtárat.",
       "disabledPrompt": "Kapcsold be a biztonsági ügynököt a Dependabot-riasztások szinkronizálásához, a kódtárak kiválasztásához és az automatizálás beállításához."
@@ -1817,9 +1817,9 @@
       "highDescription": "Jelentős adatkiszivárgás veszélye.",
       "mediumDescription": "Korlátozott hatás vagy speciális feltételek.",
       "lowDescription": "Minimális biztonsági hatás.",
-      "invalidDayCount": "adj meg egy egész számot 1 és 365 között a napok számához.",
+      "invalidDayCount": "adj meg egy egész számot {{min}} és {{max}} között a napok számához.",
       "remediationDeadlineA11y": "{{label}}: hibajavítási határidő napokban",
-      "enterWholeNumber": "Adj meg egy 1 és 365 közötti egész számot",
+      "enterWholeNumber": "Adj meg egy {{min}} és {{max}} közötti egész számot",
       "permissionNote": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők módosíthatják ezeket a beállításokat.",
       "enableTracking": "SLA-követés engedélyezése",
       "enableTrackingSubtitle": "A találatok súlyossága alapján határozza meg a hibajavítási határidőket.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Új találatok minimális súlyossága",
       "newFindingSubtitle": "Minden új találat szinkronizálásakor értesítést küld, az első szinkronizáláskor is.",
       "slaLeadTimeAccessibility": "SLA-figyelmeztetés ennyi nappal a határidő előtt",
-      "slaLeadTimeError": "Adj meg egy egész számot 1 és 365 között a napok számához.",
+      "slaLeadTimeError": "Adj meg egy egész számot {{min}} és {{max}} között a napok számához.",
       "slaLeadTimeLabel": "SLA-figyelmeztetés a határidő előtt (nap)",
       "slaPersonalTitle": "E-mailt kérek az SLA-figyelmeztetésekről",
       "slaSection": "Értesítés az SLA-figyelmeztetésekről",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Az elküldés nem sikerült. Próbáld újra.",
       "questionAnnouncement": "Az ügynöknek szüksége van a válaszodra. Amíg válaszolsz, az üzenetbeviteli mező nem használható.",
       "permissionAnnouncement": "Az ügynöknek engedélyre van szüksége a folytatáshoz. Amíg döntesz, az üzenetbeviteli mező nem használható.",
-      "positionHint": "(1., összesen {{displayCount}})",
+      "positionHint": "({{index}}., összesen {{displayCount}})",
       "movedPastPrompt": "Az ügynök már továbblépett erről a kérésről. A kártya bezárul, amikor a munkamenet folytatódik.",
       "waitingForAnswer": "Az ügynök a válaszodra vár. Amíg nem válaszolsz erre a kérdésre, az ügynöknek szánt üzeneted küldése szünetel.",
       "waitingForPermission": "Az ügynök engedélyre vár. Amíg nem döntesz erről a kérésről, az ügynöknek szánt üzeneted küldése szünetel."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Figyelmeztetés ez alatt (USD)",
       "title": "Figyelmeztetés alacsony egyenlegre",
       "emailsError": "Adj meg legalább egy érvényes e-mail-címet. Több címet vesszővel válassz el.",
-      "thresholdError": "Adj meg 0-nál nagyobb összeget."
+      "thresholdError": "Adj meg {{min}}-nál nagyobb összeget."
     },
     "memberLimit": {
       "limitLabel": "Korlát (USD naponta)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Korlát eltávolítása",
       "title": "Napi használati korlát",
       "blankError": "Adj meg egy összeget, vagy koppints az alábbi Korlát eltávolítása gombra.",
-      "rangeError": "Adj meg 0 és {{max}} közötti összeget."
+      "rangeError": "Adj meg {{min}} és {{max}} közötti összeget."
     },
     "members": {
       "changeRole": "Szerepkör módosítása",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",
-      "last30Days": "Elmúlt 30 nap",
+      "last30Days": "Elmúlt {{days}} nap",
       "outputTokens": "Kimeneti tokenek",
       "requests": "Kérések"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Egy óra messze a hatókör szokásos üteme felett van",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Ablak",
-    "window24h": "24 óra",
-    "window7d": "7 nap",
-    "window30d": "30 nap",
+    "window24h": "{{hours}} óra",
+    "window7d": "{{days}} nap",
+    "window30d": "{{days}} nap",
     "multiplierLabel": "Kiugrási szorzó",
     "saved": "A költésfigyelmeztetési beállítások elmentve",
     "loadError": "A költésfigyelmeztetéseket nem sikerült betölteni.",
     "saveError": "A költésfigyelmeztetéseket nem sikerült elmenteni.",
     "empty": "A költésfigyelmeztetések ki vannak kapcsolva. Kapcsold be őket, hogy értesítsd a hatókör számlázási kapcsolatait.",
     "noSpend": "Még nincs rögzített költés",
-    "spend24h": "Költés az elmúlt 24 órában",
-    "multiplierError": "Adj meg 1 vagy nagyobb szorzót",
+    "spend24h": "Költés az elmúlt {{hours}} órában",
+    "multiplierError": "Adj meg {{min}} vagy nagyobb szorzót",
     "permissionDenied": "Nincs jogosultságod a költésfigyelmeztetések kezelésére.",
     "pushOffByCategory": "Értesítésekben kikapcsolva"
   },

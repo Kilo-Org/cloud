@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Chagua hazina ambazo wakala wa usalama atafuatilia",
       "analysisModeSubtitle": "Uchambuzi wa {{mode}}",
       "automationAllOff": "Zote zimezimwa",
-      "automationCount": "{{displayCount}} kati ya 3 zimewashwa",
-      "notificationsCount": "{{displayCount}} kati ya 2 zimewashwa",
+      "automationCount": "{{displayCount}} kati ya {{total}} zimewashwa",
+      "notificationsCount": "{{displayCount}} kati ya {{total}} zimewashwa",
       "disabledNoManage": "Wakala wa usalama amezimwa. Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kumwasha.",
       "disabledNoRepo": "Chagua angalau hazina moja kabla ya kuwasha wakala wa usalama.",
       "disabledPrompt": "Washa wakala wa usalama ili kusawazisha arifa za Dependabot, kuchagua hazina na kusanidi utendakazi wa kiotomatiki."
@@ -1817,9 +1817,9 @@
       "highDescription": "Data inaweza kufichuliwa kwa kiwango kikubwa.",
       "mediumDescription": "Athari ndogo au masharti mahususi.",
       "lowDescription": "Athari ndogo sana kwa usalama.",
-      "invalidDayCount": "weka siku 1–365 kwa nambari nzima tu.",
+      "invalidDayCount": "weka siku {{min}}–{{max}} kwa nambari nzima tu.",
       "remediationDeadlineA11y": "Muda wa mwisho wa urekebishaji wa {{label}} kwa siku",
-      "enterWholeNumber": "Ingiza nambari kamili kati ya 1 na 365",
+      "enterWholeNumber": "Ingiza nambari kamili kati ya {{min}} na {{max}}",
       "permissionNote": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kubadilisha mipangilio hii.",
       "enableTracking": "Washa ufuatiliaji wa SLA",
       "enableTrackingSubtitle": "Weka muda wa mwisho wa urekebishaji kulingana na ukali wa tatizo.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Ukali wa chini zaidi wa matatizo mapya",
       "newFindingSubtitle": "Arifa hutumwa kila tatizo jipya linaposawazishwa, hata wakati wa usawazishaji wa kwanza.",
       "slaLeadTimeAccessibility": "Idadi ya siku za kutoa tahadhari kabla ya muda wa SLA kuisha",
-      "slaLeadTimeError": "Ingiza idadi ya siku kati ya 1 na 365 kwa nambari nzima.",
+      "slaLeadTimeError": "Ingiza idadi ya siku kati ya {{min}} na {{max}} kwa nambari nzima.",
       "slaLeadTimeLabel": "Tahadhari kabla ya muda wa SLA kuisha (siku)",
       "slaPersonalTitle": "Nitumie barua pepe kuhusu tahadhari za SLA",
       "slaSection": "Arifa ya tahadhari ya SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Imeshindikana kuwasilisha. Tafadhali jaribu tena.",
       "questionAnnouncement": "Wakala anahitaji jibu lako. Sehemu ya kuandika ujumbe imesitishwa kwa muda unapojibu.",
       "permissionAnnouncement": "Wakala anahitaji ruhusa ili aendelee. Sehemu ya kuandika ujumbe imesitishwa kwa muda unapoamua.",
-      "positionHint": "(1 kati ya {{displayCount}})",
+      "positionHint": "({{index}} kati ya {{displayCount}})",
       "movedPastPrompt": "Wakala ameshapita ombi hili. Kadi hii itafungwa kikao kitakapoendelea.",
       "waitingForAnswer": "Wakala anasubiri jibu lako. Ujumbe wako kwa wakala unasubiri hadi swali hili lijibiwe au lirukwe.",
       "waitingForPermission": "Wakala anasubiri ruhusa. Ujumbe wako kwa wakala unasubiri hadi uamue kuhusu ombi hili."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Arifu salio likiwa chini ya (USD)",
       "title": "Arifa ya salio la chini",
       "emailsError": "Weka angalau anwani moja halali ya barua pepe. Tenganisha anwani kwa koma.",
-      "thresholdError": "Weka kiasi kikubwa kuliko 0."
+      "thresholdError": "Weka kiasi kikubwa kuliko {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Kikomo (USD kwa siku)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Ondoa kikomo",
       "title": "Kikomo cha matumizi ya kila siku",
       "blankError": "Weka kiasi au uguse Ondoa kikomo hapa chini.",
-      "rangeError": "Weka kiasi kati ya 0 na {{max}}."
+      "rangeError": "Weka kiasi kati ya {{min}} na {{max}}."
     },
     "members": {
       "changeRole": "Badilisha jukumu",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",
-      "last30Days": "Siku 30 zilizopita",
+      "last30Days": "Siku {{days}} zilizopita",
       "outputTokens": "Tokeni za matokeo",
       "requests": "Maombi"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Saa moja iko juu sana kuliko kiwango cha kawaida cha wigo huu",
     "limitLabel": "Kikomo (USD)",
     "windowLabel": "Kipindi",
-    "window24h": "Saa 24",
-    "window7d": "Siku 7",
-    "window30d": "Siku 30",
+    "window24h": "Saa {{hours}}",
+    "window7d": "Siku {{days}}",
+    "window30d": "Siku {{days}}",
     "multiplierLabel": "Kizidishi cha kuongezeka",
     "saved": "Mipangilio ya tahadhari za matumizi imehifadhiwa",
     "loadError": "Tahadhari za matumizi hazikuweza kupakiwa.",
     "saveError": "Tahadhari za matumizi hazikuweza kuhifadhiwa.",
     "empty": "Tahadhari za matumizi zimezimwa. Ziwasha ili kuwatahadharisha anwani za bili za wigo huu.",
     "noSpend": "Hakuna matumizi yaliyorekodiwa bado",
-    "spend24h": "Matumizi katika saa 24 zilizopita",
-    "multiplierError": "Weka kizidishi cha 1 au zaidi",
+    "spend24h": "Matumizi katika saa {{hours}} zilizopita",
+    "multiplierError": "Weka kizidishi cha {{min}} au zaidi",
     "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
     "pushOffByCategory": "Imezimwa katika Arifa"
   },

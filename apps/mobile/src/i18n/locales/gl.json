@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Escolle os repositorios que supervisa o axente de seguridade",
       "analysisModeSubtitle": "Análise: {{mode}}",
       "automationAllOff": "Todo desactivado",
-      "automationCount": "{{displayCount}} de 3 activados",
-      "notificationsCount": "{{displayCount}} de 2 activadas",
+      "automationCount": "{{displayCount}} de {{total}} activados",
+      "notificationsCount": "{{displayCount}} de {{total}} activadas",
       "disabledNoManage": "O axente de seguridade está desactivado. Só os propietarios da organización e os xestores de facturación poden activalo.",
       "disabledNoRepo": "Selecciona polo menos un repositorio antes de activar o axente de seguridade.",
       "disabledPrompt": "Activa o axente de seguridade para sincronizar os avisos de Dependabot, escoller repositorios e configurar a automatización."
@@ -1817,9 +1817,9 @@
       "highDescription": "Posible exposición significativa de datos.",
       "mediumDescription": "Impacto limitado ou condicións específicas.",
       "lowDescription": "Impacto mínimo na seguridade.",
-      "invalidDayCount": "o prazo debe ser de 1 a 365 días, sen decimais.",
+      "invalidDayCount": "o prazo debe ser de {{min}} a {{max}} días, sen decimais.",
       "remediationDeadlineA11y": "Prazo de corrección para a gravidade {{label}}, en días",
-      "enterWholeNumber": "Introduce un número enteiro entre 1 e 365",
+      "enterWholeNumber": "Introduce un número enteiro entre {{min}} e {{max}}",
       "permissionNote": "Só os propietarios da organización e os xestores de facturación poden cambiar esta configuración.",
       "enableTracking": "Activar o seguimento do SLA",
       "enableTrackingSubtitle": "Establece prazos de corrección segundo a gravidade do achado.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Gravidade mínima dos novos achados",
       "newFindingSubtitle": "Envíase cada vez que se sincroniza un novo achado, tamén na primeira sincronización.",
       "slaLeadTimeAccessibility": "Antelación do aviso de SLA en días",
-      "slaLeadTimeError": "Introduce un número enteiro de días entre 1 e 365.",
+      "slaLeadTimeError": "Introduce un número enteiro de días entre {{min}} e {{max}}.",
       "slaLeadTimeLabel": "Antelación do aviso de SLA (días)",
       "slaPersonalTitle": "Enviarme un correo sobre os avisos de SLA",
       "slaSection": "Notificación de aviso de SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Fallou o envío. Téntao de novo.",
       "questionAnnouncement": "O axente precisa a túa resposta. O campo de mensaxe queda en pausa mentres respondes.",
       "permissionAnnouncement": "O axente precisa permiso para continuar. O campo de mensaxe queda en pausa mentres decides.",
-      "positionHint": "(1 de {{displayCount}})",
+      "positionHint": "({{index}} de {{displayCount}})",
       "movedPastPrompt": "O axente xa pasou desta solicitude. Esta tarxeta pecharase cando continúe a sesión.",
       "waitingForAnswer": "O axente agarda a túa resposta. Mentres esta pregunta estea aberta, o envío da túa mensaxe ao axente queda en pausa.",
       "waitingForPermission": "O axente agarda permiso. Mentres esta solicitude estea aberta, o envío da túa mensaxe ao axente queda en pausa."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Alertar por baixo de (USD)",
       "title": "Alerta de saldo baixo",
       "emailsError": "Introduce polo menos un enderezo de correo válido. Se introduces varios, sepáraos con comas.",
-      "thresholdError": "Introduce unha cantidade maior que 0."
+      "thresholdError": "Introduce unha cantidade maior que {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Límite (USD ao día)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Eliminar límite",
       "title": "Límite de uso diario",
       "blankError": "Introduce unha cantidade ou elimina o límite coa opción que aparece abaixo.",
-      "rangeError": "Introduce unha cantidade entre 0 e {{max}}."
+      "rangeError": "Introduce unha cantidade entre {{min}} e {{max}}."
     },
     "members": {
       "changeRole": "Cambiar rol",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 días",
+      "last30Days": "Últimos {{days}} días",
       "outputTokens": "Tokens de saída",
       "requests": "Solicitudes"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Unha hora está moi por riba do ritmo habitual deste ámbito",
     "limitLabel": "Límite (USD)",
     "windowLabel": "Ventá",
-    "window24h": "24 horas",
-    "window7d": "7 días",
-    "window30d": "30 días",
+    "window24h": "{{hours}} horas",
+    "window7d": "{{days}} días",
+    "window30d": "{{days}} días",
     "multiplierLabel": "Multiplicador do pico",
     "saved": "Gardáronse os axustes das alertas de gasto",
     "loadError": "Non se puideron cargar as alertas de gasto.",
     "saveError": "Non se puideron gardar as alertas de gasto.",
     "empty": "As alertas de gasto están desactivadas. Actívaas para avisar os contactos de facturación deste ámbito.",
     "noSpend": "Aínda non se rexistrou ningún gasto",
-    "spend24h": "Gasto nas últimas 24 horas",
-    "multiplierError": "Introduce un multiplicador de 1 ou máis",
+    "spend24h": "Gasto nas últimas {{hours}} horas",
+    "multiplierError": "Introduce un multiplicador de {{min}} ou máis",
     "permissionDenied": "Non tes permiso para xestionar as alertas de gasto.",
     "pushOffByCategory": "Desactivado en Notificacións"
   },

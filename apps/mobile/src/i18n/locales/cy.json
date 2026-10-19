@@ -1857,8 +1857,8 @@
       "selectRepositoriesSubtitle": "Dewis yr ystorfeydd y mae'r Asiant diogelwch yn eu monitro",
       "analysisModeSubtitle": "Dadansoddiad {{mode}}",
       "automationAllOff": "Popeth wedi'i ddiffodd",
-      "automationCount": "{{displayCount}} o 3 wedi'u galluogi",
-      "notificationsCount": "{{displayCount}} o 2 wedi'u galluogi",
+      "automationCount": "{{displayCount}} o {{total}} wedi'u galluogi",
+      "notificationsCount": "{{displayCount}} o {{total}} wedi'u galluogi",
       "disabledNoManage": "Mae'r Asiant diogelwch wedi'i analluogi. Dim ond perchnogion y sefydliad a rheolwyr bilio sy'n gallu ei alluogi.",
       "disabledNoRepo": "Dewiswch o leiaf un ystorfa cyn galluogi'r Asiant diogelwch.",
       "disabledPrompt": "Galluogwch yr Asiant diogelwch i gysoni rhybuddion Dependabot, dewis ystorfeydd a ffurfweddu awtomeiddio.",
@@ -1909,9 +1909,9 @@
       "highDescription": "Posibilrwydd o ddatgelu llawer o ddata.",
       "mediumDescription": "Effaith gyfyngedig neu amodau penodol.",
       "lowDescription": "Ychydig iawn o effaith ar ddiogelwch.",
-      "invalidDayCount": "rhaid nodi rhwng 1 a 365 diwrnod, mewn rhifau cyfan yn unig.",
+      "invalidDayCount": "rhaid nodi rhwng {{min}} a {{max}} diwrnod, mewn rhifau cyfan yn unig.",
       "remediationDeadlineA11y": "Dyddiad terfyn cywiro mewn diwrnodau: {{label}}",
-      "enterWholeNumber": "Rho rif cyfan rhwng 1 a 365",
+      "enterWholeNumber": "Rho rif cyfan rhwng {{min}} a {{max}}",
       "permissionNote": "Dim ond perchnogion y sefydliad a rheolwyr bilio sy'n gallu newid y gosodiadau hyn.",
       "enableTracking": "Galluogi olrhain SLA",
       "enableTrackingSubtitle": "Pennir dyddiadau terfyn cywiro yn ôl difrifoldeb y canfyddiad.",
@@ -1975,7 +1975,7 @@
       "newFindingSeverityLabel": "Isafswm difrifoldeb canfyddiadau newydd",
       "newFindingSubtitle": "Anfonir hysbysiad bob tro y caiff canfyddiad newydd ei gysoni, gan gynnwys wrth gysoni am y tro cyntaf.",
       "slaLeadTimeAccessibility": "Nifer y diwrnodau o rybudd cyn dyddiad terfyn SLA",
-      "slaLeadTimeError": "Rhowch nifer cyfan o ddyddiau rhwng 1 a 365.",
+      "slaLeadTimeError": "Rhowch nifer cyfan o ddyddiau rhwng {{min}} a {{max}}.",
       "slaLeadTimeLabel": "Rhybudd cyn dyddiad terfyn SLA (diwrnodau)",
       "slaPersonalTitle": "Anfon e-bost ataf am rybuddion SLA",
       "slaSection": "Hysbysiad rhybudd SLA",
@@ -2577,7 +2577,7 @@
       "submissionFailed": "Methodd y cyflwyno. Ceisiwch eto.",
       "questionAnnouncement": "Mae angen eich mewnbwn ar yr asiant. Ni allwch ddefnyddio'r blwch neges tra byddwch yn ateb.",
       "permissionAnnouncement": "Mae angen caniatâd ar yr asiant i barhau. Ni allwch ddefnyddio'r blwch neges tra byddwch yn penderfynu.",
-      "positionHint": "(1 o {{displayCount}})",
+      "positionHint": "({{index}} o {{displayCount}})",
       "movedPastPrompt": "Mae'r asiant wedi symud ymlaen o'r anogiad hwn. Bydd y cerdyn hwn yn cau pan fydd y sesiwn yn parhau.",
       "waitingForAnswer": "Mae'r asiant yn aros am eich ateb. Mae eich neges at yr asiant yn aros tra bo'r cwestiwn hwn ar agor.",
       "waitingForPermission": "Mae'r asiant yn aros am ganiatâd. Mae eich neges at yr asiant yn aros tra bo'r cais hwn ar agor."
@@ -3191,7 +3191,7 @@
       "thresholdLabel": "Rhybuddio o dan (USD)",
       "title": "Rhybudd balans isel",
       "emailsError": "Nodwch o leiaf un cyfeiriad e-bost dilys. Defnyddiwch gomâu i wahanu cyfeiriadau.",
-      "thresholdError": "Nodwch swm sy'n fwy na 0."
+      "thresholdError": "Nodwch swm sy'n fwy na {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Terfyn (USD y dydd)",
@@ -3201,7 +3201,7 @@
       "removeLimit": "Dileu'r terfyn",
       "title": "Terfyn defnydd dyddiol",
       "blankError": "Nodwch swm, neu defnyddiwch Dileu'r terfyn isod.",
-      "rangeError": "Nodwch swm rhwng 0 a {{max}}."
+      "rangeError": "Nodwch swm rhwng {{min}} a {{max}}."
     },
     "members": {
       "changeRole": "Newid y rôl",
@@ -3233,7 +3233,7 @@
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
-      "last30Days": "Y 30 diwrnod diwethaf",
+      "last30Days": "Y {{days}} diwrnod diwethaf",
       "outputTokens": "Tocynnau allbwn",
       "requests": "Ceisiadau"
     },
@@ -3684,17 +3684,17 @@
     "anomalySubtitle": "Mae awr ymhell uwchlaw cyfradd arferol y cwmpas hwn",
     "limitLabel": "Terfyn (USD)",
     "windowLabel": "Ffenestr",
-    "window24h": "24 awr",
-    "window7d": "7 diwrnod",
-    "window30d": "30 diwrnod",
+    "window24h": "{{hours}} awr",
+    "window7d": "{{days}} diwrnod",
+    "window30d": "{{days}} diwrnod",
     "multiplierLabel": "Lluosydd y sbig",
     "saved": "Wedi cadw gosodiadau rhybuddion gwariant",
     "loadError": "Methwyd llwytho rhybuddion gwariant.",
     "saveError": "Methwyd cadw rhybuddion gwariant.",
     "empty": "Mae rhybuddion gwariant i ffwrdd. Tro nhw ymlaen i rybuddio cysylltiadau bilio'r cwmpas hwn.",
     "noSpend": "Dim gwariant wedi'i gofnodi eto",
-    "spend24h": "Gwariant yn y 24 awr diwethaf",
-    "multiplierError": "Nodwch luosydd o 1 neu fwy",
+    "spend24h": "Gwariant yn y {{hours}} awr diwethaf",
+    "multiplierError": "Nodwch luosydd o {{min}} neu fwy",
     "permissionDenied": "Nid oes gennyt ganiatâd i reoli rhybuddion gwariant.",
     "pushOffByCategory": "I ffwrdd yn Hysbysiadau"
   },

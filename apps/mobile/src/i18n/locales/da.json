@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Vælg, hvilke kodelagre Security Agent overvåger",
       "analysisModeSubtitle": "{{mode}} analyse",
       "automationAllOff": "Alt slået fra",
-      "automationCount": "{{displayCount}} af 3 aktiveret",
-      "notificationsCount": "{{displayCount}} af 2 aktiveret",
+      "automationCount": "{{displayCount}} af {{total}} aktiveret",
+      "notificationsCount": "{{displayCount}} af {{total}} aktiveret",
       "disabledNoManage": "Security Agent er deaktiveret. Kun organisationsejere og faktureringsadministratorer kan aktivere den.",
       "disabledNoRepo": "Vælg mindst ét kodelager, før du aktiverer Security Agent.",
       "disabledPrompt": "Aktivér Security Agent for at synkronisere Dependabot-advarsler, vælge kodelagre og indstille automatisering."
@@ -1817,9 +1817,9 @@
       "highDescription": "Risiko for omfattende datalæk.",
       "mediumDescription": "Begrænset påvirkning eller krav om særlige betingelser.",
       "lowDescription": "Minimal påvirkning af sikkerheden.",
-      "invalidDayCount": "angiv 1–365 dage som et helt tal.",
+      "invalidDayCount": "angiv {{min}}–{{max}} dage som et helt tal.",
       "remediationDeadlineA11y": "Frist for udbedring i dage ved {{label}} alvorlighed",
-      "enterWholeNumber": "Indtast et helt tal mellem 1 og 365",
+      "enterWholeNumber": "Indtast et helt tal mellem {{min}} og {{max}}",
       "permissionNote": "Kun organisationsejere og faktureringsadministratorer kan ændre disse indstillinger.",
       "enableTracking": "Aktivér SLA-opfølgning",
       "enableTrackingSubtitle": "Angiv frister for udbedring ud fra fundets alvorlighed.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Laveste alvorlighed for nye fund",
       "newFindingSubtitle": "Sendes, hver gang et nyt fund synkroniseres, også ved den første synkronisering.",
       "slaLeadTimeAccessibility": "Antal dage før SLA-fristen, hvor advarslen sendes",
-      "slaLeadTimeError": "Indtast et helt antal dage mellem 1 og 365.",
+      "slaLeadTimeError": "Indtast et helt antal dage mellem {{min}} og {{max}}.",
       "slaLeadTimeLabel": "Advarsel før SLA-frist (dage)",
       "slaPersonalTitle": "Send mig e-mail om SLA-advarsler",
       "slaSection": "Notifikation om SLA-advarsler",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Afsendelsen mislykkedes. Prøv igen.",
       "questionAnnouncement": "Agenten har brug for dit svar. Beskedfeltet er deaktiveret, mens du svarer.",
       "permissionAnnouncement": "Agenten har brug for tilladelse til at fortsætte. Beskedfeltet er deaktiveret, mens du tager stilling.",
-      "positionHint": "(1 af {{displayCount}})",
+      "positionHint": "({{index}} af {{displayCount}})",
       "movedPastPrompt": "Agenten er gået videre fra denne forespørgsel. Dette kort lukkes, når sessionen fortsætter.",
       "waitingForAnswer": "Agenten venter på dit svar. Mens dette spørgsmål er åbent, er din besked til agenten sat på pause.",
       "waitingForPermission": "Agenten venter på tilladelse. Mens denne anmodning er åben, er din besked til agenten sat på pause."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Advar ved saldo under (USD)",
       "title": "Advarsel om lav saldo",
       "emailsError": "Angiv mindst én gyldig e-mailadresse. Adskil flere adresser med kommaer.",
-      "thresholdError": "Angiv et beløb over 0."
+      "thresholdError": "Angiv et beløb over {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Grænse (USD pr. dag)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Fjern grænse",
       "title": "Daglig forbrugsgrænse",
       "blankError": "Angiv et beløb, eller tryk på Fjern grænse nedenfor.",
-      "rangeError": "Angiv et beløb mellem 0 og {{max}}."
+      "rangeError": "Angiv et beløb mellem {{min}} og {{max}}."
     },
     "members": {
       "changeRole": "Skift rolle",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",
-      "last30Days": "Seneste 30 dage",
+      "last30Days": "Seneste {{days}} dage",
       "outputTokens": "Tokens i uddata",
       "requests": "Anmodninger"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "En time er langt over dette områdes sædvanlige sats",
     "limitLabel": "Grænse (USD)",
     "windowLabel": "Vindue",
-    "window24h": "24 timer",
-    "window7d": "7 dage",
-    "window30d": "30 dage",
+    "window24h": "{{hours}} timer",
+    "window7d": "{{days}} dage",
+    "window30d": "{{days}} dage",
     "multiplierLabel": "Spike-multiplikator",
     "saved": "Indstillinger for forbrugsadvarsler er gemt",
     "loadError": "Forbrugsadvarsler kunne ikke indlæses.",
     "saveError": "Forbrugsadvarsler kunne ikke gemmes.",
     "empty": "Forbrugsadvarsler er slået fra. Slå dem til for at advare dette områdes faktureringskontakter.",
     "noSpend": "Der er endnu ikke registreret noget forbrug",
-    "spend24h": "Forbrug de seneste 24 timer",
-    "multiplierError": "Angiv en multiplikator på 1 eller mere",
+    "spend24h": "Forbrug de seneste {{hours}} timer",
+    "multiplierError": "Angiv en multiplikator på {{min}} eller mere",
     "permissionDenied": "Du har ikke tilladelse til at administrere forbrugsadvarsler.",
     "pushOffByCategory": "Fra i Notifikationer"
   },

@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Zgjidh depot që monitoron agjenti i sigurisë",
       "analysisModeSubtitle": "Analiza {{mode}}",
       "automationAllOff": "Të gjitha të çaktivizuara",
-      "automationCount": "{{displayCount}} nga 3 të aktivizuara",
-      "notificationsCount": "{{displayCount}} nga 2 të aktivizuara",
+      "automationCount": "{{displayCount}} nga {{total}} të aktivizuara",
+      "notificationsCount": "{{displayCount}} nga {{total}} të aktivizuara",
       "disabledNoManage": "Agjenti i sigurisë është i çaktivizuar. Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta aktivizojnë.",
       "disabledNoRepo": "Zgjidh të paktën një depo përpara se të aktivizosh agjentin e sigurisë.",
       "disabledPrompt": "Aktivizo agjentin e sigurisë për të sinkronizuar njoftimet e Dependabot, për të zgjedhur depot dhe për të konfiguruar automatizimin."
@@ -1817,9 +1817,9 @@
       "highDescription": "Rrezik për ekspozim të konsiderueshëm të të dhënave.",
       "mediumDescription": "Ndikim i kufizuar ose kushte specifike.",
       "lowDescription": "Ndikim minimal në siguri.",
-      "invalidDayCount": "shkruaj një numër të plotë ditësh nga 1 deri në 365.",
+      "invalidDayCount": "shkruaj një numër të plotë ditësh nga {{min}} deri në {{max}}.",
       "remediationDeadlineA11y": "Afati i korrigjimit në ditë për nivelin {{label}}",
-      "enterWholeNumber": "Shkruaj një numër të plotë nga 1 deri në 365",
+      "enterWholeNumber": "Shkruaj një numër të plotë nga {{min}} deri në {{max}}",
       "permissionNote": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund t'i ndryshojnë këto cilësime.",
       "enableTracking": "Aktivizo ndjekjen e SLA-së",
       "enableTrackingSubtitle": "Cakto afatet e korrigjimit sipas nivelit të rrezikut të gjetjes.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Niveli minimal i rrezikut për gjetjet e reja",
       "newFindingSubtitle": "Dërgohet sa herë që sinkronizohet një gjetje e re, edhe gjatë sinkronizimit të parë.",
       "slaLeadTimeAccessibility": "Numri i ditëve para afatit të SLA-së për dërgimin e paralajmërimit",
-      "slaLeadTimeError": "Shkruaj një numër të plotë ditësh nga 1 deri në 365.",
+      "slaLeadTimeError": "Shkruaj një numër të plotë ditësh nga {{min}} deri në {{max}}.",
       "slaLeadTimeLabel": "Paralajmërimi para afatit të SLA-së (ditë)",
       "slaPersonalTitle": "Më dërgo email për paralajmërimet e SLA-së",
       "slaSection": "Njoftimi i paralajmërimit të SLA-së",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Dërgimi dështoi. Provo përsëri.",
       "questionAnnouncement": "Agjenti kërkon përgjigjen tënde. Fusha e mesazhit është e çaktivizuar derisa të përgjigjesh.",
       "permissionAnnouncement": "Agjenti kërkon leje për të vazhduar. Fusha e mesazhit është e çaktivizuar derisa të vendosësh.",
-      "positionHint": "(1 nga {{displayCount}})",
+      "positionHint": "({{index}} nga {{displayCount}})",
       "movedPastPrompt": "Agjenti e ka kaluar këtë kërkesë. Kjo kartë do të mbyllet kur të vazhdojë seanca.",
       "waitingForAnswer": "Agjenti po pret përgjigjen tënde. Derisa t'i përgjigjesh kësaj pyetjeje, mesazhi yt për agjentin mbetet në pritje.",
       "waitingForPermission": "Agjenti po pret lejen. Derisa të vendosësh për këtë kërkesë, mesazhi yt për agjentin mbetet në pritje."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Njofto kur gjendja bie nën (USD)",
       "title": "Njoftim për gjendje të ulët",
       "emailsError": "Shkruaj të paktën një adresë të vlefshme emaili. Nëse shkruan disa, ndaji me presje.",
-      "thresholdError": "Shkruaj një shumë më të madhe se 0."
+      "thresholdError": "Shkruaj një shumë më të madhe se {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Kufiri (USD në ditë)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Hiq kufirin",
       "title": "Kufiri ditor i përdorimit",
       "blankError": "Shkruaj një shumë ose përdor «Hiq kufirin» më poshtë.",
-      "rangeError": "Shkruaj një shumë midis 0 dhe {{max}}."
+      "rangeError": "Shkruaj një shumë midis {{min}} dhe {{max}}."
     },
     "members": {
       "changeRole": "Ndrysho rolin",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
-      "last30Days": "30 Ditët e fundit",
+      "last30Days": "{{days}} Ditët e fundit",
       "outputTokens": "Tokenët dalës",
       "requests": "Kërkesat"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Një orë është shumë mbi ritmin e zakonshëm të këtij fushëveprimi",
     "limitLabel": "Kufi (USD)",
     "windowLabel": "Dritare",
-    "window24h": "24 orë",
-    "window7d": "7 ditë",
-    "window30d": "30 ditë",
+    "window24h": "{{hours}} orë",
+    "window7d": "{{days}} ditë",
+    "window30d": "{{days}} ditë",
     "multiplierLabel": "Shumëzuesi i rritjes",
     "saved": "Cilësimet e njoftimeve për shpenzimet u ruajtën",
     "loadError": "Njoftimet për shpenzimet nuk u ngarkuan dot.",
     "saveError": "Njoftimet për shpenzimet nuk u ruajtën dot.",
     "empty": "Njoftimet për shpenzimet janë të fikura. Ndizni ato për të paralajmëruar kontaktet e faturimit të këtij fushëveprimi.",
     "noSpend": "Nuk është regjistruar ende asnjë shpenzim",
-    "spend24h": "Shpenzimet në 24 orët e fundit",
-    "multiplierError": "Vendos një shumëzues 1 ose më shumë",
+    "spend24h": "Shpenzimet në {{hours}} orët e fundit",
+    "multiplierError": "Vendos një shumëzues {{min}} ose më shumë",
     "permissionDenied": "Nuk ke leje për të menaxhuar njoftimet për shpenzimet.",
     "pushOffByCategory": "Fikur në Njoftimet"
   },

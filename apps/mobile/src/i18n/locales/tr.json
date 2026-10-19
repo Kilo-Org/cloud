@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "Yeni bulgular için en düşük önem derecesi",
       "newFindingSubtitle": "İlk eşitleme dahil, yeni bir bulgu eşitlendiğinde gönderilir.",
       "slaLeadTimeAccessibility": "SLA uyarısının kaç gün önce gönderileceği",
-      "slaLeadTimeError": "Gün sayısı olarak 1 ile 365 arasında bir tam sayı gir.",
+      "slaLeadTimeError": "Gün sayısı olarak {{min}} ile {{max}} arasında bir tam sayı gir.",
       "slaLeadTimeLabel": "SLA uyarısını önceden gönder (gün)",
       "slaPersonalTitle": "SLA uyarıları hakkında bana e-posta gönder",
       "slaSection": "SLA uyarı bildirimi",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "Analiz modu: {{mode}}",
       "automationAllOff": "Tümü kapalı",
-      "automationCount": "Etkin özellik: {{displayCount}} / 3",
+      "automationCount": "Etkin özellik: {{displayCount}} / {{total}}",
       "couldNotLoadPermissions": "İzinler yüklenemedi.",
       "couldNotLoadSettings": "Güvenlik ajanı ayarları yüklenemedi.",
       "disabledNoManage": "Güvenlik ajanı devre dışı. Yalnızca kuruluş sahipleri ve faturalandırma yöneticileri etkinleştirebilir.",
       "disabledNoRepo": "Güvenlik ajanını etkinleştirmeden önce en az bir depo seç.",
       "disabledPrompt": "Dependabot uyarılarını eşitlemek, depoları seçmek ve otomasyonu yapılandırmak için Güvenlik ajanını etkinleştir.",
-      "notificationsCount": "Etkin bildirim: {{displayCount}} / 2",
+      "notificationsCount": "Etkin bildirim: {{displayCount}} / {{total}}",
       "on": "Açık",
       "repositoriesCount": "{{displayCount}} depo seçildi",
       "repositoriesCount_other": "{{displayCount}} depo seçildi",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "Düzeltme süreleri (gün)",
       "enableTracking": "SLA takibini etkinleştir",
       "enableTrackingSubtitle": "Bulguların önem derecesine göre düzeltme sürelerini belirle.",
-      "enterWholeNumber": "1 İle 365 arasında bir tam sayı gir",
+      "enterWholeNumber": "{{min}} İle {{max}} arasında bir tam sayı gir",
       "high": "Yüksek",
       "highDescription": "Ciddi veri sızıntısına yol açabilir.",
-      "invalidDayCount": "gün sayısı 1 ile 365 arasında bir tam sayı olmalıdır.",
+      "invalidDayCount": "gün sayısı {{min}} ile {{max}} arasında bir tam sayı olmalıdır.",
       "low": "Düşük",
       "lowDescription": "Güvenliğe etkisi çok düşüktür.",
       "medium": "Orta",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "Gönderim başarısız oldu. Tekrar dene.",
       "questionAnnouncement": "Ajan yanıtını bekliyor. Yanıt verene kadar mesaj alanı kullanılamaz.",
       "permissionAnnouncement": "Ajanın devam etmek için izne ihtiyacı var. Karar verene kadar mesaj alanı kullanılamaz.",
-      "positionHint": "(1 / {{displayCount}})",
+      "positionHint": "({{index}} / {{displayCount}})",
       "movedPastPrompt": "Ajan bu istemi geride bıraktı. Oturum devam ettiğinde bu kart kapanacak.",
       "waitingForAnswer": "Ajan yanıtını bekliyor. Bu soru açıkken ajana göndereceğin mesaj bekletilir.",
       "waitingForPermission": "Ajan izin bekliyor. Bu istek açıkken ajana göndereceğin mesaj bekletilir."
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "Uyarı eşiği (USD)",
       "title": "Düşük bakiye uyarısı",
       "emailsError": "En az bir geçerli e-posta adresi gir. Birden fazla adresi virgülle ayır.",
-      "thresholdError": "0'Dan büyük bir tutar gir."
+      "thresholdError": "{{min}}'Dan büyük bir tutar gir."
     },
     "memberLimit": {
       "limitLabel": "Günlük sınır (USD)",
@@ -3040,7 +3040,7 @@
       "removeLimit": "Sınırı kaldır",
       "title": "Günlük kullanım sınırı",
       "blankError": "Bir tutar gir veya aşağıdaki “Sınırı kaldır” düğmesini kullan.",
-      "rangeError": "0 İle {{max}} arasında bir tutar gir."
+      "rangeError": "{{min}} İle {{max}} arasında bir tutar gir."
     },
     "members": {
       "changeRole": "Rolü değiştir",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
-      "last30Days": "Son 30 gün",
+      "last30Days": "Son {{days}} gün",
       "outputTokens": "Çıktı tokenları",
       "requests": "İstekler"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Bir saat bu kapsamın olağan hızının çok üzerinde",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Pencere",
-    "window24h": "24 saat",
-    "window7d": "7 gün",
-    "window30d": "30 gün",
+    "window24h": "{{hours}} saat",
+    "window7d": "{{days}} gün",
+    "window30d": "{{days}} gün",
     "multiplierLabel": "Artış çarpanı",
     "saved": "Harcama uyarısı ayarları kaydedildi",
     "loadError": "Harcama uyarıları yüklenemedi.",
     "saveError": "Harcama uyarıları kaydedilemedi.",
     "empty": "Harcama uyarıları kapalı. Bu kapsamın faturalandırma kişilerini uyarmak için aç.",
     "noSpend": "Henüz harcama kaydedilmedi",
-    "spend24h": "Son 24 saatteki harcama",
-    "multiplierError": "1 veya daha büyük bir çarpan gir",
+    "spend24h": "Son {{hours}} saatteki harcama",
+    "multiplierError": "{{min}} veya daha büyük bir çarpan gir",
     "permissionDenied": "Harcama uyarılarını yönetme iznin yok.",
     "pushOffByCategory": "Bildirimler'de kapalı"
   },

@@ -2,6 +2,8 @@ import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
   isValidDayCount,
+  MAX_SLA_DAYS,
+  MIN_SLA_DAYS,
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +46,14 @@ const NOTIFICATION_SEVERITY_OPTIONS = [
   { value: 'medium', labelKey: 'securityAgent.filter.severityMedium' },
   { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
 ] as const satisfies readonly { value: NotificationSeverity; labelKey: string }[];
+
+/** The accepted day bounds, formatted in the reader's language. */
+function slaDayBounds(language: string) {
+  return {
+    min: formatNumber(MIN_SLA_DAYS, language),
+    max: formatNumber(MAX_SLA_DAYS, language),
+  };
+}
 
 function NotificationSettingsSkeleton() {
   const { t } = useTranslation();
@@ -259,7 +269,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                   accessibilityHint={
                     isValidDayCount(slaNotificationWarningDays)
                       ? undefined
-                      : t('securityAgent.sla.enterWholeNumber')
+                      : t('securityAgent.sla.enterWholeNumber', slaDayBounds(i18n.language))
                   }
                   className={cn(
                     'rounded-lg bg-secondary pl-3 pr-3 text-sm text-foreground',
@@ -279,7 +289,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                 />
                 {!isValidDayCount(slaNotificationWarningDays) && (
                   <Text className="text-xs text-destructive">
-                    {t('securityAgent.notifications.slaLeadTimeError')}
+                    {t('securityAgent.notifications.slaLeadTimeError', slaDayBounds(i18n.language))}
                   </Text>
                 )}
               </View>

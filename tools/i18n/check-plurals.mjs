@@ -48,7 +48,7 @@ const COUNTED_OPTIONS = ['count', 'displayCount', 'itemCount'];
 export const NO_AGREEMENT = new Map([
   [
     'agentChat.blockingCard.positionHint',
-    'position, not agreement: "(1 of {{displayCount}})" names no inflected word',
+    'position, not agreement: "({{index}} of {{displayCount}})" names no inflected word',
   ],
   [
     'agentChat.contextUsage.modelAccessibilityLabel',
@@ -81,11 +81,11 @@ export const NO_AGREEMENT = new Map([
   ],
   [
     'securityAgent.settingsOverview.automationCount',
-    'fixed total: "{{displayCount}} of 3 enabled" reads the same at every count',
+    'fixed total: "{{displayCount}} of {{total}} automations enabled" reads the same at every count',
   ],
   [
     'securityAgent.settingsOverview.notificationsCount',
-    'fixed total: "{{displayCount}} of 2 enabled" reads the same at every count',
+    'fixed total: "{{displayCount}} of {{total}} notifications enabled" reads the same at every count',
   ],
   [
     'prReview.fileList.filesViewed',

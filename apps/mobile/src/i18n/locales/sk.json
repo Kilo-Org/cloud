@@ -1813,8 +1813,8 @@
       "selectRepositoriesSubtitle": "Vyberte repozitáre, ktoré má bezpečnostný agent sledovať",
       "analysisModeSubtitle": "Režim analýzy: {{mode}}",
       "automationAllOff": "Všetko vypnuté",
-      "automationCount": "Zapnuté: {{displayCount}} z 3",
-      "notificationsCount": "Zapnuté: {{displayCount}} z 2",
+      "automationCount": "Zapnuté: {{displayCount}} z {{total}}",
+      "notificationsCount": "Zapnuté: {{displayCount}} z {{total}}",
       "disabledNoManage": "Bezpečnostný agent je vypnutý. Zapnúť ho môžu iba vlastníci organizácie a správcovia fakturácie.",
       "disabledNoRepo": "Pred zapnutím bezpečnostného agenta vyberte aspoň jeden repozitár.",
       "disabledPrompt": "Zapnite bezpečnostného agenta, aby ste mohli synchronizovať upozornenia zo služby Dependabot, vybrať repozitáre a nastaviť automatizáciu.",
@@ -1863,9 +1863,9 @@
       "highDescription": "Možný závažný únik údajov.",
       "mediumDescription": "Obmedzený dosah alebo osobitné podmienky zneužitia.",
       "lowDescription": "Minimálny vplyv na bezpečnosť.",
-      "invalidDayCount": "zadajte počet dní od 1 do 365 ako celé číslo.",
+      "invalidDayCount": "zadajte počet dní od {{min}} do {{max}} ako celé číslo.",
       "remediationDeadlineA11y": "Lehota na nápravu v dňoch, závažnosť: {{label}}",
-      "enterWholeNumber": "Zadaj celé číslo od 1 do 365",
+      "enterWholeNumber": "Zadaj celé číslo od {{min}} do {{max}}",
       "permissionNote": "Tieto nastavenia môžu meniť iba vlastníci organizácie a správcovia fakturácie.",
       "enableTracking": "Zapnúť sledovanie SLA",
       "enableTrackingSubtitle": "Nastavuje termíny nápravy podľa závažnosti nálezu.",
@@ -1929,7 +1929,7 @@
       "newFindingSeverityLabel": "Minimálna závažnosť pre upozornenia na nové nálezy",
       "newFindingSubtitle": "Upozornenie sa odošle pri každej synchronizácii nového nálezu vrátane prvej synchronizácie.",
       "slaLeadTimeAccessibility": "Predstih upozornenia na termín SLA v dňoch",
-      "slaLeadTimeError": "Zadajte počet dní od 1 do 365 ako celé číslo.",
+      "slaLeadTimeError": "Zadajte počet dní od {{min}} do {{max}} ako celé číslo.",
       "slaLeadTimeLabel": "Predstih upozornenia na termín SLA (dni)",
       "slaPersonalTitle": "Posielať mi e-maily s upozorneniami na termíny SLA",
       "slaSection": "Upozornenia na termíny SLA",
@@ -2513,7 +2513,7 @@
       "submissionFailed": "Odoslanie zlyhalo. Skús to znova.",
       "questionAnnouncement": "Agent potrebuje tvoju odpoveď. Kým odpovieš, pole na správu je neaktívne.",
       "permissionAnnouncement": "Agent potrebuje povolenie na pokračovanie. Kým sa rozhodneš, pole na správu je neaktívne.",
-      "positionHint": "(1 z {{displayCount}})",
+      "positionHint": "({{index}} z {{displayCount}})",
       "movedPastPrompt": "Agent už pokračoval ďalej a túto výzvu nepotrebuje. Karta sa zatvorí, keď bude relácia pokračovať.",
       "waitingForAnswer": "Agent čaká na tvoju odpoveď. Kým je táto otázka otvorená, odosielanie tvojej správy agentovi je pozastavené.",
       "waitingForPermission": "Agent čaká na povolenie. Kým je táto žiadosť otvorená, odosielanie tvojej správy agentovi je pozastavené."
@@ -3111,7 +3111,7 @@
       "thresholdLabel": "Hranica upozornenia (USD)",
       "title": "Upozornenie na nízky zostatok",
       "emailsError": "Zadaj aspoň jednu platnú e-mailovú adresu. Viaceré adresy oddeľ čiarkami.",
-      "thresholdError": "Zadaj sumu väčšiu ako 0."
+      "thresholdError": "Zadaj sumu väčšiu ako {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Limit (USD za deň)",
@@ -3121,7 +3121,7 @@
       "removeLimit": "Odstrániť limit",
       "title": "Denný limit spotreby",
       "blankError": "Zadaj sumu alebo klepni na Odstrániť limit nižšie.",
-      "rangeError": "Zadaj sumu od 0 do {{max}}."
+      "rangeError": "Zadaj sumu od {{min}} do {{max}}."
     },
     "members": {
       "changeRole": "Zmeniť rolu",
@@ -3153,7 +3153,7 @@
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",
-      "last30Days": "Posledných 30 dní",
+      "last30Days": "Posledných {{days}} dní",
       "outputTokens": "Výstupné tokeny",
       "requests": "Požiadavky"
     },
@@ -3602,17 +3602,17 @@
     "anomalySubtitle": "Hodina je výrazne nad obvyklou sadzbou tohto rozsahu",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Okno",
-    "window24h": "24 hodín",
-    "window7d": "7 dní",
-    "window30d": "30 dní",
+    "window24h": "{{hours}} hodín",
+    "window7d": "{{days}} dní",
+    "window30d": "{{days}} dní",
     "multiplierLabel": "Násobiteľ špičky",
     "saved": "Nastavenia upozornení na výdavky boli uložené",
     "loadError": "Upozornenia na výdavky sa nepodarilo načítať.",
     "saveError": "Upozornenia na výdavky sa nepodarilo uložiť.",
     "empty": "Upozornenia na výdavky sú vypnuté. Zapni ich, aby si upozornil fakturačné kontakty tohto rozsahu.",
     "noSpend": "Zatiaľ nie sú zaznamenané žiadne výdavky",
-    "spend24h": "Výdavky za posledných 24 hodín",
-    "multiplierError": "Zadaj násobiteľ 1 alebo väčší",
+    "spend24h": "Výdavky za posledných {{hours}} hodín",
+    "multiplierError": "Zadaj násobiteľ {{min}} alebo väčší",
     "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
     "pushOffByCategory": "Vypnuté v Upozorneniach"
   },

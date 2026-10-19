@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Təhlükəsizlik agentinin izləyəcəyi repozitoriyaları seç",
       "analysisModeSubtitle": "{{mode}} təhlil",
       "automationAllOff": "Hamısı deaktivdir",
-      "automationCount": "3 seçimdən {{displayCount}} seçim aktivdir",
-      "notificationsCount": "2 seçimdən {{displayCount}} seçim aktivdir",
+      "automationCount": "{{total}} seçimdən {{displayCount}} seçim aktivdir",
+      "notificationsCount": "{{total}} seçimdən {{displayCount}} seçim aktivdir",
       "disabledNoManage": "Təhlükəsizlik agenti deaktivdir. Onu yalnız təşkilat sahibləri və ödəniş menecerləri aktivləşdirə bilər.",
       "disabledNoRepo": "Təhlükəsizlik agentini aktivləşdirməzdən əvvəl ən azı bir repozitoriya seç.",
       "disabledPrompt": "Dependabot bildirişlərini sinxronlaşdırmaq, repozitoriyaları seçmək və avtomatlaşdırmanı tənzimləmək üçün təhlükəsizlik agentini aktivləşdir."
@@ -1817,9 +1817,9 @@
       "highDescription": "Ciddi məlumat sızması ehtimalı.",
       "mediumDescription": "Məhdud təsir və ya xüsusi şərtlər.",
       "lowDescription": "Təhlükəsizliyə minimal təsir.",
-      "invalidDayCount": "gün sayını 1–365 aralığında tam ədədlə göstər.",
+      "invalidDayCount": "gün sayını {{min}}–{{max}} aralığında tam ədədlə göstər.",
       "remediationDeadlineA11y": "{{label}} üçün düzəliş müddəti, günlə",
-      "enterWholeNumber": "1-Dən 365-ə qədər tam ədəd daxil et",
+      "enterWholeNumber": "{{min}}-Dən {{max}}-ə qədər tam ədəd daxil et",
       "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
       "enableTracking": "SLA izləməsini aktivləşdir",
       "enableTrackingSubtitle": "Tapıntıların ciddilik dərəcəsinə görə düzəliş müddətlərini təyin et.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Yeni tapıntılar üçün minimum ciddilik dərəcəsi",
       "newFindingSubtitle": "İlk sinxronlaşdırma da daxil olmaqla, hər dəfə yeni tapıntı sinxronlaşdırıldıqda göndərilir.",
       "slaLeadTimeAccessibility": "SLA xəbərdarlığının neçə gün əvvəl göndəriləcəyi",
-      "slaLeadTimeError": "Gün sayını 1–365 aralığında tam ədədlə daxil et.",
+      "slaLeadTimeError": "Gün sayını {{min}}–{{max}} aralığında tam ədədlə daxil et.",
       "slaLeadTimeLabel": "SLA xəbərdarlığını əvvəlcədən göndər (gün)",
       "slaPersonalTitle": "SLA xəbərdarlıqları haqqında mənə e-poçt göndər",
       "slaSection": "SLA xəbərdarlıq bildirişi",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Göndərmək mümkün olmadı. Yenidən cəhd et.",
       "questionAnnouncement": "Agent cavabını gözləyir. Cavab verənədək mesaj sahəsi deaktivdir.",
       "permissionAnnouncement": "Agentə davam etmək üçün icazə lazımdır. Qərar verənədək mesaj sahəsi deaktivdir.",
-      "positionHint": "(1 / {{displayCount}})",
+      "positionHint": "({{index}} / {{displayCount}})",
       "movedPastPrompt": "Agent artıq bu sorğunu keçib. Sessiya davam etdikdə bu kart bağlanacaq.",
       "waitingForAnswer": "Agent cavabını gözləyir. Bu sual açıq olduğu müddətdə agentə mesajın göndərilməsi dayandırılıb.",
       "waitingForPermission": "Agent icazə gözləyir. Bu sorğu açıq olduğu müddətdə agentə mesajın göndərilməsi dayandırılıb."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Xəbərdarlıq həddi (USD)",
       "title": "Aşağı balans xəbərdarlığı",
       "emailsError": "Ən azı bir düzgün e-poçt ünvanı daxil et. Bir neçə ünvanı vergüllə ayır.",
-      "thresholdError": "0-Dan böyük məbləğ daxil et."
+      "thresholdError": "{{min}}-Dan böyük məbləğ daxil et."
     },
     "memberLimit": {
       "limitLabel": "Gündəlik limit (USD)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Limiti götür",
       "title": "Gündəlik istifadə limiti",
       "blankError": "Məbləğ daxil et və ya aşağıdakı «Limiti götür» düyməsindən istifadə et.",
-      "rangeError": "0 İlə {{max}} arasında məbləğ daxil et."
+      "rangeError": "{{min}} İlə {{max}} arasında məbləğ daxil et."
     },
     "members": {
       "changeRole": "Rolu dəyiş",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",
-      "last30Days": "Son 30 gün",
+      "last30Days": "Son {{days}} gün",
       "outputTokens": "Çıxış tokenləri",
       "requests": "Sorğular"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Bir saat bu əhatənin adi sürətindən xeyli yuxarıdır",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Pəncərə",
-    "window24h": "24 saat",
-    "window7d": "7 gün",
-    "window30d": "30 gün",
+    "window24h": "{{hours}} saat",
+    "window7d": "{{days}} gün",
+    "window30d": "{{days}} gün",
     "multiplierLabel": "Sıçrayış əmsalı",
     "saved": "Xərc bildirişi parametrləri yadda saxlanıldı",
     "loadError": "Xərc bildirişlərini yükləmək mümkün olmadı.",
     "saveError": "Xərc bildirişlərini yadda saxlamaq mümkün olmadı.",
     "empty": "Xərc bildirişləri söndürülüb. Bu əhatənin ödəniş əlaqələrini xəbərdar etmək üçün onları yandır.",
     "noSpend": "Hələ heç bir xərc qeydə alınmayıb",
-    "spend24h": "Son 24 saatda xərc",
-    "multiplierError": "1 və ya daha böyük əmsal daxil et",
+    "spend24h": "Son {{hours}} saatda xərc",
+    "multiplierError": "{{min}} və ya daha böyük əmsal daxil et",
     "permissionDenied": "Xərc bildirişlərini idarə etmək icazən yoxdur.",
     "pushOffByCategory": "Bildirişlərdə söndürülüb"
   },

@@ -1311,7 +1311,7 @@
       "newFindingSeverityLabel": "Gravedad mínima de los nuevos hallazgos",
       "newFindingSubtitle": "Se envía cada vez que se sincroniza un nuevo hallazgo, también durante la primera sincronización.",
       "slaLeadTimeAccessibility": "Antelación del aviso del SLA en días",
-      "slaLeadTimeError": "Introduce un número entero de días entre 1 y 365.",
+      "slaLeadTimeError": "Introduce un número entero de días entre {{min}} y {{max}}.",
       "slaLeadTimeLabel": "Antelación del aviso del SLA (días)",
       "slaPersonalTitle": "Enviarme un correo sobre los avisos del SLA",
       "slaSection": "Notificaciones de avisos del SLA",
@@ -1364,13 +1364,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "Modo de análisis: {{mode}}",
       "automationAllOff": "Todo desactivado",
-      "automationCount": "{{displayCount}} de 3 activadas",
+      "automationCount": "{{displayCount}} de {{total}} activadas",
       "couldNotLoadPermissions": "No se pudieron cargar los permisos.",
       "couldNotLoadSettings": "No se pudieron cargar los ajustes del agente de seguridad.",
       "disabledNoManage": "El agente de seguridad está desactivado. Solo los propietarios de la organización y los administradores de facturación pueden activarlo.",
       "disabledNoRepo": "Selecciona al menos un repositorio antes de activar el agente de seguridad.",
       "disabledPrompt": "Activa el agente de seguridad para sincronizar las alertas de Dependabot, elegir repositorios y configurar la automatización.",
-      "notificationsCount": "{{displayCount}} de 2 activadas",
+      "notificationsCount": "{{displayCount}} de {{total}} activadas",
       "on": "Activado",
       "repositoriesCount": "{{displayCount}} repositorios seleccionados",
       "repositoriesCount_other": "{{displayCount}} repositorios seleccionados",
@@ -1392,10 +1392,10 @@
       "deadlinesHeading": "Plazos de corrección (días)",
       "enableTracking": "Activar el seguimiento del SLA",
       "enableTrackingSubtitle": "Establece plazos de corrección según la gravedad del hallazgo.",
-      "enterWholeNumber": "Introduce un número entero entre 1 y 365",
+      "enterWholeNumber": "Introduce un número entero entre {{min}} y {{max}}",
       "high": "Nivel alto",
       "highDescription": "Posible exposición significativa de datos.",
-      "invalidDayCount": "introduce un número entero de días entre 1 y 365.",
+      "invalidDayCount": "introduce un número entero de días entre {{min}} y {{max}}.",
       "low": "Nivel bajo",
       "lowDescription": "Impacto mínimo en la seguridad.",
       "medium": "Nivel medio",
@@ -1953,7 +1953,7 @@
       "submissionFailed": "El envío falló. Inténtalo de nuevo.",
       "questionAnnouncement": "El agente necesita tu respuesta. El campo de mensaje está desactivado mientras respondes.",
       "permissionAnnouncement": "El agente necesita permiso para continuar. El campo de mensaje está desactivado mientras decides.",
-      "positionHint": "(1 de {{displayCount}})",
+      "positionHint": "({{index}} de {{displayCount}})",
       "movedPastPrompt": "El agente ya ha avanzado más allá de esta solicitud. Esta tarjeta se cerrará cuando continúe la sesión.",
       "waitingForAnswer": "El agente está esperando tu respuesta. El envío de tu mensaje al agente está en pausa mientras esta pregunta siga abierta.",
       "waitingForPermission": "El agente está esperando permiso. El envío de tu mensaje al agente está en pausa mientras esta solicitud siga abierta."
@@ -3070,7 +3070,7 @@
       "thresholdLabel": "Avisar si el saldo es inferior a (USD)",
       "title": "Alerta de saldo bajo",
       "emailsError": "Introduce al menos una dirección de correo válida. Si introduces varias, sepáralas con comas.",
-      "thresholdError": "Introduce un importe mayor que 0."
+      "thresholdError": "Introduce un importe mayor que {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Límite (USD por día)",
@@ -3080,7 +3080,7 @@
       "removeLimit": "Eliminar límite",
       "title": "Límite de uso diario",
       "blankError": "Introduce un importe o elimina el límite con el botón de abajo.",
-      "rangeError": "Introduce un importe entre 0 y {{max}}."
+      "rangeError": "Introduce un importe entre {{min}} y {{max}}."
     },
     "members": {
       "changeRole": "Cambiar rol",
@@ -3112,7 +3112,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 días",
+      "last30Days": "Últimos {{days}} días",
       "outputTokens": "Tokens de salida",
       "requests": "Solicitudes"
     },
@@ -3561,17 +3561,17 @@
     "anomalySubtitle": "Una hora está muy por encima del ritmo habitual de este ámbito",
     "limitLabel": "Límite (USD)",
     "windowLabel": "Ventana",
-    "window24h": "24 horas",
-    "window7d": "7 días",
-    "window30d": "30 días",
+    "window24h": "{{hours}} horas",
+    "window7d": "{{days}} días",
+    "window30d": "{{days}} días",
     "multiplierLabel": "Multiplicador del pico",
     "saved": "Ajustes de alertas de gasto guardados",
     "loadError": "No se pudieron cargar las alertas de gasto.",
     "saveError": "No se pudieron guardar las alertas de gasto.",
     "empty": "Las alertas de gasto están desactivadas. Actívalas para avisar a los contactos de facturación de este ámbito.",
     "noSpend": "Aún no se ha registrado ningún gasto",
-    "spend24h": "Gasto en las últimas 24 horas",
-    "multiplierError": "Introduce un multiplicador de 1 o más",
+    "spend24h": "Gasto en las últimas {{hours}} horas",
+    "multiplierError": "Introduce un multiplicador de {{min}} o más",
     "permissionDenied": "No tienes permiso para gestionar las alertas de gasto.",
     "pushOffByCategory": "Desactivado en Notificaciones"
   },

@@ -1,4 +1,9 @@
-import { getSettingsDirtyState, isValidDayCount } from '@kilocode/app-shared/security-agent';
+import {
+  getSettingsDirtyState,
+  isValidDayCount,
+  MAX_SLA_DAYS,
+  MIN_SLA_DAYS,
+} from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -72,6 +77,14 @@ const SLA_ROWS = [
   descriptionKey: string;
 }[];
 
+/** The accepted day bounds, formatted in the reader's language. */
+function slaDayBounds(language: string) {
+  return {
+    min: formatNumber(MIN_SLA_DAYS, language),
+    max: formatNumber(MAX_SLA_DAYS, language),
+  };
+}
+
 // Uncontrolled numeric TextInput — never pass `value` back on iOS (see
 // apps/mobile/AGENTS.md). The ref holds the raw typed text; `days` holds
 // the parsed number (or NaN while invalid) purely to drive dirty/validity,
@@ -108,14 +121,16 @@ function SlaDayRow({
         </Text>
         {!isValidDayCount(days) && (
           <Text className="mt-1 text-xs text-destructive">
-            {t('securityAgent.sla.invalidDayCount')}
+            {t('securityAgent.sla.invalidDayCount', slaDayBounds(i18n.language))}
           </Text>
         )}
       </View>
       <Input
         accessibilityLabel={t('securityAgent.sla.remediationDeadlineA11y', { label })}
         accessibilityHint={
-          isValidDayCount(days) ? undefined : t('securityAgent.sla.enterWholeNumber')
+          isValidDayCount(days)
+            ? undefined
+            : t('securityAgent.sla.enterWholeNumber', slaDayBounds(i18n.language))
         }
         className="w-16 rounded-lg border border-input bg-background pl-2 pr-2 text-sm text-foreground"
         textAlign="center"

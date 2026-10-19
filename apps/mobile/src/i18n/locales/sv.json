@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Välj vilka kodarkiv säkerhetsagenten övervakar",
       "analysisModeSubtitle": "Analysläge: {{mode}}",
       "automationAllOff": "Allt avstängt",
-      "automationCount": "{{displayCount}} av 3 aktiverade",
-      "notificationsCount": "{{displayCount}} av 2 aktiverade",
+      "automationCount": "{{displayCount}} av {{total}} aktiverade",
+      "notificationsCount": "{{displayCount}} av {{total}} aktiverade",
       "disabledNoManage": "Säkerhetsagenten är inaktiverad. Endast organisationsägare och faktureringsansvariga kan aktivera den.",
       "disabledNoRepo": "Välj minst ett kodarkiv innan du aktiverar säkerhetsagenten.",
       "disabledPrompt": "Aktivera säkerhetsagenten för att synkronisera Dependabot-varningar, välja kodarkiv och ställa in automatisering."
@@ -1817,9 +1817,9 @@
       "highDescription": "Risk för att stora mängder data röjs.",
       "mediumDescription": "Begränsad påverkan eller särskilda villkor för att kunna utnyttjas.",
       "lowDescription": "Minimal påverkan på säkerheten.",
-      "invalidDayCount": "ange 1–365 dagar, endast heltal.",
+      "invalidDayCount": "ange {{min}}–{{max}} dagar, endast heltal.",
       "remediationDeadlineA11y": "Tidsfrist för åtgärd i dagar, {{label}}",
-      "enterWholeNumber": "Ange ett heltal mellan 1 och 365",
+      "enterWholeNumber": "Ange ett heltal mellan {{min}} och {{max}}",
       "permissionNote": "Endast organisationsägare och faktureringsansvariga kan ändra dessa inställningar.",
       "enableTracking": "Aktivera SLA-uppföljning",
       "enableTrackingSubtitle": "Ange tidsfrister för åtgärder utifrån fyndens allvarlighetsgrad.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Lägsta allvarlighetsgrad för nya fynd",
       "newFindingSubtitle": "Skickas varje gång ett nytt fynd synkroniseras, även vid den första synkroniseringen.",
       "slaLeadTimeAccessibility": "Antal dagar i förväg för SLA-varningar",
-      "slaLeadTimeError": "Ange antalet dagar som ett heltal mellan 1 och 365.",
+      "slaLeadTimeError": "Ange antalet dagar som ett heltal mellan {{min}} och {{max}}.",
       "slaLeadTimeLabel": "SLA-varning i förväg (dagar)",
       "slaPersonalTitle": "Skicka e-post till mig om SLA-varningar",
       "slaSection": "Avisering om SLA-varningar",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Det gick inte att skicka. Försök igen.",
       "questionAnnouncement": "Agenten behöver ditt svar. Meddelandefältet är inaktiverat medan du svarar.",
       "permissionAnnouncement": "Agenten behöver behörighet för att fortsätta. Meddelandefältet är inaktiverat tills du har gjort ditt val.",
-      "positionHint": "(1 av {{displayCount}})",
+      "positionHint": "({{index}} av {{displayCount}})",
       "movedPastPrompt": "Agenten har gått vidare från den här frågan. Kortet stängs när sessionen fortsätter.",
       "waitingForAnswer": "Agenten väntar på ditt svar. Ditt meddelande till agenten väntar så länge frågan är öppen.",
       "waitingForPermission": "Agenten väntar på behörighet. Ditt meddelande till agenten väntar så länge förfrågan är öppen."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Varna under (USD)",
       "title": "Varning för lågt saldo",
       "emailsError": "Ange minst en giltig e-postadress. Skilj flera adresser åt med kommatecken.",
-      "thresholdError": "Ange ett belopp större än 0."
+      "thresholdError": "Ange ett belopp större än {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Gräns (USD per dag)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Ta bort gräns",
       "title": "Daglig användningsgräns",
       "blankError": "Ange ett belopp eller ta bort gränsen med knappen nedan.",
-      "rangeError": "Ange ett belopp mellan 0 och {{max}}."
+      "rangeError": "Ange ett belopp mellan {{min}} och {{max}}."
     },
     "members": {
       "changeRole": "Ändra roll",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Inmatade token",
-      "last30Days": "Senaste 30 dagarna",
+      "last30Days": "Senaste {{days}} dagarna",
       "outputTokens": "Utmatade token",
       "requests": "Begäranden"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "En timme ligger långt över detta områdes vanliga takt",
     "limitLabel": "Gräns (USD)",
     "windowLabel": "Fönster",
-    "window24h": "24 timmar",
-    "window7d": "7 dagar",
-    "window30d": "30 dagar",
+    "window24h": "{{hours}} timmar",
+    "window7d": "{{days}} dagar",
+    "window30d": "{{days}} dagar",
     "multiplierLabel": "Toppmultiplikator",
     "saved": "Inställningarna för utgiftsvarningar har sparats",
     "loadError": "Utgiftsvarningarna kunde inte läsas in.",
     "saveError": "Utgiftsvarningarna kunde inte sparas.",
     "empty": "Utgiftsvarningar är av. Slå på dem för att varna detta områdes faktureringskontakter.",
     "noSpend": "Ingen utgift registrerad ännu",
-    "spend24h": "Utgifter de senaste 24 timmarna",
-    "multiplierError": "Ange en multiplikator på 1 eller mer",
+    "spend24h": "Utgifter de senaste {{hours}} timmarna",
+    "multiplierError": "Ange en multiplikator på {{min}} eller mer",
     "permissionDenied": "Du har inte behörighet att hantera utgiftsvarningar.",
     "pushOffByCategory": "Av i Aviseringar"
   },

@@ -1791,8 +1791,8 @@
       "selectRepositoriesSubtitle": "Izvēlies, kurus repozitorijus uzraudzīs drošības aģents",
       "analysisModeSubtitle": "Analīzes režīms: {{mode}}",
       "automationAllOff": "Viss izslēgts",
-      "automationCount": "Iespējoti {{displayCount}} no 3",
-      "notificationsCount": "Iespējoti {{displayCount}} no 2",
+      "automationCount": "Iespējoti {{displayCount}} no {{total}}",
+      "notificationsCount": "Iespējoti {{displayCount}} no {{total}}",
       "disabledNoManage": "Drošības aģents ir atspējots. To var ieslēgt tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
       "disabledNoRepo": "Pirms drošības aģenta iespējošanas izvēlies vismaz vienu repozitoriju.",
       "disabledPrompt": "Ieslēdz drošības aģentu, lai sinhronizētu Dependabot brīdinājumus, izvēlētos repozitorijus un iestatītu automatizāciju.",
@@ -1840,9 +1840,9 @@
       "highDescription": "Iespējama būtiska datu noplūde.",
       "mediumDescription": "Ierobežota ietekme vai īpaši nosacījumi.",
       "lowDescription": "Minimāla ietekme uz drošību.",
-      "invalidDayCount": "norādi no 1 līdz 365 dienām, izmantojot tikai veselus skaitļus.",
+      "invalidDayCount": "norādi no {{min}} līdz {{max}} dienām, izmantojot tikai veselus skaitļus.",
       "remediationDeadlineA11y": "Labošanas termiņš dienās; smaguma pakāpe: {{label}}",
-      "enterWholeNumber": "Ievadi veselu skaitli no 1 līdz 365",
+      "enterWholeNumber": "Ievadi veselu skaitli no {{min}} līdz {{max}}",
       "permissionNote": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
       "enableTracking": "Iespējot SLA uzraudzību",
       "enableTrackingSubtitle": "Nosaka labošanas termiņus atbilstoši konstatējumu smaguma pakāpei.",
@@ -1906,7 +1906,7 @@
       "newFindingSeverityLabel": "Jaunu konstatējumu minimālā smaguma pakāpe",
       "newFindingSubtitle": "Paziņojums tiek sūtīts ikreiz, kad tiek sinhronizēts jauns konstatējums, arī pirmajā sinhronizācijā.",
       "slaLeadTimeAccessibility": "Dienu skaits pirms SLA termiņa, kad sūtīt brīdinājumu",
-      "slaLeadTimeError": "Ievadi dienu skaitu no 1 līdz 365, izmantojot veselu skaitli.",
+      "slaLeadTimeError": "Ievadi dienu skaitu no {{min}} līdz {{max}}, izmantojot veselu skaitli.",
       "slaLeadTimeLabel": "Brīdināt pirms SLA termiņa (dienās)",
       "slaPersonalTitle": "Sūtīt man e-pastus ar SLA brīdinājumiem",
       "slaSection": "SLA brīdinājumu paziņojumi",
@@ -2481,7 +2481,7 @@
       "submissionFailed": "Nosūtīšana neizdevās. Lūdzu, mēģini vēlreiz.",
       "questionAnnouncement": "Aģents gaida tavu atbildi. Kamēr atbildi, ziņojuma ievades lauks nav pieejams.",
       "permissionAnnouncement": "Aģentam nepieciešama atļauja, lai turpinātu. Kamēr pieņem lēmumu, ziņojuma ievades lauks nav pieejams.",
-      "positionHint": "(1 no {{displayCount}})",
+      "positionHint": "({{index}} no {{displayCount}})",
       "movedPastPrompt": "Aģents jau ir pārgājis pie nākamā soļa. Šī kartīte aizvērsies, kad sesija turpināsies.",
       "waitingForAnswer": "Aģents gaida tavu atbildi. Kamēr šis jautājums ir atvērts, ziņojuma nosūtīšana aģentam ir apturēta.",
       "waitingForPermission": "Aģents gaida atļauju. Kamēr šis pieprasījums ir atvērts, ziņojuma nosūtīšana aģentam ir apturēta."
@@ -3071,7 +3071,7 @@
       "thresholdLabel": "Atlikuma slieksnis (USD)",
       "title": "Brīdinājums par mazu atlikumu",
       "emailsError": "Ievadi vismaz vienu derīgu e-pasta adresi. Vairākas adreses atdali ar komatiem.",
-      "thresholdError": "Ievadi summu, kas ir lielāka par 0."
+      "thresholdError": "Ievadi summu, kas ir lielāka par {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Limits (USD dienā)",
@@ -3081,7 +3081,7 @@
       "removeLimit": "Noņemt limitu",
       "title": "Dienas tēriņu limits",
       "blankError": "Ievadi summu vai nospied zemāk esošo pogu „Noņemt limitu”.",
-      "rangeError": "Ievadi summu no 0 līdz {{max}}."
+      "rangeError": "Ievadi summu no {{min}} līdz {{max}}."
     },
     "members": {
       "changeRole": "Mainīt lomu",
@@ -3113,7 +3113,7 @@
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",
-      "last30Days": "Pēdējās 30 dienas",
+      "last30Days": "Pēdējās {{days}} dienas",
       "outputTokens": "Izvades tokeni",
       "requests": "Pieprasījumi"
     },
@@ -3561,17 +3561,17 @@
     "anomalySubtitle": "Viena stunda ir krietni virs šīs jomas ierastā tempa",
     "limitLabel": "Limits (USD)",
     "windowLabel": "Logs",
-    "window24h": "24 stundas",
-    "window7d": "7 dienas",
-    "window30d": "30 dienas",
+    "window24h": "{{hours}} stundas",
+    "window7d": "{{days}} dienas",
+    "window30d": "{{days}} dienas",
     "multiplierLabel": "Lēciena reizinātājs",
     "saved": "Izdevumu brīdinājumu iestatījumi saglabāti",
     "loadError": "Neizdevās ielādēt izdevumu brīdinājumus.",
     "saveError": "Neizdevās saglabāt izdevumu brīdinājumus.",
     "empty": "Izdevumu brīdinājumi ir izslēgti. Ieslēdz tos, lai brīdinātu šīs jomas norēķinu kontaktpersonas.",
     "noSpend": "Izdevumi vēl nav reģistrēti",
-    "spend24h": "Izdevumi pēdējo 24 stundu laikā",
-    "multiplierError": "Ievadi reizinātāju, kas ir 1 vai lielāks",
+    "spend24h": "Izdevumi pēdējo {{hours}} stundu laikā",
+    "multiplierError": "Ievadi reizinātāju, kas ir {{min}} vai lielāks",
     "permissionDenied": "Tev nav atļaujas pārvaldīt izdevumu brīdinājumus.",
     "pushOffByCategory": "Izslēgts paziņojumos"
   },

@@ -1813,8 +1813,8 @@
       "selectRepositoriesSubtitle": "Pasirink, kurias saugyklas stebės saugos agentas",
       "analysisModeSubtitle": "Analizės režimas: {{mode}}",
       "automationAllOff": "Viskas išjungta",
-      "automationCount": "Įjungta {{displayCount}} iš 3",
-      "notificationsCount": "Įjungta {{displayCount}} iš 2",
+      "automationCount": "Įjungta {{displayCount}} iš {{total}}",
+      "notificationsCount": "Įjungta {{displayCount}} iš {{total}}",
       "disabledNoManage": "Saugos agentas išjungtas. Jį įjungti gali tik organizacijos savininkai ir atsiskaitymų administratoriai.",
       "disabledNoRepo": "Prieš įjungdamas saugos agentą, pasirink bent vieną saugyklą.",
       "disabledPrompt": "Įjunk saugos agentą, kad galėtum sinchronizuoti Dependabot įspėjimus, pasirinkti saugyklas ir nustatyti automatizavimą.",
@@ -1863,9 +1863,9 @@
       "highDescription": "Galimas didelio masto duomenų nutekėjimas.",
       "mediumDescription": "Poveikis ribotas arba pažeidžiamumą galima išnaudoti tik tam tikromis sąlygomis.",
       "lowDescription": "Minimalus poveikis saugai.",
-      "invalidDayCount": "įvesk sveikąjį dienų skaičių nuo 1 iki 365.",
+      "invalidDayCount": "įvesk sveikąjį dienų skaičių nuo {{min}} iki {{max}}.",
       "remediationDeadlineA11y": "Taisymo terminas dienomis. Pavojingumas: {{label}}",
-      "enterWholeNumber": "Įvesk sveikąjį skaičių nuo 1 iki 365",
+      "enterWholeNumber": "Įvesk sveikąjį skaičių nuo {{min}} iki {{max}}",
       "permissionNote": "Šiuos nustatymus gali keisti tik organizacijos savininkai ir atsiskaitymų administratoriai.",
       "enableTracking": "Įjungti SLA stebėjimą",
       "enableTrackingSubtitle": "Nustato taisymo terminus pagal radinio pavojingumą.",
@@ -1929,7 +1929,7 @@
       "newFindingSeverityLabel": "Mažiausias naujų radinių pavojingumas",
       "newFindingSubtitle": "Pranešimai siunčiami kaskart sinchronizavus naują radinį, taip pat ir per pirmąjį sinchronizavimą.",
       "slaLeadTimeAccessibility": "Dienų skaičius iki SLA termino, kai siunčiamas įspėjimas",
-      "slaLeadTimeError": "Įvesk sveikąjį dienų skaičių nuo 1 iki 365.",
+      "slaLeadTimeError": "Įvesk sveikąjį dienų skaičių nuo {{min}} iki {{max}}.",
       "slaLeadTimeLabel": "Įspėti prieš SLA terminą (dienomis)",
       "slaPersonalTitle": "Siųsti man SLA įspėjimus el. paštu",
       "slaSection": "SLA įspėjimai",
@@ -2513,7 +2513,7 @@
       "submissionFailed": "Nepavyko pateikti atsakymo. Bandykite dar kartą.",
       "questionAnnouncement": "Agentui reikia jūsų atsakymo. Kol atsakote, žinutės įvesties laukas neaktyvus.",
       "permissionAnnouncement": "Agentui reikia leidimo tęsti. Kol sprendžiate, žinutės įvesties laukas neaktyvus.",
-      "positionHint": "(1 iš {{displayCount}})",
+      "positionHint": "({{index}} iš {{displayCount}})",
       "movedPastPrompt": "Agentas jau perėjo prie kito veiksmo. Ši kortelė užsidarys, kai sesija bus tęsiama.",
       "waitingForAnswer": "Agentas laukia jūsų atsakymo. Kol neatsakysite į šį klausimą, jūsų žinutės siuntimas agentui bus pristabdytas.",
       "waitingForPermission": "Agentas laukia leidimo. Kol neatsakysite į šį prašymą, jūsų žinutės siuntimas agentui bus pristabdytas."
@@ -3111,7 +3111,7 @@
       "thresholdLabel": "Pranešti, kai likutis mažesnis nei (USD)",
       "title": "Pranešimas apie mažą likutį",
       "emailsError": "Įveskite bent vieną tinkamą el. pašto adresą. Kelis adresus atskirkite kableliais.",
-      "thresholdError": "Įveskite sumą, didesnę nei 0."
+      "thresholdError": "Įveskite sumą, didesnę nei {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Riba (USD per dieną)",
@@ -3121,7 +3121,7 @@
       "removeLimit": "Panaikinti ribą",
       "title": "Dienos išlaidų riba",
       "blankError": "Įveskite sumą arba žemiau panaikinkite ribą.",
-      "rangeError": "Įveskite sumą nuo 0 iki {{max}}."
+      "rangeError": "Įveskite sumą nuo {{min}} iki {{max}}."
     },
     "members": {
       "changeRole": "Pakeisti vaidmenį",
@@ -3153,7 +3153,7 @@
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",
-      "last30Days": "Pastarosios 30 dienų",
+      "last30Days": "Pastarosios {{days}} dienų",
       "outputTokens": "Išvesties žetonai",
       "requests": "Užklausos"
     },
@@ -3602,17 +3602,17 @@
     "anomalySubtitle": "Viena valanda gerokai viršija įprastą šios srities tempą",
     "limitLabel": "Limitas (USD)",
     "windowLabel": "Langas",
-    "window24h": "24 valandos",
-    "window7d": "7 dienos",
-    "window30d": "30 dienų",
+    "window24h": "{{hours}} valandos",
+    "window7d": "{{days}} dienos",
+    "window30d": "{{days}} dienų",
     "multiplierLabel": "Šuolio daugiklis",
     "saved": "Išlaidų įspėjimų nustatymai išsaugoti",
     "loadError": "Nepavyko įkelti išlaidų įspėjimų.",
     "saveError": "Nepavyko išsaugoti išlaidų įspėjimų.",
     "empty": "Išlaidų įspėjimai išjungti. Įjunk juos, kad įspėtum šios srities atsiskaitymo kontaktus.",
     "noSpend": "Išlaidų dar neužregistruota",
-    "spend24h": "Išlaidos per paskutines 24 valandas",
-    "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
+    "spend24h": "Išlaidos per paskutines {{hours}} valandas",
+    "multiplierError": "Įvesk daugiklį, lygų {{min}} arba didesnį",
     "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
     "pushOffByCategory": "Išjungta pranešimuose"
   },

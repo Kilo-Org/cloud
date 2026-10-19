@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Khetha izinqolobane zekhodi ezizoqashwa i-ejenti yezokuphepha",
       "analysisModeSubtitle": "Ukuhlaziywa: {{mode}}",
       "automationAllOff": "Konke kuvaliwe",
-      "automationCount": "{{displayCount}} kwezingu-3 kuvuliwe",
-      "notificationsCount": "{{displayCount}} kwezingu-2 kuvuliwe",
+      "automationCount": "{{displayCount}} kwezingu-{{total}} kuvuliwe",
+      "notificationsCount": "{{displayCount}} kwezingu-{{total}} kuvuliwe",
       "disabledNoManage": "I-ejenti yezokuphepha ivaliwe. Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangayivula.",
       "disabledNoRepo": "Khetha okungenani inqolobane yekhodi eyodwa ngaphambi kokuvula i-ejenti yezokuphepha.",
       "disabledPrompt": "Vula i-ejenti yezokuphepha ukuze uvumelanise izexwayiso ze-Dependabot, ukhethe izinqolobane zekhodi futhi usethe okuzenzakalelayo."
@@ -1817,9 +1817,9 @@
       "highDescription": "Idatha eningi ingase ivezwe ngaphandle kwemvume.",
       "mediumDescription": "Kunomthelela olinganiselwe noma kudinga izimo ezithile.",
       "lowDescription": "Kunomthelela omncane kakhulu kwezokuphepha.",
-      "invalidDayCount": "faka izinsuku ezingu-1–365, usebenzise izinombolo eziphelele kuphela.",
+      "invalidDayCount": "faka izinsuku ezingu-{{min}}–{{max}}, usebenzise izinombolo eziphelele kuphela.",
       "remediationDeadlineA11y": "Umnqamulajuqu wokulungisa ngezinsuku: {{label}}",
-      "enterWholeNumber": "Faka inombolo ephelele phakathi kuka-1 no-365",
+      "enterWholeNumber": "Faka inombolo ephelele phakathi kuka-{{min}} no-{{max}}",
       "permissionNote": "Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangashintsha lezi zilungiselelo.",
       "enableTracking": "Vula ukulandelela kwe-SLA",
       "enableTrackingSubtitle": "Beka iminqamulajuqu yokulungisa ngokobucayi bokutholakele.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Ubucayi obuncane bokutholakele okusha",
       "newFindingSubtitle": "Isaziso sithunyelwa njalo lapho okutholakele okusha kuvumelaniswa, kuhlanganise nokuvumelanisa kokuqala.",
       "slaLeadTimeAccessibility": "Izinsuku zokuxwayisa ngaphambi komnqamulajuqu we-SLA",
-      "slaLeadTimeError": "Faka inombolo ephelele yezinsuku phakathi kuka-1 no-365.",
+      "slaLeadTimeError": "Faka inombolo ephelele yezinsuku phakathi kuka-{{min}} no-{{max}}.",
       "slaLeadTimeLabel": "Isikhathi sokuxwayisa kusengaphambili nge-SLA (izinsuku)",
       "slaPersonalTitle": "Ngithumele i-imeyili ngezexwayiso ze-SLA",
       "slaSection": "Isaziso sesexwayiso se-SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Ukuthumela kwehlulekile. Sicela uzame futhi.",
       "questionAnnouncement": "Umenzeli udinga impendulo yakho. Indawo yokubhala imisiwe ngenkathi uphendula.",
       "permissionAnnouncement": "Umenzeli udinga imvume ukuze aqhubeke. Indawo yokubhala imisiwe ngenkathi unquma.",
-      "positionHint": "(1 kwangu-{{displayCount}})",
+      "positionHint": "({{index}} kwangu-{{displayCount}})",
       "movedPastPrompt": "Umenzeli usedlulile kulesi sicelo. Leli khadi lizovaleka lapho iseshini iqhubeka.",
       "waitingForAnswer": "Umenzeli ulinde impendulo yakho. Ukuthunyelwa komlayezo wakho kumenzeli kumisiwe ngenkathi lo mbuzo uvulekile.",
       "waitingForPermission": "Umenzeli ulinde imvume. Ukuthunyelwa komlayezo wakho kumenzeli kumisiwe ngenkathi lesi sicelo sivulekile."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Yazisa uma ibhalansi ingaphansi kuka (USD)",
       "title": "Isaziso sebhalansi ephansi",
       "emailsError": "Faka okungenani ikheli le-imeyili elilodwa elivumelekile. Hlukanisa amakheli ngamakhoma.",
-      "thresholdError": "Faka inani elikhulu kuno-0."
+      "thresholdError": "Faka inani elikhulu kuno-{{min}}."
     },
     "memberLimit": {
       "limitLabel": "Umkhawulo (USD ngosuku)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Susa umkhawulo",
       "title": "Umkhawulo wokusetshenziswa kwansuku zonke",
       "blankError": "Faka inani, noma usebenzise inkinobho yokususa umkhawulo ngezansi.",
-      "rangeError": "Faka inani eliphakathi kuka-0 no-{{max}}."
+      "rangeError": "Faka inani eliphakathi kuka-{{min}} no-{{max}}."
     },
     "members": {
       "changeRole": "Shintsha iqhaza",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",
-      "last30Days": "Izinsuku ezingama-30 ezedlule",
+      "last30Days": "Izinsuku ezingama-{{days}} ezedlule",
       "outputTokens": "Amathokheni okukhishiwe",
       "requests": "Izicelo"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Ihora elilodwa liphakeme kakhulu kunezinga elivamile lalesi sikhathi",
     "limitLabel": "Umkhawulo (USD)",
     "windowLabel": "Isikhathi",
-    "window24h": "Amahora angu-24",
-    "window7d": "Izinsuku ezingu-7",
-    "window30d": "Izinsuku ezingu-30",
+    "window24h": "Amahora angu-{{hours}}",
+    "window7d": "Izinsuku ezingu-{{days}}",
+    "window30d": "Izinsuku ezingu-{{days}}",
     "multiplierLabel": "Isiphindaphindi sokukhuphuka",
     "saved": "Izilungiselelo zexwayiso lokusetshenziswa kwemali zilondoloziwe",
     "loadError": "Ayikwazanga ukulayisha izexwayiso zokusetshenziswa kwemali.",
     "saveError": "Ayikwazanga ukulondoloza izexwayiso zokusetshenziswa kwemali.",
     "empty": "Izexwayiso zokusetshenziswa kwemali zivaliwe. Zivule ukuze uxwayise abathintwayo bokukhokha balesi sikhathi.",
     "noSpend": "Akukho kusetshenziswa kwemali okurekhodiwe okwamanje",
-    "spend24h": "Ukusetshenziswa kwemali emahoreni angu-24 edlule",
-    "multiplierError": "Faka isiphindaphindi esingu-1 noma ngaphezulu",
+    "spend24h": "Ukusetshenziswa kwemali emahoreni angu-{{hours}} edlule",
+    "multiplierError": "Faka isiphindaphindi esingu-{{min}} noma ngaphezulu",
     "permissionDenied": "Awunayo imvume yokuphatha izexwayiso zokusetshenziswa kwemali.",
     "pushOffByCategory": "Kucishiwe kuzaziso"
   },

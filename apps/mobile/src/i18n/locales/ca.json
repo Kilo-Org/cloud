@@ -1791,8 +1791,8 @@
       "selectRepositoriesSubtitle": "Tria quins repositoris supervisa l'agent de seguretat",
       "analysisModeSubtitle": "Anàlisi {{mode}}",
       "automationAllOff": "Tot desactivat",
-      "automationCount": "{{displayCount}} de 3 activades",
-      "notificationsCount": "{{displayCount}} de 2 activades",
+      "automationCount": "{{displayCount}} de {{total}} activades",
+      "notificationsCount": "{{displayCount}} de {{total}} activades",
       "disabledNoManage": "L'agent de seguretat està desactivat. Només els propietaris de l'organització i els gestors de facturació poden activar-lo.",
       "disabledNoRepo": "Selecciona almenys un repositori abans d'activar l'agent de seguretat.",
       "disabledPrompt": "Activa l'agent de seguretat per sincronitzar les alertes de Dependabot, triar repositoris i configurar l'automatització.",
@@ -1840,9 +1840,9 @@
       "highDescription": "Possible exposició significativa de dades.",
       "mediumDescription": "Impacte limitat o condicions específiques.",
       "lowDescription": "Impacte mínim en la seguretat.",
-      "invalidDayCount": "el termini ha de ser d'entre 1 i 365 dies, en nombres enters.",
+      "invalidDayCount": "el termini ha de ser d'entre {{min}} i {{max}} dies, en nombres enters.",
       "remediationDeadlineA11y": "Termini de correcció en dies per a la gravetat {{label}}",
-      "enterWholeNumber": "Introdueix un nombre enter entre 1 i 365",
+      "enterWholeNumber": "Introdueix un nombre enter entre {{min}} i {{max}}",
       "permissionNote": "Només els propietaris de l'organització i els gestors de facturació poden canviar aquesta configuració.",
       "enableTracking": "Activa el seguiment de l'SLA",
       "enableTrackingSubtitle": "Estableix terminis de correcció segons la gravetat de la incidència.",
@@ -1906,7 +1906,7 @@
       "newFindingSeverityLabel": "Gravetat mínima de les incidències noves",
       "newFindingSubtitle": "S'envia cada cop que se sincronitza una incidència nova, també durant la primera sincronització.",
       "slaLeadTimeAccessibility": "Antelació de l'avís de l'SLA en dies",
-      "slaLeadTimeError": "Introdueix un nombre enter de dies entre 1 i 365.",
+      "slaLeadTimeError": "Introdueix un nombre enter de dies entre {{min}} i {{max}}.",
       "slaLeadTimeLabel": "Antelació de l'avís de l'SLA (dies)",
       "slaPersonalTitle": "Envia'm els avisos de l'SLA per correu",
       "slaSection": "Notificació d'avisos de l'SLA",
@@ -2481,7 +2481,7 @@
       "submissionFailed": "L'enviament ha fallat. Torna-ho a provar.",
       "questionAnnouncement": "L'agent necessita la teva resposta. El camp de missatge està desactivat mentre respons.",
       "permissionAnnouncement": "L'agent necessita permís per continuar. El camp de missatge està desactivat mentre decideixes.",
-      "positionHint": "(1 de {{displayCount}})",
+      "positionHint": "({{index}} de {{displayCount}})",
       "movedPastPrompt": "L'agent ja no espera una resposta a aquesta sol·licitud. Aquesta targeta es tancarà quan la sessió continuï.",
       "waitingForAnswer": "L'agent espera la teva resposta. Mentre la pregunta estigui pendent, l'enviament del teu missatge a l'agent queda en pausa.",
       "waitingForPermission": "L'agent espera permís per continuar. Mentre la sol·licitud estigui pendent, l'enviament del teu missatge a l'agent queda en pausa."
@@ -3071,7 +3071,7 @@
       "thresholdLabel": "Llindar de l'avís (USD)",
       "title": "Avís de saldo baix",
       "emailsError": "Introdueix almenys una adreça de correu electrònic vàlida. Si n'hi ha més d'una, separa-les amb comes.",
-      "thresholdError": "Introdueix un import superior a 0."
+      "thresholdError": "Introdueix un import superior a {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Límit (USD per dia)",
@@ -3081,7 +3081,7 @@
       "removeLimit": "Treu el límit",
       "title": "Límit d'ús diari",
       "blankError": "Introdueix un import o treu el límit amb el botó de sota.",
-      "rangeError": "Introdueix un import entre 0 i {{max}}."
+      "rangeError": "Introdueix un import entre {{min}} i {{max}}."
     },
     "members": {
       "changeRole": "Canvia el rol",
@@ -3113,7 +3113,7 @@
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",
-      "last30Days": "Últims 30 dies",
+      "last30Days": "Últims {{days}} dies",
       "outputTokens": "Tòkens de sortida",
       "requests": "Sol·licituds"
     },
@@ -3561,17 +3561,17 @@
     "anomalySubtitle": "Una hora està molt per sobre de la taxa habitual d'aquest àmbit",
     "limitLabel": "Límit (USD)",
     "windowLabel": "Finestra",
-    "window24h": "24 hores",
-    "window7d": "7 dies",
-    "window30d": "30 dies",
+    "window24h": "{{hours}} hores",
+    "window7d": "{{days}} dies",
+    "window30d": "{{days}} dies",
     "multiplierLabel": "Multiplicador del pic",
     "saved": "S'ha desat la configuració de les alertes de despesa",
     "loadError": "No s'han pogut carregar les alertes de despesa.",
     "saveError": "No s'han pogut desar les alertes de despesa.",
     "empty": "Les alertes de despesa estan desactivades. Activa-les per avisar els contactes de facturació d'aquest àmbit.",
     "noSpend": "Encara no s'ha registrat cap despesa",
-    "spend24h": "Despesa de les últimes 24 hores",
-    "multiplierError": "Introdueix un multiplicador d'1 o més",
+    "spend24h": "Despesa de les últimes {{hours}} hores",
+    "multiplierError": "Introdueix un multiplicador d'{{min}} o més",
     "permissionDenied": "No tens permís per gestionar les alertes de despesa.",
     "pushOffByCategory": "Desactivat a Notificacions"
   },

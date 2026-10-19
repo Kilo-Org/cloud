@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "नई समस्या की सूचना के लिए न्यूनतम गंभीरता",
       "newFindingSubtitle": "हर नई समस्या सिंक होने पर ईमेल भेजा जाता है, पहली बार सिंक करने पर भी।",
       "slaLeadTimeAccessibility": "SLA की समय सीमा से कितने दिन पहले चेतावनी भेजें",
-      "slaLeadTimeError": "दिनों की संख्या 1 से 365 के बीच पूर्णांक में दर्ज करें।",
+      "slaLeadTimeError": "दिनों की संख्या {{min}} से {{max}} के बीच पूर्णांक में दर्ज करें।",
       "slaLeadTimeLabel": "SLA की समय सीमा से कितने दिन पहले चेतावनी दें",
       "slaPersonalTitle": "SLA चेतावनियों के बारे में मुझे ईमेल करें",
       "slaSection": "SLA की चेतावनी की सूचना",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "{{mode}} विश्लेषण",
       "automationAllOff": "सभी बंद",
-      "automationCount": "3 में से {{displayCount}} चालू",
+      "automationCount": "{{total}} में से {{displayCount}} चालू",
       "couldNotLoadPermissions": "अनुमतियाँ लोड नहीं हो सकीं।",
       "couldNotLoadSettings": "सुरक्षा एजेंट की सेटिंग लोड नहीं हो सकीं।",
       "disabledNoManage": "सुरक्षा एजेंट बंद है। केवल संगठन के मालिक और बिलिंग मैनेजर ही इसे चालू कर सकते हैं।",
       "disabledNoRepo": "सुरक्षा एजेंट चालू करने से पहले कम से कम एक रिपॉज़िटरी चुनें।",
       "disabledPrompt": "Dependabot अलर्ट सिंक करने, रिपॉज़िटरी चुनने और स्वचालन की सेटिंग तय करने के लिए सुरक्षा एजेंट चालू करें।",
-      "notificationsCount": "2 में से {{displayCount}} चालू",
+      "notificationsCount": "{{total}} में से {{displayCount}} चालू",
       "on": "चालू",
       "repositoriesCount": "चुनी गई रिपॉज़िटरी: {{displayCount}}",
       "repositoriesCount_other": "चुनी गई रिपॉज़िटरी: {{displayCount}}",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "सुधार की समय सीमाएँ (दिन)",
       "enableTracking": "SLA की निगरानी चालू करें",
       "enableTrackingSubtitle": "समस्या की गंभीरता के आधार पर सुधार की समय सीमा तय करें।",
-      "enterWholeNumber": "1 और 365 के बीच एक पूर्णांक दर्ज करें",
+      "enterWholeNumber": "{{min}} और {{max}} के बीच एक पूर्णांक दर्ज करें",
       "high": "उच्च",
       "highDescription": "बड़े पैमाने पर डेटा उजागर होने की संभावना।",
-      "invalidDayCount": "दिनों की संख्या 1 से 365 के बीच पूर्णांक में दर्ज करें।",
+      "invalidDayCount": "दिनों की संख्या {{min}} से {{max}} के बीच पूर्णांक में दर्ज करें।",
       "low": "निम्न",
       "lowDescription": "सुरक्षा पर बहुत कम असर।",
       "medium": "मध्यम",
@@ -1911,7 +1911,7 @@
       "submissionFailed": "भेजा नहीं जा सका। कृपया फिर से कोशिश करें।",
       "questionAnnouncement": "एजेंट को आपका उत्तर चाहिए। उत्तर देने तक संदेश लिखने का बॉक्स बंद रहेगा।",
       "permissionAnnouncement": "आगे बढ़ने के लिए एजेंट को अनुमति चाहिए। आपके निर्णय लेने तक संदेश लिखने का बॉक्स बंद रहेगा।",
-      "positionHint": "({{displayCount}} में से 1)",
+      "positionHint": "({{displayCount}} में से {{index}})",
       "movedPastPrompt": "एजेंट इस प्रॉम्प्ट से आगे बढ़ चुका है। सत्र आगे बढ़ने पर यह कार्ड बंद हो जाएगा।",
       "waitingForAnswer": "एजेंट आपके उत्तर का इंतज़ार कर रहा है। जब तक यह प्रश्न खुला है, एजेंट को आपका संदेश नहीं भेजा जाएगा।",
       "waitingForPermission": "एजेंट अनुमति का इंतज़ार कर रहा है। जब तक यह अनुरोध खुला है, एजेंट को आपका संदेश नहीं भेजा जाएगा।"
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "इस राशि से कम होने पर चेतावनी (USD)",
       "title": "कम बैलेंस की चेतावनी",
       "emailsError": "कम से कम एक मान्य ईमेल पता दर्ज करें। एक से ज़्यादा पते हों, तो उन्हें अल्पविराम से अलग करें।",
-      "thresholdError": "0 से अधिक राशि दर्ज करें।"
+      "thresholdError": "{{min}} से अधिक राशि दर्ज करें।"
     },
     "memberLimit": {
       "limitLabel": "सीमा (USD प्रति दिन)",
@@ -3040,7 +3040,7 @@
       "removeLimit": "सीमा हटाएँ",
       "title": "रोज़ाना उपयोग की सीमा",
       "blankError": "राशि दर्ज करें या नीचे ‘सीमा हटाएँ’ पर टैप करें।",
-      "rangeError": "0 और {{max}} के बीच की राशि दर्ज करें।"
+      "rangeError": "{{min}} और {{max}} के बीच की राशि दर्ज करें।"
     },
     "members": {
       "changeRole": "भूमिका बदलें",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",
-      "last30Days": "पिछले 30 दिन",
+      "last30Days": "पिछले {{days}} दिन",
       "outputTokens": "आउटपुट टोकन",
       "requests": "अनुरोध"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "एक घंटा इस स्कोप की सामान्य दर से कहीं अधिक है",
     "limitLabel": "सीमा (USD)",
     "windowLabel": "अवधि",
-    "window24h": "24 घंटे",
-    "window7d": "7 दिन",
-    "window30d": "30 दिन",
+    "window24h": "{{hours}} घंटे",
+    "window7d": "{{days}} दिन",
+    "window30d": "{{days}} दिन",
     "multiplierLabel": "बढ़त गुणक",
     "saved": "खर्च की चेतावनी की सेटिंग्स सहेजी गईं",
     "loadError": "खर्च की चेतावनियाँ लोड नहीं हो सकीं।",
     "saveError": "खर्च की चेतावनियाँ सहेजी नहीं जा सकीं।",
     "empty": "खर्च की चेतावनियाँ बंद हैं। इस स्कोप के बिलिंग संपर्कों को सचेत करने के लिए इन्हें चालू करें।",
     "noSpend": "अभी तक कोई खर्च दर्ज नहीं हुआ",
-    "spend24h": "पिछले 24 घंटों का खर्च",
-    "multiplierError": "1 या उससे अधिक का गुणक दर्ज करें",
+    "spend24h": "पिछले {{hours}} घंटों का खर्च",
+    "multiplierError": "{{min}} या उससे अधिक का गुणक दर्ज करें",
     "permissionDenied": "आपको खर्च की चेतावनियाँ प्रबंधित करने की अनुमति नहीं है।",
     "pushOffByCategory": "सूचनाओं में बंद"
   },

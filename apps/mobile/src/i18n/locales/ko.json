@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "새 문제 알림의 최소 심각도",
       "newFindingSubtitle": "첫 동기화부터 새로 발견된 문제가 동기화될 때마다 알림을 보냅니다.",
       "slaLeadTimeAccessibility": "SLA 마감 며칠 전에 알림을 보낼지 설정",
-      "slaLeadTimeError": "일수를 1~365 사이의 정수로 입력하세요.",
+      "slaLeadTimeError": "일수를 {{min}}~{{max}} 사이의 정수로 입력하세요.",
       "slaLeadTimeLabel": "SLA 마감 전 알림(일)",
       "slaPersonalTitle": "SLA 경고를 이메일로 받기",
       "slaSection": "SLA 경고 알림",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "{{mode}} 분석",
       "automationAllOff": "모두 꺼짐",
-      "automationCount": "3개 중 {{displayCount}}개 활성화됨",
+      "automationCount": "{{total}}개 중 {{displayCount}}개 활성화됨",
       "couldNotLoadPermissions": "권한을 불러올 수 없습니다.",
       "couldNotLoadSettings": "보안 에이전트 설정을 불러올 수 없습니다.",
       "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자와 결제 관리자만 활성화할 수 있습니다.",
       "disabledNoRepo": "보안 에이전트를 활성화하기 전에 저장소를 하나 이상 선택하세요.",
       "disabledPrompt": "보안 에이전트를 활성화하여 Dependabot 알림을 동기화하고, 저장소를 선택하고, 자동화를 설정하세요.",
-      "notificationsCount": "2개 중 {{displayCount}}개 활성화됨",
+      "notificationsCount": "{{total}}개 중 {{displayCount}}개 활성화됨",
       "on": "켜짐",
       "repositoriesCount": "저장소 {{displayCount}}개 선택됨",
       "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "수정 기한(일)",
       "enableTracking": "SLA 추적 활성화",
       "enableTrackingSubtitle": "발견된 문제의 심각도에 따라 수정 기한을 설정합니다.",
-      "enterWholeNumber": "1에서 365 사이의 정수를 입력하세요",
+      "enterWholeNumber": "{{min}}에서 {{max}} 사이의 정수를 입력하세요",
       "high": "높음",
       "highDescription": "심각한 데이터 노출이 발생할 수 있습니다.",
-      "invalidDayCount": "일수를 1~365 사이의 정수로 입력하세요.",
+      "invalidDayCount": "일수를 {{min}}~{{max}} 사이의 정수로 입력하세요.",
       "low": "낮음",
       "lowDescription": "보안에 미치는 영향이 매우 적습니다.",
       "medium": "중간",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "제출에 실패했습니다. 다시 시도하세요.",
       "questionAnnouncement": "에이전트가 답변을 요청했습니다. 답변하는 동안 메시지 입력이 일시 중지됩니다.",
       "permissionAnnouncement": "에이전트가 계속 작업하려면 권한이 필요합니다. 허용 여부를 결정하는 동안 메시지 입력이 일시 중지됩니다.",
-      "positionHint": "({{displayCount}}개 중 첫 번째)",
+      "positionHint": "({{displayCount}}개 중 {{index}}번째)",
       "movedPastPrompt": "에이전트가 이미 이 요청을 넘어 다음 단계로 진행했습니다. 세션이 계속되면 이 카드가 닫힙니다.",
       "waitingForAnswer": "에이전트가 답변을 기다리고 있습니다. 이 질문에 답변할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다.",
       "waitingForPermission": "에이전트가 권한 승인을 기다리고 있습니다. 이 요청에 응답할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다."
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "알림 기준 잔액(USD 미만)",
       "title": "잔액 부족 알림",
       "emailsError": "올바른 이메일 주소를 하나 이상 입력하세요. 여러 주소는 쉼표로 구분하세요.",
-      "thresholdError": "0보다 큰 금액을 입력하세요."
+      "thresholdError": "{{min}}보다 큰 금액을 입력하세요."
     },
     "memberLimit": {
       "limitLabel": "일일 한도(USD)",
@@ -3040,7 +3040,7 @@
       "removeLimit": "한도 해제",
       "title": "일일 사용 한도",
       "blankError": "금액을 입력하거나 아래의 한도 해제를 누르세요.",
-      "rangeError": "0에서 {{max}} 사이의 금액을 입력하세요."
+      "rangeError": "{{min}}에서 {{max}} 사이의 금액을 입력하세요."
     },
     "members": {
       "changeRole": "역할 변경",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "입력 토큰",
-      "last30Days": "최근 30일",
+      "last30Days": "최근 {{days}}일",
       "outputTokens": "출력 토큰",
       "requests": "요청"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "한 시간의 지출이 이 범위의 평소 속도를 크게 웃돕니다",
     "limitLabel": "한도 (USD)",
     "windowLabel": "기간",
-    "window24h": "24시간",
-    "window7d": "7일",
-    "window30d": "30일",
+    "window24h": "{{hours}}시간",
+    "window7d": "{{days}}일",
+    "window30d": "{{days}}일",
     "multiplierLabel": "급증 배수",
     "saved": "지출 알림 설정이 저장되었습니다",
     "loadError": "지출 알림을 불러오지 못했습니다.",
     "saveError": "지출 알림을 저장하지 못했습니다.",
     "empty": "지출 알림이 꺼져 있습니다. 이 범위의 청구 담당자에게 알리려면 켜세요.",
     "noSpend": "아직 기록된 지출이 없습니다",
-    "spend24h": "최근 24시간 지출",
-    "multiplierError": "1 이상의 배수를 입력하세요",
+    "spend24h": "최근 {{hours}}시간 지출",
+    "multiplierError": "{{min}} 이상의 배수를 입력하세요",
     "permissionDenied": "지출 알림을 관리할 권한이 없습니다.",
     "pushOffByCategory": "알림에서 꺼짐"
   },

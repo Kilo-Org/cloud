@@ -217,3 +217,24 @@ test('rejects unknown placeholders in a locale-specific plural category', contex
     /mobile\/ru: "agents\.liveCount_few" uses placeholder \{\{total\}\}, which the English family does not/
   );
 });
+
+test('rejects a non-Latin digit where English holds none', context => {
+  const result = runChecker(context, {
+    translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ٢' } },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.title" spells a number in non-Latin digits; pass it to the call site as a \{\{placeholder\}\}/
+  );
+});
+
+test('accepts a non-Latin digit beside the digit English writes', context => {
+  const result = runChecker(context, {
+    english: { agents: { title: 'Agents 2025' } },
+    translated: { agents: { title: 'Agentes ٢٠٢٥' } },
+    source: "t('agents.title');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});

@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Xavfsizlik agenti kuzatadigan repozitoriyalarni tanlang",
       "analysisModeSubtitle": "{{mode}} tahlil",
       "automationAllOff": "Hammasi o'chiq",
-      "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",
-      "notificationsCount": "2 tadan {{displayCount}} tasi yoqilgan",
+      "automationCount": "{{total}} tadan {{displayCount}} tasi yoqilgan",
+      "notificationsCount": "{{total}} tadan {{displayCount}} tasi yoqilgan",
       "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalari va hisob-kitob menejerlari uni yoqishi mumkin.",
       "disabledNoRepo": "Xavfsizlik agentini yoqishdan oldin kamida bitta repozitoriyani tanlang.",
       "disabledPrompt": "Dependabot ogohlantirishlarini sinxronlash, repozitoriyalarni tanlash va avtomatlashtirishni sozlash uchun Xavfsizlik agentini yoqing."
@@ -1817,9 +1817,9 @@
       "highDescription": "Muhim ma'lumotlarning oshkor bo'lish xavfi.",
       "mediumDescription": "Cheklangan ta'sir yoki muayyan shartlar.",
       "lowDescription": "Xavfsizlikka juda kam ta'sir.",
-      "invalidDayCount": "kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
+      "invalidDayCount": "kunlar soni {{min}} dan {{max}} gacha bo'lgan butun son bo'lishi kerak.",
       "remediationDeadlineA11y": "{{label}} darajasidagi muammoni tuzatish muddati, kun hisobida",
-      "enterWholeNumber": "1 Dan 365 gacha bo‘lgan butun sonni kiriting",
+      "enterWholeNumber": "{{min}} Dan {{max}} gacha bo‘lgan butun sonni kiriting",
       "permissionNote": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
       "enableTracking": "SLA kuzatuvini yoqish",
       "enableTrackingSubtitle": "Muammoning xavf darajasiga qarab tuzatish muddatlarini belgilaydi.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Yangi muammolar uchun eng past xavf darajasi",
       "newFindingSubtitle": "Har safar yangi muammo sinxronlanganda, jumladan, birinchi sinxronlashda ham yuboriladi.",
       "slaLeadTimeAccessibility": "SLA muddati tugashidan necha kun oldin ogohlantirish",
-      "slaLeadTimeError": "Kunlar sonini 1 dan 365 gacha bo'lgan butun son bilan kiriting.",
+      "slaLeadTimeError": "Kunlar sonini {{min}} dan {{max}} gacha bo'lgan butun son bilan kiriting.",
       "slaLeadTimeLabel": "SLA muddati tugashidan oldin ogohlantirish (kun)",
       "slaPersonalTitle": "SLA ogohlantirishlari haqida menga elektron xat yuborish",
       "slaSection": "SLA ogohlantirish bildirishnomasi",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Yuborish amalga oshmadi. Iltimos, qayta urinib ko'ring.",
       "questionAnnouncement": "Agent javobingizni kutmoqda. Javob berguningizcha xabar kiritish maydoni faol bo'lmaydi.",
       "permissionAnnouncement": "Davom etish uchun agentga ruxsat kerak. Qaror qilguningizcha xabar kiritish maydoni faol bo'lmaydi.",
-      "positionHint": "(1/{{displayCount}})",
+      "positionHint": "({{index}}/{{displayCount}})",
       "movedPastPrompt": "Agent bu so'rov bosqichidan o'tdi. Sessiya davom etganda bu kartochka yopiladi.",
       "waitingForAnswer": "Agent javobingizni kutmoqda. Bu savol ochiq turganida agentga xabaringiz yuborilmay turadi.",
       "waitingForPermission": "Agent ruxsat kutmoqda. Bu so'rov ochiq turganida agentga xabaringiz yuborilmay turadi."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Ogohlantirish chegarasi (USD)",
       "title": "Balans kamayishi haqida ogohlantirish",
       "emailsError": "Kamida bitta to'g'ri elektron pochta manzilini kiriting. Bir nechta manzilni vergul bilan ajrating.",
-      "thresholdError": "0 Dan katta miqdorni kiriting."
+      "thresholdError": "{{min}} Dan katta miqdorni kiriting."
     },
     "memberLimit": {
       "limitLabel": "Limit (USD/kun)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Limitni olib tashlash",
       "title": "Kunlik foydalanish limiti",
       "blankError": "Miqdor kiriting yoki quyidagi Limitni olib tashlash tugmasini bosing.",
-      "rangeError": "0 Va {{max}} oralig'idagi miqdorni kiriting."
+      "rangeError": "{{min}} Va {{max}} oralig'idagi miqdorni kiriting."
     },
     "members": {
       "changeRole": "Rolni o'zgartirish",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",
-      "last30Days": "Oxirgi 30 kun",
+      "last30Days": "Oxirgi {{days}} kun",
       "outputTokens": "Chiqish tokenlari",
       "requests": "So'rovlar"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Bir soat bu sohaning odatdagi sur'atidan ancha yuqori",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Oyna",
-    "window24h": "24 soat",
-    "window7d": "7 kun",
-    "window30d": "30 kun",
+    "window24h": "{{hours}} soat",
+    "window7d": "{{days}} kun",
+    "window30d": "{{days}} kun",
     "multiplierLabel": "Ko'tarilish koeffitsiyenti",
     "saved": "Xarajat bildirishnomasi sozlamalari saqlandi",
     "loadError": "Xarajat bildirishnomalarini yuklab bo'lmadi.",
     "saveError": "Xarajat bildirishnomalarini saqlab bo'lmadi.",
     "empty": "Xarajat bildirishnomalari o'chirilgan. Bu sohaning to'lov kontaktlarini ogohlantirish uchun ularni yoqing.",
     "noSpend": "Hozircha xarajat qayd etilmagan",
-    "spend24h": "Oxirgi 24 soatdagi xarajat",
-    "multiplierError": "1 yoki undan katta koeffitsiyent kiriting",
+    "spend24h": "Oxirgi {{hours}} soatdagi xarajat",
+    "multiplierError": "{{min}} yoki undan katta koeffitsiyent kiriting",
     "permissionDenied": "Xarajat bildirishnomalarini boshqarishga ruxsatingiz yo'q.",
     "pushOffByCategory": "Bildirishnomalarda o'chirilgan"
   },

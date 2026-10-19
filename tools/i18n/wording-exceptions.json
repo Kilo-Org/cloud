@@ -11,7 +11,8 @@
     "open",
     "open pull request",
     "plan",
-    "reactions"
+    "reactions",
+    "{{days}} days"
   ],
   "az": [
     "block",
@@ -198,7 +199,17 @@
   "kn": ["commit", "merge", "open", "open pull request", "review"],
   "ko": ["open", "open pull request", "plan", "session exited"],
   "lo": ["review"],
-  "lt": ["commit", "edit", "files", "open", "open pull request", "outdated", "plan", "reactions"],
+  "lt": [
+    "commit",
+    "edit",
+    "files",
+    "open",
+    "open pull request",
+    "outdated",
+    "plan",
+    "reactions",
+    "{{days}} days"
+  ],
   "lv": ["open", "open pull request", "review"],
   "mg": ["block", "open", "open pull request"],
   "mi": ["commit", "open", "open pull request"],
@@ -207,7 +218,7 @@
   "mn": ["block", "files", "open", "open pull request", "tokens"],
   "mr": ["block", "open pull request"],
   "ms": ["open", "open pull request", "review"],
-  "mt": ["(empty)", "open", "open pull request"],
+  "mt": ["(empty)", "open", "open pull request", "{{days}} days"],
   "my": [
     "balanced",
     "commit",
@@ -274,7 +285,8 @@
     "fixed",
     "none",
     "open",
-    "open pull request"
+    "open pull request",
+    "{{days}} days"
   ],
   "ru": [
     "balanced",

@@ -1329,7 +1329,7 @@
       "newFindingSeverityLabel": "الحد الأدنى للخطورة لإشعارات النتائج الجديدة",
       "newFindingSubtitle": "يُرسل عند مزامنة نتيجة جديدة، بما في ذلك عند أول مزامنة.",
       "slaLeadTimeAccessibility": "عدد الأيام قبل الموعد النهائي لإرسال تحذير SLA",
-      "slaLeadTimeError": "أدخل عددًا صحيحًا من الأيام بين 1 و365.",
+      "slaLeadTimeError": "أدخل عددًا صحيحًا من الأيام بين {{min}} و{{max}}.",
       "slaLeadTimeLabel": "وقت إرسال تحذير SLA قبل الموعد النهائي (بالأيام)",
       "slaPersonalTitle": "إشعاري بتحذيرات SLA عبر البريد الإلكتروني",
       "slaSection": "إشعار تحذير SLA",
@@ -1382,13 +1382,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "نوع التحليل: {{mode}}",
       "automationAllOff": "الكل معطّل",
-      "automationCount": "تم تفعيل {{displayCount}} من 3",
+      "automationCount": "تم تفعيل {{displayCount}} من {{total}}",
       "couldNotLoadPermissions": "تعذّر تحميل الصلاحيات.",
       "couldNotLoadSettings": "تعذّر تحميل إعدادات وكيل الأمان.",
       "disabledNoManage": "وكيل الأمان معطّل. يمكن لمالكي المؤسسة ومديري الفوترة فقط تفعيله.",
       "disabledNoRepo": "اختر مستودعًا واحدًا على الأقل قبل تفعيل وكيل الأمان.",
       "disabledPrompt": "فعّل وكيل الأمان لمزامنة تنبيهات Dependabot واختيار المستودعات وضبط إعدادات الأتمتة.",
-      "notificationsCount": "تم تفعيل {{displayCount}} من 2",
+      "notificationsCount": "تم تفعيل {{displayCount}} من {{total}}",
       "on": "مفعّل",
       "repositoriesCount": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_other": "المستودعات المحددة: {{displayCount}}",
@@ -1413,10 +1413,10 @@
       "deadlinesHeading": "مهل المعالجة (بالأيام)",
       "enableTracking": "تفعيل تتبع SLA",
       "enableTrackingSubtitle": "تعيين مواعيد نهائية للمعالجة بناءً على خطورة النتيجة.",
-      "enterWholeNumber": "أدخل عددًا صحيحًا بين 1 و365",
+      "enterWholeNumber": "أدخل عددًا صحيحًا بين {{min}} و{{max}}",
       "high": "عالٍ",
       "highDescription": "احتمال انكشاف البيانات على نطاق واسع.",
-      "invalidDayCount": "أدخل عددًا صحيحًا من الأيام بين 1 و365.",
+      "invalidDayCount": "أدخل عددًا صحيحًا من الأيام بين {{min}} و{{max}}.",
       "low": "منخفض",
       "lowDescription": "تأثير أمني ضئيل.",
       "medium": "متوسط",
@@ -2001,7 +2001,7 @@
       "submissionFailed": "تعذّر الإرسال. حاول مرة أخرى.",
       "questionAnnouncement": "الوكيل بحاجة إلى إجابتك. حقل الرسالة معطّل مؤقتًا إلى أن تجيب.",
       "permissionAnnouncement": "الوكيل بحاجة إلى إذن للمتابعة. حقل الرسالة معطّل مؤقتًا إلى أن تتخذ قرارك.",
-      "positionHint": "(1 من {{displayCount}})",
+      "positionHint": "({{index}} من {{displayCount}})",
       "movedPastPrompt": "تجاوز الوكيل هذا الطلب. ستُغلق هذه البطاقة عند استئناف الجلسة.",
       "waitingForAnswer": "الوكيل في انتظار إجابتك. يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا السؤال مفتوحًا.",
       "waitingForPermission": "الوكيل في انتظار الإذن. يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا الطلب مفتوحًا."
@@ -3190,7 +3190,7 @@
       "thresholdLabel": "التنبيه عند انخفاض الرصيد عن (USD)",
       "title": "تنبيه انخفاض الرصيد",
       "emailsError": "أدخل عنوان بريد إلكتروني صالحًا واحدًا على الأقل. افصل بين العناوين بفواصل.",
-      "thresholdError": "أدخل مبلغًا أكبر من 0."
+      "thresholdError": "أدخل مبلغًا أكبر من {{min}}."
     },
     "memberLimit": {
       "limitLabel": "الحد اليومي (USD)",
@@ -3200,7 +3200,7 @@
       "removeLimit": "إزالة الحد",
       "title": "حد الاستخدام اليومي",
       "blankError": "أدخل مبلغًا، أو اضغط على «إزالة الحد» أدناه.",
-      "rangeError": "أدخل مبلغًا بين 0 و{{max}}."
+      "rangeError": "أدخل مبلغًا بين {{min}} و{{max}}."
     },
     "members": {
       "changeRole": "تغيير الدور",
@@ -3232,7 +3232,7 @@
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",
-      "last30Days": "آخر 30 يومًا",
+      "last30Days": "آخر {{days}} يومًا",
       "outputTokens": "رموز الإخراج",
       "requests": "الطلبات"
     },
@@ -3684,17 +3684,17 @@
     "anomalySubtitle": "الساعة أعلى بكثير من المعدل المعتاد لهذا النطاق",
     "limitLabel": "الحد (USD)",
     "windowLabel": "النافذة الزمنية",
-    "window24h": "24 ساعة",
-    "window7d": "7 أيام",
-    "window30d": "30 يومًا",
+    "window24h": "{{hours}} ساعة",
+    "window7d": "{{days}} أيام",
+    "window30d": "{{days}} يومًا",
     "multiplierLabel": "مضاعف الارتفاع",
     "saved": "تم حفظ إعدادات تنبيهات الإنفاق",
     "loadError": "تعذّر تحميل تنبيهات الإنفاق.",
     "saveError": "تعذّر حفظ تنبيهات الإنفاق.",
     "empty": "تنبيهات الإنفاق متوقفة. فعّلها لتنبيه جهات اتصال الفوترة لهذا النطاق.",
     "noSpend": "لم يُسجَّل أي إنفاق بعد",
-    "spend24h": "الإنفاق خلال آخر 24 ساعة",
-    "multiplierError": "أدخل مضاعفًا يساوي 1 أو أكثر",
+    "spend24h": "الإنفاق خلال آخر {{hours}} ساعة",
+    "multiplierError": "أدخل مضاعفًا يساوي {{min}} أو أكثر",
     "permissionDenied": "ليست لديك صلاحية لإدارة تنبيهات الإنفاق.",
     "pushOffByCategory": "معطّل في الإشعارات"
   },

@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Kies watter bewaarplekke die Sekuriteitsagent monitor",
       "analysisModeSubtitle": "Ontleding: {{mode}}",
       "automationAllOff": "Alles af",
-      "automationCount": "{{displayCount}} van 3 geaktiveer",
-      "notificationsCount": "{{displayCount}} van 2 geaktiveer",
+      "automationCount": "{{displayCount}} van {{total}} geaktiveer",
+      "notificationsCount": "{{displayCount}} van {{total}} geaktiveer",
       "disabledNoManage": "Die Sekuriteitsagent is gedeaktiveer. Slegs organisasie-eienaars en faktureringsbestuurders kan dit aktiveer.",
       "disabledNoRepo": "Kies ten minste een bewaarplek voordat jy die Sekuriteitsagent aktiveer.",
       "disabledPrompt": "Aktiveer die Sekuriteitsagent om Dependabot-waarskuwings te sinkroniseer, bewaarplekke te kies en outomatisering op te stel."
@@ -1817,9 +1817,9 @@
       "highDescription": "Moontlike beduidende datablootstelling.",
       "mediumDescription": "Beperkte impak of spesifieke voorwaardes.",
       "lowDescription": "Minimale sekuriteitsimpak.",
-      "invalidDayCount": "voer 1–365 dae in, slegs heelgetalle.",
+      "invalidDayCount": "voer {{min}}–{{max}} dae in, slegs heelgetalle.",
       "remediationDeadlineA11y": "Regstellingsperdatum in dae vir ernsgraad {{label}}",
-      "enterWholeNumber": "Voer 'n heelgetal tussen 1 en 365 in",
+      "enterWholeNumber": "Voer 'n heelgetal tussen {{min}} en {{max}} in",
       "permissionNote": "Slegs organisasie-eienaars en faktureringsbestuurders kan hierdie instellings verander.",
       "enableTracking": "Aktiveer SLA-monitering",
       "enableTrackingSubtitle": "Stel regstellingsperdatums volgens die bevindings se ernsgraad in.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Minimum ernsgraad vir nuwe bevindings",
       "newFindingSubtitle": "Word gestuur wanneer 'n nuwe bevinding gesinkroniseer word, ook tydens die eerste sinkronisasie.",
       "slaLeadTimeAccessibility": "Aantal dae voor die SLA-sperdatum vir waarskuwings",
-      "slaLeadTimeError": "Voer 'n aantal dae tussen 1 en 365 as 'n heelgetal in.",
+      "slaLeadTimeError": "Voer 'n aantal dae tussen {{min}} en {{max}} as 'n heelgetal in.",
       "slaLeadTimeLabel": "Waarskuwing voor SLA-sperdatum (dae)",
       "slaPersonalTitle": "E-pos my oor SLA-waarskuwings",
       "slaSection": "Kennisgewing oor SLA-waarskuwings",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Die indiening het misluk. Probeer asseblief weer.",
       "questionAnnouncement": "Die agent benodig jou insette. Die boodskapinvoer is tydelik onaktief terwyl jy antwoord.",
       "permissionAnnouncement": "Die agent benodig toestemming om voort te gaan. Die boodskapinvoer is tydelik onaktief terwyl jy besluit.",
-      "positionHint": "(1 van {{displayCount}})",
+      "positionHint": "({{index}} van {{displayCount}})",
       "movedPastPrompt": "Die agent het reeds met die volgende stap begin. Hierdie kaart sal sluit wanneer die sessie voortgaan.",
       "waitingForAnswer": "Die agent wag op jou antwoord. Jou boodskap aan die agent word teruggehou terwyl hierdie vraag oop is.",
       "waitingForPermission": "Die agent wag op toestemming. Jou boodskap aan die agent word teruggehou terwyl hierdie versoek oop is."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Waarsku onder (USD)",
       "title": "Waarskuwing vir lae saldo",
       "emailsError": "Voer minstens een geldige e-posadres in. Skei verskeie adresse met kommas.",
-      "thresholdError": "Voer 'n bedrag groter as 0 in."
+      "thresholdError": "Voer 'n bedrag groter as {{min}} in."
     },
     "memberLimit": {
       "limitLabel": "Perk (USD per dag)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Verwyder perk",
       "title": "Daaglikse gebruiksperk",
       "blankError": "Voer 'n bedrag in of tik hieronder op Verwyder perk.",
-      "rangeError": "Voer 'n bedrag tussen 0 en {{max}} in."
+      "rangeError": "Voer 'n bedrag tussen {{min}} en {{max}} in."
     },
     "members": {
       "changeRole": "Verander rol",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Invoertekens",
-      "last30Days": "Laaste 30 dae",
+      "last30Days": "Laaste {{days}} dae",
       "outputTokens": "Uitsettekens",
       "requests": "Versoeke"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "'n Uur is ver bo hierdie omvang se gewone tempo",
     "limitLabel": "Limiet (USD)",
     "windowLabel": "Venster",
-    "window24h": "24 uur",
-    "window7d": "7 dae",
-    "window30d": "30 dae",
+    "window24h": "{{hours}} uur",
+    "window7d": "{{days}} dae",
+    "window30d": "{{days}} dae",
     "multiplierLabel": "Piekvermenigvuldiger",
     "saved": "Instellings vir bestedingswaarskuwings gestoor",
     "loadError": "Kon nie bestedingswaarskuwings laai nie.",
     "saveError": "Kon nie bestedingswaarskuwings stoor nie.",
     "empty": "Bestedingswaarskuwings is af. Skakel dit aan om hierdie omvang se faktuurkontakte te waarsku.",
     "noSpend": "Nog geen besteding aangeteken nie",
-    "spend24h": "Besteding in die afgelope 24 uur",
-    "multiplierError": "Voer 'n vermenigvuldiger van 1 of meer in",
+    "spend24h": "Besteding in die afgelope {{hours}} uur",
+    "multiplierError": "Voer 'n vermenigvuldiger van {{min}} of meer in",
     "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
     "pushOffByCategory": "Af in Kennisgewings"
   },

@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "Mức độ nghiêm trọng tối thiểu của vấn đề mới",
       "newFindingSubtitle": "Thông báo được gửi mỗi khi có vấn đề mới được đồng bộ, kể cả trong lần đồng bộ đầu tiên.",
       "slaLeadTimeAccessibility": "Số ngày cảnh báo trước hạn chót SLA",
-      "slaLeadTimeError": "Nhập số ngày từ 1 đến 365, chỉ dùng số nguyên.",
+      "slaLeadTimeError": "Nhập số ngày từ {{min}} đến {{max}}, chỉ dùng số nguyên.",
       "slaLeadTimeLabel": "Cảnh báo trước hạn chót SLA (ngày)",
       "slaPersonalTitle": "Gửi email cho tôi về các cảnh báo SLA",
       "slaSection": "Cảnh báo SLA",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "Phân tích {{mode}}",
       "automationAllOff": "Tất cả đều tắt",
-      "automationCount": "Đã bật {{displayCount}}/3",
+      "automationCount": "Đã bật {{displayCount}}/{{total}}",
       "couldNotLoadPermissions": "Không thể tải thông tin quyền truy cập.",
       "couldNotLoadSettings": "Không thể tải cài đặt Trợ lý bảo mật.",
       "disabledNoManage": "Trợ lý bảo mật đang tắt. Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể bật tính năng này.",
       "disabledNoRepo": "Chọn ít nhất một kho lưu trữ trước khi bật Trợ lý bảo mật.",
       "disabledPrompt": "Bật Trợ lý bảo mật để đồng bộ cảnh báo Dependabot, chọn kho lưu trữ và thiết lập tự động hóa.",
-      "notificationsCount": "Đã bật {{displayCount}}/2",
+      "notificationsCount": "Đã bật {{displayCount}}/{{total}}",
       "on": "Bật",
       "repositoriesCount": "Đã chọn {{displayCount}} kho mã nguồn",
       "repositoriesCount_other": "Đã chọn {{displayCount}} kho mã nguồn",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "Thời hạn khắc phục (ngày)",
       "enableTracking": "Bật theo dõi SLA",
       "enableTrackingSubtitle": "Đặt thời hạn khắc phục dựa trên mức độ nghiêm trọng của vấn đề.",
-      "enterWholeNumber": "Nhập một số nguyên từ 1 đến 365",
+      "enterWholeNumber": "Nhập một số nguyên từ {{min}} đến {{max}}",
       "high": "Cao",
       "highDescription": "Có nguy cơ rò rỉ dữ liệu ở mức đáng kể.",
-      "invalidDayCount": "số ngày phải là số nguyên từ 1 đến 365.",
+      "invalidDayCount": "số ngày phải là số nguyên từ {{min}} đến {{max}}.",
       "low": "Thấp",
       "lowDescription": "Ảnh hưởng rất ít đến bảo mật.",
       "medium": "Trung bình",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "Không thể gửi. Vui lòng thử lại.",
       "questionAnnouncement": "Tác nhân cần bạn trả lời. Ô nhập tin nhắn tạm thời bị khóa trong lúc bạn trả lời.",
       "permissionAnnouncement": "Tác nhân cần được cấp quyền để tiếp tục. Ô nhập tin nhắn tạm thời bị khóa trong lúc bạn quyết định.",
-      "positionHint": "(1 trong số {{displayCount}})",
+      "positionHint": "({{index}} trong số {{displayCount}})",
       "movedPastPrompt": "Tác nhân đã chuyển sang bước khác. Thẻ này sẽ đóng khi phiên tiếp tục.",
       "waitingForAnswer": "Tác nhân đang chờ bạn trả lời. Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi câu hỏi này được đóng.",
       "waitingForPermission": "Tác nhân đang chờ được cấp quyền. Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi yêu cầu này được đóng."
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "Cảnh báo khi số dư dưới (USD)",
       "title": "Cảnh báo số dư thấp",
       "emailsError": "Hãy nhập ít nhất một địa chỉ email hợp lệ. Nếu nhập nhiều địa chỉ, hãy ngăn cách bằng dấu phẩy.",
-      "thresholdError": "Hãy nhập số tiền lớn hơn 0."
+      "thresholdError": "Hãy nhập số tiền lớn hơn {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Giới hạn (USD mỗi ngày)",
@@ -3040,7 +3040,7 @@
       "removeLimit": "Bỏ giới hạn",
       "title": "Giới hạn sử dụng hằng ngày",
       "blankError": "Hãy nhập số tiền hoặc chọn Bỏ giới hạn bên dưới.",
-      "rangeError": "Hãy nhập số tiền từ 0 đến {{max}}."
+      "rangeError": "Hãy nhập số tiền từ {{min}} đến {{max}}."
     },
     "members": {
       "changeRole": "Thay đổi vai trò",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
-      "last30Days": "30 Ngày qua",
+      "last30Days": "{{days}} Ngày qua",
       "outputTokens": "Token đầu ra",
       "requests": "Yêu cầu"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Một giờ cao hơn hẳn mức thường lệ của phạm vi này",
     "limitLabel": "Giới hạn (USD)",
     "windowLabel": "Khoảng thời gian",
-    "window24h": "24 giờ",
-    "window7d": "7 ngày",
-    "window30d": "30 ngày",
+    "window24h": "{{hours}} giờ",
+    "window7d": "{{days}} ngày",
+    "window30d": "{{days}} ngày",
     "multiplierLabel": "Hệ số tăng vọt",
     "saved": "Đã lưu cài đặt cảnh báo chi tiêu",
     "loadError": "Không thể tải cảnh báo chi tiêu.",
     "saveError": "Không thể lưu cảnh báo chi tiêu.",
     "empty": "Cảnh báo chi tiêu đang tắt. Bật chúng để thông báo cho các liên hệ thanh toán của phạm vi này.",
     "noSpend": "Chưa ghi nhận chi tiêu nào",
-    "spend24h": "Chi tiêu trong 24 giờ qua",
-    "multiplierError": "Nhập hệ số từ 1 trở lên",
+    "spend24h": "Chi tiêu trong {{hours}} giờ qua",
+    "multiplierError": "Nhập hệ số từ {{min}} trở lên",
     "permissionDenied": "Bạn không có quyền quản lý cảnh báo chi tiêu.",
     "pushOffByCategory": "Đã tắt trong Thông báo"
   },

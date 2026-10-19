@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Pilih repositori yang dipantau oleh Ejen Keselamatan",
       "analysisModeSubtitle": "Analisis {{mode}}",
       "automationAllOff": "Semua dinyahdayakan",
-      "automationCount": "{{displayCount}} daripada 3 didayakan",
-      "notificationsCount": "{{displayCount}} daripada 2 didayakan",
+      "automationCount": "{{displayCount}} daripada {{total}} didayakan",
+      "notificationsCount": "{{displayCount}} daripada {{total}} didayakan",
       "disabledNoManage": "Ejen Keselamatan dinyahdayakan. Hanya pemilik organisasi dan pengurus pengebilan boleh mendayakannya.",
       "disabledNoRepo": "Pilih sekurang-kurangnya satu repositori sebelum mendayakan Ejen Keselamatan.",
       "disabledPrompt": "Dayakan Ejen Keselamatan untuk menyegerakkan amaran Dependabot, memilih repositori dan menetapkan automasi."
@@ -1817,9 +1817,9 @@
       "highDescription": "Potensi pendedahan data yang ketara.",
       "mediumDescription": "Kesan terhad atau keadaan tertentu.",
       "lowDescription": "Kesan minimum terhadap keselamatan.",
-      "invalidDayCount": "bilangan hari mesti antara 1 hingga 365, dalam nombor bulat sahaja.",
+      "invalidDayCount": "bilangan hari mesti antara {{min}} hingga {{max}}, dalam nombor bulat sahaja.",
       "remediationDeadlineA11y": "Tempoh pemulihan {{label}} dalam hari",
-      "enterWholeNumber": "Masukkan nombor bulat antara 1 dan 365",
+      "enterWholeNumber": "Masukkan nombor bulat antara {{min}} dan {{max}}",
       "permissionNote": "Hanya pemilik organisasi dan pengurus pengebilan boleh menukar tetapan ini.",
       "enableTracking": "Dayakan penjejakan SLA",
       "enableTrackingSubtitle": "Tetapkan tarikh akhir pemulihan berdasarkan keterukan penemuan.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Keterukan minimum penemuan baharu",
       "newFindingSubtitle": "Dihantar setiap kali penemuan baharu disegerakkan, termasuk pada penyegerakan pertama.",
       "slaLeadTimeAccessibility": "Tempoh amaran awal SLA dalam hari",
-      "slaLeadTimeError": "Masukkan bilangan hari antara 1 hingga 365 dalam nombor bulat.",
+      "slaLeadTimeError": "Masukkan bilangan hari antara {{min}} hingga {{max}} dalam nombor bulat.",
       "slaLeadTimeLabel": "Tempoh amaran awal SLA (hari)",
       "slaPersonalTitle": "Hantar e-mel kepada saya tentang amaran SLA",
       "slaSection": "Pemberitahuan amaran SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Penghantaran gagal. Sila cuba semula.",
       "questionAnnouncement": "Ejen memerlukan maklumat daripada anda. Ruang mesej dinyahdayakan sementara anda menjawab.",
       "permissionAnnouncement": "Ejen memerlukan kebenaran untuk meneruskan. Ruang mesej dinyahdayakan sementara anda membuat keputusan.",
-      "positionHint": "(1 daripada {{displayCount}})",
+      "positionHint": "({{index}} daripada {{displayCount}})",
       "movedPastPrompt": "Ejen telah melepasi gesaan ini. Kad ini akan ditutup apabila sesi diteruskan.",
       "waitingForAnswer": "Ejen sedang menunggu jawapan anda. Penghantaran mesej anda kepada ejen dijeda selagi soalan ini belum dijawab.",
       "waitingForPermission": "Ejen sedang menunggu kebenaran. Penghantaran mesej anda kepada ejen dijeda selagi permintaan ini belum dijawab."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Amaran jika baki kurang daripada (USD)",
       "title": "Amaran baki rendah",
       "emailsError": "Masukkan sekurang-kurangnya satu alamat e-mel yang sah. Pisahkan alamat e-mel dengan koma.",
-      "thresholdError": "Masukkan amaun yang lebih besar daripada 0."
+      "thresholdError": "Masukkan amaun yang lebih besar daripada {{min}}."
     },
     "memberLimit": {
       "limitLabel": "Had (USD sehari)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Buang had",
       "title": "Had penggunaan harian",
       "blankError": "Masukkan amaun atau ketik Buang had di bawah.",
-      "rangeError": "Masukkan amaun antara 0 dan {{max}}."
+      "rangeError": "Masukkan amaun antara {{min}} dan {{max}}."
     },
     "members": {
       "changeRole": "Tukar peranan",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Token masukan",
-      "last30Days": "30 Hari terakhir",
+      "last30Days": "{{days}} Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Satu jam jauh melebihi kadar biasa skop ini",
     "limitLabel": "Had (USD)",
     "windowLabel": "Tetingkap",
-    "window24h": "24 jam",
-    "window7d": "7 hari",
-    "window30d": "30 hari",
+    "window24h": "{{hours}} jam",
+    "window7d": "{{days}} hari",
+    "window30d": "{{days}} hari",
     "multiplierLabel": "Pengganda lonjakan",
     "saved": "Tetapan amaran perbelanjaan disimpan",
     "loadError": "Tidak dapat memuatkan amaran perbelanjaan.",
     "saveError": "Tidak dapat menyimpan amaran perbelanjaan.",
     "empty": "Amaran perbelanjaan dimatikan. Hidupkannya untuk memberitahu kenalan pengebilan skop ini.",
     "noSpend": "Belum ada perbelanjaan direkodkan",
-    "spend24h": "Perbelanjaan dalam 24 jam terakhir",
-    "multiplierError": "Masukkan pengganda 1 atau lebih",
+    "spend24h": "Perbelanjaan dalam {{hours}} jam terakhir",
+    "multiplierError": "Masukkan pengganda {{min}} atau lebih",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus amaran perbelanjaan.",
     "pushOffByCategory": "Dimatikan dalam Pemberitahuan"
   },

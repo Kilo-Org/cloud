@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Yan àwọn ibi ìpamọ́ tí Aṣojú ààbò ń bójú tó",
       "analysisModeSubtitle": "ìtúpalẹ̀ {{mode}}",
       "automationAllOff": "Gbogbo rẹ̀ ti pa",
-      "automationCount": "{{displayCount}} nínú 3 ń ṣiṣẹ́",
-      "notificationsCount": "{{displayCount}} nínú 2 ń ṣiṣẹ́",
+      "automationCount": "{{displayCount}} nínú {{total}} ń ṣiṣẹ́",
+      "notificationsCount": "{{displayCount}} nínú {{total}} ń ṣiṣẹ́",
       "disabledNoManage": "A ti pa Aṣojú ààbò. Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè mú un ṣiṣẹ́.",
       "disabledNoRepo": "Yan ó kéré tán ibi ìpamọ́ kan kí o tó mú Aṣojú ààbò ṣiṣẹ́.",
       "disabledPrompt": "Mú Aṣojú ààbò ṣiṣẹ́ láti mú àwọn ìkìlọ̀ Dependabot ṣiṣẹ́pọ̀, yan àwọn ibi ìpamọ́, kí o sì ṣètò ìṣiṣẹ́ aládàáṣiṣẹ́."
@@ -1817,9 +1817,9 @@
       "highDescription": "Ó ṣeé ṣe kí dátà pàtàkì farahàn sí ẹni tí kò ní àṣẹ.",
       "mediumDescription": "Ipa tó ní ààlà tàbí tó dá lórí àwọn ipò pàtó.",
       "lowDescription": "Ipa kékeré lórí ààbò.",
-      "invalidDayCount": "lo odindi nọ́ńbà ọjọ́ láàárín 1 àti 365.",
+      "invalidDayCount": "lo odindi nọ́ńbà ọjọ́ láàárín {{min}} àti {{max}}.",
       "remediationDeadlineA11y": "Ọjọ́ ìparí àtúnṣe {{label}}, ní iye ọjọ́",
-      "enterWholeNumber": "Tẹ nọ́ńbà odidi láàárín 1 àti 365 sí i",
+      "enterWholeNumber": "Tẹ nọ́ńbà odidi láàárín {{min}} àti {{max}} sí i",
       "permissionNote": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí àwọn ètò wọ̀nyí padà.",
       "enableTracking": "Mú ìtọpinpin SLA ṣiṣẹ́",
       "enableTrackingSubtitle": "Ṣètò àwọn ọjọ́ ìparí àtúnṣe gẹ́gẹ́ bí ìwọ̀n ewu àbùkù.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Ìwọ̀n ewu tó kéré jù fún àbùkù tuntun",
       "newFindingSubtitle": "A máa ń fi ránṣẹ́ nígbàkúgbà tí a bá mú àbùkù tuntun ṣiṣẹ́pọ̀, títí kan ìmúṣiṣẹ́pọ̀ àkọ́kọ́.",
       "slaLeadTimeAccessibility": "Iye ọjọ́ ṣáájú ọjọ́ ìparí SLA fún ìkìlọ̀",
-      "slaLeadTimeError": "Tẹ odindi nọ́ńbà ọjọ́ láàárín 1 àti 365 sí i.",
+      "slaLeadTimeError": "Tẹ odindi nọ́ńbà ọjọ́ láàárín {{min}} àti {{max}} sí i.",
       "slaLeadTimeLabel": "Ìkìlọ̀ ṣáájú ọjọ́ ìparí SLA (iye ọjọ́)",
       "slaPersonalTitle": "Fi ímeèlì ránṣẹ́ sí mi nípa àwọn ìkìlọ̀ SLA",
       "slaSection": "Ìfitónilétí ìkìlọ̀ SLA",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Fífiranṣẹ́ kùnà. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "questionAnnouncement": "Aṣojú nílò ìdáhùn rẹ. A ti dá ààyè ìkọ̀wé dúró bí o ṣe ń dáhùn.",
       "permissionAnnouncement": "Aṣojú nílò ìyọ̀ǹda láti tẹ̀síwájú. A ti dá ààyè ìkọ̀wé dúró bí o ṣe ń pinnu.",
-      "positionHint": "(1 nínú {{displayCount}})",
+      "positionHint": "({{index}} nínú {{displayCount}})",
       "movedPastPrompt": "Aṣojú ti kọjá ọ̀rọ̀ ìtọ́ni yìí. Káàdì yìí yóò pa dé nígbà tí ìgbà iṣẹ́ bá tẹ̀síwájú.",
       "waitingForAnswer": "Aṣojú ń dúró de ìdáhùn rẹ. Bí ìbéèrè yìí ṣe ṣì ṣí sílẹ̀, a ti dá ìfiránṣẹ́ rẹ sí aṣojú dúró.",
       "waitingForPermission": "Aṣojú ń dúró de ìyọ̀ǹda. Bí ìbéèrè yìí ṣe ṣì ṣí sílẹ̀, a ti dá ìfiránṣẹ́ rẹ sí aṣojú dúró."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Kìlọ̀ tí owó bá dín ju (USD)",
       "title": "Ìkìlọ̀ owó tó kù díẹ̀",
       "emailsError": "Tẹ ó kéré tán àdírẹ́sì ímeèlì tó péye kan. Lo àmì kọ́mà láti ya àwọn àdírẹ́sì sọ́tọ̀.",
-      "thresholdError": "Tẹ iye owó tó ju 0 lọ."
+      "thresholdError": "Tẹ iye owó tó ju {{min}} lọ."
     },
     "memberLimit": {
       "limitLabel": "Ààlà (USD lójoojúmọ́)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Yọ ààlà kúrò",
       "title": "Ààlà lílo ojoojúmọ́",
       "blankError": "Tẹ iye owó kan, tàbí tẹ Yọ ààlà kúrò ní ìsàlẹ̀.",
-      "rangeError": "Tẹ iye owó tó wà láàárín 0 àti {{max}}."
+      "rangeError": "Tẹ iye owó tó wà láàárín {{min}} àti {{max}}."
     },
     "members": {
       "changeRole": "Yí ipò padà",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",
-      "last30Days": "Ọjọ́ 30 tó kọjá",
+      "last30Days": "Ọjọ́ {{days}} tó kọjá",
       "outputTokens": "Àwọn ìpín ọ̀rọ̀ ìjáde",
       "requests": "Àwọn ìbéèrè"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Wákàtí kan ga ju ìwọ̀n ìṣe ẹ̀ka yìí lọ",
     "limitLabel": "Ààlà (USD)",
     "windowLabel": "Àkókò",
-    "window24h": "Wákàtí 24",
-    "window7d": "Ọjọ́ 7",
-    "window30d": "Ọjọ́ 30",
+    "window24h": "Wákàtí {{hours}}",
+    "window7d": "Ọjọ́ {{days}}",
+    "window30d": "Ọjọ́ {{days}}",
     "multiplierLabel": "Ìlọ́po ìgbésókè",
     "saved": "A ti fipamọ́ àwọn ètò ìkìlọ̀ ìnáwó",
     "loadError": "A kò lè gbé àwọn ìkìlọ̀ ìnáwó wọlé.",
     "saveError": "A kò lè fipamọ́ àwọn ìkìlọ̀ ìnáwó.",
     "empty": "Àwọn ìkìlọ̀ ìnáwó ti pa. Tan wọ́n kí o lè kìlọ̀ fún àwọn olùbáṣepọ̀ ìsanwó ẹ̀ka yìí.",
     "noSpend": "A kò tíì ṣe àkọsílẹ̀ ìnáwó kankan",
-    "spend24h": "Ìnáwó ní wákàtí 24 sẹ́yìn",
-    "multiplierError": "Tẹ ìlọ́po 1 tàbí jù bẹ́ẹ̀ lọ",
+    "spend24h": "Ìnáwó ní wákàtí {{hours}} sẹ́yìn",
+    "multiplierError": "Tẹ ìlọ́po {{min}} tàbí jù bẹ́ẹ̀ lọ",
     "permissionDenied": "O kò ní ìyọ̀ǹda láti ṣàkóso àwọn ìkìlọ̀ ìnáwó.",
     "pushOffByCategory": "Ti pa nínú Àwọn ìfitónilétí"
   },

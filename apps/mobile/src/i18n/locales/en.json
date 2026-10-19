@@ -1833,8 +1833,8 @@
       "selectRepositoriesSubtitle": "Choose which repositories Security Agent monitors",
       "analysisModeSubtitle": "{{mode}} analysis",
       "automationAllOff": "All off",
-      "automationCount": "{{displayCount}} of 3 enabled",
-      "notificationsCount": "{{displayCount}} of 2 enabled",
+      "automationCount": "{{displayCount}} of {{total}} automations enabled",
+      "notificationsCount": "{{displayCount}} of {{total}} notifications enabled",
       "disabledNoManage": "Security Agent is disabled. Only organization owners and billing managers can turn it on.",
       "disabledNoRepo": "Select at least one repository before enabling Security Agent.",
       "disabledPrompt": "Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation."
@@ -1881,9 +1881,9 @@
       "highDescription": "Potential significant data exposure.",
       "mediumDescription": "Limited impact or specific conditions.",
       "lowDescription": "Minimal security impact.",
-      "invalidDayCount": "1-365 days, whole numbers only.",
+      "invalidDayCount": "{{min}}-{{max}} days, whole numbers only.",
       "remediationDeadlineA11y": "{{label}} remediation deadline in days",
-      "enterWholeNumber": "Enter a whole number between 1 and 365",
+      "enterWholeNumber": "Enter a whole number between {{min}} and {{max}}",
       "permissionNote": "Only organization owners and billing managers can change these settings.",
       "enableTracking": "Enable SLA tracking",
       "enableTrackingSubtitle": "Set remediation deadlines based on finding severity.",
@@ -1947,7 +1947,7 @@
       "newFindingSeverityLabel": "New-finding minimum severity",
       "newFindingSubtitle": "Sent whenever a new finding is synced, including on first sync.",
       "slaLeadTimeAccessibility": "SLA warning lead time in days",
-      "slaLeadTimeError": "Enter a whole number of days between 1 and 365.",
+      "slaLeadTimeError": "Enter a whole number of days between {{min}} and {{max}}.",
       "slaLeadTimeLabel": "SLA warning lead time (days)",
       "slaPersonalTitle": "Email me about SLA warnings",
       "slaSection": "SLA warning notification",
@@ -2532,7 +2532,7 @@
       "submissionFailed": "Submission failed. Please try again.",
       "questionAnnouncement": "Agent needs your input. The composer is paused while you answer.",
       "permissionAnnouncement": "Agent needs permission to continue. The composer is paused while you decide.",
-      "positionHint": "(1 of {{displayCount}})",
+      "positionHint": "({{index}} of {{displayCount}})",
       "movedPastPrompt": "The agent has moved past this prompt. This card will close when the session continues.",
       "waitingForAnswer": "The agent is waiting for your answer. While this question is open, your message to the agent is paused.",
       "waitingForPermission": "The agent is waiting for permission. While this request is open, your message to the agent is paused."
@@ -3108,7 +3108,7 @@
       "thresholdLabel": "Alert below (USD)",
       "title": "Low balance alert",
       "emailsError": "Enter at least one valid email, separated by commas",
-      "thresholdError": "Enter an amount greater than 0"
+      "thresholdError": "Enter an amount greater than {{min}}"
     },
     "memberLimit": {
       "limitLabel": "Limit (USD per day)",
@@ -3118,7 +3118,7 @@
       "removeLimit": "Remove limit",
       "title": "Daily usage limit",
       "blankError": "Enter an amount, or use Remove limit below",
-      "rangeError": "Enter an amount between 0 and {{max}}"
+      "rangeError": "Enter an amount between {{min}} and {{max}}"
     },
     "members": {
       "changeRole": "Change role",
@@ -3150,7 +3150,7 @@
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
-      "last30Days": "Last 30 days",
+      "last30Days": "Last {{days}} days",
       "outputTokens": "Output Tokens",
       "requests": "Requests"
     },
@@ -3584,17 +3584,17 @@
     "anomalySubtitle": "This scope's hourly rate is far above its own p95 baseline",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Window",
-    "window24h": "24 hours",
-    "window7d": "7 days",
-    "window30d": "30 days",
+    "window24h": "{{hours}} hours",
+    "window7d": "{{days}} days",
+    "window30d": "{{days}} days",
     "multiplierLabel": "Spike multiplier",
     "saved": "Spend alert settings saved",
     "loadError": "Couldn't load spend alerts.",
     "saveError": "Couldn't save spend alerts.",
     "empty": "Spend alerts are off. Turn them on to alert this scope's billing contacts.",
     "noSpend": "No spend recorded yet",
-    "spend24h": "Spend in the last 24 hours",
-    "multiplierError": "Enter a multiplier of 1 or more",
+    "spend24h": "Spend in the last {{hours}} hours",
+    "multiplierError": "Enter a multiplier of {{min}} or more",
     "permissionDenied": "You don't have permission to manage spend alerts.",
     "pushOffByCategory": "Off in Notifications"
   },

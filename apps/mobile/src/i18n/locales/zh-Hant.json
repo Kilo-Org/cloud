@@ -1305,7 +1305,7 @@
       "newFindingSeverityLabel": "新資安問題通知的最低嚴重程度",
       "newFindingSubtitle": "每次同步到新的資安問題時都會傳送通知，首次同步也不例外。",
       "slaLeadTimeAccessibility": "SLA 到期預警的提前通知天數",
-      "slaLeadTimeError": "請輸入 1 到 365 之間的整數天數。",
+      "slaLeadTimeError": "請輸入 {{min}} 到 {{max}} 之間的整數天數。",
       "slaLeadTimeLabel": "SLA 到期預警提前通知（天）",
       "slaPersonalTitle": "有 SLA 到期預警時以電子郵件通知我",
       "slaSection": "SLA 到期預警通知",
@@ -1358,13 +1358,13 @@
     "settingsOverview": {
       "analysisModeSubtitle": "{{mode}} 分析",
       "automationAllOff": "全部關閉",
-      "automationCount": "已啟用 {{displayCount}}/3 項",
+      "automationCount": "已啟用 {{displayCount}}/{{total}} 項",
       "couldNotLoadPermissions": "無法載入權限。",
       "couldNotLoadSettings": "無法載入資安代理設定。",
       "disabledNoManage": "資安代理已停用。只有組織擁有者與帳單管理員可以啟用。",
       "disabledNoRepo": "啟用資安代理前，請至少選取一個存放庫。",
       "disabledPrompt": "啟用資安代理，即可同步 Dependabot 警報、選取存放庫並設定自動化。",
-      "notificationsCount": "已啟用 {{displayCount}}/2 項",
+      "notificationsCount": "已啟用 {{displayCount}}/{{total}} 項",
       "on": "開啟",
       "repositoriesCount": "已選擇 {{displayCount}} 個存放庫",
       "repositoriesCount_other": "已選擇 {{displayCount}} 個存放庫",
@@ -1385,10 +1385,10 @@
       "deadlinesHeading": "修復期限（天）",
       "enableTracking": "啟用 SLA 追蹤",
       "enableTrackingSubtitle": "依資安問題的嚴重程度設定修復期限。",
-      "enterWholeNumber": "請輸入 1 到 365 之間的整數",
+      "enterWholeNumber": "請輸入 {{min}} 到 {{max}} 之間的整數",
       "high": "高",
       "highDescription": "可能導致嚴重的資料外洩。",
-      "invalidDayCount": "天數必須是 1 到 365 之間的整數。",
+      "invalidDayCount": "天數必須是 {{min}} 到 {{max}} 之間的整數。",
       "low": "低",
       "lowDescription": "對安全性的影響極小。",
       "medium": "中",
@@ -1937,7 +1937,7 @@
       "submissionFailed": "送出失敗。請再試一次。",
       "questionAnnouncement": "智慧代理需要你的回覆。回答期間，訊息輸入框會暫停使用。",
       "permissionAnnouncement": "智慧代理需要授權才能繼續。在你做出決定前，訊息輸入框會暫停使用。",
-      "positionHint": "（第 1 個，共 {{displayCount}} 個）",
+      "positionHint": "（第 {{index}} 個，共 {{displayCount}} 個）",
       "movedPastPrompt": "智慧代理已不再等待回應此提示。工作階段繼續時，此卡片會關閉。",
       "waitingForAnswer": "智慧代理正在等待你的答案。在你回答問題前，傳給智慧代理的訊息會暫停傳送。",
       "waitingForPermission": "智慧代理正在等待授權。在你回應此請求前，傳給智慧代理的訊息會暫停傳送。"
@@ -3030,7 +3030,7 @@
       "thresholdLabel": "餘額低於此金額時提醒（USD）",
       "title": "餘額不足提醒",
       "emailsError": "請輸入至少一個有效的電子郵件地址，多個地址請以逗號分隔。",
-      "thresholdError": "請輸入大於 0 的金額。"
+      "thresholdError": "請輸入大於 {{min}} 的金額。"
     },
     "memberLimit": {
       "limitLabel": "每日上限（USD）",
@@ -3040,7 +3040,7 @@
       "removeLimit": "移除限制",
       "title": "每日用量限制",
       "blankError": "請輸入金額，或點一下下方的「移除限制」。",
-      "rangeError": "請輸入介於 0 與 {{max}} 之間的金額。"
+      "rangeError": "請輸入介於 {{min}} 與 {{max}} 之間的金額。"
     },
     "members": {
       "changeRole": "變更角色",
@@ -3072,7 +3072,7 @@
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
-      "last30Days": "最近 30 天",
+      "last30Days": "最近 {{days}} 天",
       "outputTokens": "輸出詞元",
       "requests": "請求"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "某一小時的支出遠高於此範圍的平時速率",
     "limitLabel": "限額 (USD)",
     "windowLabel": "時間視窗",
-    "window24h": "24 小時",
-    "window7d": "7 天",
-    "window30d": "30 天",
+    "window24h": "{{hours}} 小時",
+    "window7d": "{{days}} 天",
+    "window30d": "{{days}} 天",
     "multiplierLabel": "激增倍數",
     "saved": "支出提醒設定已儲存",
     "loadError": "無法載入支出提醒。",
     "saveError": "無法儲存支出提醒。",
     "empty": "支出提醒已關閉。開啟後會通知此範圍的帳單聯絡人。",
     "noSpend": "尚無支出記錄",
-    "spend24h": "過去 24 小時的支出",
-    "multiplierError": "請輸入 1 或更大的倍數",
+    "spend24h": "過去 {{hours}} 小時的支出",
+    "multiplierError": "請輸入 {{min}} 或更大的倍數",
     "permissionDenied": "你沒有管理支出提醒的權限。",
     "pushOffByCategory": "已在通知中關閉"
   },

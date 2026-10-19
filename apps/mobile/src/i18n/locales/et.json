@@ -1769,8 +1769,8 @@
       "selectRepositoriesSubtitle": "Vali, milliseid hoidlaid turvaagent jälgib",
       "analysisModeSubtitle": "{{mode}} analüüs",
       "automationAllOff": "Kõik väljas",
-      "automationCount": "{{displayCount}} kolmest lubatud",
-      "notificationsCount": "{{displayCount}} kahest lubatud",
+      "automationCount": "{{displayCount}} / {{total}} lubatud",
+      "notificationsCount": "{{displayCount}} / {{total}} lubatud",
       "disabledNoManage": "Turvaagent on välja lülitatud. Seda saavad sisse lülitada ainult organisatsiooni omanikud ja arveldushaldurid.",
       "disabledNoRepo": "Enne turvaagendi sisselülitamist vali vähemalt üks hoidla.",
       "disabledPrompt": "Lülita turvaagent sisse, et sünkroonida Dependaboti hoiatusi, valida hoidlaid ja seadistada automatiseerimist."
@@ -1817,9 +1817,9 @@
       "highDescription": "Võib põhjustada ulatusliku andmelekke.",
       "mediumDescription": "Mõju on piiratud või ärakasutamine eeldab kindlaid tingimusi.",
       "lowDescription": "Mõju turvalisusele on minimaalne.",
-      "invalidDayCount": "päevade arv peab olema täisarv vahemikus 1–365.",
+      "invalidDayCount": "päevade arv peab olema täisarv vahemikus {{min}}–{{max}}.",
       "remediationDeadlineA11y": "{{label}}: parandamise tähtaeg päevades",
-      "enterWholeNumber": "Sisesta täisarv vahemikus 1 kuni 365",
+      "enterWholeNumber": "Sisesta täisarv vahemikus {{min}} kuni {{max}}",
       "permissionNote": "Neid seadeid saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
       "enableTracking": "Luba SLA jälgimine",
       "enableTrackingSubtitle": "Määrab parandamise tähtajad leiu raskusastme järgi.",
@@ -1883,7 +1883,7 @@
       "newFindingSeverityLabel": "Uue leiu minimaalne raskusaste",
       "newFindingSubtitle": "Saadetakse alati, kui uus leid sünkroonitakse, sealhulgas esimesel sünkroonimisel.",
       "slaLeadTimeAccessibility": "SLA hoiatuse etteteatamisaeg päevades",
-      "slaLeadTimeError": "Sisesta päevade arv täisarvuna vahemikus 1–365.",
+      "slaLeadTimeError": "Sisesta päevade arv täisarvuna vahemikus {{min}}–{{max}}.",
       "slaLeadTimeLabel": "SLA hoiatuse etteteatamisaeg (päevades)",
       "slaPersonalTitle": "Saada mulle SLA hoiatused e-postiga",
       "slaSection": "SLA hoiatused",
@@ -2449,7 +2449,7 @@
       "submissionFailed": "Saatmine ebaõnnestus. Proovi uuesti.",
       "questionAnnouncement": "Agent vajab sinu vastust. Vastamise ajal on sõnumi sisestusväli ajutiselt keelatud.",
       "permissionAnnouncement": "Agent vajab jätkamiseks luba. Otsustamise ajal on sõnumi sisestusväli ajutiselt keelatud.",
-      "positionHint": "(1/{{displayCount}})",
+      "positionHint": "({{index}}/{{displayCount}})",
       "movedPastPrompt": "Agent on selle viiba juba läbinud. See kaart sulgub, kui seanss jätkub.",
       "waitingForAnswer": "Agent ootab sinu vastust. Kuni see küsimus on avatud, on sinu sõnumi saatmine agendile peatatud.",
       "waitingForPermission": "Agent ootab luba. Kuni see taotlus on avatud, on sinu sõnumi saatmine agendile peatatud."
@@ -3031,7 +3031,7 @@
       "thresholdLabel": "Hoiatuse saldopiir (USD)",
       "title": "Madala saldo hoiatus",
       "emailsError": "Sisesta vähemalt üks kehtiv e-posti aadress. Eralda aadressid komadega.",
-      "thresholdError": "Sisesta nullist suurem summa."
+      "thresholdError": "Sisesta {{min}}-st suurem summa."
     },
     "memberLimit": {
       "limitLabel": "Piirang (USD päevas)",
@@ -3041,7 +3041,7 @@
       "removeLimit": "Eemalda piirang",
       "title": "Päevane kasutuspiirang",
       "blankError": "Sisesta summa või eemalda piirang alloleva nupuga.",
-      "rangeError": "Sisesta summa vahemikus 0 kuni {{max}}."
+      "rangeError": "Sisesta summa vahemikus {{min}} kuni {{max}}."
     },
     "members": {
       "changeRole": "Muuda rolli",
@@ -3073,7 +3073,7 @@
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
-      "last30Days": "Viimased 30 päeva",
+      "last30Days": "Viimased {{days}} päeva",
       "outputTokens": "Väljundtokenid",
       "requests": "Päringud"
     },
@@ -3520,17 +3520,17 @@
     "anomalySubtitle": "Üks tund on selle piirkonna tavapärasest määrast tunduvalt kõrgem",
     "limitLabel": "Limiit (USD)",
     "windowLabel": "Aken",
-    "window24h": "24 tundi",
-    "window7d": "7 päeva",
-    "window30d": "30 päeva",
+    "window24h": "{{hours}} tundi",
+    "window7d": "{{days}} päeva",
+    "window30d": "{{days}} päeva",
     "multiplierLabel": "Tõusu kordaja",
     "saved": "Kulutushoiatuste seaded on salvestatud",
     "loadError": "Kulutushoiatuste laadimine ebaõnnestus.",
     "saveError": "Kulutushoiatuste salvestamine ebaõnnestus.",
     "empty": "Kulutushoiatused on välja lülitatud. Lülita need sisse, et hoiatada selle piirkonna faktureerimiskontakte.",
     "noSpend": "Kulutusi pole veel registreeritud",
-    "spend24h": "Viimase 24 tunni kulutus",
-    "multiplierError": "Sisesta kordaja 1 või suurem",
+    "spend24h": "Viimase {{hours}} tunni kulutus",
+    "multiplierError": "Sisesta kordaja {{min}} või suurem",
     "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
     "pushOffByCategory": "Teavitustes väljas"
   },

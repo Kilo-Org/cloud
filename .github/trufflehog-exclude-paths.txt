@@ -8,3 +8,9 @@ packages/harness-sdk/src/plugins/remote-model/security\.test\.ts
 # embedded credentials ("user:secret@localhost") is rejected. Exclude the
 # fixture path so the synthetic credential URI does not fail the scan.
 apps/web/src/lib/cloud-agent/preview-link\.test\.ts
+
+# Database client fixtures. database-url.test.ts builds connection strings with
+# a placeholder user and password to assert how the client configuration is
+# derived. Exclude the fixture path so the synthetic credential URI does not
+# fail the scan.
+packages/db/src/database-url\.test\.ts

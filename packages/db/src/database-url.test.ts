@@ -19,9 +19,7 @@ describe('getDatabaseClientConfig', () => {
     });
 
     it('keeps TLS off when the URL carries no sslmode', () => {
-      const config = getDatabaseClientConfig(
-        'postgres://user:secret@db.example.com:5432/mydb'
-      );
+      const config = getDatabaseClientConfig('postgres://user:secret@db.example.com:5432/mydb');
 
       expect(config.ssl).toBe(false);
     });
@@ -127,9 +125,7 @@ describe('getDatabaseClientConfig', () => {
     it('expands escaped newlines in the CA', () => {
       process.env.DATABASE_CA = pem;
 
-      const config = getDatabaseClientConfig(
-        'postgres://user:secret@db.example.com:5432/mydb'
-      );
+      const config = getDatabaseClientConfig('postgres://user:secret@db.example.com:5432/mydb');
 
       expect(config.ssl).toMatchObject({ ca: pem.replace(/\\n/g, '\n') });
     });

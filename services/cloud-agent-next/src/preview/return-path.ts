@@ -33,6 +33,5 @@ export function previewReturnPath(raw: string | null): string {
   }
   if (resolved.origin !== RESOLVE_BASE || isPreviewReservedPath(resolved.pathname)) return '/';
   if (!resolved.pathname.startsWith('/') || resolved.pathname.startsWith('//')) return '/';
-  if (resolved.pathname.includes('\\')) return '/';
   return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }

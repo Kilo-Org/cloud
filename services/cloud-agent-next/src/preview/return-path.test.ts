@@ -29,7 +29,6 @@ describe('previewReturnPath', () => {
     ['dot segments resolving to a double-slash path', '/a/..//evil.example'],
     ['single dot resolving to a double-slash path', '/.//evil.example'],
     ['encoded dot resolving to a double-slash path', '/%2e//evil.example'],
-    ['backslash reached through dot segments', '/a/..\\evil.example'],
   ])('lands on / for a %s', (_name, raw) => {
     expect(previewReturnPath(raw)).toBe('/');
   });

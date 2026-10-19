@@ -31,12 +31,13 @@ export function ModelCatalogScreen() {
   const [tab, setTab] = useState<Tab>('fits');
   const search = useModelSearch();
   const listRef = useRef<FlashListRef<HfListedModel>>(null);
-  // Changing the filter swaps the search query's key, so the list briefly
-  // empties while the fresh pages load. The stale offset would otherwise land
-  // the regrown list mid-card, hiding the recommended section above it.
+  // Changing the filter or the paused search text swaps the search query's
+  // key, so the list briefly empties while the fresh pages load. The stale
+  // offset would otherwise land the regrown list mid-card, hiding the
+  // recommended section above it.
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [tab]);
+  }, [tab, search.query]);
   const models = useHfModelSearch({
     search: search.query,
     fitsOnly: tab === 'fits',

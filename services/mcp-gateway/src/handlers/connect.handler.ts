@@ -34,7 +34,12 @@ import { proxyUpstream } from '../lib/upstream-proxy';
 import { challengeResponse, forbiddenResponse, insufficientScopeResponse } from '../lib/responses';
 import { validateIncomingOrigin } from '../lib/origin';
 import { resolveActiveRouteCached } from '../lib/route-cache';
-import { enforceRuntimeLimits, limitedResponse, recordProxyUsage } from '../lib/usage';
+import {
+  enforceAnonymousClientLimit,
+  enforceRuntimeLimits,
+  limitedResponse,
+  recordProxyUsage,
+} from '../lib/usage';
 
 function bearerToken(header: string | undefined): string | null {
   if (!header?.toLowerCase().startsWith('bearer ')) return null;
@@ -44,6 +49,7 @@ function bearerToken(header: string | undefined): string | null {
 
 type RuntimePhase =
   | 'parse_route'
+  | 'limit_anonymous'
   | 'limit_runtime'
   | 'load_route'
   | 'load_jwt_keyset'
@@ -157,6 +163,9 @@ async function handleConnect(
     const token = bearerToken(c.req.header('authorization'));
     hasBearerToken = Boolean(token);
     if (!token) {
+      phase = 'limit_anonymous';
+      const limited = await enforceAnonymousClientLimit(c);
+      if (limited) return limited;
       phase = 'load_route';
       const cachedRoute = await resolveActiveRouteCached({ env: c.env, route });
       if (!cachedRoute) {

@@ -430,6 +430,27 @@ describe('MCP gateway route surface', () => {
     expect(mockRuntimeLimit).toHaveBeenCalled();
   });
 
+  it('applies the client-IP window to tokenless-looking credentials', async () => {
+    const responses = await Promise.all([
+      app.request(
+        `https://mcp.kilosessions.ai${userRoute}`,
+        { headers: { Authorization: 'Basic jwt-credential' } },
+        env
+      ),
+      app.request(
+        `https://mcp.kilosessions.ai${userRoute}`,
+        { headers: { Authorization: 'Bearer ' } },
+        env
+      ),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status).toBe(401);
+    }
+    expect(mockUnauthLimit).toHaveBeenCalledTimes(2);
+    expect(mockRuntimeLimit).not.toHaveBeenCalled();
+  });
+
   it('returns 429 on the runtime path when the per-user limit is exhausted', async () => {
     mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
     mockRuntimeLimit.mockImplementation(({ key }: { key: string }) =>

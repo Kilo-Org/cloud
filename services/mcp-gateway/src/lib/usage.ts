@@ -1,4 +1,4 @@
-import type { Context, MiddlewareHandler } from 'hono';
+import type { Context } from 'hono';
 import type { MCPGatewayEnv } from '../types';
 
 export const CLIENT_IP_HEADER = 'CF-Connecting-IP';
@@ -25,27 +25,27 @@ export function limitedResponse(c: Context<MCPGatewayEnv>) {
   return c.json({ error: 'rate_limited' }, 429);
 }
 
+/** The subset of a Hono context the anonymous limiter reads. */
+type LimiterContext = {
+  env: MCPGatewayEnv['Bindings'];
+  req: { header(name: string): string | undefined };
+};
+
 /**
  * One rate-limit window per client IP for the tokenless gateway surface. Uses
  * the edge-provided client IP; client-supplied forwarded headers are ignored.
- * Requests that carry a bearer token are metered by the authenticated runtime
- * windows instead, so this check does not consume their IP budget. No-op when
- * the binding is absent (unit tests, non-prod envs).
+ * Returns null when the request may proceed. Callers apply it only to
+ * requests without a parsed bearer token; bearer requests are metered by the
+ * authenticated runtime windows instead. No-op when the binding is absent.
  */
-export const anonymousClientLimiter: MiddlewareHandler<MCPGatewayEnv> = async (c, next) => {
-  const authorization = c.req.header('authorization');
-  if (authorization && authorization.trim().length > 0) {
-    await next();
-    return;
-  }
+export async function enforceAnonymousClientLimit(c: LimiterContext): Promise<Response | null> {
   const ip = c.req.header(CLIENT_IP_HEADER)?.trim() || UNKNOWN_CLIENT_KEY;
   const outcome = await consumeLimit(c.env.MCP_GATEWAY_UNAUTH_LIMITER, `ip:${ip}`);
   if (outcome === MISSING_BINDING || outcome === true) {
-    await next();
-    return;
+    return null;
   }
-  return limitedResponse(c);
-};
+  return limitedResponse(c as Context<MCPGatewayEnv>);
+}
 
 /**
  * Per-user and per-config windows for the authenticated runtime path, checked

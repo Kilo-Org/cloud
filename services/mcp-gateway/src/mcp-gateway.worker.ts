@@ -10,7 +10,7 @@ import {
   redirectToAuthorizationServerAuthorizeMetadata,
   redirectToAuthorizationServerMetadata,
 } from './handlers/authorization-server-metadata.handler';
-import { anonymousClientLimiter } from './lib/usage';
+import { enforceAnonymousClientLimit } from './lib/usage';
 import type { MCPGatewayEnv } from './types';
 import { runCleanup } from './lib/cleanup';
 
@@ -20,11 +20,16 @@ export const app = new Hono<MCPGatewayEnv>();
 
 app.get('/health', c => handleHealth(c));
 
-// Anonymous-client window for the scoped runtime and metadata surfaces. Health,
-// generic protected-resource metadata, and the authorization-server redirect
-// aliases stay unlimited because they do not touch route state.
-app.use('/mcp-connect/*', anonymousClientLimiter);
-app.use('/.well-known/oauth-protected-resource/mcp-connect/*', anonymousClientLimiter);
+// Anonymous-client window for the scoped metadata surfaces, which never carry
+// a bearer token. Health, generic protected-resource metadata, and the
+// authorization-server redirect aliases stay unlimited because they do not
+// touch route state. The scoped runtime surfaces apply the same window inside
+// the connect handler, where the parsed-token decision is available.
+app.use('/.well-known/oauth-protected-resource/mcp-connect/*', async (c, next) => {
+  const limited = await enforceAnonymousClientLimit(c);
+  if (limited) return limited;
+  await next();
+});
 
 app.get('/mcp-connect/user/:userId/:configId/:routeKey', c => handleUserConnect(c, c.req.param()));
 app.post('/mcp-connect/user/:userId/:configId/:routeKey', c => handleUserConnect(c, c.req.param()));

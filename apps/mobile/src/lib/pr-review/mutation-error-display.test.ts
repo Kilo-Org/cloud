@@ -221,10 +221,9 @@ describe('mutationErrorDisplay', () => {
       kind: 'retryable',
       message: 'Too many requests. Please try again later.',
     });
-    // The submit surface keeps its own retryable copy.
     expect(mutationErrorDisplayFromError('submit', rateLimited)).toEqual({
       kind: 'retryable',
-      message: 'Could not submit review. Check your connection and try again.',
+      message: 'Too many requests. Please try again later.',
     });
   });
 
@@ -250,6 +249,10 @@ describe('mutationErrorDisplay', () => {
       message: 'This changed while you were working on it. Reload it and try again.',
     });
     expect(mutationErrorDisplayFromError('edit-comment', conflict)).toEqual({
+      kind: 'retryable',
+      message: 'This changed while you were working on it. Reload it and try again.',
+    });
+    expect(mutationErrorDisplayFromError('submit', conflict)).toEqual({
       kind: 'retryable',
       message: 'This changed while you were working on it. Reload it and try again.',
     });

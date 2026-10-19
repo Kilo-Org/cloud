@@ -106,19 +106,19 @@ export function mutationErrorDisplay(
   if (classification.kind === 'reconnect') {
     return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };
   }
-  if (surface === 'submit') {
-    return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
-  }
   // The server's raw text never reaches the inline box, whatever the
   // retryable carrier was. A rate limit gets the localized wait copy (the
-  // server's "try again in about N minutes" is English-only); every other
-  // retryable failure (transport drop, conflict, gateway) gets the surface's
-  // localized line.
+  // server's "try again in about N minutes" is English-only); a conflict
+  // names the reload-and-retry recovery. Both before the submit return, so
+  // every surface gets them.
   if (readTrpcErrorField(rawError, 'code') === 'TOO_MANY_REQUESTS') {
     return { kind: 'retryable', message: i18n.t('prReview.mutationError.rateLimited') };
   }
   if (readTrpcErrorField(rawError, 'code') === 'CONFLICT') {
     return { kind: 'retryable', message: i18n.t('prReview.mutationError.conflict') };
+  }
+  if (surface === 'submit') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
   }
   const message =
     surface === 'edit-comment'

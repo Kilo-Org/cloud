@@ -165,6 +165,7 @@ export function PrConversationCommentComposer({
         } else {
           setInlineError(t('prReview.discussion.termsAcceptRequired'));
           setInlineErrorKind(null);
+          setInlineErrorIsLocal(true);
         }
       })();
     } else if (classification.kind === 'bad-request') {

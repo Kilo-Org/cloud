@@ -394,6 +394,9 @@ describe('PrConversationCommentComposer', () => {
     expect(props.inlineError).toBe('You must accept the Terms of Service to post.');
     expect(props.inlineError).not.toBe('You must be 13 or older to post.');
     expect(props.inlineErrorKind).toBe(null);
+    // The dismissed copy is a local rejection: it announces through the
+    // inline box, matching the inline-error surface's dismissed branch.
+    expect(props.inlineErrorIsLocal).toBe(true);
   });
 });
 

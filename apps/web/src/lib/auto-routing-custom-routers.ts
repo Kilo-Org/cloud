@@ -50,6 +50,7 @@ import * as z from 'zod';
 import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-pool-validation';
 
 const BENCHMARK_REGISTER_BATCH_SIZE = 10;
+const BENCHMARK_ADMISSION_TIMEOUT_MS = 10_000;
 // 400 bodies from benchmark workers that cannot benchmark the requested base router: a worker
 // that predates frontier owner profiles, or one without a saved config for that router.
 const UNSUPPORTED_BASE_ROUTER_ERRORS = [
@@ -283,28 +284,37 @@ function gatewayEntryRejection(model: string, catalog: EligibleCatalog): string 
   return 'Unknown model. Choose a model from your catalog';
 }
 
-async function validateNewGatewayEntries(params: {
+async function gatewayEntryRejections(params: {
   userId: string;
   owner: CustomRouterOwner;
   entries: CustomRouterEntry[];
-  existingKeys: ReadonlySet<string>;
-}): Promise<void> {
-  const added = params.entries.flatMap((entry, index) =>
-    entry.kind === 'gateway' && !params.existingKeys.has(customRouterEntryKey(entry))
-      ? [{ model: entry.model, index }]
-      : []
-  );
-  if (added.length === 0) return;
+}): Promise<ReadonlyMap<string, string>> {
+  const rejections = new Map<string, string>();
+  if (!params.entries.some(entry => entry.kind === 'gateway')) return rejections;
   const catalog = await buildEligibleCatalog({
     userId: params.userId,
     organizationId: params.owner.type === 'org' ? params.owner.id : null,
   });
-  for (const { model, index } of added) {
-    const rejection = gatewayEntryRejection(model, catalog);
-    if (rejection) {
+  for (const entry of params.entries) {
+    if (entry.kind !== 'gateway') continue;
+    const rejection = gatewayEntryRejection(entry.model, catalog);
+    if (rejection) rejections.set(customRouterEntryKey(entry), rejection);
+  }
+  return rejections;
+}
+
+function validateNewGatewayEntries(params: {
+  entries: CustomRouterEntry[];
+  existingKeys: ReadonlySet<string>;
+  rejections: ReadonlyMap<string, string>;
+}): void {
+  params.entries.forEach((entry, index) => {
+    const key = customRouterEntryKey(entry);
+    const rejection = params.rejections.get(key);
+    if (rejection && !params.existingKeys.has(key)) {
       throw new CustomRouterApiError('invalid_request', `entries.${index}: ${rejection}`);
     }
-  }
+  });
 }
 
 async function requestPlatformBenchmarks(params: {
@@ -315,13 +325,32 @@ async function requestPlatformBenchmarks(params: {
   const models = params.entries.flatMap(entry =>
     entry.kind === 'gateway' && !requiresClientEval(entry) ? [{ model: entry.model }] : []
   );
+  if (models.length === 0) return;
+  const signal = AbortSignal.timeout(BENCHMARK_ADMISSION_TIMEOUT_MS);
   for (let start = 0; start < models.length; start += BENCHMARK_REGISTER_BATCH_SIZE) {
-    const result = await registerOwnerBenchmarkProfiles({
+    const registration = {
       router: params.baseRouter,
       ownerType: params.owner.type,
       ownerId: params.owner.id,
       entries: models.slice(start, start + BENCHMARK_REGISTER_BATCH_SIZE),
-    });
+    };
+    const register = () => registerOwnerBenchmarkProfiles(registration, signal);
+    // Registration is idempotent for pending, running, and ready profiles, so one retry is safe.
+    const result = await register()
+      .then(
+        first => (!first.ok && first.status >= 500 && !signal.aborted ? register() : first),
+        error => {
+          if (signal.aborted) throw error;
+          return register();
+        }
+      )
+      .catch(error => {
+        captureException(error, {
+          tags: { source: 'auto_routing_custom_router_admission' },
+          extra: { ownerType: params.owner.type, baseRouter: params.baseRouter },
+        });
+        throw new CustomRouterApiError('internal_error', 'Could not request benchmarks');
+      });
     if (result.ok) continue;
     if ('quota' in result) {
       throw new CustomRouterApiError(
@@ -440,10 +469,8 @@ async function ownerRouterSlugs(
 }
 
 /**
- * Every check a request can fail (schema, slug, default entry, caps, catalog) runs before benchmark
- * admission, which spends the owner's quota and is the gate for quota_exceeded. The write
- * transaction holds the owner lock only for the database work; its re-checks fail only when a
- * concurrent write for the same owner wins the race.
+ * Catalog I/O stays outside the owner lock. Final validation, bounded worker admission, and the
+ * write are serialized; worker admission cannot be rolled back if the database commit fails.
  */
 export async function createCustomRouterResponse(
   context: CustomRouterRequestContext,
@@ -454,17 +481,21 @@ export async function createCustomRouterResponse(
   const input = parsed.data;
   const owner = await resolveEditableOwner(context, input.scope);
   assertCanCreate(await ownerRouterSlugs(db, owner), input.slug);
-  await validateNewGatewayEntries({
+  const rejections = await gatewayEntryRejections({
     userId: context.user.id,
     owner,
     entries: input.entries,
-    existingKeys: new Set(),
   });
-  await requestPlatformBenchmarks({ owner, baseRouter: input.baseRouter, entries: input.entries });
 
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
     assertCanCreate(await ownerRouterSlugs(tx, owner), input.slug);
+    validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
+    await requestPlatformBenchmarks({
+      owner,
+      baseRouter: input.baseRouter,
+      entries: input.entries,
+    });
     const [row] = await tx
       .insert(auto_routing_custom_routers)
       .values({
@@ -518,25 +549,29 @@ export async function updateCustomRouterResponse(
   const input = parsed.data;
   const owner = await resolveEditableOwner(context, scope);
 
-  const before = await findRouter(db, owner, slug);
-  const planned = applyUpdate(before, input);
-  await validateNewGatewayEntries({
+  const rejections = await gatewayEntryRejections({
     userId: context.user.id,
     owner,
-    entries: planned.entries,
-    existingKeys: new Set(before.entries.map(customRouterEntryKey)),
+    entries: input.entries ?? [],
   });
-  if (input.entries !== undefined || input.baseRouter !== undefined) {
-    await requestPlatformBenchmarks({
-      owner,
-      baseRouter: planned.baseRouter,
-      entries: planned.entries,
-    });
-  }
 
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
-    return saveRouter(tx, applyUpdate(await findRouter(tx, owner, slug), input));
+    const current = await findRouter(tx, owner, slug);
+    const next = applyUpdate(current, input);
+    validateNewGatewayEntries({
+      entries: next.entries,
+      existingKeys: new Set(current.entries.map(customRouterEntryKey)),
+      rejections,
+    });
+    if (input.entries !== undefined || input.baseRouter !== undefined) {
+      await requestPlatformBenchmarks({
+        owner,
+        baseRouter: next.baseRouter,
+        entries: next.entries,
+      });
+    }
+    return saveRouter(tx, next);
   });
 
   return singleRouterResponse(router, true);
@@ -548,10 +583,13 @@ export async function deleteCustomRouterResponse(
 ): Promise<NextResponse> {
   const { scope, slug } = parseRouterParams(params);
   const owner = await resolveEditableOwner(context, scope);
-  const deleted = await db
-    .delete(auto_routing_custom_routers)
-    .where(and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, slug)))
-    .returning({ id: auto_routing_custom_routers.id });
+  const deleted = await db.transaction(async tx => {
+    await lockOwner(tx, owner);
+    return tx
+      .delete(auto_routing_custom_routers)
+      .where(and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, slug)))
+      .returning({ id: auto_routing_custom_routers.id });
+  });
   if (deleted.length === 0) throw routerNotFound();
   return new NextResponse(null, { status: 204 });
 }

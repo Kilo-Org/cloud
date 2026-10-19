@@ -200,20 +200,17 @@ type InferenceProvider = {
   retainsPrompts: boolean;
 };
 
-export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvider | null {
-  if (isStealthModel(model)) {
-    return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
-  }
-
-  if (model.inference_providers.length !== 1) return null;
-  const slug = model.inference_providers[0];
-
-  return {
-    slug,
-    name: slug.toUpperCase(),
-    training: model.flags.includes('requires-data-collection'),
-    retainsPrompts: true,
-  };
+export function getInferenceProviders(model: KiloExclusiveModel): InferenceProvider[] {
+  return model.inference_providers.map(slug =>
+    slug === 'stealth'
+      ? { slug, name: 'Stealth', training: true, retainsPrompts: true }
+      : {
+          slug,
+          name: slug.toUpperCase(),
+          training: model.flags.includes('requires-data-collection'),
+          retainsPrompts: true,
+        }
+  );
 }
 
 function formatPricePerMillionAsPerToken(price: number): string;

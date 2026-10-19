@@ -191,13 +191,13 @@ describe('a Hugging Face model detail', () => {
     expect(detail.hasGgufFiles).toBe(true);
   });
 
-  it('rates nothing when sharded files leave only an unlabeled draft', () => {
+  it('offers nothing runnable when sharded files leave only an unlabeled draft', () => {
     const detail = readModelDetail(info({ gguf: { total: 27_000_000_000 } }), [
       file('Model-27B-Q4_K_M-00001-of-00002.gguf', 9_000_000_000, '1'),
       file('Model-27B-Q4_K_M-00002-of-00002.gguf', 8_000_000_000, '2'),
       file('Big-27B-FastMTP-32K.gguf', 903_453_952, '3'),
     ]);
-    expect(detail.quants.map(quant => quant.label)).toEqual(['Big-27B-FastMTP-32K']);
+    expect(detail.quants).toEqual([]);
     expect(
       smallestDownloadBytes(
         [

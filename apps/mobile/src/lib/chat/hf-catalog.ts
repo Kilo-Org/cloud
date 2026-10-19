@@ -16,7 +16,7 @@ const QUANT =
   /(?:^|[-_.])((?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|TQ\d_\d|MXFP4(?:_MOE)?|BF16|FP16|F16|F32))(?=[-_.]|$)/i;
 /** Auxiliary weights: not a quantization of the repository's model. */
 const AUXILIARY_FILE =
-  /(?:^|\/)(?:mtp|dflash|draft|adapter|imatrix|lilicorr)[-_.]|\.imatrix\.|(?:^|[-_.])embeddings?[-_.](?:UD-)?(?:I?Q\d|TQ\d_\d|MXFP4(?:_MOE)?|BF16|F16|FP16|F32)[^/]*\.gguf$|(?:^|[-_.])embeddings?\.gguf$/i;
+  /(?:^|\/)(?:mtp|dflash|draft|adapter|imatrix|lilicorr)[-_.]|\.imatrix\.|[-_.](?:fast)?mtp[-_.]|(?:^|[-_.])embeddings?[-_.](?:UD-)?(?:I?Q\d|TQ\d_\d|MXFP4(?:_MOE)?|BF16|F16|FP16|F32)[^/]*\.gguf$|(?:^|[-_.])embeddings?\.gguf$/i;
 
 const count = z.number().nonnegative().default(0);
 const entries = z.array(z.unknown());
@@ -291,28 +291,13 @@ function quantFiles(files: readonly HfFile[], parameters: number | undefined): r
 }
 
 /**
- * Whether the single files left after filtering are all complete
- * quantizations of the stated parameters. A repository that publishes only
- * sharded files plus one unlabeled stray (a draft model, an importance
- * matrix) offers nothing runnable, so the list must not rate the stray as
- * the model's best download.
- */
-function allNamed(files: readonly HfFile[]): boolean {
-  return files.length > 0 && files.every(file => quantOf(file.path) !== undefined);
-}
-
-/**
  * The bytes of the smallest quantization and its projector: the best fit the
  * repository offers. The parameter count filters files that cannot be the
  * model the entry claims to be.
  */
 export function smallestDownloadBytes(tree: unknown, parameters?: number): number | undefined {
   const files = ggufFiles(tree);
-  const quants = quantFiles(files, parameters);
-  if (!allNamed(quants)) {
-    return undefined;
-  }
-  const [smallest] = quants;
+  const [smallest] = quantFiles(files, parameters);
   if (smallest === undefined) {
     return undefined;
   }

@@ -31,7 +31,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: { select: mockReplicaSelect },
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
-  getCustomLlmsById: async () => new Map([['acme/custom', {}]]),
+  requireCustomLlmsById: async () => new Map([['acme/custom', {}]]),
 }));
 
 const score = {

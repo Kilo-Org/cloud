@@ -1,4 +1,4 @@
-import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { requireCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
@@ -64,7 +64,7 @@ export function terminalBenchFor(
 }
 
 async function loadTerminalBench(): Promise<TerminalBenchSummaries> {
-  const [rows, customLlmsById] = await Promise.all([loadActiveRows(), getCustomLlmsById()]);
+  const [rows, customLlmsById] = await Promise.all([loadActiveRows(), requireCustomLlmsById()]);
   return summarizeTerminalBench(rows, new Set(customLlmsById.keys()));
 }
 

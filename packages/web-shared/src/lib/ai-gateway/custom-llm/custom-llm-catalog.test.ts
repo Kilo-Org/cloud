@@ -3,6 +3,7 @@ import { custom_llm2 } from '@kilocode/db/schema';
 import {
   findCustomLlm,
   isCustomLlm,
+  requireCustomLlmsById,
   resetCustomLlmCacheForTest,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -59,7 +60,7 @@ describe('custom LLM catalog', () => {
     });
 
     await expect(isCustomLlm('acme/model')).resolves.toBe(false);
-    await expect(isCustomLlm('acme/model')).resolves.toBe(false);
+    await expect(requireCustomLlmsById()).rejects.toThrow('custom LLM catalog could not be read');
     expect(select).toHaveBeenCalledTimes(1);
 
     clock.mockReturnValue(now + 5_000);

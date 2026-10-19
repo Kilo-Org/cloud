@@ -219,7 +219,11 @@ export function ChatGptSharedServicesCardView(props: ChatGptSharedServicesCardVi
         </CardContent>
       </Card>
       {props.status?.usageLimit && !props.isUsageLimitDismissed ? (
-        <ChatGptUsageLimitDialog open onDismiss={() => props.onDismissUsageLimit?.()} />
+        <ChatGptUsageLimitDialog
+          open
+          code={props.status.usageLimit.code}
+          onDismiss={() => props.onDismissUsageLimit?.()}
+        />
       ) : null}
     </>
   );

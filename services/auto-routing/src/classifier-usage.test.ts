@@ -30,11 +30,13 @@ const payload: MirrorPayload = {
   },
 };
 const identity: ClassifierUsageIdentity = {
+  scope: 'efficient',
   conversationKey: 'conversation-1',
   classifierModel: 'test/classifier',
   contentHash: 'exact-content-hash',
   kind: 'sync',
   requestStart: 'request-start-1',
+  requestedModel: 'kilo-auto/efficient',
 };
 const createdAt = '2026-01-01T00:00:00.000Z';
 const costUsd = 0.000013;
@@ -83,23 +85,35 @@ describe('classifier usage identity', () => {
     expect(first.core.id).not.toBe(other.core.id);
   });
 
-  it('namespaces usage IDs by router and defaults omitted routers to efficient', async () => {
-    const defaultUsage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
-    const efficientUsage = await buildClassifierUsage(
-      { ...payload, router: 'efficient' },
-      identity,
-      costUsd,
-      createdAt
-    );
+  it('namespaces usage IDs by decision scope', async () => {
+    const efficientUsage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
     const frontierUsage = await buildClassifierUsage(
-      { ...payload, router: 'frontier' },
-      identity,
+      payload,
+      { ...identity, scope: 'frontier' },
       costUsd,
       createdAt
     );
-    expect(defaultUsage.core.id).toBe(efficientUsage.core.id);
-    expect(frontierUsage.core.id).not.toBe(efficientUsage.core.id);
+    const customUsage = await buildClassifierUsage(
+      payload,
+      { ...identity, scope: 'custom:router-1' },
+      costUsd,
+      createdAt
+    );
+    expect(new Set([efficientUsage.core.id, frontierUsage.core.id, customUsage.core.id]).size).toBe(
+      3
+    );
     expect(frontierUsage.metadata.id).toBe(frontierUsage.core.id);
+  });
+
+  it('bills a custom router call under the custom router model ID', async () => {
+    const usage = await buildClassifierUsage(
+      payload,
+      { ...identity, scope: 'custom:router-1', requestedModel: 'kilo-auto/custom/org/team' },
+      costUsd,
+      createdAt
+    );
+    expect(usage.core.requested_model).toBe('kilo-auto/custom/org/team');
+    expect(usage.metadata.auto_model).toBe('kilo-auto/custom/org/team');
   });
 
   it('matches classifier billing fields without persisting prompt text or lifecycle identity', async () => {
@@ -192,7 +206,7 @@ describe('classifier usage delivery', () => {
     }
   );
 
-  it('delivers frontier usage through its router-scoped conversation object', async () => {
+  it('delivers usage through its scope-keyed conversation object', async () => {
     const record = vi.fn(async () => {});
     const idFromName = vi.fn((name: string) => name);
     const env = {
@@ -203,12 +217,14 @@ describe('classifier usage delivery', () => {
     } as unknown as Env;
     await recordClassifierUsage(
       env,
-      { ...payload, router: 'frontier' },
-      identity,
+      payload,
+      { ...identity, scope: 'custom:router-1' },
       costUsd,
       createdAt
     );
-    expect(idFromName).toHaveBeenCalledExactlyOnceWith(`frontier:${identity.conversationKey}`);
+    expect(idFromName).toHaveBeenCalledExactlyOnceWith(
+      `custom:router-1:${identity.conversationKey}`
+    );
     expect(record).toHaveBeenCalledTimes(1);
   });
 

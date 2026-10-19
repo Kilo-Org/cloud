@@ -10,6 +10,28 @@ import {
   TypedResourceDelegationError,
 } from '@/lib/auth/resource-delegation';
 import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@/lib/admin/admin-action-audit';
+
+const ANY_ORGANIZATION_ROLE = ['owner', 'admin', 'billing_manager', 'member'] as const;
+
+// Records a token minted by a Kilo admin who is not a member of the organization.
+async function recordTokenMint(
+  user: Parameters<typeof adminActionContextFromHeaders>[0],
+  organizationId: string,
+  headers: Headers,
+  metadata: Record<string, unknown>
+) {
+  await recordElevatedOrganizationAdminAction(adminActionContextFromHeaders(user, headers), {
+    organizationId,
+    requiredRoles: ANY_ORGANIZATION_ROLE,
+    action: 'organization.token.mint',
+    message: 'Minted organization-scoped token',
+    metadata,
+  });
+}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const organizationId = (await params).id;
@@ -62,6 +84,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         actor_id: user.id,
         message: `Resource token generated for organization ${organization.name}`,
       });
+      await recordTokenMint(user, organizationId, request.headers, {
+        tokenKind: 'resource',
+        resource,
+        organizationRole,
+        expiresAt: delegated.expiresAt,
+      });
       return NextResponse.json({
         token: delegated.token,
         expiresAt: delegated.expiresAt,
@@ -92,6 +120,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     actor_email: user.google_user_email,
     actor_id: user.id,
     message: `User token generated for organization ${organization.name}`,
+  });
+  await recordTokenMint(user, organizationId, request.headers, {
+    tokenKind: 'legacy',
+    organizationRole: user.role,
+    expiresAt,
   });
 
   return NextResponse.json({

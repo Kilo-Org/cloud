@@ -888,6 +888,15 @@ export const AdminActionAuditAction = z.enum([
   'cloud_agent_session.messages.view',
   'cloud_agent_session.api_history.view',
   'webhook_trigger.request_logs.view',
+  'organization.member.invite',
+  'organization.member.role.update',
+  'organization.member.remove',
+  'organization.child_memberships.set',
+  'organization.token.mint',
+  'organization.mcp_gateway.update',
+  'organization.gitlab_webhook_secret.rotate',
+  'organization.bitbucket.update',
+  'organization.webhook_session.share',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;

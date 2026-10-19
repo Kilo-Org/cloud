@@ -6,6 +6,7 @@ import {
   updateUserRoleInOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
+  admin_action_audit_logs,
   organization_audit_logs,
   organization_memberships,
   organization_invitations,
@@ -155,6 +156,86 @@ describe('organizations members trpc router', () => {
       expect(invitedMember).not.toHaveProperty('inviteUrl');
       expect(invitedMember).not.toHaveProperty('dailyUsageLimitUsd');
       expect(invitedMember).not.toHaveProperty('currentDailyUsageUsd');
+    });
+  });
+
+  describe('Kilo admin elevated writes', () => {
+    async function elevatedAudits(actorId: string, organizationId: string) {
+      return db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.actor_id, actorId),
+            eq(admin_action_audit_logs.target_id, organizationId)
+          )
+        );
+    }
+
+    it('records role changes and self-invites by a non-member Kilo admin', async () => {
+      const organization = await createOrganization('Elevated Audit Org', regularUser.id);
+      const member = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.members.update({
+        organizationId: organization.id,
+        memberId: member.id,
+        role: 'admin',
+      });
+      await caller.organizations.members.invite({
+        organizationId: organization.id,
+        email: adminUser.google_user_email,
+        role: 'owner',
+      });
+
+      const audits = await elevatedAudits(adminUser.id, organization.id);
+      expect(
+        audits.find(audit => audit.action === 'organization.member.role.update')
+      ).toMatchObject({
+        target_type: 'organization',
+        metadata: {
+          memberKiloUserId: member.id,
+          previousRole: 'member',
+          role: 'admin',
+          heldRoles: [],
+        },
+      });
+      const invite = audits.find(audit => audit.action === 'organization.member.invite');
+      expect(invite?.metadata).toMatchObject({
+        role: 'owner',
+        invitedSelf: true,
+        invitedEmailDomain: 'admin.example.com',
+      });
+      expect(JSON.stringify([invite?.message, invite?.metadata])).not.toContain(
+        adminUser.google_user_email
+      );
+    });
+
+    it('does not record writes by members acting within their own role', async () => {
+      const organization = await createOrganization('Member Write Org', regularUser.id);
+      const member = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const kiloAdminOwner = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdminOwner.id, 'owner');
+
+      await (
+        await createCallerForUser(regularUser.id)
+      ).organizations.members.update({
+        organizationId: organization.id,
+        memberId: member.id,
+        role: 'admin',
+      });
+      await (
+        await createCallerForUser(kiloAdminOwner.id)
+      ).organizations.members.update({
+        organizationId: organization.id,
+        memberId: member.id,
+        role: 'member',
+      });
+
+      expect(await elevatedAudits(regularUser.id, organization.id)).toEqual([]);
+      expect(await elevatedAudits(kiloAdminOwner.id, organization.id)).toEqual([]);
     });
   });
 

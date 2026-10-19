@@ -24,7 +24,12 @@ import {
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   enqueueInviteEmail,
   resetInviteEmailForResend,
@@ -277,6 +282,14 @@ export const organizationsMembersRouter = createTRPCRouter({
         await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
       }
 
+      await recordElevatedOrganizationAdminAction(ctx, {
+        organizationId,
+        requiredRoles: ORGANIZATION_MANAGE_ROLES,
+        action: 'organization.member.role.update',
+        message: `Changed member role from ${targetMember.role} to ${role}`,
+        metadata: { memberKiloUserId: memberId, previousRole: targetMember.role, role },
+      });
+
       return successResult({ updated: 'role and limit' });
     }),
   setChildMemberships: organizationBillingMutationProcedure
@@ -425,6 +438,20 @@ export const organizationsMembersRouter = createTRPCRouter({
         }
       }
 
+      if (added.length > 0 || removed.length > 0) {
+        await recordElevatedOrganizationAdminAction(ctx, {
+          organizationId,
+          requiredRoles: ORGANIZATION_BILLING_ROLES,
+          action: 'organization.child_memberships.set',
+          message: 'Changed child organization memberships',
+          metadata: {
+            memberKiloUserId: memberId,
+            addedOrganizationIds: added,
+            removedOrganizationIds: removed,
+          },
+        });
+      }
+
       return successResult({ added, removed });
     }),
   remove: organizationAdminMutationProcedure
@@ -486,6 +513,14 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
       await cleanupRemovedMemberInstances(memberId, organizationId);
+
+      await recordElevatedOrganizationAdminAction(ctx, {
+        organizationId,
+        requiredRoles: ORGANIZATION_MANAGE_ROLES,
+        action: 'organization.member.remove',
+        message: memberId === user.id ? 'Removed self from organization' : 'Removed member',
+        metadata: { memberKiloUserId: memberId, previousRole: targetMember.role },
+      });
 
       return successResult({ updated: memberId });
     }),
@@ -550,6 +585,21 @@ export const organizationsMembersRouter = createTRPCRouter({
           });
 
           return { acceptInviteUrl, invitationId: invitation.id };
+        });
+
+        // The invitee's address stays out of the audit log; inviting oneself
+        // (turning elevation into lasting membership) is flagged explicitly.
+        await recordElevatedOrganizationAdminAction(ctx, {
+          organizationId,
+          requiredRoles: role === 'member' ? ORGANIZATION_BILLING_ROLES : ORGANIZATION_MANAGE_ROLES,
+          action: 'organization.member.invite',
+          message: `Invited a user as ${role}`,
+          metadata: {
+            invitationId: result.invitationId,
+            role,
+            invitedEmailDomain: getLowerDomainFromEmail(email),
+            invitedSelf: email.trim().toLowerCase() === user.google_user_email.toLowerCase(),
+          },
         });
 
         return { ...result, emailStatus: 'pending' as const };

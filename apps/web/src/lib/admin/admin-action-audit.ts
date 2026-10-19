@@ -1,8 +1,20 @@
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
-import { admin_action_audit_logs, type User } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  organization_memberships,
+  organizations,
+  type User,
+} from '@kilocode/db/schema';
+import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { AdminActionAuditAction, AdminActionAuditTargetType } from '@kilocode/db/schema-types';
-import type { AdminAuditContext } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  type AdminAuditContext,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -149,4 +161,78 @@ export function userActionTarget(userId: string): AdminActionTarget {
 
 export function organizationActionTarget(organizationId: string): AdminActionTarget {
   return { type: 'organization', id: organizationId };
+}
+
+/**
+ * Records an organization write made through the `is_admin` escape hatch, i.e.
+ * by a Kilo admin whose own membership in the organization would not have
+ * allowed it. Admins acting within a role they actually hold are ordinary
+ * members and are not recorded.
+ *
+ * Reads stay as `kilo_admin_elevation` log lines; call this only from
+ * mutations, after they succeed.
+ */
+export async function recordElevatedOrganizationAdminAction(
+  ctx: AdminActionContext & { user: { is_admin: boolean } },
+  params: {
+    organizationId: string;
+    requiredRoles: readonly OrganizationRole[];
+    action: AdminActionAuditAction;
+    message: string;
+    metadata?: Record<string, unknown>;
+  }
+): Promise<void> {
+  if (!ctx.user.is_admin) return;
+  const heldRoles = await getMembershipRoles(ctx.user.id, params.organizationId);
+  if (heldRoles.some(role => params.requiredRoles.includes(role))) return;
+
+  await recordAdminAction(ctx, {
+    action: params.action,
+    target: organizationActionTarget(params.organizationId),
+    message: params.message,
+    metadata: { ...params.metadata, heldRoles },
+  });
+}
+
+// Direct roles plus roles inherited from a parent organization, mirroring
+// ensureOrganizationAccess for non-admins.
+async function getMembershipRoles(
+  userId: string,
+  organizationId: string
+): Promise<OrganizationRole[]> {
+  const direct = await db
+    .select({ role: organization_memberships.role })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.kilo_user_id, userId),
+        eq(organization_memberships.organization_id, organizationId)
+      )
+    );
+  const inherited = await db
+    .select({ role: organization_memberships.role })
+    .from(organizations)
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, organizations.parent_organization_id),
+        eq(organization_memberships.kilo_user_id, userId),
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+      )
+    )
+    .where(eq(organizations.id, organizationId));
+  return [...new Set([...direct, ...inherited].map(row => row.role))];
+}
+
+/** Audit context for REST route handlers, which have request headers instead of a tRPC context. */
+export function adminActionContextFromHeaders(
+  user: AdminActionContext['user'] & { is_admin: boolean },
+  headersList: Headers
+): AdminActionContext & { user: { is_admin: boolean } } {
+  return {
+    user,
+    authViaToken: authViaTokenFromHeaders(headersList),
+    tokenSource: null,
+    ip: clientIpFromHeaders(headersList),
+  };
 }

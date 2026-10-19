@@ -47,6 +47,7 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => undefined),
+      all: vi.fn(() => []),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -103,10 +104,12 @@ describe('SessionIngestDO ingest ordering', () => {
     const operations: string[] = [];
     const metaValues = new Map<string, string | null>();
     const getResults = [
-      undefined,
-      undefined,
-      undefined,
-      undefined,
+      undefined, // deleted check
+      undefined, // kiloUserId meta
+      undefined, // sessionId meta
+      undefined, // ingestVersion meta
+      undefined, // runningCostMicrodollars read
+      { value: '0' }, // hasIngestMeta: total seeded → skip seed scan
       { ingested_at: 0, item_data_r2_key: 'items/old' },
       undefined,
     ];
@@ -183,6 +186,7 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => undefined),
+      all: vi.fn(() => []),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -236,6 +240,7 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => undefined),
+      all: vi.fn(() => []),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -312,6 +317,7 @@ describe('SessionIngestDO session-ready push', () => {
         return selectQuery;
       }),
       get: vi.fn(() => (queriedKey === undefined ? undefined : rows.get(queriedKey))),
+      all: vi.fn(() => []),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -1182,6 +1188,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
         // activity throttle closed so we isolate cost-scan behavior
         lastActivityPersistedAtMs: String(Date.now()),
         lastActivityPersistedValueMs: '9999999999999',
+        // total already seeded: the one-time seed scan does not run
+        runningCostMicrodollars: '100000',
       },
       seedMessageRows: [
         {
@@ -1209,7 +1217,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('100000');
   });
 
-  it('idle transition still scans and persists cost inside closed 30s window (D17)', async () => {
+  it('one-time seed counts pre-existing assistant rows, idle persists the total (D17)', async () => {
     const priorCost = JSON.stringify({
       role: 'assistant',
       time: { created: 1000 },
@@ -1234,16 +1242,21 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     await harness.settle();
 
-    // cost scan runs at least once (attention path may also select message rows)
-    expect(harness.costScanCount).toBeGreaterThanOrEqual(1);
+    // One-time seed scan counts the pre-existing assistant row (meta absent);
+    // the idle transition's attention path selects the newest message rows once.
+    // Neither runs per-window again: the next candidate comes from the meta.
+    expect(harness.costScanCount).toBe(2);
     expect(harness.pgCallCount).toBe(1);
     expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('250000');
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
+    expect(harness.meta.get('runningCostMicrodollars')).toBe('250000');
   });
 
   it('user-only message batch does not open cost persist (KB-4)', async () => {
     const harness = makeLiveHarness({
       seedMeta: {
+        // total already seeded: the one-time seed scan does not run
+        runningCostMicrodollars: '0',
         // leave activity path free so we can see activity-only write
       },
     });
@@ -1260,6 +1273,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
   });
 
   it('assistant message still opens cost path (KB-4 regression)', async () => {
+    // Meta absent → the one-time seed scan runs, then the batch's own assistant
+    // message advances the running total; no per-window transcript scan follows.
     const harness = makeLiveHarness();
     await harness.durableObject.ingest(
       [assistantItem('a1', 0.05)],
@@ -1270,7 +1285,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     await harness.settle();
 
-    expect(harness.costScanCount).toBe(1);
+    expect(harness.costScanCount).toBe(1); // one-time seed, not the per-window scan
     expect(harness.pgCallCount).toBe(1);
     expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('50000');
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('50000');

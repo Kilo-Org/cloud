@@ -36,7 +36,8 @@ import {
   type AttentionSignal,
 } from './session-ingest-attention';
 import {
-  computeRunningAssistantCostUsd,
+  assistantMessageCostMicrodollars,
+  capRunningCostMicrodollars,
   computeSessionMetrics,
   COST_PERSIST_THROTTLE_MS,
   decideLivePersist,
@@ -70,6 +71,7 @@ type LiveThrottleMetaKey =
   | 'lastActivityPersistedValueMs'
   | 'lastCostPersistedAtMs'
   | 'lastCostPersistedMicrodollars'
+  | 'runningCostMicrodollars'
   | 'lastLiveSummaryPersistedAtMs';
 
 type IngestMetaKey =
@@ -530,6 +532,30 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Executed upserts only (not stale-skipped). Activity = message|part; cost gate = message.
     let wroteActivityItem = false;
     let wroteAssistantMessageItem = false;
+    // Running cost total for this session, advanced per stored assistant message
+    // (clamped contribution minus the overwritten row's contribution) and read by
+    // the live persist gate. Seeded from meta so incremental updates survive
+    // across batches; a session with no stored total starts at 0.
+    let runningCostMicrodollars = readIngestMetaNumber(this.db, 'runningCostMicrodollars') ?? 0;
+    if (!hasIngestMeta(this.db, 'runningCostMicrodollars')) {
+      // One-time seed: pre-existing assistant rows (an upgrade or an earlier
+      // ingest batch) must be counted, or the running total undercounts the
+      // transcript. Bounded to inline message rows; R2-offloaded rows ('{}')
+      // contribute 0, matching computeSessionMetrics.
+      const seededRows = this.db
+        .select({ item_data: ingestItems.item_data })
+        .from(ingestItems)
+        .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
+        .all();
+      for (const row of seededRows) {
+        runningCostMicrodollars = capRunningCostMicrodollars(
+          runningCostMicrodollars + assistantMessageCostMicrodollars(row.item_data)
+        );
+      }
+      if (seededRows.length > 0) {
+        writeIngestMetaNumber(this.db, 'runningCostMicrodollars', runningCostMicrodollars);
+      }
+    }
     // §4.10: in-batch {notificationId -> message} so the post-loop signal builder can
     // re-emit on replay without re-reading item_data from SQLite.
     const pendingAgentNotifications = new Map<string, string>();
@@ -543,22 +569,41 @@ export class SessionIngestDO extends DurableObject<Env> {
     for (const item of payload) {
       const { item_id, item_type } = getItemIdentity(item);
 
-      // Check timestamp guard: skip if existing row has a newer ingested_at.
-      // Also read the existing R2 key so we can clean up orphaned blobs.
-      if (ingestedAt !== undefined) {
-        const existing = this.db
+      // Cost gate is assistant-only (the running total moves per assistant message).
+      // In-batch role check: assistantMessageCostMicrodollars re-validates the
+      // payload with the metrics schema before its cost joins the total.
+      const isAssistantMessage =
+        item.type === 'message' &&
+        typeof item.data === 'object' &&
+        item.data !== null &&
+        'role' in item.data &&
+        item.data.role === 'assistant';
+
+      // Previous row for this identity, when one exists. Read for the timestamp
+      // guard, and for assistant messages even without a timestamp (the upsert
+      // still overwrites, so the running total must subtract the old cost).
+      let existing:
+        | {
+            ingested_at: number | null;
+            item_data_r2_key: string | null;
+            item_data: string;
+          }
+        | undefined;
+      if (ingestedAt !== undefined || isAssistantMessage) {
+        existing = this.db
           .select({
             ingested_at: ingestItems.ingested_at,
             item_data_r2_key: ingestItems.item_data_r2_key,
+            item_data: ingestItems.item_data,
           })
           .from(ingestItems)
           .where(eq(ingestItems.item_id, item_id))
           .get();
-        if (
-          existing?.ingested_at !== null &&
-          existing?.ingested_at !== undefined &&
-          existing.ingested_at > ingestedAt
-        ) {
+      }
+
+      // Check timestamp guard: skip if existing row has a newer ingested_at.
+      if (ingestedAt !== undefined && existing) {
+        if (existing.ingested_at !== null && existing.ingested_at > ingestedAt) {
           // Item is stale — if the caller wrote an R2 blob for it, that blob is orphaned
           const newR2Key = r2References?.[item_id];
           if (newR2Key) orphanedR2Keys.push(newR2Key);
@@ -567,7 +612,7 @@ export class SessionIngestDO extends DurableObject<Env> {
 
         // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
         const newR2Key = r2References?.[item_id] ?? null;
-        if (existing?.item_data_r2_key && existing.item_data_r2_key !== newR2Key) {
+        if (existing.item_data_r2_key && existing.item_data_r2_key !== newR2Key) {
           orphanedR2Keys.push(existing.item_data_r2_key);
         }
       }
@@ -600,10 +645,22 @@ export class SessionIngestDO extends DurableObject<Env> {
       if (item.type === 'message' || item.type === 'part') {
         wroteActivityItem = true;
       }
-      // Cost gate is assistant-only (computeRunningAssistantCostUsd sums role:assistant).
-      // data is looseObject — role is optional at the type level; cheap property check, no parse.
-      if (item.type === 'message' && (item.data as { role?: unknown }).role === 'assistant') {
+      // Cost gate is assistant-only (the running total moves per assistant message).
+      // In-batch role check: assistantMessageCostMicrodollars re-validates the
+      // payload with the metrics schema before its cost joins the total.
+      if (isAssistantMessage) {
         wroteAssistantMessageItem = true;
+        // Incremental running cost total: add this message's clamped contribution,
+        // subtracting the contribution of the row this upsert overwrites. A stale
+        // item never reaches this point, so its cost is never double counted.
+        const newContribution = assistantMessageCostMicrodollars(itemDataJson);
+        const oldContribution =
+          existing && existing.item_data_r2_key === null
+            ? assistantMessageCostMicrodollars(existing.item_data)
+            : 0;
+        runningCostMicrodollars = capRunningCostMicrodollars(
+          runningCostMicrodollars + newContribution - oldContribution
+        );
       }
 
       // §4.10: agent_notification items carry no state transition, so the DO durably tracks
@@ -660,6 +717,14 @@ export class SessionIngestDO extends DurableObject<Env> {
           lifecycleEvents.push({ type: 'session_close', reason: item.data.reason });
         }
       }
+    }
+
+    // Persist the running cost total before the alarm awaits below: a batch that
+    // only accrues (throttle closed) must still leave its delta, and a write
+    // spanning an await would lose updates from an interleaved ingest. The value
+    // is capped, so an out-of-range bigint write is impossible.
+    if (wroteAssistantMessageItem) {
+      writeIngestMetaNumber(this.db, 'runningCostMicrodollars', runningCostMicrodollars);
     }
 
     if (ingestVersion >= 1) {
@@ -765,8 +830,10 @@ export class SessionIngestDO extends DurableObject<Env> {
       lastPersistedAtMs: readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs'),
     });
 
-    // Only scan all inline messages when the cost-persist window is open (KB-3).
+    // Only compute a cost candidate when the cost-persist window is open (KB-3).
     // Window needs no cost value: idle forces (D17), else assistant upsert + 30s throttle.
+    // The candidate is the incremental running total advanced per stored assistant
+    // message above — no transcript scan.
     const nowMs = Date.now();
     const lastCostPersistedAtMs = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
     const costWindowOpen =
@@ -775,16 +842,9 @@ export class SessionIngestDO extends DurableObject<Env> {
         (lastCostPersistedAtMs === null ||
           nowMs - lastCostPersistedAtMs >= COST_PERSIST_THROTTLE_MS));
 
-    let currentCostMicrodollars: number | null = null;
-    if (costWindowOpen) {
-      const messageRows = this.db
-        .select({ item_data: ingestItems.item_data })
-        .from(ingestItems)
-        .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
-        .all();
-      const usd = computeRunningAssistantCostUsd(messageRows);
-      currentCostMicrodollars = Math.max(0, Math.round(usd * 1_000_000));
-    }
+    const currentCostMicrodollars = costWindowOpen
+      ? capRunningCostMicrodollars(runningCostMicrodollars)
+      : null;
 
     const lastActivityValueMs = ingestedAt ?? nowMs;
     const decision = decideLivePersist({
@@ -897,6 +957,16 @@ export class SessionIngestDO extends DurableObject<Env> {
               error: error instanceof Error ? error.message : String(error),
               stack: error instanceof Error ? error.stack : undefined,
             });
+            // Advance the cost throttle even on failure so a deterministically
+            // failing write (e.g. an out-of-range value) retries on the normal
+            // 30s window instead of every ingest. The persisted-value meta stays
+            // un-advanced, so the monotonic guard still opens for newer data.
+            if (costToPersist !== undefined) {
+              const prevCostAt = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
+              if (prevCostAt === null || nowMs > prevCostAt) {
+                writeIngestMetaNumber(this.db, 'lastCostPersistedAtMs', nowMs);
+              }
+            }
           }
         })()
       );
@@ -1270,17 +1340,19 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Best-effort persist the per-session total cost to Postgres so the session
     // list can surface it. Runs before the O11Y RPC so an analytics failure cannot
     // skip it. Failures are logged and swallowed — must never break metrics emission.
-    // Same helper + CASE guard as live cost persist (D20).
+    // Same CASE guard as live cost persist (D20). The total is a sum of per-message
+    // clamped costs, so it is finite and non-negative; only the MAX_SAFE_INTEGER
+    // running-total cap applies here, not the per-message bound.
     try {
-      if (Number.isFinite(metrics.totalCost)) {
-        const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));
-        await persistLiveSessionColumns(
-          this.env.HYPERDRIVE.connectionString,
-          kiloUserId,
-          sessionId,
-          { costMicrodollars: totalCostMicrodollars }
-        );
-      }
+      const totalCostMicrodollars = capRunningCostMicrodollars(
+        Math.max(0, Math.round(metrics.totalCost * 1_000_000))
+      );
+      await persistLiveSessionColumns(
+        this.env.HYPERDRIVE.connectionString,
+        kiloUserId,
+        sessionId,
+        { costMicrodollars: totalCostMicrodollars }
+      );
     } catch (error) {
       console.error('SessionIngestDO failed to persist session total cost', {
         sessionId,

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  computeRunningAssistantCostUsd,
+  assistantCostUsdToMicrodollars,
+  clampAssistantCostUsd,
   computeSessionMetrics,
   decideLivePersist,
   type DecideLivePersistArgs,
@@ -337,45 +338,125 @@ describe('computeSessionMetrics', () => {
   });
 });
 
-function assistantMessage(cost: number) {
-  return makeItem('message', {
-    role: 'assistant',
-    time: { created: 1000 },
-    tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
-    cost,
-  });
-}
-
-describe('computeRunningAssistantCostUsd', () => {
-  it('sums assistant message costs in USD', () => {
-    const rows = [assistantMessage(0.05), assistantMessage(0.1)];
-    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.15);
-  });
-
-  it('ignores user messages', () => {
-    const rows = [
-      makeItem('message', { role: 'user', time: { created: 1000 } }),
-      assistantMessage(0.2),
+describe('computeSessionMetrics cost clamping', () => {
+  it('a negative-cost message contributes zero cost but keeps its tokens', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 20, write: 5 } },
+        cost: -100,
+      }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 2000 },
+        tokens: { input: 10, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0.05,
+      }),
     ];
-    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.2);
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.totalCost).toBeCloseTo(0.05);
+    expect(result.totalTokens.input).toBe(110);
+    expect(result.totalErrors).toBe(0);
   });
 
-  it('skips malformed rows', () => {
-    const rows = [{ item_data: 'not json' }, { item_data: 'null' }, assistantMessage(0.07)];
-    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.07);
+  it('a negative-cost message cannot lower a genuine total below its real sum', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0.5,
+      }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 2000 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: -1000,
+      }),
+    ];
+    expect(computeSessionMetrics(items, 'completed').totalCost).toBeCloseTo(0.5);
   });
 
-  it("treats R2-offloaded '{}' as 0", () => {
-    expect(computeRunningAssistantCostUsd([{ item_data: '{}' }])).toBe(0);
+  it('a cost above the per-message cap contributes the cap, not an offset', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 1e308,
+      }),
+    ];
+    expect(computeSessionMetrics(items, 'completed').totalCost).toBe(1000);
   });
 
-  it('clamps negative totals to 0', () => {
-    expect(computeRunningAssistantCostUsd([assistantMessage(-0.5)])).toBe(0);
+  it("negative tokens on one message do not offset another message's real tokens", () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 100, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+      }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 2000 },
+        tokens: { input: -500, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+      }),
+    ];
+    expect(computeSessionMetrics(items, 'completed').totalTokens.input).toBe(100);
   });
 
-  it('converts to microdollars with the close-path formula (0.15 USD → 150_000)', () => {
-    const usd = computeRunningAssistantCostUsd([assistantMessage(0.15)]);
-    expect(Math.max(0, Math.round(usd * 1_000_000))).toBe(150_000);
+  it('a cost above the per-message cap is clamped and an expensive session total survives', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 5000,
+      }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 2000 },
+        tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 500,
+      }),
+    ];
+    // Per-message cap 1000: 5000 → 1000; the sum 1500 is above the cap and is kept.
+    expect(computeSessionMetrics(items, 'completed').totalCost).toBe(1500);
+  });
+});
+
+describe('clampAssistantCostUsd', () => {
+  it('passes normal costs through', () => {
+    expect(clampAssistantCostUsd(0.05)).toBe(0.05);
+  });
+
+  it('clamps negative and non-finite costs to 0', () => {
+    expect(clampAssistantCostUsd(-0.5)).toBe(0);
+    expect(clampAssistantCostUsd(Number.NaN)).toBe(0);
+    expect(clampAssistantCostUsd(Number.POSITIVE_INFINITY)).toBe(0);
+  });
+
+  it('clamps costs above the per-message cap to the cap', () => {
+    expect(clampAssistantCostUsd(5000)).toBe(1000);
+  });
+});
+
+describe('assistantCostUsdToMicrodollars', () => {
+  it('converts normal costs (0.15 USD → 150_000)', () => {
+    expect(assistantCostUsdToMicrodollars(0.15)).toBe(150_000);
+  });
+
+  it('keeps an aggregate above the per-message cap finite (1.5 USD → 1_500_000)', () => {
+    expect(assistantCostUsdToMicrodollars(1.5)).toBe(1_500_000);
+  });
+
+  it('stays finite for a huge input (1e308 does not produce Infinity)', () => {
+    const micro = assistantCostUsdToMicrodollars(1e308);
+    expect(Number.isFinite(micro)).toBe(true);
+    expect(micro).toBe(1000_000_000);
   });
 });
 

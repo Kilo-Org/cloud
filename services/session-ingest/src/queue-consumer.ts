@@ -73,10 +73,18 @@ async function processMessage(
   } catch (err) {
     if (err instanceof StagingParseError) {
       // Items that parsed before the malformed tail may still be buffered in
-      // the chunker; flush them first so the metadata flush and attention
-      // dispatch below observe their changes, then remove the staging object
-      // and complete the message.
-      await chunker.flushChunkToSessionDO();
+      // the chunker; flush them so the catch-up below observes their changes.
+      // The flush is best-effort: a flush failure must not skip the catch-up,
+      // which then still runs with whatever was collected before the failure.
+      try {
+        await chunker.flushChunkToSessionDO();
+      } catch (flushError) {
+        console.error('Failed to flush buffered items after an incomplete parse', {
+          r2Key: msg.r2Key,
+          sessionId: msg.sessionId,
+          error: flushError instanceof Error ? flushError.message : String(flushError),
+        });
+      }
       await flushPartialMetadataChanges(env, msg, mergedChanges, ctx);
       scheduleAttentionSignalDispatch(
         env,

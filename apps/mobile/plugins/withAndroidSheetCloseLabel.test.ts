@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-type StringItem = { $: { name: string }; _?: string; '#text'?: string };
+type StringItem = { $: { name: string }; _?: string };
 type StringsXml = { resources: { string: StringItem[] } };
 
 interface ExpoConfigPlugin {
@@ -44,12 +44,14 @@ afterEach(() => {
   }
 });
 
-/** The minimal surface of fast-xml-parser the harness uses. */
-interface XmlParser {
-  parse: (xml: string) => unknown;
-}
-interface XmlBuilderLike {
-  build: (value: unknown) => string;
+/** The minimal surface of xml2js the harness uses (types not installed in the app). */
+interface Xml2jsLike {
+  Builder: new (o: object) => { buildObject: (v: object) => string };
+  parseString: (
+    xml: string,
+    options: object,
+    cb: (error: unknown, result: unknown) => void
+  ) => void;
 }
 
 /** Run the plugin's full android mod pipeline against a throwaway prebuilt android tree. */
@@ -73,56 +75,40 @@ async function runMod(): Promise<{ resPath: string }> {
   // the strings mod and writes modResults back afterwards (the base-mod
   // provider's read/write); simulate both around the plugin's mod.
   await mods.strings(config);
-  // fast-xml-parser is expo config-plugins' own dependency, not the app's, so
-  // resolve it from config-plugins' own module context.
+  // xml2js is @expo/config-plugins' own declared dependency (the same module
+  // its Resources/String mods parse with), so resolve it from config-plugins'
+  // module context instead of declaring it in the app.
   const { Module } = require('node:module');
   const configPluginsRequire = Module.createRequire(require.resolve('expo/config-plugins'));
-  const { XMLParser: Parser, XMLBuilder } = configPluginsRequire('fast-xml-parser') as {
-    XMLParser: new (o: object) => XmlParser;
-    XMLBuilder: new (o: object) => XmlBuilderLike;
-  };
-  const parser = new Parser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '$',
-    isArray: () => false,
-  });
-  const builder = new XMLBuilder({
-    ignoreAttributes: false,
-    attributeNamePrefix: '$',
-    format: false,
-  });
-  const written = builder.build(config.modResults);
+  const xml2js = configPluginsRequire('xml2js') as Xml2jsLike;
+  const written = new xml2js.Builder({ headless: true }).buildObject(config.modResults);
   fs.writeFileSync(path.join(resPath, 'values', 'strings.xml'), written);
   await mods.dangerous(config);
   return { resPath };
 }
 
 function readStrings(file: string): StringsXml {
-  // The plugin writes plain XML; parse it into the shape expo's
-  // withStringsXml modResults use, normalizing single-entry collections and
-  // fast-xml-parser's `$name` prefix for one-attribute elements.
+  // The plugin writes plain XML; parse it with the same parser expo's
+  // withStringsXml mods read resources with, into the modResults shape.
   const { Module } = require('node:module');
   const configPluginsRequire = Module.createRequire(require.resolve('expo/config-plugins'));
-  const { XMLParser: Parser } = configPluginsRequire('fast-xml-parser') as {
-    XMLParser: new (o: object) => XmlParser;
-  };
-  const parser = new Parser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '$',
-    isArray: () => false,
-  });
-  const parsed = parser.parse(fs.readFileSync(file, 'utf8')) as {
-    resources?: {
-      string?:
-        | { $name?: string; $?: { name: string }; _?: string; '#text'?: string }
-        | (string & string)[];
-    };
-  };
+  const xml2js = configPluginsRequire('xml2js') as Xml2jsLike;
+  const parsed = ((xml: string, options: object) => {
+    // xml2js ships only the callback API; wrap it so the read stays expression-shaped.
+    let out: unknown;
+    xml2js.parseString(xml, options, (_error: unknown, result: unknown) => {
+      out = result;
+    });
+    return out;
+  })(fs.readFileSync(file, 'utf8'), {
+    explicitArray: false,
+    explicitCharkey: false,
+  }) as { resources?: { string?: StringItem | StringItem[] } };
   const raw = parsed.resources?.string;
   const entries = (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw]).map(item =>
-    typeof item === 'object' && item !== null && '$name' in item
-      ? { $: { name: String(item.$name) }, _: item['#text'] }
-      : (item as StringItem)
+    item === null || typeof item !== 'object'
+      ? { $: { name: '' } }
+      : { $: { name: item.$?.name ?? '' }, _: item._ }
   );
   return { resources: { string: entries } };
 }

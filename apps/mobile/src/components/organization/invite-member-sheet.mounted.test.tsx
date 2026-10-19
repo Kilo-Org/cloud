@@ -24,6 +24,8 @@ const invite = vi.hoisted(() => ({
   mutate: vi.fn(),
   reset: vi.fn(),
   isPending: false,
+  isError: false,
+  error: { message: 'Seat limit reached' },
 }));
 // The route's focus effect: a mounted sheet registers it on every render, and
 // the test re-runs the latest one to present the sheet again.
@@ -76,6 +78,7 @@ beforeEach(() => {
   boundary.role = 'owner';
   boundary.isResolving = false;
   invite.isPending = false;
+  invite.isError = false;
   invite.mutate.mockClear();
   invite.reset.mockClear();
   focus.effect = null;
@@ -115,6 +118,12 @@ function errorMessage(rendered: RenderWithProvidersResult): unknown {
     throw new Error('missing AccessibleStatus');
   }
   return fieldStatus.props.message;
+}
+
+/** The invite mutation's inline error: the second AccessibleStatus on the screen. */
+function inviteMessage(rendered: RenderWithProvidersResult): unknown {
+  const statuses = rendered.renderer.root.findAll(node => String(node.type) === 'AccessibleStatus');
+  return statuses[1]?.props.message as unknown;
 }
 
 /** Mount, then run the first focus — a fresh mount's state is already clean. */
@@ -165,21 +174,62 @@ describe('InviteMemberSheet reopen', () => {
     rendered.unmount();
   });
 
-  it('keeps an invite that is still running on the next open', async () => {
+  it('keeps an invite that is still running on the next open, without its error', async () => {
     const rendered = await openSheet();
-    invite.isPending = true;
-    // Rendering with the invite in flight is what a send does before its
-    // result arrives.
     act(() => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
+    act(() => {
+      buttonProps(rendered).onPress();
+    });
+    expect(invite.mutate).toHaveBeenCalledOnce();
 
+    invite.isPending = true;
+    act(() => {
+      fieldProps(rendered).onChangeText('');
+    });
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
     act(() => {
       focus.effect?.();
     });
 
     expect(invite.reset).not.toHaveBeenCalled();
     expect(buttonProps(rendered).disabled).toBe(true);
+
+    // The earlier attempt fails after the reopen: its error belongs to the
+    // previous form, not to the one on screen now.
+    invite.isPending = false;
+    invite.isError = true;
+    act(() => {
+      fieldProps(rendered).onChangeText('');
+    });
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+
+    expect(inviteMessage(rendered)).toBeNull();
+    rendered.unmount();
+  });
+
+  it('shows the invite error of a submit made in this open', async () => {
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      buttonProps(rendered).onPress();
+    });
+    invite.isError = true;
+    act(() => {
+      fieldProps(rendered).onChangeText('');
+    });
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+
+    expect(inviteMessage(rendered)).toBe('Seat limit reached');
     rendered.unmount();
   });
 

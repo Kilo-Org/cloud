@@ -38,9 +38,11 @@ export function InviteMemberSheet() {
   const resetInvite = mutations.invite.reset;
   // A reset would drop an in-flight invite's callbacks (its success toast and
   // the members invalidation), so a reopen keeps observing one that is still
-  // running.
+  // running. Its outcome belongs to the previous open, so the error is only
+  // rendered for a submit made in the form that is open now.
   const invitePendingRef = useRef(false);
   invitePendingRef.current = mutations.invite.isPending;
+  const submittedThisOpenRef = useRef(false);
 
   // The route can stay mounted while its sheet is dismissed and presented
   // again, so mount-time state is not a clean slate. Every later focus starts
@@ -58,6 +60,7 @@ export function InviteMemberSheet() {
       setCanSubmit(false);
       setRole('member');
       setFormEpoch(epoch => epoch + 1);
+      submittedThisOpenRef.current = false;
       if (!invitePendingRef.current) {
         resetInvite();
       }
@@ -84,6 +87,7 @@ export function InviteMemberSheet() {
       return;
     }
     const email = emailRef.current.trim().toLowerCase();
+    submittedThisOpenRef.current = true;
     mutations.invite.mutate(
       { email, role: isBillingManager ? 'member' : role },
       {
@@ -164,7 +168,11 @@ export function InviteMemberSheet() {
           so AccessibleStatus is the single announcement owner here: one
           announcement per platform, visuals preserved (tone error). */}
       <AccessibleStatus
-        message={mutations.invite.isError ? mutations.invite.error.message : null}
+        message={
+          submittedThisOpenRef.current && mutations.invite.isError
+            ? mutations.invite.error.message
+            : null
+        }
         className="text-sm"
       />
 

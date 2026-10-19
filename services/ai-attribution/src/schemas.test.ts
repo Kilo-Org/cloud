@@ -32,6 +32,7 @@ import {
   MAX_TRACK_BODY_BYTES,
   MAX_TRACK_LINE_ENTRIES,
   MAX_TRACK_ID_LENGTH,
+  MAX_TRACK_PROJECT_ID_LENGTH,
   MAX_TRACK_FILE_PATH_LENGTH,
 } from './schemas';
 
@@ -119,9 +120,15 @@ describe('AttributionsTrackRequestBody', () => {
   });
 
   it('rejects a long project_id', () => {
-    const payload = { ...validPayload(), project_id: 'p'.repeat(MAX_TRACK_ID_LENGTH + 1) };
+    const payload = { ...validPayload(), project_id: 'p'.repeat(MAX_TRACK_PROJECT_ID_LENGTH + 1) };
 
     expect(() => AttributionsTrackRequestBody.parse(payload)).toThrow();
+  });
+
+  it('accepts a project_id at the storage length boundary', () => {
+    const payload = { ...validPayload(), project_id: 'p'.repeat(MAX_TRACK_PROJECT_ID_LENGTH) };
+
+    expect(() => AttributionsTrackRequestBody.parse(payload)).not.toThrow();
   });
 
   it('rejects a long branch', () => {

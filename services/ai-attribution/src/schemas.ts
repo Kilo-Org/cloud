@@ -5,6 +5,9 @@ import { z } from 'zod';
 export const MAX_TRACK_LINE_ENTRIES = 512;
 export const MAX_TRACK_LINE_HASH_LENGTH = 128;
 export const MAX_TRACK_ID_LENGTH = 256;
+// The code-indexing storage layer accepts project identifiers up to this
+// length, so the track schema must admit the same values.
+export const MAX_TRACK_PROJECT_ID_LENGTH = 512;
 export const MAX_TRACK_FILE_PATH_LENGTH = 1024;
 export const MAX_TRACK_BODY_BYTES = 256 * 1024;
 
@@ -31,7 +34,7 @@ const trackLineSchema = z.object({
 
 export type AttributionsTrackRequestBody = z.infer<typeof AttributionsTrackRequestBody>;
 export const AttributionsTrackRequestBody = z.object({
-  project_id: attributionPathSegmentSchema.max(MAX_TRACK_ID_LENGTH),
+  project_id: attributionPathSegmentSchema.max(MAX_TRACK_PROJECT_ID_LENGTH),
   branch: z.string().min(1).max(MAX_TRACK_ID_LENGTH),
   file_path: attributionPathSegmentSchema,
   status: z.enum(['accepted', 'rejected']),

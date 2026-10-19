@@ -183,6 +183,7 @@ describe('reading a resource off a remote server', () => {
       mimeType: 'text/html;profile=mcp-app',
       text: '<h1>chart</h1>',
       blob: undefined,
+      _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] }, permissions: {} } },
     });
     expect(served.seen.authorization).toContain(`Bearer ${token}`);
   });

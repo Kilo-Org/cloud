@@ -265,7 +265,14 @@ const chartApp: Tools = {
   read: uri =>
     uri === 'ui://work/chart.html'
       ? {
-          contents: [{ uri, mimeType: 'text/html;profile=mcp-app', text: '<h1>chart</h1>' }],
+          contents: [
+            {
+              uri,
+              mimeType: 'text/html;profile=mcp-app',
+              text: '<h1>chart</h1>',
+              _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] }, permissions: {} } },
+            },
+          ],
         }
       : undefined,
 };

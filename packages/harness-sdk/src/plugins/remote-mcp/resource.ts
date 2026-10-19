@@ -12,12 +12,18 @@ import { RemoteMcpError, type RemoteMcpServer } from './server.js';
  * shapes the protocol allows; a host that asked for an MCP Apps view reads
  * `text` and renders it, and `blob` is there so a caller who asked for a
  * binary resource is not left with nothing.
+ *
+ * `_meta` is the content's own metadata, carried as the server wrote it. The
+ * Apps specification writes the view's policy there — the CSP domains the view
+ * may load from and the permissions it asks for — so a host that renders the
+ * HTML has the policy it must enforce, not a default it guessed at.
  */
 interface RemoteMcpResource {
   readonly uri: string;
   readonly mimeType: string | undefined;
   readonly text: string | undefined;
   readonly blob: string | undefined;
+  readonly _meta: Readonly<Record<string, unknown>> | undefined;
 }
 
 /**
@@ -44,12 +50,13 @@ const resourceOf = (
           cause: `the server answered no content for ${uri}`,
         });
       }
-      const { uri: answered, mimeType } = content;
+      const { uri: answered, mimeType, _meta } = content;
       const resource: RemoteMcpResource = {
         uri: answered,
         mimeType,
         text: 'text' in content ? content.text : undefined,
         blob: 'blob' in content ? content.blob : undefined,
+        _meta,
       };
       return resource;
     },

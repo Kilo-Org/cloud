@@ -65,6 +65,7 @@ import {
   security_remediations,
   security_audit_log,
   auto_triage_tickets,
+  auto_fix_tickets,
   slack_bot_requests,
   bot_requests,
   cloud_agent_pending_uploads,
@@ -1495,6 +1496,7 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(security_remediations).where(eq(security_remediations.owned_by_user_id, userId));
   await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
+  await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
   await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
   await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
   await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));

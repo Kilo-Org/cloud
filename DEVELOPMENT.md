@@ -582,3 +582,24 @@ If image/video files appear as small text files with `oid sha256:...`, run:
 ```bash
 git lfs pull
 ```
+
+## Agent morning briefings
+
+The mobile Home briefing summarizes overnight coding sessions separately for Personal and each organization.
+Users configure a saved timezone, night start, shared night-end/morning-start, and morning end.
+Dismissal restores live status across devices; report history remains available.
+
+The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
+AI summaries and briefing notifications require separate opt-ins.
+Summary settings include a model override and finite generation time and spend limits.
+The default summary model is `~deepseek/deepseek-flash-latest`.
+The structured report remains available when generation fails or reaches a limit.
+
+Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
+The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
+Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
+
+The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
+They use the existing cron authorization, database, gateway, and notification configuration.
+Local verification must use an isolated database and fake accounts.
+Use a local notification sink and fixture inference provider to avoid real pushes or upstream charges.

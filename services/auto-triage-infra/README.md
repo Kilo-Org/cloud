@@ -4,7 +4,7 @@ Cloudflare Worker that orchestrates the auto-triage process for GitHub issues us
 
 ## Architecture
 
-This worker follows the same pattern as the auto-fix worker:
+This worker follows the same pattern as other Cloudflare automation workers:
 
 - **HTTP API**: Receives triage requests from Next.js backend via [`index.ts`](src/index.ts:1)
 - **Durable Objects**: [`TriageOrchestrator`](src/triage-orchestrator.ts:24) manages the lifecycle of each triage ticket
@@ -56,7 +56,7 @@ auto-triage worker
 
 - **Duplicate Detection**: Calls Next.js API to check for similar issues using vector similarity search
 - **Issue Classification**: Uses cloud-agent-next with AI models to classify issues as bug/feature/question/unclear via prepare + initiate + callback
-- **Label Application**: Applies AI-selected labels plus action-tracking labels (kilo-triaged, and kilo-auto-fix when the issue author holds a repository write permission tier verified through GitHub's collaborator permission API) via the Next.js API
+- **Label Application**: Applies AI-selected labels plus the `kilo-triaged` action-tracking label via the Next.js API. Labels that triage applies itself are not offered for selection and are dropped from a returned selection
 - **Status Updates**: Real-time callbacks to Next.js API for status tracking
 - **Modular Services**: Clean separation of concerns with dedicated service classes
 
@@ -166,18 +166,12 @@ stuck-ticket alarm.
 6. **Callback route** validates the per-ticket secret, resolves the DO, and invokes
    `completeClassification()` which parses the assistant output and acts on it:
    - **Question/Unclear** → update status (TODO: post comment)
-   - **Bug/Feature (high confidence, author holds repository write permission
-     — admin, maintain, or write — verified through GitHub's collaborator
-     permission API)** → apply `kilo-auto-fix` so auto-fix picks it up
-   - **Bug/Feature (high confidence, author permission not verified as write
-     tier)** → apply the triaged label and classification labels without
-     `kilo-auto-fix`; a maintainer can add it by hand
-   - **Bug/Feature (low confidence)** → request clarification
+   - **Bug/Feature** → apply `kilo-triaged` and mark the ticket actioned
 
 ### Classification Process
 
 1. Worker calls Next.js to get configuration (model, GitHub token, custom instructions, excluded labels)
-2. Worker fetches repository labels from GitHub and filters out excluded labels
+2. Worker fetches repository labels from GitHub and filters out excluded labels and labels that triage applies itself
 3. [`PromptBuilder`](src/services/prompt-builder.ts:30) creates a structured classification prompt
 4. Worker mints a per-ticket `callbackSecret` (UUID) and persists it to DO state together with the available labels and classify config
 5. Worker calls `prepareSession` on cloud-agent-next with `callbackTarget.headers['X-Callback-Secret']`
@@ -188,12 +182,7 @@ stuck-ticket alarm.
 
 ### PR Creation Process
 
-PR creation is not handled in this worker. When a classification is
-high-confidence and the issue author holds a repository write permission
-tier (verified through GitHub's collaborator permission API), the worker
-applies the `kilo-auto-fix` label to the issue; the separate
-`auto-fix-infra` worker subscribes to that label and creates PRs
-independently.
+PR creation is not handled in this worker.
 
 ### Timeouts
 
@@ -216,6 +205,7 @@ callback delivery, and post-classification label/comment API calls.
 - **Async classification via callback**: `prepareSession` + `initiateFromPreparedSession` return immediately; the terminal result is delivered to the worker's own callback route. No SSE stream held open across the run.
 - **Per-ticket callback secret**: Each triage mints a UUID stored in DO state and relayed via `callbackTarget.headers['X-Callback-Secret']`. Compared in constant time inside the DO. A leak from cloud-agent-next's callback queue only compromises a single ticket's in-flight callback.
 - **State persistence**: All state stored in Durable Object storage for reliability
+- **Worker-applied labels are reserved**: `kilo-triaged` and `kilo-duplicate` are applied by triage itself, so they are not offered as classification candidates and are dropped from any returned label list. Repository labels with the same names follow the same rule.
 - **Alarm safety net**: A single DO alarm covers the full classification end-to-end so stuck tickets are recovered automatically.
 
 ## Development
@@ -373,7 +363,7 @@ The [`TriageOrchestrator`](src/triage-orchestrator.ts:24) Durable Object manages
    - **Duplicate** ([`closeDuplicate()`](src/triage-orchestrator.ts:210)): Updates status with duplicate info
    - **Question** ([`answerQuestion()`](src/triage-orchestrator.ts:227)): Posts answer comment (TODO)
    - **Unclear** ([`requestClarification()`](src/triage-orchestrator.ts:244)): Requests more info (TODO)
-   - **Bug/Feature** (high confidence, author holds a repository write permission tier): Applies `kilo-auto-fix` label for the auto-fix worker to pick up
+   - **Bug/Feature**: Applies `kilo-triaged` and marks the ticket actioned
 
 ### Service Classes
 
@@ -457,7 +447,7 @@ The worker uses a comprehensive type system defined in [`types.ts`](src/types.ts
 
 - **[`SessionInput`](src/types.ts:30)**: Configuration for triage session
   - GitHub issue details (repo, number, title, body)
-  - Thresholds for duplicate detection and auto-fix label application
+  - Thresholds for duplicate detection
   - Model selection and custom instructions
 
 - **[`ClassificationResult`](src/types.ts:106)**: AI classification output

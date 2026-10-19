@@ -1,7 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { z } from 'zod';
-import { parseCollaboratorPermission } from '@kilocode/worker-utils/github-collaborator-permission';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 import crypto from 'crypto';
@@ -418,35 +417,12 @@ export async function hasPRCommentWithMarker(
 }
 
 /**
- * Used to acknowledge @kilo fix mentions on inline review comments.
- */
-export async function addReactionToPRReviewComment(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commentId: number,
-  reaction: 'eyes' | '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket',
-  appType: GitHubAppType = 'standard'
-): Promise<void> {
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
-
-  await octokit.reactions.createForPullRequestReviewComment({
-    owner,
-    repo,
-    comment_id: commentId,
-    content: reaction,
-  });
-}
-
-/**
  * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
- * Parsing delegates to the shared collaborator-permission module; octokit
- * returns 'maintain' for maintain-tier collaborators, which the shared parser
- * normalizes alongside the other known levels.
  */
 export type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
+
+const KNOWN_PERMISSIONS = new Set<string>(['admin', 'write', 'read', 'none']);
 
 export async function getCollaboratorPermissionLevel(
   installationId: string,
@@ -465,9 +441,11 @@ export async function getCollaboratorPermissionLevel(
       username,
     });
 
-    const permission = parseCollaboratorPermission(data);
-    if (permission === 'maintain') return null;
-    return permission;
+    if (KNOWN_PERMISSIONS.has(data.permission)) {
+      // Safe: value validated against the known set above
+      return data.permission as CollaboratorPermission;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -1008,6 +986,7 @@ export type AssociatedPullRequest = {
   title: string;
   headSha: string;
   updatedAt: string; // ISO
+  createdAt?: string;
   /**
    * `owner/name` of the PR's base repository, as reported by GitHub. Used to
    * verify that a session's stored link actually names this repository rather
@@ -1203,6 +1182,7 @@ export async function fetchPullRequestByNumber(params: {
       title: pr.title,
       headSha: pr.head.sha,
       updatedAt: pr.updated_at,
+      createdAt: pr.created_at,
       baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
       headRepoFullName: pr.head.repo?.full_name ?? '',
       headRef: pr.head.ref,

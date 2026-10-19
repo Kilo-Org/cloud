@@ -25,7 +25,6 @@ export const FEATURE_VALUES = [
   'code-review',
   'code-review-memory',
   'auto-triage',
-  'autofix',
   'app-builder',
   'agent-manager',
   'security-agent',

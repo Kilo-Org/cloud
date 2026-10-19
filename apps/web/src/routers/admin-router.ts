@@ -51,6 +51,7 @@ import { contributorChampionsRouter } from '@/routers/admin/contributor-champion
 import { salesDemoRouter } from '@/routers/admin/sales-demo-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
+import { adminInternalBotUsersRouter } from '@/routers/admin/internal-bot-users-router';
 import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
@@ -59,6 +60,7 @@ import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminAutoFreeConfigRouter } from '@/routers/admin/auto-free-config-router';
 import { adminGatewayModelListsRouter } from '@/routers/admin/gateway-model-lists-router';
+import { adminVercelModelIdOverridesRouter } from '@/routers/admin/vercel-model-id-overrides-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
@@ -287,6 +289,10 @@ function isKiloClawCancelDesiredState(params: {
 
 function parseJsonSafe(text: string): unknown {
   return JSON.parse(text) as unknown;
+}
+
+function isManualProviderSyncEnabled(): boolean {
+  return process.env.VERCEL_ENV !== 'production';
 }
 
 const AddNoteSchema = z.object({
@@ -2274,7 +2280,14 @@ export const adminRouter = createTRPCRouter({
   }),
 
   syncProviders: createTRPCRouter({
+    getManualSyncEnabled: adminProcedure.query(() => isManualProviderSyncEnabled()),
     triggerSync: adminProcedure.mutation(async () => {
+      if (!isManualProviderSyncEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+        });
+      }
       const result = await syncAndStoreProviders();
       return result;
     }),
@@ -2581,6 +2594,7 @@ export const adminRouter = createTRPCRouter({
   salesDemo: salesDemoRouter,
   bulkUserCredits: bulkUserCreditsRouter,
   creditCampaigns: creditCampaignsRouter,
+  internalBotUsers: adminInternalBotUsersRouter,
   cloudBillingSkus: cloudBillingSkusRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,
@@ -2590,6 +2604,7 @@ export const adminRouter = createTRPCRouter({
   gatewayConfig: adminGatewayConfigRouter,
   autoFreeConfig: adminAutoFreeConfigRouter,
   gatewayModelLists: adminGatewayModelListsRouter,
+  vercelModelIdOverrides: adminVercelModelIdOverridesRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,

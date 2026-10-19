@@ -28,7 +28,6 @@ function createTicket(): TriageTicket {
       issueTitle: 'Failure callback',
       issueBody: null,
       duplicateThreshold: 0.8,
-      autoFixThreshold: 0.9,
       modelSlug: 'test-model',
     },
     owner: { type: 'user', id: 'user-1', userId: 'user-1' },
@@ -39,31 +38,48 @@ function createTicket(): TriageTicket {
   };
 }
 
-function createAutoFixTicket(author?: string): TriageTicket {
+function payloadFor(classification: string, confidence: number, selectedLabels: string[]) {
   return {
-    ...createTicket(),
-    issueAuthor: author,
-    githubToken: 'github-token',
+    cloudAgentSessionId,
+    status: 'completed' as const,
+    lastAssistantMessageText: `Classification complete.\n\`\`\`json\n${JSON.stringify({
+      classification,
+      confidence,
+      intentSummary: 'Reported behavior',
+      selectedLabels,
+    })}\n\`\`\``,
   };
 }
 
-const highConfidencePayload = {
-  cloudAgentSessionId,
-  status: 'completed' as const,
-  lastAssistantMessageText:
-    'Classification complete.\n```json\n{"classification":"bug","confidence":0.98,"intentSummary":"Crash on startup","selectedLabels":[]}\n```',
-};
+function field(value: unknown, key: string): unknown {
+  if (typeof value !== 'object' || value === null) return undefined;
+  return Object.entries(value).find(([name]) => name === key)?.[1];
+}
 
-function labelsInFetchCalls(
-  calls: Array<unknown[]>
-): Array<{ labels?: string[]; autoFixSkipped?: boolean }> {
-  return calls.map(call => {
-    const init = call[1] as { body?: string } | undefined;
-    const body = JSON.parse(init?.body ?? '{}') as {
-      labels?: string[];
-      actionMetadata?: { autoFixSkipped?: boolean };
-    };
-    return { labels: body.labels, autoFixSkipped: body.actionMetadata?.autoFixSkipped };
+function requestBody(call: readonly unknown[]): unknown {
+  const raw = field(call[1], 'body');
+  if (typeof raw !== 'string') return undefined;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function requestUrl(call: readonly unknown[]): string {
+  const input = call[0];
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  const url = field(input, 'url');
+  return typeof url === 'string' ? url : '';
+}
+
+function appliedLabelLists(calls: readonly (readonly unknown[])[]): string[][] {
+  return calls.flatMap(call => {
+    const labels = field(requestBody(call), 'labels');
+    if (!Array.isArray(labels)) return [];
+    const names = labels.filter((item): item is string => typeof item === 'string');
+    return names.length === labels.length ? [names] : [];
   });
 }
 
@@ -73,16 +89,20 @@ function createHarness(ticket: TriageTicket = createTicket()) {
     storedState = structuredClone(value);
   });
   const deleteAlarm = vi.fn(async () => {});
+  const setAlarm = vi.fn(async () => {});
   const context = {
     storage: {
       get: async () => structuredClone(storedState),
       put,
       deleteAlarm,
+      setAlarm,
     },
   } as unknown as DurableObjectState;
   const environment = {
     API_URL: 'https://api.example.com',
     INTERNAL_API_SECRET: 'internal-secret',
+    SELF_URL: 'https://triage-worker.example.com',
+    CLOUD_AGENT_URL: 'https://cloud-agent.example.com',
   };
   const orchestrator = new TriageOrchestrator(context, environment as never);
 
@@ -170,158 +190,128 @@ describe('TriageOrchestrator classification failure callbacks', () => {
   });
 });
 
-describe('TriageOrchestrator auto-fix label permission gate', () => {
+describe('TriageOrchestrator reserved label handling', () => {
+  const addLabelUrl = 'https://api.example.com/api/internal/triage/add-label';
+
   beforeEach(() => {
     vi.unstubAllGlobals();
   });
 
-  async function stubFetchResponses(responses: Array<{ urlPart: string; body: unknown }>) {
+  function stubFetch(responses: Array<{ urlPart: string; body: unknown }>) {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.startsWith(addLabelUrl)) {
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      }
       for (const response of responses) {
         if (url.includes(response.urlPart)) {
           return new Response(JSON.stringify(response.body), { status: 200 });
         }
       }
-      return new Response(null, { status: 200 });
+      return new Response(JSON.stringify({}), { status: 200 });
     });
     vi.stubGlobal('fetch', fetchMock);
     return fetchMock;
   }
 
-  type FetchMock = ReturnType<typeof vi.fn>;
+  it.each(['bug', 'feature'])(
+    'applies the selected content labels on the %s path',
+    async classification => {
+      const harness = createHarness({
+        ...createTicket(),
+        availableLabels: ['bug', 'kilo-triaged', 'kilo-duplicate'],
+      });
+      const fetchMock = stubFetch([]);
 
-  function calledGithubPermissionApi(fetchMock: FetchMock): boolean {
-    return fetchMock.mock.calls.some(call => {
-      const input = call[0];
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      return url.includes('api.github.com');
+      await harness.orchestrator.completeClassification(
+        callbackSecret,
+        payloadFor(classification, 0.97, ['bug', 'kilo-triaged', 'kilo-duplicate'])
+      );
+
+      expect(appliedLabelLists(fetchMock.mock.calls)).toEqual([['kilo-triaged', 'bug']]);
+      expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
+    }
+  );
+
+  it('preserves repository labels whose names match built-in object properties', async () => {
+    const harness = createHarness({
+      ...createTicket(),
+      availableLabels: ['constructor', 'kilo-triaged'],
     });
-  }
+    const fetchMock = stubFetch([]);
 
-  const permissionUrl = 'https://api.github.com/repos/kilocode/example/collaborators';
-
-  it('withstands a read-permission author at high confidence: auto-fix label is not applied', async () => {
-    const harness = createHarness(createAutoFixTicket('outside-contributor'));
-    const fetchMock = await stubFetchResponses([
-      { urlPart: permissionUrl, body: { permission: 'read' } },
-    ]);
-
-    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
-
-    const calls = labelsInFetchCalls(fetchMock.mock.calls);
-    expect(calls.some(call => call.labels?.includes('kilo-triaged'))).toBe(true);
-    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(false);
-    expect(calls.some(call => call.autoFixSkipped)).toBe(true);
-    expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
-  });
-
-  it('strips worker-owned labels from the model selection and preserves same-named repository labels', async () => {
-    // 'constructor' is a legitimate repository label whose name matches an
-    // Object.prototype key; the strip must remove only the table's own keys.
-    const ticket = {
-      ...createAutoFixTicket('outside-contributor'),
-      availableLabels: ['bug', 'kilo-auto-fix', 'constructor'],
-    };
-    const harness = createHarness(ticket);
-    const fetchMock = await stubFetchResponses([
-      { urlPart: permissionUrl, body: { permission: 'read' } },
-    ]);
-
-    await harness.orchestrator.completeClassification(callbackSecret, {
-      cloudAgentSessionId,
-      status: 'completed',
-      lastAssistantMessageText:
-        'Classification complete.\n```json\n{"classification":"bug","confidence":0.95,"intentSummary":"Crash on startup","selectedLabels":["kilo-auto-fix","constructor","bug"]}\n```',
-    });
-
-    const calls = labelsInFetchCalls(fetchMock.mock.calls);
-    const applied = calls.find(call => call.labels !== undefined);
-    expect(applied?.labels).toEqual(['kilo-triaged', 'constructor', 'bug']);
-    expect(calls.some(call => call.autoFixSkipped)).toBe(true);
-  });
-
-  it('resolves the author in the permission lookup URL', async () => {
-    const harness = createHarness(createAutoFixTicket('author-login'));
-    const fetchMock = await stubFetchResponses([
-      { urlPart: permissionUrl, body: { permission: 'write' } },
-    ]);
-
-    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
-
-    const requestedUrls = fetchMock.mock.calls.map(call => {
-      const input = call[0];
-      return typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    });
-    expect(requestedUrls.some(url => url.includes('/collaborators/author-login/permission'))).toBe(
-      true
+    await harness.orchestrator.completeClassification(
+      callbackSecret,
+      payloadFor('bug', 0.97, ['constructor', 'kilo-triaged'])
     );
+
+    expect(appliedLabelLists(fetchMock.mock.calls)).toEqual([['kilo-triaged', 'constructor']]);
   });
 
-  it('applies the auto-fix label for a maintain-tier author at high confidence', async () => {
-    const harness = createHarness(createAutoFixTicket('repo-maintainer'));
-    const fetchMock = await stubFetchResponses([
-      { urlPart: permissionUrl, body: { permission: 'maintain' } },
-    ]);
+  it.each(['question', 'unclear'])(
+    'applies only triage-owned labels on the %s path',
+    async classification => {
+      const harness = createHarness({
+        ...createTicket(),
+        availableLabels: [classification, 'kilo-triaged', 'kilo-duplicate'],
+      });
+      const fetchMock = stubFetch([]);
 
-    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
+      await harness.orchestrator.completeClassification(
+        callbackSecret,
+        payloadFor(classification, 0.6, [classification, 'kilo-duplicate', 'kilo-triaged'])
+      );
 
-    const calls = labelsInFetchCalls(fetchMock.mock.calls);
-    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(true);
-    expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
-  });
+      expect(appliedLabelLists(fetchMock.mock.calls)).toEqual([['kilo-triaged', classification]]);
+      expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
+    }
+  );
 
-  it('applies the auto-fix label for a write-permission author at high confidence', async () => {
-    const harness = createHarness(createAutoFixTicket('repo-committer'));
-    const fetchMock = await stubFetchResponses([
-      { urlPart: permissionUrl, body: { permission: 'write' } },
-    ]);
-
-    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
-
-    const calls = labelsInFetchCalls(fetchMock.mock.calls);
-    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(true);
-    expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
-  });
-
-  it('fails closed when the permission lookup returns an unexpected level', async () => {
-    const harness = createHarness(createAutoFixTicket('unknown-tier'));
-    const fetchMock = await stubFetchResponses([
-      { urlPart: permissionUrl, body: { permission: 'tier-1' } },
-    ]);
-
-    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
-
-    const calls = labelsInFetchCalls(fetchMock.mock.calls);
-    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(false);
-    expect(calls.some(call => call.autoFixSkipped)).toBe(true);
-  });
-
-  it('fails closed when no GitHub token is available', async () => {
-    const ticket = { ...createAutoFixTicket('some-author'), githubToken: undefined };
-    const harness = createHarness(ticket);
-    const fetchMock = await stubFetchResponses([]);
-
-    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
-
-    expect(calledGithubPermissionApi(fetchMock)).toBe(false);
-    const calls = labelsInFetchCalls(fetchMock.mock.calls);
-    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(false);
-  });
-
-  it('does not call the permission API on the low-confidence path', async () => {
-    const harness = createHarness(createAutoFixTicket('outside-contributor'));
-    const fetchMock = await stubFetchResponses([
-      { urlPart: permissionUrl, body: { permission: 'read' } },
-    ]);
-
-    await harness.orchestrator.completeClassification(callbackSecret, {
-      cloudAgentSessionId,
-      status: 'completed',
-      lastAssistantMessageText:
-        'Classification complete.\n```json\n{"classification":"bug","confidence":0.4,"intentSummary":"Crash on startup","selectedLabels":[]}\n```',
+  it('leaves triage-applied labels out of the classification candidates', async () => {
+    const harness = createHarness({
+      ...createTicket(),
+      status: 'pending',
+      cloudAgentSessionId: undefined,
+      callbackSecret: undefined,
     });
+    const fetchMock = stubFetch([
+      { urlPart: '/api/internal/triage/check-duplicates', body: { isDuplicate: false } },
+      {
+        urlPart: '/api/internal/triage/classify-config',
+        body: {
+          githubToken: 'github-token',
+          config: { model_slug: 'test-model' },
+          excluded_labels: ['skip-me'],
+        },
+      },
+      {
+        urlPart: 'api.github.com/repos/kilocode/example/labels',
+        body: [{ name: 'bug' }, { name: 'kilo-triaged' }, { name: 'kilo-duplicate' }],
+      },
+      {
+        urlPart: '/trpc/prepareSession',
+        body: {
+          result: { data: { cloudAgentSessionId: 'agent-1', kiloSessionId: 'kilo-1' } },
+        },
+      },
+      {
+        urlPart: '/trpc/initiateFromKilocodeSessionV2',
+        body: { result: { data: { executionId: 'exec-1' } } },
+      },
+    ]);
 
-    expect(calledGithubPermissionApi(fetchMock)).toBe(false);
+    await harness.orchestrator.runTriage();
+
+    const prepareCall = fetchMock.mock.calls.find(call =>
+      requestUrl(call).includes('/trpc/prepareSession')
+    );
+    expect(prepareCall).toBeDefined();
+    const prompt = field(requestBody(prepareCall ?? []), 'prompt');
+    expect(typeof prompt).toBe('string');
+    expect(prompt).toContain('- "bug"');
+    expect(prompt).not.toContain('skip-me');
+    expect(prompt).not.toContain('kilo-triaged');
+    expect(prompt).not.toContain('kilo-duplicate');
+    expect(harness.getStoredState().availableLabels).toEqual(['bug']);
   });
 });

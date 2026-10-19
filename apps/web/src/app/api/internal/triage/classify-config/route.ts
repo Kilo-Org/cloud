@@ -13,14 +13,13 @@
  * Protected by internal API secret
  */
 
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getTriageTicketById } from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type { Owner } from '@/lib/auto-triage/db/types';
 import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
@@ -32,7 +31,6 @@ interface ClassifyConfigRequest {
 
 interface ClassifyConfigResponse {
   githubToken?: string;
-  issueAuthor: string;
   config: {
     model_slug: string;
     custom_instructions?: string | null;
@@ -43,10 +41,8 @@ interface ClassifyConfigResponse {
 export async function POST(req: NextRequest) {
   try {
     // Validate internal API secret
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const unauthorized = authorizeInternalApiRequest(req);
+    if (unauthorized) return unauthorized;
 
     const body: ClassifyConfigRequest = await req.json();
     const { ticketId } = body;
@@ -119,11 +115,9 @@ export async function POST(req: NextRequest) {
     // Labels used for gating (skip/required) should not be offered to the AI for auto-labeling
     const excluded_labels = [...(config.skip_labels ?? []), ...(config.required_labels ?? [])];
 
-    // Return configuration for DO to use. issueAuthor lets the worker gate
-    // label application on the author's repository permission.
+    // Return configuration for DO to use
     const response: ClassifyConfigResponse = {
       githubToken,
-      issueAuthor: ticket.issue_author,
       config: {
         model_slug: config.model_slug,
         custom_instructions: config.custom_instructions,

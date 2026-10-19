@@ -10,6 +10,7 @@ import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
 import { AutoFreeContent } from '@/app/admin/gateway/AutoFreeContent';
 import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListContent';
+import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -77,7 +78,7 @@ export default function AdminGatewayPage() {
               Custom LLMs
             </TabsTrigger>
             <TabsTrigger value="routing" className={tabTriggerClass}>
-              Routing
+              Vercel Routing
             </TabsTrigger>
             <TabsTrigger value="auto-free" className={tabTriggerClass}>
               Auto Free
@@ -98,8 +99,9 @@ export default function AdminGatewayPage() {
           <TabsContent value="custom-llms" className="mt-4">
             <CustomLlmsContent />
           </TabsContent>
-          <TabsContent value="routing" className="mt-4">
+          <TabsContent value="routing" className="mt-4 flex flex-col gap-y-6">
             <RoutingContent />
+            <VercelModelIdOverridesContent />
           </TabsContent>
           <TabsContent value="auto-free" className="mt-4">
             <AutoFreeContent />

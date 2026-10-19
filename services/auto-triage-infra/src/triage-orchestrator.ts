@@ -19,10 +19,6 @@ import type {
 } from './types';
 import { parseClassification } from './parsers/classification-parser';
 import { createCloudAgentNextFetchClient } from '@kilocode/worker-utils';
-import {
-  fetchCollaboratorPermission,
-  hasWriteAccess,
-} from '@kilocode/worker-utils/github-collaborator-permission';
 import { buildClassificationPrompt } from './services/prompt-builder';
 import { fetchRepoLabels, DEFAULT_LABELS } from './services/github-labels-service';
 
@@ -39,16 +35,15 @@ function constantTimeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Labels owned by worker logic. They are excluded from the model's label
- * choices and removed from model-provided label lists before application.
+ * Labels that triage applies by itself. They are left out of the candidate
+ * label list and dropped if they appear in a returned label list.
  */
 const RESERVED_AUTOMATION_LABELS: Record<string, true> = {
   'kilo-triaged': true,
-  'kilo-auto-fix': true,
   'kilo-duplicate': true,
 };
 
-/** Remove worker-reserved labels from a model-provided label list. */
+/** Drop reserved labels from a label list. */
 function stripReservedLabels(labels: string[]): string[] {
   return labels.filter(label => !Object.hasOwn(RESERVED_AUTOMATION_LABELS, label));
 }
@@ -307,7 +302,6 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
     const configData: {
       githubToken?: string;
-      issueAuthor?: string;
       config: {
         model_slug: string;
         custom_instructions?: string | null;
@@ -402,8 +396,6 @@ export class TriageOrchestrator extends DurableObject<Env> {
     this.state.cloudAgentSessionId = prepareResult.cloudAgentSessionId;
     this.state.availableLabels = availableLabels;
     this.state.classifyConfig = config;
-    this.state.issueAuthor = configData.issueAuthor;
-    this.state.githubToken = githubToken;
     this.state.updatedAt = new Date().toISOString();
     await this.ctx.storage.put('state', this.state);
 
@@ -435,34 +427,8 @@ export class TriageOrchestrator extends DurableObject<Env> {
     } else if (classification.classification === 'unclear') {
       await this.buildAndApplyLabels(['kilo-triaged'], selectedLabels);
       await this.requestClarification(classification);
-    } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
-      const autoFixAuthorized = await this.authorizeAutoFix();
-      if (!autoFixAuthorized) {
-        // Author does not (verifiably) have write access: apply the
-        // classification labels only and leave the auto-fix label for a
-        // maintainer to add by hand.
-        await this.buildAndApplyLabels(['kilo-triaged'], selectedLabels);
-        await this.updateStatus('actioned', {
-          classification: classification.classification,
-          confidence: classification.confidence,
-          intentSummary: classification.intentSummary,
-          relatedFiles: classification.relatedFiles,
-          actionMetadata: {
-            autoFixSkipped: true,
-            autoFixSkippedReason: 'author lacks verified repository write access',
-          },
-        });
-        return;
-      }
-      const labelsApplied = await this.buildAndApplyLabels(
-        ['kilo-triaged', 'kilo-auto-fix'],
-        selectedLabels
-      );
-      if (!labelsApplied) {
-        console.error('[TriageOrchestrator] kilo-auto-fix label may not have been applied', {
-          ticketId: this.state.ticketId,
-        });
-      }
+    } else {
+      const labelsApplied = await this.buildAndApplyLabels(['kilo-triaged'], selectedLabels);
       await this.updateStatus('actioned', {
         classification: classification.classification,
         confidence: classification.confidence,
@@ -470,52 +436,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
         relatedFiles: classification.relatedFiles,
         actionMetadata: labelsApplied ? undefined : { labelWarning: 'Failed to apply labels' },
       });
-    } else {
-      await this.buildAndApplyLabels(['kilo-triaged'], selectedLabels);
-      await this.requestClarification(classification);
     }
-  }
-
-  /**
-   * Decide whether this ticket's author may receive the auto-fix label.
-   *
-   * The label triggers downstream automation, so it requires the author to
-   * hold a repository write permission tier, verified server-side through
-   * GitHub's collaborator permission API — model-reported confidence alone is
-   * not authorization. Fails closed: a missing author, a missing token, or a
-   * failed lookup all deny the label.
-   */
-  private async authorizeAutoFix(): Promise<boolean> {
-    const { issueAuthor, githubToken, sessionInput } = this.state;
-    if (!issueAuthor) {
-      console.warn('[auto-triage:labels] No issue author on ticket; skipping auto-fix label', {
-        ticketId: this.state.ticketId,
-      });
-      return false;
-    }
-    if (!githubToken) {
-      console.warn(
-        '[auto-triage:labels] No GitHub token for permission check; skipping auto-fix label',
-        {
-          ticketId: this.state.ticketId,
-        }
-      );
-      return false;
-    }
-    const permission = await fetchCollaboratorPermission(
-      sessionInput.repoFullName,
-      issueAuthor,
-      githubToken
-    );
-    if (!hasWriteAccess(permission)) {
-      console.log('[auto-triage:labels] Author lacks write access; skipping auto-fix label', {
-        ticketId: this.state.ticketId,
-        author: issueAuthor,
-        permission: permission ?? 'unverifiable',
-      });
-      return false;
-    }
-    return true;
   }
 
   /**

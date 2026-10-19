@@ -48,6 +48,7 @@ type StoredRecord = {
   stopOpId?: string | null;
   lastSnapshot?: { id: string; sourceAllocation: string } | null;
   startSource?: 'image' | 'repository';
+  startImage?: string;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: string;
@@ -2390,6 +2391,29 @@ describe('SandboxContainers repository snapshots', () => {
     });
   });
 
+  it('captures under the start image after the configured image changes and the DO reconstructs', async () => {
+    const { kv, data } = fakeKv();
+    const initial = setup({ env: { REPO_SNAPSHOTS: kv } });
+    await launchFromRepo(initial.instance, REF_A);
+    const restored = setup({
+      record: initial.readRecord(),
+      running: true,
+      env: { REPO_SNAPSHOTS: kv },
+    });
+    const newImage = 'registry.example/kilo/app:next';
+    restored.container.images.app = newImage;
+
+    await expect(restored.instance.captureRepository(REF_A, REPO_KEY, 'abc123')).resolves.toBe(
+      true
+    );
+
+    expect(data.has(await indexKeyFor(REPO_KEY, newImage))).toBe(false);
+    expect(JSON.parse(data.get(await indexKeyFor()) ?? 'null')).toMatchObject({
+      snapshotId: 'snap-1',
+      commit: 'abc123',
+    });
+  });
+
   it('starts from the image when the index has no entry, and a different image has none', async () => {
     const other = await indexKeyFor(REPO_KEY, 'registry.example/kilo/app:previous');
     const { kv } = fakeKv({ [other]: { snapshotId: 'snap-old-image' } });
@@ -2936,6 +2960,18 @@ describe('SandboxContainers repository capture', () => {
     container.running = false;
     await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
     expect(container.snapshotCalls).toBe(0);
+  });
+
+  it('skips capture for a legacy running allocation whose start image is unknown', async () => {
+    const store = fakeKv();
+    const { instance, container } = setup({
+      running: true,
+      env: { REPO_SNAPSHOTS: store.kv },
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
+    expect(container.snapshotCalls).toBe(0);
+    expect(store.data.size).toBe(0);
   });
 
   it('reports a failed snapshot or index write as false and publishes nothing', async () => {

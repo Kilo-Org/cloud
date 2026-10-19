@@ -87,6 +87,13 @@ describe('classifyTerminalCreateError', () => {
     ).toEqual({ kind: 'final-error', statusText: 'PTY allocation failed' });
   });
 
+  it('retries transport failures that carry no server code', () => {
+    expect(classifyTerminalCreateError(new Error('Failed to fetch'))).toEqual({
+      kind: 'retry',
+      statusText: 'Waiting for terminal',
+    });
+  });
+
   it('stops retrying for permanent access and session errors', () => {
     expect(
       classifyTerminalCreateError({

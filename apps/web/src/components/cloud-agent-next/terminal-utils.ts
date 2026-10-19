@@ -109,6 +109,10 @@ export function classifyTerminalCreateError(error: unknown): TerminalConnectionD
     };
   }
 
+  if (code === undefined) {
+    return { kind: 'retry', statusText: 'Waiting for terminal' };
+  }
+
   if (isRetryableTerminalMessage(message)) {
     return {
       kind: 'retry',

@@ -169,7 +169,7 @@ export function useCloudAgentTerminal({
   }, [active, cloudAgentSessionId, resizeTerminal]);
 
   useEffect(() => {
-    if (!enabled || !active || !cloudAgentSessionId) return;
+    if (!enabled || !cloudAgentSessionId) return;
 
     let disposed = false;
     const unsubscribe = subscribeSandboxStatus({
@@ -209,7 +209,7 @@ export function useCloudAgentTerminal({
       disposed = true;
       unsubscribe();
     };
-  }, [active, cloudAgentSessionId, enabled, organizationId]);
+  }, [cloudAgentSessionId, enabled, organizationId]);
 
   useEffect(() => {
     if (!enabled || !cloudAgentSessionId) return;

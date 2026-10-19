@@ -10,6 +10,7 @@ import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
@@ -66,7 +67,9 @@ export async function removeUserFromOrganization(
         });
 
       // Pending invitations are deleted with the membership they belong to,
-      // so the invitation list and the membership stay consistent.
+      // so the invitation list and the membership stay consistent. Both
+      // sides are compared in normalized form, matching how acceptance
+      // resolves the invitation email.
       const [member] = await tx
         .select({
           email: sql<string>`coalesce(${kilocode_users.normalized_email}, lower(${kilocode_users.google_user_email}))`,
@@ -77,21 +80,29 @@ export async function removeUserFromOrganization(
 
       if (member) {
         const pending = await tx
-          .delete(organization_invitations)
+          .select({ id: organization_invitations.id, email: organization_invitations.email })
+          .from(organization_invitations)
           .where(
             and(
               eq(organization_invitations.organization_id, organizationId),
-              eq(organization_invitations.email, member.email),
               isNull(organization_invitations.accepted_at),
               gt(organization_invitations.expires_at, sql`NOW()`)
             )
-          )
-          .returning({ id: organization_invitations.id });
+          );
 
-        // An invitation row that is gone must never produce a later invite
-        // email. Mark the outbox rows terminal so the cron drain skips them
-        // (same shape as the deleteInvite procedure).
-        for (const row of pending) {
+        const normalizedMember = normalizeEmail(member.email);
+        const removable = pending.filter(
+          invitation => normalizeEmail(invitation.email) === normalizedMember
+        );
+
+        for (const invitation of removable) {
+          await tx
+            .delete(organization_invitations)
+            .where(eq(organization_invitations.id, invitation.id));
+
+          // An invitation row that is gone must never produce a later invite
+          // email. Mark the outbox rows terminal so the cron drain skips them
+          // (same shape as the deleteInvite procedure).
           await tx
             .update(external_side_effect_outbox)
             .set({
@@ -100,7 +111,7 @@ export async function removeUserFromOrganization(
               next_attempt_at: null,
               last_error: 'revoked',
             })
-            .where(eq(external_side_effect_outbox.invitation_id, row.id));
+            .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
         }
       }
     }

@@ -761,6 +761,22 @@ export async function acceptOrganizationInvite(
         .limit(1);
 
       if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
+        // The invitation is refused, so it must not linger as live in the
+        // invitation list or produce a later invite email: expire it and mark
+        // its outbox row terminal (same shape as the deleteInvite procedure).
+        await tx
+          .update(organization_invitations)
+          .set({ expires_at: sql`NOW()` })
+          .where(eq(organization_invitations.id, invitation.id));
+        await tx
+          .update(external_side_effect_outbox)
+          .set({
+            status: 'failed',
+            claimed_at: null,
+            next_attempt_at: null,
+            last_error: 'revoked',
+          })
+          .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
         return failureResult('Invitation is no longer valid');
       }
 

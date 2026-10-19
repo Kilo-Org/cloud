@@ -246,6 +246,50 @@ describe('removeUserFromOrganization', () => {
     expect(outboxRow.next_attempt_at).toBeNull();
   });
 
+  test('deletes a pending invitation whose stored email only differs in case or aliases from the member address', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createOrganization('Case Org', owner.id);
+
+    // The invitation is stored with a different case and a plus alias, the
+    // form acceptance also matches, so removal must still find it.
+    const storedEmail = `${member.google_user_email.split('@')[0]}+team@Example.com`;
+    const invitation = await inviteUserToOrganization(
+      organization.id,
+      owner.id,
+      storedEmail,
+      'member'
+    );
+
+    await db.insert(external_side_effect_outbox).values({
+      operation: 'send_org_invite_email',
+      invitation_id: invitation.id,
+      payload: {
+        invitationId: invitation.id,
+        to: storedEmail,
+        organizationName: 'Case Org',
+        inviterName: 'Test User',
+        acceptInviteUrl: `https://app.kilo.ai/invite/${invitation.token}`,
+      },
+    });
+
+    await addUserToOrganization(organization.id, member.id, 'member');
+    await removeUserFromOrganization(organization.id, member.id, owner.id);
+
+    const invitations = await db
+      .select()
+      .from(organization_invitations)
+      .where(eq(organization_invitations.id, invitation.id));
+    expect(invitations).toHaveLength(0);
+
+    const [outboxRow] = await db
+      .select()
+      .from(external_side_effect_outbox)
+      .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    expect(outboxRow.status).toBe('failed');
+    expect(outboxRow.last_error).toBe('revoked');
+  });
+
   test('keeps accepted, expired, and other-organization invitations during removal', async () => {
     const owner = await insertTestUser();
     const member = await insertTestUser();

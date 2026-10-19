@@ -1928,7 +1928,7 @@ describe('H2: Membership removal tombstone', () => {
     expect(membershipsAfterRejoin.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('should accept an invitation newer than the stored membership record', async () => {
+  test('should reject an invitation older than the removal record', async () => {
     // Fixtures: the stored record, then an invitation with an earlier
     // creation timestamp.
     await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
@@ -1990,6 +1990,13 @@ describe('H2: Membership removal tombstone', () => {
         )
       );
     expect(removals).toHaveLength(1);
+
+    // The refused invitation is expired so it cannot linger as live.
+    const [refusedInvitation] = await db
+      .select({ expiresAt: organization_invitations.expires_at })
+      .from(organization_invitations)
+      .where(eq(organization_invitations.id, invitation.id));
+    expect(new Date(refusedInvitation.expiresAt).getTime()).toBeLessThanOrEqual(Date.now());
   });
 
   test('should accept a newer invitation and clear the stored membership record', async () => {

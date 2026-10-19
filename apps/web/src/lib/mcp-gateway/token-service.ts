@@ -51,7 +51,7 @@ function publicJwks(config: GatewayAppConfig): { keys: Array<JsonWebKey & { kid:
       const jwk: JsonWebKey & { kid: string } = { kid: key.keyId };
       for (const member of PublishedJwkMembers) {
         if (member in key.publicJwk) {
-          jwk[member] = key.publicJwk[member];
+          (jwk as unknown as Record<string, unknown>)[member] = key.publicJwk[member];
         }
       }
       return jwk;

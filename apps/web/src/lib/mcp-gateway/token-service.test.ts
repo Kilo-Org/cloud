@@ -49,15 +49,7 @@ describe('MCP gateway published keyset', () => {
     const { keys } = services.tokenService.publicJwks(config);
 
     expect(keys).toHaveLength(1);
-    expect(Object.keys(keys[0]).sort()).toEqual([
-      'alg',
-      'e',
-      'key_ops',
-      'kid',
-      'kty',
-      'n',
-      'use',
-    ]);
+    expect(Object.keys(keys[0]).sort()).toEqual(['alg', 'e', 'key_ops', 'kid', 'kty', 'n', 'use']);
     expect(keys[0]).toMatchObject({
       kid: 'jwt-active',
       kty: 'RSA',

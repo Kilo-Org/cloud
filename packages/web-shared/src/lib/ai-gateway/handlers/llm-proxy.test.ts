@@ -15,6 +15,7 @@ import {
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
@@ -1050,6 +1051,9 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect(getRoutingProviderConfig).toBeDefined();
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
+    expect(jest.mocked(getOrganizationGroupPolicyContext)).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-1', fromDb: readDb })
+    );
   });
 
   describe('Anthropic provider for Claude', () => {

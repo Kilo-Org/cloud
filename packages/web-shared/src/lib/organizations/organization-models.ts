@@ -17,7 +17,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
@@ -29,9 +29,10 @@ import {
 
 export async function getAvailableModelsForOrganization(
   organizationId: string,
-  subject: OrganizationPolicySubject
+  subject: OrganizationPolicySubject,
+  fromDb: typeof db = db
 ): Promise<OpenRouterModelsResponse | null> {
-  const context = await getOrganizationGroupPolicyContext({ organizationId, subject });
+  const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 

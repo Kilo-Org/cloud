@@ -21,6 +21,7 @@ import {
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type * as DirectByok from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnkryptBenchmarks } from '@kilocode/web-shared/lib/model-stats/enkrypt';
@@ -917,10 +918,11 @@ describe('final Enkrypt serialization boundaries', () => {
           expect(JSON.stringify(result)).not.toContain(field);
         }
         if (branch === 'organization') {
-          expect(getAvailableModelsForOrganization).toHaveBeenCalledWith('test-org-id', {
-            type: 'member',
-            kiloUserId: 'test-user-id',
-          });
+          const [organizationId, subject, fromDb] =
+            jest.mocked(getAvailableModelsForOrganization).mock.lastCall ?? [];
+          expect(organizationId).toBe('test-org-id');
+          expect(subject).toEqual({ type: 'member', kiloUserId: 'test-user-id' });
+          expect(fromDb).toBe(readDb);
           expect(result.data.map(model => model.id)).toEqual(['some-other-model']);
           expect(getDirectByokModelsForUser).not.toHaveBeenCalled();
         }

@@ -238,11 +238,13 @@ export async function isModelRouteAllowed(
 export async function resolveOrganizationMemberModelPolicy(params: {
   organizationId: string;
   kiloUserId: string;
+  fromDb?: typeof db;
 }): Promise<EffectiveOrganizationModelPolicy> {
   return evaluateEffectiveModelAccessPolicy(
     await getOrganizationGroupPolicyContext({
       organizationId: params.organizationId,
       subject: { type: 'member', kiloUserId: params.kiloUserId },
+      fromDb: params.fromDb,
     })
   );
 }
@@ -268,6 +270,7 @@ export async function resolveOrganizationMemberModelDecision(params: {
   kiloUserId: string;
   modelId: string;
   providerLookup?: ProviderLookup;
+  fromDb?: typeof db;
 }) {
   const policy = await resolveOrganizationMemberModelPolicy(params);
   return {

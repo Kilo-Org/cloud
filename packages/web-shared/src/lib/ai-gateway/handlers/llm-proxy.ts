@@ -337,6 +337,7 @@ export async function handleLlmProxyRequest(
     const context = await getOrganizationGroupPolicyContext({
       organizationId: auth.organizationId,
       subject: { type: 'member', kiloUserId: auth.user.id },
+      fromDb: readDb,
     });
     return evaluateEffectiveModelAccessPolicy(context);
   });

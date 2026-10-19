@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModel,
@@ -223,10 +224,13 @@ describe('deniedAutoRoutingModelIdsForMember', () => {
         modelIds: ['anthropic/claude-sonnet-4.6', 'openai/gpt-5', 'kilo-auto/frontier'],
       })
     ).resolves.toEqual(['openai/gpt-5']);
-    expect(resolveOrganizationMemberModelPolicy).toHaveBeenCalledWith({
+    const { fromDb, ...policyParams } =
+      jest.mocked(resolveOrganizationMemberModelPolicy).mock.lastCall?.[0] ?? {};
+    expect(policyParams).toEqual({
       organizationId: member.organizationId,
       kiloUserId: member.userId,
     });
+    expect(fromDb).toBe(readDb);
   });
 
   it('denies data-collection-required candidates when the organization denies data collection', async () => {

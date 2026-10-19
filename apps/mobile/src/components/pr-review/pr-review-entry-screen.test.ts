@@ -181,8 +181,14 @@ describe('provider-neutral URL field', () => {
   });
 
   it('reports denied paste access instead of an empty clipboard', async () => {
+    // Denial semantics: the read returns '' while the pasteboard still holds
+    // text, so hasStringAsync keeps reporting content. The harness's read spy
+    // replaces the mock's module binding, so the clipboard content below is
+    // what a successful read would have returned.
     mocks.clipboard.current = 'https://gitlab.com/acme/api/-/merge_requests/3';
-    mocks.clipboard.hasString = false;
+    mocks.clipboard.hasString = true;
+    const clipboardModule = await import('expo-clipboard');
+    const readSpy = vi.spyOn(clipboardModule, 'getStringAsync').mockResolvedValue('');
     const tree = await renderLoaded();
     const paste = find(
       tree,
@@ -191,6 +197,7 @@ describe('provider-neutral URL field', () => {
     );
     await (propsOf(paste).onPress as () => Promise<void>)();
     await flush();
+    readSpy.mockRestore();
     expect(mocks.toastError).toHaveBeenCalledWith(
       'Paste access was denied. Allow paste and try again.'
     );
@@ -200,6 +207,7 @@ describe('provider-neutral URL field', () => {
 
   it('keeps the empty-clipboard copy for a truly empty clipboard', async () => {
     mocks.clipboard.current = '';
+    mocks.clipboard.hasString = false;
     const tree = await renderLoaded();
     const paste = find(
       tree,

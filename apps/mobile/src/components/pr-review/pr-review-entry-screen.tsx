@@ -106,18 +106,21 @@ export function PrReviewEntryScreen() {
   };
 
   const handlePaste = async () => {
-    // Probe before reading: a denied iOS paste read returns '' from
-    // getStringAsync, and hasStringAsync inspects only the content type
-    // without raising the paste prompt. Denial gets its own message; the
-    // empty-clipboard copy stays for a truly empty clipboard.
-    if (!(await Clipboard.hasStringAsync())) {
-      announcingToast.error(prLinkToastPasteDeniedCopy());
+    const clipboard = await Clipboard.getStringAsync();
+    if (clipboard.length === 0) {
+      // A denied iOS paste read returns '' while the clipboard still holds
+      // text, so classify with the content-type probe: it reads only the
+      // pasteboard metadata and raises no prompt. hasString with an empty
+      // read is denial; no string content at all is a truly empty clipboard.
+      if (await Clipboard.hasStringAsync()) {
+        announcingToast.error(prLinkToastPasteDeniedCopy());
+      } else {
+        announcingToast.error(prLinkToastClipboardEmptyCopy());
+      }
       return;
     }
-    const clipboard = await Clipboard.getStringAsync();
     const decision = decidePrLinkPaste(clipboard);
     if (decision.kind === 'empty') {
-      announcingToast.error(prLinkToastClipboardEmptyCopy());
       return;
     }
     // Replace entire field (never append-at-cursor): native field + ref + hasInput.

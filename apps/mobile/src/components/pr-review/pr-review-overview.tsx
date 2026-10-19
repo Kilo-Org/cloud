@@ -197,17 +197,17 @@ export function PrReviewOverview({
     // the request. A BAD_GATEWAY (service-unavailable) names its own cause —
     // the review service is temporarily unavailable, not GitHub — while every
     // other failure keeps the generic server-error copy. Both offer Retry.
+    let errorTitle = t('prReview.couldNotLoadPullRequest');
+    if (state.kind === 'service-unavailable') {
+      errorTitle = t('prReview.reviewServiceUnavailable');
+    } else if (isMergeRequest) {
+      errorTitle = t('prReview.terms.couldNotLoadMergeRequest');
+    }
     return (
       <QueryError
         refreshControl={refreshControl}
         variant="server"
-        title={
-          state.kind === 'service-unavailable'
-            ? t('prReview.reviewServiceUnavailable')
-            : isMergeRequest
-              ? t('prReview.terms.couldNotLoadMergeRequest')
-              : t('prReview.couldNotLoadPullRequest')
-        }
+        title={errorTitle}
         onRetry={() => {
           void pr.refetch();
         }}

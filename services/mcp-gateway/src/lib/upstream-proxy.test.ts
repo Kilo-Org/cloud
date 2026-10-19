@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { proxyUpstream } from './upstream-proxy';
-import { clearDnsCacheForTests } from './url-policy';
+import { clearDnsCacheForTests, validateResolvedPublicUrl } from './url-policy';
 
 describe('proxyUpstream', () => {
   beforeEach(() => {
@@ -228,6 +228,32 @@ describe('proxyUpstream', () => {
     await expect(
       proxyUpstream({ ...baseParams, remoteUrl: 'https://blocked.example/other' })
     ).rejects.toMatchObject({ code: 'invalid_request' });
+
+    expect(dnsCalls).toBe(2);
+  });
+
+  it('rethrows the specific failure reason on a cached failed validation', async () => {
+    clearDnsCacheForTests();
+    let dnsCalls = 0;
+    const fetchImpl: typeof fetch = async input => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+        dnsCalls += 1;
+        if (url.includes('type=AAAA')) {
+          return new Response(JSON.stringify({ Answer: [{ data: 'fd00::1' }] }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ Answer: [{ data: '8.8.8.8' }] }), { status: 200 });
+      }
+      return new Response('upstream-body', { status: 200 });
+    };
+
+    await expect(
+      validateResolvedPublicUrl('https://reason.example/mcp', fetchImpl)
+    ).rejects.toMatchObject({ message: 'Upstream resolves to a private destination' });
+    await expect(
+      validateResolvedPublicUrl('https://reason.example/other', fetchImpl)
+    ).rejects.toMatchObject({ message: 'Upstream resolves to a private destination' });
 
     expect(dnsCalls).toBe(2);
   });

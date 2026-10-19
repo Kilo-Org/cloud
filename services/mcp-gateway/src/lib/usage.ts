@@ -26,11 +26,18 @@ export function limitedResponse(c: Context<MCPGatewayEnv>) {
 }
 
 /**
- * One rate-limit window per client IP for the anonymous gateway surface. Uses
+ * One rate-limit window per client IP for the tokenless gateway surface. Uses
  * the edge-provided client IP; client-supplied forwarded headers are ignored.
- * No-op when the binding is absent (unit tests, non-prod envs).
+ * Requests that carry a bearer token are metered by the authenticated runtime
+ * windows instead, so this check does not consume their IP budget. No-op when
+ * the binding is absent (unit tests, non-prod envs).
  */
 export const anonymousClientLimiter: MiddlewareHandler<MCPGatewayEnv> = async (c, next) => {
+  const authorization = c.req.header('authorization');
+  if (authorization && authorization.trim().length > 0) {
+    await next();
+    return;
+  }
   const ip = c.req.header(CLIENT_IP_HEADER)?.trim() || UNKNOWN_CLIENT_KEY;
   const outcome = await consumeLimit(c.env.MCP_GATEWAY_UNAUTH_LIMITER, `ip:${ip}`);
   if (outcome === MISSING_BINDING || outcome === true) {

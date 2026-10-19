@@ -416,6 +416,20 @@ describe('MCP gateway route surface', () => {
     );
   });
 
+  it('does not consume the client-IP window for requests with a bearer token', async () => {
+    mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer ip-exempt-token' } },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(mockUnauthLimit).not.toHaveBeenCalled();
+    expect(mockRuntimeLimit).toHaveBeenCalled();
+  });
+
   it('returns 429 on the runtime path when the per-user limit is exhausted', async () => {
     mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
     mockRuntimeLimit.mockImplementation(({ key }: { key: string }) =>
@@ -448,6 +462,23 @@ describe('MCP gateway route surface', () => {
 
     expect(response.status).toBe(429);
     await expect(response.json()).resolves.toEqual({ error: 'rate_limited' });
+    expect(mockResolveRuntimeState).not.toHaveBeenCalled();
+  });
+
+  it('rejects a claims/route mismatch before consuming the runtime windows', async () => {
+    const mismatched = validMcpAccessToken();
+    mismatched.route_key = 'abcdefghijklmnopqrstuvwxyzABCDEZ';
+    mockVerifyGatewayToken.mockResolvedValue(mismatched);
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer mismatched-route-token' } },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(mockRuntimeLimit).not.toHaveBeenCalled();
+    expect(mockResolveActiveRoute).not.toHaveBeenCalled();
     expect(mockResolveRuntimeState).not.toHaveBeenCalled();
   });
 

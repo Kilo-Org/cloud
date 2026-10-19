@@ -191,6 +191,26 @@ async function handleConnect(
     if (!parseScopeString(claims.scope).includes(GatewayMcpAccessScope)) {
       return insufficientScopeResponse(c, canonicalUrl);
     }
+    const claimsMatchRoute =
+      claims.sub.length > 0 &&
+      claims.owner_scope === route.ownerScope &&
+      claims.owner_id === route.ownerId &&
+      claims.config_id === route.configId &&
+      claims.route_key === route.routeKey &&
+      (route.ownerScope !== 'personal' || claims.execution_context.type === 'personal') &&
+      (route.ownerScope !== 'organization' ||
+        (claims.execution_context.type === 'organization' &&
+          claims.execution_context.organizationId === route.ownerId)) &&
+      claims.MCPID ===
+        buildMCPID({
+          ownerScope: route.ownerScope,
+          ownerId: route.ownerId,
+          configId: route.configId,
+          routeKey: route.routeKey,
+        });
+    if (!claimsMatchRoute) {
+      return forbiddenResponse(c);
+    }
     phase = 'limit_runtime';
     if (
       !(await enforceRuntimeLimits({
@@ -200,26 +220,6 @@ async function handleConnect(
       }))
     ) {
       return limitedResponse(c);
-    }
-    if (
-      claims.sub.length === 0 ||
-      claims.owner_scope !== route.ownerScope ||
-      claims.owner_id !== route.ownerId ||
-      claims.config_id !== route.configId ||
-      claims.route_key !== route.routeKey ||
-      (route.ownerScope === 'personal' && claims.execution_context.type !== 'personal') ||
-      (route.ownerScope === 'organization' &&
-        (claims.execution_context.type !== 'organization' ||
-          claims.execution_context.organizationId !== route.ownerId)) ||
-      claims.MCPID !==
-        buildMCPID({
-          ownerScope: route.ownerScope,
-          ownerId: route.ownerId,
-          configId: route.configId,
-          routeKey: route.routeKey,
-        })
-    ) {
-      return forbiddenResponse(c);
     }
     phase = 'load_route';
     const activeRoute = await resolveActiveRoute({ env: c.env, route });

@@ -7,9 +7,13 @@ import NewSessionScreen from '@/app/(app)/agent-chat/new';
 
 const state = vi.hoisted(() => ({
   organization: { organizationId: undefined as string | undefined, isResolved: true },
+  context: { error: null as 'restore' | 'save' | null, retry: vi.fn() },
 }));
 vi.mock('@/components/agents/use-new-session-organization', () => ({
   useNewSessionOrganization: () => ({ ...state.organization, isCloneEntry: false }),
+}));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => state.context,
 }));
 vi.mock('@/components/agents/new-session-screen-body', () => ({
   NewSessionScreenBody: 'Body',
@@ -20,11 +24,13 @@ vi.mock('@/components/agents/new-session-model-provider', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 
 const ModelProvider = 'ModelProvider' as ElementType;
 const Body = 'Body' as ElementType;
 const Loading = 'ActivityIndicator' as ElementType;
+const Retry = 'Pressable' as ElementType;
 
 async function render() {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -46,6 +52,7 @@ function unmount(renderer: TestRenderer.ReactTestRenderer) {
 
 beforeEach(() => {
   state.organization = { organizationId: undefined, isResolved: true };
+  state.context = { error: null, retry: vi.fn() };
 });
 
 describe('NewSessionScreen account gate', () => {
@@ -56,6 +63,22 @@ describe('NewSessionScreen account gate', () => {
     // and its model selection would stay on that first list.
     expect(renderer.root.findAllByType(ModelProvider)).toHaveLength(0);
     expect(renderer.root.findAllByType(Loading)).toHaveLength(1);
+    expect(renderer.root.findAllByType(Retry)).toHaveLength(0);
+    unmount(renderer);
+  });
+
+  it('surfaces a failed account restore with a retry', async () => {
+    state.organization = { organizationId: undefined, isResolved: false };
+    state.context = { error: 'restore', retry: vi.fn() };
+    const renderer = await render();
+    expect(renderer.root.findAllByType(ModelProvider)).toHaveLength(0);
+    const retry = renderer.root.findByType(Retry);
+    expect(retry.props.accessibilityLabel).toBe('Retry');
+    const press = retry.props.onPress as () => void;
+    act(() => {
+      press();
+    });
+    expect(state.context.retry).toHaveBeenCalledTimes(1);
     unmount(renderer);
   });
 

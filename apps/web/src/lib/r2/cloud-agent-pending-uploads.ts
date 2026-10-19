@@ -1,7 +1,7 @@
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { TRPCError } from '@trpc/server';
 import { randomUUID } from 'crypto';
-import { and, count, eq, inArray, like, not, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, eq, gt, inArray, like, not, sql, type SQL } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
 import {
@@ -219,16 +219,18 @@ async function deletePendingUploadObjects(
  * Claiming first is what keeps a concurrent linkPendingUploads from losing a
  * sent attachment: after the claim the row is no longer 'pending', so the link
  * matches nothing and the object it needs is never deleted. Returns the number
- * of objects actually deleted.
+ * of rows claimed and the number of objects actually deleted.
  */
-async function claimAndDeleteUploadObjects(claim: SQL | undefined): Promise<number> {
+async function claimAndDeleteUploadObjects(
+  claim: SQL | undefined
+): Promise<{ claimed: number; deleted: number }> {
   const claimed = await db
     .update(cloud_agent_pending_uploads)
     .set({ status: 'reaped' })
     .where(claim)
     .returning({ object_key: cloud_agent_pending_uploads.object_key });
 
-  if (claimed.length === 0) return 0;
+  if (claimed.length === 0) return { claimed: 0, deleted: 0 };
 
   const { deletedKeys, failedKeys } = await deletePendingUploadObjects(
     claimed.map(row => row.object_key)
@@ -246,7 +248,7 @@ async function claimAndDeleteUploadObjects(claim: SQL | undefined): Promise<numb
       );
   }
 
-  return deletedKeys.length;
+  return { claimed: claimed.length, deleted: deletedKeys.length };
 }
 
 /**
@@ -272,32 +274,40 @@ export async function releasePendingUploads(
 
 /**
  * Delete the private objects behind every live upload row this user admitted,
- * one bounded batch at a time, so account deletion removes the objects
- * together with their ledger rows.
+ * one bounded batch at a time in id order, so account deletion removes the
+ * objects together with their ledger rows.
  */
 export async function purgeUserPendingUploads(kiloUserId: string): Promise<void> {
+  let cursor = '';
+
   for (;;) {
-    const batch = db
+    const batch = await db
       .select({ id: cloud_agent_pending_uploads.id })
       .from(cloud_agent_pending_uploads)
       .where(
         and(
           eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-          inArray(cloud_agent_pending_uploads.status, ['pending', 'linked'])
+          inArray(cloud_agent_pending_uploads.status, ['pending', 'linked']),
+          gt(cloud_agent_pending_uploads.id, cursor)
         )
       )
+      .orderBy(asc(cloud_agent_pending_uploads.id))
       .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
 
-    const reaped = await claimAndDeleteUploadObjects(
+    if (batch.length === 0) return;
+
+    cursor = batch[batch.length - 1].id;
+
+    await claimAndDeleteUploadObjects(
       and(
         eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
         inArray(cloud_agent_pending_uploads.status, ['pending', 'linked']),
-        inArray(cloud_agent_pending_uploads.id, batch)
+        inArray(
+          cloud_agent_pending_uploads.id,
+          batch.map(row => row.id)
+        )
       )
     );
-
-    // A short batch means every row for this user is claimed.
-    if (reaped < CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH) return;
   }
 }
 
@@ -319,12 +329,12 @@ export async function reapAbandonedUploads(): Promise<ReapAbandonedUploadsSummar
     )
     .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
 
-  return {
-    reaped: await claimAndDeleteUploadObjects(
-      and(
-        eq(cloud_agent_pending_uploads.status, 'pending'),
-        inArray(cloud_agent_pending_uploads.id, expiredBatch)
-      )
-    ),
-  };
+  const { deleted } = await claimAndDeleteUploadObjects(
+    and(
+      eq(cloud_agent_pending_uploads.status, 'pending'),
+      inArray(cloud_agent_pending_uploads.id, expiredBatch)
+    )
+  );
+
+  return { reaped: deleted };
 }

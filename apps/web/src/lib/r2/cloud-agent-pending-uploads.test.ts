@@ -656,6 +656,56 @@ describe('cloud-agent pending-upload ledger', () => {
     );
   }, 30_000);
 
+  it('purgeUserPendingUploads reaches rows behind a failed delete', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    // A full batch plus one row whose delete fails once, then succeeds on the
+    // next pass behind the cursor.
+    const failingAttachment = crypto.randomUUID();
+    const trailingAttachment = crypto.randomUUID();
+    await db.insert(cloud_agent_pending_uploads).values([
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: kiloUserId,
+        object_key: buildObjectKey(kiloUserId, messageUuid, failingAttachment),
+        message_uuid: messageUuid,
+        attachment_id: failingAttachment,
+        byte_size: 42,
+        status: 'pending',
+        expires_at: future,
+      },
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: kiloUserId,
+        object_key: buildObjectKey(kiloUserId, messageUuid, trailingAttachment),
+        message_uuid: messageUuid,
+        attachment_id: trailingAttachment,
+        byte_size: 42,
+        status: 'linked',
+        expires_at: future,
+      },
+    ]);
+
+    mockSend.mockRejectedValueOnce(new Error('R2 unavailable'));
+    await purgeUserPendingUploads(kiloUserId);
+
+    // The failing row's delete runs once, fails, and its row returns to
+    // 'pending'; the row behind it in id order is still reached in the same
+    // pass. Ids are random, so compare as sets rather than in order.
+    const deletedKeys = mockSend.mock.calls.map(call => call[0].input.Key);
+    expect(deletedKeys).toHaveLength(2);
+    expect(deletedKeys).toContain(buildObjectKey(kiloUserId, messageUuid, failingAttachment));
+    expect(deletedKeys).toContain(buildObjectKey(kiloUserId, messageUuid, trailingAttachment));
+
+    const remaining = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
+    expect(remaining.map(row => row.status).sort()).toEqual(['pending', 'reaped']);
+  });
+
   it('releasePendingUploads deletes only the caller pending object and leaves linked and other-user rows', async () => {
     mockSend.mockResolvedValue({});
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;

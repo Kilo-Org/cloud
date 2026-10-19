@@ -993,10 +993,12 @@ describe('queue-backed handlers', () => {
     expect(mockSubmitManualAnalysisStart).not.toHaveBeenCalled();
   });
 
-  it('releases the reservation when the worker submission fails', async () => {
+  it('releases the reservation when the worker submission fails with a definitive rejection', async () => {
     mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
     mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: true });
-    mockSubmitManualAnalysisStart.mockRejectedValue(new Error('worker unreachable'));
+    mockSubmitManualAnalysisStart.mockRejectedValue(
+      new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'worker unreachable' })
+    );
     mockAdmitOperation.mockResolvedValue({
       admission: 'admitted',
       row: {
@@ -1017,6 +1019,32 @@ describe('queue-backed handlers', () => {
     expect(mockReleaseAnalysisStartReservation).toHaveBeenCalledWith(
       'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
     );
+  });
+
+  it('keeps the reservation when the submission outcome is ambiguous', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
+    mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: true });
+    mockSubmitManualAnalysisStart.mockRejectedValue(
+      new TRPCError({ code: 'CONFLICT', message: 'ambiguous' })
+    );
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'start_analysis',
+        resource_key:
+          'security:start_analysis:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    });
+
+    await expect(
+      createHandlers().startAnalysis.handler({
+        ctx: context,
+        input: { findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+      })
+    ).rejects.toThrow('ambiguous');
+
+    expect(mockReleaseAnalysisStartReservation).not.toHaveBeenCalled();
   });
 
   it('validates the owner cap for a restart without reserving a new slot', async () => {

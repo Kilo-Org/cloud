@@ -107,13 +107,22 @@ function fakeAdmissionDb(options: {
           return {
             from: () => ({
               where: () => ({
-                limit: async () => [{ analysisStatus: options.admissionAnalysisStatus }],
+                limit: async () => [
+                  {
+                    analysisStatus: options.admissionAnalysisStatus,
+                    status: 'open',
+                  },
+                ],
               }),
             }),
           };
         }
         return {
-          from: () => ({ where: async () => [{ total: options.inflightTotal ?? 0 }] }),
+          from: () => ({
+            leftJoin: () => ({
+              where: async () => [{ total: options.inflightTotal ?? 0 }],
+            }),
+          }),
         };
       },
       insert: () => ({
@@ -250,7 +259,7 @@ describe('processManualAnalysisStart', () => {
     expect(startSecurityAnalysis).not.toHaveBeenCalled();
   });
 
-  it('skips the lease for a pre-reserved finding and takes it for unreserved state', async () => {
+  it('skips the launch lease for both pre-reserved and worker-leased admission', async () => {
     const preReservedDb = fakeAdmissionDb({
       admissionAnalysisStatus: 'pending',
       queueRowId: 'queue-row',
@@ -285,7 +294,7 @@ describe('processManualAnalysisStart', () => {
     });
     expect(tryAcquireAnalysisStartLease).toHaveBeenCalledWith(expect.anything(), command.findingId);
     expect(startSecurityAnalysis).toHaveBeenCalledWith(
-      expect.objectContaining({ preReserved: false })
+      expect.objectContaining({ preReserved: true })
     );
   });
 

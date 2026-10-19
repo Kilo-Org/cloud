@@ -1766,11 +1766,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             },
           });
         } catch (error) {
-          // Submission failed before the Worker accepted the command; the
-          // reservation would otherwise hold a slot until a terminal settle
-          // that will never come. Guarded clear: no-op when the Worker
-          // actually owns the finding lifecycle.
-          if (!input.restartActive) {
+          // Release only for a definitive pre-acceptance rejection: the
+          // ledger row settled `pre_acceptance_rejected`, so the Worker has
+          // no command to run. Ambiguous outcomes reconcile through the
+          // ledger and the Worker keeps lifecycle control.
+          if (!input.restartActive && error instanceof TRPCError && error.code !== 'CONFLICT') {
             await releaseAnalysisStartReservation(input.findingId);
           }
           throw error;

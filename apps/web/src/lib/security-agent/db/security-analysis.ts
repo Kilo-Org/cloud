@@ -16,7 +16,20 @@ import {
   type SecurityFindingAuditEventFinding,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
-import { eq, and, sql, count, isNotNull, desc, or, isNull, not, like } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  sql,
+  count,
+  countDistinct,
+  inArray,
+  isNotNull,
+  desc,
+  or,
+  isNull,
+  not,
+  like,
+} from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type {
   AutoAnalysisMinSeverity,
@@ -408,15 +421,26 @@ export async function tryReserveAnalysisStartSlot(
       throw new Error('security_analysis_owner_state row missing after upsert');
     }
 
+    // Inflight = findings already flipped to pending/running, plus scheduled
+    // queue claims that reserve a slot while the finding status is still null.
+    // Distinct by finding: a finding counted in the first term cannot add a
+    // second slot through its queue row.
     const [inflight] = await tx
-      .select({ total: count() })
+      .select({ total: countDistinct(security_findings.id) })
       .from(security_findings)
+      .leftJoin(
+        security_analysis_queue,
+        eq(security_analysis_queue.finding_id, security_findings.id)
+      )
       .where(
         and(
           ownerFindingsCondition(ownerConverted),
           or(
-            eq(security_findings.analysis_status, 'pending'),
-            eq(security_findings.analysis_status, 'running')
+            inArray(security_findings.analysis_status, ['pending', 'running']),
+            and(
+              isNull(security_findings.analysis_status),
+              inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+            )
           )
         )
       );
@@ -467,14 +491,21 @@ export async function tryReserveAnalysisRestartSlot(
     }
 
     const [inflight] = await tx
-      .select({ total: count() })
+      .select({ total: countDistinct(security_findings.id) })
       .from(security_findings)
+      .leftJoin(
+        security_analysis_queue,
+        eq(security_analysis_queue.finding_id, security_findings.id)
+      )
       .where(
         and(
           ownerFindingsCondition(ownerConverted),
           or(
-            eq(security_findings.analysis_status, 'pending'),
-            eq(security_findings.analysis_status, 'running')
+            inArray(security_findings.analysis_status, ['pending', 'running']),
+            and(
+              isNull(security_findings.analysis_status),
+              inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+            )
           ),
           sql`${security_findings.id} <> ${findingId}::uuid`
         )
@@ -608,6 +639,40 @@ export async function cleanupStaleAnalyses(maxAgeMinutes = 30): Promise<number> 
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cleanupStaleAnalyses' },
+      extra: { maxAgeMinutes },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Reap start reservations left in `pending` with no active queue row and no
+ * recent update; the finding becomes startable again. The Worker's pre-launch
+ * failure paths clear the same state synchronously; this sweep covers
+ * admissions that stopped before reaching the Worker.
+ */
+export async function cleanupStaleStartReservations(maxAgeMinutes = 10): Promise<number> {
+  try {
+    const result = await db
+      .update(security_findings)
+      .set({ analysis_status: null, updated_at: sql`now()` })
+      .where(
+        and(
+          eq(security_findings.analysis_status, 'pending'),
+          sql`${security_findings.updated_at} < now() - make_interval(mins => ${maxAgeMinutes})`,
+          sql`NOT EXISTS (
+            SELECT 1
+            FROM ${security_analysis_queue}
+            WHERE ${security_analysis_queue.finding_id} = ${security_findings.id}
+              AND ${security_analysis_queue.queue_status} IN ('pending', 'running')
+          )`
+        )
+      )
+      .returning({ id: security_findings.id });
+    return result.length;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'cleanupStaleStartReservations' },
       extra: { maxAgeMinutes },
     });
     throw error;

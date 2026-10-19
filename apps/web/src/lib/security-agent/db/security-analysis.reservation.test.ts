@@ -222,6 +222,17 @@ describe('tryReserveAnalysisRestartSlot', () => {
       expect(startResult).toMatchObject({ reserved: false });
     }
     expect(restartResult.reserved).toBe(true);
+
+    const inflight = await db
+      .select({ id: security_findings.id })
+      .from(security_findings)
+      .where(
+        and(
+          eq(security_findings.owned_by_user_id, userId),
+          inArray(security_findings.analysis_status, ['pending', 'running'])
+        )
+      );
+    expect(inflight.length).toBeLessThanOrEqual(SECURITY_ANALYSIS_OWNER_CAP);
   });
 
   it('admits every sequential restart of the same running finding without consuming extra slots', async () => {

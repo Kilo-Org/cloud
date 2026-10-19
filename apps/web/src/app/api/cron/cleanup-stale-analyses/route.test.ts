@@ -7,13 +7,19 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
-jest.mock('@/lib/security-agent/db/security-analysis', () => ({ cleanupStaleAnalyses: jest.fn() }));
+jest.mock('@/lib/security-agent/db/security-analysis', () => ({
+  cleanupStaleAnalyses: jest.fn(),
+  cleanupStaleStartReservations: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: jest.fn(() => jest.fn()),
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-import { cleanupStaleAnalyses } from '@/lib/security-agent/db/security-analysis';
+import {
+  cleanupStaleAnalyses,
+  cleanupStaleStartReservations,
+} from '@/lib/security-agent/db/security-analysis';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
 
@@ -24,6 +30,7 @@ describe('GET /api/cron/cleanup-stale-analyses', () => {
 
   it('emits a success event for a no-work cleanup', async () => {
     jest.mocked(cleanupStaleAnalyses).mockResolvedValue(0);
+    jest.mocked(cleanupStaleStartReservations).mockResolvedValue(0);
 
     const response = await GET(
       new Request('http://localhost/api/cron/cleanup-stale-analyses', {
@@ -35,6 +42,7 @@ describe('GET /api/cron/cleanup-stale-analyses', () => {
     expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
       outcome: 'succeeded',
       cleaned_count: 0,
+      reaped_reservations: 0,
       anomaly_threshold: 10,
       anomaly_detected: false,
     });

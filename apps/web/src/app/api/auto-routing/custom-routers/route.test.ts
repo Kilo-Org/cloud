@@ -383,6 +383,7 @@ describe('/api/auto-routing/custom-routers', () => {
             canEdit: true,
           }),
         ]);
+        mockedRequireActiveSubscription.mockClear();
         expect(
           (
             await updateRouter(

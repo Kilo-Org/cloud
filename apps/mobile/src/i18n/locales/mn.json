@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Асаалттай — тохиргооны хэрэгслүүд загварт илгээгдэнэ",
       "settingsToolsOff": "Унтраалттай — загварт ямар ч тохиргооны хэрэгсэл илгээгдэхгүй",
       "serverChecking": "Энэ серверийг шалгаж байна…",
-      "serverToolCount": "{{count}} хэрэгсэл",
+      "serverToolCount_one": "{{count}} хэрэгсэл",
+      "serverToolCount_other": "{{count}} хэрэгсэл",
       "serverUnreachable": "Энэ серверт хүрч чадсангүй",
       "serverOff": "Энэ сервер унтарсан"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Хүрээлэн буй орчны хувьсагч, тохируулах команд, ур чадварыг сешнүүдэд дахин ашиглахын тулд профайл үүсгээрэй.",
     "loadFailed": "Профайлуудыг ачаалж чадсангүй",
     "counts": {
-      "vars": "{{count}} хувьсагч",
+      "vars_one": "{{count}} хувьсагч",
+      "vars_other": "{{count}} хувьсагч",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ур чадвар",
-      "commands": "{{count}} команд",
+      "skills_one": "{{count}} ур чадвар",
+      "skills_other": "{{count}} ур чадвар",
+      "commands_one": "{{count}} команд",
+      "commands_other": "{{count}} команд",
       "varsShort": "{{count}}х",
       "skillsShort": "{{count}}у",
       "commandsShort": "{{count}}к"

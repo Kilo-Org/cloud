@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Päällä — asetustyökalut lähetetään mallille",
       "settingsToolsOff": "Pois — mallille ei lähetetä yhtään asetustyökalua",
       "serverChecking": "Tarkistetaan tätä palvelinta…",
-      "serverToolCount": "{{count}} työkalua",
+      "serverToolCount_one": "{{count}} työkalu",
+      "serverToolCount_other": "{{count}} työkalua",
       "serverUnreachable": "Tähän palvelimeen ei saatu yhteyttä",
       "serverOff": "Tämä palvelin on pois päältä"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Luo profiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
     "loadFailed": "Profiilien lataaminen epäonnistui",
     "counts": {
-      "vars": "{{count}} muuttujaa",
+      "vars_one": "{{count}} muuttuja",
+      "vars_other": "{{count}} muuttujaa",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} taitoa",
-      "commands": "{{count}} komentoa",
+      "skills_one": "{{count}} taito",
+      "skills_other": "{{count}} taitoa",
+      "commands_one": "{{count}} komento",
+      "commands_other": "{{count}} komentoa",
       "varsShort": "{{count}}m",
       "skillsShort": "{{count}}t",
       "commandsShort": "{{count}}k"

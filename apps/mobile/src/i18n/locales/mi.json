@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Kā — ka tukuna ngā taputapu tautuhinga ki te tauira",
       "settingsToolsOff": "Weto — kāore he taputapu tautuhinga e tukuna ana ki te tauira",
       "serverChecking": "E tirotiro ana i tēnei tūmau…",
-      "serverToolCount": "{{count}} taputapu",
+      "serverToolCount_one": "{{count}} taputapu",
+      "serverToolCount_other": "{{count}} taputapu",
       "serverUnreachable": "Kāore i taea te toro atu ki tēnei tūmau",
       "serverOff": "Kua weto tēnei tūmau"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Waihangatia he kōtaha hei whakamahi ano i nga taurangi taiao, nga whakahau tatūnga, me nga pukenga puta noa i nga waahi.",
     "loadFailed": "Kāore i taea te uta kōtaha",
     "counts": {
-      "vars": "{{count}} taurangi",
+      "vars_one": "{{count}} taurangi",
+      "vars_other": "{{count}} taurangi",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} pukenga",
-      "commands": "{{count}} whakahau",
+      "skills_one": "{{count}} pukenga",
+      "skills_other": "{{count}} pukenga",
+      "commands_one": "{{count}} whakahau",
+      "commands_other": "{{count}} whakahau",
       "varsShort": "{{count}}t",
       "skillsShort": "{{count}}p",
       "commandsShort": "{{count}}w"

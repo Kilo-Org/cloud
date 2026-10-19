@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "በርቷል — የቅንብር መሳሪያዎቹ ወደ ሞዴሉ ይላካሉ",
       "settingsToolsOff": "ጠፍቷል — ምንም የቅንብር መሳሪያ ወደ ሞዴሉ አይላክም",
       "serverChecking": "ይህን ሰርቨር በመፈተሽ ላይ…",
-      "serverToolCount": "{{count}} መሳሪያዎች",
+      "serverToolCount_one": "{{count}} መሳሪያዎች",
+      "serverToolCount_other": "{{count}} መሳሪያዎች",
       "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
       "serverOff": "ይህ ሰርቨር ተዘግቷል"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም መገለጫ ይፍጠሩ።",
     "loadFailed": "መገለጫዎችን መጫን አልተቻለም",
     "counts": {
-      "vars": "{{count}} ተለዋዋጮች",
+      "vars_one": "{{count}} ተለዋዋጮች",
+      "vars_other": "{{count}} ተለዋዋጮች",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ችሎታዎች",
-      "commands": "{{count}} ትዕዛዞች",
+      "skills_one": "{{count}} ችሎታዎች",
+      "skills_other": "{{count}} ችሎታዎች",
+      "commands_one": "{{count}} ትዕዛዞች",
+      "commands_other": "{{count}} ትዕዛዞች",
       "varsShort": "{{count}}ተ",
       "skillsShort": "{{count}}ች",
       "commandsShort": "{{count}}ት"

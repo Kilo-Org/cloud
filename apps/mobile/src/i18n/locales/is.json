@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Kveikt — stillingaverkfærin eru send til líkansins",
       "settingsToolsOff": "Slökkt — ekkert stillingaverkfæri er sent til líkansins",
       "serverChecking": "Athuga þennan þjón…",
-      "serverToolCount": "{{count}} verkfæri",
+      "serverToolCount_one": "{{count}} verkfæri",
+      "serverToolCount_other": "{{count}} verkfæri",
       "serverUnreachable": "Náði ekki sambandi við þennan þjón",
       "serverOff": "Þessi þjónn er óvirkur"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Búðu til prófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
     "loadFailed": "Ekki tókst að hlaða prófílum",
     "counts": {
-      "vars": "{{count}} breytur",
+      "vars_one": "{{count}} breyta",
+      "vars_other": "{{count}} breytur",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} færni",
-      "commands": "{{count}} skipanir",
+      "skills_one": "{{count}} færni",
+      "skills_other": "{{count}} færni",
+      "commands_one": "{{count}} skipun",
+      "commands_other": "{{count}} skipanir",
       "varsShort": "{{count}}b",
       "skillsShort": "{{count}}f",
       "commandsShort": "{{count}}s"

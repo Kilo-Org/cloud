@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Aktiv — parametr alətləri modelə göndərilir",
       "settingsToolsOff": "Deaktiv — modelə heç bir parametr aləti göndərilmir",
       "serverChecking": "Bu server yoxlanılır…",
-      "serverToolCount": "{{count}} alət",
+      "serverToolCount_one": "{{count}} alət",
+      "serverToolCount_other": "{{count}} alət",
       "serverUnreachable": "Bu serverə çatmaq mümkün olmadı",
       "serverOff": "Bu server söndürülüb"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün profil yaradın.",
     "loadFailed": "Profilləri yükləmək mümkün olmadı",
     "counts": {
-      "vars": "{{count}} dəyişən",
+      "vars_one": "{{count}} dəyişən",
+      "vars_other": "{{count}} dəyişən",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} bacarıq",
-      "commands": "{{count}} əmr",
+      "skills_one": "{{count}} bacarıq",
+      "skills_other": "{{count}} bacarıq",
+      "commands_one": "{{count}} əmr",
+      "commands_other": "{{count}} əmr",
       "varsShort": "{{count}}d",
       "skillsShort": "{{count}}b",
       "commandsShort": "{{count}}ə"

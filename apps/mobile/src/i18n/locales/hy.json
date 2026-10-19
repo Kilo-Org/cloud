@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Միացված — կարգավորումների գործիքներն ուղարկվում են մոդելին",
       "settingsToolsOff": "Անջատված — ոչ մի կարգավորումների գործիք չի ուղարկվում մոդելին",
       "serverChecking": "Ստուգվում է այս սերվերը…",
-      "serverToolCount": "{{count}} գործիք",
+      "serverToolCount_one": "{{count}} գործիք",
+      "serverToolCount_other": "{{count}} գործիք",
       "serverUnreachable": "Չհաջողվեց հասնել այս սերվերին",
       "serverOff": "Այս սերվերն անջատված է"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Ստեղծեք պրոֆիլ՝ շրջակա միջավայրի փոփոխականները, կարգաբերման հրամանները և հմտությունները սեսիաներում կրկին օգտագործելու համար:",
     "loadFailed": "Չհաջողվեց բեռնել պրոֆիլները",
     "counts": {
-      "vars": "{{count}} փոփոխական",
+      "vars_one": "{{count}} փոփոխական",
+      "vars_other": "{{count}} փոփոխական",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} հմտություն",
-      "commands": "{{count}} հրաման",
+      "skills_one": "{{count}} հմտություն",
+      "skills_other": "{{count}} հմտություն",
+      "commands_one": "{{count}} հրաման",
+      "commands_other": "{{count}} հրաման",
       "varsShort": "{{count}}փ",
       "skillsShort": "{{count}}հ",
       "commandsShort": "{{count}}հր"

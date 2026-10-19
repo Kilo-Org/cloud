@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "开启 — 设置工具会发送给模型",
       "settingsToolsOff": "关闭 — 不会向模型发送任何设置工具",
       "serverChecking": "正在检查此服务器…",
-      "serverToolCount": "{{count}} 个工具",
+      "serverToolCount_one": "{{count}} 个工具",
+      "serverToolCount_other": "{{count}} 个工具",
       "serverUnreachable": "无法连接此服务器",
       "serverOff": "此服务器已关闭"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "创建配置文件以跨会话重复使用环境变量、设置命令和技能。",
     "loadFailed": "无法加载配置文件",
     "counts": {
-      "vars": "{{count}} 个变量",
+      "vars_one": "{{count}} 个变量",
+      "vars_other": "{{count}} 个变量",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} 个技能",
-      "commands": "{{count}} 个命令",
+      "skills_one": "{{count}} 个技能",
+      "skills_other": "{{count}} 个技能",
+      "commands_one": "{{count}} 个命令",
+      "commands_other": "{{count}} 个命令",
       "varsShort": "{{count}}变",
       "skillsShort": "{{count}}技",
       "commandsShort": "{{count}}命"

@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Sees — sätete tööriistad saadetakse mudelile",
       "settingsToolsOff": "Väljas — mudelile ei saadeta ühtegi sätete tööriista",
       "serverChecking": "Selle serveri kontrollimine…",
-      "serverToolCount": "{{count}} tööriista",
+      "serverToolCount_one": "{{count}} tööriista",
+      "serverToolCount_other": "{{count}} tööriista",
       "serverUnreachable": "Selle serverini ei õnnestunud jõuda",
       "serverOff": "See server on välja lülitatud"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Looge profiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
     "loadFailed": "Profiilide laadimine nurjus",
     "counts": {
-      "vars": "{{count}} muutujat",
+      "vars_one": "{{count}} muutujat",
+      "vars_other": "{{count}} muutujat",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} oskust",
-      "commands": "{{count}} käsku",
+      "skills_one": "{{count}} oskust",
+      "skills_other": "{{count}} oskust",
+      "commands_one": "{{count}} käsku",
+      "commands_other": "{{count}} käsku",
       "varsShort": "{{count}}m",
       "skillsShort": "{{count}}o",
       "commandsShort": "{{count}}k"

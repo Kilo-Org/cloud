@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "खुला — सेटिङ उपकरणहरू मोडेलमा पठाइन्छन्",
       "settingsToolsOff": "बन्द — मोडेलमा कुनै पनि सेटिङ उपकरण पठाइँदैन",
       "serverChecking": "यो सर्भर जाँचिँदै छ…",
-      "serverToolCount": "{{count}} उपकरण",
+      "serverToolCount_one": "{{count}} उपकरण",
+      "serverToolCount_other": "{{count}} उपकरण",
       "serverUnreachable": "यो सर्भरसम्म पुग्न सकिएन",
       "serverOff": "यो सर्भर बन्द छ"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "वातावरण चरहरू, सेटअप आदेशहरू, र सत्रहरूमा सीपहरू पुन: प्रयोग गर्न प्रोफाइल सिर्जना गर्नुहोस्।",
     "loadFailed": "प्रोफाइलहरू लोड गर्न सकिएन",
     "counts": {
-      "vars": "{{count}} चर",
+      "vars_one": "{{count}} चर",
+      "vars_other": "{{count}} चर",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} सीप",
-      "commands": "{{count}} आदेश",
+      "skills_one": "{{count}} सीप",
+      "skills_other": "{{count}} सीप",
+      "commands_one": "{{count}} आदेश",
+      "commands_other": "{{count}} आदेश",
       "varsShort": "{{count}}च",
       "skillsShort": "{{count}}स",
       "commandsShort": "{{count}}आ"

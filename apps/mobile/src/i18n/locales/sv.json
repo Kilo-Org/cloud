@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "På — inställningsverktygen skickas till modellen",
       "settingsToolsOff": "Av — inget inställningsverktyg skickas till modellen",
       "serverChecking": "Kontrollerar denna server…",
-      "serverToolCount": "{{count}} verktyg",
+      "serverToolCount_one": "{{count}} verktyg",
+      "serverToolCount_other": "{{count}} verktyg",
       "serverUnreachable": "Kunde inte nå denna server",
       "serverOff": "Denna server är avstängd"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Skapa en profil för att återanvända miljövariabler, inställningskommandon och färdigheter över sessioner.",
     "loadFailed": "Det gick inte att läsa in profiler",
     "counts": {
-      "vars": "{{count}} variabler",
+      "vars_one": "{{count}} variabel",
+      "vars_other": "{{count}} variabler",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} färdigheter",
-      "commands": "{{count}} kommandon",
+      "skills_one": "{{count}} färdighet",
+      "skills_other": "{{count}} färdigheter",
+      "commands_one": "{{count}} kommando",
+      "commands_other": "{{count}} kommandon",
       "varsShort": "{{count}}var",
       "skillsShort": "{{count}}fär",
       "commandsShort": "{{count}}kom"

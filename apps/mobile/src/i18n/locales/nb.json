@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "På — innstillingsverktøyene sendes til modellen",
       "settingsToolsOff": "Av — ingen innstillingsverktøy sendes til modellen",
       "serverChecking": "Sjekker denne serveren…",
-      "serverToolCount": "{{count}} verktøy",
+      "serverToolCount_one": "{{count}} verktøy",
+      "serverToolCount_other": "{{count}} verktøy",
       "serverUnreachable": "Kunne ikke nå denne serveren",
       "serverOff": "Denne serveren er av"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Opprett en profil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
     "loadFailed": "Kunne ikke laste inn profiler",
     "counts": {
-      "vars": "{{count}} variabler",
+      "vars_one": "{{count}} variabel",
+      "vars_other": "{{count}} variabler",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ferdigheter",
-      "commands": "{{count}} kommandoer",
+      "skills_one": "{{count}} ferdighet",
+      "skills_other": "{{count}} ferdigheter",
+      "commands_one": "{{count}} kommando",
+      "commands_other": "{{count}} kommandoer",
       "varsShort": "{{count}}var",
       "skillsShort": "{{count}}fer",
       "commandsShort": "{{count}}kom"

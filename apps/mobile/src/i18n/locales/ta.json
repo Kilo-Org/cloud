@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "இயக்கத்தில் — அமைப்புக் கருவிகள் மாதிரிக்கு அனுப்பப்படும்",
       "settingsToolsOff": "அணைக்கப்பட்டது — மாதிரிக்கு எந்த அமைப்புக் கருவியும் அனுப்பப்படாது",
       "serverChecking": "இந்தச் சேவையகம் சரிபார்க்கப்படுகிறது…",
-      "serverToolCount": "{{count}} கருவிகள்",
+      "serverToolCount_one": "{{count}} கருவி",
+      "serverToolCount_other": "{{count}} கருவிகள்",
       "serverUnreachable": "இந்தச் சேவையகத்தை அணுக முடியவில்லை",
       "serverOff": "இந்தச் சேவையகம் அணைக்கப்பட்டுள்ளது"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "சூழல் மாறிகள், அமைவு கட்டளைகள் மற்றும் அமர்வுகள் முழுவதும் திறன்களை மீண்டும் பயன்படுத்த சுயவிவரத்தை உருவாக்கவும்.",
     "loadFailed": "சுயவிவரங்களை ஏற்ற முடியவில்லை",
     "counts": {
-      "vars": "{{count}} மாறிகள்",
+      "vars_one": "{{count}} மாறி",
+      "vars_other": "{{count}} மாறிகள்",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} திறன்கள்",
-      "commands": "{{count}} கட்டளைகள்",
+      "skills_one": "{{count}} திறன்",
+      "skills_other": "{{count}} திறன்கள்",
+      "commands_one": "{{count}} கட்டளை",
+      "commands_other": "{{count}} கட்டளைகள்",
       "varsShort": "{{count}}மா",
       "skillsShort": "{{count}}தி",
       "commandsShort": "{{count}}க"

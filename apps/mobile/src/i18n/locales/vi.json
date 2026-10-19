@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Bật — các công cụ cài đặt được gửi đến mô hình",
       "settingsToolsOff": "Tắt — không có công cụ cài đặt nào được gửi đến mô hình",
       "serverChecking": "Đang kiểm tra máy chủ này…",
-      "serverToolCount": "{{count}} công cụ",
+      "serverToolCount_one": "{{count}} công cụ",
+      "serverToolCount_other": "{{count}} công cụ",
       "serverUnreachable": "Không thể kết nối với máy chủ này",
       "serverOff": "Máy chủ này đang tắt"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Tạo hồ sơ để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
     "loadFailed": "Không thể tải hồ sơ",
     "counts": {
-      "vars": "{{count}} biến",
+      "vars_one": "{{count}} biến",
+      "vars_other": "{{count}} biến",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} kỹ năng",
-      "commands": "{{count}} lệnh",
+      "skills_one": "{{count}} kỹ năng",
+      "skills_other": "{{count}} kỹ năng",
+      "commands_one": "{{count}} lệnh",
+      "commands_other": "{{count}} lệnh",
       "varsShort": "{{count}}b",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}l"

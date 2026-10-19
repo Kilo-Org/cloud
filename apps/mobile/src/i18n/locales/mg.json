@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Alefa — alefa any amin'ny maodely ny fitaovana parametatra",
       "settingsToolsOff": "Vono — tsy misy fitaovana parametatra alefa any amin'ny maodely",
       "serverChecking": "Manamarina ity server ity…",
-      "serverToolCount": "fitaovana {{count}}",
+      "serverToolCount_one": "fitaovana {{count}}",
+      "serverToolCount_other": "fitaovana {{count}}",
       "serverUnreachable": "Tsy tratra ity server ity",
       "serverOff": "Mihidy ity server ity"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Mamorona mombamomba hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
     "loadFailed": "Tsy afaka mampiditra ny mombamomba",
     "counts": {
-      "vars": "{{count}} miovaova",
+      "vars_one": "{{count}} miovaova",
+      "vars_other": "{{count}} miovaova",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} fahaiza-manao",
-      "commands": "{{count}} baiko",
+      "skills_one": "{{count}} fahaiza-manao",
+      "skills_other": "{{count}} fahaiza-manao",
+      "commands_one": "{{count}} baiko",
+      "commands_other": "{{count}} baiko",
       "varsShort": "{{count}}m",
       "skillsShort": "{{count}}f",
       "commandsShort": "{{count}}b"

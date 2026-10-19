@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "চালু — সেটিংস টুল মডেলে পাঠানো হয়",
       "settingsToolsOff": "বন্ধ — মডেলে কোনো সেটিংস টুল পাঠানো হয় না",
       "serverChecking": "এই সার্ভার যাচাই করা হচ্ছে…",
-      "serverToolCount": "{{count}} টুল",
+      "serverToolCount_one": "{{count}} টুল",
+      "serverToolCount_other": "{{count}} টুল",
       "serverUnreachable": "এই সার্ভারে পৌঁছানো যায়নি",
       "serverOff": "এই সার্ভার বন্ধ আছে"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "সেশন জুড়ে পরিবেশ ভেরিয়েবল, সেটআপ কমান্ড এবং দক্ষতা পুনরায় ব্যবহার করার জন্য একটি প্রোফাইল তৈরি করুন।",
     "loadFailed": "প্রোফাইল লোড করা যায়নি",
     "counts": {
-      "vars": "{{count}} ভেরিয়েবল",
+      "vars_one": "{{count}} ভেরিয়েবল",
+      "vars_other": "{{count}} ভেরিয়েবল",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} দক্ষতা",
-      "commands": "{{count}} কমান্ড",
+      "skills_one": "{{count}} দক্ষতা",
+      "skills_other": "{{count}} দক্ষতা",
+      "commands_one": "{{count}} কমান্ড",
+      "commands_other": "{{count}} কমান্ড",
       "varsShort": "{{count}}ভ",
       "skillsShort": "{{count}}দ",
       "commandsShort": "{{count}}ক"

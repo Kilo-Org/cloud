@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "चालू — सेटिंग्स टूल मॉडल को भेजे जाते हैं",
       "settingsToolsOff": "बंद — मॉडल को कोई सेटिंग्स टूल नहीं भेजा जाता",
       "serverChecking": "इस सर्वर की जाँच हो रही है…",
-      "serverToolCount": "{{count}} टूल",
+      "serverToolCount_one": "{{count}} टूल",
+      "serverToolCount_other": "{{count}} टूल",
       "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका",
       "serverOff": "यह सर्वर बंद है"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "सभी सत्रों में पर्यावरण चर, सेटअप कमांड और कौशल का पुन: उपयोग करने के लिए एक प्रोफ़ाइल बनाएं।",
     "loadFailed": "प्रोफ़ाइल लोड नहीं हो सकीं",
     "counts": {
-      "vars": "{{count}} चर",
+      "vars_one": "{{count}} चर",
+      "vars_other": "{{count}} चर",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} कौशल",
-      "commands": "{{count}} आदेश",
+      "skills_one": "{{count}} कौशल",
+      "skills_other": "{{count}} कौशल",
+      "commands_one": "{{count}} आदेश",
+      "commands_other": "{{count}} आदेश",
       "varsShort": "{{count}}च",
       "skillsShort": "{{count}}क",
       "commandsShort": "{{count}}आ"

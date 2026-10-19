@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "آن — سیٹنگز ٹولز ماڈل کو بھیجے جاتے ہیں",
       "settingsToolsOff": "آف — ماڈل کو کوئی سیٹنگز ٹول نہیں بھیجا جاتا",
       "serverChecking": "اس سرور کی جانچ ہو رہی ہے…",
-      "serverToolCount": "{{count}} ٹولز",
+      "serverToolCount_one": "{{count}} ٹولز",
+      "serverToolCount_other": "{{count}} ٹولز",
       "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
       "serverOff": "یہ سرور بند ہے"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک پروفائل بنائیں۔",
     "loadFailed": "پروفائلز لوڈ نہیں ہو سکے۔",
     "counts": {
-      "vars": "{{count}} متغیرات",
+      "vars_one": "{{count}} متغیرات",
+      "vars_other": "{{count}} متغیرات",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ہنر",
-      "commands": "{{count}} کمانڈز",
+      "skills_one": "{{count}} ہنر",
+      "skills_other": "{{count}} ہنر",
+      "commands_one": "{{count}} کمانڈز",
+      "commands_other": "{{count}} کمانڈز",
       "varsShort": "{{count}}م",
       "skillsShort": "{{count}}ہ",
       "commandsShort": "{{count}}ک"

@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "چالاک — ئامرازەکانی ڕێکخستن بۆ مۆدێل دەنێردرێن",
       "settingsToolsOff": "ناچالاک — هیچ ئامرازێکی ڕێکخستن بۆ مۆدێل نانێردرێت",
       "serverChecking": "پشکنینی ئەم سێرڤەرە…",
-      "serverToolCount": "{{count}} ئامراز",
+      "serverToolCount_one": "{{count}} ئامراز",
+      "serverToolCount_other": "{{count}} ئامراز",
       "serverUnreachable": "نەتوانرا بگەیت بەم سێرڤەرە",
       "serverOff": "ئەم سێرڤەرە ناچالاکە"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "پرۆفایلی دروست بکە بۆ دووبارە بەکارهێنانەوەی گۆڕاوە ژینگەییەکان، فەرمانەکانی ڕێکخستن و لێهاتووییەکان لە سەرانسەری دانیشتنەکاندا.",
     "loadFailed": "نەتوانرا پڕۆفایلی باربکرێت",
     "counts": {
-      "vars": "{{count}} گۆڕاوە",
+      "vars_one": "{{count}} گۆڕاوە",
+      "vars_other": "{{count}} گۆڕاوە",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} کارامەیی",
-      "commands": "{{count}} فەرمان",
+      "skills_one": "{{count}} کارامەیی",
+      "skills_other": "{{count}} کارامەیی",
+      "commands_one": "{{count}} فەرمان",
+      "commands_other": "{{count}} فەرمان",
       "varsShort": "{{count}}گ",
       "skillsShort": "{{count}}ک",
       "commandsShort": "{{count}}ف"

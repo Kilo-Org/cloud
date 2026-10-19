@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Banaa — meeshaaleen qindaa'inaa moodeelaaf ergamu",
       "settingsToolsOff": "Cufaa — meeshaan qindaa'inaa tokkoon moodeelaaf hin ergamu",
       "serverChecking": "Seerverii kana sakatta'aa jira…",
-      "serverToolCount": "meeshaalee {{count}}",
+      "serverToolCount_one": "meeshaa {{count}}",
+      "serverToolCount_other": "meeshaalee {{count}}",
       "serverUnreachable": "Seerverii kana bira ga'uun hin danda'amne",
       "serverOff": "Seerveriin kun dhaameera"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii uumi.",
     "loadFailed": "Profaayilii fe'uu hin dandeenye",
     "counts": {
-      "vars": "{{count}} jijjiiramoota",
+      "vars_one": "{{count}} jijjiirama",
+      "vars_other": "{{count}} jijjiiramoota",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} dandeettiiwwan",
-      "commands": "{{count}} ajajoota",
+      "skills_one": "{{count}} dandeettii",
+      "skills_other": "{{count}} dandeettiiwwan",
+      "commands_one": "{{count}} ajaja",
+      "commands_other": "{{count}} ajajoota",
       "varsShort": "{{count}}j",
       "skillsShort": "{{count}}d",
       "commandsShort": "{{count}}a"

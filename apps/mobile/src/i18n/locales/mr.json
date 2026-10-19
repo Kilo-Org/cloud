@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "चालू — सेटिंग्ज साधने मॉडेलला पाठवली जातात",
       "settingsToolsOff": "बंद — मॉडेलला कोणतेही सेटिंग्ज साधन पाठवले जात नाही",
       "serverChecking": "हा सर्व्हर तपासत आहे…",
-      "serverToolCount": "{{count}} साधने",
+      "serverToolCount_one": "{{count}} साधन",
+      "serverToolCount_other": "{{count}} साधने",
       "serverUnreachable": "या सर्व्हरपर्यंत पोहोचता आले नाही",
       "serverOff": "हा सर्व्हर बंद आहे"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी प्रोफाइल तयार करा.",
     "loadFailed": "प्रोफाइल लोड करू शकलो नाही",
     "counts": {
-      "vars": "{{count}} चल",
+      "vars_one": "{{count}} चल",
+      "vars_other": "{{count}} चल",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} कौशल्य",
-      "commands": "{{count}} कमांड",
+      "skills_one": "{{count}} कौशल्य",
+      "skills_other": "{{count}} कौशल्य",
+      "commands_one": "{{count}} कमांड",
+      "commands_other": "{{count}} कमांड",
       "varsShort": "{{count}}च",
       "skillsShort": "{{count}}क",
       "commandsShort": "{{count}}कम"

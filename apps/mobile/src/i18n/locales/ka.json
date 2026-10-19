@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "ჩართულია — პარამეტრების ხელსაწყოები იგზავნება მოდელთან",
       "settingsToolsOff": "გამორთულია — მოდელთან არცერთი პარამეტრის ხელსაწყო არ იგზავნება",
       "serverChecking": "ამ სერვერის შემოწმება…",
-      "serverToolCount": "{{count}} ხელსაწყო",
+      "serverToolCount_one": "{{count}} ხელსაწყო",
+      "serverToolCount_other": "{{count}} ხელსაწყო",
       "serverUnreachable": "ამ სერვერთან დაკავშირება ვერ მოხერხდა",
       "serverOff": "ეს სერვერი გამორთულია"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "შექმენით პროფილი გარემოს ცვლადების, დაყენების ბრძანებებისა და უნარების ხელახლა გამოსაყენებლად სესიებზე.",
     "loadFailed": "პროფილების ჩატვირთვა ვერ მოხერხდა",
     "counts": {
-      "vars": "{{count}} ცვლადი",
+      "vars_one": "{{count}} ცვლადი",
+      "vars_other": "{{count}} ცვლადი",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} უნარი",
-      "commands": "{{count}} ბრძანება",
+      "skills_one": "{{count}} უნარი",
+      "skills_other": "{{count}} უნარი",
+      "commands_one": "{{count}} ბრძანება",
+      "commands_other": "{{count}} ბრძანება",
       "varsShort": "{{count}}ც",
       "skillsShort": "{{count}}უ",
       "commandsShort": "{{count}}ბ"

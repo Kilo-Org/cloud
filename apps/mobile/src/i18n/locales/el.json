@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Ενεργό — τα εργαλεία ρυθμίσεων αποστέλλονται στο μοντέλο",
       "settingsToolsOff": "Ανενεργό — κανένα εργαλείο ρυθμίσεων δεν αποστέλλεται στο μοντέλο",
       "serverChecking": "Έλεγχος αυτού του διακομιστή…",
-      "serverToolCount": "{{count}} εργαλεία",
+      "serverToolCount_one": "{{count}} εργαλείο",
+      "serverToolCount_other": "{{count}} εργαλεία",
       "serverUnreachable": "Δεν ήταν δυνατή η πρόσβαση σε αυτόν τον διακομιστή",
       "serverOff": "Ο διακομιστής αυτός είναι ανενεργός"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Δημιουργήστε ένα προφίλ για να επαναχρησιμοποιήσετε μεταβλητές περιβάλλοντος, εντολές ρύθμισης και δεξιότητες στις συνεδρίες.",
     "loadFailed": "Δεν ήταν δυνατή η φόρτωση των προφίλ",
     "counts": {
-      "vars": "{{count}} μεταβλητές",
+      "vars_one": "{{count}} μεταβλητή",
+      "vars_other": "{{count}} μεταβλητές",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} δεξιότητες",
-      "commands": "{{count}} εντολές",
+      "skills_one": "{{count}} δεξιότητα",
+      "skills_other": "{{count}} δεξιότητες",
+      "commands_one": "{{count}} εντολή",
+      "commands_other": "{{count}} εντολές",
       "varsShort": "{{count}}μ",
       "skillsShort": "{{count}}δ",
       "commandsShort": "{{count}}ε"

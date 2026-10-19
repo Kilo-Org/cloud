@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "ਚਾਲੂ — ਸੈਟਿੰਗਾਂ ਟੂਲ ਮਾਡਲ ਨੂੰ ਭੇਜੇ ਜਾਂਦੇ ਹਨ",
       "settingsToolsOff": "ਬੰਦ — ਮਾਡਲ ਨੂੰ ਕੋਈ ਸੈਟਿੰਗਾਂ ਟੂਲ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ",
       "serverChecking": "ਇਹ ਸਰਵਰ ਜਾਂਚਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
-      "serverToolCount": "{{count}} ਟੂਲ",
+      "serverToolCount_one": "{{count}} ਟੂਲ",
+      "serverToolCount_other": "{{count}} ਟੂਲ",
       "serverUnreachable": "ਇਸ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ",
       "serverOff": "ਇਹ ਸਰਵਰ ਬੰਦ ਹੈ"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।",
     "loadFailed": "ਪ੍ਰੋਫਾਈਲਾਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "counts": {
-      "vars": "{{count}} ਵੇਰੀਏਬਲ",
+      "vars_one": "{{count}} ਵੇਰੀਏਬਲ",
+      "vars_other": "{{count}} ਵੇਰੀਏਬਲ",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ਹੁਨਰ",
-      "commands": "{{count}} ਕਮਾਂਡਾਂ",
+      "skills_one": "{{count}} ਹੁਨਰ",
+      "skills_other": "{{count}} ਹੁਨਰ",
+      "commands_one": "{{count}} ਕਮਾਂਡ",
+      "commands_other": "{{count}} ਕਮਾਂਡਾਂ",
       "varsShort": "{{count}}ਵ",
       "skillsShort": "{{count}}ਹ",
       "commandsShort": "{{count}}ਕ"

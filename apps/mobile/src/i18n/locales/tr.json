@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Açık — ayar araçları modele gönderilir",
       "settingsToolsOff": "Kapalı — modele hiçbir ayar aracı gönderilmez",
       "serverChecking": "Bu sunucu denetleniyor…",
-      "serverToolCount": "{{count}} araç",
+      "serverToolCount_one": "{{count}} araç",
+      "serverToolCount_other": "{{count}} araç",
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
       "serverOff": "Bu sunucu kapalı"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir profil oluşturun.",
     "loadFailed": "Profiller yüklenemedi",
     "counts": {
-      "vars": "{{count}} değişken",
+      "vars_one": "{{count}} değişken",
+      "vars_other": "{{count}} değişken",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} yetenek",
-      "commands": "{{count}} komut",
+      "skills_one": "{{count}} yetenek",
+      "skills_other": "{{count}} yetenek",
+      "commands_one": "{{count}} komut",
+      "commands_other": "{{count}} komut",
       "varsShort": "{{count}}d",
       "skillsShort": "{{count}}y",
       "commandsShort": "{{count}}k"

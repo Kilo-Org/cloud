@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "Aktif — alat setelan dikirim ke model",
       "settingsToolsOff": "Nonaktif — tidak ada alat setelan yang dikirim ke model",
       "serverChecking": "Memeriksa server ini…",
-      "serverToolCount": "{{count}} alat",
+      "serverToolCount_one": "{{count}} alat",
+      "serverToolCount_other": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menjangkau server ini",
       "serverOff": "Server ini nonaktif"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Buat profil untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
     "loadFailed": "Tidak dapat memuat profil",
     "counts": {
-      "vars": "{{count}} variabel",
+      "vars_one": "{{count}} variabel",
+      "vars_other": "{{count}} variabel",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} keterampilan",
-      "commands": "{{count}} perintah",
+      "skills_one": "{{count}} keterampilan",
+      "skills_other": "{{count}} keterampilan",
+      "commands_one": "{{count}} perintah",
+      "commands_other": "{{count}} perintah",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}p"

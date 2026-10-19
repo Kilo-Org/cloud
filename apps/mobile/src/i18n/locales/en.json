@@ -3479,7 +3479,8 @@
       "settingsToolsOn": "On — the settings tools are sent to the model",
       "settingsToolsOff": "Off — no settings tool is sent to the model",
       "serverChecking": "Checking this server…",
-      "serverToolCount": "{{count}} tools",
+      "serverToolCount_one": "{{count}} tool",
+      "serverToolCount_other": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
       "serverOff": "This server is off"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "Create a profile to reuse environment variables, setup commands, and skills across sessions.",
     "loadFailed": "Couldn't load profiles",
     "counts": {
-      "vars": "{{count}} vars",
+      "vars_one": "{{count}} var",
+      "vars_other": "{{count}} vars",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} skills",
-      "commands": "{{count}} cmds",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
+      "commands_one": "{{count}} cmd",
+      "commands_other": "{{count}} cmds",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}s",
       "commandsShort": "{{count}}c"

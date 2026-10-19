@@ -3310,7 +3310,8 @@
       "settingsToolsOn": "ચાલુ — સેટિંગ્સ સાધનો મોડેલને મોકલવામાં આવે છે",
       "settingsToolsOff": "બંધ — મોડેલને કોઈ સેટિંગ્સ સાધન મોકલવામાં આવતું નથી",
       "serverChecking": "આ સર્વર તપાસી રહ્યું છે…",
-      "serverToolCount": "{{count}} સાધનો",
+      "serverToolCount_one": "{{count}} સાધન",
+      "serverToolCount_other": "{{count}} સાધનો",
       "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી",
       "serverOff": "આ સર્વર બંધ છે"
     },
@@ -3542,10 +3543,13 @@
     "emptyDescription": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ કમાન્ડ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે પ્રોફાઇલ બનાવો.",
     "loadFailed": "પ્રોફાઇલ લોડ કરી શકાઈ નથી",
     "counts": {
-      "vars": "{{count}} ચલો",
+      "vars_one": "{{count}} ચલ",
+      "vars_other": "{{count}} ચલો",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} કૌશલ્ય",
-      "commands": "{{count}} આદેશો",
+      "skills_one": "{{count}} કૌશલ્ય",
+      "skills_other": "{{count}} કૌશલ્યો",
+      "commands_one": "{{count}} આદેશ",
+      "commands_other": "{{count}} આદેશો",
       "varsShort": "{{count}}ચ",
       "skillsShort": "{{count}}ક",
       "commandsShort": "{{count}}આ"

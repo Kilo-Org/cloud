@@ -247,6 +247,37 @@ describe('source-lot credit adjustments', () => {
     expect(await balance(user.id)).toBe(-40);
   });
 
+  it.each([
+    ['both before the deadline', beforeDeadline, beforeDeadline],
+    ['across the deadline', beforeDeadline, afterDeadline],
+    ['both after the deadline', afterDeadline, afterDeadline],
+  ])('offsets expired principal once across partial refunds %s', async (_, first, second) => {
+    const { user, source } = await sourceLot(20);
+    await refund(user.id, source.id, 30, 'partial-refund-1', first);
+    await refund(user.id, source.id, 70, 'partial-refund-2', second);
+    await expire(user.id);
+    expect(await balance(user.id)).toBe(-20);
+  });
+
+  it.each([beforeDeadline, afterDeadline])(
+    'reclaims a refunded lot in full after its balance was zeroed (refund at %s)',
+    async refundAt => {
+      const { user, source } = await sourceLot(40);
+      await db.transaction(tx =>
+        retireCreditBalance(tx, {
+          owner: { type: 'user', id: user.id },
+          actorId: user.id,
+          creditCategory: 'dispute-reset',
+          description: 'Reset',
+          now: beforeDeadline,
+        })
+      );
+      const result = await refund(user.id, source.id, 100, 'refund-after-reset', refundAt);
+      expect(result.amountMicrodollars).toBe(100);
+      expect(await balance(user.id)).toBe(-100);
+    }
+  );
+
   it('preserves Apple-exempt refunds and reversals without introducing an expiry', async () => {
     const { user, source } = await sourceLot(10, null);
     const debit = await refund(user.id, source.id, 50, 'apple-refund');

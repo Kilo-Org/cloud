@@ -16,7 +16,7 @@ import {
   recordRefundDebtRepayment,
   refundDebtAllocationCategory,
 } from '@kilocode/db/credit-refund-repayments';
-import { and, asc, eq, gt, inArray, isNull, notExists, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lt, notExists, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 type OwnerState = CreditExpirationOwnerState;
@@ -232,12 +232,54 @@ export async function refundCreditTransaction(
     0,
     Math.min(source.amount_microdollars, Math.round(params.amountMicrodollars))
   );
-  const alreadyExpired =
-    Math.max(0, -(expiration?.amount_microdollars ?? 0)) +
-    (source.expiry_date !== null && new Date(source.expiry_date) <= now
-      ? source.retired_microdollars
-      : 0);
-  const amount = Math.max(0, requested - alreadyExpired);
+  const priorRefunds = await tx
+    .select()
+    .from(credit_transactions)
+    .where(
+      and(
+        ownerFilter(params.owner),
+        eq(credit_transactions.source_transaction_id, source.id),
+        lt(credit_transactions.refund_principal_microdollars, 0)
+      )
+    );
+  const reversals =
+    priorRefunds.length === 0
+      ? []
+      : await tx
+          .select({
+            refundId: credit_transactions.source_transaction_id,
+            createdAt: credit_transactions.created_at,
+          })
+          .from(credit_transactions)
+          .where(
+            and(
+              ownerFilter(params.owner),
+              inArray(
+                credit_transactions.source_transaction_id,
+                priorRefunds.map(refund => refund.id)
+              ),
+              gt(credit_transactions.refund_principal_microdollars, 0)
+            )
+          );
+  const reversedAt = new Map(reversals.map(reversal => [reversal.refundId, reversal.createdAt]));
+  // Expired principal offsets refunded principal once across all refunds of the lot. A refund
+  // reversed after the deadline leaves its retirement unrestored, so it rejoins the expired pool.
+  const unclaimedExpiredPrincipal = priorRefunds.reduce(
+    (pool, refund) => {
+      const reversal = reversedAt.get(refund.id);
+      if (reversal === undefined) {
+        return (
+          pool -
+          Math.max(0, refund.amount_microdollars - (refund.refund_principal_microdollars ?? 0))
+        );
+      }
+      return source.expiry_date !== null && new Date(reversal) >= new Date(source.expiry_date)
+        ? pool + refund.retired_microdollars
+        : pool;
+    },
+    Math.max(0, -(expiration?.amount_microdollars ?? 0))
+  );
+  const amount = requested - Math.min(requested, Math.max(0, unclaimedExpiredPrincipal));
   const retirement = expiration
     ? 0
     : Math.min(

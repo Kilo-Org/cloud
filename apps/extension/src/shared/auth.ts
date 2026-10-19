@@ -171,8 +171,8 @@ export const pollDeviceAuthCode = async ({
   signal,
 }: PollDeviceAuthCodeOptions): Promise<DeviceAuthPollResult> => {
   const requestInit: RequestInit = {
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ deviceCode }),
+    headers: { 'Content-Type': 'application/json' },
     method: 'POST',
     ...(signal === undefined ? {} : { signal }),
   };

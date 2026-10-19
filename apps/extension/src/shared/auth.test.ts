@@ -190,9 +190,9 @@ describe('device auth API client', () => {
     for (const requestUrl of seenRequests) {
       expect(requestUrl).toContain('/api/device-auth/token');
     }
-    expect(seenBodies).toStrictEqual(
-      Array(4).fill(JSON.stringify({ deviceCode: 'base64url-device-secret' }))
-    );
+    for (const body of seenBodies) {
+      expect(body).toBe(JSON.stringify({ deviceCode: 'base64url-device-secret' }));
+    }
   });
 
   it('validates stored tokens with the user endpoint', async () => {

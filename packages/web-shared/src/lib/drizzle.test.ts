@@ -215,6 +215,70 @@ describe('drizzle', () => {
       expect(ip.http_ip_id).toBe(1);
     });
 
+    it('restarts sequences advanced only by another pooled connection', async () => {
+      const writer = await pool.connect();
+      try {
+        const { rows: writerRows } = await writer.query<{ pid: number }>(
+          'SELECT pg_backend_pid() AS pid'
+        );
+        await writer.query(`SELECT nextval('http_ip_http_ip_id_seq') FROM generate_series(1, 2)`);
+        const { rows: observerRows } = await db.execute<{ pid: number; last_value: bigint }>(sql`
+          SELECT pg_backend_pid() AS pid,
+            pg_sequence_last_value('http_ip_http_ip_id_seq'::regclass) AS last_value
+        `);
+        expect(observerRows[0].pid).not.toBe(writerRows[0].pid);
+        expect(observerRows[0].last_value).toBe(BigInt(2));
+
+        await cleanupDbForTest();
+
+        const { rows } = await writer.query<{ id: bigint }>(
+          `SELECT nextval('http_ip_http_ip_id_seq') AS id`
+        );
+        expect(rows[0].id).toBe(BigInt(1));
+      } finally {
+        writer.release();
+      }
+    });
+
+    it('rolls back sequence restarts with table deletes when commit fails', async () => {
+      await db
+        .insert(http_user_agent)
+        .values([{ http_user_agent: 'rollback-a' }, { http_user_agent: 'rollback-b' }]);
+      await db.execute(sql`
+        CREATE FUNCTION public.cleanup_forced_commit_failure() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+          IF (SELECT is_called FROM public.http_user_agent_http_user_agent_id_seq) THEN
+            RAISE EXCEPTION 'cleanup failed before sequence restart';
+          END IF;
+          RAISE EXCEPTION 'forced cleanup commit failure';
+        END;
+        $$;
+        CREATE CONSTRAINT TRIGGER cleanup_forced_commit_failure
+          AFTER DELETE ON public.http_user_agent
+          DEFERRABLE INITIALLY DEFERRED
+          FOR EACH ROW EXECUTE FUNCTION public.cleanup_forced_commit_failure();
+        ALTER TABLE public.http_user_agent ENABLE ALWAYS TRIGGER cleanup_forced_commit_failure;
+      `);
+      try {
+        await expect(cleanupDbForTest()).rejects.toMatchObject({
+          cause: { message: 'forced cleanup commit failure' },
+        });
+        const retained = await db.select().from(http_user_agent);
+        expect(retained.map(row => row.http_user_agent_id).sort()).toEqual([1, 2]);
+        const [next] = await db
+          .insert(http_user_agent)
+          .values({ http_user_agent: 'rollback-c' })
+          .returning();
+        expect(next.http_user_agent_id).toBe(3);
+      } finally {
+        await db.execute(sql`
+          DROP TRIGGER cleanup_forced_commit_failure ON public.http_user_agent;
+          DROP FUNCTION public.cleanup_forced_commit_failure();
+        `);
+      }
+    });
+
     it('leaves every emptied heap with zero pages, as TRUNCATE does', async () => {
       const owner = await insertTestUser();
       await createTestOrganization('Cleanup heap pin', owner.id, 0);

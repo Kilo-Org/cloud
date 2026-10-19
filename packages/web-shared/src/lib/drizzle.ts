@@ -245,8 +245,9 @@ const cleanupRoots = drizzleSql`
 /**
  * Leaves the database as `TRUNCATE <every public table> RESTART IDENTITY CASCADE`
  * would: every table and partition empty, every owned identity/serial sequence
- * restarted. TRUNCATE recreates the files of all ~250 tables and their indexes on
- * every call; this only deletes from tables whose heap has pages. A table without
+ * restarted. Sequence restarts roll back with the deletes if cleanup fails.
+ * TRUNCATE recreates the files of all ~250 tables and their indexes on every
+ * call; this only deletes from tables whose heap has pages. A table without
  * pages holds no tuples, so the set never misses rows.
  *
  * `session_replication_role = replica` skips FK checks and ON DELETE actions,
@@ -279,7 +280,7 @@ export async function cleanupDbForTest(): Promise<void> {
       ),
       -- Materialized so pg_sequence_last_value only ever sees sequence OIDs.
       owned AS MATERIALIZED (
-        SELECT s.seqrelid, s.seqstart
+        SELECT s.seqrelid
         FROM tree
         JOIN pg_depend d
           ON d.refclassid = 'pg_class'::regclass
@@ -294,7 +295,7 @@ export async function cleanupDbForTest(): Promise<void> {
       GROUP BY roots.oid, roots.relname
       HAVING bool_or(pg_relation_size(tree.rel) > 0)
       UNION ALL
-      SELECT 'sequence', format('setval(%s, %s, false)', seqrelid, seqstart)
+      SELECT 'sequence', format('ALTER SEQUENCE %s RESTART', seqrelid::regclass)
       FROM owned
       WHERE pg_sequence_last_value(seqrelid) IS NOT NULL
     `);
@@ -308,7 +309,7 @@ export async function cleanupDbForTest(): Promise<void> {
         ...tables.map(table => `DELETE FROM ${table}`)
       );
     }
-    if (sequenceResets.length > 0) statements.push(`SELECT ${sequenceResets.join(', ')}`);
+    statements.push(...sequenceResets);
     if (statements.length > 0) await tx.execute(drizzleSql.raw(statements.join(';\n')));
     return tables;
   });

@@ -189,12 +189,12 @@ const LICENSE_NAMES = {
   unlicense: 'Unlicense',
 } satisfies Readonly<Record<string, string>>;
 
-const LICENSE_BY_ID: Readonly<Record<string, string>> = LICENSE_NAMES;
-
 function licenseOf(card: HfRepoInfo['cardData']): string | undefined {
   const license = Array.isArray(card?.license) ? card.license[0] : card?.license;
   const named = license === 'other' ? (card?.license_name ?? license) : license;
-  return named === undefined ? undefined : (LICENSE_BY_ID[named.toLowerCase()] ?? named);
+  return named === undefined
+    ? undefined
+    : (LICENSE_NAMES[named.toLowerCase() as keyof typeof LICENSE_NAMES] ?? named);
 }
 
 function quantOf(path: string): string | undefined {

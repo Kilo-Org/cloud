@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -23,7 +32,10 @@ function runChecker(context, files) {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, content);
   }
-  copyFileSync(new URL('./check-classes.mjs', import.meta.url), join(root, 'tools/nativewind/check-classes.mjs'));
+  copyFileSync(
+    new URL('./check-classes.mjs', import.meta.url),
+    join(root, 'tools/nativewind/check-classes.mjs')
+  );
   copyFileSync(join(MOBILE_ROOT, 'src/global.css'), join(root, 'apps/mobile/src/global.css'));
   symlinkSync(join(MOBILE_ROOT, 'node_modules'), join(root, 'apps/mobile/node_modules'), 'dir');
 
@@ -53,7 +65,8 @@ test('flags all-side padding on a scroll container own className but not on cont
 
 test('accepts all-side padding moved to contentContainerClassName', context => {
   const result = runChecker(context, {
-    'apps/mobile/src/screen.tsx': 'export const a = <ScrollView contentContainerClassName="p-4" />;\n',
+    'apps/mobile/src/screen.tsx':
+      'export const a = <ScrollView contentContainerClassName="p-4" />;\n',
   });
   assert.equal(result.status, 0);
 });
@@ -71,7 +84,9 @@ test('flags an opacity modifier on every theme token', context => {
   const tokens = themeTokens();
   assert.ok(tokens.includes('primary-disabled'));
   assert.ok(tokens.includes('hair-soft'));
-  const body = tokens.map(token => `export const k_${token.replace(/-/g, '_')} = "bg-${token}/50";\n`).join('');
+  const body = tokens
+    .map(token => `export const k_${token.replace(/-/g, '_')} = "bg-${token}/50";\n`)
+    .join('');
   const result = runChecker(context, { 'apps/mobile/src/all-tokens.ts': body });
   assert.equal(result.status, 1);
   for (const token of tokens) {
@@ -81,7 +96,8 @@ test('flags an opacity modifier on every theme token', context => {
 
 test('accepts theme tokens without an opacity modifier', context => {
   const result = runChecker(context, {
-    'apps/mobile/src/panel.ts': 'export const a = "bg-primary-disabled border-hair-soft bg-good-tile-bg";\n',
+    'apps/mobile/src/panel.ts':
+      'export const a = "bg-primary-disabled border-hair-soft bg-good-tile-bg";\n',
   });
   assert.equal(result.status, 0);
 });

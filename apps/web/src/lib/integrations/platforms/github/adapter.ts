@@ -736,6 +736,10 @@ export async function fetchPRInlineComments(
       pull_number: prNumber,
       per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
       page,
+      // Newest comments first, so a page or byte cap keeps the freshest
+      // duplicate-detection hints and drops the oldest ones.
+      sort: 'created',
+      direction: 'desc',
     });
 
     for (const c of data) {

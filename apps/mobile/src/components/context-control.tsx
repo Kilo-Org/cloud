@@ -22,16 +22,23 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
  * Returns the opener for its control plus the sheet element the caller renders,
  * so the sheet lives in the caller's tree (a portal-free `Modal`) instead of a
  * process-wide action-sheet provider. `onSelectionChange` fires only for a
- * picked account that differs from the active one, so a caller that reloads its
+ * picked account that differs from the shown one, so a caller that reloads its
  * screen can leave a re-pick of the current account a no-op.
+ *
+ * `shownOrganizationId` is the account the caller's screen is scoped to when
+ * that differs from the active one (for example an explicit route scope). It
+ * drives the check mark and the no-op comparison; a pick still changes the
+ * active account, which is what every other surface reads.
  */
 export function useContextPicker(
   orgs: OrgListEntry[] | undefined,
-  onSelectionChange?: (organizationId: string | null) => void
+  onSelectionChange?: (organizationId: string | null) => void,
+  shownOrganizationId?: string | null
 ) {
   const { t } = useTranslation();
   const { setOrganizationId, organizationId } = useOrganization();
   const [open, setOpen] = useState(false);
+  const shownId = shownOrganizationId !== undefined ? shownOrganizationId : organizationId;
 
   const labels = [
     t('common.personal'),
@@ -42,9 +49,9 @@ export function useContextPicker(
   // Personal is index 0 and the memberships follow in list order. A persisted
   // membership that is no longer listed checks nothing, so the mark never names
   // an account the user is not on.
-  const memberIndex = orgs?.findIndex(org => org.organizationId === organizationId) ?? -1;
+  const memberIndex = orgs?.findIndex(org => org.organizationId === shownId) ?? -1;
   let currentIndex = -1;
-  if (organizationId === null) {
+  if (shownId === null) {
     currentIndex = 0;
   } else if (memberIndex >= 0) {
     currentIndex = memberIndex + 1;
@@ -56,14 +63,14 @@ export function useContextPicker(
       return;
     }
     if (index === 0) {
-      if (organizationId !== null) {
+      if (shownId !== null) {
         setOrganizationId(null);
         onSelectionChange?.(null);
       }
       return;
     }
     const org = orgs?.[index - 1];
-    if (org && org.organizationId !== organizationId) {
+    if (org && org.organizationId !== shownId) {
       setOrganizationId(org.organizationId);
       onSelectionChange?.(org.organizationId);
     }
@@ -91,15 +98,21 @@ export function useContextPicker(
   };
 }
 
-/** An explicit scope is always read-only; explicit null never inherits global scope. */
+/**
+ * An explicit `scope` is always read-only; explicit null never inherits global
+ * scope. `value` instead keeps the control switchable while it shows the account
+ * the caller's screen is scoped to, which may differ from the active account.
+ */
 export function ContextControl({
   scope,
   showOrganizationName = true,
   onSelectionChange,
+  value,
 }: Readonly<{
   scope?: ContextDisplayScope;
   showOrganizationName?: boolean;
   onSelectionChange?: (organizationId: string | null) => void;
+  value?: string | null;
 }>) {
   const context = useOrganization();
   const { token } = useAuth();
@@ -111,10 +124,17 @@ export function ContextControl({
     enabled: token != null,
   });
   const orgs = organizations.data;
-  const { openPicker, picker } = useContextPicker(orgs, onSelectionChange);
-  const organizationId = scope ? scope.organizationId : context.organizationId;
-  const isResolved = scope ? scope.isResolved : context.isLoaded;
-  const providerError = scope ? null : context.error;
+  const { openPicker, picker } = useContextPicker(
+    orgs,
+    onSelectionChange,
+    scope ? undefined : value
+  );
+  // A caller-supplied `value` (or a read-only scope) is the screen's own
+  // account; otherwise the active account drives the label.
+  const shownId = value !== undefined ? value : context.organizationId;
+  const organizationId = scope ? scope.organizationId : shownId;
+  const isResolved = scope ? scope.isResolved : context.isLoaded || value !== undefined;
+  const providerError = scope || value !== undefined ? null : context.error;
   const org = orgs?.find(entry => entry.organizationId === organizationId);
   const nameError = isResolved && (!scope || organizationId !== null) && organizations.isError;
   const unavailable = isResolved && organizationId !== null && orgs !== undefined && !org;

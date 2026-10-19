@@ -43,6 +43,7 @@ import {
   readForkPrefillText,
   readForkSourceIsCloudAgent,
 } from '@/components/agents/new-session-prefill';
+import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ContextControl } from '@/components/context-control';
@@ -144,12 +145,15 @@ export function NewSessionScreenBody() {
     forkSourceIsCloudAgent?: string;
     preselectRunOn?: string;
   }>();
-  const organizationId = searchParams.organizationId;
+  const {
+    organizationId,
+    isResolved: organizationResolved,
+    isCloneEntry,
+  } = useNewSessionOrganization();
   const shareIdParam = searchParams.shareId;
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
   const cloneSourceTitle = readCloneSourceTitle(searchParams);
-  const isCloneEntry = cloneFromKiloSessionId !== '';
   // "Fork from here": the inclusive cut, and a forked user message's text for
   // the new session's composer. Both empty for a full Continue.
   const cloneUpToMessageId = isCloneEntry ? readCloneUpToMessageId(searchParams) : '';
@@ -201,17 +205,21 @@ export function NewSessionScreenBody() {
   // that remount happens only while the user has typed nothing.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
 
-  // The Organization section above Run on. Switching the account switches the
-  // whole new-session screen with it: the create is attributed to the active
-  // account, and the org-scoped picks (repositories, models, profiles) belong
-  // to the previous one, so the body remounts through a stack-safe replace
-  // carrying the new ?organizationId. The durable text draft survives — the
-  // pending debounced write flushes before the replace, so the remount's
-  // draft load reads the newest text (the replace's push lands before the old
-  // screen's unmount flush would run). A clone entry is locked to its source
-  // session's org: a read-only row (an explicit scope never inherits global).
-  // The entry's own params (share prefill, clone/fork ids, run-on preselect)
-  // stay in the URL so the remount keeps the same entry.
+  // The Organization section above Run on. The account it names is the one the
+  // create is attributed to and every org-scoped pick reads
+  // (`useNewSessionOrganization`): an explicit ?organizationId, else the active
+  // account, so an entry that carries no organization (the tour hand-off, the
+  // launcher "New Agent" shortcut) starts in the account Home shows. Switching
+  // the account switches the whole screen with it: the org-scoped picks
+  // (repositories, models, profiles) belong to the previous one, so the body
+  // remounts through a stack-safe replace carrying the new ?organizationId. The
+  // durable text draft survives — the pending debounced write flushes before
+  // the replace, so the remount's draft load reads the newest text (the
+  // replace's push lands before the old screen's unmount flush would run). A
+  // clone entry is locked to its source session's org: a read-only row (an
+  // explicit scope never inherits the active account). The entry's own params
+  // (share prefill, clone/fork ids, run-on preselect) stay in the URL so the
+  // remount keeps the same entry.
   const stackSafeRouter = useStackSafeReplace();
   const handleOrganizationSwitch = useCallback(
     (nextOrganizationId: string | null) => {
@@ -247,7 +255,10 @@ export function NewSessionScreenBody() {
       {isCloneEntry ? (
         <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
       ) : (
-        <ContextControl onSelectionChange={handleOrganizationSwitch} />
+        <ContextControl
+          value={organizationResolved ? (organizationId ?? null) : undefined}
+          onSelectionChange={handleOrganizationSwitch}
+        />
       )}
     </View>
   );

@@ -145,11 +145,7 @@ export function NewSessionScreenBody() {
     forkSourceIsCloudAgent?: string;
     preselectRunOn?: string;
   }>();
-  const {
-    organizationId,
-    isResolved: organizationResolved,
-    isCloneEntry,
-  } = useNewSessionOrganization();
+  const { organizationId, isCloneEntry } = useNewSessionOrganization();
   const shareIdParam = searchParams.shareId;
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
@@ -256,7 +252,7 @@ export function NewSessionScreenBody() {
         <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
       ) : (
         <ContextControl
-          value={organizationResolved ? (organizationId ?? null) : undefined}
+          value={organizationId ?? null}
           onSelectionChange={handleOrganizationSwitch}
         />
       )}

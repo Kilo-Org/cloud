@@ -76,7 +76,7 @@ export function useAgentProfileList(organizationId?: string) {
     enabled: isOrganization,
     placeholderData: keepPreviousDataForQueryKey(combinedOptions.queryKey),
     networkMode: 'always',
-    refetchOnReconnect: true,
+    refetchOnReconnect: 'always',
   });
 
   const query = isOrganization ? combined : personal;

@@ -571,10 +571,10 @@ export class SessionIngestDO extends DurableObject<Env> {
     // across batches; a session with no stored total starts at 0.
     let runningCostMicrodollars = readIngestMetaNumber(this.db, 'runningCostMicrodollars') ?? 0;
     if (!hasIngestMeta(this.db, 'runningCostMicrodollars')) {
-      // One-time seed: pre-existing assistant rows (an upgrade or an earlier
-      // ingest batch) must be counted, or the running total undercounts the
-      // transcript. Bounded to inline message rows; R2-offloaded rows ('{}')
-      // contribute 0, matching computeSessionMetrics.
+      // One-time initial count: pre-existing inline assistant rows (an upgrade or
+      // an earlier ingest batch) must be counted, or the running total undercounts
+      // the transcript. The filter matches computeSessionMetrics, which counts an
+      // R2-offloaded row as zero.
       const seededRows = this.db
         .select({ item_data: ingestItems.item_data })
         .from(ingestItems)

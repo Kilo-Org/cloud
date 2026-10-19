@@ -88,4 +88,43 @@ describe('createCachedFetch', () => {
     expect(await get()).toBe(10); // stale fallback
     expect(await get()).toBe(20); // recovered
   });
+
+  test('shares one in-flight fetch between concurrent callers', async () => {
+    let resolveFetch: (value: number) => void = () => {};
+    const fetcher = jest.fn(
+      () =>
+        new Promise<number>(resolve => {
+          resolveFetch = resolve;
+        })
+    );
+    const get = createCachedFetch(fetcher, 10_000, 0);
+
+    const results = Promise.all([get(), get(), get()]);
+    resolveFetch(7);
+
+    expect(await results).toEqual([7, 7, 7]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  test('shares the fallback of a failed in-flight fetch and retries on the next call', async () => {
+    let rejectFetch: (error: Error) => void = () => {};
+    const fetcher = jest
+      .fn<() => Promise<string>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<string>((_resolve, reject) => {
+            rejectFetch = reject;
+          })
+      )
+      .mockResolvedValueOnce('recovered');
+    const get = createCachedFetch(fetcher, 10_000, 'default');
+
+    const results = Promise.all([get(), get()]);
+    rejectFetch(new Error('timeout'));
+
+    expect(await results).toEqual(['default', 'default']);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(await get()).toBe('recovered');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });

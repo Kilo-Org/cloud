@@ -1,26 +1,30 @@
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { ai_gateway_config } from '@kilocode/db/schema';
 import { GatewayModelListConfigSchema } from '@kilocode/db/schema-types';
-import { eq } from 'drizzle-orm';
-import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import {
+  createAiGatewayConfigSelector,
+  readAiGatewayConfigSnapshot,
+} from '@kilocode/web-shared/lib/ai-gateway/ai-gateway-config-snapshot';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 
 // Direct requests are rejected, but kilo-auto still routes to it.
 const HARDCODED_UNAVAILABLE_MODEL_IDS = [GEMMA_4_26B_A4B_IT_FREE_ID];
 
-/** Throws on an invalid stored list, so the cached getter keeps its last valid value. */
-export async function readUnavailableModelIds(): Promise<string[]> {
-  const [row] = await readDb
-    .select({ unavailable_models: ai_gateway_config.unavailable_models })
-    .from(ai_gateway_config)
-    .where(eq(ai_gateway_config.id, 1))
-    .limit(1);
-  if (!row?.unavailable_models) return [];
-  return GatewayModelListConfigSchema.parse(row.unavailable_models).models;
+function parseUnavailableModelIds(unavailableModels: unknown): string[] {
+  if (!unavailableModels) return [];
+  return GatewayModelListConfigSchema.parse(unavailableModels).models;
 }
 
-const getConfiguredUnavailableModelIds = createCachedFetch(readUnavailableModelIds, 60_000, []);
+/** Throws on an invalid stored list, so the cached getter keeps its last valid value. */
+export async function readUnavailableModelIds(): Promise<string[]> {
+  const snapshot = await readAiGatewayConfigSnapshot(readDb);
+  return parseUnavailableModelIds(snapshot?.unavailable_models);
+}
+
+const getConfiguredUnavailableModelIds = createAiGatewayConfigSelector<ReadonlyArray<string>>(
+  snapshot => parseUnavailableModelIds(snapshot.unavailable_models),
+  []
+);
 
 export async function getUnavailableModelIds(): Promise<ReadonlySet<string>> {
   return new Set([

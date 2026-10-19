@@ -5,6 +5,8 @@ import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-t
 import { AUTO_FREE_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { AI_GATEWAY_CONFIG_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
 let admin: User;
 let nonAdmin: User;
@@ -16,7 +18,22 @@ const config: AutoFreeConfig = {
   ],
 };
 
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { get: jest.fn(async () => null), set: jest.fn(), del: jest.fn() },
+}));
+
+const redisSet = jest.mocked(redisClient.set);
+
+function lastPublishedSnapshot(): unknown {
+  const call = redisSet.mock.lastCall;
+  expect(call?.[0]).toBe(AI_GATEWAY_CONFIG_REDIS_KEY);
+  expect(call?.[2]).toEqual({ ex: 300 });
+  return JSON.parse(String(call?.[1]));
+}
+
 beforeEach(async () => {
+  redisSet.mockReset();
+  redisSet.mockResolvedValue('OK' as never);
   await cleanupDbForTest();
   admin = await insertTestUser({
     google_user_email: `auto-free-admin-${Math.random()}@admin.example.com`,
@@ -97,6 +114,12 @@ describe('adminAutoFreeConfigRouter', () => {
 
     await caller.admin.autoFreeConfig.set({ config });
     expect((await caller.admin.autoFreeConfig.get()).config).toEqual(config);
+    expect(lastPublishedSnapshot()).toEqual({
+      config: { vercel_routing_enabled: false },
+      auto_free: config,
+      unavailable_models: null,
+      preferred_models: null,
+    });
 
     const updated: AutoFreeConfig = { models: [config.models[1]] };
     await caller.admin.autoFreeConfig.set({ config: updated });
@@ -104,6 +127,8 @@ describe('adminAutoFreeConfigRouter', () => {
 
     await caller.admin.autoFreeConfig.set({ config: null });
     expect((await caller.admin.autoFreeConfig.get()).config).toBeNull();
+    expect(lastPublishedSnapshot()).toMatchObject({ auto_free: null });
+    expect(redisSet).toHaveBeenCalledTimes(3);
 
     const [row] = await db.select().from(ai_gateway_config);
     expect(row.config).toEqual({ vercel_routing_enabled: false });
@@ -138,6 +163,7 @@ describe('adminAutoFreeConfigRouter', () => {
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(model) });
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
+      expect(redisSet).not.toHaveBeenCalled();
     }
   );
 });

@@ -8,6 +8,10 @@ import {
   readUnavailableModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { get: jest.fn(async () => null), set: jest.fn(async () => 'OK') },
+}));
+
 beforeAll(async () => {
   await cleanupDbForTest();
   await db.insert(ai_gateway_config).values({

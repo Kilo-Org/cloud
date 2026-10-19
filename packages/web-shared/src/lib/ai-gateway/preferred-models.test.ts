@@ -4,6 +4,10 @@ import { ai_gateway_config } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { getMonitoredModels, getPreferredModels, readPreferredModels } from './preferred-models';
 
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { get: jest.fn(async () => null), set: jest.fn(async () => 'OK') },
+}));
+
 const storedModels = [
   'kilo-auto/efficient',
   'provider/a:free',

@@ -19,6 +19,8 @@ export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey(BLACKLISTED_DOMAINS_REDIS_KE
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 
+export const AI_GATEWAY_CONFIG_REDIS_KEY = redisKey('ai-gateway-config:v1');
+
 export const codingPlanUsageRedisKey = (input: {
   userId: string;
   subscriptionId: string;

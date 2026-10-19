@@ -9,6 +9,8 @@ import {
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import type { GatewayModelList } from '@/routers/admin/gateway-model-lists-router';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { AI_GATEWAY_CONFIG_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
 let admin: User;
 let nonAdmin: User;
@@ -19,7 +21,22 @@ const config: GatewayModelListConfig = {
 
 const lists: GatewayModelList[] = ['preferred_models', 'unavailable_models'];
 
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { get: jest.fn(async () => null), set: jest.fn(), del: jest.fn() },
+}));
+
+const redisSet = jest.mocked(redisClient.set);
+
+function lastPublishedSnapshot(): unknown {
+  const call = redisSet.mock.lastCall;
+  expect(call?.[0]).toBe(AI_GATEWAY_CONFIG_REDIS_KEY);
+  expect(call?.[2]).toEqual({ ex: 300 });
+  return JSON.parse(String(call?.[1]));
+}
+
 beforeEach(async () => {
+  redisSet.mockReset();
+  redisSet.mockResolvedValue('OK' as never);
   await cleanupDbForTest();
   admin = await insertTestUser({
     google_user_email: `gateway-model-lists-admin-${Math.random()}@admin.example.com`,
@@ -88,6 +105,14 @@ describe('adminGatewayModelListsRouter', () => {
 
       await caller.admin.gatewayModelLists.set({ list, config });
       expect((await caller.admin.gatewayModelLists.get({ list })).config).toEqual(config);
+      expect(lastPublishedSnapshot()).toEqual({
+        config: { vercel_routing_enabled: false },
+        auto_free: autoFree,
+        unavailable_models: null,
+        preferred_models: null,
+        [otherList]: otherConfig,
+        [list]: config,
+      });
 
       const reordered: GatewayModelListConfig = { models: [...config.models].reverse() };
       await caller.admin.gatewayModelLists.set({ list, config: reordered });
@@ -95,6 +120,7 @@ describe('adminGatewayModelListsRouter', () => {
 
       await caller.admin.gatewayModelLists.set({ list, config: null });
       expect((await caller.admin.gatewayModelLists.get({ list })).config).toBeNull();
+      expect(lastPublishedSnapshot()).toMatchObject({ [list]: null, [otherList]: otherConfig });
 
       const [row] = await db.select().from(ai_gateway_config);
       expect(row).toMatchObject({
@@ -124,6 +150,7 @@ describe('adminGatewayModelListsRouter', () => {
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    expect(redisSet).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown list name', async () => {

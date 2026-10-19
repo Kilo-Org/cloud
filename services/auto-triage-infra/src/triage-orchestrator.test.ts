@@ -216,28 +216,46 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
     expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
   });
 
-  it('applies only worker-owned automation labels when the model selects one', async () => {
+  it('strips worker-owned labels from the model selection and preserves same-named repository labels', async () => {
+    // 'constructor' is a legitimate repository label whose name matches an
+    // Object.prototype key; the strip must remove only the table's own keys.
     const ticket = {
-      ...createAutoFixTicket('repo-maintainer'),
-      availableLabels: ['bug', 'kilo-auto-fix'],
+      ...createAutoFixTicket('outside-contributor'),
+      availableLabels: ['bug', 'kilo-auto-fix', 'constructor'],
     };
     const harness = createHarness(ticket);
     const fetchMock = await stubFetchResponses([
-      { urlPart: permissionUrl, body: { permission: 'write' } },
+      { urlPart: permissionUrl, body: { permission: 'read' } },
     ]);
 
     await harness.orchestrator.completeClassification(callbackSecret, {
       cloudAgentSessionId,
       status: 'completed',
       lastAssistantMessageText:
-        'Classification complete.\n```json\n{"classification":"bug","confidence":0.5,"intentSummary":"Crash on startup","selectedLabels":["kilo-auto-fix","bug"]}\n```',
+        'Classification complete.\n```json\n{"classification":"bug","confidence":0.95,"intentSummary":"Crash on startup","selectedLabels":["kilo-auto-fix","constructor","bug"]}\n```',
     });
 
     const calls = labelsInFetchCalls(fetchMock.mock.calls);
     const applied = calls.find(call => call.labels !== undefined);
-    expect(applied?.labels).toContain('bug');
-    expect(applied?.labels).not.toContain('kilo-auto-fix');
-    expect(calledGithubPermissionApi(fetchMock)).toBe(false);
+    expect(applied?.labels).toEqual(['kilo-triaged', 'constructor', 'bug']);
+    expect(calls.some(call => call.autoFixSkipped)).toBe(true);
+  });
+
+  it('resolves the author in the permission lookup URL', async () => {
+    const harness = createHarness(createAutoFixTicket('author-login'));
+    const fetchMock = await stubFetchResponses([
+      { urlPart: permissionUrl, body: { permission: 'write' } },
+    ]);
+
+    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
+
+    const requestedUrls = fetchMock.mock.calls.map(call => {
+      const input = call[0];
+      return typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    });
+    expect(requestedUrls.some(url => url.includes('/collaborators/author-login/permission'))).toBe(
+      true
+    );
   });
 
   it('applies the auto-fix label for a maintain-tier author at high confidence', async () => {

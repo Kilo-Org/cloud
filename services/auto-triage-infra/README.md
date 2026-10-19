@@ -56,7 +56,7 @@ auto-triage worker
 
 - **Duplicate Detection**: Calls Next.js API to check for similar issues using vector similarity search
 - **Issue Classification**: Uses cloud-agent-next with AI models to classify issues as bug/feature/question/unclear via prepare + initiate + callback
-- **Label Application**: Applies AI-selected labels plus action-tracking labels (kilo-triaged, kilo-auto-fix) via the Next.js API
+- **Label Application**: Applies AI-selected labels plus action-tracking labels (kilo-triaged, and kilo-auto-fix when the issue author holds a repository write permission tier verified through GitHub's collaborator permission API) via the Next.js API
 - **Status Updates**: Real-time callbacks to Next.js API for status tracking
 - **Modular Services**: Clean separation of concerns with dedicated service classes
 
@@ -166,7 +166,12 @@ stuck-ticket alarm.
 6. **Callback route** validates the per-ticket secret, resolves the DO, and invokes
    `completeClassification()` which parses the assistant output and acts on it:
    - **Question/Unclear** → update status (TODO: post comment)
-   - **Bug/Feature (high confidence)** → apply `kilo-auto-fix` label so auto-fix picks it up
+   - **Bug/Feature (high confidence, author holds repository write permission
+     — admin, maintain, or write — verified through GitHub's collaborator
+     permission API)** → apply `kilo-auto-fix` so auto-fix picks it up
+   - **Bug/Feature (high confidence, author permission not verified as write
+     tier)** → apply the triaged label and classification labels without
+     `kilo-auto-fix`; a maintainer can add it by hand
    - **Bug/Feature (low confidence)** → request clarification
 
 ### Classification Process
@@ -184,9 +189,11 @@ stuck-ticket alarm.
 ### PR Creation Process
 
 PR creation is not handled in this worker. When a classification is
-high-confidence, the worker applies the `kilo-auto-fix` label to the
-issue; the separate `auto-fix-infra` worker subscribes to that label
-and creates PRs independently.
+high-confidence and the issue author holds a repository write permission
+tier (verified through GitHub's collaborator permission API), the worker
+applies the `kilo-auto-fix` label to the issue; the separate
+`auto-fix-infra` worker subscribes to that label and creates PRs
+independently.
 
 ### Timeouts
 
@@ -366,7 +373,7 @@ The [`TriageOrchestrator`](src/triage-orchestrator.ts:24) Durable Object manages
    - **Duplicate** ([`closeDuplicate()`](src/triage-orchestrator.ts:210)): Updates status with duplicate info
    - **Question** ([`answerQuestion()`](src/triage-orchestrator.ts:227)): Posts answer comment (TODO)
    - **Unclear** ([`requestClarification()`](src/triage-orchestrator.ts:244)): Requests more info (TODO)
-   - **Bug/Feature** (high confidence): Applies `kilo-auto-fix` label for the auto-fix worker to pick up
+   - **Bug/Feature** (high confidence, author holds a repository write permission tier): Applies `kilo-auto-fix` label for the auto-fix worker to pick up
 
 ### Service Classes
 

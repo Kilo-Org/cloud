@@ -13,11 +13,7 @@ import {
   listTtfbAlertingConfigs,
   upsertTtfbAlertingConfig,
 } from './ttfb-config-store';
-import {
-  ModelIdSchema,
-  queryErrorRateBaseline,
-  queryTtfbBaseline,
-} from './query';
+import { ModelIdSchema, queryErrorRateBaseline, queryTtfbBaseline } from './query';
 
 function errorRate(errors: number, total: number): number {
   if (total <= 0) return 0;

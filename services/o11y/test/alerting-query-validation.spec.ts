@@ -28,9 +28,7 @@ function mockAeResponse(data: unknown[]): ReturnType<typeof vi.fn> {
 
 describe('model id validation', () => {
   it('accepts a normal model slug', () => {
-    expect(parseModelId('anthropic/claude-sonnet-4.5')).toBe(
-      'anthropic/claude-sonnet-4.5'
-    );
+    expect(parseModelId('anthropic/claude-sonnet-4.5')).toBe('anthropic/claude-sonnet-4.5');
     expect(ModelIdSchema.safeParse('openai/gpt-4o-mini').success).toBe(true);
   });
 
@@ -63,18 +61,14 @@ describe('model id validation', () => {
 describe('baseline query builders', () => {
   it('queryErrorRateBaseline throws for an id with a backslash', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    await expect(
-      queryErrorRateBaseline('x\\', makeAeEnv())
-    ).rejects.toThrow('Invalid model id');
+    await expect(queryErrorRateBaseline('x\\', makeAeEnv())).rejects.toThrow('Invalid model id');
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 
   it('queryTtfbBaseline throws for an id with a quote', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    await expect(queryTtfbBaseline("x'", makeAeEnv())).rejects.toThrow(
-      'Invalid model id'
-    );
+    await expect(queryTtfbBaseline("x'", makeAeEnv())).rejects.toThrow('Invalid model id');
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
@@ -119,9 +113,13 @@ describe('baseline route validation', () => {
 
   async function get(url: string): Promise<Response> {
     const app = makeApp();
-    return app.request(url, {
-      headers: { 'X-O11Y-ADMIN-TOKEN': 'test-admin-token' },
-    }, makeRouteEnv());
+    return app.request(
+      url,
+      {
+        headers: { 'X-O11Y-ADMIN-TOKEN': 'test-admin-token' },
+      },
+      makeRouteEnv()
+    );
   }
 
   it('returns 400 for a model with a backslash on the baseline route', async () => {

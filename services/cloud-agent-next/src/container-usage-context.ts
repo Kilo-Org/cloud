@@ -50,7 +50,7 @@ export type LegacySandboxClassName = Exclude<
 >;
 
 // Production values mirror this service's top-level wrangler.jsonc entries and
-// apps/web/src/lib/cloudflare/container-capacity.ts. The parity test reads all three sources.
+// apps/web/src/lib/cloudflare/container-capacity.ts. Keep all three in sync manually.
 // Development intentionally uses different named instance types and does not query Analytics.
 export const SANDBOX_CAPACITIES: Record<LegacySandboxClassName, SandboxCapacity> = {
   Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },

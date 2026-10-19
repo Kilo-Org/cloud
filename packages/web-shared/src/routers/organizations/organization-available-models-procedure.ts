@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -31,7 +32,16 @@ export const listAvailableModelsProcedure = organizationMemberProcedure
         message: 'Organization not found',
       });
     }
-    const routers = await listUsableCustomRouters({ userId: ctx.user.id, organizationId });
+    const routers = await listUsableCustomRouters({
+      userId: ctx.user.id,
+      organizationId,
+    }).catch(error => {
+      captureException(error, {
+        tags: { endpoint: 'organizations/models' },
+        extra: { action: 'listing_custom_routers', organizationId },
+      });
+      return [];
+    });
     return {
       ...result,
       data: addCustomRouterModels(

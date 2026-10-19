@@ -149,12 +149,15 @@ export type RegisterOwnerBenchmarkProfilesResult =
   | { ok: false; status: 429; quota: BenchmarkProfileQuotaError }
   | { ok: false; status: number; error: ErrorBody };
 
-export async function registerOwnerBenchmarkProfiles(request: {
-  router: AutoRouter;
-  ownerType: CustomRouterScope;
-  ownerId: string;
-  entries: PoolEntry[];
-}): Promise<RegisterOwnerBenchmarkProfilesResult> {
+export async function registerOwnerBenchmarkProfiles(
+  request: {
+    router: AutoRouter;
+    ownerType: CustomRouterScope;
+    ownerId: string;
+    entries: PoolEntry[];
+  },
+  signal: AbortSignal = AbortSignal.timeout(5_000)
+): Promise<RegisterOwnerBenchmarkProfilesResult> {
   if (!AUTO_ROUTING_BENCHMARK_WORKER_URL || !INTERNAL_API_SECRET) {
     return {
       ok: false,
@@ -171,6 +174,7 @@ export async function registerOwnerBenchmarkProfiles(request: {
         'content-type': 'application/json',
       },
       body: JSON.stringify(request),
+      signal,
     }
   );
   const body: unknown = await response.json().catch(() => null);

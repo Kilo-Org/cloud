@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
+import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
 
 type UseOrganizationModelsReturn = {
   /** Models formatted for the ModelCombobox component */
@@ -24,11 +25,18 @@ type UseOrganizationModelsReturn = {
  * If organizationId is provided, the models API applies org access policy.
  *
  * @param organizationId - Optional organization ID to filter models for
+ * @param audience - Who runs the selected model; see {@link OrganizationModelAudience}
  */
-export function useOrganizationModels(organizationId?: string): UseOrganizationModelsReturn {
+export function useOrganizationModels(
+  organizationId?: string,
+  audience: OrganizationModelAudience = 'member'
+): UseOrganizationModelsReturn {
   // Fetch models for the model selector
-  const { data: openRouterModels, isLoading: isLoadingOpenRouter } =
-    useModelSelectorList(organizationId);
+  const { data: openRouterModels, isLoading: isLoadingOpenRouter } = useModelSelectorList(
+    organizationId,
+    true,
+    audience
+  );
 
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 

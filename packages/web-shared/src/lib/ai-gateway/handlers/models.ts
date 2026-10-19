@@ -69,6 +69,7 @@ export async function handleModelsRequest(): Promise<
         ? await getAvailableModelsForOrganization(
             auth.organizationId,
             { type: 'member', kiloUserId: auth.user.id },
+            'member',
             readDb
           )
         : null;

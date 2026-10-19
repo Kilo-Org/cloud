@@ -5,6 +5,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -62,6 +63,10 @@ export function deniedModelIdsForCandidates(
 }
 
 export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promise<string[] | null> {
+  const migrated = await findEffectiveLegacyPoolRouter(owner);
+  if (migrated) {
+    return migrated.entries.flatMap(entry => (entry.kind === 'gateway' ? [entry.model] : []));
+  }
   const owners = [
     ...(owner.organizationId ? [{ ownerType: 'org' as const, ownerId: owner.organizationId }] : []),
     { ownerType: 'user' as const, ownerId: owner.userId },

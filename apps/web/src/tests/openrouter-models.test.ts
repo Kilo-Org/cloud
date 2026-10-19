@@ -918,10 +918,11 @@ describe('final Enkrypt serialization boundaries', () => {
           expect(JSON.stringify(result)).not.toContain(field);
         }
         if (branch === 'organization') {
-          const [organizationId, subject, fromDb] =
+          const [organizationId, subject, audience, fromDb] =
             jest.mocked(getAvailableModelsForOrganization).mock.lastCall ?? [];
           expect(organizationId).toBe('test-org-id');
           expect(subject).toEqual({ type: 'member', kiloUserId: 'test-user-id' });
+          expect(audience).toBe('member');
           expect(fromDb).toBe(readDb);
           expect(result.data.map(model => model.id)).toEqual(['some-other-model']);
           expect(getDirectByokModelsForUser).not.toHaveBeenCalled();

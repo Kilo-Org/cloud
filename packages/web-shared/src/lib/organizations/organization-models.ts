@@ -17,6 +17,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import {
+  openAiChatGptSharedServicesOwner,
+  type OpenAiChatGptOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getEnkryptBenchmarks,
@@ -27,9 +32,26 @@ import {
   type OrganizationPolicySubject,
 } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 
+/**
+ * The ChatGPT connection whose models the list marks BYOK-available. A
+ * shared-services run is served only from the organization's shared-services
+ * connection, never from a member's own, so a member's connection marks models
+ * only in that member's own list.
+ */
+function chatGptByokOwner(
+  organizationId: string,
+  subject: OrganizationPolicySubject,
+  audience: OrganizationModelAudience
+): OpenAiChatGptOwner | null {
+  if (audience === 'shared_services') return openAiChatGptSharedServicesOwner(organizationId);
+  if (subject.type === 'member') return { kiloUserId: subject.kiloUserId, organizationId };
+  return null;
+}
+
 export async function getAvailableModelsForOrganization(
   organizationId: string,
   subject: OrganizationPolicySubject,
+  audience: OrganizationModelAudience = 'member',
   fromDb: typeof db = db
 ): Promise<OpenRouterModelsResponse | null> {
   const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
@@ -62,13 +84,9 @@ export async function getAvailableModelsForOrganization(
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
   availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
 
-  // The ChatGPT connection is personal, so it marks models only for the member
-  // whose connection applies to this organization.
-  if (subject.type === 'member') {
-    availableModels = await tagOpenAiChatGptByokModels(
-      { kiloUserId: subject.kiloUserId, organizationId },
-      availableModels
-    );
+  const chatGptOwner = chatGptByokOwner(organizationId, subject, audience);
+  if (chatGptOwner) {
+    availableModels = await tagOpenAiChatGptByokModels(chatGptOwner, availableModels);
   }
 
   const snapshot = await getEnkryptBenchmarks();

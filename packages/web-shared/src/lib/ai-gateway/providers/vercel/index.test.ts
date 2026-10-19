@@ -434,6 +434,7 @@ describe('applyVercelSettings BYOK pinning', () => {
         anthropic: [{ apiKey: 'sk-anthropic' }],
         bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
       },
+      sessionAffinity: true,
     });
     expect(request.body.provider).toBeUndefined();
   });
@@ -703,6 +704,96 @@ describe('applyVercelSettings managed requests', () => {
     await applyManagedVercelSettings('openai/gpt-5', request);
 
     expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
+  });
+});
+
+describe('applyVercelSettings session affinity', () => {
+  const conversationId = 'conversation-hash';
+
+  function requestWithConversationId(
+    kind: GatewayRequest['kind'],
+    id: string | undefined
+  ): GatewayRequest {
+    const model = 'anthropic/claude-sonnet-4.5';
+    const provider = { order: ['google-vertex', 'amazon-bedrock'] };
+    if (kind === 'responses') {
+      return { kind, body: { model, input: 'hello', provider, prompt_cache_key: id } };
+    }
+    if (kind === 'messages') {
+      return {
+        kind,
+        body: {
+          model,
+          max_tokens: 128,
+          messages: [{ role: 'user', content: 'hello' }],
+          provider,
+          session_id: id,
+        },
+      };
+    }
+    return {
+      kind,
+      body: {
+        model,
+        messages: [{ role: 'user', content: 'hello' }],
+        provider,
+        prompt_cache_key: id,
+      },
+    };
+  }
+
+  async function loadApplyVercelSettings() {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['vertex', 'bedrock']),
+      getVercelModelsFromDatabase: jest.fn(),
+    }));
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
+      .applyVercelSettings;
+  }
+
+  const kinds = ['chat_completions', 'messages', 'responses'] as const;
+
+  it.each(kinds)('sends the conversation ID for managed %s requests', async kind => {
+    const applySettings = await loadApplyVercelSettings();
+    const request = requestWithConversationId(kind, conversationId);
+
+    await applySettings('anthropic/claude-sonnet-4.5', request, null);
+
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      sessionId: conversationId,
+      sessionAffinity: true,
+      order: ['vertex', 'bedrock'],
+    });
+  });
+
+  it.each(kinds)('sends the conversation ID for BYOK %s requests', async kind => {
+    const request = requestWithConversationId(kind, conversationId);
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      sessionId: conversationId,
+      sessionAffinity: true,
+    });
+  });
+
+  it.each(kinds)('leaves sessionId unset without a conversation ID for %s', async kind => {
+    const applySettings = await loadApplyVercelSettings();
+    const managed = requestWithConversationId(kind, undefined);
+    const byok = requestWithConversationId(kind, '');
+
+    await applySettings('anthropic/claude-sonnet-4.5', managed, null);
+    await applySettings('anthropic/claude-sonnet-4.5', byok, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    for (const request of [managed, byok]) {
+      expect(request.body.providerOptions?.gateway?.sessionAffinity).toBe(true);
+      expect(request.body.providerOptions?.gateway).not.toHaveProperty('sessionId');
+    }
   });
 });
 

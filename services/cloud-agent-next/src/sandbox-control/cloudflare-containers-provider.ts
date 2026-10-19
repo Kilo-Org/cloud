@@ -1,5 +1,5 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
-import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -96,7 +96,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       try {
         admission = await container.ensureBillingAdmission(input, instance);
       } catch (error) {
-        if (isContainerConcurrencyLimitError(error)) throw error;
+        if (getContainerCapacityFailureReason(error)) throw error;
         admission = {
           success: false,
           code: 'meter_unavailable',

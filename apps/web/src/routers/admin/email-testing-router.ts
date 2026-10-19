@@ -47,6 +47,13 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${orgId}/code-reviews`;
 
   switch (template) {
+    case 'autoRoutingPoolNotice':
+      return {
+        cutover_at: 'November 1, 2099 at 12:00:00 UTC (2099-11-01T12:00:00.000Z)',
+        routers: new RawHtml(
+          `<li>Your personal pool<br /><code>kilo-auto/custom/efficient</code><br /><a href="${NEXTAUTH_URL}/profile">Manage this pool</a></li>`
+        ),
+      };
     case 'orgSubscription':
       return { seats: '5 seats', organization_url, invoices_url };
     case 'orgRenewed':

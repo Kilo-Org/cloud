@@ -6,6 +6,7 @@ import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organ
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
+  ORGANIZATION_PARENT_ACCESS_ROLES,
 } from '@kilocode/app-shared/organizations';
 import { baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
@@ -23,14 +24,6 @@ export const OrganizationIdInputSchema = z.object({
   organizationId: z.uuid(),
 });
 
-// Roles in a parent organization that inherit access to its children. Kept
-// separate from ORGANIZATION_BILLING_ROLES so changing billing scope cannot
-// silently widen child-organization inheritance.
-const parentOrganizationAccessRoles = [
-  'owner',
-  'admin',
-  'billing_manager',
-] satisfies OrganizationRole[];
 const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
 function allowedRole(
@@ -74,7 +67,7 @@ export async function ensureOrganizationAccess(
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
         eq(organization_memberships.kilo_user_id, ctx.user.id),
-        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
     .where(eq(organizations.id, organizationId));
@@ -148,7 +141,7 @@ export async function getOrganizationsAccessRoles(
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
         eq(organization_memberships.kilo_user_id, ctx.user.id),
-        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
     .where(inArray(organizations.id, uniqueIds));
@@ -237,7 +230,7 @@ export async function ensureOrganizationAccessAndFetchOrg(
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
         eq(organization_memberships.kilo_user_id, ctx.user.id),
-        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
     .where(eq(organizations.id, organizationId));

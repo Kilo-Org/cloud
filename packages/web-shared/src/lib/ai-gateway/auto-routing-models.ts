@@ -1,6 +1,7 @@
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   AUTO_SMALL_TARGET_MODELS,
+  customRouterAutoModel,
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
@@ -9,8 +10,12 @@ import {
   KILO_AUTO_SMALL_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getAutoFreeCandidates } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
+import {
+  isVirtualAutoModelId,
+  type CustomRouterDefinition,
+} from '@kilocode/auto-routing-contracts';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { buildAutoModelCatalogEntry } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 
 function visibleConcreteModelIds(models: Iterable<string>, availableModelIds: ReadonlySet<string>) {
   return [
@@ -68,4 +73,28 @@ export async function addAutoRoutingModels(
     }
     return [modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model];
   });
+}
+
+export function addCustomRouterModels(
+  models: OpenRouterModelsResponse['data'],
+  routers: CustomRouterDefinition[]
+): OpenRouterModelsResponse['data'] {
+  if (routers.length === 0) return models;
+  const availableModelIds = new Set(models.map(model => model.id));
+  const customRouterModels = routers.map(router => {
+    const model = buildAutoModelCatalogEntry(
+      customRouterAutoModel({
+        scope: router.ownerType,
+        slug: router.slug,
+        name: router.name,
+        baseRouter: router.baseRouter,
+      })
+    );
+    const modelIds = visibleConcreteModelIds(
+      router.entries.flatMap(entry => (entry.kind === 'gateway' ? [entry.model] : [])),
+      availableModelIds
+    );
+    return modelIds.length ? { ...model, autoRouting: { models: modelIds } } : model;
+  });
+  return models.concat(customRouterModels);
 }

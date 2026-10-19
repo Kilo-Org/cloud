@@ -132,6 +132,7 @@ export const PullRequestPayloadSchema = z.object({
     draft: z.boolean().optional(),
     merged: z.boolean().nullable().optional(),
     html_url: z.string().optional(),
+    created_at: z.string().datetime().optional(),
     user: z.object({
       id: z.number(),
       login: z.string(),

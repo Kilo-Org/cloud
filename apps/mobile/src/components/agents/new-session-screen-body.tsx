@@ -200,6 +200,8 @@ export function NewSessionScreenBody() {
   // carrying the new ?organizationId. The durable text draft survives — the
   // prompt is the session's own state, not an org pick. A clone entry is
   // locked: the source session belongs to its own org (no section rendered).
+  // The entry's own params (share prefill, clone/fork ids, run-on preselect)
+  // stay in the URL so the remount keeps the same entry.
   const { t: orgT } = useTranslation();
   const stackSafeRouter = useStackSafeReplace();
   const handleOrganizationSwitch = useCallback(
@@ -207,12 +209,21 @@ export function NewSessionScreenBody() {
       // See ModelSelector: the sheet never re-anchors after the keyboard
       // hides, so the keyboard must be down before this push.
       Keyboard.dismiss();
-      const query = nextOrganizationId
-        ? `?organizationId=${encodeURIComponent(nextOrganizationId)}`
-        : '';
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(searchParams)) {
+        // The typed `useLocalSearchParams` shape above makes every entry a
+        // string; empty params are dropped so the route keeps no bare key.
+        if (key !== 'organizationId' && value !== '') {
+          params.set(key, value);
+        }
+      }
+      if (nextOrganizationId) {
+        params.set('organizationId', nextOrganizationId);
+      }
+      const query = params.size > 0 ? `?${params.toString()}` : '';
       stackSafeRouter.replace(`/(app)/agent-chat/new${query}` as Href);
     },
-    [stackSafeRouter]
+    [stackSafeRouter, searchParams]
   );
   const organizationSection = isCloneEntry ? undefined : (
     <View className="mt-5">

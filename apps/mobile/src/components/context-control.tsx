@@ -54,12 +54,14 @@ export function useContextPicker(
       return;
     }
     if (index === 0) {
-      setOrganizationId(null);
-      onSelectionChange?.(null);
+      if (organizationId !== null) {
+        setOrganizationId(null);
+        onSelectionChange?.(null);
+      }
       return;
     }
     const org = orgs?.[index - 1];
-    if (org) {
+    if (org && org.organizationId !== organizationId) {
       setOrganizationId(org.organizationId);
       onSelectionChange?.(org.organizationId);
     }

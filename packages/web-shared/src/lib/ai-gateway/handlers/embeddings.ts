@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -134,7 +135,6 @@ export async function handleEmbeddingsRequest(
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
@@ -271,7 +271,7 @@ export async function handleEmbeddingsRequest(
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
-    if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
+    if (!canSpendPaidUsage(balance) && !isFreeModel(requestedModelLowerCased) && !userByok) {
       return await creditsBlockedResponse({
         user,
         balance,

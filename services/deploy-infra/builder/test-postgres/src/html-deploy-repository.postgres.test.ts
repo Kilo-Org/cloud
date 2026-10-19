@@ -365,8 +365,8 @@ describe('builder ephemeral deployment Postgres repository', () => {
 
     expect(firstSweep.length).toBeLessThanOrEqual(25);
     expect(secondSweep.length).toBeLessThanOrEqual(25);
-    expect(firstSweep).toHaveLength(25);
-    expect(secondSweep).toHaveLength(5);
+    // The sweeps run concurrently, so either one can claim first.
+    expect([firstSweep.length, secondSweep.length].sort((a, b) => a - b)).toEqual([5, 25]);
     expect(
       new Set([...firstSweep, ...secondSweep].map(deployment => deployment.id))
     ).toHaveProperty('size', 30);

@@ -35,6 +35,7 @@ import {
 import { usePreferredModels } from '@/components/shared/usePreferredModels';
 import { useConfiguredCustomPricing } from '@/components/shared/useConfiguredCustomPricing';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
+import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
 import {
   modelRetainsPrompts,
   modelTrains,
@@ -529,9 +530,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           <TabsContent
             value="auto-routing"
             forceMount
-            className="mt-6 data-[state=inactive]:hidden"
+            className="mt-6 space-y-6 data-[state=inactive]:hidden"
           >
             <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
+            <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
         </Tabs>
 

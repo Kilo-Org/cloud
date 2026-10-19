@@ -1,21 +1,38 @@
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
 
 type StreamTicketPayload = {
   type: 'stream_ticket';
-  purpose?: 'stream' | 'terminal';
+  purpose?: 'stream' | 'terminal' | 'preview';
   userId?: string;
   kiloSessionId?: string;
   cloudAgentSessionId?: string;
   sessionId?: string;
   organizationId?: string;
   ptyId?: string;
+  port?: number;
   nonce?: string;
   aud?: string;
 };
 
 export const STREAM_TICKET_AUDIENCE = 'cloud-agent-stream';
 export const TERMINAL_TICKET_AUDIENCE = 'cloud-agent-terminal';
+export const PREVIEW_TICKET_AUDIENCE = 'cloud-agent-preview';
+export const PREVIEW_SESSION_AUDIENCE = 'cloud-agent-preview-session';
+
+/** The claims both preview tokens carry: the entry ticket and the session cookie. */
+const previewClaimsSchema = z.object({
+  userId: z.string().min(1),
+  cloudAgentSessionId: z.string().min(1),
+  port: z.number().int(),
+  organizationId: z.string().optional(),
+});
+
+export type PreviewClaims = z.infer<typeof previewClaimsSchema>;
+
+/** A preview token must expire; `jwt.verify` accepts a token without `exp`. */
+const previewTokenPayloadSchema = previewClaimsSchema.extend({ exp: z.number() });
 
 export type WrapperDispatchTicketClaims = {
   type: 'wrapper_dispatch_ticket';
@@ -107,6 +124,84 @@ export function mintWrapperDispatchTicket(
     algorithm: 'HS256',
     expiresIn: WRAPPER_DISPATCH_TICKET_MAX_LIFETIME_SECONDS,
   });
+}
+
+export const PREVIEW_SESSION_LIFETIME_SECONDS = 3600;
+
+export function mintPreviewSessionToken(
+  claims: PreviewClaims,
+  secret: string,
+  nowSeconds = Math.floor(Date.now() / 1000)
+): string {
+  return jwt.sign(
+    { ...claims, type: 'preview_session', exp: nowSeconds + PREVIEW_SESSION_LIFETIME_SECONDS },
+    secret,
+    { algorithm: 'HS256', noTimestamp: true, audience: PREVIEW_SESSION_AUDIENCE }
+  );
+}
+
+export type PreviewTokenValidation =
+  | { success: true; claims: PreviewClaims }
+  | { success: false; error: string };
+
+const INVALID_PREVIEW_CLAIMS = { success: false, error: 'Invalid preview claims' } as const;
+
+/** The object strips every other field, so `aud`, `exp` and `type` never reach the claims. */
+function previewClaimsFrom(payload: unknown): PreviewTokenValidation {
+  const parsed = previewTokenPayloadSchema.safeParse(payload);
+  if (!parsed.success) return INVALID_PREVIEW_CLAIMS;
+  const { exp: _exp, ...claims } = parsed.data;
+  return { success: true, claims };
+}
+
+export type PreviewEntryTicketValidation =
+  | { success: true; claims: PreviewClaims; nonce: string; expiresAtMs: number }
+  | { success: false; error: string };
+
+/** The entry carries the single-use `nonce` and its expiry apart from the claims. */
+const previewEntryTicketSchema = previewTokenPayloadSchema.extend({ nonce: z.string().min(1) });
+
+/** The 60-second entry ticket the web app mints (a `stream_ticket` with purpose `preview`). */
+export function validatePreviewEntryTicket(
+  ticket: string | null,
+  secret: string | null | undefined
+): PreviewEntryTicketValidation {
+  const validated = validateStreamTicket(ticket, secret, PREVIEW_TICKET_AUDIENCE);
+  if (!validated.success) return validated;
+  if (validated.payload.purpose !== 'preview') {
+    return { success: false, error: 'Invalid ticket purpose' };
+  }
+  const parsed = previewEntryTicketSchema.safeParse(validated.payload);
+  if (!parsed.success) return INVALID_PREVIEW_CLAIMS;
+  const { exp, nonce, ...claims } = parsed.data;
+  return { success: true, claims, nonce, expiresAtMs: exp * 1000 };
+}
+
+/** The host-bound session token the Worker sets as the preview cookie. */
+export function validatePreviewSessionToken(
+  token: string | null,
+  secret: string | null | undefined
+): PreviewTokenValidation {
+  if (!token) return { success: false, error: 'Missing preview session' };
+  if (!secret) {
+    return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
+  }
+  let payload: string | jwt.JwtPayload;
+  try {
+    payload = jwt.verify(token, secret, {
+      algorithms: ['HS256'],
+      audience: PREVIEW_SESSION_AUDIENCE,
+    });
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return { success: false, error: 'Preview session expired' };
+    }
+    return { success: false, error: 'Invalid preview session' };
+  }
+  if (typeof payload === 'string' || payload.type !== 'preview_session') {
+    return { success: false, error: 'Invalid preview session type' };
+  }
+  return previewClaimsFrom(payload);
 }
 
 function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDispatchTicketClaims {

@@ -16,14 +16,18 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   convertFromKiloExclusiveModel,
-  type KiloExclusiveModel,
+  getInferenceProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModels,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { getPreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -86,7 +90,7 @@ export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
     },
     context_length: m.context_length,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
-    opencode: m.opencode_settings,
+    opencode: m.opencode_settings && withLegacyVariants(m.opencode_settings),
   };
 }
 
@@ -120,10 +124,6 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   return name;
 }
 
-export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
-  return model.status !== 'disabled' || model.pricing === null;
-}
-
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels, unavailableModelIds] =
@@ -136,73 +136,90 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
+  const catalogModels = models
+    .filter(
+      model =>
+        (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
+        !kiloExclusiveModels.some(m => m.public_id === model.id) &&
+        !unavailableModelIds.has(model.id) &&
+        !model.id.endsWith(':batch')
+    )
+    .map((model): OpenRouterModel => {
+      const preferredProvider = getPreferredProviderOrder(model.id).at(0);
+      const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
+      const rawPricing = !preferredProvider
+        ? endpoints[0]?.pricing
+        : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+          endpoints.find(
+            e =>
+              normalizeInferenceProviderId(e.tag) ===
+              normalizeInferenceProviderId(preferredProvider)
+          )?.pricing);
+      const pricing = getModelDisplayPricing(rawPricing);
+      const terminalBench = terminalBenchFor(summaries, model.id);
+      const aliasTarget = model.id.startsWith('~')
+        ? endpointsMetadata[model.id]?.alias_target?.slug
+        : undefined;
+      return {
+        ...model,
+        ...(pricing && { pricing }),
+        ...(terminalBench && { terminalBench }),
+        alias_target: aliasTarget,
+      };
+    })
+    .concat(
+      kiloExclusiveModels
+        .filter(m => !unavailableModelIds.has(m.public_id))
+        .map(model => convertFromKiloExclusiveModel(model))
+    )
+    .concat(autoModels)
+    .map(applyCustomPricingToModel);
+  const exclusiveById = new Map(kiloExclusiveModels.map(entry => [entry.public_id, entry]));
+  const providerLookupId = (model: OpenRouterModel) =>
+    exclusiveById.get(model.id)?.internal_id ?? model.alias_target ?? model.id;
+  const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));
   const enhancedModels = await Promise.all(
-    models
-      .filter(
-        model =>
-          (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
-          !kiloExclusiveModels.some(
-            m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
-          ) &&
-          !unavailableModelIds.has(model.id) &&
-          !model.id.endsWith(':batch')
-      )
-      .map(model => {
-        const preferredProvider = getPreferredProviderOrder(model.id).at(0);
-        const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
-        const rawPricing = !preferredProvider
-          ? endpoints[0]?.pricing
-          : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
-            endpoints.find(
-              e =>
-                normalizeInferenceProviderId(e.tag) ===
-                normalizeInferenceProviderId(preferredProvider)
-            )?.pricing);
-        const pricing = getModelDisplayPricing(rawPricing);
-        const terminalBench = terminalBenchFor(summaries, model.id);
-        return {
-          ...model,
-          ...(pricing && { pricing }),
-          ...(terminalBench && { terminalBench }),
-        };
-      })
-      .concat(
-        kiloExclusiveModels
-          .filter(m => m.status === 'public')
-          .map(model => convertFromKiloExclusiveModel(model))
-      )
-      .concat(autoModels)
-      .map(applyCustomPricingToModel)
-      .map(async (model: OpenRouterModel) => {
-        const preferredIndex = preferredModels.indexOf(model.id);
-        const addPdf =
-          isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
-        const description = isFreeNemotronModel(model.id)
-          ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
-          : model.description;
-        const isFree = isFreeModel(model.id);
-        return {
-          ...model,
-          name: formatName(model, preferredIndex),
-          description,
-          preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
-          isFree: model.isFree ?? isFree,
-          mayTrainOnYourPrompts:
-            model.mayTrainOnYourPrompts ?? (isFree || dataCollectionRequiredModelIds.has(model.id)),
-          opencode:
-            model.opencode ??
-            (await getGatewayOpenCodeSettings(
-              model.id,
-              model.supported_parameters?.includes('reasoning') ?? false
-            )),
-          architecture: addPdf
-            ? {
-                ...model.architecture,
-                input_modalities: model.architecture.input_modalities.concat(['pdf']),
-              }
-            : model.architecture,
-        };
-      })
+    catalogModels.map(async (model: OpenRouterModel) => {
+      const preferredIndex = preferredModels.indexOf(model.id);
+      const exclusive = exclusiveById.get(model.id);
+      const exclusiveProvider = exclusive && getInferenceProvider(exclusive);
+      const providerIds = exclusiveProvider
+        ? [exclusiveProvider.slug]
+        : exclusive && exclusive.inference_provider_restriction.length > 0
+          ? exclusive.inference_provider_restriction
+          : (indexedProviders.get(providerLookupId(model)) ?? []);
+      const inferenceProviderIds = [
+        ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),
+      ];
+      const addPdf =
+        isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
+      const description = isFreeNemotronModel(model.id)
+        ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
+        : model.description;
+      const isFree = isFreeModel(model.id);
+      return {
+        ...model,
+        inference_provider_ids: inferenceProviderIds,
+        name: formatName(model, preferredIndex),
+        description,
+        preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
+        isFree: model.isFree ?? isFree,
+        mayTrainOnYourPrompts:
+          model.mayTrainOnYourPrompts ?? (isFree || dataCollectionRequiredModelIds.has(model.id)),
+        opencode:
+          model.opencode ??
+          (await getGatewayOpenCodeSettings(
+            model.id,
+            model.supported_parameters?.includes('reasoning') ?? false
+          )),
+        architecture: addPdf
+          ? {
+              ...model.architecture,
+              input_modalities: model.architecture.input_modalities.concat(['pdf']),
+            }
+          : model.architecture,
+      };
+    })
   );
   const sortedModels = enhancedModels.sort((a, b) => {
     // Sort by preferredIndex (undefined values last)

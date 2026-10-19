@@ -85,6 +85,97 @@
       "when": 1791310930981,
       "tag": "0011_silent_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791913598739,
+      "tag": "0012_fancy_spirit",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791917551948,
+      "tag": "0013_harsh_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1791925892377,
+      "tag": "0014_huge_gauntlet",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1791952997255,
+      "tag": "0015_brief_monster_badoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1791954884900,
+      "tag": "0016_jittery_skaar",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791995922484,
+      "tag": "0017_serious_lila_cheney",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": 6,
+      "when": 1791995922485,
+      "tag": "0018_system_optimal_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1792074152266,
+      "tag": "0019_soft_brother_voodoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1792086908958,
+      "tag": "0020_nosy_lady_vermin",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1792097931865,
+      "tag": "0021_puzzling_sersi",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1792168659121,
+      "tag": "0022_burly_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1792180639453,
+      "tag": "0023_spicy_jasper_sitwell",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1792216595824,
+      "tag": "0024_married_vanisher",
+      "breakpoints": true
     }
   ]
 }

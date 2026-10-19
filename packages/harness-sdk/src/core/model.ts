@@ -109,7 +109,13 @@ type ModelEvent =
    * every round to find out is worse than being told.
    */
   | { readonly kind: 'toolResult'; readonly result: ToolResult }
-  | { readonly kind: 'done'; readonly usage: ModelUsage; readonly stop: StopReason };
+  | {
+      readonly kind: 'done';
+      readonly usage: ModelUsage;
+      readonly stop: StopReason;
+      /** The model the provider served, when reported; not the next request's target. */
+      readonly model?: string;
+    };
 
 const zeroUsage: ModelUsage = {
   inputTokens: 0,

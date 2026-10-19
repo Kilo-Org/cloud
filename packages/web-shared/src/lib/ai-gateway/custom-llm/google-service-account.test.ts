@@ -52,6 +52,29 @@ describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
     expect(CustomLlmCredentialsSchema.safeParse(serviceAccount('private-key')).success).toBe(true);
   });
 
+  it('accepts secure proxy credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'secure_proxy',
+        proxy_secret: 'proxy-secret',
+        config: {
+          url: 'https://llm.example.com/v1',
+          extra_headers: { Authorization: 'Bearer partner-token' },
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects secure proxy credentials with a non-HTTPS upstream', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'secure_proxy',
+        proxy_secret: 'proxy-secret',
+        config: { url: 'http://llm.example.com/v1' },
+      }).success
+    ).toBe(false);
+  });
+
   it('validates custom LLM definition without credentials', () => {
     expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
   });

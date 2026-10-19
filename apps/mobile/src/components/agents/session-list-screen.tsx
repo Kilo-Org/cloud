@@ -355,7 +355,7 @@ export function AgentSessionListScreen({
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
-    body = <SessionListSkeletonRows sidePadding={sidePadding} />;
+    body = <SessionListSkeletonRows insets={{ left, right }} />;
   } else if (hasLiveRows && visibleSessions.length === 0) {
     // The reserved band is mounted here too (the sessions exist behind the
     // filter), so the native control gets the same treatment as the rows
@@ -492,7 +492,7 @@ export function AgentSessionListScreen({
           reserveEyebrow
           size="large"
           showBackButton={false}
-          className="px-[22px] pb-1"
+          className="px-[22px]"
           // An accepted empty live list carries the history route in its body
           // (`LiveSessionListEmptyState`'s `historyAction`), so the controls row
           // is withheld there: the empty state renders exactly one history

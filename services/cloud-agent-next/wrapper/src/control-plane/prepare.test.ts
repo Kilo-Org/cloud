@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { profileConfigPath } from './runtime-profile.js';
 import { describe, expect, it, spyOn } from 'bun:test';
+import { createHash } from 'node:crypto';
 import {
   CONTROL_PLANE_TIMERS,
   type ControlPlaneTimers,
@@ -26,9 +27,16 @@ import {
 } from './workspace-stamp.js';
 
 const NOW = 1_800_000_000_000;
-import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
+import {
+  createKiloRuntimes,
+  KiloWorktreeCredentialClassMismatchError,
+  KiloWorktreeMcpMismatchError,
+  liveRuntimeClient,
+  type KiloRuntime,
+} from './kilo-runtime.js';
 import type { restoreWorktreeRecovery } from './worktree-recovery.js';
 import { restoreSession } from '../restore-session.js';
+import { createWorkspaceCapture } from './workspace-capture.js';
 
 describe('replacement workspace local recovery', () => {
   const recovery = {
@@ -246,6 +254,14 @@ type Harness = {
   installCalls: Array<{ key: string; env: Record<string, string> }>;
   releaseCalls: string[];
   removeCalls: string[];
+  abortCalls: string[];
+  stopProcessCalls: string[];
+  childrenCalls: string[];
+  setChildren: (sessionId: string, children: Array<{ id: string; directory: string }>) => void;
+  setChildrenHung: (sessionId: string) => void;
+  setAbortHung: (sessionId: string) => void;
+  setCleanupFailure: (value: boolean) => void;
+  setEnsureSessionError: (value: unknown) => void;
   ensureSessionCalls: () => number;
   cloneParallelism: () => number;
   setClone: (value: ExecResult | (() => Promise<ExecResult>)) => void;
@@ -285,6 +301,14 @@ function createHarness(
     beforeInstall?: () => Promise<void>;
     recoverWorktree?: typeof restoreWorktreeRecovery;
     beforeCapture?: () => Promise<void>;
+    captureRequest?: (
+      sessionId: string,
+      commit: string | undefined,
+      timeoutMs: number
+    ) => Promise<boolean>;
+    beforeWorkspace?: () => Promise<void>;
+    releaseCleanupDeadlineMs?: number;
+    runtimes?: PrepareRuntimePort;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -296,6 +320,14 @@ function createHarness(
   const installCalls: Array<{ key: string; env: Record<string, string> }> = [];
   const releaseCalls: string[] = [];
   const removeCalls: string[] = [];
+  const abortCalls: string[] = [];
+  const stopProcessCalls: string[] = [];
+  const childrenCalls: string[] = [];
+  const childrenBySession = new Map<string, Array<{ id: string; directory: string }>>();
+  const childrenHung = new Set<string>();
+  const abortHung = new Set<string>();
+  let cleanupFailure = false;
+  let ensureSessionError: unknown;
   let clone: ExecResult | (() => Promise<ExecResult>) = result(0);
   let customGit:
     | ((args: string[], options?: ProcessOptions) => ExecResult | Promise<ExecResult>)
@@ -328,8 +360,9 @@ function createHarness(
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
+  let currentClient: WrapperKiloClient | undefined;
 
-  const runtimes: PrepareRuntimePort = {
+  const defaultRuntimes: PrepareRuntimePort = {
     ensure: async input => {
       ensureCalls += 1;
       ensureInputs.push({ key: input.key, directory: input.directory, env: input.env });
@@ -337,18 +370,68 @@ function createHarness(
       if (ensureHung) return new Promise<WrapperKiloClient>(() => undefined);
       if (ensureError !== undefined) throw ensureError;
       if (ensureRejects) throw new Error('kilo server failed to start');
-      return {
+      const client = {
         serverUrl: 'http://127.0.0.1:1',
         ensureSession: async () => {
           ensureSessionCalls += 1;
+          if (ensureSessionError !== undefined) throw ensureSessionError;
+        },
+        abortSessionForCleanup: async (opts: {
+          sessionId: string;
+          directory: string;
+          signal?: AbortSignal;
+        }) => {
+          abortCalls.push(opts.sessionId);
+          if (cleanupFailure) throw new Error('abort failed');
+          if (abortHung.has(opts.sessionId)) {
+            await new Promise<void>((_resolve, reject) => {
+              opts.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+                once: true,
+              });
+            });
+          }
+        },
+        abortSession: async (opts: {
+          sessionId: string;
+          directory?: string;
+          signal?: AbortSignal;
+        }) => {
+          abortCalls.push(opts.sessionId);
+          if (cleanupFailure) throw new Error('abort failed');
+          return true;
+        },
+        children: async (opts: { sessionId: string; directory: string; signal?: AbortSignal }) => {
+          childrenCalls.push(opts.sessionId);
+          if (childrenHung.has(opts.sessionId)) {
+            return await new Promise<Array<{ id: string; directory: string }>>(
+              (_resolve, reject) => {
+                opts.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+                  once: true,
+                });
+              }
+            );
+          }
+          if (cleanupFailure) throw new Error('children failed');
+          return childrenBySession.get(opts.sessionId) ?? [];
+        },
+        stopSessionProcesses: async (opts: {
+          sessionId: string;
+          directory: string;
+          signal?: AbortSignal;
+        }) => {
+          stopProcessCalls.push(opts.sessionId);
+          if (cleanupFailure) throw new Error('stop failed');
         },
       } as unknown as WrapperKiloClient;
+      currentClient = client;
+      return client;
     },
     installCredentials: async (key, env) => {
       installCalls.push({ key, env });
       await options.beforeInstall?.();
     },
     isUnavailable: key => unavailableKeys.has(key),
+    getLiveClient: () => currentClient,
     remove: key => {
       removeCalls.push(key);
     },
@@ -356,6 +439,7 @@ function createHarness(
       releaseCalls.push(key);
     },
   };
+  const runtimes = options.runtimes ?? defaultRuntimes;
 
   const manager = createPreparationManager({
     timers: activeTimers,
@@ -367,12 +451,17 @@ function createHarness(
     homeRoot: options.homeRoot ?? '/tmp/prepare-test-homes',
     allocationId: 'alloc-current',
     now: () => NOW,
+    ...(options.releaseCleanupDeadlineMs === undefined
+      ? {}
+      : { releaseCleanupDeadlineMs: options.releaseCleanupDeadlineMs }),
     ...(options.capture
       ? {
           capture: {
             request: async (sessionId: string, commit: string | undefined, timeoutMs: number) => {
               await options.beforeCapture?.();
               captureRequests.push({ sessionId, commit, timeoutMs });
+              if (options.captureRequest)
+                return options.captureRequest(sessionId, commit, timeoutMs);
               if (captureResult === 'throw') throw new Error('capture channel failed');
               return captureResult;
             },
@@ -415,6 +504,7 @@ function createHarness(
       return result(0);
     },
     runSetup: async (_command, _directory, _env, onOutput) => {
+      await options.beforeWorkspace?.();
       setupOutput?.(onOutput ?? (() => undefined));
       return setupResult;
     },
@@ -443,6 +533,24 @@ function createHarness(
     installCalls,
     releaseCalls,
     removeCalls,
+    abortCalls,
+    stopProcessCalls,
+    childrenCalls,
+    setChildren: (sessionId, children) => {
+      childrenBySession.set(sessionId, children);
+    },
+    setChildrenHung: sessionId => {
+      childrenHung.add(sessionId);
+    },
+    setAbortHung: sessionId => {
+      abortHung.add(sessionId);
+    },
+    setCleanupFailure: value => {
+      cleanupFailure = value;
+    },
+    setEnsureSessionError: value => {
+      ensureSessionError = value;
+    },
     ensureSessionCalls: () => ensureSessionCalls,
     cloneParallelism: () => maxActiveClones,
     setClone: value => {
@@ -512,6 +620,96 @@ function lastFrame(frames: ControlPlaneWrapperFrame[]): ControlPlaneWrapperFrame
   return frames.at(-1);
 }
 
+async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('waitFor timed out');
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+}
+
+/** A locally-decodable runtime-credential-proxy handle, matching the Worker JWT shape. */
+function proxyHandle(expSeconds: number, extra: Record<string, unknown> = {}): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({
+      aud: 'cloud-agent-next:runtime-credential-proxy',
+      exp: expSeconds,
+      iat: expSeconds - 3_600,
+      ...extra,
+    })
+  ).toString('base64url');
+  return `${header}.${payload}.test-signature`;
+}
+
+function credentialsFor(
+  spec: ControlPlaneRouteSpec,
+  handle: string
+): ControlPlaneSessionCredentialsPayload {
+  return {
+    sessionId: spec.sessionId,
+    kilo: { token: spec.kilo?.token ?? 'alias' },
+    proxy: { handle, targets: specTargets(spec) },
+  };
+}
+
+function specTargets(
+  spec: ControlPlaneRouteSpec
+): NonNullable<ControlPlaneRouteSpec['kilo']>['targets'] {
+  const targets = spec.kilo?.targets;
+  if (!targets) throw new Error('route spec is missing kilo targets');
+  return targets;
+}
+
+const EXP_NOW = Math.floor(NOW / 1_000) + 3_600;
+
+/**
+ * A real `createKiloRuntimes` registry with an injected fake runtime, so prepare
+ * tests observe key reuse and the pre-`ensure` class guard without spawning.
+ */
+function createRegistryRuntimes(): {
+  port: PrepareRuntimePort;
+  registry: ReturnType<typeof createKiloRuntimes>;
+  created: () => number;
+} {
+  let created = 0;
+  const registry = createKiloRuntimes({
+    timers: FAST_TIMERS,
+    pidfileDirectory: '/tmp/prepare-registry-pids',
+    createRuntime: options => {
+      created += 1;
+      let env = options.env;
+      return {
+        directory: options.directory,
+        get env() {
+          return env;
+        },
+        client: {} as WrapperKiloClient,
+        ensure: async () => ({}) as WrapperKiloClient,
+        installCredentials: async (next: Record<string, string>) => {
+          env = next;
+        },
+        applyPendingCredentials: async () => false,
+        isSuspected: () => false,
+        isRestarting: () => false,
+        isUnavailable: () => false,
+        shutdown: async () => undefined,
+      } as unknown as KiloRuntime;
+    },
+  });
+  const port: PrepareRuntimePort = {
+    ensure: input => registry.ensure(input),
+    installCredentials: async (key, env) => {
+      await registry.get(key)?.installCredentials(env);
+    },
+    isUnavailable: key => registry.get(key)?.isUnavailable() ?? false,
+    getLiveClient: key => liveRuntimeClient(registry.get(key)),
+    remove: key => registry.remove(key),
+    release: key => registry.remove(key),
+  };
+  return { port, registry, created: () => created };
+}
+
 describe('createPreparationManager', () => {
   it('starts a fresh preparation requested before the released owner finishes', async () => {
     const entered = Promise.withResolvers<void>();
@@ -530,7 +728,9 @@ describe('createPreparationManager', () => {
     resume.resolve();
     await Promise.all([running, next]);
     expect(harness.ensureCalls()).toBe(2);
-    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+    // The re-prepare superseded the release, so the runtime is kept for the
+    // fresh route instead of being torn down.
+    expect(harness.releaseCalls).toEqual([]);
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
     expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
       { type: 'session.ready', sessionId: spec.sessionId },
@@ -560,7 +760,7 @@ describe('createPreparationManager', () => {
     expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
   });
 
-  it('invalidates an in-flight runtime preparation without releasing a shared sibling runtime', async () => {
+  it('releases the key of an in-flight preparation invalidated by release', async () => {
     for (const runtimeIsolation of ['per-session', undefined] as const) {
       const entered = Promise.withResolvers<void>();
       const resume = Promise.withResolvers<void>();
@@ -582,9 +782,9 @@ describe('createPreparationManager', () => {
           frame => frame.type === 'session.ready' || frame.type === 'session.failed'
         )
       ).toBe(false);
-      expect(harness.releaseCalls).toEqual(
-        runtimeIsolation === 'per-session' ? [spec.sessionId] : []
-      );
+      expect(harness.releaseCalls).toEqual([
+        runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory,
+      ]);
       expect(harness.removeCalls).toEqual([]);
       await harness.manager.prepare(spec);
       expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
@@ -625,10 +825,10 @@ describe('createPreparationManager', () => {
     expect(setupOutput).toBeDefined();
   });
 
-  it('fails a per-session route without retrying when the warm runtime MCP config drifted', async () => {
+  it('fails a shared-runtime route without retrying when the warm runtime MCP config drifted', async () => {
     const harness = createHarness();
     harness.setEnsureError(new KiloWorktreeMcpMismatchError());
-    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const spec = routeSpec();
 
     await harness.manager.prepare(spec);
 
@@ -636,6 +836,18 @@ describe('createPreparationManager', () => {
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
     const failed = harness.frames.find(frame => frame.type === 'session.failed');
     expect(failed).toBeDefined();
+  });
+
+  it('fails a shared-runtime route without retrying on a credential-class mismatch', async () => {
+    const harness = createHarness();
+    harness.setEnsureError(new KiloWorktreeCredentialClassMismatchError());
+    const spec = routeSpec();
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+    expect(harness.frames.find(frame => frame.type === 'session.failed')).toBeDefined();
   });
 
   it('suppresses failed and runtime retries after release during a rejected startup', async () => {
@@ -1094,6 +1306,7 @@ describe('createPreparationManager', () => {
             }) as unknown as WrapperKiloClient,
           installCredentials: async () => undefined,
           isUnavailable: () => false,
+          getLiveClient: () => undefined,
           remove: () => undefined,
           release: () => undefined,
         },
@@ -1331,24 +1544,30 @@ describe('createPreparationManager', () => {
     ).toBe(true);
   });
 
-  it('gives per-session runtimes distinct HOMEs', async () => {
+  it('keys shared HOME by worktree scope and directory', async () => {
     const harness = createHarness();
-    const specA = routeSpec({
+    const directory = '/tmp/home-scope-one';
+    const worktree = routeSpec({
       sessionId: 'ses_a',
       kiloSessionId: 'kilo_a',
-      runtimeIsolation: 'per-session',
+      directory,
     });
-    const specB = routeSpec({
+    // A non-worktree modern session carries its own session id as the scope id.
+    const nonWorktree = routeSpec({
       sessionId: 'ses_b',
       kiloSessionId: 'kilo_b',
-      runtimeIsolation: 'per-session',
+      directory: '/tmp/home-non-worktree',
+      kilo: { ...routeSpec().kilo!, scopeId: 'ses_b' },
     });
 
-    await harness.manager.prepare(specA);
-    await harness.manager.prepare(specB);
+    await harness.manager.prepare(worktree);
+    await harness.manager.prepare(nonWorktree);
 
-    expect(harness.ensureInputs).toHaveLength(2);
-    expect(harness.ensureInputs[0]!.env.HOME).not.toBe(harness.ensureInputs[1]!.env.HOME);
+    const homeRoot = '/tmp/prepare-test-homes';
+    const expected = (key: string, dir: string): string =>
+      path.join(homeRoot, createHash('sha256').update(key).update('\0').update(dir).digest('hex'));
+    expect(harness.ensureInputs[0]!.env.HOME).toBe(expected('scope-1', directory));
+    expect(harness.ensureInputs[1]!.env.HOME).toBe(expected('ses_b', '/tmp/home-non-worktree'));
   });
 
   it('re-prepares a prepared route whose runtime is unavailable', async () => {
@@ -1475,6 +1694,7 @@ describe('createPreparationManager', () => {
         ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
         installCredentials: async () => undefined,
         isUnavailable: () => false,
+        getLiveClient: () => undefined,
         remove: () => undefined,
         release: () => undefined,
       },
@@ -2113,6 +2333,28 @@ describe('capturing a repository snapshot', () => {
     expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
   });
 
+  it('continues through Kilo startup when the capture acknowledgement times out', async () => {
+    const capture = createWorkspaceCapture({ send: () => undefined });
+    const harness = createHarness(timers({ captureMs: 20 }), {
+      capture: true,
+      captureRequest: (sessionId, commit, timeoutMs) =>
+        capture.request(sessionId, commit, timeoutMs),
+    });
+    const spec = captureSpec();
+    harness.setSessionExists(false);
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.captureRequests).toHaveLength(1);
+    expect(harness.logs).toContain(`control-plane capture not saved session=${spec.sessionId}`);
+    const setUrls = harness.gitCalls.filter(args => args[0] === 'remote' && args[1] === 'set-url');
+    expect(setUrls.at(-1)?.[3]).toContain('git-1');
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.ensureSessionCalls()).toBe(1);
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
   it('fails the route when the credential cannot be restored after a capture', async () => {
     const harness = createHarness(FAST_TIMERS, { capture: true });
     harness.setGit(args =>
@@ -2276,7 +2518,7 @@ describe('control-plane runtime profiles', () => {
       },
     });
     try {
-      const spec = routeSpec({ ...profile, runtimeIsolation: 'per-session' });
+      const spec = routeSpec(profile);
       await harness.manager.prepare(spec);
       expect(harness.frames.at(-1)?.type).toBe('session.ready');
       const env = harness.ensureInputs[0].env;
@@ -2291,18 +2533,574 @@ describe('control-plane runtime profiles', () => {
         JSON.parse(await fs.readFile(env.KILO_CONFIG, 'utf8')).command['review-now'].agent
       ).toBe('reviewer');
       const sibling = routeSpec({
+        ...spec,
         sessionId: 'ses_22222222222222222222222222',
-        runtimeIsolation: 'per-session',
+        kiloSessionId: 'ses_22222222222222222222222222',
       });
       await harness.manager.prepare(sibling);
       const siblingEnv = harness.ensureInputs[1].env;
-      expect(siblingEnv.HOME).not.toBe(env.HOME);
-      expect(siblingEnv.KILO_CONFIG).toBeUndefined();
-      expect(existsSync(path.join(siblingEnv.HOME, '.kilocode/skills/review/SKILL.md'))).toBe(
-        false
+      expect(harness.ensureInputs[0].key).toBe(spec.directory);
+      expect(harness.ensureInputs[1].key).toBe(spec.directory);
+      expect(siblingEnv.HOME).toBe(env.HOME);
+      expect(siblingEnv.KILO_CONFIG).toBe(env.KILO_CONFIG);
+
+      await harness.manager.prepare(
+        routeSpec({
+          sessionId: 'ses_33333333333333333333333333',
+          kiloSessionId: 'ses_33333333333333333333333333',
+          directory: `${spec.directory}/other-worktree`,
+        })
       );
+      const otherEnv = harness.ensureInputs[2].env;
+      expect(otherEnv.HOME).not.toBe(env.HOME);
+      expect(otherEnv.KILO_CONFIG).toBeUndefined();
+      expect(existsSync(path.join(otherEnv.HOME, '.kilocode/skills/review/SKILL.md'))).toBe(false);
+      expect(
+        await fs.readFile(path.join(env.HOME, '.kilocode/skills/review/SKILL.md'), 'utf8')
+      ).toBe(profile.runtimeSkills[0].rawMarkdown);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('release cleanup and last-route accounting', () => {
+  const directory = '/tmp/prepare-release-shared';
+  const exp = EXP_NOW;
+  // Cleanup validates child rows as real 30-char Kilo session ids.
+  const rootA = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const rootB = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const childA = 'ses_cccccccccccccccccccccccccc';
+
+  function sharedSpec(sessionId: string, kiloSessionId: string): ControlPlaneRouteSpec {
+    return routeSpec({ sessionId, kiloSessionId, directory });
+  }
+
+  it('aborts a released route tree without releasing the shared runtime or touching MCP env', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    const config = harness.ensureInputs[0]?.env.KILO_CONFIG_CONTENT;
+    harness.setChildren(rootA, [{ id: childA, directory }]);
+
+    harness.manager.release('ses_a');
+    await waitFor(() => harness.abortCalls.includes(childA));
+
+    expect(harness.abortCalls).toEqual(expect.arrayContaining([rootA, childA]));
+    expect(harness.stopProcessCalls).toEqual(expect.arrayContaining([rootA, childA]));
+    expect(harness.releaseCalls).toEqual([]);
+    expect(harness.removeCalls).toEqual([]);
+    expect(harness.installCalls).toEqual([]);
+    expect(harness.manager.isPrepared('ses_b')).toBe(true);
+    expect(harness.ensureInputs[0]?.env.KILO_CONFIG_CONTENT).toBe(config);
+    // The walk runs only because a sibling keeps the key.
+    expect(
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' && diagnostic.fields.stage === 'process_cleanup'
+      )
+    ).toBe(true);
+  });
+
+  it('releases the shared runtime only on the last prepared route', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', 'kilo_a');
+    const specB = sharedSpec('ses_b', 'kilo_b');
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+
+    harness.manager.release('ses_a');
+    expect(harness.releaseCalls).toEqual([]);
+    harness.manager.release('ses_b');
+    expect(harness.releaseCalls).toEqual([directory]);
+  });
+
+  it('counts a sibling that is only preparing as a holder', async () => {
+    const bEntered = Promise.withResolvers<void>();
+    const bResume = Promise.withResolvers<void>();
+    let ensureCount = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        ensureCount += 1;
+        if (ensureCount === 2) {
+          bEntered.resolve();
+          await bResume.promise;
+        }
+      },
+    });
+    const specA = sharedSpec('ses_a', 'kilo_a');
+    const specB = sharedSpec('ses_b', 'kilo_b');
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    const runningB = harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    await bEntered.promise;
+
+    harness.manager.release('ses_a');
+    expect(harness.releaseCalls).toEqual([]);
+
+    // Releasing the route while it is still preparing takes effect when its
+    // prepare settles; then it is the last route and releases the key.
+    harness.manager.release('ses_b');
+    expect(harness.releaseCalls).toEqual([]);
+    bResume.resolve();
+    await runningB;
+    await waitFor(() => harness.releaseCalls.length === 1);
+    expect(harness.releaseCalls).toEqual([directory]);
+    expect(harness.manager.isPrepared('ses_b')).toBe(false);
+  });
+
+  it('does not kill a survivor when a release races its prepare', async () => {
+    const bEntered = Promise.withResolvers<void>();
+    const bResume = Promise.withResolvers<void>();
+    let ensureCount = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        ensureCount += 1;
+        if (ensureCount === 2) {
+          bEntered.resolve();
+          await bResume.promise;
+        }
+      },
+    });
+    const specA = sharedSpec('ses_a', 'kilo_a');
+    const specB = sharedSpec('ses_b', 'kilo_b');
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    const runningB = harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    await bEntered.promise;
+
+    harness.manager.release('ses_a');
+    bResume.resolve();
+    await runningB;
+
+    expect(harness.releaseCalls).toEqual([]);
+    expect(harness.manager.isPrepared('ses_b')).toBe(true);
+  });
+
+  it('releases the process and skips the session walk for the last route', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ runtimeIsolation: 'per-session', kiloSessionId: rootA });
+    await harness.manager.prepare(spec, credentialsFor(spec, proxyHandle(exp)));
+    harness.setChildren(rootA, [{ id: childA, directory: spec.directory }]);
+
+    harness.manager.release(spec.sessionId);
+    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+    // Process stop reaps owned processes; a walk on a dying client would emit
+    // false unreaped-process diagnostics, so none may run.
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(harness.abortCalls).toEqual([]);
+    expect(harness.stopProcessCalls).toEqual([]);
+    expect(
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' && diagnostic.fields.stage === 'process_cleanup'
+      )
+    ).toBe(false);
+  });
+
+  it('bounds a cyclic session tree while a sibling keeps the key', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    harness.setChildren(rootA, [{ id: childA, directory }]);
+    harness.setChildren(childA, [{ id: rootA, directory }]);
+
+    harness.manager.release(specA.sessionId);
+    await waitFor(() => harness.abortCalls.length >= 2);
+    expect([...harness.abortCalls].sort()).toEqual([rootA, childA].sort());
+  });
+
+  it('bounds session-tree depth and node count while a sibling keeps the key', async () => {
+    const chain = (index: number): string => `ses_${String(index).padStart(27, '0')}`;
+
+    const depthHarness = createHarness();
+    const depthA = sharedSpec('ses_a', rootA);
+    const depthB = sharedSpec('ses_b', rootB);
+    await depthHarness.manager.prepare(depthA, credentialsFor(depthA, proxyHandle(exp)));
+    await depthHarness.manager.prepare(depthB, credentialsFor(depthB, proxyHandle(exp)));
+    depthHarness.setChildren(rootA, [{ id: chain(0), directory }]);
+    for (let index = 0; index < 12; index += 1) {
+      depthHarness.setChildren(chain(index), [{ id: chain(index + 1), directory }]);
+    }
+    depthHarness.manager.release(depthA.sessionId);
+    // Depth ≤ 8: rootA is depth 0, so chain(7) is the deepest aborted node.
+    await waitFor(() => depthHarness.abortCalls.includes(chain(7)));
+    expect(depthHarness.abortCalls).not.toContain(chain(8));
+
+    const nodeHarness = createHarness();
+    const nodeA = sharedSpec('ses_a', rootA);
+    const nodeB = sharedSpec('ses_b', rootB);
+    await nodeHarness.manager.prepare(nodeA, credentialsFor(nodeA, proxyHandle(exp)));
+    await nodeHarness.manager.prepare(nodeB, credentialsFor(nodeB, proxyHandle(exp)));
+    nodeHarness.setChildren(
+      rootA,
+      Array.from({ length: 80 }, (_, index) => ({ id: chain(index), directory }))
+    );
+    nodeHarness.manager.release(nodeA.sessionId);
+    await waitFor(() => nodeHarness.abortCalls.length >= 64);
+    expect(nodeHarness.abortCalls).toHaveLength(64);
+  });
+
+  it('ends cleanup at the deadline while a sibling keeps the key', async () => {
+    const harness = createHarness(FAST_TIMERS, { releaseCleanupDeadlineMs: 30 });
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    harness.setChildrenHung(rootA);
+
+    harness.manager.release(specA.sessionId);
+    expect(harness.releaseCalls).toEqual([]);
+    await waitFor(() =>
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' && diagnostic.fields.stage === 'process_cleanup'
+      )
+    );
+    expect(harness.abortCalls).toEqual([rootA]);
+  });
+
+  it('does not block the route release on cleanup failure', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    harness.setCleanupFailure(true);
+
+    harness.manager.release(specA.sessionId);
+    // The route is gone even though the walk fails; the runtime stays for B.
+    expect(harness.manager.isPrepared(specA.sessionId)).toBe(false);
+    expect(harness.releaseCalls).toEqual([]);
+    await waitFor(() =>
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.ok === false
+      )
+    );
+  });
+
+  it('defers a held sibling release to its finalizer and then releases the key', async () => {
+    const bHeld = Promise.withResolvers<void>();
+    const bResume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeWorkspace: async () => {
+        bHeld.resolve();
+        await bResume.promise;
+      },
+    });
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = routeSpec({
+      sessionId: 'ses_b',
+      kiloSessionId: rootB,
+      directory,
+      setupCommands: ['echo hi'],
+    });
+    await harness.manager.prepare(specA);
+    const runningB = harness.manager.prepare(specB);
+    await bHeld.promise;
+
+    harness.manager.release(specA.sessionId);
+    expect(harness.releaseCalls).toEqual([]); // B still holds the key
+    harness.manager.release(specB.sessionId);
+    expect(harness.releaseCalls).toEqual([]); // deferred to B's finalizer
+    bResume.resolve();
+    await runningB;
+    await waitFor(() => harness.releaseCalls.length === 1);
+    expect(harness.releaseCalls).toEqual([directory]);
+    expect(harness.manager.isPrepared(specB.sessionId)).toBe(false);
+  });
+
+  it('releases the key when a prepare fails after ensure and was never released', async () => {
+    const bHeld = Promise.withResolvers<void>();
+    const bResume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeWorkspace: async () => {
+        bHeld.resolve();
+        await bResume.promise;
+      },
+    });
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = routeSpec({
+      sessionId: 'ses_b',
+      kiloSessionId: rootB,
+      directory,
+      setupCommands: ['echo hi'],
+    });
+    await harness.manager.prepare(specA);
+    const runningB = harness.manager.prepare(specB);
+    await bHeld.promise;
+
+    harness.manager.release(specA.sessionId);
+    expect(harness.releaseCalls).toEqual([]); // B is still preparing
+    harness.setSessionExists(false);
+    harness.setEnsureSessionError(new Error('kilo session failed'));
+    bResume.resolve();
+    await runningB;
+
+    // B failed after ensure without being released; as the last holder its
+    // runtime must not be left behind.
+    await waitFor(() => harness.releaseCalls.length === 1);
+    expect(harness.releaseCalls).toEqual([directory]);
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(true);
+  });
+
+  it('does not abort a re-prepared session while a previous cleanup still walks', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    harness.setAbortHung(rootA);
+
+    harness.manager.release(specA.sessionId);
+    await waitFor(() => harness.abortCalls.includes(rootA));
+
+    const running = harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await running;
+    expect(
+      harness.frames.some(
+        frame => frame.type === 'session.ready' && frame.sessionId === specA.sessionId
+      )
+    ).toBe(true);
+    const started = harness.abortCalls.length + harness.stopProcessCalls.length;
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(harness.abortCalls.length + harness.stopProcessCalls.length).toBe(started);
+  });
+
+  it('releases a legacy shared key so a later modern route gets a fresh runtime', async () => {
+    const harness = createHarness();
+    const legacy = sharedSpec('ses_legacy', rootA);
+    await harness.manager.prepare(legacy);
+    harness.manager.release(legacy.sessionId);
+    expect(harness.releaseCalls).toEqual([directory]);
+
+    const modern = sharedSpec('ses_modern', rootB);
+    await harness.manager.prepare(modern, credentialsFor(modern, proxyHandle(exp)));
+    expect(harness.manager.isPrepared(modern.sessionId)).toBe(true);
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
+  it('reuses one registry runtime for two specs on one directory', async () => {
+    const registry = createRegistryRuntimes();
+    const harness = createHarness(FAST_TIMERS, { runtimes: registry.port });
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    expect(registry.created()).toBe(1);
+    expect(harness.manager.isPrepared(specA.sessionId)).toBe(true);
+    expect(harness.manager.isPrepared(specB.sessionId)).toBe(true);
+  });
+
+  it('reuses after the runtime env moved to a newer proxy handle mid-prepare', async () => {
+    const registry = createRegistryRuntimes();
+    const harness = createHarness(FAST_TIMERS, { runtimes: registry.port });
+    const specA = sharedSpec('ses_a', rootA);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    // A concurrent credential refresh moves the runtime's env to a newer handle
+    // while another route is still preparing; the rest of the env is preserved.
+    const runtime = registry.registry.get(directory);
+    await runtime?.installCredentials({
+      ...(runtime.env ?? {}),
+      KILOCODE_TOKEN: proxyHandle(exp + 3_600),
+    });
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp + 7_200)));
+    expect(registry.created()).toBe(1);
+    expect(harness.manager.isPrepared(specB.sessionId)).toBe(true);
+  });
+});
+
+describe('credentials buffered during prepare', () => {
+  it('applies a frame received during prepare before session.ready', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    let readyAtInstall: boolean | undefined;
+    let framesRef: ControlPlaneWrapperFrame[] = [];
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+      beforeInstall: async () => {
+        readyAtInstall = framesRef.some(frame => frame.type === 'session.ready');
+      },
+    });
+    framesRef = harness.frames;
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'alias' },
+    });
+    await entered.promise;
+    const handle = proxyHandle(EXP_NOW);
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'alias' },
+      proxy: { handle, targets: specTargets(spec) },
+    });
+    resume.resolve();
+    await running;
+
+    expect(harness.installCalls).toHaveLength(1);
+    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
+    expect(readyAtInstall).toBe(false);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it('applies only the latest frame received during prepare', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'alias' },
+    });
+    await entered.promise;
+    const first = proxyHandle(EXP_NOW);
+    const second = proxyHandle(EXP_NOW + 3_600);
+    const base = credentialsFor(spec, first);
+    await harness.manager.installCredentials(base);
+    await harness.manager.installCredentials({
+      ...base,
+      proxy: { handle: second, targets: specTargets(spec) },
+    });
+    resume.resolve();
+    await running;
+
+    expect(harness.installCalls).toHaveLength(1);
+    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(second);
+  });
+
+  it('drops a buffered frame when the route was released', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'alias' },
+    });
+    await entered.promise;
+    await harness.manager.installCredentials(credentialsFor(spec, proxyHandle(EXP_NOW)));
+    harness.manager.release(spec.sessionId);
+    resume.resolve();
+    await running;
+
+    expect(harness.installCalls).toHaveLength(0);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+  });
+
+  it('carries a buffered frame across a chained re-prepare', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec);
+    await entered.promise;
+    harness.manager.release(spec.sessionId);
+    const next = harness.manager.prepare({ ...spec, attemptId: 'attempt-2' });
+    const handle = proxyHandle(EXP_NOW);
+    await harness.manager.installCredentials(credentialsFor(spec, handle));
+    resume.resolve();
+    await Promise.all([running, next]);
+
+    // The frame was buffered on the chained owner and must survive the fresh
+    // owner the chain creates.
+    expect(harness.installCalls.some(call => call.env.KILOCODE_TOKEN === handle)).toBe(true);
+    expect(
+      harness.frames.some(
+        frame => frame.type === 'session.ready' && frame.sessionId === spec.sessionId
+      )
+    ).toBe(true);
+  });
+
+  it('still updates the Git remote when the proxy handle is unchanged', async () => {
+    // Regression guard for the prepare-side effect: an unchanged handle must
+    // still reach the runtime and refresh the Git remote. The "no restart
+    // marker" half of the contract is covered by the real-runtime test
+    // `does not roll for a repeated or stale proxy handle but latches a pending one`.
+    const harness = createHarness();
+    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
+    const handle = proxyHandle(EXP_NOW);
+    await harness.manager.prepare(spec, credentialsFor(spec, handle));
+    harness.gitCalls.length = 0;
+
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      git: { token: 'git-2' },
+      kilo: { token: 'alias' },
+      proxy: { handle, targets: specTargets(spec) },
+    });
+
+    expect(harness.installCalls).toHaveLength(1);
+    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
+    expect(harness.gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(true);
+  });
+});
+
+describe('release cleanup with no live runtime client', () => {
+  it('skips cleanup without throwing when the shared runtime has no live client', async () => {
+    const abortCalls: string[] = [];
+    const manager = createPreparationManager({
+      timers: FAST_TIMERS,
+      allocationId: 'alloc-current',
+      emit: () => undefined,
+      runtimes: {
+        ensure: async () =>
+          ({
+            serverUrl: 'http://127.0.0.1:1',
+            ensureSession: async () => undefined,
+            abortSessionForCleanup: async (opts: { sessionId: string }) => {
+              abortCalls.push(opts.sessionId);
+            },
+          }) as unknown as WrapperKiloClient,
+        installCredentials: async () => undefined,
+        isUnavailable: () => false,
+        // The runtime is restarting: the real adapter reports no live client.
+        getLiveClient: () => undefined,
+        remove: () => undefined,
+        release: () => undefined,
+      },
+      inheritedEnv: {},
+      homeRoot: '/tmp/prepare-test-homes',
+      hasGit: async () => false,
+      readStamp: async () => null,
+      writeStamp: async () => undefined,
+      mkdir: async () => undefined,
+      configureGitAuthor: async () => undefined,
+      seedRegistration: async () => undefined,
+      sessionExists: async () => true,
+    });
+    const directory = '/tmp/release-no-client';
+    await manager.prepare(routeSpec({ sessionId: 'ses_a', directory }));
+    await manager.prepare(routeSpec({ sessionId: 'ses_b', directory }));
+
+    // A throwing `.client` getter must not escape the release path.
+    expect(() => manager.release('ses_a')).not.toThrow();
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(abortCalls).toHaveLength(0);
   });
 });

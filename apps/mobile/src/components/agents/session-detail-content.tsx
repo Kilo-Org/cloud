@@ -107,6 +107,7 @@ import {
   countInFlightMessages,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
+  restoreCanceledQueuedMessages,
   retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
@@ -189,6 +190,7 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
+import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
@@ -659,12 +661,18 @@ export function SessionDetailContent({
 
   // Custom modes: a remote session merges the session profile's visible custom
   // agents (loaded for the session's own recorded/bound profile, not the
-  // context's effective default) with the session's runtime-reported agents, so
-  // the user's roles show even when the CLI has not reported them. Cloud-agent
-  // and read-only sessions use only `runtimeAgents`. The selected slug is
-  // appended once when it is neither a built-in nor already listed, so an
-  // inherited custom slug stays visible in the picker.
+  // context's effective default) with the agents its CLI reports for the
+  // session's directory, so both the user's profile roles and the project's
+  // `.kilo/agents` show. Cloud-agent and read-only sessions use only
+  // `runtimeAgents`. The selected slug is appended once when it is neither a
+  // built-in nor already listed, so an inherited custom slug stays visible in
+  // the picker.
   const runtimeAgents = sessionConfig?.runtimeAgents;
+  const { agents: cliAgents } = useCliAgents(
+    activeSessionType === 'remote' && remoteModelState.ownerConnectionId !== null
+      ? { sessionId, ownerConnectionId: remoteModelState.ownerConnectionId }
+      : null
+  );
   const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
     organizationId,
     activeSessionProfileId
@@ -673,11 +681,12 @@ export function SessionDetailContent({
     () =>
       resolveSessionRoleView({
         sessionType: activeSessionType,
-        runtimeAgents,
+        runtimeAgents:
+          activeSessionType === 'remote' && cliAgents.length > 0 ? cliAgents : runtimeAgents,
         profileAgents: effectiveProfileAgents,
         selectedMode: currentMode,
       }),
-    [activeSessionType, runtimeAgents, effectiveProfileAgents, currentMode]
+    [activeSessionType, cliAgents, runtimeAgents, effectiveProfileAgents, currentMode]
   );
   const customOptions = roleView.customOptions;
   // A custom agent can pin a model (+ optional variant). The pin always comes
@@ -1037,24 +1046,7 @@ export function SessionDetailContent({
     if (canceledQueuedMessages.size === 0) {
       return base;
     }
-    // Re-insert the canceled-but-kept rows the SDK already removed, in their
-    // original id-sorted position (the SDK orders messages by id).
-    const kept = [...canceledQueuedMessages.values()].filter(
-      m => !base.some(b => b.info.id === m.info.id)
-    );
-    if (kept.length === 0) {
-      return base;
-    }
-    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; the spread already copies so nothing shared is mutated
-    return [...base, ...kept].sort((a, b) => {
-      if (a.info.id < b.info.id) {
-        return -1;
-      }
-      if (a.info.id > b.info.id) {
-        return 1;
-      }
-      return 0;
-    });
+    return restoreCanceledQueuedMessages(base, canceledQueuedMessages);
   }, [messages, droppedQueuedIds, supersededMessageIds, canceledQueuedMessages]);
 
   // Visibility-only strip for the "Hide thinking details" option. Applied once

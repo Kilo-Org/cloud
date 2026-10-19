@@ -13,6 +13,12 @@ import {
   GEMMA_4_26B_A4B_IT_FREE_ID,
   GEMMA_4_26B_A4B_IT_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import {
+  customRouterModelId,
+  isCustomRouterModelId,
+  type AutoRouter,
+  type CustomRouterScope,
+} from '@kilocode/auto-routing-contracts';
 
 export type AutoModelPricing = {
   prompt: string;
@@ -98,11 +104,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   pricing: UNKNOWN_PRICING,
   supports_images: true,
   supports_pdf: true,
-  opencode_settings: {
-    ai_sdk_provider: 'anthropic',
-    family: 'claude',
-    prompt: 'anthropic',
-  },
+  opencode_settings: undefined,
 };
 
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
@@ -186,6 +188,26 @@ export const AUTO_MODELS = [
   KILO_AUTO_SMALL_MODEL,
 ];
 
+export function customRouterAutoModel(router: {
+  scope: CustomRouterScope;
+  slug: string;
+  name: string;
+  baseRouter: AutoRouter;
+}): AutoModel {
+  const base =
+    router.baseRouter === 'frontier' ? KILO_AUTO_FRONTIER_MODEL : KILO_AUTO_EFFICIENT_MODEL;
+  return {
+    ...base,
+    id: customRouterModelId(router.scope, router.slug),
+    name: router.name,
+    description: `Custom auto router built on ${base.name}. Routes only to the models in its pool.`,
+  };
+}
+
 export function isKiloAutoModel(model: string) {
-  return AUTO_MODELS.some(m => m.id === model) || model === ORG_AUTO_MODEL.id;
+  return (
+    AUTO_MODELS.some(m => m.id === model) ||
+    model === ORG_AUTO_MODEL.id ||
+    isCustomRouterModelId(model)
+  );
 }

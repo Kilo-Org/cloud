@@ -5,6 +5,7 @@ import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
+import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 
 // Composes the native-intent concerns in order: the share-extension check
 // returns early before web-path mapping (a share URL is never a web route), then
@@ -34,6 +35,18 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   // Dev-only Home fixture links (`kiloapp:///dev/home-fixture/<name>`).
   if (__DEV__ && handleHomeFixturePath(path)) {
     return null;
+  }
+  if (__DEV__) {
+    if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/transcript-style-fixture';
+    }
+    if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/question-card-fixture';
+    }
+    const fixtureRoute = modelPickerFixtureRoute(path);
+    if (fixtureRoute) {
+      return fixtureRoute;
+    }
   }
   if (handleAppActionPath({ path, initial })) {
     return null;

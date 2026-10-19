@@ -78,12 +78,15 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 Kilo remains the default backend. Custom backends use the harness SDK's remote
 model plugin, while the SDK owns conversations, tools, and compaction.
 
-- Open **Chat → Manage backends** to configure an API root, protocol, credentials, headers, and models.
+- Open **Chat → Manage backends** to view **Chat providers** and configure custom endpoints and models.
 - Use Chat Completions, Responses, or Messages with the endpoint's API root, such as `https://api.openai.com/v1`.
 - Chat Completions uses `max_completion_tokens` by default. Select `max_tokens` when the endpoint requires the legacy field.
 - Enter models manually, or discover models when the endpoint supports discovery.
 - Use **Test model connection** to send a short inference request. The provider can charge for this request.
 - Enable tool calls only when the selected model and endpoint support them.
+- Provider choices separate the selected model from its availability and default status.
+- Open **Browse models** for downloadable models. Expand **Advanced** only when using a direct download link.
+- Catalog cards show capabilities, download size, estimated memory, and device compatibility. Open **Details** for technical filenames and licenses.
 
 Profiles and credentials remain on the device and belong to the signed-in
 account. Sign-out and account changes remove them.
@@ -136,13 +139,13 @@ app's minSdk does not change.
 
 ### Downloaded GGUF models
 
-**Manage backends → Downloadable models** lists small instruct models the app
-can download and run locally with `llama.rn` (llama.cpp). Each entry states its
-size and license and pins one Hugging Face revision, so the bytes cannot change
-underneath a download. A direct HTTPS link to a `.gguf` file works too. The user
-starts every download; it can be paused, resumed, or cancelled, and a cancelled
-or failed download deletes its partial file. Storage is checked before a
-download and again as soon as the server states a length.
+**Chat providers → Downloadable models → Browse models** lists models the app
+can download and run locally with `llama.rn` (llama.cpp). Model details show the
+license and technical filenames. Downloads pin a Hugging Face revision, so the
+bytes cannot change underneath a download. **Advanced** accepts a direct HTTPS
+link to a `.gguf` file. The user starts every download. Downloads can pause,
+resume, or cancel. Cancelled or failed downloads delete their partial files.
+Storage is checked before download and again when the server supplies a length.
 
 - Model files live in the app's document directory. They hold no account data, so the downloaded list survives sign-out and account changes.
 - A downloaded model appears in the picker once its file has been read by llama.cpp, which is where its context window comes from. Only one model is loaded at a time; switching releases the previous one, and the app releases it in the background.

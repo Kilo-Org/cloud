@@ -97,7 +97,7 @@ function blockCommitMessageRequest() {
     response,
     kiloClient: createWrapperKiloClient(
       createKiloClient({ baseUrl: serverUrl }),
-      serverUrl,
+      { url: serverUrl },
       '/workspace'
     ),
   };

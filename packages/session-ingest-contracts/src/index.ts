@@ -1,7 +1,9 @@
 export * from './rpc-contract';
 export * from './session-live-summary';
 export * from './cloud-agent-session-scope';
+export * from './cloud-agent-worktree-scope';
 export * from './public-worktree-projection';
+export * from './message-id';
 
 export const DEFAULT_SESSION_TITLE_PATTERN =
   /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;

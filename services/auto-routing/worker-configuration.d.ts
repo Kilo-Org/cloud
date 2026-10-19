@@ -7,7 +7,13 @@ interface __BaseEnv_Env {
 	INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
 	OPENROUTER_API_KEY: SecretsStoreSecret;
 	O11Y_CF_AE_API_TOKEN: SecretsStoreSecret;
+	NEXTAUTH_SECRET: SecretsStoreSecret;
+	AUTO_ROUTING_DECISION_SECRET: SecretsStoreSecret;
+	UPSTASH_REDIS_REST_URL: SecretsStoreSecret;
+	UPSTASH_REDIS_REST_TOKEN: SecretsStoreSecret;
 	O11Y_CF_ACCOUNT_ID: "e115e769bcdd4c3d66af59d3332cb394";
+	KILO_WEB_API_BASE_URL: string;
+	KILO_AI_GATEWAY_BASE_URL: string;
 	AUTO_ROUTING_DECISION_CACHE: DurableObjectNamespace<import("./src/index").AutoRoutingDecisionCacheDO>;
 	AUTO_ROUTING_MODE_CONFIG: DurableObjectNamespace<import("./src/index").AutoRoutingModeConfigDO>;
 	BENCHMARK_SERVICE: Fetcher /* auto-routing-benchmark */;
@@ -24,5 +30,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "O11Y_CF_ACCOUNT_ID">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "O11Y_CF_ACCOUNT_ID" | "KILO_WEB_API_BASE_URL">> {}
 }

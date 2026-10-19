@@ -590,6 +590,14 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       [...sessions.values()].some(
         record => record.execution && record.execution.activity !== 'waiting'
       ),
+    hasRecentProgress: (withinMs: number) =>
+      [...sessions.values()].some(
+        record =>
+          record.execution &&
+          record.execution.activity !== 'stopping' &&
+          record.execution.progressed &&
+          options.now() - record.execution.lastProgressAt < withinMs
+      ),
     state(id: string) {
       const record = sessions.get(id);
       const execution = record?.execution;

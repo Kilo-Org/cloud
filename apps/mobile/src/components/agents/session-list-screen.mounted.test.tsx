@@ -374,8 +374,8 @@ function header() {
   return root().findByType(ScreenHeader);
 }
 function listSkeletons() {
-  return nodes('Skeleton').filter(
-    node => typeof node.props.className === 'string' && node.props.className.includes('h-[76px]')
+  return root().findAll(
+    node => typeof node.type === 'string' && node.props.testID === 'session-row-skeleton'
   );
 }
 function requireNode(type: string) {
@@ -623,9 +623,6 @@ describe('AgentSessionListScreen live presentation', () => {
     Object.assign(state.live, test.patch);
     await renderScreen();
     expect(listSkeletons()).toHaveLength(test.skeleton ? 8 : 0);
-    if (test.skeleton) {
-      expect(listSkeletons()[0]?.props.className).toContain('h-[76px]');
-    }
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
     // With cached rows on screen, a retryable failure is a refresh failure and
     // speaks through the reserved status line, not the load-failure block.
@@ -731,7 +728,6 @@ describe('AgentSessionListScreen live presentation', () => {
     const emptyState = root().findByType(EmptyState);
 
     expect(header().parent?.children[0]).toBe(header());
-    expect(header().props.className).toContain('px-[22px]');
     expect(header().props.headerRight).toBeUndefined();
     expect(header().props.context).toBeUndefined();
     expect(emptyState.props.placement).toBeUndefined();
@@ -776,7 +772,7 @@ describe('AgentSessionListScreen live presentation', () => {
     state.live.isFetching = true;
     await renderScreen();
     const loading = nodes('Text').find(node => node.children.includes('Loading…'));
-    const skeletons = nodes('Skeleton');
+    const skeletons = listSkeletons();
     expect(loading).toBeDefined();
     expect(skeletons).toHaveLength(8);
     expect(text()).not.toContain('Updating');
@@ -789,7 +785,7 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(nodes('Text').find(node => node.children.includes('Loading…'))).toBe(loading);
     for (const [index, skeleton] of skeletons.entries()) {
-      expect(nodes('Skeleton')[index]).toBe(skeleton);
+      expect(listSkeletons()[index]).toBe(skeleton);
     }
     expect(state.announcements).toEqual(['Loading…']);
     expect(text()).not.toContain('Nothing running right now');

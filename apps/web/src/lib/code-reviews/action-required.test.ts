@@ -173,7 +173,7 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
 
   it('routes repeated repository clone timeout recovery to support email', () => {
     expect(getCodeReviewActionRequiredRecoveryHref('repeated_repository_clone_timeout')).toBe(
-      'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
+      'mailto:hi@kilo.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
     );
   });
 

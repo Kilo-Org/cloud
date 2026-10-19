@@ -39,6 +39,7 @@ import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organizat
 import { captureOrganizationMemberJoined } from '@kilocode/web-shared/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -253,6 +254,9 @@ export async function createOrganization(
   plan?: 'teams' | 'enterprise'
 ): Promise<Organization> {
   const organization = await db.transaction(async tx => {
+    if (userId) {
+      await enforceOrganizationCreationLimit(tx, userId);
+    }
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
 
@@ -814,23 +818,6 @@ export async function acceptOrganizationInvite(
     console.error('Error accepting organization invite:', error);
     return failureResult('An unexpected error occurred');
   }
-}
-
-/**
- * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
- */
-export async function isOrganizationMember(
-  organizationId: Organization['id'],
-  userId: User['id'],
-  fromDb: typeof db = db
-) {
-  const result = await fromDb.query.organization_memberships.findFirst({
-    where: and(
-      eq(organization_memberships.organization_id, organizationId),
-      eq(organization_memberships.kilo_user_id, userId)
-    ),
-  });
-  return !!result;
 }
 
 export function getAcceptInviteUrl(inviteToken: OrganizationInvitation['token']): string {

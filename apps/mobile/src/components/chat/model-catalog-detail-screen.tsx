@@ -9,7 +9,6 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import {
   Cpu,
   Download,
-  Eye,
   FileSearch,
   Lock,
   type LucideIcon,
@@ -27,7 +26,13 @@ import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { GgufDownloadControls } from './gguf-model-section';
-import { CatalogStat, compactNumber, FitBadge, useCatalogDownload } from './model-catalog-parts';
+import {
+  CatalogCapabilities,
+  CatalogStat,
+  compactNumber,
+  FitBadge,
+  useCatalogDownload,
+} from './model-catalog-parts';
 
 function Hint({ icon: Icon, label }: Readonly<{ icon: LucideIcon; label: string }>) {
   const colors = useThemeColors();
@@ -84,17 +89,17 @@ function Summary({ detail }: Readonly<{ detail: HfModelDetail }>) {
             : t('modelChat.catalog.license', { license: detail.license })}
         </Text>
       </View>
-      {(detail.tools || detail.vision) && (
-        <View className="gap-2">
-          <View className="flex-row flex-wrap gap-2">
-            {detail.tools && <Hint icon={Wrench} label={t('modelChat.catalog.tools')} />}
-            {detail.vision && <Hint icon={Eye} label={t('modelChat.catalog.vision')} />}
-          </View>
+      <View className="gap-2">
+        <View className="flex-row flex-wrap items-center gap-2">
+          <CatalogCapabilities images={detail.vision} />
+          {detail.tools && <Hint icon={Wrench} label={t('modelChat.catalog.tools')} />}
+        </View>
+        {(detail.tools || detail.vision) && (
           <Text variant="muted" className="text-xs">
             {t('modelChat.catalog.hintsHelp')}
           </Text>
-        </View>
-      )}
+        )}
+      </View>
       {detail.gated && (
         <View className="flex-row items-start gap-2 rounded-xl bg-warn-tile-bg p-3">
           <Lock size={16} color={colors.warn} />
@@ -105,6 +110,9 @@ function Summary({ detail }: Readonly<{ detail: HfModelDetail }>) {
         <Eyebrow>{t('modelChat.catalog.quantizations')}</Eyebrow>
         <Text variant="muted" className="text-xs">
           {t('modelChat.catalog.quantizationsHelp')}
+        </Text>
+        <Text variant="muted" className="text-xs">
+          {t('modelChat.catalog.memoryEstimateNote')}
         </Text>
       </View>
     </View>
@@ -136,6 +144,14 @@ function QuantRow({
           memory: formatFileSize(estimatedMemoryBytes(bytes), i18n.language),
         })}
       </Text>
+      <Text variant="muted" className="text-xs">
+        {t('modelChat.catalog.fullFileName', { name: quant.path.split('/').pop() ?? quant.path })}
+      </Text>
+      {quant.model.license !== '' && (
+        <Text variant="muted" className="text-xs">
+          {t('modelChat.catalog.license', { license: quant.model.license })}
+        </Text>
+      )}
       <GgufDownloadControls
         fileId={quant.model.fileId}
         name={quant.model.name}

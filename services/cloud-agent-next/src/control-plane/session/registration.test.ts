@@ -11,6 +11,7 @@ import {
 import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
+import { controlPlaneSandboxSelectionSchema } from './sandbox-selection.js';
 
 function generateKeyPair() {
   return generateKeyPairSync('rsa', {
@@ -49,6 +50,131 @@ function metadata(overrides: Record<string, unknown> = {}) {
 }
 
 const selection = { provider: 'cloudflare' as const };
+
+describe('egress policy registration', () => {
+  it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'preserves a matching policy %j',
+    ({ egressAllowlist }) => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        },
+      });
+      expect(
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).sandboxSelection?.egressAllowlist
+      ).toEqual(egressAllowlist);
+    }
+  );
+
+  it.each([undefined, [], ['other.example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'rejects a mismatched policy %j',
+    ({ egressAllowlist }) => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist: ['example.com'],
+        },
+      });
+      expect(() =>
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        })
+      ).toThrow('Sandbox selection egress allowlist does not match session metadata');
+    }
+  );
+
+  it.each([
+    { storedList: undefined, selectedList: undefined },
+    { storedList: [], selectedList: undefined },
+    { storedList: undefined, selectedList: [] },
+  ])('treats omitted and empty deny lists equivalently: %j', ({ storedList, selectedList }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAllowlist: storedList,
+      },
+    });
+    expect(
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAllowlist: selectedList,
+      }).sandboxSelection?.egressMode
+    ).toBe('allowlist');
+  });
+
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'rejects a mode-only mismatch against stored %s',
+    egressMode => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode,
+        },
+      });
+      expect(() =>
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode: egressMode === 'allowlist' ? undefined : 'allowlist',
+        })
+      ).toThrow('Sandbox selection egress mode does not match session metadata');
+    }
+  );
+
+  it('treats explicit and omitted unrestricted equivalently', () => {
+    expect(
+      buildControlPlaneSessionRegistration(metadata(), {
+        ...selection,
+        egressMode: 'unrestricted',
+      }).sandboxSelection?.egressMode
+    ).toBe('unrestricted');
+  });
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'invalid' },
+  ])('rejects ambiguous sandbox selection policy %j', policy => {
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({
+        provider: 'cloudflare-containers',
+        ...policy,
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    { provider: 'cloudflare' },
+    { provider: 'vercel' },
+    { provider: 'cloudflare-containers', sandboxKind: 'shared' },
+    { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
+  ])('restricts only allowlist mode to isolated containers: %j', placement => {
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'allowlist' })
+        .success
+    ).toBe(false);
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'unrestricted' })
+        .success
+    ).toBe(true);
+  });
+});
 
 describe('migrated origin permissions', () => {
   it.each(['standard', 'lite', undefined] as const)(
@@ -136,14 +262,14 @@ describe('migrated origin permissions', () => {
       expect(spec.runtimeIsolation).toBe('per-session');
       expect(
         controlPlaneRouteSpecSchema.safeParse({ ...spec, runtimeIsolation: undefined }).success
-      ).toBe(false);
+      ).toBe(true);
     }
   );
 });
 
 describe('runtime authorization admission', () => {
   it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
-    'isolates modern %s runtimes and freezes the admission containment selection',
+    'preserves legacy isolation for modern %s and freezes the admission containment selection',
     provider => {
       const modern = metadata({
         auth: {
@@ -156,6 +282,7 @@ describe('runtime authorization admission', () => {
         containmentEnabled: true,
         workerUrl: 'https://worker.test',
       });
+      // The Sandbox removes compatibility isolation only for new shared allocations.
       expect(registration.spec.runtimeIsolation).toBe('per-session');
       expect(registration.spec.env?.KILOCODE_TOKEN).toBeUndefined();
       expect(registration.sandboxSelection?.containment).toEqual({
@@ -257,7 +384,7 @@ describe('saved internal review allocation admission', () => {
 });
 
 describe('buildControlPlaneSessionRegistration MCP materialization', () => {
-  it('keeps materialized servers out of the spec and isolates the session', () => {
+  it('keeps materialized servers out of the spec and preserves compatibility isolation', () => {
     const registration = buildControlPlaneSessionRegistration(
       metadata({
         profile: {
@@ -281,7 +408,7 @@ describe('buildControlPlaneSessionRegistration MCP materialization', () => {
 
     // Plaintext MCP must never be persisted into the route spec.
     expect(registration.spec.mcp).toBeUndefined();
-    // Materialized MCP is per-session user config and must not share a runtime.
+    // Existing allocations retain their MCP isolation.
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     // The encrypted snapshot rides the DO-private credential source.
     expect(registration.credentials.mcpServers).toEqual({
@@ -414,7 +541,7 @@ describe('buildControlPlaneSessionRegistration MCP materialization', () => {
 });
 
 describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
-  it('forces per-session isolation for a secret-bearing spec and keeps secrets out of env', () => {
+  it('keeps secrets out of persisted env with compatibility isolation', () => {
     const envelope = encryptWithPublicKey('secret-value', publicKey);
     const registration = buildControlPlaneSessionRegistration(
       metadata({ profile: { encryptedSecrets: { DATABASE_URL: envelope } } }),
@@ -422,8 +549,6 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
     );
 
     expect(registration.credentials.encryptedSecrets).toEqual({ DATABASE_URL: envelope });
-    // Secrets never enter the persisted spec env, and a secret-bearing spec owns
-    // its Kilo runtime so a sibling in the same directory cannot reuse its env.
     expect(registration.spec.env?.DATABASE_URL).toBeUndefined();
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     expect(JSON.stringify(registration)).not.toContain('secret-value');
@@ -824,7 +949,7 @@ describe('profile runtime delivery', () => {
   };
 
   it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands'] as const)(
-    'delivers %s and isolates its runtime even without modern auth',
+    'delivers %s with compatibility isolation',
     key => {
       const registration = buildControlPlaneSessionRegistration(
         metadata({ profile: { [key]: profile[key] } }),
@@ -841,7 +966,7 @@ describe('profile runtime delivery', () => {
     }
   );
 
-  it('isolates a profile with only plain environment variables', () => {
+  it('delivers plain environment variables with compatibility isolation', () => {
     const registration = buildControlPlaneSessionRegistration(
       metadata({ profile: { envVars: { PROJECT: 'demo' } } }),
       selection
@@ -861,16 +986,15 @@ describe('profile runtime delivery', () => {
       ...profile,
       env: { PROJECT: 'demo' },
       setupCommands: ['echo setup'],
-      runtimeIsolation: 'per-session',
     });
   });
 
-  it('rejects a runtime profile without per-session isolation', () => {
+  it('accepts an inherited worktree profile without per-session isolation', () => {
     const registration = buildControlPlaneSessionRegistration(metadata({ profile }), selection);
     expect(
       controlPlaneRouteSpecSchema.safeParse({ ...registration.spec, runtimeIsolation: undefined })
         .success
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('rejects unsafe companion paths at the wrapper protocol boundary', () => {

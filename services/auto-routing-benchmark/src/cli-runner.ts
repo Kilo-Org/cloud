@@ -1,5 +1,7 @@
+import type { PaidExecutionKey } from './scheduler';
 import { parseKiloRunEvents } from './kilo-events';
 import type { DeciderCase } from './datasets/decider-cases';
+import { materializeLongContext } from './datasets/long-context';
 
 export type CliRunResult = {
   text: string;
@@ -12,13 +14,26 @@ export type CliRunResult = {
   timedOut: boolean;
 };
 
-const DECIDER_CLI_TIMEOUT_MS = 180_000;
+export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 
 // Appended to every decider prompt: the agent harness tends to wrap answers
 // in prose ("The output is: ..."), which strict mechanical checks reject.
 // One uniform instruction across all candidate models keeps grading fair.
 const FINAL_ANSWER_SUFFIX =
   '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
+
+/**
+ * The exact text `kilo run` sends to the model for a decider case: the container writes it
+ * to the CLI's stdin, which the CLI uses verbatim. Long-context cases carry their generated
+ * workspace snapshot, as the offline sweep and candidate screen send them. The CLI has no
+ * system-prompt flag, so the system prompt is folded in. The platform container and client
+ * evals (ADR 0005) both send this string, so their measurements in one custom router share
+ * byte-identical prompts.
+ */
+export function deciderCliPrompt(benchCase: DeciderCase): string {
+  const prompts = materializeLongContext(benchCase);
+  return `${prompts.systemPrompt}\n\n${prompts.userPrompt}${FINAL_ANSWER_SUFFIX}`;
+}
 
 export function isRetryableContainerAvailabilityError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -33,7 +48,7 @@ export function isRetryableContainerAvailabilityError(error: unknown): boolean {
   );
 }
 
-type ContainerRunResponse = {
+export type ContainerRunResponse = {
   exitCode: number;
   durationMs: number;
   stdoutLines: string[];
@@ -45,9 +60,7 @@ type ContainerRunResponse = {
  * Run one decider case through the `kilo` CLI inside a Cloudflare Container.
  *
  * `instanceName` is the precomputed DO instance name; the caller owns the
- * keying so chunks for the same model/repetition share a stable instance. The
- * CLI has no system-prompt flag, so we fold the system prompt into the user
- * prompt.
+ * keying so chunks for the same model/repetition share a stable instance.
  */
 export async function runDeciderCaseViaCli(
   env: Env,
@@ -66,12 +79,14 @@ export async function runDeciderCaseViaCli(
     variant?: string | null;
     /** @deprecated Prefer `variant`. Same value; kept for call-site compatibility. */
     reasoningEffort?: string | null;
+    /** Where the container posts the outcome if this request's connection is lost. */
+    resultCallback?: { url: string; execution: PaidExecutionKey };
   }
 ): Promise<CliRunResult> {
   const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId } = params;
   const variant = params.variant !== undefined ? params.variant : (params.reasoningEffort ?? null);
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(instanceName));
-  const prompt = `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
+  const prompt = deciderCliPrompt(benchCase);
 
   const startedAt = Date.now();
   const response = await stub.fetch(
@@ -86,6 +101,7 @@ export async function runDeciderCaseViaCli(
         orgId: orgId ?? null,
         timeoutMs: DECIDER_CLI_TIMEOUT_MS,
         variant: variant ?? null,
+        resultCallback: params.resultCallback ?? null,
       }),
     })
   );
@@ -95,15 +111,37 @@ export async function runDeciderCaseViaCli(
     throw new Error(`container /run failed: HTTP ${response.status} ${detail}`);
   }
 
-  const body = (await response.json()) as ContainerRunResponse;
+  return parseContainerRunResponse(await response.json(), startedAt);
+}
+
+export function parseContainerRunResponse(
+  body: ContainerRunResponse,
+  startedAt: number
+): CliRunResult {
   const { text, costUsd, eventCount, lastEventTypes } = parseKiloRunEvents(body.stdoutLines ?? []);
+  const providerThrottled = (body.stdoutLines ?? []).some(line => {
+    try {
+      const event: unknown = JSON.parse(line);
+      return (
+        typeof event === 'object' &&
+        event !== null &&
+        'type' in event &&
+        event.type === 'error' &&
+        /(?:\b429\b|rate.?limit|throttl)/i.test(line)
+      );
+    } catch {
+      return false;
+    }
+  });
 
   return {
     text,
     costUsd,
     latencyMs: body.durationMs ?? Date.now() - startedAt,
     exitCode: body.exitCode,
-    stderrTail: body.stderrTail ?? '',
+    stderrTail: providerThrottled
+      ? `${body.stderrTail ?? ''}\nHTTP 429 provider throttle`
+      : (body.stderrTail ?? ''),
     eventCount,
     lastEventTypes,
     timedOut: body.timedOut ?? false,

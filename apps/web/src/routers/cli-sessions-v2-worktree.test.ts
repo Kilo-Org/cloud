@@ -150,6 +150,7 @@ const ownershipRow = {
   pr_link_verified_at: null,
   status: null,
   status_updated_at: null,
+  status_transition_id: null,
   last_activity_at: null,
   total_cost_microdollars: null,
   live_summary: null,
@@ -324,6 +325,60 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
       messages: [],
     });
     expect(mockGetRuntimeSession).not.toHaveBeenCalled();
+  });
+
+  it.each(['kilo/assigned', 'feature/selected'])(
+    'returns assigned branch %s before preparation or CLI metadata arrives',
+    async branchName => {
+      mockGetRuntimeSession.mockResolvedValueOnce({
+        sessionId: WORKSPACE_ID,
+        userId: USER_ID,
+        branchName,
+        execution: null,
+        timestamp: 1,
+        version: 1,
+      });
+
+      const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+      expect(result.git_branch).toBe(branchName);
+      expect(result.runtimeState?.branchName).toBe(branchName);
+      expect(result.runtimeState?.preparedAt).toBeUndefined();
+    }
+  );
+
+  it('preserves a reported branch switch instead of replacing it with the assignment', async () => {
+    await db
+      .update(cli_sessions_v2)
+      .set({ git_branch: 'feature/switched' })
+      .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      branchName: 'kilo/assigned',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+
+    const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+    expect(result.git_branch).toBe('feature/switched');
+  });
+
+  it('does not mistake a legacy upstream branch for a known assignment', async () => {
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      upstreamBranch: 'main',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+
+    const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+    expect(result.git_branch).toBeNull();
   });
 
   it.each([

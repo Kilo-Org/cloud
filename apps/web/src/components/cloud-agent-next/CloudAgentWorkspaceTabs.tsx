@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import {
   ChevronDown,
   FileDiff,
+  Globe,
   LoaderCircle,
   MessageSquare,
   Plus,
@@ -82,8 +83,10 @@ export function CloudAgentWorkspaceTabs({
   onCloseFile,
   terminalStatuses,
   canCreateTerminal,
+  canOpenPreview = false,
   onSelectTab,
   onCreateTerminal,
+  onOpenPreview,
   onCloseTerminal,
   onActivateTab,
   selectionSuppressed = false,
@@ -111,8 +114,10 @@ export function CloudAgentWorkspaceTabs({
   terminals: TerminalWorkspaceTab[];
   terminalStatuses: Record<string, TerminalStatusSummary | undefined>;
   canCreateTerminal: boolean;
+  canOpenPreview?: boolean;
   onSelectTab: (tabId: WorkspaceTabId) => void;
   onCreateTerminal: () => void;
+  onOpenPreview?: () => void;
   onCloseTerminal: (terminalId: string) => void;
   onActivateTab?: () => void;
   selectionSuppressed?: boolean;
@@ -177,17 +182,15 @@ export function CloudAgentWorkspaceTabs({
   ) : null;
 
   type DisplayChatTab = { pending: true } | { pending: false; session: StoredSession };
-  const displayChatTabs: DisplayChatTab[] =
-    pendingChat && pendingChat.placement === 'replace'
-      ? visibleChatSessions.flatMap<DisplayChatTab>(session =>
-          session.sessionId === pendingChat.sourceKiloSessionId
-            ? [{ pending: true }]
-            : [{ pending: false, session }]
-        )
-      : [
-          ...visibleChatSessions.map<DisplayChatTab>(session => ({ pending: false, session })),
-          ...(pendingChat ? [{ pending: true } as const] : []),
-        ];
+  const pendingChatSessionId =
+    pendingChat?.resolvedKiloSessionId ??
+    (pendingChat?.placement === 'replace' ? pendingChat.sourceKiloSessionId : null);
+  const displayChatTabs = visibleChatSessions.map<DisplayChatTab>(session =>
+    session.sessionId === pendingChatSessionId ? { pending: true } : { pending: false, session }
+  );
+  if (pendingChat && !displayChatTabs.some(tab => tab.pending)) {
+    displayChatTabs.push({ pending: true });
+  }
 
   useEffect(() => {
     if (!editingSessionId) return;
@@ -755,6 +758,19 @@ export function CloudAgentWorkspaceTabs({
             <Terminal className="h-4 w-4" aria-hidden="true" />
           </Button>
         ) : null}
+        {canOpenPreview && onOpenPreview && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-label="Open preview"
+            title="Open preview"
+            className="text-muted-foreground h-8 w-8 shrink-0 px-0 focus-visible:ring-inset [@media(any-pointer:coarse)]:h-11 [@media(any-pointer:coarse)]:w-11"
+            onClick={onOpenPreview}
+          >
+            <Globe className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
       </div>
     </div>
   );

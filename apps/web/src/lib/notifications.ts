@@ -73,15 +73,6 @@ export const normalUnconditionalNotifications: KiloNotification[] = [
     },
     showIn: ['extension', 'cli'],
   },
-  {
-    id: 'stepfun-step-5-preview-free-oct-8',
-    title: 'StepFun Step 5 Preview is free in Kilo!',
-    message:
-      'StepFun Step 5 Preview is now free to use in Kilo — a flagship agentic coding model with a 1M-token context window, tool calling, and image and video input.',
-    suggestModelId: 'stepfun/step-5-preview-free',
-    showIn: ['extension', 'cli'],
-    expiresAt: '2026-10-22T08:00:00Z',
-  },
 ];
 
 export async function generateUserNotifications(
@@ -200,7 +191,7 @@ async function generateAutoTopUpOrgsNotification(
       id: 'auto-top-up-orgs-march-10',
       title: 'New: Auto Top-Ups For Organizations',
       message:
-        "Set your top-up amount once—we'll automatically add credits to your organization's balance when it drops below $50.",
+        "Set your top-up amount once—we'll automatically add credits to your organization's balance when it drops below the threshold you choose.",
       action: {
         actionText: 'Enable Auto Top-Ups',
         actionURL: 'https://app.kilo.ai/',

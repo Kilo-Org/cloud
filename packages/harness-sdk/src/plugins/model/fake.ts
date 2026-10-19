@@ -20,6 +20,7 @@ interface FakeReply {
   readonly deltas: readonly string[];
   readonly reasoning?: readonly string[];
   readonly usage?: Partial<ModelUsage>;
+  readonly model?: string;
   readonly fail?: ModelError;
   /** Closes the thinking, the way a provider does, on its own event. */
   readonly signature?: string;
@@ -76,6 +77,7 @@ const fakeModel = (
       kind: 'done',
       usage: { ...zeroUsage, ...reply.usage },
       stop: reply.stop ?? 'end',
+      ...(reply.model === undefined ? {} : { model: reply.model }),
     });
     if (reply.stall === true) {
       return Stream.concat(deltas, Stream.never);

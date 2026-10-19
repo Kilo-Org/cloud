@@ -145,6 +145,8 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
     needsCompute: () =>
       !lifetime.signal.aborted && (unhealthySince !== undefined || supervisor.needsCompute()),
     isReady: () => !lifetime.signal.aborted && !faulted && unhealthySince === undefined,
+    observationFailureSince: () => unhealthySince,
+    hasRecentProgress: supervisor.hasRecentProgress,
     refresh,
     lost,
     connected() {

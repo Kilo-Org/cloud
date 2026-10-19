@@ -69,8 +69,12 @@ The six-question payload, cache identity, analytics, billing, and sticky decisio
    fallback; publish
    with any empty tier → skipped, previous table stays live. An
    `efficient` request must never degrade *below* balanced.
-4. **Results are reproducible.** Grading is mechanical only (`exact` /
-   `contains_all` / `regex` / `json_equal`), never LLM-judged.
+4. **Grading is explicit.** Use mechanical checks (`exact` / `contains_all` /
+   `regex` / `json_equal`) wherever possible. Answers that require semantic
+   evaluation use `judged` checks graded by a System One model with a probability
+   score, calibrated with `judge:calibrate`.
+   Grader outages retry the chunk against persisted model output; they are not
+   wrong-answer scores. Retry exhaustion uses the lane-failure path.
    Each run snapshots its policy, container budget, benchmark identity, and exact `(model, variant)` entries.
    Measurements use that snapshot.
    Platform publication selects current catalog pairs from the ready registry.
@@ -128,9 +132,10 @@ one-time penalty. Stickiness trusts only real classifier output.
   publishes into the void. The smallest *shippable* unit is the full loop behind a
   hidden model — which is why it ships hidden rather than as smaller live
   increments.
-- **LLM-judged grading.** Rejected for reproducibility: re-running a benchmark
-  must yield comparable numbers. Mechanical checks are deterministic; golden
-  answers were hand-derived and mechanically re-verified.
+- **Free-form LLM-judged grading.** Rejected for comparable measurements:
+  mechanical checks remain preferred, with golden answers hand-derived and
+  mechanically re-verified. Rubric checks that cannot be graded mechanically
+  use calibrated System One probability grading instead of free-form verdicts.
 
 ## Rollout / cutover
 

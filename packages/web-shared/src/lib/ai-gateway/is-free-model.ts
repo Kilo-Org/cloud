@@ -21,7 +21,6 @@ export function isFreeModel(model: string): boolean {
     modelId === KILO_AUTO_FREE_MODEL.id ||
     modelId.endsWith(':free') ||
     modelId === 'openrouter/free' ||
-    modelId === 'inclusionai/ling-3.1-flash' ||
     (modelId.startsWith('stealth/') && modelId.endsWith('-alpha'))
   );
 }
@@ -31,9 +30,7 @@ export function hasBestEffortGuessDataCollectionRequirement(model: string): bool
     isFreeModel(model) ||
     kiloExclusiveModels.some(
       candidate =>
-        candidate.public_id === model &&
-        candidate.status !== 'disabled' &&
-        candidate.flags.includes('requires-data-collection')
+        candidate.public_id === model && candidate.flags.includes('requires-data-collection')
     )
   );
 }

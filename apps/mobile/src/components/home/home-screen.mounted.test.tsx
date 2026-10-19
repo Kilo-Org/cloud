@@ -97,6 +97,12 @@ vi.mock('expo-router', () => ({
   }),
 }));
 vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
+// The briefing card renders the paid-summary surfaces and reaches the native
+// SQLCipher store; Home's layout assertions do not exercise it.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: 'BriefingCard',
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
+}));
 vi.mock('@/components/todos/up-next-section', () => ({ UpNextSection: 'UpNextSection' }));
 vi.mock('@/components/home/new-task-from-picture-button', () => ({
   NewTaskFromPictureButton: 'NewTaskFromPictureButton',
@@ -219,7 +225,10 @@ function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
 /** The one glanceable card's frame; absent while no card is shown. */
-const CARD_FRAME = 'overflow-hidden rounded-2xl border border-border bg-card';
+// The Home card now renders through the shared adaptive frame that holds the
+// live card, the briefing and the pending placeholder.
+const CARD_FRAME =
+  'flex-row items-stretch overflow-hidden rounded-2xl border border-border bg-card';
 function cardFrame() {
   return nodes('View').find(node => node.props.className === CARD_FRAME);
 }

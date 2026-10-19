@@ -694,12 +694,32 @@ export class MeteredBillingLifecycle {
 
   /** The account and instance the next container start is attributed to, if known. */
   async getStartAttribution(): Promise<
-    { subject: BillingContext['subject']; instanceId: string } | undefined
+    | {
+        subject: BillingContext['subject'];
+        actor: BillingContext['actor'];
+        instanceId: string;
+        billingOrigin?: string;
+      }
+    | undefined
   > {
     const pending = await this.getPendingAttribution();
-    if (pending) return { subject: pending.subject, instanceId: pending.sandboxId };
+    if (pending) {
+      return {
+        subject: pending.subject,
+        actor: pending.actor,
+        instanceId: pending.sandboxId,
+        billingOrigin: pending.metadata?.origin,
+      };
+    }
     const context = await getBillingContext(this.host.storage);
-    return context ? { subject: context.subject, instanceId: context.instanceId } : undefined;
+    return context
+      ? {
+          subject: context.subject,
+          actor: context.actor,
+          instanceId: context.instanceId,
+          billingOrigin: context.metadata?.origin,
+        }
+      : undefined;
   }
 
   private async getPendingAttribution(): Promise<SandboxBillingInput | undefined> {

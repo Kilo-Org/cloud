@@ -296,17 +296,32 @@ export function removeChatCompletionsToolNames(request: OpenRouterChatCompletion
   }
 }
 
+export function removeChatCompletionsMessageNames(request: OpenRouterChatCompletionRequest) {
+  for (const message of request.messages) {
+    if ('name' in message) {
+      delete message.name;
+    }
+  }
+}
+
 /**
  * Inverse of the reasoning-content response transform: folds
  * OpenRouter-style `reasoning_details` back into the DeepSeek-style
  * `reasoning_content` string that upstreams like Friendli and Perplexity
- * expect on chat completions messages.
+ * expect on chat completions messages. The legacy OpenRouter `reasoning`
+ * string is dropped because strict upstreams reject it as an unknown field.
  */
 export function mapReasoningDetailsToReasoningContent(request: OpenRouterChatCompletionRequest) {
   for (const message of request.messages) {
     const messageWithReasoning = message as typeof message & MessageWithReasoning;
+    const legacyReasoning = messageWithReasoning.reasoning;
+    delete messageWithReasoning.reasoning;
+
     const reasoningDetails = messageWithReasoning.reasoning_details;
     if (!Array.isArray(reasoningDetails)) {
+      if (legacyReasoning && !messageWithReasoning.reasoning_content) {
+        messageWithReasoning.reasoning_content = legacyReasoning;
+      }
       continue;
     }
     delete messageWithReasoning.reasoning_details;
@@ -353,6 +368,30 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
     request.body.enable_thinking === false || // Alibaba
     request.body.thinking?.type === 'disabled' // Bytedance
   );
+}
+
+/**
+ * Strict OpenAI-compatible upstreams reject OpenRouter's top-level `reasoning`
+ * object as an unknown parameter, so its effort is carried over as the
+ * standard `reasoning_effort` instead. `reasoning: { enabled: false }` maps to
+ * `reasoning_effort: 'none'` only for upstreams that accept that value; others,
+ * such as Chutes, reject it.
+ */
+export function replaceReasoningObjectWithReasoningEffort(
+  request: GatewayRequest,
+  { disableWithNoneEffort = false }: { disableWithNoneEffort?: boolean } = {}
+) {
+  if (request.kind !== 'chat_completions') {
+    return;
+  }
+  const reasoning = request.body.reasoning;
+  const reasoningEffort =
+    reasoning?.effort ??
+    (disableWithNoneEffort && reasoning?.enabled === false ? 'none' : undefined);
+  if (reasoningEffort) {
+    request.body.reasoning_effort ??= reasoningEffort;
+  }
+  delete request.body.reasoning;
 }
 
 export function enableReasoningSummaries(request: GatewayRequest) {

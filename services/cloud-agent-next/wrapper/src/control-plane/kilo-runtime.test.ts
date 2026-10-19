@@ -15,8 +15,11 @@ import {
   cleanupStaleKiloPidfiles,
   createKiloRuntime,
   createKiloRuntimes,
+  KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  liveRuntimeClient,
   parseKiloPidfile,
+  prepareKiloFilesystem,
   type KiloFeedCallbacks,
   type KiloProcess,
   type KiloProcessSpawner,
@@ -25,6 +28,20 @@ import {
   type KiloRuntimeScheduler,
   type KiloRuntimes,
 } from './kilo-runtime.js';
+
+/** A locally-decodable runtime-credential-proxy handle, matching the Worker JWT shape. */
+function proxyHandle(expSeconds: number, extra: Record<string, unknown> = {}): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({
+      aud: 'cloud-agent-next:runtime-credential-proxy',
+      exp: expSeconds,
+      iat: expSeconds - 3_600,
+      ...extra,
+    })
+  ).toString('base64url');
+  return `${header}.${payload}.test-signature`;
+}
 
 function timers(overrides: Partial<ControlPlaneTimers['wrapper']> = {}): ControlPlaneTimers {
   return {
@@ -91,6 +108,7 @@ function createSpawner(): {
     const process: KiloProcess = {
       pid,
       url: `http://127.0.0.1:${pid}`,
+      authorization: 'Basic test',
       exited: deferred.promise,
       stop: async () => {
         record.stopped += 1;
@@ -102,7 +120,7 @@ function createSpawner(): {
   return { spawn, processes, spawnCount: () => processes.length };
 }
 
-type FakeFeedRecord = { callbacks: KiloFeedCallbacks; closed: number };
+type FakeFeedRecord = { callbacks: KiloFeedCallbacks; closed: number; nativeRuntimeId: string };
 
 function createFeedFactory(options: { failOpens?: number } = {}): {
   openFeed: (
@@ -115,8 +133,12 @@ function createFeedFactory(options: { failOpens?: number } = {}): {
   let remainingFailures = options.failOpens ?? 0;
   return {
     feeds,
-    openFeed: (_source, callbacks) => {
-      const record: FakeFeedRecord = { callbacks, closed: 0 };
+    openFeed: (source, callbacks) => {
+      const record: FakeFeedRecord = {
+        callbacks,
+        closed: 0,
+        nativeRuntimeId: source.nativeRuntimeId,
+      };
       feeds.push(record);
       return {
         open: async () => {
@@ -172,10 +194,12 @@ function createRuntime(options: {
   directory?: string;
   env?: Record<string, string>;
   isIdle?: () => boolean | Promise<boolean>;
-  prepareFilesystem?: (env: Record<string, string>, directory: string) => Promise<void>;
+  prepareFilesystem?: KiloRuntimeOptions['prepareFilesystem'];
+  sandboxProvider?: KiloRuntimeOptions['sandboxProvider'];
   spawnKilo?: KiloProcessSpawner;
   timers?: ControlPlaneTimers;
-  onRestart?: (info: { directory: string; reason: string }) => void;
+  onRestart?: KiloRuntimeOptions['onRestart'];
+  onEvent?: KiloRuntimeOptions['onEvent'];
   sampleMemory?: KiloRuntimeOptions['sampleMemory'];
   memoryHolds?: boolean[];
   readSnapshot?: KiloRuntimeOptions['readSnapshot'];
@@ -199,12 +223,15 @@ function createRuntime(options: {
     readProcessStartTime: () => undefined,
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
+    onEvent: options.onEvent,
     ...(options.isIdle
       ? {
           isIdle: async () => options.isIdle!(),
         }
       : {}),
-    ...(options.prepareFilesystem ? { prepareFilesystem: options.prepareFilesystem } : {}),
+    // The real preparation writes under HOME; `prepareKiloFilesystem` has its own tests.
+    prepareFilesystem: options.prepareFilesystem ?? (async () => {}),
+    ...(options.sandboxProvider ? { sandboxProvider: options.sandboxProvider } : {}),
     ...(options.sampleMemory ? { sampleMemory: options.sampleMemory } : {}),
     onMemoryHold: info => options.memoryHolds?.push(info.held),
     onRestart: info => {
@@ -229,6 +256,70 @@ function createRuntime(options: {
     runtime,
   };
 }
+
+describe('prepareKiloFilesystem', () => {
+  it('writes auth.json and the Cloud Agent rules with the reserved port of the provider', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const home = path.join(root, 'home');
+      const directory = path.join(root, 'worktree');
+      await prepareKiloFilesystem(
+        {
+          HOME: home,
+          XDG_DATA_HOME: path.join(home, '.local', 'share'),
+          KILO_AUTH_CONTENT: '{"kilo":{}}',
+        },
+        directory,
+        'cloudflare'
+      );
+      const rules = await fsp.readFile(
+        path.join(home, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(rules).toContain('# Cloud Agent Environment');
+      expect(rules).toContain('Port 3000 is used by the sandbox itself.');
+      expect(rules).toContain('no more than 3 minutes 30 seconds');
+      expect(
+        await fsp.readFile(path.join(home, '.local', 'share', 'kilo', 'auth.json'), 'utf8')
+      ).toBe('{"kilo":{}}');
+      expect((await fsp.stat(directory)).isDirectory()).toBe(true);
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves the reserved-port rule out when the provider is unknown', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      await prepareKiloFilesystem({ HOME: root }, path.join(root, 'worktree'));
+      const rules = await fsp.readFile(
+        path.join(root, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(rules).not.toContain('used by the sandbox itself');
+      expect(rules).toContain('read its output to find the port that it uses');
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('receives the runtime provider before Kilo starts', async () => {
+    const providers: Array<string | undefined> = [];
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      sandboxProvider: 'vercel',
+      prepareFilesystem: async (_env, _directory, sandboxProvider) => {
+        providers.push(sandboxProvider);
+      },
+    });
+    await runtime.ensure();
+    expect(providers).toEqual(['vercel']);
+    await runtime.shutdown();
+  });
+});
 
 describe('Kilo startup lifecycle', () => {
   it('keeps credentials installed while the first feed is opening pending behind the idle gate', async () => {
@@ -1272,6 +1363,7 @@ describe('createKiloRuntime', () => {
       return {
         pid,
         url: `http://127.0.0.1:${pid}`,
+        authorization: 'Basic test',
         exited: deferred.promise,
         stop: async () => {
           record.stopped += 1;
@@ -1311,6 +1403,7 @@ describe('createKiloRuntime', () => {
       return {
         pid,
         url: `http://127.0.0.1:${pid}`,
+        authorization: 'Basic test',
         exited: deferred.promise,
         stop: async () => {
           record.stopped += 1;
@@ -1366,6 +1459,7 @@ describe('createKiloRuntime', () => {
           XDG_RUNTIME_DIR: runtimeDir,
           KILO_AUTH_CONTENT: '{"token":"x"}',
         },
+        prepareFilesystem: prepareKiloFilesystem,
       });
 
       await runtime.ensure();
@@ -1380,6 +1474,389 @@ describe('createKiloRuntime', () => {
       await fsp.access(worktree);
     } finally {
       await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Kilo observation recovery', () => {
+  async function fixture(healthRequestMs = CONTROL_PLANE_TIMERS.wrapper.healthRequestMs) {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const frames: ControlPlaneWrapperFrame[] = [];
+    const submissions: string[] = [];
+    const aborts: string[] = [];
+    const snapshots = { fail: false, reads: 0 };
+    const created = createRuntime({
+      spawner,
+      scheduler,
+      feed,
+      probe,
+      timers: timers({ healthRequestMs }),
+      onEvent: event => turns.observeKiloEvent(event),
+      onRestart: info => turns.onRuntimeRestart({ ...info, key: info.directory }),
+      readSnapshot: async () => {
+        snapshots.reads++;
+        if (snapshots.fail) throw new Error('Synthetic snapshot failure');
+        return [];
+      },
+    });
+    const turns = createTurnManager({
+      timers: CONTROL_PLANE_TIMERS,
+      now: () => scheduler.scheduler.now(),
+      runtimes: { get: () => created.runtime },
+      emit: frame => frames.push(frame),
+      materializeAttachments: async message => ({ ...message, prompt: 'Synthetic prompt' }),
+    });
+    const client = await created.runtime.ensure();
+    client.sendPromptAsync = async input => {
+      submissions.push(input.messageId ?? '');
+    };
+    client.abortSession = async input => {
+      aborts.push(input.sessionId);
+      return true;
+    };
+    turns.registerRoute({
+      sessionId: 'workspace_observation',
+      kiloSessionId: 'ses_observation',
+      directory: created.runtime.directory,
+      attemptId: 'attempt',
+    });
+    turns.submit('workspace_observation', {
+      messageId: 'message',
+      turn: { type: 'prompt', prompt: 'Synthetic prompt' },
+      agent: { mode: 'code', model: 'test/model' },
+    });
+    await waitFor(() => submissions.length === 1);
+    function event(type: string, properties: Record<string, unknown>) {
+      const current = feed.feeds.at(-1)!;
+      current.callbacks.onEvent({
+        type,
+        properties,
+        nativeRuntimeId: current.nativeRuntimeId,
+        directory: created.runtime.directory,
+      });
+    }
+    event('session.turn.open', { sessionID: 'ses_observation' });
+    event('message.updated', {
+      info: { id: 'assistant', sessionID: 'ses_observation', role: 'assistant' },
+    });
+    let text = '';
+    function progress() {
+      text += 'output';
+      event('message.part.updated', {
+        part: {
+          id: 'part',
+          sessionID: 'ses_observation',
+          messageID: 'assistant',
+          type: 'text',
+          text,
+        },
+      });
+    }
+    progress();
+    snapshots.fail = true;
+    await created.runtime.refreshActivity();
+    return {
+      ...created,
+      spawner,
+      scheduler,
+      feed,
+      probe,
+      snapshots,
+      submissions,
+      aborts,
+      event,
+      progress,
+      outcomes: () => frames.filter(frame => frame.type === 'session.outcome'),
+      async tick(ms = 5_000, progressing = true) {
+        scheduler.advance(ms);
+        if (progressing) progress();
+        else event('server.heartbeat', {});
+        scheduler.fire();
+        await Bun.sleep(1);
+      },
+      async dispose() {
+        turns.shutdown();
+        await created.runtime.shutdown();
+      },
+    };
+  }
+
+  it('preserves accepted work through transient observation failure and completes after recovery', async () => {
+    const h = await fixture();
+    try {
+      await h.tick(120_000);
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      expect(h.spawner.spawnCount()).toBe(1);
+      expect(h.restarts).toEqual([]);
+      expect(h.outcomes()).toEqual([]);
+      expect(h.probe.calls.count).toBe(1);
+      const reads = h.snapshots.reads;
+      for (let index = 0; index < 6; index++) await h.tick();
+      expect(h.snapshots.reads).toBeGreaterThan(reads);
+      h.snapshots.fail = false;
+      await h.runtime.refreshActivity();
+      expect(h.runtime.isSuspected()).toBe(false);
+      await h.tick(120_000);
+      h.event('session.status', { sessionID: 'ses_observation', status: { type: 'idle' } });
+      h.event('session.turn.close', { sessionID: 'ses_observation', reason: 'completed' });
+      await Bun.sleep(1);
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      expect(h.aborts).toEqual([]);
+      expect(h.submissions).toEqual(['message']);
+      expect(h.outcomes()).toEqual([
+        {
+          type: 'session.outcome',
+          sessionId: 'workspace_observation',
+          status: 'completed',
+          lastMessageId: 'message',
+        },
+      ]);
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it('bounds permanent observation failure at four minutes despite healthy progress', async () => {
+    const h = await fixture();
+    try {
+      await h.tick(120_000);
+      for (let index = 0; index < 23; index++) await h.tick();
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      expect(h.outcomes()).toEqual([]);
+      await h.tick();
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.restarts).toEqual([{ reason: 'hang' }]);
+      expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_restarted' });
+      expect(h.submissions).toEqual(['message']);
+      expect(h.aborts).toEqual([]);
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it.each(['reasoning', 'tool_output', 'tool_state'] as const)(
+    'permits bounded recovery on meaningful %s progress',
+    async kind => {
+      const h = await fixture();
+      try {
+        if (kind === 'tool_state') {
+          h.event('message.part.updated', {
+            part: {
+              id: 'tool',
+              sessionID: 'ses_observation',
+              messageID: 'assistant',
+              type: 'tool',
+              state: { status: 'pending' },
+            },
+          });
+        }
+        h.scheduler.advance(120_000);
+        h.event('message.part.updated', {
+          part: {
+            id: kind === 'reasoning' ? 'reasoning' : 'tool',
+            sessionID: 'ses_observation',
+            messageID: 'assistant',
+            type: kind === 'reasoning' ? 'reasoning' : 'tool',
+            ...(kind === 'reasoning'
+              ? { text: 'Synthetic reasoning' }
+              : { state: { status: 'running', output: kind === 'tool_output' ? 'output' : '' } }),
+          },
+        });
+        h.scheduler.fire();
+        await Bun.sleep(1);
+        expect(h.probe.calls.count).toBe(1);
+        expect(h.spawner.processes[0].stopped).toBe(0);
+        expect(h.outcomes()).toEqual([]);
+      } finally {
+        await h.dispose();
+      }
+    }
+  );
+
+  it.each(['heartbeat', 'repeated_part', 'metadata', 'busy', 'retry', 'user_input'] as const)(
+    'does not extend observation recovery for %s without meaningful progress',
+    async kind => {
+      const h = await fixture();
+      try {
+        h.scheduler.advance(120_000);
+        if (kind === 'repeated_part') {
+          h.event('message.part.updated', {
+            part: {
+              id: 'part',
+              sessionID: 'ses_observation',
+              messageID: 'assistant',
+              type: 'text',
+              text: 'output',
+            },
+          });
+        } else if (kind === 'metadata' || kind === 'user_input') {
+          h.event('message.updated', {
+            info: {
+              id: kind === 'user_input' ? 'user' : 'assistant',
+              sessionID: 'ses_observation',
+              role: kind === 'user_input' ? 'user' : 'assistant',
+            },
+          });
+        } else if (kind === 'busy' || kind === 'retry') {
+          h.event('session.status', { sessionID: 'ses_observation', status: { type: kind } });
+        } else {
+          h.event('server.heartbeat', {});
+        }
+        h.scheduler.fire();
+        await waitFor(() => h.outcomes().length === 1);
+        expect(h.probe.calls.count).toBe(1);
+        expect(h.spawner.processes[0].stopped).toBe(1);
+        expect(h.spawner.spawnCount()).toBe(2);
+        expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_restarted' });
+      } finally {
+        await h.dispose();
+      }
+    }
+  );
+
+  it('rechecks progress during the extension instead of letting heartbeats retain it', async () => {
+    const h = await fixture();
+    try {
+      await h.tick(120_000);
+      expect(h.outcomes()).toEqual([]);
+      await h.tick(29_999, false);
+      expect(h.outcomes()).toEqual([]);
+      await h.tick(1, false);
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_restarted' });
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it.each([false, 'reject'] as const)(
+    'retains genuine-hang handling when the observation health probe returns %s',
+    async answer => {
+      const h = await fixture();
+      try {
+        h.probe.set(
+          answer === 'reject' ? () => Promise.reject(new Error('Synthetic probe failure')) : answer
+        );
+        await h.tick(120_000, answer !== false);
+        await waitFor(() => h.outcomes().length === 1);
+        expect(h.probe.calls.count).toBe(1);
+        expect(h.spawner.processes[0].stopped).toBe(1);
+        expect(h.spawner.spawnCount()).toBe(2);
+        expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_unresponsive' });
+        expect(h.logs.some(message => message.includes('"trigger":"health_probe_false"'))).toBe(
+          true
+        );
+      } finally {
+        await h.dispose();
+      }
+    }
+  );
+
+  it('rechecks runtime health during the extension even while progress events arrive', async () => {
+    const h = await fixture();
+    try {
+      await h.tick(120_000);
+      expect(h.outcomes()).toEqual([]);
+      h.probe.set(false);
+      await h.tick();
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.probe.calls.count).toBe(2);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_unresponsive' });
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it('bounds a hung observation health probe and emits one genuine-hang outcome', async () => {
+    const h = await fixture(20);
+    try {
+      h.probe.set(() => new Promise(() => undefined));
+      await h.tick(120_000);
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.probe.calls.count).toBe(1);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_unresponsive' });
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it('keeps observation probes single-flight and drops a late decision after snapshot recovery', async () => {
+    const h = await fixture();
+    const pending = Promise.withResolvers<boolean>();
+    try {
+      h.probe.set(() => pending.promise);
+      await h.tick(120_000);
+      for (let index = 0; index < 3; index++) await h.tick();
+      expect(h.probe.calls.count).toBe(1);
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      h.snapshots.fail = false;
+      await h.runtime.refreshActivity();
+      pending.resolve(false);
+      await Bun.sleep(1);
+      expect(h.spawner.spawnCount()).toBe(1);
+      expect(h.outcomes()).toEqual([]);
+    } finally {
+      pending.resolve(false);
+      await h.dispose();
+    }
+  });
+
+  it('does not let an in-flight probe delay the four-minute observation bound', async () => {
+    const h = await fixture();
+    const pending = Promise.withResolvers<boolean>();
+    try {
+      await h.tick(120_000);
+      h.probe.set(() => pending.promise);
+      for (let index = 0; index < 23; index++) await h.tick();
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      await h.tick();
+      await waitFor(() => h.outcomes().length === 1);
+      pending.resolve(false);
+      await Bun.sleep(1);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.outcomes()).toHaveLength(1);
+      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_restarted' });
+    } finally {
+      pending.resolve(false);
+      await h.dispose();
+    }
+  });
+
+  it('fences queued observation decisions and old feed callbacks after process replacement', async () => {
+    const h = await fixture();
+    const pending = Promise.withResolvers<boolean>();
+    try {
+      h.probe.set(() => pending.promise);
+      await h.tick(120_000);
+      const oldFeed = h.feed.feeds[0];
+      h.spawner.processes[0].exit();
+      await waitFor(() => h.outcomes().length === 1);
+      pending.resolve(false);
+      oldFeed.callbacks.onFailure();
+      oldFeed.callbacks.onEvent({
+        type: 'server.heartbeat',
+        properties: {},
+        nativeRuntimeId: oldFeed.nativeRuntimeId,
+      });
+      await Bun.sleep(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.spawner.processes[1].stopped).toBe(0);
+      expect(h.outcomes()).toHaveLength(1);
+      expect(h.restarts).toEqual([{ reason: 'exit' }]);
+    } finally {
+      pending.resolve(false);
+      await h.dispose();
     }
   });
 });
@@ -1402,7 +1879,7 @@ describe('Kilo hang restart under memory pressure', () => {
       .map(fields => [fields.phase, fields.memoryHoldOutcome]);
   }
 
-  it('keeps a silent Kilo running while reclaiming and resumes it without a restart', async () => {
+  it('recovers after 90 seconds of memory pressure without restarting with production timers', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
     const feed = createFeedFactory();
@@ -1413,15 +1890,16 @@ describe('Kilo hang restart under memory pressure', () => {
       feed,
       probe,
       scheduler,
+      timers: CONTROL_PLANE_TIMERS,
       sampleMemory: reclaimingAtCap(),
       memoryHolds,
     });
 
     await runtime.ensure();
-    scheduleSilence(scheduler, TEST_TIMERS);
+    scheduleSilence(scheduler, CONTROL_PLANE_TIMERS);
     await waitFor(() => memoryHolds.length === 1);
-    // Each check probes again, so a Kilo that recovers is seen within one check.
-    scheduleTick(scheduler, TEST_TIMERS);
+    scheduler.advance(90_000);
+    scheduler.fire();
     await waitFor(() => probe.calls.count === 2);
     // Let the second decision settle; a check during an in-flight probe is skipped.
     await Bun.sleep(5);
@@ -1429,7 +1907,7 @@ describe('Kilo hang restart under memory pressure', () => {
     expect(runtime.isSuspected()).toBe(true);
 
     probe.set(true);
-    scheduleTick(scheduler, TEST_TIMERS);
+    scheduleTick(scheduler, CONTROL_PLANE_TIMERS);
     await waitFor(() => feed.feeds.length === 2);
     feed.feeds[1]!.callbacks.onEvent({
       type: 'server.heartbeat',
@@ -1437,7 +1915,7 @@ describe('Kilo hang restart under memory pressure', () => {
       nativeRuntimeId: 'r',
     });
     // The next check sees Kilo delivering events and observable, and ends the hold.
-    scheduleTick(scheduler, TEST_TIMERS);
+    scheduleTick(scheduler, CONTROL_PLANE_TIMERS);
     await waitFor(() => memoryHolds.length === 2);
 
     expect(spawner.spawnCount()).toBe(1);
@@ -1481,6 +1959,37 @@ describe('Kilo hang restart under memory pressure', () => {
       ['kilo_memory_hold_ended', 'expired'],
     ]);
     await runtime.shutdown();
+  });
+
+  it('bounds sustained memory pressure to a two-minute hold with production timers', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const memoryHolds: boolean[] = [];
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed: createFeedFactory(),
+      probe: createProbe(false),
+      scheduler,
+      timers: CONTROL_PLANE_TIMERS,
+      sampleMemory: reclaimingAtCap(),
+      memoryHolds,
+    });
+    try {
+      await runtime.ensure();
+      scheduleSilence(scheduler, CONTROL_PLANE_TIMERS);
+      await waitFor(() => memoryHolds.length === 1);
+      scheduler.advance(119_999);
+      scheduler.fire();
+      await Bun.sleep(1);
+      expect(spawner.spawnCount()).toBe(1);
+      scheduler.advance(1);
+      scheduler.fire();
+      await waitFor(() => spawner.spawnCount() === 2);
+      expect(restarts).toEqual([{ reason: 'hang', outcomeReason: 'sandbox_out_of_memory' }]);
+      expect(memoryHolds).toEqual([true, false]);
+    } finally {
+      await runtime.shutdown();
+    }
   });
 
   it('holds failed activity observation once, then restarts at kiloMemoryHoldMs', async () => {
@@ -1956,7 +2465,7 @@ describe('createKiloRuntimes', () => {
       KILO_CONFIG_CONTENT: JSON.stringify({ auth: { token }, mcp }),
     });
     const input = (mcp: unknown, token?: string) => ({
-      key: 'session-a',
+      key: '/tmp/dir',
       directory: '/tmp/dir',
       env: config(mcp, token),
     });
@@ -1979,6 +2488,183 @@ describe('createKiloRuntimes', () => {
     // Drift must not silently recreate the runtime with the changed servers.
     expect(created).toBe(1);
   });
+
+  it('rejects a proxy/non-proxy credential-class mismatch and never recreates the runtime', async () => {
+    let created = 0;
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-class-test-pids',
+      createRuntime: options => {
+        created += 1;
+        let currentEnv = options.env;
+        return {
+          directory: options.directory,
+          get env() {
+            return currentEnv;
+          },
+          client: {},
+          ensure: async () => ({}),
+          installCredentials: async (env: Record<string, string>) => {
+            currentEnv = env;
+          },
+          applyPendingCredentials: async () => false,
+          isSuspected: () => false,
+          isRestarting: () => false,
+          isUnavailable: () => false,
+          shutdown: async () => undefined,
+        } as unknown as KiloRuntime;
+      },
+    });
+    const input = (key: string, token: string) => ({
+      key,
+      directory: key,
+      env: { KILOCODE_TOKEN: token },
+    });
+
+    // Two non-proxy envs on one directory share one runtime.
+    await runtimes.ensure(input('dir-legacy', 'kcp1.legacy-a'));
+    await runtimes.ensure(input('dir-legacy', 'kcp1.legacy-b'));
+    expect(created).toBe(1);
+
+    // A proxy handle whose grant/handle string differs but whose presence
+    // matches still reuses, including after a newer handle was installed.
+    await runtimes.ensure(input('dir-proxy', proxyHandle(1_800_000_000)));
+    const proxyRuntime = runtimes.get('dir-proxy');
+    expect(proxyRuntime).toBeDefined();
+    await proxyRuntime!.installCredentials({
+      KILOCODE_TOKEN: proxyHandle(1_800_000_900),
+    });
+    await runtimes.ensure(input('dir-proxy', proxyHandle(1_800_000_100, { grantId: 'other' })));
+    expect(created).toBe(2);
+
+    // Either direction on one key is a permanent class mismatch.
+    let legacyThenProxy: unknown;
+    try {
+      await runtimes.ensure(input('dir-legacy', proxyHandle(1_800_000_000)));
+    } catch (error) {
+      legacyThenProxy = error;
+    }
+    expect(legacyThenProxy).toBeInstanceOf(KiloWorktreeCredentialClassMismatchError);
+    let proxyThenLegacy: unknown;
+    try {
+      await runtimes.ensure(input('dir-proxy', 'kcp1.legacy-c'));
+    } catch (error) {
+      proxyThenLegacy = error;
+    }
+    expect(proxyThenLegacy).toBeInstanceOf(KiloWorktreeCredentialClassMismatchError);
+    expect(created).toBe(2);
+  });
+
+  it('does not roll for a repeated or stale proxy handle but latches a pending one', async () => {
+    const exp = 1_800_000_000;
+    const { runtime, restarts } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      isIdle: () => true,
+      env: { KILOCODE_TOKEN: proxyHandle(exp) },
+    });
+    await runtime.ensure();
+
+    // An identical handle marks no restart.
+    await runtime.installCredentials({ KILOCODE_TOKEN: proxyHandle(exp) });
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
+
+    // A handle that expires earlier is stale: it neither replaces the stored
+    // env nor marks a restart.
+    await runtime.installCredentials({ KILOCODE_TOKEN: proxyHandle(exp - 3_600) });
+    expect(runtime.env.KILOCODE_TOKEN).toBe(proxyHandle(exp));
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
+
+    // A different handle with an equal expiry is not newer either: strictly
+    // later expiry is required to roll the credential.
+    await runtime.installCredentials({
+      KILOCODE_TOKEN: proxyHandle(exp, { grantId: 'same-exp-different-grant' }),
+    });
+    expect(runtime.env.KILOCODE_TOKEN).toBe(proxyHandle(exp));
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
+
+    // A genuinely newer handle marks one rollover; a repeated identical frame
+    // must not clear the latched marker.
+    await runtime.installCredentials({ KILOCODE_TOKEN: proxyHandle(exp + 3_600) });
+    await runtime.installCredentials({ KILOCODE_TOKEN: proxyHandle(exp + 3_600) });
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
+    expect(restarts.filter(restart => restart.reason === 'credentials')).toHaveLength(1);
+    await runtime.shutdown();
+  });
+
+  it('marks exactly one restart for a non-proxy credential change', async () => {
+    const { runtime, restarts } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      isIdle: () => true,
+      env: { HOME: '/old' },
+    });
+    await runtime.ensure();
+    await runtime.installCredentials({ HOME: '/new' });
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
+    expect(restarts.filter(restart => restart.reason === 'credentials')).toHaveLength(1);
+    await runtime.shutdown();
+  });
+
+  it('defers a proxy rollover while busy and applies it once at idle', async () => {
+    const exp = 1_800_000_000;
+    let idle = false;
+    const { runtime, restarts } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      isIdle: () => idle,
+      env: { KILOCODE_TOKEN: proxyHandle(exp) },
+    });
+    await runtime.ensure();
+    await runtime.installCredentials({ KILOCODE_TOKEN: proxyHandle(exp + 3_600) });
+
+    // The runtime is busy: the rollover is latched but not applied.
+    expect(await runtime.applyPendingCredentials(() => idle)).toBe(false);
+    idle = true;
+    expect(await runtime.applyPendingCredentials(() => idle)).toBe(true);
+    expect(await runtime.applyPendingCredentials(() => idle)).toBe(false);
+    // An identical frame after the restart must not mark a new rollover.
+    await runtime.installCredentials({ KILOCODE_TOKEN: proxyHandle(exp + 3_600) });
+    expect(await runtime.applyPendingCredentials(() => idle)).toBe(false);
+    expect(restarts.filter(restart => restart.reason === 'credentials')).toHaveLength(1);
+    await runtime.shutdown();
+  });
+
+  it('restarts for identical non-proxy envs and for a mixed-class frame', async () => {
+    const exp = 1_800_000_000;
+    const { runtime, restarts } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      isIdle: () => true,
+      env: { HOME: '/home', KILOCODE_TOKEN: 'kcp1.legacy-a' },
+    });
+    await runtime.ensure();
+
+    // A repeated non-proxy frame is not deduped: it changes the alias.
+    await runtime.installCredentials({ HOME: '/home', KILOCODE_TOKEN: 'kcp1.legacy-a' });
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
+
+    // A frame that changes only the credential value (not HOME) also rolls.
+    await runtime.installCredentials({ HOME: '/home', KILOCODE_TOKEN: 'kcp1.legacy-b' });
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
+
+    // A frame that flips credential class also rolls (the class guard only
+    // rejects reuse at `ensure`, not a live credential install).
+    await runtime.installCredentials({ HOME: '/home', KILOCODE_TOKEN: proxyHandle(exp) });
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
+    expect(restarts.filter(restart => restart.reason === 'credentials')).toHaveLength(3);
+    await runtime.shutdown();
+  });
 });
 
 /** Advances the fake clock by one silence window, then runs the watchdog tick. */
@@ -1992,3 +2678,46 @@ function scheduleTick(scheduler: FakeScheduler, activeTimers: ControlPlaneTimers
   scheduler.advance(Math.max(1, Math.floor(activeTimers.wrapper.sseSilenceMs / 6)));
   scheduler.fire();
 }
+
+describe('liveRuntimeClient', () => {
+  const base = {
+    directory: '/d',
+    env: {},
+    ensure: async () => ({}) as never,
+    installCredentials: async () => undefined,
+    applyPendingCredentials: async () => false,
+    isRetiredClient: () => false,
+    phase: () => 'healthy' as const,
+    isSuspected: () => false,
+    isRestarting: () => false,
+    isUnavailable: () => false,
+    shutdown: async () => undefined,
+  };
+
+  it('never reads a client that is restarting, unavailable, or throwing', () => {
+    const throwingRuntime = (overrides: Record<string, unknown> = {}): KiloRuntime =>
+      ({
+        ...base,
+        ...overrides,
+        get client(): never {
+          throw new Error('Kilo runtime has not started');
+        },
+      }) as unknown as KiloRuntime;
+    expect(liveRuntimeClient(undefined)).toBeUndefined();
+    expect(liveRuntimeClient(throwingRuntime({ isRestarting: () => true }))).toBeUndefined();
+    expect(liveRuntimeClient(throwingRuntime({ isUnavailable: () => true }))).toBeUndefined();
+    // Healthy but not started: the getter throw is swallowed.
+    expect(liveRuntimeClient(throwingRuntime())).toBeUndefined();
+  });
+
+  it('returns the live client while healthy', () => {
+    const client = {} as never;
+    const runtime = {
+      ...base,
+      get client() {
+        return client;
+      },
+    } as unknown as KiloRuntime;
+    expect(liveRuntimeClient(runtime)).toBe(client);
+  });
+});

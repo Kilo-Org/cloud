@@ -1,5 +1,5 @@
 {
-  "id": "3c84d28c-006e-42b5-8739-fdfcffafe6e4",
+  "id": "f8b451f3-429d-47f5-8951-fc356a41bd80",
   "prevId": "3ead8d31-3b34-45b4-a18a-40a6200c93c4",
   "version": "7",
   "dialect": "postgresql",
@@ -1276,12 +1276,6 @@
         },
         "unavailable_models": {
           "name": "unavailable_models",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "custom_pricing": {
-          "name": "custom_pricing",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -6364,6 +6358,12 @@
         "wrapper_run_id": {
           "name": "wrapper_run_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "container": {
+          "name": "container",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

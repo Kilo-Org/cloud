@@ -20,7 +20,14 @@ import {
   useNewSessionCreator,
 } from '@/components/agents/use-new-session-creator';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
-import { lockedModelOption, resolvePinnedAgentModel } from '@/components/agents/mode-normalize';
+import {
+  type AgentMode,
+  dedupeCustomModeOptions,
+  isBuiltinAgentMode,
+  lockedModelOption,
+  mergeProfileAndRuntimeModeOptions,
+  resolvePinnedAgentModel,
+} from '@/components/agents/mode-normalize';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { useNewSessionModelState } from '@/components/agents/new-session-model-provider';
@@ -50,6 +57,7 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
 import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
@@ -90,7 +98,7 @@ import { peekSharePayload } from '@/lib/share-payload';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
-import { linkStartedTodoSession } from '@/lib/hooks/use-todos';
+import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
@@ -203,7 +211,7 @@ export function NewSessionScreenBody() {
   // prompt's own `useSharePrefill` still delivers the shared files and
   // re-applies the same text idempotently. A to-do's Start carries its prompt
   // the same way, so it also beats a stored draft.
-  const { prompt: routePrefillPrompt, todoId } = useNewSessionPrefill();
+  const { prompt: routePrefillPrompt, todoId, todoTitle } = useNewSessionPrefill();
   const [sharePrefillText] = useState<string | null>(() =>
     shareId ? (peekSharePayload(shareId)?.text ?? null) : (routePrefillPrompt ?? null)
   );
@@ -263,7 +271,60 @@ export function NewSessionScreenBody() {
   // Custom modes and the pinned model come from the effective default profile.
   // The lock applies only to the Cloud Agent target; a remote target keeps the
   // unlocked model view and never sends a gateway pin.
-  const { customOptions, profileAgents } = useEffectiveProfileCustomModes(organizationId);
+  const {
+    customOptions,
+    profileAgents,
+    settled: profileSettled,
+  } = useEffectiveProfileCustomModes(organizationId);
+  // A computer also offers the agents its CLI loads for the selected launch
+  // folder, including project agents from `.kilo/agents`.
+  const { agents: cliAgents, settled: cliAgentsSettled } = useCliAgents(
+    runOnInstance ? { connectionId: runOnInstance.connectionId, directory: folderPath } : null
+  );
+  const remoteCustomOptions = dedupeCustomModeOptions(
+    mergeProfileAndRuntimeModeOptions(profileAgents, cliAgents)
+  );
+  // The slug the user picked from a CLI's own list on this screen.
+  const cliPickedModeRef = useRef<AgentMode | null>(null);
+  const handleModeChange = useCallback(
+    (next: AgentMode) => {
+      cliPickedModeRef.current =
+        !isBuiltinAgentMode(next) &&
+        !profileAgents.some(agent => agent.slug === next) &&
+        cliAgents.some(agent => agent.slug === next)
+          ? next
+          : null;
+      setMode(next);
+    },
+    [profileAgents, cliAgents, setMode]
+  );
+  // Once the target's agent lists are known, a custom mode the target does not
+  // offer falls back to the default instead of being sent as the session
+  // agent. On a computer this covers any custom mode, including one inherited
+  // from a prefill. On Cloud only a mode picked from a CLI list is checked, so
+  // an inherited custom slug keeps its earlier Cloud behavior.
+  useEffect(() => {
+    if (isBuiltinAgentMode(mode) || !profileSettled || !cliAgentsSettled) {
+      return;
+    }
+    const available = runOnInstance === null ? customOptions : remoteCustomOptions;
+    if (available.some(option => option.value === mode)) {
+      return;
+    }
+    if (runOnInstance === null && cliPickedModeRef.current !== mode) {
+      return;
+    }
+    cliPickedModeRef.current = null;
+    setMode('code');
+  }, [
+    mode,
+    profileSettled,
+    cliAgentsSettled,
+    runOnInstance,
+    customOptions,
+    remoteCustomOptions,
+    setMode,
+  ]);
   // Clone entry keeps the source prefill model and an unlocked toolbar: no
   // pinned-agent lock, no gateway pin override.
   const pinned = isCloneEntry ? {} : resolvePinnedAgentModel({ slug: mode, profileAgents });
@@ -459,10 +520,16 @@ export function NewSessionScreenBody() {
   const handleSpawnSucceeded = useCallback(
     (sessionId: string) => {
       if (todoId) {
-        void linkStartedTodoSession({ queryClient, trpc, todoId, sessionId });
+        void linkStartedTodoSession({
+          queryClient,
+          trpc,
+          todoId,
+          sessionId,
+          ...(todoTitle ? { title: todoTitle } : {}),
+        });
       }
     },
-    [queryClient, todoId, trpc]
+    [queryClient, todoId, todoTitle, trpc]
   );
 
   // The manual draft as the create body carries it: one plaintext value per key
@@ -492,6 +559,7 @@ export function NewSessionScreenBody() {
     manualEnvVars,
     setupCommands,
     todoId,
+    todoTitle,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -952,12 +1020,12 @@ export function NewSessionScreenBody() {
         model={isRemoteTargetSelected ? modelView.selectedValue : displayModel}
         variant={isRemoteTargetSelected ? modelView.selectedVariant : displayVariant}
         modelOptions={isRemoteTargetSelected ? modelView.options : modelOptionsForToolbar}
-        customOptions={customOptions}
+        customOptions={isRemoteTargetSelected ? remoteCustomOptions : customOptions}
         modelLocked={isRemoteTargetSelected ? false : Boolean(pinned.model)}
         modelLockLabel={isRemoteTargetSelected ? undefined : pinned.agentName}
         initialPrompt={initialPrompt}
         onChangeText={handlePromptChange}
-        onModeChange={setMode}
+        onModeChange={handleModeChange}
         onModelSelect={handleModelSelect}
         onAddAttachment={() => void handleAddAttachment()}
         onRemoveAttachment={handleRemoveAttachment}

@@ -18,6 +18,7 @@ import {
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
+import { kiloClientConfig, type KiloServer } from './kilo-server-auth.js';
 import {
   boundSlashCommandCatalog,
   toSlashCommandInfo,
@@ -25,6 +26,7 @@ import {
   type SlashCommandInfo,
 } from '../../src/shared/slash-commands.js';
 import { KILO_CLI_VERSION } from '../../src/shared/kilo-cli-version.js';
+import { sessionChildSchema } from './control/session-child-schema.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -286,6 +288,27 @@ export type WrapperKiloClient = {
     directory?: string;
     signal?: AbortSignal;
   }) => Promise<boolean>;
+  /** Direct child sessions forked from one session, for release tree cleanup. */
+  children: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<Array<{ id: string; directory: string }>>;
+  /**
+   * Abort a session during release cleanup. A 404 is success: the session is
+   * already gone, so there is nothing left to abort.
+   */
+  abortSessionForCleanup: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<void>;
+  /** Stops and forgets every background process owned by one session. */
+  stopSessionProcesses: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<void>;
   summarizeSession: (opts: {
     sessionId: string;
     model: { providerID?: string; modelID: string };
@@ -359,16 +382,19 @@ export type WrapperKiloClient = {
   }>;
   /** The in-process server URL — for diagnostics */
   readonly serverUrl: string;
+  /** The server and its credential; raw requests and sockets must use both. */
+  readonly server: KiloServer;
 };
 
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
-  serverUrl: string,
+  server: KiloServer,
   workspacePath: string
 ): WrapperKiloClient {
+  const serverUrl = server.url;
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
-  const v2Client = createV2Client({ baseUrl: serverUrl, directory: workspacePath });
-  const globalClient = createV2Client({ baseUrl: serverUrl });
+  const v2Client = createV2Client(kiloClientConfig(server, workspacePath));
+  const globalClient = createV2Client(kiloClientConfig(server));
 
   function promptParameters(opts: PromptOptions) {
     const rawParts =
@@ -399,6 +425,7 @@ export function createWrapperKiloClient(
 
   return {
     serverUrl,
+    server,
 
     subscribeEvents: async opts => {
       const result = await v2Client.global.event({ signal: opts.signal });
@@ -566,6 +593,41 @@ export function createWrapperKiloClient(
         throw new Error(`${operation} returned no boolean result`);
       }
       return data;
+    },
+
+    children: async opts => {
+      const result = await v2Client.session.children(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      const data = requireSdkData(result, `Session children for ${opts.sessionId}`);
+      return z.array(sessionChildSchema).parse(data);
+    },
+
+    abortSessionForCleanup: async opts => {
+      const result = await v2Client.session.abort(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      // A missing session is already aborted; do not retry a 404.
+      if (result.response?.status === 404) return;
+      const operation = `Cleanup abort for ${opts.sessionId}`;
+      const data = requireSdkData<unknown>(result, operation);
+      if (data !== true) {
+        throw new Error(`${operation} returned no boolean result`);
+      }
+    },
+
+    stopSessionProcesses: async opts => {
+      const result = await v2Client.backgroundProcess.stopSession(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      const operation = `Stop session processes for ${opts.sessionId}`;
+      const data = requireSdkData<unknown>(result, operation);
+      if (data !== true) {
+        throw new Error(`${operation} returned no boolean result`);
+      }
     },
 
     summarizeSession: async opts => {

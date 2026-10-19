@@ -13,6 +13,7 @@ import type {
 import {
   type User,
   type Organization,
+  auto_routing_custom_routers,
   custom_llm2,
   organization_audit_logs,
   organization_group_memberships,
@@ -350,6 +351,52 @@ describe('organizations settings trpc router', () => {
         context_length: 8192,
       };
     }
+
+    it('lists only the requested organization routers for fallback and custom-mode pickers', async () => {
+      const organization = await createTestOrganization('Router catalog', owner.id, 0, {}, false);
+      const otherOrganization = await createTestOrganization(
+        'Other router catalog',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const personalSlug = `personal-${randomUUID()}`;
+      const gatewayModel = 'openai/gpt-4o';
+      const routerSettings = {
+        name: 'Coding',
+        base_router: 'efficient' as const,
+        mode: 'cost_per_accuracy' as const,
+        entries: [{ kind: 'gateway' as const, model: gatewayModel }],
+        default_entry_key: `gateway:${gatewayModel}`,
+      };
+      await db.insert(auto_routing_custom_routers).values([
+        { ...routerSettings, slug: 'coding', owned_by_organization_id: organization.id },
+        { ...routerSettings, slug: 'other', owned_by_organization_id: otherOrganization.id },
+        { ...routerSettings, slug: personalSlug, owned_by_user_id: member.id },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(member.id);
+        const result = await caller.organizations.settings.listAvailableModels({
+          organizationId: organization.id,
+        });
+
+        expect(result.data.filter(model => model.id.startsWith('kilo-auto/custom/'))).toEqual([
+          expect.objectContaining({
+            id: 'kilo-auto/custom/org/coding',
+            autoRouting: { models: [gatewayModel] },
+          }),
+        ]);
+      } finally {
+        await db
+          .delete(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.slug, personalSlug));
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+        await db.delete(organizations).where(eq(organizations.id, otherOrganization.id));
+      }
+    });
 
     it('includes group-only custom LLMs only for members of an allowed group', async () => {
       const organization = await createTestOrganization(

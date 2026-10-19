@@ -451,6 +451,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.upstream_id).toBe('chatcmpl-ccebc94c526d4f8797cfe00023478a9a');
     expect(result.inference_provider).toBe('fireworks');
     expect(result.cost_mUsd).toBe(47482);
+    expect(result.generation_time).toBe(4287);
   });
 
   test('leaves upstream_id null when the Vercel gateway reports no provider request id', async () => {
@@ -472,6 +473,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     );
 
     expect(result.upstream_id).toBeNull();
+    expect(result.generation_time).toBeNull();
   });
 
   test('records the Vercel upstream provider request id for non-streamed responses', () => {
@@ -499,6 +501,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
                           provider: 'fireworks',
                           credentialType: 'system',
                           success: true,
+                          startTime: 1791906882421,
+                          endTime: 1791906921724,
                           providerResponseId: 'chatcmpl-non-streamed',
                         },
                       ],
@@ -518,6 +522,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
     expect(result.upstream_id).toBe('chatcmpl-non-streamed');
     expect(result.inference_provider).toBe('fireworks');
+    expect(result.generation_time).toBe(39303);
   });
 });
 
@@ -1499,6 +1504,25 @@ describe('logMicrodollarUsage', () => {
       expect(mockedDeliverUsageEventWireBody).not.toHaveBeenCalled();
       expect(mockedReportUsageEvent).toHaveBeenCalledWith(
         expect.objectContaining({ requestId, costMicrodollars: BASE_USAGE_STATS.cost_mUsd })
+      );
+      expect(mockedReportUsageEvent.mock.calls[0]?.[0]).not.toHaveProperty('siwc');
+    });
+
+    test('marks a request served on the delegated ChatGPT connection as siwc', async () => {
+      const user = await insertTestUser({
+        id: 'test-bouncer-siwc-user',
+        microdollars_used: 0,
+        google_user_email: 'bouncer-siwc@example.com',
+      });
+      const requestId = 'req-bouncer-siwc';
+
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null },
+        { ...spendWatchContext(user, requestId, false), provider: 'openai-chatgpt' }
+      );
+
+      expect(mockedReportUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId, accountId: `user:${user.id}`, siwc: true })
       );
     });
   });

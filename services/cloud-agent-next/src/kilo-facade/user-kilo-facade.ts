@@ -2666,6 +2666,8 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
             () => getSandboxSessionStub(this.env, userId, root.cloudAgentSessionId),
             stub => stub.releaseNativeEvents({ attachmentId }),
             'releaseNativeEvents'
+          ).catch(error =>
+            logger.withFields({ error: String(error) }).error('Failed to release native events')
           )
         );
       }

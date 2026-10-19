@@ -105,6 +105,19 @@ describe('SandboxSessionV2.kiloRequest', () => {
     );
   });
 
+  it.each(['refs/pull/123/head', 'refs/merge-requests/99/head', 'refs/heads/main'])(
+    'uses the default remote diff base for a full-ref upstream %s',
+    async upstreamBranch => {
+      const kiloRequest = vi.fn(async () => ({ ok: true, result: [] }));
+      const session = unit({ peer: { kiloRequest } });
+      session.metadata = { repository: { upstreamBranch } };
+      await session.kiloRequest({ name: 'session.diff', baseRef: 'refs/heads/untrusted' } as never);
+      expect(kiloRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: { name: 'session.diff' } })
+      );
+    }
+  );
+
   it('returns not_found without a registration', async () => {
     const session = unit({});
     session.registration = null;

@@ -4258,6 +4258,42 @@ describe('hosted global native events', () => {
     }
   });
 
+  it('handles a failed late release after cancellation during a pending subscribe', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    const subscription = Promise.withResolvers<void>();
+    fixture.subscribeNativeEvents.mockImplementation(async input => {
+      await subscription.promise;
+      return { registered: true, fence: 10, kiloSessionId: input.kiloSessionId };
+    });
+    fixture.releaseNativeEvents
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Release unavailable'));
+    const reader = globalReader(fixture.facade);
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      const attachment = fixture.subscribeNativeEvents.mock.calls[0]?.[0];
+      expect(attachment).toBeDefined();
+      await reader.cancel();
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      subscription.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fixture.releaseNativeEvents).toHaveBeenCalledTimes(2);
+      expect(fixture.releaseNativeEvents).toHaveBeenLastCalledWith({
+        attachmentId: attachment?.attachmentId,
+      });
+      await expect(
+        Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise))
+      ).resolves.toEqual([undefined, undefined]);
+      await expect(reader.read()).resolves.toEqual({ done: true, value: undefined });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      subscription.resolve();
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
   it('coalesces heartbeat refreshes while subscribe is pending and avoids duplicate attachments', async () => {
     vi.useFakeTimers();
     const fixture = globalFixture();

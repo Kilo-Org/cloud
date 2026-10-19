@@ -1425,7 +1425,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         parsed.name === 'session.diff'
           ? {
               name: 'session.diff',
-              ...(upstreamBranch === undefined
+              ...(upstreamBranch === undefined || upstreamBranch.startsWith('refs/')
                 ? {}
                 : { baseRef: `refs/remotes/origin/${upstreamBranch}` }),
             }

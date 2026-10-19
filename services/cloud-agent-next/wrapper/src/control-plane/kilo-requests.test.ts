@@ -300,6 +300,30 @@ describe('control-plane native reads', () => {
     expect(emitted[0]).toMatchObject({ ok: true, result: [] });
   });
 
+  it('captures a fetched review checkout against the default remote base', async () => {
+    const { directory, git } = await repository();
+    git('checkout', '-q', '-b', 'refs/pull/123/head');
+    await writeFile(join(directory, 'review.txt'), 'review change\n');
+    git('add', '.');
+    git('-c', 'core.hooksPath=/dev/null', 'commit', '-q', '-m', 'Review');
+    const request = frame({ name: 'session.diff' });
+    request.session.directory = directory;
+    const { emitted, handler } = harness(client(), true, directory);
+    await handler.handle(request);
+    expect(emitted[0]).toMatchObject({
+      ok: true,
+      result: [
+        {
+          file: 'review.txt',
+          status: 'added',
+          additions: 1,
+          deletions: 0,
+          patch: expect.stringContaining('+review change\n'),
+        },
+      ],
+    });
+  });
+
   it('reports a real oversized patch instead of silently omitting it', async () => {
     const { directory } = await repository();
     await writeFile(join(directory, 'large.txt'), 'line\n'.repeat(10_001));

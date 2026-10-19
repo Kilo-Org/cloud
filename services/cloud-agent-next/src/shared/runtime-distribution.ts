@@ -82,3 +82,21 @@ export const RUNTIME_REQUIRED_BINARIES = [
   'rg',
   'kilo',
 ] as const;
+
+/** The bootstrap owns this value. User or profile env must not select the runtime. */
+export function selectedRuntimeCli(env: Record<string, string | undefined>): string {
+  const selected = env.KILO_RUNTIME_CLI_PATH;
+  if (selected === undefined) return 'kilo';
+  if (
+    !selected.startsWith(`${RUNTIME_RESERVED_ROOT}/cli/`) ||
+    selected.includes('\0') ||
+    selected.includes('\r') ||
+    selected.includes('\n') ||
+    selected
+      .slice(1)
+      .split('/')
+      .some(part => !part || part === '.' || part === '..')
+  )
+    throw new Error('Invalid selected runtime CLI');
+  return selected;
+}

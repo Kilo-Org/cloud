@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { getPlatformProxy } from 'wrangler';
 import { AwsClient } from 'aws4fetch';
 import { z } from 'zod';
 import type { ArtifactObjectStore } from '../src/sandbox-control/runtime-artifact-keys.js';
@@ -111,4 +113,34 @@ export function remoteArtifactStore(options: {
       return bytes;
     },
   };
+}
+
+/** Use the same private bucket API and persistence as local Wrangler development. */
+export async function localR2ArtifactStore(packageRoot: string) {
+  const platform = await getPlatformProxy<{ RUNTIME_RELEASE_BUCKET?: R2Bucket }>({
+    configPath: path.join(packageRoot, 'wrangler.jsonc'),
+    environment: 'dev',
+    persist: { path: path.join(packageRoot, '.wrangler/state/v3') },
+    remoteBindings: false,
+  });
+  const bucket = platform.env.RUNTIME_RELEASE_BUCKET;
+  if (!bucket) {
+    await platform.dispose();
+    throw new Error('Local runtime bucket is not configured');
+  }
+  const store: ArtifactObjectStore = {
+    async putIfAbsent(key, bytes, contentType) {
+      return (
+        (await bucket.put(key, new Uint8Array(bytes), {
+          onlyIf: { etagDoesNotMatch: '*' },
+          httpMetadata: { contentType },
+        })) !== null
+      );
+    },
+    async getBytes(key) {
+      const object = await bucket.get(key);
+      return object === null ? null : new Uint8Array(await object.arrayBuffer());
+    },
+  };
+  return { store, dispose: platform.dispose };
 }

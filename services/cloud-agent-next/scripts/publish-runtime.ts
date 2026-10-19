@@ -6,7 +6,7 @@ import { zstdCompressSync, zstdDecompressSync, gunzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../src/shared/control-plane-protocol.js';
-import { remoteArtifactStore } from './runtime-publish-store.js';
+import { localR2ArtifactStore, remoteArtifactStore } from './runtime-publish-store.js';
 import { downloadVerified } from './runtime-cli-artifact.js';
 import { fileURLToPath } from 'node:url';
 import {
@@ -325,8 +325,9 @@ function argValue(argv: string[], name: string): string | undefined {
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const out = argValue(argv, '--out');
   const bucket = argValue(argv, '--bucket');
-  if ((out === undefined) === (bucket === undefined))
-    throw new Error('Specify exactly one target: --out <directory> or --bucket <name>');
+  const local = argv.includes('--local');
+  if (Number(out !== undefined) + Number(bucket !== undefined) + Number(local) !== 1)
+    throw new Error('Specify exactly one target: --out <directory>, --bucket <name>, or --local');
   const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const build = spawnSync('bun', ['run', 'build:wrapper'], { cwd: packageRoot, stdio: 'inherit' });
   if (build.status !== 0) throw new Error('Wrapper build failed');
@@ -360,14 +361,24 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   } = process.env;
   if (bucket && (!accountId || !accessKeyId || !secretAccessKey))
     throw new Error('Runtime publisher credentials are missing');
+  const localTarget = local ? await localR2ArtifactStore(packageRoot) : undefined;
   const store =
-    out !== undefined
+    localTarget?.store ??
+    (out !== undefined
       ? localDirectoryArtifactStore(out)
       : bucket && accountId && accessKeyId && secretAccessKey
         ? remoteArtifactStore({ accountId, bucket, accessKeyId, secretAccessKey })
-        : null;
+        : null);
   if (!store) throw new Error('Runtime publisher target is invalid');
-  console.log(JSON.stringify(await publishRuntimeRelease(store, packaged)));
+  try {
+    const published = await publishRuntimeRelease(store, packaged);
+    const descriptorOut = argValue(argv, '--descriptor-out');
+    if (descriptorOut)
+      await fs.writeFile(descriptorOut, serializeRuntimeRelease(packaged.descriptor));
+    console.log(JSON.stringify(published));
+  } finally {
+    await localTarget?.dispose();
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

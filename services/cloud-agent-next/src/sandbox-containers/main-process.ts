@@ -60,8 +60,8 @@ export function observeCmdline(
 
 /**
  * Diagnostic fields for the last observation a check completed, or `none` when
- * every read was cut off. The cmdline is PID 1's argv, which this DO chose as the
- * entrypoint; it is joined with spaces and bounded by `diagnosticCause`.
+ * every read was cut off. Only fixed known commands can be logged. Startup and
+ * unknown argv can contain a short-lived artifact grant.
  */
 export function mainProcessObservationFields(
   observation: MainProcessObservation | null
@@ -74,7 +74,12 @@ export function mainProcessObservationFields(
   switch (observation.kind) {
     case 'cmdline': {
       const argv = new TextDecoder().decode(withoutTrailingNul(observation.cmdline)).split('\0');
-      const cmdline = argv.join(' ');
+      const cmdline =
+        observation.identity === 'supervisor' || observation.identity === 'sleep'
+          ? argv.join(' ')
+          : observation.cmdline.byteLength === 0
+            ? 'empty'
+            : 'redacted';
       return {
         ...fields,
         lastCmdline: cmdline === '' ? 'empty' : diagnosticCause(cmdline),

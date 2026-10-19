@@ -64,6 +64,12 @@ import {
   type VercelProviderLocator,
 } from '../../sandbox-control/vercel-provider.js';
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
+import { downloadedStartup } from '../../sandbox-control/downloaded-startup.js';
+import { selectStartup, startupRepositoryKey } from '../../sandbox-control/startup-selection.js';
+import {
+  STARTUP_FAILURES,
+  type StartupFailureCode,
+} from '../../sandbox-control/startup-failure.js';
 import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
 import {
   kiloTokenHasRuntimeAuthorization,
@@ -1549,6 +1555,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  async reportStartupFailure(input: {
+    allocationId: string;
+    credential: string;
+    code: StartupFailureCode;
+  }): Promise<boolean> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const state = await this.readAllocation();
+      if (
+        (state.kind !== 'creating' && state.kind !== 'starting') ||
+        !(await this.validateAllocationCredential(input.allocationId, input.credential))
+      )
+        return false;
+      logControlDiagnostic('runtime_startup_failed', {
+        allocationId: input.allocationId,
+        code: input.code,
+      });
+      await this.applyEvent({
+        type: 'startup-failed',
+        at: Date.now(),
+        allocationId: input.allocationId,
+        code: input.code,
+      });
+      return true;
+    });
+  }
+
   async fetch(request: Request): Promise<Response> {
     await this.initialized;
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
@@ -1667,8 +1700,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       this.expireUnboundSockets(Date.now());
       await this.recoverRepositoryPreparationFailures();
-      const state = await this.readAllocation();
+      let state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
+      if (
+        state.kind === 'stopped' &&
+        !this.createInFlight &&
+        (await routeRetryAllowed(this.routeContext(state)))
+      ) {
+        await this.applyEvent({
+          type: 'ensure',
+          at: Date.now(),
+          allocationId: crypto.randomUUID(),
+        });
+        state = await this.readAllocation();
+      }
       if (state.kind === 'creating' && this.createInFlight) {
         // N2: the in-flight attempt owns the create deadline. Keep a backstop;
         // it will dispatch its own result and re-arm.
@@ -3090,6 +3135,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await notifyReadyRoutes(this.routeContext(next));
       return;
     }
+    if (
+      event.type === 'startup-failed' &&
+      previous.kind !== 'stopping' &&
+      next.kind === 'stopping'
+    ) {
+      const reason = STARTUP_FAILURES[event.code].reason;
+      if (reason !== null) {
+        for (const route of await listRoutes(this.db)) {
+          if (route.state === 'preparing')
+            await failCurrentAttempt(
+              this.routeContext(next),
+              route.sessionId,
+              route.attemptId,
+              reason,
+              'runtime_startup_failed'
+            );
+        }
+      }
+    }
     if (previous.kind !== 'stopping' && next.kind === 'stopping') {
       // The reducer owns the cause; ready routes must not re-derive it.
       if (stopReason !== undefined) {
@@ -3151,7 +3215,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       otherRoutes: routes.filter(route => route.state !== 'preparing' && route.state !== 'ready')
         .length,
     });
-    if (retry) {
+    if (retry && !this.createInFlight) {
       await this.applyEvent({ type: 'ensure', at: ctx.now(), allocationId: crypto.randomUUID() });
     } else {
       await this.armAlarm(next);
@@ -3915,7 +3979,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
-        const startupCommand = preinstalledStartup();
+        const selection = selectStartup(this.env, pin.provider);
+        const createDeadline =
+          state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
+        const startupCommand =
+          selection.mode === 'preinstalled'
+            ? preinstalledStartup()
+            : await withTimeout(
+                downloadedStartup({
+                  env: this.env,
+                  descriptor: selection.descriptor,
+                  sandboxId: this.sandboxId,
+                  allocationId,
+                  deadlineAt: createDeadline + this.sandboxTimers().wrapperFirstConnectMs,
+                }),
+                remainingMs(createDeadline),
+                'Runtime preflight timed out'
+              );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) {
           await assertContainerCapacity(this.env, {
@@ -3926,8 +4006,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             billingOrigin: pin.billing.metadata?.origin,
           });
         }
-        const createDeadline =
-          state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
+
         if (pin.provider === 'vercel') {
           let admission: 'admitted' | 'blocked' | 'unavailable' | 'retry' = 'retry';
           let admissionRejected = false;
@@ -4049,10 +4128,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
-        await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped);
+        await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped, selection.mode);
         if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
         const launchOptions = {
           ...launch.options,
+          ...(launch.options.repoKey === undefined
+            ? {}
+            : {
+                repoKey: startupRepositoryKey(launch.options.repoKey, selection.mode),
+              }),
           ...(pin.provider === 'cloudflare-containers' ? { deadlineAt: launchDeadline } : {}),
         };
         let launched = await withTimeout(
@@ -4112,7 +4196,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               createdRef,
               { command: startupCommand, env: imageLaunchEnv },
               {
-                ...launch.options,
+                ...launchOptions,
                 skipRepository: true,
                 deadlineAt: launchDeadline,
               }
@@ -4166,7 +4250,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
     } finally {
       this.createInFlight = false;
-      await this.enqueue(() => this.recoverRepositoryPreparationFailures());
+      await this.enqueue(async () => {
+        await this.recoverRepositoryPreparationFailures();
+        const pending = await this.readAllocation();
+        // Stop may finish before this launch returns. Start again only after
+        // recordLaunch settles, without changing transient create retry pauses.
+        if (pending.kind === 'stopped' && (await routeRetryAllowed(this.routeContext(pending)))) {
+          await this.applyEvent({
+            type: 'ensure',
+            at: Date.now(),
+            allocationId: crypto.randomUUID(),
+          });
+        }
+      });
     }
   }
 
@@ -4194,6 +4290,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await recordRepositoryLaunch(this.ctx.storage, {
         allocationId,
         startSource,
+        startupMode: existing.startupMode ?? 'preinstalled',
         confirmed,
         ...(existing.preparationFailures === undefined
           ? {}
@@ -4761,7 +4858,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
       else {
         reason = 'capture_declined';
         ok = await withTimeout(
-          provider.captureRepository(state.providerRef, route.repoKey, frame.commit),
+          provider.captureRepository(
+            state.providerRef,
+            startupRepositoryKey(
+              route.repoKey,
+              (await readRepositoryLaunch(this.ctx.storage))?.startupMode ?? 'preinstalled'
+            ),
+            frame.commit
+          ),
           REPOSITORY_CAPTURE_CALL_MS,
           'Repository capture timed out'
         );
@@ -5144,11 +5248,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.sandboxTimers()
     );
     const routeAt = await earliestRouteDeadlineAt(this.db);
+    // Pending work must survive loss of the in-memory launch continuation.
+    const retryAt =
+      state.kind === 'stopped' &&
+      routeAt !== null &&
+      (await routeRetryAllowed(this.routeContext(state)))
+        ? Date.now() + this.sandboxTimers().providerCreateRetryMs
+        : null;
     if (this.billingSchedule.snapshotEarliestDue() === undefined) await this.billingSchedule.load();
     const billingAt = this.billingSchedule.snapshotEarliestDue() ?? null;
-    const candidates = [allocationAt, routeAt, billingAt, this.earliestHelloDeadlineAt()].filter(
-      (at): at is number => at !== null
-    );
+    const candidates = [
+      allocationAt,
+      routeAt,
+      retryAt,
+      billingAt,
+      this.earliestHelloDeadlineAt(),
+    ].filter((at): at is number => at !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;

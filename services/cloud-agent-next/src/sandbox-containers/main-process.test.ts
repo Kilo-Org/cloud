@@ -52,7 +52,7 @@ describe('mainProcessObservationFields', () => {
     const cmdline = fields.lastCmdline as string;
     expect(cmdline.length).toBeLessThanOrEqual(CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
     expect(cmdline).toMatch(CONTROL_DIAGNOSTIC_STRING_CHARSET);
-    expect(cmdline.startsWith('node_x')).toBe(true);
+    expect(cmdline).toBe('redacted');
   });
 
   it('names an empty cmdline instead of emitting an empty string', () => {
@@ -80,4 +80,12 @@ describe('mainProcessObservationFields', () => {
       lastCause: 'exec_failed:_no_such_container',
     });
   });
+});
+
+it('does not log the supplied startup arguments', () => {
+  const secret = 'temporary-artifact-credential';
+  const command = { argv: ['/bin/sh', '-c', secret] };
+  const observation = observeCmdline(encode(command.argv.join('\0')), command);
+  expect(observation.identity).toBe('startup');
+  expect(JSON.stringify(mainProcessObservationFields(observation)).includes(secret)).toBe(false);
 });

@@ -2126,7 +2126,8 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         });
         await runAlarm(stub);
         await waitFor(() => expect(heartbeats).toHaveLength(1));
-        expect(heartbeats[0]).toBeGreaterThanOrEqual(29);
+        expect(heartbeats[0]).toBeGreaterThanOrEqual(19);
+        expect(heartbeats[0]).toBeLessThan(29);
         if (result === 'budget') {
           await waitFor(() => expect(provider.stopCalls).toContain(providerRef));
           const generation = billing.context?.generation;

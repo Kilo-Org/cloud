@@ -711,6 +711,26 @@ describe('deliverSettlement', () => {
     expect(meter.recordStopInputs).toHaveLength(1);
     expect(meter.recordStopInputs[0].usageSinceLast).toBe(100);
   });
+
+  it('bills a reserved Vercel allocation from provider creation rather than admission', async () => {
+    const { storage, meter, billing } = setup();
+    const context = await seedContext(storage, {
+      metadata: { origin: 'cloud-agent', allocation_id: 'allocation-1' },
+    });
+    await saveVercelBillingBinding(
+      storage,
+      bindingFor(context.generation, {
+        createdAtMs: T0 + 10_000,
+        terminalAtMs: T0 + 30_000,
+      })
+    );
+    vi.setSystemTime(T0 + 60_000);
+
+    await billing.deliverSettlement(context.generation);
+
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(20);
+  });
 });
 
 describe('onGenerationClosed', () => {

@@ -128,10 +128,7 @@ export class VercelBilling {
     if (!context || context.generation !== generation) return;
     const binding = await loadVercelBillingBinding(this.deps.storage, generation);
     if (!context.measurementStarted && binding !== undefined && binding.generation === generation) {
-      await this.deps.lifecycle.pinMeasurementCursor(
-        generation,
-        context.metadata?.allocation_id === undefined ? binding.createdAtMs : context.startEpochMs
-      );
+      await this.deps.lifecycle.pinMeasurementCursor(generation, binding.createdAtMs);
       const pinned = await getBillingContext(this.deps.storage);
       if (!pinned || pinned.generation !== generation) return;
       context = pinned;

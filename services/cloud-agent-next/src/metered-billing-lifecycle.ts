@@ -460,7 +460,6 @@ export class MeteredBillingLifecycle {
             return;
           }
         } else if (!previous.measurementStarted) {
-          await this.pinAssumeHeld(previous.generation, previous.startEpochMs);
           await this.admitAndScheduleBestEffort(identity, previous);
           return;
         } else {

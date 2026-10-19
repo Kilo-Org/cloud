@@ -502,10 +502,7 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     ) {
       await (
         await ensureRuntime()
-      )?.lifecycle.pinMeasurementCursor(
-        context.generation,
-        context.metadata?.allocation_id === undefined ? binding.createdAtMs : context.startEpochMs
-      );
+      )?.lifecycle.pinMeasurementCursor(context.generation, binding.createdAtMs);
     }
   }
 

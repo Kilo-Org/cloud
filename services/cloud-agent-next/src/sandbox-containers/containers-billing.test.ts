@@ -519,7 +519,7 @@ describe('ContainersBilling physical lifecycle', () => {
     expect((await instance.getState()).status).toBe('running');
   });
 
-  it('preserves the admission cursor so successful creates bill their create duration', async () => {
+  it('stamps the launch time, not the admission time, on the first schedule', async () => {
     const { instance, storage, pendingTasks } = setup();
     await admit(instance, 'standard-4');
     const admittedAt = (storage.map.get(BILLING_CONTEXT_KEY) as { usageMeasuredAtMs: number })
@@ -535,8 +535,8 @@ describe('ContainersBilling physical lifecycle', () => {
       usageMeasuredAtMs: number;
     };
     expect(context.measurementStarted).toBe(true);
-    expect(context.usageMeasuredAtMs).toBe(admittedAt);
-    expect(context.usageMeasuredAtMs).not.toBe(launchedAt);
+    expect(context.usageMeasuredAtMs).toBe(launchedAt);
+    expect(context.usageMeasuredAtMs).not.toBe(admittedAt);
   });
 
   it('budget stop blocks, schedules force-stop, destroys, settles, and a fresh admission succeeds', async () => {

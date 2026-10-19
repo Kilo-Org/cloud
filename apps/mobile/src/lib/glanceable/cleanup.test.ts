@@ -304,10 +304,10 @@ describe('cleanup', () => {
             status,
             scopeKey: terminal.scopeKey,
             updatedAt: terminal.updatedAt,
-            expiresAt: terminal.expiresAt,
             running: 0,
             needsInput: 0,
             needsApproval: 0,
+            idle: 0,
             needsInputSince: null,
           });
         }

@@ -17,14 +17,14 @@ export const NEEDS_INPUT_ACTION_IDS = {
 export type NeedsInputActionId =
   (typeof NEEDS_INPUT_ACTION_IDS)[keyof typeof NEEDS_INPUT_ACTION_IDS];
 
-/**
- * What the waiting agent needs. `unknown` is the app-side default for a
- * producer that did not classify the raise; it offers both answer actions
- * because the app cannot tell which one applies.
- */
+/** The kinds a producer may attach to a needs-input raise. */
 export const NEEDS_INPUT_ATTENTION_KINDS = ['question', 'permission'] as const;
 
-/** The producer-facing kinds plus the app-side `unknown` default. */
+/**
+ * The full kind vocabulary. `unknown` is the app-side default for a producer
+ * that did not classify the raise; it offers both answer actions because the
+ * app cannot tell which one applies.
+ */
 export const NEEDS_INPUT_KINDS = [...NEEDS_INPUT_ATTENTION_KINDS, 'unknown'] as const;
 export type NeedsInputKind = (typeof NEEDS_INPUT_KINDS)[number];
 

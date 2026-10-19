@@ -278,9 +278,9 @@ const glanceablePayload = {
 describe('pushDataSchema active_agents_glanceable', () => {
   it('parses a payload whose server omits needsApproval, defaulting it to 0', () => {
     const parsed = pushDataSchema.parse(glanceablePayload);
-    // The newest-result pair is the one defaulted field group: a server that
-    // predates the fact omits it, and the parsed shape fills null so mobile can
-    // spread it straight into a snapshot. Every other defaulted count fills 0.
+    // The approval count and the newest-result pair are the defaulted fields:
+    // a server that predates them omits them, and the parsed shape fills 0 or
+    // null so mobile can spread it straight into a snapshot.
     expect(parsed).toEqual({
       ...glanceablePayload,
       needsApproval: 0,

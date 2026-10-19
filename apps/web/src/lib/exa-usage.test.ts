@@ -6,6 +6,7 @@ import {
   inference_reservations,
   kilocode_users,
   organization_user_usage,
+  organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -117,6 +118,107 @@ describe('Exa Usage Tracking', () => {
         await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
       }
     });
+
+    test.each([
+      ['personal', 25, true],
+      ['personal', 120, true],
+      ['personal', 25, false],
+      ['organization', 0, true],
+      ['organization', 25, true],
+      ['organization', 120, true],
+      ['organization', 25, false],
+    ] as const)(
+      'settles %s Exa cost %s with chargedToBalance %s exactly once',
+      async (kind, cost, chargedToBalance) => {
+        const user = await insertTestUser({ total_microdollars_acquired: 100 });
+        const organization =
+          kind === 'organization'
+            ? await createTestOrganization('Prepaid Exa', user.id, 100)
+            : undefined;
+        const requestId = crypto.randomUUID();
+        const chargedAmount = chargedToBalance ? cost : 0;
+        const params = {
+          userId: user.id,
+          organizationId: organization?.id,
+          path: '/search',
+          costMicrodollars: cost,
+          chargedToBalance,
+          freeAllowanceMicrodollars: 100,
+          prepaidReservationId: requestId,
+        };
+        try {
+          await reserveInferenceCredits(db, {
+            requestId,
+            userId: user.id,
+            organizationId: organization?.id,
+            amountMicrodollars: 60,
+          });
+          await recordExaUsage(params);
+          await expect(recordExaUsage(params)).rejects.toThrow();
+          const [reservation] = await db
+            .select()
+            .from(inference_reservations)
+            .where(eq(inference_reservations.request_id, requestId));
+          expect(reservation).toMatchObject({
+            status: 'settled',
+            actual_cost_microdollars: chargedAmount,
+          });
+          const [personalPayer] = await db
+            .select()
+            .from(kilocode_users)
+            .where(eq(kilocode_users.id, user.id));
+          expect(personalPayer).toMatchObject({
+            microdollars_used: organization ? 0 : chargedAmount,
+            inference_microdollars_held: 0,
+          });
+          if (organization) {
+            const [payer] = await db
+              .select()
+              .from(organizations)
+              .where(eq(organizations.id, organization.id));
+            expect(payer).toMatchObject({
+              microdollars_used: chargedAmount,
+              microdollars_balance: 100 - chargedAmount,
+              inference_microdollars_held: 0,
+            });
+            const members = await db
+              .select()
+              .from(organization_user_usage)
+              .where(eq(organization_user_usage.organization_id, organization.id));
+            expect(members).toEqual(
+              chargedAmount === 0
+                ? []
+                : [expect.objectContaining({ microdollar_usage: chargedAmount })]
+            );
+          }
+          const [monthly] = await db
+            .select()
+            .from(exa_monthly_usage)
+            .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+          expect(monthly).toMatchObject({
+            total_cost_microdollars: cost,
+            total_charged_microdollars: chargedAmount,
+            request_count: 1,
+          });
+        } finally {
+          await db.delete(exa_monthly_usage).where(eq(exa_monthly_usage.kilo_user_id, user.id));
+          await db.delete(exa_usage_log).where(eq(exa_usage_log.kilo_user_id, user.id));
+          await db
+            .delete(inference_reservations)
+            .where(eq(inference_reservations.kilo_user_id, user.id));
+          if (organization) {
+            await db
+              .delete(organization_user_usage)
+              .where(eq(organization_user_usage.organization_id, organization.id));
+            await db
+              .delete(organization_memberships)
+              .where(eq(organization_memberships.organization_id, organization.id));
+            await db.delete(organizations).where(eq(organizations.id, organization.id));
+          }
+          await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+        }
+      }
+    );
 
     test('creates a counter row on first request with free allowance', async () => {
       const user = await insertTestUser();

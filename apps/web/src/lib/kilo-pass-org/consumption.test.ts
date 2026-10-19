@@ -6,11 +6,15 @@ import {
   kilo_pass_org_audit_records,
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_qualifying_spend_events,
+  organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  addUserToOrganization,
+  createOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   activatePaidAgreement,
@@ -205,6 +209,205 @@ describe('organization Pass consumption', () => {
     expect(credits).toHaveLength(0);
   });
 
+  it('accumulates steady qualifying spend once per source credit without unlocking a bonus', async () => {
+    const { owner, organization } = await activePass();
+    const charges = [
+      { source: 'ai-gateway' as const, sourceId: 'shared-source', amountMicrodollars: 1_000_001 },
+      { source: 'exa' as const, sourceId: 'shared-source', amountMicrodollars: 2_000_002 },
+      { source: 'ai-gateway' as const, sourceId: 'next-source', amountMicrodollars: 3_000_003 },
+    ];
+    const occurredAt = '2027-07-16T00:30:00.000Z';
+    for (const charge of charges) {
+      const input = {
+        ...charge,
+        organizationId: organization.id,
+        kiloUserId: owner.id,
+        occurredAt,
+      };
+      const first = await db.transaction(tx => recordOrganizationConsumption(tx, input));
+      const replay = await db.transaction(tx =>
+        recordOrganizationConsumption(tx, {
+          ...input,
+          amountMicrodollars: charge.amountMicrodollars + 100,
+        })
+      );
+      expect(first.recorded).toBe(true);
+      expect(replay.recorded).toBe(false);
+    }
+
+    const [snapshot] = await db
+      .select()
+      .from(kilo_pass_org_issuance_snapshots)
+      .where(
+        eq(kilo_pass_org_issuance_snapshots.allocation_container_organization_id, organization.id)
+      );
+    const events = await db
+      .select({
+        snapshotId: kilo_pass_org_qualifying_spend_events.issuance_snapshot_id,
+        creditId: kilo_pass_org_qualifying_spend_events.credit_transaction_id,
+        spent: kilo_pass_org_qualifying_spend_events.spent_microdollars,
+        amount: credit_transactions.amount_microdollars,
+        category: credit_transactions.credit_category,
+      })
+      .from(kilo_pass_org_qualifying_spend_events)
+      .innerJoin(
+        credit_transactions,
+        eq(kilo_pass_org_qualifying_spend_events.credit_transaction_id, credit_transactions.id)
+      )
+      .where(
+        eq(
+          kilo_pass_org_qualifying_spend_events.allocation_container_organization_id,
+          organization.id
+        )
+      );
+    expect(events).toHaveLength(charges.length);
+    expect(new Set(events.map(event => event.creditId)).size).toBe(charges.length);
+    for (const charge of charges) {
+      expect(events).toContainEqual({
+        snapshotId: snapshot.id,
+        creditId: expect.any(String),
+        spent: charge.amountMicrodollars,
+        amount: -charge.amountMicrodollars,
+        category: `kpo:consumption:${charge.source}:${charge.sourceId}`,
+      });
+    }
+    const spent = charges.reduce((total, charge) => total + charge.amountMicrodollars, 0);
+    expect(snapshot.qualifying_spend_microdollars).toBe(spent);
+    expect(snapshot.bonus_unlocked_at).toBeNull();
+    expect(snapshot.bonus_credit_transaction_id).toBeNull();
+    const credits = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.organization_id, organization.id));
+    expect(credits).toHaveLength(charges.length + 1);
+    expect(credits.find(credit => credit.id === snapshot.base_credit_transaction_id)).toEqual(
+      expect.objectContaining({ amount_microdollars: snapshot.base_credit_microdollars })
+    );
+    const [payer] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, organization.id));
+    expect(payer.microdollars_used).toBe(spent);
+    expect(payer.total_microdollars_acquired).toBe(snapshot.base_credit_microdollars);
+    expect(payer.microdollars_balance).toBe(snapshot.base_credit_microdollars - spent);
+    const memberUsage = await db
+      .select()
+      .from(organization_user_usage)
+      .where(eq(organization_user_usage.organization_id, organization.id));
+    expect(memberUsage).toEqual([
+      expect.objectContaining({
+        kilo_user_id: owner.id,
+        usage_date: '2027-07-16',
+        limit_type: 'daily',
+        microdollar_usage: spent,
+      }),
+    ]);
+  });
+
+  it('unlocks one bonus across concurrent members and preserves its post-consumption baseline', async () => {
+    const { owner, organization } = await activePass();
+    const member = await insertTestUser();
+    await addUserToOrganization(organization.id, member.id, 'member');
+    const inputs = [owner, member].map(user => ({
+      organizationId: organization.id,
+      kiloUserId: user.id,
+      amountMicrodollars: 9_500_000,
+      occurredAt: '2027-07-15T12:00:00.000Z',
+      source: 'ai-gateway' as const,
+      sourceId: `concurrent-member-${user.id}`,
+    }));
+    const recorded = await Promise.all(
+      inputs.map(input => db.transaction(tx => recordOrganizationConsumption(tx, input)))
+    );
+    expect(recorded.every(result => result.recorded)).toBe(true);
+    for (const input of inputs) {
+      const replay = await db.transaction(tx => recordOrganizationConsumption(tx, input));
+      expect(replay.recorded).toBe(false);
+    }
+    await db.transaction(tx =>
+      recordOrganizationConsumption(tx, {
+        ...inputs[0],
+        sourceId: 'after-member-unlock',
+        amountMicrodollars: 1_000_000,
+        occurredAt: '2027-07-16T12:00:00.000Z',
+      })
+    );
+
+    const [snapshot] = await db
+      .select()
+      .from(kilo_pass_org_issuance_snapshots)
+      .where(
+        eq(kilo_pass_org_issuance_snapshots.allocation_container_organization_id, organization.id)
+      );
+    expect(snapshot.qualifying_spend_microdollars).toBe(20_000_000);
+    expect(new Date(snapshot.bonus_unlocked_at ?? 0).toISOString()).toBe(inputs[0].occurredAt);
+    const credits = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.organization_id, organization.id));
+    expect(credits.filter(credit => credit.amount_microdollars < 0)).toHaveLength(3);
+    const bonuses = credits.filter(
+      credit => credit.credit_category === `kpo:bonus-unlock:${snapshot.id}`
+    );
+    expect(bonuses).toHaveLength(1);
+    expect(bonuses[0]).toEqual(
+      expect.objectContaining({
+        id: snapshot.bonus_credit_transaction_id,
+        amount_microdollars: snapshot.bonus_credit_microdollars,
+        expiration_baseline_microdollars_used: 19_000_000,
+        original_baseline_microdollars_used: 19_000_000,
+      })
+    );
+    expect(new Date(bonuses[0].expiry_date ?? 0).toISOString()).toBe(
+      activeWindow.end.toISOString()
+    );
+    const events = await db
+      .select()
+      .from(kilo_pass_org_qualifying_spend_events)
+      .where(eq(kilo_pass_org_qualifying_spend_events.issuance_snapshot_id, snapshot.id));
+    expect(events).toHaveLength(3);
+    expect(new Set(events.map(event => event.credit_transaction_id)).size).toBe(3);
+    expect(events.reduce((total, event) => total + event.spent_microdollars, 0)).toBe(20_000_000);
+    for (const event of events) {
+      expect(credits).toContainEqual(
+        expect.objectContaining({
+          id: event.credit_transaction_id,
+          amount_microdollars: -event.spent_microdollars,
+        })
+      );
+    }
+    const [payer] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, organization.id));
+    expect(payer.microdollars_used).toBe(20_000_000);
+    expect(payer.total_microdollars_acquired).toBe(
+      snapshot.base_credit_microdollars + snapshot.bonus_credit_microdollars
+    );
+    expect(payer.microdollars_balance).toBe(payer.total_microdollars_acquired - 20_000_000);
+    const memberUsage = await db
+      .select()
+      .from(organization_user_usage)
+      .where(eq(organization_user_usage.organization_id, organization.id));
+    expect(memberUsage).toHaveLength(3);
+    for (const input of inputs) {
+      expect(memberUsage).toContainEqual(
+        expect.objectContaining({
+          kilo_user_id: input.kiloUserId,
+          usage_date: '2027-07-15',
+          microdollar_usage: 9_500_000,
+        })
+      );
+    }
+    expect(memberUsage).toContainEqual(
+      expect.objectContaining({
+        kilo_user_id: owner.id,
+        usage_date: '2027-07-16',
+        microdollar_usage: 1_000_000,
+      })
+    );
+  });
+
   it('records a concurrent source debit once and unlocks bonus exactly at its threshold', async () => {
     const { owner, organization } = await activePass();
     const input = {
@@ -221,8 +424,7 @@ describe('organization Pass consumption', () => {
     ]);
     const replay = await db.transaction(tx => recordOrganizationConsumption(tx, input));
 
-    expect(first.recorded).toBe(true);
-    expect(concurrent.recorded).toBe(false);
+    expect([first.recorded, concurrent.recorded].sort()).toEqual([false, true]);
     expect(replay.recorded).toBe(false);
     const credits = await db
       .select({
@@ -460,6 +662,16 @@ describe('organization Pass consumption', () => {
         sourceId: `late-${crypto.randomUUID()}`,
       })
     );
+    await db.transaction(tx =>
+      recordOrganizationConsumption(tx, {
+        organizationId: organization.id,
+        kiloUserId: owner.id,
+        amountMicrodollars: 1,
+        occurredAt: '2025-05-16T12:00:00.000Z',
+        source: 'exa',
+        sourceId: `late-after-threshold-${crypto.randomUUID()}`,
+      })
+    );
     const events = await db
       .select()
       .from(kilo_pass_org_qualifying_spend_events)
@@ -477,8 +689,16 @@ describe('organization Pass consumption', () => {
       .select()
       .from(credit_transactions)
       .where(eq(credit_transactions.organization_id, organization.id));
-    expect(events).toHaveLength(1);
-    expect(audits).toHaveLength(1);
+    expect(events).toHaveLength(2);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        after_json: {
+          issuanceSnapshotId: events[0].issuance_snapshot_id,
+          qualifyingSpendMicrodollars: 19_000_000,
+        },
+        idempotency_key: `kpo:expired-bonus-miss:${events[0].issuance_snapshot_id}`,
+      }),
+    ]);
     expect(
       bonusCredits.filter(credit => credit.credit_category?.startsWith('kpo:bonus-unlock:'))
     ).toHaveLength(0);

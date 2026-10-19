@@ -1,12 +1,10 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
-import type { db, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type { db } from '@kilocode/web-shared/lib/drizzle';
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 const REPAIR_CLAIM_LEASE_MINUTES = 5;
-
-type UsageDailyRollupDatabase = typeof db | DrizzleTransaction;
 
 export type DailyUsageRollupRepairParams = {
   usageId: string;
@@ -63,25 +61,27 @@ function scopePredicate(
     : sql`${userColumn} = ${kiloUserId} AND ${organizationColumn} = ${organizationId}::uuid`;
 }
 
-export async function enqueueDailyUsageRollupRepair(
-  database: UsageDailyRollupDatabase,
-  params: DailyUsageRollupRepairParams
-): Promise<void> {
+export function dailyUsageRollupRepairInsert(
+  params: DailyUsageRollupRepairParams,
+  source?: SQL
+): SQL {
   const usageDate = utcUsageDate(params.createdAt);
-  await database.execute(sql`
+  return sql`
     INSERT INTO microdollar_usage_daily_repairs AS repair (
       usage_id,
       kilo_user_id,
       organization_id,
       usage_date,
       next_attempt_at
-    ) VALUES (
+    )
+    SELECT
       ${params.usageId}::uuid,
       ${params.kiloUserId},
       ${params.organizationId}::uuid,
       ${usageDate}::date,
       CURRENT_TIMESTAMP
-    )
+    ${source ? sql`FROM ${source}` : sql``}
+    WHERE true
     ON CONFLICT (usage_id)
     DO UPDATE SET
       next_attempt_at = CURRENT_TIMESTAMP,
@@ -90,7 +90,7 @@ export async function enqueueDailyUsageRollupRepair(
       attempt_count = 0,
       last_error_redacted = NULL,
       updated_at = CURRENT_TIMESTAMP
-  `);
+  `;
 }
 
 export async function claimPendingDailyUsageRollupRepairs(

@@ -101,7 +101,7 @@ describe('UsageRecordRequestSchema', () => {
   // Required by packages/db/AGENTS.md "Timestamp boundaries": PostgreSQL
   // timestamptz text is not strict ISO 8601, and must never enter this contract.
   // The sender uses new Date().toISOString(); a DB-read value would silently
-  // shift day bucketing in enqueueDailyUsageRollupRepair.
+  // shift day bucketing in daily rollup repairs.
   test.each([
     ['production-shaped PostgreSQL timestamptz', '2026-04-29 01:16:12.945+00'],
     ['PostgreSQL timestamptz without fractional seconds', '2026-04-29 01:16:12+00'],

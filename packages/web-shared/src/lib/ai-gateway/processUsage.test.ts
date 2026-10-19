@@ -1213,7 +1213,8 @@ describe('logMicrodollarUsage', () => {
       await expect(
         insertUsageRecord(
           { ...core, id: invalidUsageId, kilo_user_id: user.id, cost: 600 },
-          metadata
+          metadata,
+          { request_id: 'req-failed-usage-source', payload: { costMicrodollars: 600 } }
         )
       ).resolves.toBeNull();
 
@@ -1229,6 +1230,12 @@ describe('logMicrodollarUsage', () => {
         .from(microdollar_usage_daily_repairs)
         .where(eq(microdollar_usage_daily_repairs.kilo_user_id, user.id));
       expect(repairRows).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(bouncer_usage_event_outbox)
+          .where(eq(bouncer_usage_event_outbox.request_id, 'req-failed-usage-source'))
+      ).toHaveLength(0);
       const dailyRows = await db
         .select()
         .from(microdollar_usage_daily)
@@ -1513,6 +1520,80 @@ describe('logMicrodollarUsage', () => {
       });
       expect(mockedDeliverUsageEventWireBody).toHaveBeenCalledTimes(1);
       expect(mockedReportUsageEvent).not.toHaveBeenCalled();
+    });
+
+    test('rolls back usage, metadata, daily repair, and balance when outbox enqueue fails', async () => {
+      const user = await insertTestUser({ microdollars_used: 1000 });
+      const { core, metadata } = await defineMicrodollarUsage();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await expect(
+          insertUsageRecord({ ...core, kilo_user_id: user.id, cost: 600 }, metadata, {
+            request_id: 'invalid\u0000request',
+            payload: { costMicrodollars: 600 },
+          })
+        ).resolves.toBeNull();
+
+        expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
+        expect(
+          await db.select().from(microdollar_usage).where(eq(microdollar_usage.id, core.id))
+        ).toEqual([]);
+        expect(
+          await db
+            .select()
+            .from(microdollar_usage_metadata)
+            .where(eq(microdollar_usage_metadata.id, core.id))
+        ).toEqual([]);
+        expect(
+          await db
+            .select()
+            .from(microdollar_usage_daily_repairs)
+            .where(eq(microdollar_usage_daily_repairs.usage_id, core.id))
+        ).toEqual([]);
+        expect(
+          await db
+            .select()
+            .from(bouncer_usage_event_outbox)
+            .where(eq(bouncer_usage_event_outbox.user_id, user.id))
+        ).toEqual([]);
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    test('keeps the first outbox payload and delivery state when a request is enqueued again', async () => {
+      const user = await insertTestUser({ microdollars_used: 0 });
+      const first = await defineMicrodollarUsage();
+      const second = await defineMicrodollarUsage();
+      const requestId = `req-idempotent-${user.id}`;
+      const event = { request_id: requestId, payload: { costMicrodollars: 600 } };
+      await expect(
+        insertUsageRecord(
+          { ...first.core, kilo_user_id: user.id, cost: 600 },
+          first.metadata,
+          event
+        )
+      ).resolves.not.toBeNull();
+      await db
+        .update(bouncer_usage_event_outbox)
+        .set({ status: 'delivered', attempts: 3 })
+        .where(eq(bouncer_usage_event_outbox.request_id, requestId));
+
+      await expect(
+        insertUsageRecord({ ...second.core, kilo_user_id: user.id, cost: 700 }, second.metadata, {
+          request_id: requestId,
+          payload: { costMicrodollars: 700 },
+        })
+      ).resolves.not.toBeNull();
+
+      const rows = await db
+        .select()
+        .from(bouncer_usage_event_outbox)
+        .where(eq(bouncer_usage_event_outbox.request_id, requestId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ payload: event.payload, status: 'delivered', attempts: 3 });
+      expect((await findUserById(user.id))?.microdollars_used).toBe(1300);
     });
 
     test('keeps the best-effort send and enqueues nothing without spendWatch', async () => {

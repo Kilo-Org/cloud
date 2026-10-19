@@ -32,6 +32,10 @@ import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-w
 import { after } from 'next/server';
 import { subHours } from 'date-fns';
 import { maybePerformOrganizationAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import {
+  mutateOrganizationCreditUsage,
+  type InferenceSettlementPayer,
+} from '@kilocode/db/inference-reservations';
 
 /**
  * The paying account's row as the balance check read it: the user for a personal request, the
@@ -296,62 +300,23 @@ export type OrganizationUsageMutationInput = Pick<
 
 export async function mutateOrganizationUsage(
   tx: DrizzleTransaction,
-  usage: OrganizationUsageMutationInput
+  usage: OrganizationUsageMutationInput,
+  debitPayer?: () => Promise<InferenceSettlementPayer>
 ): Promise<OrganizationUsageMutationResult> {
   const { cost, kilo_user_id, organization_id, created_at } = usage;
   if (!organization_id) return NO_ORGANIZATION_BALANCE_ALERT;
 
-  const limitType: OrganizationUserLimitType = 'daily';
-  await tx.execute(sql`
-    INSERT INTO ${organization_user_usage} (
-      organization_id,
-      kilo_user_id,
-      usage_date,
-      limit_type,
-      microdollar_usage,
-      created_at,
-      updated_at
-    )
-    SELECT
-      ${organization_id},
-      ${kilo_user_id},
-      (${created_at}::timestamptz AT TIME ZONE 'UTC')::date,
-      ${limitType},
-      ${cost},
-      NOW(),
-      NOW()
-    WHERE EXISTS (
-      SELECT 1
-      FROM ${organization_memberships}
-      WHERE ${organization_memberships.organization_id} = ${organization_id}
-        AND ${organization_memberships.kilo_user_id} = ${kilo_user_id}
-    )
-      AND EXISTS (
-        SELECT 1
-        FROM ${organizations}
-        WHERE ${organizations.id} = ${organization_id}
-      )
-    ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
-    DO UPDATE SET
-      microdollar_usage = ${organization_user_usage.microdollar_usage} + ${cost},
-      updated_at = NOW()
-  `);
-
-  const [orgData] = await tx
-    .update(organizations)
-    .set({
-      microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
-      microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
-    })
-    .where(eq(organizations.id, organization_id))
-    .returning({
-      total_microdollars_acquired: organizations.total_microdollars_acquired,
-      previous_microdollars_used: sql<number>`${organizations.microdollars_used} - ${cost}`.mapWith(
-        Number
-      ),
-      new_microdollars_used: organizations.microdollars_used,
-      settings: organizations.settings,
-    });
+  const orgData = debitPayer
+    ? await debitPayer()
+    : await mutateOrganizationCreditUsage(tx, {
+        userId: kilo_user_id,
+        organizationId: organization_id,
+        amountMicrodollars: cost,
+        occurredAt: created_at,
+      });
+  if (orgData?.kind === 'personal') {
+    throw new Error('Organization usage requires an organization payer');
+  }
 
   if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
 

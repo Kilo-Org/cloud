@@ -25,8 +25,97 @@ type ReservationIdentity = {
 };
 
 type ReserveInput = ReservationIdentity & { amountMicrodollars: number };
-type SettleInput = ReservationIdentity & { actualCostMicrodollars: number };
+type SettleInput = ReservationIdentity & { actualCostMicrodollars: number; occurredAt: string };
 type Reservation = typeof inference_reservations.$inferSelect;
+
+export type InferenceSettlementPayer =
+  | {
+      kind: 'personal';
+      newMicrodollarsUsed: number;
+      kiloPassThreshold: number | null;
+    }
+  | {
+      kind: 'organization';
+      total_microdollars_acquired: number;
+      previous_microdollars_used: number;
+      new_microdollars_used: number;
+      settings: (typeof organizations.$inferSelect)['settings'];
+    };
+
+type OrganizationCreditUsageInput = {
+  userId: string;
+  organizationId: string;
+  amountMicrodollars: number;
+  occurredAt: string;
+};
+
+async function updateOrganizationCreditUsage(
+  tx: InferenceReservationTransaction,
+  input: OrganizationCreditUsageInput,
+  heldMicrodollars: number
+) {
+  const memberUsage = tx.$with('member_usage', {}).as(sql`
+    INSERT INTO ${organization_user_usage} (
+      organization_id, kilo_user_id, usage_date, limit_type,
+      microdollar_usage, created_at, updated_at
+    )
+    SELECT ${input.organizationId}, ${input.userId},
+      (${input.occurredAt}::timestamptz AT TIME ZONE 'UTC')::date,
+      'daily', ${input.amountMicrodollars}, NOW(), NOW()
+    WHERE ${input.amountMicrodollars} <> 0
+      AND EXISTS (
+        SELECT 1 FROM ${organization_memberships}
+        WHERE ${organization_memberships.organization_id} = ${input.organizationId}
+          AND ${organization_memberships.kilo_user_id} = ${input.userId}
+      )
+      AND EXISTS (
+        SELECT 1 FROM ${organizations} WHERE ${organizations.id} = ${input.organizationId}
+      )
+    ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
+    DO UPDATE SET
+      microdollar_usage = ${organization_user_usage.microdollar_usage} + ${input.amountMicrodollars},
+      updated_at = NOW()
+    RETURNING organization_id
+  `);
+  const [payer] = await tx
+    .with(memberUsage)
+    .update(organizations)
+    .set({
+      microdollars_used: sql`${organizations.microdollars_used} + ${input.amountMicrodollars}`,
+      microdollars_balance: sql`${organizations.microdollars_balance} - ${input.amountMicrodollars}`,
+      inference_microdollars_held:
+        heldMicrodollars > 0
+          ? sql`${organizations.inference_microdollars_held} - ${heldMicrodollars}`
+          : undefined,
+    })
+    .where(
+      and(
+        eq(organizations.id, input.organizationId),
+        heldMicrodollars > 0
+          ? sql`${organizations.inference_microdollars_held} >= ${heldMicrodollars}`
+          : undefined,
+        sql`${organizations.id} = COALESCE((SELECT organization_id FROM ${memberUsage}), ${input.organizationId}::uuid)`
+      )
+    )
+    .returning({
+      kind: sql<'organization'>`'organization'`,
+      total_microdollars_acquired: organizations.total_microdollars_acquired,
+      previous_microdollars_used:
+        sql<number>`${organizations.microdollars_used} - ${input.amountMicrodollars}`.mapWith(
+          Number
+        ),
+      new_microdollars_used: organizations.microdollars_used,
+      settings: organizations.settings,
+    });
+  return payer;
+}
+
+export function mutateOrganizationCreditUsage(
+  tx: InferenceReservationTransaction,
+  input: OrganizationCreditUsageInput
+) {
+  return updateOrganizationCreditUsage(tx, input, 0);
+}
 
 export type ReserveInferenceCreditsResult =
   | { kind: 'reserved'; requestId: string; amountMicrodollars: number }
@@ -93,22 +182,56 @@ export async function reserveInferenceCredits(
   try {
     return await db.transaction<ReserveInferenceCreditsResult>(
       async tx => {
-        await tx.execute(sql`
+        const timeoutSetup = tx.execute(sql`
           SELECT
             set_config('lock_timeout', '1s', true),
             set_config('statement_timeout', '2s', true),
             set_config('idle_in_transaction_session_timeout', '5s', true)
         `);
-        const [inserted] = await tx
-          .insert(inference_reservations)
-          .values({
-            request_id: input.requestId,
-            kilo_user_id: input.userId,
-            organization_id: input.organizationId,
-            amount_microdollars: input.amountMicrodollars,
-          })
-          .onConflictDoNothing({ target: inference_reservations.request_id })
-          .returning({ requestId: inference_reservations.request_id });
+        const insertion = sql`
+          INSERT INTO ${inference_reservations}
+            (request_id, kilo_user_id, organization_id, amount_microdollars)
+          VALUES (${input.requestId}, ${input.userId}, ${input.organizationId ?? null}, ${input.amountMicrodollars})
+          ON CONFLICT (request_id) DO NOTHING
+          RETURNING request_id
+        `;
+        const pendingAdmission =
+          input.organizationId !== undefined
+            ? tx.execute<{ inserted: boolean; held: boolean }>(sql`
+              WITH inserted AS (${insertion}), locked AS MATERIALIZED (
+                SELECT ${organizations.id}
+                FROM ${organizations} CROSS JOIN inserted
+                WHERE ${organizations.id} = ${input.organizationId}
+                FOR NO KEY UPDATE OF ${organizations}
+              )
+              SELECT EXISTS (SELECT 1 FROM inserted) AS inserted,
+                EXISTS (SELECT 1 FROM locked) AS held
+            `)
+            : tx.execute<{ inserted: boolean; held: boolean }>(sql`
+              WITH inserted AS (${insertion}), held AS (
+                UPDATE ${kilocode_users}
+                SET inference_microdollars_held = ${kilocode_users.inference_microdollars_held} + ${input.amountMicrodollars}
+                WHERE ${kilocode_users.id} = ${input.userId}
+                  AND EXISTS (SELECT 1 FROM inserted)
+                  AND ${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used} - ${kilocode_users.inference_microdollars_held} >= ${input.amountMicrodollars}
+                  AND ${kilocode_users.inference_microdollars_held} >= 0
+                  AND ${kilocode_users.inference_microdollars_held} <= ${Number.MAX_SAFE_INTEGER - input.amountMicrodollars}
+                RETURNING id
+              )
+              SELECT EXISTS (SELECT 1 FROM inserted) AS inserted,
+                EXISTS (SELECT 1 FROM held) AS held
+            `);
+        const [timeoutResult, admissionResult] = await Promise.allSettled([
+          timeoutSetup,
+          pendingAdmission,
+        ]);
+        if (timeoutResult.status === 'rejected') throw timeoutResult.reason;
+        if (admissionResult.status === 'rejected') throw admissionResult.reason;
+        const attempt = admissionResult.value;
+        const inserted = attempt.rows[0]?.inserted;
+        if (inserted && !attempt.rows[0]?.held) {
+          throw insufficientCredits;
+        }
 
         if (!inserted) {
           const existing = await lockReservation(tx, input);
@@ -125,13 +248,6 @@ export async function reserveInferenceCredits(
 
         if (input.organizationId !== undefined) {
           // The next statement needs a fresh snapshot after waiting for the payer lock.
-          const [payer] = await tx
-            .select({ id: organizations.id })
-            .from(organizations)
-            .where(eq(organizations.id, input.organizationId))
-            .for('no key update');
-          if (!payer) throw insufficientCredits;
-
           const [held] = await tx
             .update(organizations)
             .set({
@@ -172,22 +288,6 @@ export async function reserveInferenceCredits(
               )
             )
             .returning({ id: organizations.id });
-          if (!held) throw insufficientCredits;
-        } else {
-          const [held] = await tx
-            .update(kilocode_users)
-            .set({
-              inference_microdollars_held: sql`${kilocode_users.inference_microdollars_held} + ${input.amountMicrodollars}`,
-            })
-            .where(
-              and(
-                eq(kilocode_users.id, input.userId),
-                sql`${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used} - ${kilocode_users.inference_microdollars_held} >= ${input.amountMicrodollars}`,
-                sql`${kilocode_users.inference_microdollars_held} >= 0`,
-                sql`${kilocode_users.inference_microdollars_held} <= ${Number.MAX_SAFE_INTEGER - input.amountMicrodollars}`
-              )
-            )
-            .returning({ id: kilocode_users.id });
           if (!held) throw insufficientCredits;
         }
 
@@ -261,39 +361,84 @@ export async function releaseInferenceCredits(
     .where(eq(inference_reservations.request_id, input.requestId));
 }
 
-function assertSettlement(row: Reservation, input: SettleInput): void {
+function assertSettlement(row: Reservation, actualCostMicrodollars: number): void {
   if (row.status === 'released') throw new InferenceReservationError('terminal');
-  if (row.status === 'settled' && row.actual_cost_microdollars !== input.actualCostMicrodollars) {
+  if (row.status === 'settled' && row.actual_cost_microdollars !== actualCostMicrodollars) {
     throw new InferenceReservationError('identity_mismatch');
   }
 }
 
-/** Lock the reservation before billing, without locking the payer during metadata preparation. */
-export async function lockInferenceReservationForSettlement(
+/** The callback must persist its idempotent usage source before calling debitPayer. */
+export async function settleInferenceCredits<T>(
   tx: InferenceReservationTransaction,
-  input: SettleInput
-): Promise<void> {
+  input: SettleInput,
+  writeUsage: (debitPayer: () => Promise<InferenceSettlementPayer>) => Promise<T>
+): Promise<T> {
   validateIdentity(input);
-  validateMoney(input.actualCostMicrodollars);
-  assertSettlement(await lockReservation(tx, input), input);
-}
-
-export async function settleInferenceCredits(
-  tx: InferenceReservationTransaction,
-  input: SettleInput
-): Promise<void> {
-  validateIdentity(input);
-  validateMoney(input.actualCostMicrodollars);
-  const row = await lockReservation(tx, input);
-  assertSettlement(row, input);
-  if (row.status === 'settled') return;
-  await removeHold(tx, row);
-  await tx
+  const { actualCostMicrodollars } = input;
+  validateMoney(actualCostMicrodollars);
+  const [finalized] = await tx
     .update(inference_reservations)
     .set({
       status: 'settled',
-      actual_cost_microdollars: input.actualCostMicrodollars,
+      actual_cost_microdollars: actualCostMicrodollars,
       finalized_at: sql`now()`,
     })
-    .where(eq(inference_reservations.request_id, input.requestId));
+    .where(
+      and(
+        eq(inference_reservations.request_id, input.requestId),
+        eq(inference_reservations.kilo_user_id, input.userId),
+        sql`${inference_reservations.organization_id} IS NOT DISTINCT FROM ${input.organizationId ?? null}::uuid`,
+        eq(inference_reservations.status, 'reserved')
+      )
+    )
+    .returning();
+  const row = finalized ?? (await lockReservation(tx, input));
+  assertSettlement(row, actualCostMicrodollars);
+  let debitStarted = false;
+  let debited = false;
+  const result = await writeUsage(async () => {
+    if (!finalized || debitStarted) {
+      throw new InferenceReservationError('terminal');
+    }
+    debitStarted = true;
+    if (row.organization_id) {
+      const payer = await updateOrganizationCreditUsage(
+        tx,
+        {
+          userId: row.kilo_user_id,
+          organizationId: row.organization_id,
+          amountMicrodollars: actualCostMicrodollars,
+          occurredAt: input.occurredAt,
+        },
+        row.amount_microdollars
+      );
+      if (!payer) throw new InferenceReservationError('counter_integrity');
+      debited = true;
+      return payer;
+    }
+    const [payer] = await tx
+      .update(kilocode_users)
+      .set({
+        microdollars_used: sql`${kilocode_users.microdollars_used} + ${actualCostMicrodollars}`,
+        inference_microdollars_held: sql`${kilocode_users.inference_microdollars_held} - ${row.amount_microdollars}`,
+      })
+      .where(
+        and(
+          eq(kilocode_users.id, row.kilo_user_id),
+          sql`${kilocode_users.inference_microdollars_held} >= ${row.amount_microdollars}`
+        )
+      )
+      .returning({
+        newMicrodollarsUsed: kilocode_users.microdollars_used,
+        kiloPassThreshold: kilocode_users.kilo_pass_threshold,
+      });
+    if (!payer) throw new InferenceReservationError('counter_integrity');
+    debited = true;
+    return { kind: 'personal', ...payer };
+  });
+  if (finalized && !debited) {
+    throw new InferenceReservationError('counter_integrity');
+  }
+  return result;
 }

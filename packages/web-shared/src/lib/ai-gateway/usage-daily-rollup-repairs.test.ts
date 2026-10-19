@@ -14,7 +14,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import {
   claimPendingDailyUsageRollupRepairs,
-  enqueueDailyUsageRollupRepair,
+  dailyUsageRollupRepairInsert,
   failDailyUsageRollupRepair,
   processPendingDailyUsageRollupRepairs,
   repairClaimedDailyUsageRollup,
@@ -66,12 +66,14 @@ async function enqueueUsage(
   createdAt: string,
   organizationId: string | null = null
 ): Promise<void> {
-  await enqueueDailyUsageRollupRepair(db, {
-    usageId,
-    kiloUserId,
-    organizationId,
-    createdAt,
-  });
+  await db.execute(
+    dailyUsageRollupRepairInsert({
+      usageId,
+      kiloUserId,
+      organizationId,
+      createdAt,
+    })
+  );
 }
 
 async function dailyRows(kiloUserId: string, organizationId: string | null) {
@@ -223,12 +225,14 @@ describe('usage daily rollup repairs', () => {
           cache_hit_tokens: 0,
           created_at: createdAt,
         });
-        await enqueueDailyUsageRollupRepair(transaction, {
-          usageId,
-          kiloUserId: user.id,
-          organizationId: null,
-          createdAt,
-        });
+        await transaction.execute(
+          dailyUsageRollupRepairInsert({
+            usageId,
+            kiloUserId: user.id,
+            organizationId: null,
+            createdAt,
+          })
+        );
         throw new Error('source_transaction_failed');
       })
     ).rejects.toThrow('source_transaction_failed');
@@ -274,6 +278,45 @@ describe('usage daily rollup repairs', () => {
       lastError: 'postgres:55P03',
     });
   });
+
+  test.each(['claimed', 'backoff'])(
+    're-enqueueing %s work clears its claim and retry state for immediate repair',
+    async state => {
+      const user = await createUser();
+      const createdAt = '2026-07-14T12:00:00.000Z';
+      const usageId = await insertRawUsage(user.id, 25, createdAt);
+      await enqueueUsage(usageId, user.id, createdAt);
+      const [claim] = await claimPendingDailyUsageRollupRepairs(db, 1);
+      if (!claim) throw new Error('expected repair claim');
+      if (state === 'backoff') {
+        await failDailyUsageRollupRepair(db, claim, 'simulated failure 55P03');
+      }
+
+      await enqueueUsage(usageId, user.id, createdAt);
+
+      const [repair] = await db
+        .select({
+          attemptCount: microdollar_usage_daily_repairs.attempt_count,
+          claimedAt: microdollar_usage_daily_repairs.claimed_at,
+          claimToken: microdollar_usage_daily_repairs.claim_token,
+          lastError: microdollar_usage_daily_repairs.last_error_redacted,
+        })
+        .from(microdollar_usage_daily_repairs)
+        .where(eq(microdollar_usage_daily_repairs.usage_id, usageId));
+      expect(repair).toEqual({
+        attemptCount: 0,
+        claimedAt: null,
+        claimToken: null,
+        lastError: null,
+      });
+      expect(await processPendingDailyUsageRollupRepairs(db, { limit: 1 })).toEqual({
+        claimed: 1,
+        repaired: 1,
+        failed: [],
+      });
+      expect(await dailyRows(user.id, null)).toEqual([{ usageDate: '2026-07-14', total: 25 }]);
+    }
+  );
 
   test('coalesces multiple pending repairs for one daily key into one canonical repair', async () => {
     const user = await createUser();

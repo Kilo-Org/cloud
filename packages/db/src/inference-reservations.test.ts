@@ -1,10 +1,9 @@
-import { afterAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { createDrizzleClient } from './client';
 import { computeDatabaseUrl } from './database-url';
 import {
   InferenceReservationError,
-  lockInferenceReservationForSettlement,
   releaseInferenceCredits,
   reserveInferenceCredits,
   settleInferenceCredits,
@@ -25,7 +24,18 @@ if (process.env.USE_PRODUCTION_DB === 'true') {
 
 const { db, pool } = createDrizzleClient({
   connectionString: computeDatabaseUrl(),
-  poolConfig: { application_name: 'inference-reservations-test', max: 8 },
+  poolConfig: { application_name: 'inference-reservations-test', max: 8, pipeline: true },
+});
+
+beforeAll(async () => {
+  const client = await pool.connect();
+  try {
+    if (!('pipeline' in client) || client.pipeline !== true) {
+      throw new Error('Reservation regressions require native query pipelining');
+    }
+  } finally {
+    client.release();
+  }
 });
 
 afterAll(async () => {
@@ -33,7 +43,7 @@ afterAll(async () => {
 });
 
 type Fixture = { userId: string; otherUserId: string; organizationId: string };
-type Input = Parameters<typeof reserveInferenceCredits>[1];
+type Input = Parameters<typeof reserveInferenceCredits>[1] & { occurredAt: string };
 
 async function withFixture(work: (fixture: Fixture) => Promise<void>): Promise<void> {
   const userId = `oauth/reservation/${crypto.randomUUID()}`;
@@ -81,7 +91,12 @@ async function withFixture(work: (fixture: Fixture) => Promise<void>): Promise<v
 }
 
 function personal(fixture: Fixture, amountMicrodollars = 60): Input {
-  return { requestId: crypto.randomUUID(), userId: fixture.userId, amountMicrodollars };
+  return {
+    requestId: crypto.randomUUID(),
+    userId: fixture.userId,
+    amountMicrodollars,
+    occurredAt: new Date().toISOString(),
+  };
 }
 
 function organization(fixture: Fixture, amountMicrodollars = 60): Input {
@@ -109,53 +124,22 @@ async function reservationState(requestId: string) {
 }
 
 async function postUsage(input: Input, cost: number): Promise<void> {
-  await db.transaction(async tx => {
-    const settlement = { ...input, actualCostMicrodollars: cost };
-    await lockInferenceReservationForSettlement(tx, settlement);
-    await tx.insert(microdollar_usage).values({
-      id: input.requestId,
-      kilo_user_id: input.userId,
-      organization_id: input.organizationId,
-      cost,
-      input_tokens: 1,
-      output_tokens: 1,
-      cache_write_tokens: 0,
-      cache_hit_tokens: 0,
-    });
-    if (input.organizationId) {
-      await tx
-        .insert(organization_user_usage)
-        .values({
-          organization_id: input.organizationId,
-          kilo_user_id: input.userId,
-          limit_type: 'daily',
-          usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`,
-          microdollar_usage: cost,
-        })
-        .onConflictDoUpdate({
-          target: [
-            organization_user_usage.organization_id,
-            organization_user_usage.kilo_user_id,
-            organization_user_usage.limit_type,
-            organization_user_usage.usage_date,
-          ],
-          set: { microdollar_usage: sql`${organization_user_usage.microdollar_usage} + ${cost}` },
-        });
-      await tx
-        .update(organizations)
-        .set({
-          microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
-          microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
-        })
-        .where(eq(organizations.id, input.organizationId));
-    } else {
-      await tx
-        .update(kilocode_users)
-        .set({ microdollars_used: sql`${kilocode_users.microdollars_used} + ${cost}` })
-        .where(eq(kilocode_users.id, input.userId));
-    }
-    await settleInferenceCredits(tx, settlement);
-  });
+  await db.transaction(tx =>
+    settleInferenceCredits(tx, { ...input, actualCostMicrodollars: cost }, async debitPayer => {
+      await tx.insert(microdollar_usage).values({
+        id: input.requestId,
+        kilo_user_id: input.userId,
+        organization_id: input.organizationId,
+        cost,
+        created_at: input.occurredAt,
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+      });
+      await debitPayer();
+    })
+  );
 }
 
 async function setAllowance(fixture: Fixture, limit: number, usage = 0): Promise<void> {
@@ -174,7 +158,103 @@ async function setAllowance(fixture: Fixture, limit: number, usage = 0): Promise
   });
 }
 
+async function waitForBlockedReservations(blockingPid: number, expected: number): Promise<void> {
+  const deadline = Date.now() + 750;
+  do {
+    const state = await pool.query<{ count: number }>(
+      `
+      WITH RECURSIVE blocked AS (
+        SELECT pid FROM pg_stat_activity WHERE $1::int = ANY(pg_blocking_pids(pid))
+        UNION
+        SELECT activity.pid FROM pg_stat_activity activity
+        JOIN blocked ON blocked.pid = ANY(pg_blocking_pids(activity.pid))
+      )
+      SELECT count(*)::int AS count FROM blocked
+      JOIN pg_stat_activity USING (pid)
+      WHERE datname = current_database() AND query LIKE '%inference_reservations%'
+    `,
+      [blockingPid]
+    );
+    if ((state.rows[0]?.count ?? 0) >= expected) return;
+  } while (Date.now() < deadline);
+  throw new Error('Reservation transactions did not reach the PostgreSQL lock barrier');
+}
+
 describe('inference credit reservations', () => {
+  it.each(['personal', 'organization'] as const)(
+    'admits both %s requests after a payer wait when their combined holds fit',
+    async kind => {
+      await withFixture(async fixture => {
+        const makeInput = kind === 'personal' ? personal : organization;
+        const inputs = [makeInput(fixture, 40), makeInput(fixture, 40)];
+        const table = kind === 'personal' ? 'kilocode_users' : 'organizations';
+        const payerId = kind === 'personal' ? fixture.userId : fixture.organizationId;
+        const locker = await pool.connect();
+        let pending:
+          | Promise<PromiseSettledResult<Awaited<ReturnType<typeof reserveInferenceCredits>>>[]>
+          | undefined;
+        let open = false;
+        try {
+          await locker.query('BEGIN');
+          open = true;
+          const identity = await locker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+          const pid = identity.rows[0]?.pid;
+          if (!pid) throw new Error('Missing blocking backend identity');
+          await locker.query(`SELECT id FROM ${table} WHERE id = $1 FOR NO KEY UPDATE`, [payerId]);
+          pending = Promise.allSettled(inputs.map(input => reserveInferenceCredits(db, input)));
+          await waitForBlockedReservations(pid, 2);
+          await locker.query('COMMIT');
+          open = false;
+          for (const decision of await pending) {
+            if (decision.status === 'rejected') throw decision.reason;
+            expect(decision.value).toMatchObject({ kind: 'reserved', amountMicrodollars: 40 });
+          }
+          const payer =
+            kind === 'personal'
+              ? await userState(fixture.userId)
+              : await organizationState(fixture.organizationId);
+          expect(payer).toMatchObject({ inference_microdollars_held: 80, microdollars_used: 0 });
+          await Promise.all(
+            inputs.map(input => db.transaction(tx => releaseInferenceCredits(tx, input)))
+          );
+          const released =
+            kind === 'personal'
+              ? await userState(fixture.userId)
+              : await organizationState(fixture.organizationId);
+          expect(released.inference_microdollars_held).toBe(0);
+        } finally {
+          if (open) await locker.query('ROLLBACK');
+          locker.release();
+          await pending;
+        }
+      });
+    }
+  );
+
+  it('rolls back a failed pipelined admission before reusing its connection for another payer', async () => {
+    const isolated = createDrizzleClient({
+      connectionString: computeDatabaseUrl(),
+      poolConfig: { max: 1, pipeline: true },
+    });
+    try {
+      await withFixture(async fixture => {
+        const bad = { ...personal(fixture), userId: `missing/${crypto.randomUUID()}` };
+        await expect(reserveInferenceCredits(isolated.db, bad)).rejects.toMatchObject({
+          cause: { code: '23503' },
+        });
+        expect(await reservationState(bad.requestId)).toBeUndefined();
+        const good = personal(fixture, 100);
+        expect(await reserveInferenceCredits(isolated.db, good)).toMatchObject({
+          kind: 'reserved',
+        });
+        expect((await userState(fixture.userId)).inference_microdollars_held).toBe(100);
+        await isolated.db.transaction(tx => releaseInferenceCredits(tx, good));
+        expect((await userState(fixture.userId)).inference_microdollars_held).toBe(0);
+      });
+    } finally {
+      await isolated.pool.end();
+    }
+  });
   it.each(['personal', 'organization'] as const)(
     'serializes concurrent %s payer admission without spending the same funds twice',
     async kind => {
@@ -200,30 +280,76 @@ describe('inference credit reservations', () => {
     }
   );
 
-  it('reuses an active request ID concurrently without adding a second hold', async () => {
+  it.each(['personal', 'organization'] as const)(
+    'reuses an active %s request ID concurrently without adding a second hold',
+    async kind => {
+      await withFixture(async fixture => {
+        const input = kind === 'personal' ? personal(fixture) : organization(fixture);
+        const results = await Promise.all(
+          Array.from({ length: 4 }, () => reserveInferenceCredits(db, input))
+        );
+        expect(results).toEqual(
+          Array.from({ length: 4 }, () => ({
+            kind: 'reserved',
+            requestId: input.requestId,
+            amountMicrodollars: 60,
+          }))
+        );
+        const payer =
+          kind === 'personal'
+            ? await userState(fixture.userId)
+            : await organizationState(fixture.organizationId);
+        expect(payer.inference_microdollars_held).toBe(60);
+        await expect(
+          reserveInferenceCredits(db, { ...input, amountMicrodollars: 61 })
+        ).rejects.toMatchObject({ reason: 'identity_mismatch' });
+        await expect(
+          reserveInferenceCredits(db, { ...input, userId: fixture.otherUserId })
+        ).rejects.toMatchObject({ reason: 'identity_mismatch' });
+        await expect(
+          reserveInferenceCredits(db, {
+            ...input,
+            organizationId: kind === 'personal' ? fixture.organizationId : undefined,
+          })
+        ).rejects.toMatchObject({ reason: 'identity_mismatch' });
+        expect((await userState(fixture.otherUserId)).inference_microdollars_held).toBe(0);
+      });
+    }
+  );
+
+  it('never admits an unfunded organization created after the admission snapshot', async () => {
     await withFixture(async fixture => {
-      const input = personal(fixture);
-      const results = await Promise.all(
-        Array.from({ length: 4 }, () => reserveInferenceCredits(db, input))
-      );
-      expect(results).toEqual(
-        Array.from({ length: 4 }, () => ({
-          kind: 'reserved',
-          requestId: input.requestId,
-          amountMicrodollars: 60,
-        }))
-      );
-      expect((await userState(fixture.userId)).inference_microdollars_held).toBe(60);
-      await expect(
-        reserveInferenceCredits(db, { ...input, amountMicrodollars: 61 })
-      ).rejects.toMatchObject({ reason: 'identity_mismatch' });
-      await expect(
-        reserveInferenceCredits(db, { ...input, userId: fixture.otherUserId })
-      ).rejects.toMatchObject({ reason: 'identity_mismatch' });
-      await expect(
-        reserveInferenceCredits(db, { ...input, organizationId: fixture.organizationId })
-      ).rejects.toMatchObject({ reason: 'identity_mismatch' });
-      expect((await userState(fixture.otherUserId)).inference_microdollars_held).toBe(0);
+      const input = { ...organization(fixture), organizationId: crypto.randomUUID() };
+      const locker = await pool.connect();
+      let admission: ReturnType<typeof reserveInferenceCredits> | undefined;
+      try {
+        await locker.query('BEGIN');
+        const identity = await locker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+        const pid = identity.rows[0]?.pid;
+        if (!pid) throw new Error('Missing blocking backend identity');
+        await locker.query('SELECT id FROM kilocode_users WHERE id = $1 FOR UPDATE', [
+          fixture.userId,
+        ]);
+        admission = reserveInferenceCredits(db, input);
+        await waitForBlockedReservations(pid, 1);
+        await db.insert(organizations).values({
+          id: input.organizationId,
+          name: 'Concurrent reservation payer',
+          total_microdollars_acquired: 0,
+        });
+        await locker.query('COMMIT');
+        expect(await admission).toEqual({ kind: 'insufficient' });
+        expect(await reservationState(input.requestId)).toBeUndefined();
+        expect((await organizationState(input.organizationId)).inference_microdollars_held).toBe(0);
+      } finally {
+        await locker.query('ROLLBACK');
+        locker.release();
+        await admission?.catch(() => undefined);
+        await db
+          .delete(inference_reservations)
+          .where(eq(inference_reservations.request_id, input.requestId));
+        await db.delete(organizations).where(eq(organizations.id, input.organizationId));
+      }
     });
   });
 
@@ -253,26 +379,23 @@ describe('inference credit reservations', () => {
         await reserveInferenceCredits(db, input);
         const ready = Promise.withResolvers<void>();
         const proceed = Promise.withResolvers<void>();
-        const prepared = db.transaction(async tx => {
-          await lockInferenceReservationForSettlement(tx, settlement);
-          ready.resolve();
-          await proceed.promise;
-          await tx.insert(microdollar_usage).values({
-            id: input.requestId,
-            kilo_user_id: input.userId,
-            organization_id: input.organizationId,
-            cost: 20,
-            input_tokens: 1,
-            output_tokens: 1,
-            cache_write_tokens: 0,
-            cache_hit_tokens: 0,
-          });
-          await tx.execute(sql`
-            UPDATE ${payer} SET microdollars_used = ${payer.microdollars_used} + 20
-            WHERE ${payer.id} = ${payerId}
-          `);
-          await settleInferenceCredits(tx, settlement);
-        });
+        const prepared = db.transaction(tx =>
+          settleInferenceCredits(tx, settlement, async debitPayer => {
+            ready.resolve();
+            await proceed.promise;
+            await tx.insert(microdollar_usage).values({
+              id: input.requestId,
+              kilo_user_id: input.userId,
+              organization_id: input.organizationId,
+              cost: 20,
+              input_tokens: 1,
+              output_tokens: 1,
+              cache_write_tokens: 0,
+              cache_hit_tokens: 0,
+            });
+            await debitPayer();
+          })
+        );
         try {
           await Promise.race([ready.promise, prepared]);
           const probe = await pool.connect();
@@ -330,7 +453,11 @@ describe('inference credit reservations', () => {
           reason: 'terminal',
         });
         await expect(
-          db.transaction(tx => settleInferenceCredits(tx, { ...input, actualCostMicrodollars: 5 }))
+          db.transaction(tx =>
+            settleInferenceCredits(tx, { ...input, actualCostMicrodollars: 5 }, debitPayer =>
+              debitPayer()
+            )
+          )
         ).rejects.toMatchObject({ reason: 'terminal' });
         expect(
           await reserveInferenceCredits(db, {
@@ -410,13 +537,19 @@ describe('inference credit reservations', () => {
           actual_cost_microdollars: 130,
         });
         await db.transaction(tx =>
-          settleInferenceCredits(tx, { ...input, actualCostMicrodollars: 130 })
+          settleInferenceCredits(
+            tx,
+            { ...input, actualCostMicrodollars: 130 },
+            async () => undefined
+          )
         );
         await db.transaction(tx => releaseInferenceCredits(tx, input));
         await expect(postUsage(input, 130)).rejects.toThrow();
         await expect(
           db.transaction(tx =>
-            settleInferenceCredits(tx, { ...input, actualCostMicrodollars: 131 })
+            settleInferenceCredits(tx, { ...input, actualCostMicrodollars: 131 }, debitPayer =>
+              debitPayer()
+            )
           )
         ).rejects.toMatchObject({ reason: 'identity_mismatch' });
         await expect(reserveInferenceCredits(db, input)).rejects.toMatchObject({
@@ -473,14 +606,12 @@ describe('inference credit reservations', () => {
       await reserveInferenceCredits(db, input);
       const failure = new Error('accounting rejected');
       await expect(
-        db.transaction(async tx => {
-          await settleInferenceCredits(tx, { ...input, actualCostMicrodollars: 20 });
-          await tx
-            .update(kilocode_users)
-            .set({ microdollars_used: 20 })
-            .where(eq(kilocode_users.id, fixture.userId));
-          throw failure;
-        })
+        db.transaction(tx =>
+          settleInferenceCredits(tx, { ...input, actualCostMicrodollars: 20 }, async debitPayer => {
+            await debitPayer();
+            throw failure;
+          })
+        )
       ).rejects.toBe(failure);
       expect(await reservationState(input.requestId)).toMatchObject({
         status: 'reserved',
@@ -496,6 +627,37 @@ describe('inference credit reservations', () => {
       });
     });
   });
+
+  it.each(['personal', 'organization'] as const)(
+    'rolls back a %s settlement callback that omits or repeats its payer debit',
+    async kind => {
+      await withFixture(async fixture => {
+        const input = kind === 'personal' ? personal(fixture) : organization(fixture);
+        const settlement = { ...input, actualCostMicrodollars: 20 };
+        await reserveInferenceCredits(db, input);
+        await expect(
+          db.transaction(tx => settleInferenceCredits(tx, settlement, async () => undefined))
+        ).rejects.toMatchObject({ reason: 'counter_integrity' });
+        await expect(
+          db.transaction(tx =>
+            settleInferenceCredits(tx, settlement, async debitPayer => {
+              await debitPayer();
+              await debitPayer();
+            })
+          )
+        ).rejects.toMatchObject({ reason: 'terminal' });
+        expect(await reservationState(input.requestId)).toMatchObject({
+          status: 'reserved',
+          actual_cost_microdollars: null,
+        });
+        const payer =
+          kind === 'personal'
+            ? await userState(fixture.userId)
+            : await organizationState(fixture.organizationId);
+        expect(payer).toMatchObject({ inference_microdollars_held: 60, microdollars_used: 0 });
+      });
+    }
+  );
 
   it('serializes member allowance admission against committed usage and all active holds', async () => {
     await withFixture(async fixture => {
@@ -689,7 +851,9 @@ describe('inference credit reservations', () => {
         await expect(reserveInferenceCredits(db, input)).rejects.toBeInstanceOf(RangeError);
         await expect(
           db.transaction(tx =>
-            settleInferenceCredits(tx, { ...input, actualCostMicrodollars: amount })
+            settleInferenceCredits(tx, { ...input, actualCostMicrodollars: amount }, debitPayer =>
+              debitPayer()
+            )
           )
         ).rejects.toBeInstanceOf(RangeError);
         expect((await userState(fixture.userId)).inference_microdollars_held).toBe(0);
@@ -707,20 +871,20 @@ describe('inference credit reservations', () => {
       ).rejects.toMatchObject({ reason: 'identity_mismatch' });
       await expect(
         db.transaction(tx =>
-          settleInferenceCredits(tx, {
-            ...input,
-            organizationId: fixture.organizationId,
-            actualCostMicrodollars: 20,
-          })
+          settleInferenceCredits(
+            tx,
+            { ...input, organizationId: fixture.organizationId, actualCostMicrodollars: 20 },
+            debitPayer => debitPayer()
+          )
         )
       ).rejects.toMatchObject({ reason: 'identity_mismatch' });
       await expect(
         db.transaction(tx =>
-          settleInferenceCredits(tx, {
-            ...input,
-            requestId: crypto.randomUUID(),
-            actualCostMicrodollars: 20,
-          })
+          settleInferenceCredits(
+            tx,
+            { ...input, requestId: crypto.randomUUID(), actualCostMicrodollars: 20 },
+            debitPayer => debitPayer()
+          )
         )
       ).rejects.toMatchObject({ reason: 'not_found' });
       expect((await userState(fixture.userId)).inference_microdollars_held).toBe(60);

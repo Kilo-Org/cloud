@@ -7,8 +7,8 @@ import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/o
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
-  lockInferenceReservationForSettlement,
   settleInferenceCredits,
+  type InferenceSettlementPayer,
 } from '@kilocode/db/inference-reservations';
 
 export type ExaMonthlyUsageResult = {
@@ -94,45 +94,44 @@ export async function recordExaUsage(params: {
         userId,
         organizationId,
         actualCostMicrodollars: chargedAmount,
+        occurredAt,
       }
     : undefined;
 
   const organizationUsage = await db.transaction(async tx => {
-    if (settlement) await lockInferenceReservationForSettlement(tx, settlement);
-    await tx.insert(exa_usage_log).values({
-      id: sourceId,
-      kilo_user_id: userId,
-      organization_id: organizationId ?? null,
-      path,
-      cost_microdollars: costMicrodollars,
-      charged_to_balance: chargedToBalance,
-      feature_id: featureId ?? null,
-      type: type ?? null,
-      created_at: occurredAt,
-    });
+    const writeUsage = async (debitPayer?: () => Promise<InferenceSettlementPayer>) => {
+      await tx.insert(exa_usage_log).values({
+        id: sourceId,
+        kilo_user_id: userId,
+        organization_id: organizationId ?? null,
+        path,
+        cost_microdollars: costMicrodollars,
+        charged_to_balance: chargedToBalance,
+        feature_id: featureId ?? null,
+        type: type ?? null,
+        created_at: occurredAt,
+      });
 
-    await upsertMonthlyCounter(tx, {
-      userId,
-      organizationId,
-      occurredAt,
-      costMicrodollars,
-      chargedAmount,
-      freeAllowanceMicrodollars,
-    });
+      await upsertMonthlyCounter(tx, {
+        userId,
+        organizationId,
+        occurredAt,
+        costMicrodollars,
+        chargedAmount,
+        freeAllowanceMicrodollars,
+      });
 
-    const result =
-      chargedToBalance && costMicrodollars > 0
-        ? await deductFromBalance(tx, {
-            userId,
-            organizationId,
-            occurredAt,
-            costMicrodollars,
-            sourceId,
-          })
-        : null;
-    if (settlement) await settleInferenceCredits(tx, settlement);
-
-    return result;
+      if (chargedToBalance && costMicrodollars > 0) {
+        return deductFromBalance(
+          tx,
+          { userId, organizationId, occurredAt, costMicrodollars, sourceId },
+          debitPayer
+        );
+      }
+      if (debitPayer) await debitPayer();
+      return null;
+    };
+    return settlement ? settleInferenceCredits(tx, settlement, writeUsage) : writeUsage();
   });
 
   if (organizationId && organizationUsage) {
@@ -208,19 +207,29 @@ async function deductFromBalance(
     occurredAt: string;
     costMicrodollars: number;
     sourceId: string;
-  }
+  },
+  debitPayer?: () => Promise<InferenceSettlementPayer>
 ): Promise<OrganizationUsageMutationResult | null> {
   const { userId, organizationId, occurredAt, costMicrodollars, sourceId } = params;
   if (organizationId) {
-    const result = await recordOrganizationConsumption(tx, {
-      organizationId,
-      kiloUserId: userId,
-      amountMicrodollars: costMicrodollars,
-      occurredAt,
-      source: 'exa',
-      sourceId,
-    });
+    const result = await recordOrganizationConsumption(
+      tx,
+      {
+        organizationId,
+        kiloUserId: userId,
+        amountMicrodollars: costMicrodollars,
+        occurredAt,
+        source: 'exa',
+        sourceId,
+      },
+      debitPayer
+    );
     return result.organizationUsage;
+  }
+
+  if (debitPayer) {
+    await debitPayer();
+    return null;
   }
 
   const updated = await tx

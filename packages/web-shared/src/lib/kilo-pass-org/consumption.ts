@@ -12,11 +12,12 @@ import {
 } from '@kilocode/db/schema';
 import { KiloPassOrgBonusMode, KiloPassOrgIssuanceKind } from '@kilocode/db/schema-types';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { and, eq, gt, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import {
   mutateOrganizationUsage,
   type OrganizationUsageMutationResult,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { InferenceSettlementPayer } from '@kilocode/db/inference-reservations';
 
 export type OrganizationConsumptionSource = 'ai-gateway' | 'exa';
 
@@ -33,6 +34,21 @@ export type OrganizationConsumptionResult = {
   recorded: boolean;
   organizationUsage: OrganizationUsageMutationResult;
 };
+
+type QualifyingSpendMutationResult = { event_inserted: boolean } & (
+  | Pick<
+      typeof kilo_pass_org_issuance_snapshots.$inferSelect,
+      | 'id'
+      | 'agreement_id'
+      | 'window_end'
+      | 'bonus_mode'
+      | 'bonus_unlocked_at'
+      | 'qualifying_spend_microdollars'
+      | 'unlock_spend_microdollars'
+      | 'bonus_credit_microdollars'
+    >
+  | { id: null }
+);
 
 const noAlert: OrganizationUsageMutationResult = {
   crossedMinimumBalance: false,
@@ -54,59 +70,46 @@ function sourceIdentity(input: RecordOrganizationConsumptionInput): string {
  */
 export async function recordOrganizationConsumption(
   tx: DrizzleTransaction,
-  input: RecordOrganizationConsumptionInput
+  input: RecordOrganizationConsumptionInput,
+  debitPayer?: () => Promise<InferenceSettlementPayer>
 ): Promise<OrganizationConsumptionResult> {
   if (!Number.isSafeInteger(input.amountMicrodollars) || input.amountMicrodollars <= 0) {
     return { recorded: false, organizationUsage: noAlert };
   }
 
-  const [parentAgreement] = await tx
-    .select({ id: kilo_pass_org_agreements.id })
-    .from(kilo_pass_org_agreements)
-    .where(
-      and(
-        eq(kilo_pass_org_agreements.parent_organization_id, input.organizationId),
-        ne(kilo_pass_org_agreements.state, 'ended')
-      )
-    )
-    .limit(1);
-  const [childAgreement] = parentAgreement
-    ? []
-    : await tx
-        .select({ id: kilo_pass_org_agreements.id })
-        .from(kilo_pass_org_allocation_plan_rows)
-        .innerJoin(
-          kilo_pass_org_allocation_plans,
-          eq(
-            kilo_pass_org_allocation_plans.id,
-            kilo_pass_org_allocation_plan_rows.allocation_plan_id
-          )
-        )
-        .innerJoin(
-          kilo_pass_org_agreements,
-          eq(kilo_pass_org_agreements.id, kilo_pass_org_allocation_plans.agreement_id)
-        )
-        .where(
-          and(
-            eq(
-              kilo_pass_org_allocation_plan_rows.allocation_container_organization_id,
-              input.organizationId
-            ),
-            gt(kilo_pass_org_allocation_plan_rows.pass_capacity, 0),
-            ne(kilo_pass_org_agreements.state, 'ended')
-          )
-        )
-        .limit(1);
+  const {
+    rows: [agreement],
+  } = await tx.execute<{ qualifies: boolean }>(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM ${kilo_pass_org_agreements}
+      WHERE ${kilo_pass_org_agreements.parent_organization_id} = ${input.organizationId}
+        AND ${kilo_pass_org_agreements.state} <> 'ended'
+    ) OR EXISTS (
+      SELECT 1 FROM ${kilo_pass_org_allocation_plan_rows}
+      JOIN ${kilo_pass_org_allocation_plans}
+        ON ${kilo_pass_org_allocation_plans.id} = ${kilo_pass_org_allocation_plan_rows.allocation_plan_id}
+      JOIN ${kilo_pass_org_agreements}
+        ON ${kilo_pass_org_agreements.id} = ${kilo_pass_org_allocation_plans.agreement_id}
+      WHERE ${kilo_pass_org_allocation_plan_rows.allocation_container_organization_id} = ${input.organizationId}
+        AND ${kilo_pass_org_allocation_plan_rows.pass_capacity} > 0
+        AND ${kilo_pass_org_agreements.state} <> 'ended'
+    ) AS qualifies
+  `);
+  if (!agreement) throw new Error('Organization consumption eligibility was not returned');
 
-  if (!parentAgreement && !childAgreement) {
+  if (!agreement.qualifies) {
     return {
       recorded: true,
-      organizationUsage: await mutateOrganizationUsage(tx, {
-        kilo_user_id: input.kiloUserId,
-        organization_id: input.organizationId,
-        cost: input.amountMicrodollars,
-        created_at: input.occurredAt,
-      }),
+      organizationUsage: await mutateOrganizationUsage(
+        tx,
+        {
+          kilo_user_id: input.kiloUserId,
+          organization_id: input.organizationId,
+          cost: input.amountMicrodollars,
+          created_at: input.occurredAt,
+        },
+        debitPayer
+      ),
     };
   }
 
@@ -130,15 +133,19 @@ export async function recordOrganizationConsumption(
   // side effect below. Do not infer an existing source from mutable usage rows.
   if (!credit) return { recorded: false, organizationUsage: noAlert };
 
-  const organizationUsage = await mutateOrganizationUsage(tx, {
-    kilo_user_id: input.kiloUserId,
-    organization_id: input.organizationId,
-    cost: input.amountMicrodollars,
-    created_at: input.occurredAt,
-  });
+  const organizationUsage = await mutateOrganizationUsage(
+    tx,
+    {
+      kilo_user_id: input.kiloUserId,
+      organization_id: input.organizationId,
+      cost: input.amountMicrodollars,
+      created_at: input.occurredAt,
+    },
+    debitPayer
+  );
 
   const snapshots = await tx
-    .select()
+    .select({ id: kilo_pass_org_issuance_snapshots.id })
     .from(kilo_pass_org_issuance_snapshots)
     .where(
       and(
@@ -158,27 +165,43 @@ export async function recordOrganizationConsumption(
     .for('update');
 
   for (const snapshot of snapshots) {
-    const [event] = await tx
-      .insert(kilo_pass_org_qualifying_spend_events)
-      .values({
-        issuance_snapshot_id: snapshot.id,
-        allocation_container_organization_id: input.organizationId,
-        credit_transaction_id: credit.id,
-        spent_microdollars: input.amountMicrodollars,
-        occurred_at: input.occurredAt,
-      })
-      .onConflictDoNothing()
-      .returning({ id: kilo_pass_org_qualifying_spend_events.id });
-    if (!event) continue;
-
-    const [updated] = await tx
-      .update(kilo_pass_org_issuance_snapshots)
-      .set({
-        qualifying_spend_microdollars: sql`${kilo_pass_org_issuance_snapshots.qualifying_spend_microdollars} + ${input.amountMicrodollars}`,
-      })
-      .where(eq(kilo_pass_org_issuance_snapshots.id, snapshot.id))
-      .returning();
-    if (!updated) throw new Error('organization pass snapshot disappeared during consumption');
+    const {
+      rows: [updated],
+    } = await tx.execute<QualifyingSpendMutationResult>(sql`
+      WITH inserted_event AS (
+        INSERT INTO ${kilo_pass_org_qualifying_spend_events}
+          (issuance_snapshot_id, allocation_container_organization_id,
+           credit_transaction_id, spent_microdollars, occurred_at)
+        VALUES (
+          ${snapshot.id}, ${input.organizationId}, ${credit.id},
+          ${input.amountMicrodollars}, ${input.occurredAt}
+        )
+        ON CONFLICT DO NOTHING
+        RETURNING id
+      ), updated_snapshot AS (
+        UPDATE ${kilo_pass_org_issuance_snapshots}
+        SET qualifying_spend_microdollars =
+          ${kilo_pass_org_issuance_snapshots.qualifying_spend_microdollars} + ${input.amountMicrodollars}
+        WHERE ${kilo_pass_org_issuance_snapshots.id} = ${snapshot.id}
+          AND EXISTS (SELECT 1 FROM inserted_event)
+        RETURNING
+          id,
+          agreement_id,
+          window_end::text,
+          bonus_mode,
+          bonus_unlocked_at::text,
+          qualifying_spend_microdollars::float8,
+          unlock_spend_microdollars::float8,
+          bonus_credit_microdollars::float8
+      )
+      SELECT EXISTS (SELECT 1 FROM inserted_event) AS event_inserted, updated_snapshot.*
+      FROM (VALUES (1)) AS result(anchor)
+      LEFT JOIN updated_snapshot ON true
+    `);
+    if (!updated) throw new Error('Organization consumption qualifying spend was not returned');
+    if (!updated.event_inserted) continue;
+    if (updated.id === null)
+      throw new Error('organization pass snapshot disappeared during consumption');
 
     const expired = new Date(updated.window_end) < new Date();
     if (

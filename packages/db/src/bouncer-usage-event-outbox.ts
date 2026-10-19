@@ -16,10 +16,10 @@
  * the `claimed_at` token returned by the claim and updates only while the row is still that
  * `sending` claim, so a late mark from a reclaimed sender is a no-op.
  *
- * `enqueueBouncerUsageEvent` is idempotent on the unique `request_id`; Bouncer also dedupes a usage
+ * Usage enqueue is idempotent on the unique `request_id`; Bouncer also dedupes a usage
  * event by `requestId`, so a redelivery after a lost acknowledgement counts once.
  */
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 
 import type { BouncerCreditEventOutboxDatabase } from './bouncer-credit-event-outbox';
 import {
@@ -66,20 +66,20 @@ export type PurgeBouncerUsageEventOutboxResult = {
   failedPurged: number;
 };
 
-// ----- enqueue ------------------------------------------------------------------
-
-/**
- * Enqueues one usage event, idempotently on `request_id`. Passing the usage-write transaction makes
- * the enqueue atomic with the billing row; a DB error propagates and rolls both back.
- */
-export async function enqueueBouncerUsageEvent(
-  database: BouncerUsageEventOutboxDatabase,
-  input: { requestId: string; userId: string; payload: BouncerUsageEventOutboxPayload }
-): Promise<void> {
-  await database
-    .insert(bouncer_usage_event_outbox)
-    .values({ request_id: input.requestId, user_id: input.userId, payload: input.payload })
-    .onConflictDoNothing({ target: bouncer_usage_event_outbox.request_id });
+export function bouncerUsageEventInsert(
+  input: { requestId: string; userId: string; payload: BouncerUsageEventOutboxPayload },
+  source?: SQL
+): SQL {
+  return sql`
+    INSERT INTO bouncer_usage_event_outbox (request_id, user_id, payload)
+    SELECT
+      ${input.requestId},
+      ${input.userId},
+      ${sql.param(input.payload, bouncer_usage_event_outbox.payload)}
+    ${source ? sql`FROM ${source}` : sql``}
+    WHERE true
+    ON CONFLICT (request_id) DO NOTHING
+  `;
 }
 
 // ----- claim ------------------------------------------------------------------

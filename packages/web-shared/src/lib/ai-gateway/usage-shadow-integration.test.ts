@@ -48,7 +48,6 @@ jest.mock('@kilocode/web-shared/lib/kilo-pass/threshold', () => ({
   getEffectiveKiloPassThreshold: () => null,
 }));
 jest.mock('@kilocode/web-shared/lib/kilo-pass/issuance', () => ({}));
-jest.mock('./usage-daily-rollup-repairs', () => ({ enqueueDailyUsageRollupRepair: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/kilo-pass-org/consumption', () => ({}));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: () => () => {},
@@ -68,9 +67,6 @@ jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox', () => ({
   deliverBouncerUsageEventNow: jest.fn(async () => true),
-}));
-jest.mock('@kilocode/db/bouncer-usage-event-outbox', () => ({
-  enqueueBouncerUsageEvent: jest.fn(),
 }));
 
 // Next's installed runtime uses this global when constructing request async stores.
@@ -107,9 +103,6 @@ const writer = jest.requireMock<{ recordUsageInPrimaryRegion: jest.Mock }>(
 ).recordUsageInPrimaryRegion;
 const bouncer = jest.requireMock<{ deliverBouncerUsageEventNow: jest.Mock }>(
   '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox'
-);
-const outbox = jest.requireMock<{ enqueueBouncerUsageEvent: jest.Mock }>(
-  '@kilocode/db/bouncer-usage-event-outbox'
 );
 const { fetchGeneration } = jest.requireMock<{ fetchGeneration: jest.Mock }>(
   './providers/upstream-request'
@@ -389,11 +382,6 @@ describe('gateway shadow background integration', () => {
           payload.core.inference_provider,
           payload.core.project_id,
         ]);
-        expect(outbox.enqueueBouncerUsageEvent).toHaveBeenCalledWith(expect.anything(), {
-          requestId: event.request_id,
-          userId: context.kiloUserId,
-          payload: event.payload,
-        });
       }
       expect(info).toHaveBeenCalledWith('usage enqueue accepted', {
         usageId: record?.usageId,

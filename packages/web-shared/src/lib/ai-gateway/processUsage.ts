@@ -98,7 +98,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
-import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
+import { dailyUsageRollupRepairInsert } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
   normalizeJa4,
@@ -107,11 +107,11 @@ import {
   type UsageEvent,
 } from '@kilocode/web-shared/lib/bouncer/client';
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
-import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
+import { bouncerUsageEventInsert } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
 import {
-  lockInferenceReservationForSettlement,
   settleInferenceCredits,
+  type InferenceSettlementPayer,
 } from '@kilocode/db/inference-reservations';
 
 const posthogClient = PostHogClient();
@@ -590,7 +590,6 @@ async function insertUsageTransaction(
   bouncerUsageEvent: BouncerUsageEventEnqueue | null
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
-    await setUsageTransactionIdleTimeout(tx);
     const settlement =
       metadataFields.prepaid_reservation_id && metadataFields.prepaid_usage_final === true
         ? {
@@ -598,53 +597,59 @@ async function insertUsageTransaction(
             userId: coreUsageFields.kilo_user_id,
             organizationId: coreUsageFields.organization_id ?? undefined,
             actualCostMicrodollars: coreUsageFields.cost,
+            occurredAt: coreUsageFields.created_at,
           }
         : undefined;
-    if (settlement) {
-      if (settlement.requestId !== coreUsageFields.id) {
-        throw new Error('Reservation and usage identities differ');
+    if (settlement && settlement.requestId !== coreUsageFields.id) {
+      throw new Error('Reservation and usage identities differ');
+    }
+    const writeUsage = async (
+      debitPayer?: () => Promise<InferenceSettlementPayer>
+    ): Promise<UsageTransactionResult> => {
+      const inserted = await insertUsageAndMetadataWithBalanceUpdate(
+        tx,
+        coreUsageFields,
+        metadataFields,
+        debitPayer === undefined,
+        bouncerUsageEvent
+      );
+      if (coreUsageFields.organization_id) {
+        if (coreUsageFields.cost > 0) {
+          const consumption = await recordOrganizationConsumption(
+            tx,
+            {
+              organizationId: coreUsageFields.organization_id,
+              kiloUserId: coreUsageFields.kilo_user_id,
+              amountMicrodollars: coreUsageFields.cost,
+              occurredAt: coreUsageFields.created_at,
+              source: 'ai-gateway',
+              sourceId: coreUsageFields.id,
+            },
+            debitPayer
+          );
+          inserted.organizationUsage = consumption.organizationUsage;
+        } else if (coreUsageFields.cost < 0) {
+          inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
+        } else if (debitPayer) {
+          await debitPayer();
+        }
+      } else if (debitPayer) {
+        const payer = await debitPayer();
+        if (payer.kind !== 'personal') throw new Error('Personal usage requires a personal payer');
+        if (coreUsageFields.cost > 0) {
+          inserted.newMicrodollarsUsed = payer.newMicrodollarsUsed;
+          inserted.kiloPassThreshold = payer.kiloPassThreshold;
+        }
       }
-      await lockInferenceReservationForSettlement(tx, settlement);
-    }
-    const inserted = await insertUsageAndMetadataWithBalanceUpdate(
-      tx,
-      coreUsageFields,
-      metadataFields
-    );
-    if (coreUsageFields.organization_id) {
-      if (coreUsageFields.cost > 0) {
-        const consumption = await recordOrganizationConsumption(tx, {
-          organizationId: coreUsageFields.organization_id,
-          kiloUserId: coreUsageFields.kilo_user_id,
-          amountMicrodollars: coreUsageFields.cost,
-          occurredAt: coreUsageFields.created_at,
-          source: 'ai-gateway',
-          sourceId: coreUsageFields.id,
-        });
-        inserted.organizationUsage = consumption.organizationUsage;
-      } else if (coreUsageFields.cost < 0) {
-        inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
-      }
-    }
-    if (settlement) await settleInferenceCredits(tx, settlement);
-    if (coreUsageFields.cost !== 0) {
-      await enqueueDailyUsageRollupRepair(tx, {
-        usageId: coreUsageFields.id,
-        kiloUserId: coreUsageFields.kilo_user_id,
-        organizationId: coreUsageFields.organization_id,
-        createdAt: coreUsageFields.created_at,
-      });
-    }
-    // A spend-watched request's usage event commits with its billing row, so a Bouncer outage
-    // cannot lose the spend it reports. A PK collision rolls this back together with the usage.
-    if (bouncerUsageEvent) {
-      await enqueueBouncerUsageEvent(tx, {
-        requestId: bouncerUsageEvent.request_id,
-        userId: coreUsageFields.kilo_user_id,
-        payload: bouncerUsageEvent.payload,
-      });
-    }
-    return { inserted };
+      return { inserted };
+    };
+    const [timeoutResult, usageResult] = await Promise.allSettled([
+      setUsageTransactionIdleTimeout(tx),
+      settlement ? settleInferenceCredits(tx, settlement, writeUsage) : writeUsage(),
+    ]);
+    if (timeoutResult.status === 'rejected') throw timeoutResult.reason;
+    if (usageResult.status === 'rejected') throw usageResult.reason;
+    return usageResult.value;
   });
 }
 
@@ -868,11 +873,10 @@ export async function insertUsageRecord(
 async function insertUsageAndMetadataWithBalanceUpdate(
   executor: UsageStatementExecutor,
   coreUsageFields: MicrodollarUsage,
-  metadataFields: UsageMetaData
+  metadataFields: UsageMetaData,
+  updatePersonalBalance: boolean,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
 ): Promise<UsageStatementResult> {
-  // Use a single SQL statement with CTEs to insert usage, upsert all lookup values, metadata, and update user balance in one roundtrip.
-  // The contended daily rollup is deliberately maintained after this transaction commits.
-  // This ensures atomicity: microdollar_usage insert and kilocode_users.microdollars_used update happen together
   const result = await executor.execute<{
     usage_id: string;
     usage_created_at: string;
@@ -906,6 +910,35 @@ async function insertUsageAndMetadataWithBalanceUpdate(
             )
             RETURNING id, created_at
           )
+          ${
+            coreUsageFields.cost !== 0
+              ? sql`, daily_repair_ins AS (
+                  ${dailyUsageRollupRepairInsert(
+                    {
+                      usageId: coreUsageFields.id,
+                      kiloUserId: coreUsageFields.kilo_user_id,
+                      organizationId: coreUsageFields.organization_id,
+                      createdAt: coreUsageFields.created_at,
+                    },
+                    sql`microdollar_usage_ins`
+                  )}
+                )`
+              : sql``
+          }
+          ${
+            bouncerUsageEvent
+              ? sql`, bouncer_usage_event_ins AS (
+                  ${bouncerUsageEventInsert(
+                    {
+                      requestId: bouncerUsageEvent.request_id,
+                      userId: coreUsageFields.kilo_user_id,
+                      payload: bouncerUsageEvent.payload,
+                    },
+                    sql`microdollar_usage_ins`
+                  )}
+                )`
+              : sql``
+          }
           , ${createUpsertCTE(sql`http_user_agent`, metadataFields.http_user_agent)}
           , ${createUpsertCTE(sql`http_ip`, metadataFields.http_x_forwarded_for)}
           , ${createUpsertCTE(sql`vercel_ip_country`, metadataFields.http_x_vercel_ip_country)}
@@ -1001,6 +1034,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT mode_id FROM mode_cte),
               (SELECT auto_model_id FROM auto_model_cte),
               (SELECT reasoning_setting_id FROM reasoning_setting_cte)
+            FROM microdollar_usage_ins
+            RETURNING id
           )
           , balance_update AS (
             UPDATE kilocode_users
@@ -1008,6 +1043,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
             WHERE id = ${coreUsageFields.kilo_user_id}
               AND ${coreUsageFields.organization_id}::uuid IS NULL
               AND ${coreUsageFields.cost} > 0
+              AND ${updatePersonalBalance}
+              AND EXISTS (SELECT 1 FROM metadata_ins)
             RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold
           )
           SELECT
@@ -1024,9 +1061,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
     throw new Error('microdollar_usage insert returned no identity');
   }
 
-  // Missing balance update is expected for org usage and zero-cost rows, but
-  // suspicious for positive-cost personal usage.
   if (
+    updatePersonalBalance &&
     inserted.new_microdollars_used === null &&
     !coreUsageFields.organization_id &&
     coreUsageFields.cost > 0
@@ -1037,18 +1073,13 @@ async function insertUsageAndMetadataWithBalanceUpdate(
       extra: { coreUsageFields },
     });
   }
-
-  const newMicrodollarsUsed =
-    inserted.new_microdollars_used === null ? null : Number(inserted.new_microdollars_used);
-
-  const kiloPassThreshold =
-    inserted.kilo_pass_threshold == null ? null : Number(inserted.kilo_pass_threshold);
-
   return {
     usageId: inserted.usage_id,
     createdAt: inserted.usage_created_at,
-    newMicrodollarsUsed,
-    kiloPassThreshold,
+    newMicrodollarsUsed:
+      inserted.new_microdollars_used === null ? null : Number(inserted.new_microdollars_used),
+    kiloPassThreshold:
+      inserted.kilo_pass_threshold == null ? null : Number(inserted.kilo_pass_threshold),
   };
 }
 

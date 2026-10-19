@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ContainerConcurrencyLimitError } from '../container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from '../container-concurrency.js';
 import { ExecutionError } from '../execution/errors.js';
 import type {
   ExecutionDeliveryContext,
@@ -753,6 +756,49 @@ describe('flushNextPendingSessionMessage', () => {
 });
 
 describe('SessionMessageQueue', () => {
+  it('bounds retries for unavailable capacity and settles with a recoverable billing error', async () => {
+    vi.useFakeTimers();
+    try {
+      const failure = new Error(`remote RPC: ${new ContainerCapacityUnavailableError().message}`);
+      const harness = createQueueHarness({
+        deliver: async () => {
+          throw failure;
+        },
+      });
+      await harness.queue.admitSubmittedMessage({
+        userId: 'user_test' as UserId,
+        turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'start this turn' },
+      });
+      await harness.queue.drainNextPendingMessage();
+      expect(harness.terminalizations).toHaveLength(0);
+      expect(harness.deliver).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(PENDING_FLUSH_RETRY_BASE_DELAY_MS);
+      await harness.queue.drainNextPendingMessage();
+      expect(harness.deliver).toHaveBeenCalledTimes(2);
+      expect(harness.terminalizations).toHaveLength(1);
+      const params = harness.terminalizations[0].params;
+      expect(params).toMatchObject({
+        kind: 'failed',
+        failureStage: 'pre_dispatch',
+        failureCode: 'admission_billing_unavailable',
+        attempts: 2,
+      });
+      const { state } = await terminalizeMessageOnce(harness.storage, FIRST_MESSAGE_ID, params);
+      if (!state) throw new Error('Expected terminal capacity-unavailable state');
+      expect(projectTerminalClientError({ ...state, status: 'failed' })).toMatchObject({
+        retryable: true,
+      });
+      expect(buildCloudMessageFailedPayload(state)).toMatchObject({
+        failure: {
+          code: 'admission_billing_unavailable',
+          message: expect.stringContaining('Try again shortly'),
+        },
+      });
+      await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it.each([
     new ContainerConcurrencyLimitError('personal', 20),
     new Error(`remote RPC: ${new ContainerConcurrencyLimitError('organization', 50).message}`),

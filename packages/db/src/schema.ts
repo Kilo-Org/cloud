@@ -137,6 +137,7 @@ import type {
   CustomLlmDefinition,
   AutoFreeConfig,
   GatewayModelListConfig,
+  VercelModelIdOverridesConfig,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -235,6 +236,20 @@ export const StripeServiceFeeOutcome = {
 export type StripeServiceFeeOutcome =
   (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
 
+// ADR 0005 custom router values. Declared here rather than imported from
+// @kilocode/auto-routing-contracts: consumers that typecheck this package's
+// source would otherwise pull in the contracts source, which needs a newer
+// TypeScript lib than several of them set. Values mirror the ADR table.
+export const CustomRouterBaseRouter = {
+  Efficient: 'efficient',
+  Frontier: 'frontier',
+} as const;
+
+export const CustomRouterMode = {
+  CostPerAccuracy: 'cost_per_accuracy',
+  BestAccuracy: 'best_accuracy',
+} as const;
+
 export const SCHEMA_CHECK_ENUMS = {
   StripeServiceFeeFlow,
   StripeServiceFeeOutcome,
@@ -328,6 +343,8 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
+  CustomRouterBaseRouter,
+  CustomRouterMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -5742,6 +5759,7 @@ export const ai_gateway_config = pgTable(
     auto_free: jsonb().$type<AutoFreeConfig>(),
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
+    vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
@@ -6385,6 +6403,7 @@ export const cli_sessions_v2 = pgTable(
     pr_link_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     status: text(),
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    status_transition_id: text(),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
     total_cost_microdollars: bigint({ mode: 'number' }),
     // The small derived summary the session card shows. Derived by
@@ -7205,6 +7224,7 @@ export const openai_chatgpt_connections = pgTable(
     usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
     /** The reset time OpenAI reported with the limit, when it reported one. */
     usage_limit_resets_at: timestamp({ withTimezone: true, mode: 'string' }),
+    usage_limit_error_code: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -12225,3 +12245,197 @@ export const stripe_service_fee_assessments = pgTable(
 
 export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
 export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;
+
+export const agent_briefing_preferences = pgTable(
+  'agent_briefing_preferences',
+  {
+    kilo_user_id: text()
+      .primaryKey()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    timezone: text().notNull(),
+    night_start: text().notNull().default('22:00'),
+    morning_start: text().notNull().default('08:00'),
+    morning_end: text().notNull().default('12:00'),
+    language: text().notNull().default('en'),
+    notifications_enabled: boolean().notNull().default(false),
+    next_run_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+  },
+  table => [index('agent_briefing_preferences_due').on(table.next_run_at)]
+);
+
+export const agent_briefing_context_preferences = pgTable(
+  'agent_briefing_context_preferences',
+  {
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    context_key: text().notNull(),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    ai_enabled: boolean().notNull().default(false),
+    model: text().notNull(),
+    max_duration_seconds: integer().notNull().default(600),
+    max_spend_microdollars: bigint({ mode: 'number' }).notNull().default(2_000_000),
+  },
+  table => [
+    primaryKey({ columns: [table.kilo_user_id, table.context_key] }),
+    check(
+      'agent_briefing_context_limits',
+      sql`${table.max_duration_seconds} BETWEEN 1 AND 600 AND ${table.max_spend_microdollars} > 0`
+    ),
+  ]
+);
+
+export const agent_briefing_events = pgTable(
+  'agent_briefing_events',
+  {
+    id: text().primaryKey(),
+    kilo_user_id: text().notNull(),
+    session_id: text().notNull(),
+    organization_id: uuid(),
+    kind: text().notNull(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    recorded_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    status: text(),
+    title: text(),
+    url: text(),
+    payload: jsonb().$type<Record<string, unknown>>(),
+  },
+  table => [
+    foreignKey({
+      columns: [table.session_id, table.kilo_user_id],
+      foreignColumns: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+      name: 'agent_briefing_events_session_fk',
+    }).onDelete('cascade'),
+    index('agent_briefing_events_user_window').on(table.kilo_user_id, table.occurred_at),
+    index('agent_briefing_events_session_window').on(
+      table.session_id,
+      table.kilo_user_id,
+      table.occurred_at
+    ),
+  ]
+);
+
+export const agent_briefing_reports = pgTable(
+  'agent_briefing_reports',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    context_key: text().notNull(),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    local_date: text().notNull(),
+    night_start_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    cutoff_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    morning_end_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    published_at: timestamp({ withTimezone: true, mode: 'string' }),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    next_refresh_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
+    next_charge_check_at: timestamp({ withTimezone: true, mode: 'string' }),
+    read_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revision: integer().notNull().default(1),
+    evidence_hash: text().notNull(),
+    facts: jsonb().notNull().$type<Record<string, unknown>>(),
+    summary: jsonb().notNull().$type<Record<string, unknown>>(),
+    generation_id: text(),
+    generation_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    generation_finished_at: timestamp({ withTimezone: true, mode: 'string' }),
+    generation_deadline_at: timestamp({ withTimezone: true, mode: 'string' }),
+    generation_revision: integer(),
+    generation_max_cost: bigint({ mode: 'number' }),
+    notification_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('agent_briefing_reports_window').on(
+      table.kilo_user_id,
+      table.context_key,
+      table.local_date
+    ),
+    index('agent_briefing_reports_user_history').on(table.kilo_user_id, table.cutoff_at),
+    index('agent_briefing_reports_active').on(table.morning_end_at),
+    index('agent_briefing_reports_refresh_due').on(table.next_refresh_at),
+    index('agent_briefing_reports_charge_due').on(table.next_charge_check_at),
+  ]
+);
+
+// Mirrors the contracts pool entry union (ADR 0005). Consumers pass values
+// typed by @kilocode/auto-routing-contracts, so a shape change here fails to
+// compile at those call sites.
+export type AutoRoutingCustomRouterEntry =
+  | { kind: 'gateway'; model: string }
+  | {
+      kind: 'client';
+      provider: string;
+      model: string;
+      variants: string[];
+      capabilities: {
+        contextLength: number | null;
+        inputModalities: string[];
+        toolCall: boolean;
+        reasoning: boolean;
+      };
+      pricing: {
+        inputPerMTokUsd: number;
+        outputPerMTokUsd: number;
+        cacheReadPerMTokUsd?: number;
+      } | null;
+    };
+
+// ADR 0005: custom auto routers owned by a user or an organization.
+export const auto_routing_custom_routers = pgTable(
+  'auto_routing_custom_routers',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // Audit trail; nulled by nothing, so a deleted creator stays unattributed.
+    created_by_user_id: text(),
+    slug: text().notNull(),
+    name: text().notNull(),
+    base_router: text()
+      .$type<(typeof CustomRouterBaseRouter)[keyof typeof CustomRouterBaseRouter]>()
+      .notNull(),
+    mode: text().$type<(typeof CustomRouterMode)[keyof typeof CustomRouterMode]>().notNull(),
+    entries: jsonb().$type<AutoRoutingCustomRouterEntry[]>().notNull(),
+    default_entry_key: text().notNull(),
+    legacy_pool: boolean().default(false).notNull(),
+    legacy_mode_inherited: boolean().default(false).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_auto_routing_custom_routers_org_slug')
+      .on(table.owned_by_organization_id, table.slug)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_auto_routing_custom_routers_user_slug')
+      .on(table.owned_by_user_id, table.slug)
+      .where(isNotNull(table.owned_by_user_id)),
+    index('IDX_auto_routing_custom_routers_org_id').on(table.owned_by_organization_id),
+    index('IDX_auto_routing_custom_routers_user_id').on(table.owned_by_user_id),
+    check(
+      'auto_routing_custom_routers_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    enumCheck(
+      'auto_routing_custom_routers_base_router_check',
+      table.base_router,
+      CustomRouterBaseRouter
+    ),
+    enumCheck('auto_routing_custom_routers_mode_check', table.mode, CustomRouterMode),
+  ]
+);
+
+export type AutoRoutingCustomRouter = typeof auto_routing_custom_routers.$inferSelect;
+export type NewAutoRoutingCustomRouter = typeof auto_routing_custom_routers.$inferInsert;

@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@jest/globals';
+import { afterEach, describe, test, expect } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { kilocode_users, organizations, user_auth_provider } from '@kilocode/db/schema';
 import {
@@ -443,5 +443,36 @@ describe('admin.users.releaseEmailAddress', () => {
         expectedEmail: target.google_user_email,
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Admin access required' });
+  });
+});
+
+describe('admin.syncProviders manual sync', () => {
+  const originalVercelEnv = process.env.VERCEL_ENV;
+
+  afterEach(() => {
+    if (originalVercelEnv === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = originalVercelEnv;
+    }
+  });
+
+  test('is disabled in production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(false);
+    await expect(caller.admin.syncProviders.triggerSync()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  test.each(['preview', 'development'])('is enabled when VERCEL_ENV is %s', async vercelEnv => {
+    process.env.VERCEL_ENV = vercelEnv;
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(true);
   });
 });

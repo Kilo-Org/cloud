@@ -1,5 +1,5 @@
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type { AutoFreeModel } from '@kilocode/web-shared/lib/ai-gateway/models';
@@ -33,7 +33,7 @@ export function getIneligibleAutoFreeModelIds(config: AutoFreeConfig): string[] 
 
 /** Returns the configured auto-free models, or null when none are stored or the stored value is invalid. */
 export async function readConfiguredAutoFreeModels(): Promise<ReadonlyArray<AutoFreeModel> | null> {
-  const [row] = await db
+  const [row] = await readDb
     .select({ auto_free: ai_gateway_config.auto_free })
     .from(ai_gateway_config)
     .where(eq(ai_gateway_config.id, 1))

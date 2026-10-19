@@ -3,6 +3,7 @@ import { AUTO_ROUTERS, POLICY_SETTING_KEYS } from '@kilocode/auto-routing-contra
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
+import { registerClientEvalRoutes } from './client-eval';
 import type { HonoEnv } from './hono-env';
 import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
 import { isRetryableContainerAvailabilityError } from './cli-runner';
@@ -17,6 +18,7 @@ import {
   sweepStaleRunsAndDrain,
   type BenchmarkJobMessage,
 } from './run';
+import { dailyReconcileSubscriptions } from './subscriptions';
 
 // Queue name of the dead-letter queue, matched against batch.queue.
 const DLQ_NAME = 'auto-routing-benchmark-dlq';
@@ -37,6 +39,7 @@ app.use('*', authMiddleware);
 app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing-benchmark' }));
 
 registerAdminRoutes(app);
+registerClientEvalRoutes(app);
 
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler());
@@ -62,6 +65,15 @@ export default {
           );
         } else {
           const staleRunIds = await sweepStaleRuns(env);
+          await dailyReconcileSubscriptions(env, router).catch(() => {
+            console.warn(
+              JSON.stringify({
+                event: 'benchmark_subscription_daily_failed',
+                category: 'daily_reconciliation',
+                router,
+              })
+            );
+          });
           const { desiredEntries } = await syncPlatformRegistry(env, fetch, router);
           const computed = await reevaluateSystemOptimalSettings(env, router, production).catch(
             error => {
@@ -90,12 +102,7 @@ export default {
               })
             );
           }
-          const startedRuns = await drainQueues(
-            env,
-            router === 'frontier' ? 'platform' : 'both',
-            undefined,
-            router
-          );
+          const startedRuns = await drainQueues(env, 'both', undefined, router);
           const published = await publishPlatformRoutingTable(env, fetch, router).catch(error => {
             console.warn(
               JSON.stringify({

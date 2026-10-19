@@ -36,6 +36,8 @@ export const perRecipientOutcomeSchema = z.enum([
   'suppressed_presence',
   'suppressed_preference',
   'no_tokens',
+  'suppressed_expired',
+  'suppressed_access',
   'duplicate',
   'failed',
 ]);
@@ -274,10 +276,16 @@ export type SendAgentSessionNotificationResult = z.infer<
 
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
+export const agentBriefingDispatchWindowSchema = z.object({
+  localDate: z.string().date(),
+  expiresAt: z.string().datetime(),
+});
+
 export const dispatchPushInputSchema = z.object({
   userId: z.string().min(1),
   presenceContext: z.string().min(1).nullable(),
   idempotencyKey: z.string().min(1),
+  agentBriefing: agentBriefingDispatchWindowSchema.optional(),
   badge: z
     .object({
       badgeBucket: z.string().min(1),
@@ -312,6 +320,9 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
   z.object({ kind: z.literal('suppressed_presence') }),
   z.object({ kind: z.literal('suppressed_rate_limit') }),
+  z.object({ kind: z.literal('suppressed_preference') }),
+  z.object({ kind: z.literal('suppressed_expired') }),
+  z.object({ kind: z.literal('suppressed_access') }),
   z.object({ kind: z.literal('no_tokens') }),
   z.object({ kind: z.literal('duplicate') }),
   z.object({ kind: z.literal('failed'), error: z.string() }),
@@ -399,10 +410,19 @@ export type InternalDispatchSecurityLifecycleRequest = z.infer<
   typeof internalDispatchSecurityLifecycleRequestSchema
 >;
 
+export const internalDispatchAgentBriefingRequestSchema = agentBriefingDispatchWindowSchema.extend({
+  kind: z.literal('agent_briefing'),
+  userId: z.string().min(1),
+});
+export type InternalDispatchAgentBriefingRequest = z.infer<
+  typeof internalDispatchAgentBriefingRequestSchema
+>;
+
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
   internalDispatchSpendAlertRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
   internalDispatchSecurityLifecycleRequestSchema,
+  internalDispatchAgentBriefingRequestSchema,
 ]);
 export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

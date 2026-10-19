@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  customLlmDefinition,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
 import {
@@ -157,19 +159,43 @@ describe('effective organization model access', () => {
 
   describe('custom LLMs', () => {
     beforeAll(async () => {
-      await insertCustomLlmForTest('acme/private-model');
+      await insertCustomLlmForTest('acme/private-model', customLlmDefinition());
+      await insertCustomLlmForTest('acme/public-model', publicCustomLlmDefinition(['acme']));
     });
 
     afterAll(async () => {
       await deleteCustomLlmForTest('acme/private-model');
+      await deleteCustomLlmForTest('acme/public-model');
     });
 
-    it('keeps a custom LLM exempt from effective Enterprise restrictions', async () => {
+    it('keeps a private custom LLM exempt from effective Enterprise restrictions', async () => {
       const policy = evaluateEffectiveModelAccessPolicy(context());
 
       await expect(
         getEffectiveModelDecision(policy, 'acme/private-model', async () => new Set())
       ).resolves.toEqual({ allowed: true });
+    });
+
+    it('routes a public custom LLM only to its allowed inference providers', async () => {
+      const withProviderAllowList = (provider_allow_list: string[]) =>
+        evaluateEffectiveModelAccessPolicy(
+          context({
+            organization: {
+              ...context().organization,
+              settings: { model_deny_list: [], provider_allow_list },
+            },
+            defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+          })
+        );
+      const allowsAcme = withProviderAllowList(['acme', 'openai']);
+      const allowsOpenAi = withProviderAllowList(['openai']);
+
+      await expect(
+        getEffectiveModelDecision(allowsAcme, 'acme/public-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['acme']) });
+      await expect(
+        getEffectiveModelDecision(allowsOpenAi, 'acme/public-model', async () => new Set())
+      ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
     });
   });
 

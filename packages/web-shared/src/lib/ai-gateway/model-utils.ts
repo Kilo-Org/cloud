@@ -11,13 +11,10 @@ import type { OpenRouterModel } from '@kilocode/db/schema-types';
  *
  * The names look swapped but are intentional: Kilo Code (the extension) selects
  * Kilo-hosted models under `kilo/`, while KiloClaw selects them under
- * `kilocode/`. `kilo-internal/` is the prefix the admin UI requires for new custom
- * LLM (`custom_llm2`) ids; never use it to recognize a custom LLM, look the id up
- * in the custom LLM catalog instead. `kilo-auto/` contains virtual routing models.
+ * `kilocode/`. `kilo-auto/` contains virtual routing models.
  */
 export const KILOCODE_KILO_PROVIDER_PREFIX = 'kilo/';
 export const KILOCLAW_KILO_PROVIDER_PREFIX = 'kilocode/';
-export const CUSTOM_LLM_PREFIX = 'kilo-internal/';
 export const KILO_AUTO_MODEL_PREFIX = 'kilo-auto/';
 
 /**

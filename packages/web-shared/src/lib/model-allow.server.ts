@@ -4,7 +4,11 @@ import {
   KILO_AUTO_MODEL_PREFIX,
   normalizeModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import {
+  findCustomLlm,
+  getPublicCustomLlmInferenceProviders,
+  isPublicCustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
@@ -19,16 +23,33 @@ export type ModelRestrictions = {
 /** Receives the requested model id as-is (including variant suffixes such as `:free`). */
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
+/** Non-public custom LLMs are granted explicitly by a Kilo admin, so organization
+ * model policy does not apply to them. Public custom LLMs are policy-checked. */
 export async function isModelRestrictionExempt(modelId: string): Promise<boolean> {
   const requestedModelId = modelId.trim().toLowerCase();
-  if (
-    requestedModelId.startsWith(KILO_AUTO_MODEL_PREFIX) ||
-    (await isCustomLlm(requestedModelId))
-  ) {
+  if (requestedModelId.startsWith(KILO_AUTO_MODEL_PREFIX)) {
     return true;
+  }
+  const customLlm = await findCustomLlm(requestedModelId);
+  if (customLlm) {
+    return !isPublicCustomLlm(customLlm.definition);
   }
   const directByokModel = await getDirectByokModel(requestedModelId);
   return directByokModel.provider !== null && directByokModel.model !== null;
+}
+
+/**
+ * Providers a model is pinned to regardless of the snapshot: those of a public
+ * custom LLM, which shadows any built-in model with the same id, or those of a
+ * Kilo-exclusive model. Undefined when the snapshot decides.
+ */
+export async function getModelInferenceProviderRestriction(
+  modelId: string
+): Promise<ReadonlySet<string> | undefined> {
+  return (
+    (await getPublicCustomLlmInferenceProviders(modelId)) ??
+    getKiloExclusiveInferenceProviders(modelId)
+  );
 }
 
 export function hasActiveModelRestrictions(restrictions: ModelRestrictions): boolean {
@@ -51,7 +72,7 @@ export function createAllowPredicateFromProviderAllowList(
       return false;
     }
     const providerSlugs =
-      getKiloExclusiveInferenceProviders(modelId) ?? (await providerLookup(modelId));
+      (await getModelInferenceProviderRestriction(modelId)) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));

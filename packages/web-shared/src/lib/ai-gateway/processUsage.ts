@@ -1377,7 +1377,10 @@ export async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
+  const kiloExclusiveModel =
+    usageContext.provider === 'custom'
+      ? null
+      : findKiloExclusiveModel(usageContext.requested_model);
   if (kiloExclusiveModel?.pricing) {
     const exclusiveCost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
     if (exclusiveCost_mUsd !== undefined) {

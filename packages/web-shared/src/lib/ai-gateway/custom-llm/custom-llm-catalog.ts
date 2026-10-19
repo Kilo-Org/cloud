@@ -2,6 +2,7 @@ import 'server-only';
 import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { captureException } from '@sentry/nextjs';
 
 export type CustomLlm = {
@@ -9,6 +10,16 @@ export type CustomLlm = {
   definition: CustomLlmDefinition;
   encrypted_api_key: CustomLlm2['encrypted_api_key'];
 };
+
+export type PublicCustomLlmDefinition = CustomLlmDefinition & {
+  public: NonNullable<CustomLlmDefinition['public']>;
+};
+
+export function isPublicCustomLlm(
+  definition: CustomLlmDefinition
+): definition is PublicCustomLlmDefinition {
+  return definition.public !== undefined;
+}
 
 export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return rows.flatMap(row => {
@@ -68,7 +79,10 @@ async function loadCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
   }
 }
 
-/** A failed refresh serves the previous value; with nothing cached the catalog is unavailable. */
+/**
+ * A failed refresh serves the previous value. With nothing cached the catalog
+ * is unavailable; see `lookupCustomLlm` for how routing treats that.
+ */
 async function getCustomLlmCatalog(): Promise<CustomLlmCatalog> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
     return { byId: cache.byId, available: true };
@@ -119,10 +133,49 @@ export function resetCustomLlmCacheForTest() {
   lastFailureAt = null;
 }
 
+export type CustomLlmLookup =
+  | { kind: 'custom-llm'; customLlm: CustomLlm }
+  | { kind: 'none' }
+  | { kind: 'unknown' };
+
+/**
+ * Resolves a model id for routing. While the catalog is unavailable, an id is
+ * `unknown` only if it is a Kilo-exclusive id: a custom LLM may shadow it, and
+ * routing must not fall back to the exclusive model. Any other custom LLM id
+ * matches no built-in model, so treating it as built-in fails on its own.
+ */
+export async function lookupCustomLlm(modelId: string): Promise<CustomLlmLookup> {
+  const normalizedModelId = modelId.trim().toLowerCase();
+  const catalog = await getCustomLlmCatalog();
+  const customLlm = catalog.byId.get(normalizedModelId);
+  if (customLlm) return { kind: 'custom-llm', customLlm };
+  if (
+    !catalog.available &&
+    kiloExclusiveModels.some(model => model.public_id === normalizedModelId)
+  ) {
+    return { kind: 'unknown' };
+  }
+  return { kind: 'none' };
+}
+
+/** A custom LLM for the id, or null when there is none or the catalog is unavailable. */
 export async function findCustomLlm(modelId: string): Promise<CustomLlm | null> {
   return (await getCustomLlmsById()).get(modelId.trim().toLowerCase()) ?? null;
 }
 
 export async function isCustomLlm(modelId: string): Promise<boolean> {
   return (await findCustomLlm(modelId)) !== null;
+}
+
+/**
+ * Inference providers a model id is restricted to by a public custom LLM, or
+ * null when the id is not a public custom LLM.
+ */
+export async function getPublicCustomLlmInferenceProviders(
+  modelId: string
+): Promise<ReadonlySet<string> | null> {
+  const customLlm = await findCustomLlm(modelId);
+  return customLlm && isPublicCustomLlm(customLlm.definition)
+    ? new Set(customLlm.definition.public.inference_providers)
+    : null;
 }

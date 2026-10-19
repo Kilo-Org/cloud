@@ -17,7 +17,6 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   convertFromKiloExclusiveModel,
   getInferenceProvider,
-  type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
@@ -124,10 +123,6 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   return name;
 }
 
-export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
-  return model.status !== 'disabled' || model.pricing === null;
-}
-
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels, unavailableModelIds] =
@@ -143,9 +138,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     .filter(
       model =>
         (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
-        !kiloExclusiveModels.some(
-          m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
-        ) &&
+        !kiloExclusiveModels.some(m => m.public_id === model.id) &&
         !unavailableModelIds.has(model.id) &&
         !model.id.endsWith(':batch')
     )
@@ -174,16 +167,12 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     })
     .concat(
       kiloExclusiveModels
-        .filter(m => m.status === 'public' && !unavailableModelIds.has(m.public_id))
+        .filter(m => !unavailableModelIds.has(m.public_id))
         .map(model => convertFromKiloExclusiveModel(model))
     )
     .concat(autoModels)
     .map(applyCustomPricingToModel);
-  const exclusiveById = new Map(
-    kiloExclusiveModels
-      .filter(entry => entry.status === 'public')
-      .map(entry => [entry.public_id, entry])
-  );
+  const exclusiveById = new Map(kiloExclusiveModels.map(entry => [entry.public_id, entry]));
   const providerLookupId = (model: OpenRouterModel) =>
     exclusiveById.get(model.id)?.internal_id ?? model.alias_target ?? model.id;
   const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));

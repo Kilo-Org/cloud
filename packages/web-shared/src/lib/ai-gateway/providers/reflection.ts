@@ -43,6 +43,7 @@ function hasChatCompletionsReasoning(message: MessageWithReasoning) {
 }
 
 function addChatCompletionsReasoningPlaceholders(request: OpenRouterChatCompletionRequest) {
+  let placeholderCount = 0;
   for (const message of request.messages) {
     if (message.role !== 'assistant') {
       continue;
@@ -55,7 +56,9 @@ function addChatCompletionsReasoningPlaceholders(request: OpenRouterChatCompleti
       ...(assistant.reasoning_details ?? []),
       { type: ReasoningDetailType.Text, text: REASONING_PLACEHOLDER },
     ];
+    placeholderCount++;
   }
+  return placeholderCount;
 }
 
 function makePlaceholderThinkingBlock(): Anthropic.ThinkingBlockParam {
@@ -63,6 +66,7 @@ function makePlaceholderThinkingBlock(): Anthropic.ThinkingBlockParam {
 }
 
 function addMessagesReasoningPlaceholders(request: GatewayMessagesRequest) {
+  let placeholderCount = 0;
   for (const message of request.messages) {
     if (message.role !== 'assistant') {
       continue;
@@ -72,6 +76,7 @@ function addMessagesReasoningPlaceholders(request: GatewayMessagesRequest) {
         makePlaceholderThinkingBlock(),
         ...(message.content ? [{ type: 'text' as const, text: message.content }] : []),
       ];
+      placeholderCount++;
       continue;
     }
     const hasThinking = message.content.some(
@@ -79,8 +84,10 @@ function addMessagesReasoningPlaceholders(request: GatewayMessagesRequest) {
     );
     if (!hasThinking) {
       message.content.unshift(makePlaceholderThinkingBlock());
+      placeholderCount++;
     }
   }
+  return placeholderCount;
 }
 
 type ResponsesInputItem = OpenAI.Responses.ResponseInputItem;
@@ -114,7 +121,7 @@ function hasResponsesReasoning(item: ResponsesInputItem) {
 
 function addResponsesReasoningPlaceholders(request: GatewayResponsesRequest) {
   if (!Array.isArray(request.input)) {
-    return;
+    return 0;
   }
   const input: ResponsesInputItem[] = [];
   let placeholderCount = 0;
@@ -142,6 +149,7 @@ function addResponsesReasoningPlaceholders(request: GatewayResponsesRequest) {
   }
   closeTurn();
   request.input = input;
+  return placeholderCount;
 }
 
 /**
@@ -149,16 +157,25 @@ function addResponsesReasoningPlaceholders(request: GatewayResponsesRequest) {
  * reasoning. Clients drop reasoning after a model switch, so every assistant
  * turn without reasoning text gets a placeholder.
  */
-export function addReflectionReasoningPlaceholders(request: GatewayRequest) {
-  switch (request.kind) {
-    case 'chat_completions':
-      addChatCompletionsReasoningPlaceholders(request.body);
-      break;
-    case 'messages':
-      addMessagesReasoningPlaceholders(request.body);
-      break;
-    case 'responses':
-      addResponsesReasoningPlaceholders(request.body);
-      break;
+export function addReflectionReasoningPlaceholders(model: string, request: GatewayRequest) {
+  const placeholderCount = (() => {
+    switch (request.kind) {
+      case 'chat_completions':
+        return addChatCompletionsReasoningPlaceholders(request.body);
+      case 'messages':
+        return addMessagesReasoningPlaceholders(request.body);
+      case 'responses':
+        return addResponsesReasoningPlaceholders(request.body);
+    }
+  })();
+  if (placeholderCount > 0) {
+    console.warn(
+      '[addReflectionReasoningPlaceholders] mutated request with reasoning placeholders',
+      {
+        model,
+        requestKind: request.kind,
+        placeholderCount,
+      }
+    );
   }
 }

@@ -55,9 +55,12 @@ import {
 } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
-import { fetchCustomRoutingTable } from './benchmark-origin';
 import { getRoutingTable } from './routing-table';
-import { getEffectiveAutoRoutingSettings } from './routing-mode';
+import {
+  getEffectiveAutoRoutingSettings,
+  getOwnerCustomRoutingTable,
+  type AutoRoutingSettingsOwner,
+} from './routing-mode';
 import type { HonoEnv } from './hono-env';
 import { resolveLegacyPoolRouting, type LegacyPoolRouting } from './legacy-pool-overlap';
 import { getModelCapabilities } from './model-capabilities';
@@ -65,8 +68,8 @@ import type { ModelCapabilitiesMap } from './model-capabilities';
 import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
 
 const CUSTOM_ROUTING_TABLE_CACHE_TTL_MS = 60_000;
+export const CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES = 64;
 
-/** Ordered canonical key for an Efficient model pool (sort by poolEntryKey). */
 export function orderedPoolCacheKey(pool: EfficientModelPool): string {
   return [...pool]
     .map(entry => poolEntryKey(entry))
@@ -74,7 +77,6 @@ export function orderedPoolCacheKey(pool: EfficientModelPool): string {
     .join('\n');
 }
 
-// Per-pool-key isolate caches that close over the pool entries (~60s TTL).
 const customTableLoaders = new Map<
   string,
   ReturnType<typeof ttlCached<Env, RoutingTable | null>>
@@ -89,14 +91,20 @@ export function clearCustomRoutingTableCache(): void {
 
 async function loadCustomRoutingTable(
   env: Env,
-  pool: EfficientModelPool
+  pool: EfficientModelPool,
+  owner: AutoRoutingSettingsOwner
 ): Promise<RoutingTable | null> {
-  const key = orderedPoolCacheKey(pool);
+  const key = JSON.stringify([owner.ownerType, owner.ownerId, orderedPoolCacheKey(pool)]);
   let cache = customTableLoaders.get(key);
   if (!cache) {
-    const poolSnapshot = pool;
+    if (customTableLoaders.size >= CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES) {
+      const oldestKey = customTableLoaders.keys().next().value;
+      if (oldestKey !== undefined) {
+        customTableLoaders.delete(oldestKey);
+      }
+    }
     cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, (e: Env) =>
-      fetchCustomRoutingTable(e, poolSnapshot)
+      getOwnerCustomRoutingTable(e, owner)
     );
     customTableLoaders.set(key, cache);
   }
@@ -438,9 +446,9 @@ function platformTarget(
 
       const tableStartedAt = performance.now();
       const [routingTable, shadowRoutingTable] = await Promise.all([
-        configuredPool === null
+        configuredPool === null || effectiveSettings.poolOwner === null
           ? getRoutingTable(c.env, router)
-          : loadCustomRoutingTable(c.env, configuredPool),
+          : loadCustomRoutingTable(c.env, configuredPool, effectiveSettings.poolOwner),
         router === 'efficient' ? getShadowRoutingTable(c.env) : null,
       ]);
       timings.tableMs = performance.now() - tableStartedAt;

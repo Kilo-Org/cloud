@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f8ee87e8-b2e8-4aaa-87e6-fcc610bae23c",
+  "id": "90c397cc-b7c4-4274-ba17-c3f578c3b9b2",
   "prevId": "09819ac0-dfe3-423d-91f4-ee97b6918685",
   "tables": {
     "benchmark_config": {
@@ -237,6 +237,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "invalidated_at": {
+          "name": "invalidated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "requested_at": {
           "name": "requested_at",
           "type": "text",
@@ -450,6 +457,67 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "benchmark_subscriptions": {
+      "name": "benchmark_subscriptions",
+      "columns": {
+        "router": {
+          "name": "router",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_type": {
+          "name": "owner_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "benchmark_subscriptions_router_owner_type_owner_id_pk": {
+          "columns": [
+            "router",
+            "owner_type",
+            "owner_id"
+          ],
+          "name": "benchmark_subscriptions_router_owner_type_owner_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -705,13 +773,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
-        },
-        "pending_grader_usage": {
-          "name": "pending_grader_usage",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {},

@@ -227,6 +227,21 @@ export type ResolveCloudAgentRootSessionForKiloSessionResult = {
   cloudAgentSessionId: string;
 } | null;
 
+const sdkSnapshotFileDiffBaseSchema = z.object({
+  file: z.string(),
+  additions: z.number(),
+  deletions: z.number(),
+  status: z.enum(['added', 'deleted', 'modified']).optional(),
+});
+
+const sdkTokenUsageSchema = z.object({
+  total: z.number().optional(),
+  input: z.number(),
+  output: z.number(),
+  reasoning: z.number(),
+  cache: z.object({ read: z.number(), write: z.number() }),
+});
+
 export const kiloSdkSessionInfoSchema = z.object({
   id: sessionIdSchema,
   slug: z.string(),
@@ -240,16 +255,7 @@ export const kiloSdkSessionInfoSchema = z.object({
       additions: z.number(),
       deletions: z.number(),
       files: z.number(),
-      diffs: z
-        .array(
-          z.object({
-            file: z.string(),
-            additions: z.number(),
-            deletions: z.number(),
-            status: z.enum(['added', 'deleted', 'modified']).optional(),
-          })
-        )
-        .optional(),
+      diffs: z.array(sdkSnapshotFileDiffBaseSchema).optional(),
     })
     .optional(),
   share: z.object({ url: z.string() }).optional(),
@@ -370,12 +376,6 @@ export const sdkAssistantErrorSchema = z.discriminatedUnion('name', [
 ]);
 export type KiloSdkAssistantError = z.infer<typeof sdkAssistantErrorSchema>;
 
-const sdkSnapshotFileDiffBaseSchema = z.object({
-  file: z.string(),
-  additions: z.number(),
-  deletions: z.number(),
-  status: z.enum(['added', 'deleted', 'modified']).optional(),
-});
 export const sdkSnapshotFileDiffSchema = sdkSnapshotFileDiffBaseSchema
   .extend({ patch: z.string() })
   .strict();
@@ -482,13 +482,7 @@ export const kiloSdkAssistantMessageSchema = z.object({
   path: z.object({ cwd: z.string(), root: z.string() }),
   summary: z.boolean().optional(),
   cost: z.number(),
-  tokens: z.object({
-    total: z.number().optional(),
-    input: z.number(),
-    output: z.number(),
-    reasoning: z.number(),
-    cache: z.object({ read: z.number(), write: z.number() }),
-  }),
+  tokens: sdkTokenUsageSchema,
   structured: z.unknown().optional(),
   variant: z.string().optional(),
   finish: z.string().optional(),
@@ -630,13 +624,7 @@ export const kiloSdkPartSchema = z.discriminatedUnion('type', [
     reason: z.string(),
     snapshot: z.string().optional(),
     cost: z.number(),
-    tokens: z.object({
-      total: z.number().optional(),
-      input: z.number(),
-      output: z.number(),
-      reasoning: z.number(),
-      cache: z.object({ read: z.number(), write: z.number() }),
-    }),
+    tokens: sdkTokenUsageSchema,
     model: z.object({ providerID: z.string(), modelID: z.string() }).optional(),
   }),
   z.object({ ...sdkPartBaseShape, type: z.literal('snapshot'), snapshot: z.string() }),

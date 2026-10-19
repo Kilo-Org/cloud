@@ -5,14 +5,12 @@ import {
   CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
-  OWNER_POOL_CONVERSION_SCAN_PATH,
 } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { authMiddleware } from './auth';
 import { classifierAnalyticsHandler } from './admin-classifier-analytics';
 import { getClassifierModelHandler, putClassifierModelHandler } from './admin-classifier-model';
 import { getRoutingModeHandler, putRoutingModeHandler } from './admin-routing-mode';
-import { ownerPoolConversionScanHandler } from './owner-pool-conversion';
 import { decideHandler } from './decide';
 import type { HonoEnv } from './hono-env';
 import {
@@ -47,7 +45,6 @@ app.get('/admin/classifier-model', getClassifierModelHandler);
 app.put('/admin/classifier-model', putClassifierModelHandler);
 app.get('/admin/routing-mode', getRoutingModeHandler);
 app.put('/admin/routing-mode', putRoutingModeHandler);
-app.post(OWNER_POOL_CONVERSION_SCAN_PATH, ownerPoolConversionScanHandler);
 app.get('/admin/classifier-analytics', classifierAnalyticsHandler);
 
 app.post('/decide', decideHandler);

@@ -19,6 +19,8 @@ import {
   fetchGitLabProjects,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
+  findKiloReviewNote,
+  hasMRNoteWithMarker,
 } from './adapter';
 
 // Mock fetch globally
@@ -679,5 +681,172 @@ describe('validatePersonalAccessToken', () => {
       error: 'GitLab instance URL host resolves to an address that is not allowed.',
     });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+const TOKEN_USER = {
+  id: 42,
+  username: 'kilo-review-bot',
+  name: 'Kilo Review Bot',
+  email: 'bot@example.com',
+  avatar_url: 'https://gitlab.com/avatar/42',
+  web_url: 'https://gitlab.com/kilo-review-bot',
+};
+
+function mockTokenUser() {
+  mockFetch.mockImplementationOnce((_url: string) =>
+    Promise.resolve({
+      ok: true,
+      json: async () => TOKEN_USER,
+      headers: { get: () => null },
+    })
+  );
+}
+
+type TestNote = {
+  id: number;
+  body: string;
+  author: { id: number; username: string; name: string };
+  created_at: string;
+  updated_at: string;
+  system: boolean;
+  noteable_id: number;
+  noteable_type: string;
+  noteable_iid: number;
+  resolvable: boolean;
+};
+
+function makeNote(overrides: {
+  id: number;
+  body: string;
+  authorId: number;
+  system?: boolean;
+  updated_at?: string;
+}): TestNote {
+  return {
+    id: overrides.id,
+    body: overrides.body,
+    author: {
+      id: overrides.authorId,
+      username: overrides.authorId === 42 ? 'kilo-review-bot' : 'someone-else',
+      name: overrides.authorId === 42 ? 'Kilo Review Bot' : 'Someone Else',
+    },
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: overrides.updated_at ?? '2026-01-02T00:00:00Z',
+    system: overrides.system ?? false,
+    noteable_id: 1,
+    noteable_type: 'MergeRequest',
+    noteable_iid: 7,
+    resolvable: false,
+  };
+}
+
+function mockNotePage(notes: TestNote[]) {
+  mockFetch.mockImplementationOnce((_url: string) =>
+    Promise.resolve({
+      ok: true,
+      json: async () => notes,
+      headers: { get: () => null },
+    })
+  );
+}
+
+describe('findKiloReviewNote', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('returns the latest note carrying the marker when it is authored by the token user', async () => {
+    mockTokenUser();
+    mockNotePage([
+      makeNote({
+        id: 11,
+        body: 'review text <!-- kilo-review -->',
+        authorId: 42,
+        updated_at: '2026-01-02T00:00:00Z',
+      }),
+      makeNote({
+        id: 12,
+        body: 'newer review text <!-- kilo-review -->',
+        authorId: 42,
+        updated_at: '2026-01-03T00:00:00Z',
+      }),
+    ]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 12, body: 'newer review text <!-- kilo-review -->' });
+  });
+
+  it('ignores a note carrying the marker when a different account authored it', async () => {
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 13, body: 'stranger text <!-- kilo-review -->', authorId: 77 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toBeNull();
+  });
+
+  it('still returns the token user note when a stranger note also carries the marker', async () => {
+    mockTokenUser();
+    mockNotePage([
+      makeNote({ id: 13, body: 'stranger text <!-- kilo-review -->', authorId: 77 }),
+      makeNote({ id: 14, body: 'bot text <!-- kilo-review -->', authorId: 42 }),
+    ]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 14, body: 'bot text <!-- kilo-review -->' });
+  });
+
+  it('ignores system notes regardless of author', async () => {
+    mockTokenUser();
+    mockNotePage([
+      makeNote({ id: 15, body: 'system <!-- kilo-review -->', authorId: 42, system: true }),
+    ]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toBeNull();
+  });
+
+  it('propagates identity lookup failures', async () => {
+    mockFetch.mockImplementationOnce((_url: string) =>
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        text: async () => 'Server error',
+        headers: { get: () => null },
+      })
+    );
+
+    await expect(findKiloReviewNote('test-token', 'group/project', 7)).rejects.toThrow(
+      'GitLab user fetch failed: 500'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('hasMRNoteWithMarker', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('reports the marker when a token-user note carries it', async () => {
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 21, body: 'notice <!-- billing-notice -->', authorId: 42 })]);
+
+    await expect(
+      hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')
+    ).resolves.toBe(true);
+  });
+
+  it('reports no marker when a different account authored the matching note', async () => {
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 22, body: 'notice <!-- billing-notice -->', authorId: 77 })]);
+
+    await expect(
+      hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')
+    ).resolves.toBe(false);
   });
 });

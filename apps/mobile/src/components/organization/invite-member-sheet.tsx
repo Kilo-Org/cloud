@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -33,6 +33,36 @@ export function InviteMemberSheet() {
   const [canSubmit, setCanSubmit] = useState(false);
   const isBillingManager = myRole === 'billing_manager';
   const [role, setRole] = useState<OrgRole>('member');
+  const openedOnceRef = useRef(false);
+  const [formEpoch, setFormEpoch] = useState(0);
+  const resetInvite = mutations.invite.reset;
+  // A reset would drop an in-flight invite's callbacks (its success toast and
+  // the members invalidation), so a reopen keeps observing one that is still
+  // running.
+  const invitePendingRef = useRef(false);
+  invitePendingRef.current = mutations.invite.isPending;
+
+  // The route can stay mounted while its sheet is dismissed and presented
+  // again, so mount-time state is not a clean slate. Every later focus starts
+  // the form over: no text, no derived canSubmit, default role, a field
+  // instance without blur-validation, and no mutation error from the last
+  // open. The first focus of a fresh mount is already clean, so it is skipped
+  // rather than remounting the auto-focused field.
+  useFocusEffect(
+    useCallback(() => {
+      if (!openedOnceRef.current) {
+        openedOnceRef.current = true;
+        return;
+      }
+      emailRef.current = '';
+      setCanSubmit(false);
+      setRole('member');
+      setFormEpoch(epoch => epoch + 1);
+      if (!invitePendingRef.current) {
+        resetInvite();
+      }
+    }, [resetInvite])
+  );
 
   if (isResolving) {
     return (
@@ -50,6 +80,9 @@ export function InviteMemberSheet() {
   }
 
   const onSubmit = () => {
+    if (!canSubmit) {
+      return;
+    }
     const email = emailRef.current.trim().toLowerCase();
     mutations.invite.mutate(
       { email, role: isBillingManager ? 'member' : role },
@@ -77,6 +110,7 @@ export function InviteMemberSheet() {
       </Text>
 
       <FormField
+        key={formEpoch}
         label={t('common.email')}
         required
         placeholder={t('organization.inviteMember.emailPlaceholder')}

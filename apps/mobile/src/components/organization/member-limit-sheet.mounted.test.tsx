@@ -20,7 +20,11 @@ const query = vi.hoisted(() => ({
   isFetching: false,
   refetch: vi.fn(),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
+const invite = vi.hoisted(() => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: vi.fn() }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
@@ -55,7 +59,9 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isActiveOrgMember: (member: { status: string }) => member.status === 'active',
   isMoneyRole: (role: string) => role === 'owner' || role === 'billing_manager',
 }));
-vi.mock('@/lib/hooks/use-organization-mutations', () => ({ useOrganizationMutations: () => ({}) }));
+vi.mock('@/lib/hooks/use-organization-mutations', () => ({
+  useOrganizationMutations: () => ({ invite }),
+}));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ email: 'test@example.com' }),
 }));

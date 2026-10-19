@@ -138,6 +138,7 @@ describe('POST /api/auth/native/token', () => {
       isNew: false,
     } as never);
     mockGenerateApiToken.mockReturnValue('minted-jwt');
+    mockCreateDeviceSession.mockResolvedValue('session-1');
     mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: false });
     mockFindUserById.mockResolvedValue(undefined);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
@@ -189,7 +190,13 @@ describe('POST /api/auth/native/token', () => {
         undefined,
         true
       );
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
     });
 
     it('falls back to the email prefix as the name when fullName is not provided', async () => {
@@ -1544,8 +1551,13 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
@@ -1566,7 +1578,13 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
   });
@@ -1793,8 +1811,13 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'device-session-1',
+      });
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     });
 

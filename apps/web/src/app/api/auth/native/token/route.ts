@@ -99,6 +99,29 @@ async function checkExistingProviderAccount(
   return eligibility.ok ? undefined : eligibilityResponse(eligibility);
 }
 
+/**
+ * Mint the long-lived credential returned to a sign-in that does not receive a
+ * refresh pair. The response shape stays the same, and the credential carries
+ * the device session created for this sign-in.
+ */
+async function legacyTokenResponse(params: {
+  user: Parameters<typeof generateApiToken>[0];
+  sessionId?: string;
+  userAgent?: string;
+  created: boolean;
+}) {
+  const deviceSessionId =
+    params.sessionId ??
+    (await createDeviceSession({
+      userId: params.user.id,
+      userAgent: params.userAgent,
+    }));
+
+  captureMessage('native_token_legacy_long_lived_count: 1');
+  const token = generateApiToken(params.user, { deviceSessionId });
+  return NextResponse.json({ token, created: params.created }, { status: 200 });
+}
+
 const requestSchema = z.discriminatedUnion('provider', [
   z.object({
     provider: z.literal('apple'),
@@ -232,9 +255,11 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       );
     }
 
-    captureMessage('native_token_legacy_long_lived_count: 1');
-    const token = generateApiToken(user);
-    return NextResponse.json({ token, created: false }, { status: 200 });
+    return legacyTokenResponse({
+      user,
+      userAgent: request.headers.get('user-agent') ?? undefined,
+      created: false,
+    });
   }
 
   if (data.provider === 'apple') {
@@ -518,9 +543,12 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         );
       }
 
-      captureMessage('native_token_legacy_long_lived_count: 1');
-      const token = generateApiToken(result.user);
-      return NextResponse.json({ token, created: result.isNew }, { status: 200 });
+      return legacyTokenResponse({
+        user: result.user,
+        sessionId,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+        created: result.isNew,
+      });
     } catch (error) {
       phase = 'release';
       throw error;
@@ -677,7 +705,10 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     );
   }
 
-  captureMessage('native_token_legacy_long_lived_count: 1');
-  const token = generateApiToken(result.user);
-  return NextResponse.json({ token, created: result.isNew }, { status: 200 });
+  return legacyTokenResponse({
+    user: result.user,
+    sessionId,
+    userAgent: request.headers.get('user-agent') ?? undefined,
+    created: result.isNew,
+  });
 });

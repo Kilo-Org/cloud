@@ -18,7 +18,8 @@ import type { NextAuthOptions, JWT, LoggerInstance } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { redirect } from 'next/navigation';
-import type { Organization, User } from '@kilocode/db/schema';
+import { device_sessions, type Organization, type User } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
@@ -233,7 +234,10 @@ export async function getUserFromBearerForCredentialExchange(
     false,
     undefined,
     undefined,
-    db
+    db,
+    undefined,
+    undefined,
+    auth.claims.deviceSessionId
   );
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
@@ -418,6 +422,29 @@ async function validateUserAuthorization(
     return report_blocked_user(kiloUserId);
   } else if (opts.adminOnly && !user.is_admin) {
     return authError(403, 'Access denied (nonadmin)', kiloUserId);
+  }
+
+  // A credential bound to a device session dies with that session. The lookup
+  // reads the primary because a session created moments ago must authenticate
+  // its first request, and a revocation must take effect without replica lag.
+  if (deviceSessionId !== undefined) {
+    const session = uuid.safeParse(deviceSessionId).success
+      ? await db.query.device_sessions.findFirst({
+          where: and(
+            eq(device_sessions.id, deviceSessionId),
+            eq(device_sessions.kilo_user_id, kiloUserId),
+            isNull(device_sessions.revoked_at)
+          ),
+          columns: { id: true },
+        })
+      : undefined;
+    if (!session) {
+      // The caller presented a credential that no longer works, so this must
+      // not degrade into an anonymous request.
+      return authError(401, 'Device session is no longer active', kiloUserId, {
+        credentialsRejected: true,
+      });
+    }
   }
 
   if (organizationId) {

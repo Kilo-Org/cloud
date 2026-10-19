@@ -11,6 +11,7 @@ const mockHeaders = jest.fn();
 const mockFindUser = jest.fn();
 const mockMembership = jest.fn();
 const mockBalance = jest.fn();
+const mockDeviceSession = jest.fn();
 jest.mock('next/headers', () => ({ headers: () => mockHeaders(), cookies: jest.fn() }));
 jest.mock('next-auth', () => ({
   __esModule: true,
@@ -22,7 +23,12 @@ jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: (...args: unknown[]) => mockFindUser(...args),
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: { query: { kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) } } },
+  db: {
+    query: {
+      kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) },
+      device_sessions: { findFirst: (...args: unknown[]) => mockDeviceSession(...args) },
+    },
+  },
   readDb: {},
 }));
 jest.mock('@kilocode/worker-utils/account-access', () => ({
@@ -61,6 +67,7 @@ jest.mock('@/lib/user/sso', () => ({}));
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({}));
 
 const organizationId = '11111111-1111-4111-8111-111111111111';
+const deviceSessionId = '22222222-2222-4222-8222-222222222222';
 const user = {
   id: 'user_123',
   api_token_pepper: 'current-pepper',
@@ -97,6 +104,7 @@ beforeEach(() => {
   mockFindUser.mockResolvedValue(user);
   mockMembership.mockResolvedValue(true);
   mockBalance.mockResolvedValue({ balance: 12 });
+  mockDeviceSession.mockResolvedValue({ id: deviceSessionId });
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => jest.restoreAllMocks());
@@ -111,7 +119,7 @@ it.each(['human-api', 'device-access'])(
     requestWith(
       controlToken({
         tokenPurpose,
-        ...(tokenPurpose === 'device-access' ? { deviceSessionId: 'device_123' } : {}),
+        ...(tokenPurpose === 'device-access' ? { deviceSessionId } : {}),
       })
     );
     expect((await GET()).status).toBe(200);

@@ -38,7 +38,7 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { kilocode_users, organizations } from '@kilocode/db/schema';
+import { device_sessions, kilocode_users, organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -648,15 +648,41 @@ describe('getUserFromAuth', () => {
       google_user_email: `api-token-device-session-${crypto.randomUUID()}@example.com`,
       api_token_pepper: 'device-session-pepper',
     });
-    const deviceSessionId = crypto.randomUUID();
-    const token = generateApiToken(user, { deviceSessionId });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
 
     expect(result.authFailedResponse).toBeNull();
     expect(result.user?.id).toBe(user.id);
-    expect(result.deviceSessionId).toBe(deviceSessionId);
+    expect(result.deviceSessionId).toBe(session!.id);
+  });
+
+  test('rejects a bearer token whose device session was revoked', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-revoked-session-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'revoked-session-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: user.id,
+        revoked_at: new Date().toISOString(),
+        revoked_reason: 'logout',
+      })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
   });
 
   test('web-session branch leaves deviceSessionId undefined', async () => {

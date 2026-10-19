@@ -48,9 +48,9 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
   switch (template) {
     case 'autoRoutingPoolNotice':
       return {
-        cutover_at: 'November 1, 2099 at 12:00:00 UTC (2099-11-01T12:00:00.000Z)',
+        cutover_at: 'Sunday, November 1, 2099 at 12:00 UTC',
         routers: new RawHtml(
-          `<li>Your personal pool<br /><code>kilo-auto/custom/efficient</code><br /><a href="${NEXTAUTH_URL}/profile">Manage this pool</a></li>`
+          `<li><strong>Your personal pool:</strong> <code>kilo-auto/custom/efficient</code> · <a href="${NEXTAUTH_URL}/profile">Manage</a></li>`
         ),
       };
     case 'orgSubscription':

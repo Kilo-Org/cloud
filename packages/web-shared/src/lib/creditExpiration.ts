@@ -229,7 +229,11 @@ async function fetchOpenCreditLotsForOrganizations(
       expiredCredits,
       and(
         eq(expiredCredits.organization_id, creditTransactionsTable.organization_id),
-        eq(expiredCredits.credit_category, 'credits_expired'),
+        inArray(expiredCredits.credit_category, [
+          'credits_expired',
+          'orb_credit_expired',
+          'orb_credit_voided',
+        ]),
         eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
       )
     )

@@ -7,7 +7,7 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 async function createTestOrg(
@@ -633,6 +633,65 @@ describe('processOrganizationExpirationsBatch', () => {
       next_credit_expiration_at: null,
     });
   });
+
+  it.each(['orb_credit_expired', 'orb_credit_voided'] as const)(
+    'does not expire a lot already closed by %s',
+    async closureCategory => {
+      const org = await insertOrganization({
+        total_microdollars_acquired: 5_000_000,
+        microdollars_balance: 5_000_000,
+        next_credit_expiration_at: '2024-01-10T00:00:00Z',
+      });
+      const closedLotId = randomUUID();
+      await db.insert(creditTransactionsTable).values([
+        {
+          id: closedLotId,
+          kilo_user_id: ownerId,
+          organization_id: org.id,
+          amount_microdollars: 5_000_000,
+          is_free: true,
+          expiry_date: '2024-01-10T00:00:00Z',
+          expiration_baseline_microdollars_used: 0,
+          original_baseline_microdollars_used: 0,
+        },
+        {
+          kilo_user_id: ownerId,
+          organization_id: org.id,
+          amount_microdollars: -5_000_000,
+          is_free: true,
+          credit_category: closureCategory,
+          original_transaction_id: closedLotId,
+        },
+        {
+          kilo_user_id: ownerId,
+          organization_id: org.id,
+          amount_microdollars: 5_000_000,
+          is_free: false,
+        },
+      ]);
+
+      const result = await processOrganizationExpirationsBatch(
+        [org],
+        new Date('2024-01-15T00:00:00Z')
+      );
+
+      expect(result.get(org.id)).toEqual({
+        microdollars_used: 0,
+        total_microdollars_acquired: 5_000_000,
+        next_credit_expiration_at: null,
+      });
+      const expirations = await db
+        .select()
+        .from(creditTransactionsTable)
+        .where(
+          and(
+            eq(creditTransactionsTable.organization_id, org.id),
+            eq(creditTransactionsTable.credit_category, 'credits_expired')
+          )
+        );
+      expect(expirations).toHaveLength(0);
+    }
+  );
 
   it('retries with current usage when the caller snapshot loses an optimistic race', async () => {
     const staleOrg = await insertOrganization({

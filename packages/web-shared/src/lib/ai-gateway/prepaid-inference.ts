@@ -17,7 +17,7 @@ import {
   isPrepaidInferenceReservationsEnabled,
 } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
+import { billingDb, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { quoteInferenceReservation } from './reservation-quote';
 
@@ -44,10 +44,10 @@ export async function executeLocalInferenceReservation(
     if (!isPrepaidInferenceReservationsEnabled()) {
       throw new Error('Prepaid inference admission is disabled');
     }
-    return reserveInferenceCredits(db, command);
+    return reserveInferenceCredits(billingDb, command);
   }
   if (command.action !== 'release') throw new Error('Invalid ledger command');
-  await db.transaction(tx => releaseInferenceCredits(tx, command));
+  await billingDb.transaction(tx => releaseInferenceCredits(tx, command));
   return { kind: 'released' };
 }
 

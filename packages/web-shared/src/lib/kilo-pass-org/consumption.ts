@@ -11,13 +11,15 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { KiloPassOrgBonusMode, KiloPassOrgIssuanceKind } from '@kilocode/db/schema-types';
-import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import {
   mutateOrganizationUsage,
   type OrganizationUsageMutationResult,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import type { InferenceSettlementPayer } from '@kilocode/db/inference-reservations';
+import type {
+  InferenceReservationTransaction,
+  InferenceSettlementPayer,
+} from '@kilocode/db/inference-reservations';
 
 export type OrganizationConsumptionSource = 'ai-gateway' | 'exa';
 
@@ -69,7 +71,7 @@ function sourceIdentity(input: RecordOrganizationConsumptionInput): string {
  * stable for their source system.
  */
 export async function recordOrganizationConsumption(
-  tx: DrizzleTransaction,
+  tx: InferenceReservationTransaction,
   input: RecordOrganizationConsumptionInput,
   debitPayer?: () => Promise<InferenceSettlementPayer>
 ): Promise<OrganizationConsumptionResult> {

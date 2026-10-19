@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
-import type { NodePgDatabase, NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
-import type { PgTransaction } from 'drizzle-orm/pg-core';
+import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
+import type { PgTransaction, PgTransactionConfig } from 'drizzle-orm/pg-core';
 import type * as schema from './schema';
 import {
   inference_reservations,
@@ -12,10 +12,9 @@ import {
   organizations,
 } from './schema';
 
-export type InferenceReservationTransaction = PgTransaction<
-  NodePgQueryResultHKT,
-  typeof schema,
-  ExtractTablesWithRelations<typeof schema>
+export type InferenceReservationTransaction = Pick<
+  PgTransaction<NodePgQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>,
+  '$with' | 'with' | 'select' | 'insert' | 'update' | 'delete' | 'execute' | 'rollback'
 >;
 
 type ReservationIdentity = {
@@ -174,7 +173,12 @@ async function lockReservation(
 }
 
 export async function reserveInferenceCredits(
-  db: NodePgDatabase<typeof schema>,
+  db: {
+    transaction<T>(
+      callback: (tx: InferenceReservationTransaction) => Promise<T>,
+      config?: PgTransactionConfig
+    ): Promise<T>;
+  },
   input: ReserveInput
 ): Promise<ReserveInferenceCreditsResult> {
   validateIdentity(input);

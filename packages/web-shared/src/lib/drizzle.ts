@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { computeDatabaseUrl } from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import assert from 'node:assert';
@@ -208,6 +209,7 @@ export const readDb = replica.db;
  * consider using `readDb` instead for better performance in US regions.
  */
 export const db = primaryDb;
+export const billingDb = drizzle(pool, { logger: !!DEBUG_QUERY_LOGGING });
 export { sql } from 'drizzle-orm';
 
 // Helper for automatically updating the deleted_at column with database server time

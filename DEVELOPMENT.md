@@ -471,6 +471,10 @@ The enabled benchmark refuses drivers that silently ignore the option.
 `POSTGRES_QUERY_PIPELINING_ENABLED` remains independently disabled by default in application pools.
 Verify the deployed connection pooler and transaction recovery before activating it.
 
+Billing uses a schema-free Drizzle wrapper on the existing primary pool.
+It avoids constructing unrelated relational query builders for each transaction.
+The general client retains its relational query API.
+
 It does not establish production database headroom or actual cross-region admission latency.
 Validate those separately before enabling production admission.
 

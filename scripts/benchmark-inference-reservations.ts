@@ -383,9 +383,11 @@ async function main() {
     resolve(root, 'packages/web-shared/src/lib/drizzle.ts'),
     'Script tsconfig resolves to a different checkout'
   );
-  const { db, pool, closeAllDrizzleConnections, usesSeparateReplica } = requireWeb(
+  const database = requireWeb(
     resolve(root, 'packages/web-shared/src/lib/drizzle.ts')
   ) as typeof ApplicationDatabase;
+  const { db, pool, closeAllDrizzleConnections, usesSeparateReplica } = database;
+  const billingDb = database.billingDb ?? db;
   assert.equal(usesSeparateReplica, false, 'Benchmark cannot use a replica');
   Object.assign(pool.options, {
     max: poolSize,
@@ -944,7 +946,7 @@ async function main() {
                 try {
                   if (request.held) {
                     await measure('reserve', async () => {
-                      const reserved = await reserveInferenceCredits(db, {
+                      const reserved = await reserveInferenceCredits(billingDb, {
                         requestId: request.core.id,
                         userId: request.userId,
                         organizationId: request.payer.organizationId,

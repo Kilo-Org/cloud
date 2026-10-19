@@ -34,6 +34,7 @@ import { subHours } from 'date-fns';
 import { maybePerformOrganizationAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import {
   mutateOrganizationCreditUsage,
+  type InferenceReservationTransaction,
   type InferenceSettlementPayer,
 } from '@kilocode/db/inference-reservations';
 
@@ -299,7 +300,7 @@ export type OrganizationUsageMutationInput = Pick<
 >;
 
 export async function mutateOrganizationUsage(
-  tx: DrizzleTransaction,
+  tx: InferenceReservationTransaction,
   usage: OrganizationUsageMutationInput,
   debitPayer?: () => Promise<InferenceSettlementPayer>
 ): Promise<OrganizationUsageMutationResult> {

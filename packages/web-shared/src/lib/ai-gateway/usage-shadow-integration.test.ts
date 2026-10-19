@@ -12,14 +12,14 @@ import type { SQL } from 'drizzle-orm';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  isUSRegion: () => process.env.VERCEL_REGION === 'sfo1',
-  db: {
+jest.mock('@kilocode/web-shared/lib/drizzle', () => {
+  const db = {
     transaction: jest.fn(),
     select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }),
     query: { microdollar_usage: { findFirst: jest.fn() } },
-  },
-}));
+  };
+  return { db, billingDb: db, isUSRegion: () => process.env.VERCEL_REGION === 'sfo1' };
+});
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   USAGE_SHADOW_PUBLISH_ENABLED: false,
   USAGE_INGEST_URL: 'http://usage.example.test/usage',

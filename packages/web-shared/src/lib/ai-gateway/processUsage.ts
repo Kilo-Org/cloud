@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { db, isUSRegion } from '../drizzle';
+import { billingDb, db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
 import { USAGE_SHADOW_PUBLISH_ENABLED } from '@kilocode/web-shared/lib/config.server';
@@ -589,7 +589,7 @@ async function insertUsageTransaction(
   metadataFields: UsageMetaData,
   bouncerUsageEvent: BouncerUsageEventEnqueue | null
 ): Promise<UsageTransactionResult> {
-  return db.transaction(async tx => {
+  return billingDb.transaction(async tx => {
     const settlement =
       metadataFields.prepaid_reservation_id && metadataFields.prepaid_usage_final === true
         ? {

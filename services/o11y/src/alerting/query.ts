@@ -78,13 +78,14 @@ export function queryErrorRates(
   return queryAnalyticsEngine<ErrorRateRow>(sql, env);
 }
 
-const MODEL_ID_PATTERN = /^[A-Za-z0-9._:/@-]+$/;
+const MODEL_ID_PATTERN = /^[A-Za-z0-9._:/@~-]+$/;
 const MODEL_ID_MAX_LENGTH = 200;
 
 /**
  * A model identifier that is safe to interpolate into an Analytics Engine SQL
  * string literal: restricted to a fixed character set and length, with quotes,
- * whitespace, and backslashes rejected outright.
+ * whitespace, and backslashes rejected outright. `~` covers gateway alias ids
+ * such as `~vendor/family-latest`.
  */
 export const ModelIdSchema = z
   .string()

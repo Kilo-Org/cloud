@@ -30,6 +30,7 @@ describe('model id validation', () => {
   it('accepts a normal model slug', () => {
     expect(parseModelId('anthropic/claude-sonnet-4.5')).toBe('anthropic/claude-sonnet-4.5');
     expect(ModelIdSchema.safeParse('openai/gpt-4o-mini').success).toBe(true);
+    expect(ModelIdSchema.safeParse('~vendor/family-latest').success).toBe(true);
   });
 
   it('rejects a model id with a backslash', () => {

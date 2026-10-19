@@ -21,6 +21,7 @@ import { parseClassification } from './parsers/classification-parser';
 import { createCloudAgentNextFetchClient } from '@kilocode/worker-utils';
 import { buildClassificationPrompt } from './services/prompt-builder';
 import { fetchRepoLabels, DEFAULT_LABELS } from './services/github-labels-service';
+import { duplicateResultSchema } from './types';
 
 /**
  * Constant-time comparison for auth secrets. Not exposed on Workers runtime
@@ -32,6 +33,32 @@ function constantTimeEqual(a: string, b: string): boolean {
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
+}
+
+/**
+ * Maximum number of raw title characters quoted in a duplicate notice.
+ */
+const QUOTED_TITLE_MAX_LENGTH = 280;
+
+/**
+ * Render another issue's title for a bot-authored comment as a single inline
+ * code span, which renders its content literally per CommonMark. The
+ * delimiter run is one backtick longer than the longest backtick run in the
+ * (truncated) title, so any title — including one made entirely of
+ * backticks — stays inside the span. A single space pads the content when it
+ * starts or ends with a backtick, per CommonMark.
+ */
+export function formatQuotedIssueTitle(title: string): string {
+  const truncated =
+    title.length > QUOTED_TITLE_MAX_LENGTH ? `${title.slice(0, QUOTED_TITLE_MAX_LENGTH)}…` : title;
+  const longestRun = [...truncated.matchAll(/`+/g)].reduce(
+    (max, run) => Math.max(max, run[0].length),
+    0
+  );
+  const delimiter = '`'.repeat(longestRun + 1);
+  const needsPadding = truncated.startsWith('`') || truncated.endsWith('`');
+  const content = needsPadding ? ` ${truncated} ` : truncated;
+  return `${delimiter}${content}${delimiter}`;
 }
 
 export class TriageOrchestrator extends DurableObject<Env> {
@@ -253,7 +280,11 @@ export class TriageOrchestrator extends DurableObject<Env> {
       throw new Error(`Duplicate check failed: ${response.statusText}`);
     }
 
-    return await response.json();
+    const parsed = duplicateResultSchema.safeParse(await response.json());
+    if (!parsed.success) {
+      throw new Error(`Duplicate check returned an invalid response: ${parsed.error.message}`);
+    }
+    return parsed.data;
   }
 
   /**
@@ -480,15 +511,15 @@ export class TriageOrchestrator extends DurableObject<Env> {
     // Prefer the ticket that matches the canonical duplicateOfTicketId; fall back to the
     // first similar ticket if no match is found (defensive: shouldn't happen in practice).
     const duplicateTicket =
-      result.similarTickets?.find(t => t.ticketId === result.duplicateOfTicketId) ??
-      result.similarTickets?.[0];
+      result.similarTickets.find(t => t.ticketId === result.duplicateOfTicketId) ??
+      result.similarTickets[0];
     if (duplicateTicket) {
       const issueUrl = `https://github.com/${duplicateTicket.repoFullName}/issues/${duplicateTicket.issueNumber}`;
-      const escapedTitle = duplicateTicket.issueTitle.replace(/([\\*_~`[\]()#>!|])/g, '\\$1');
+      const quotedTitle = formatQuotedIssueTitle(duplicateTicket.issueTitle);
       const commentBody = [
         `This issue appears to be a duplicate of ${issueUrl}.`,
         '',
-        `> **${escapedTitle}** (#${duplicateTicket.issueNumber})`,
+        `> **${quotedTitle}** (#${duplicateTicket.issueNumber})`,
         '',
         `Similarity score: ${Math.round(duplicateTicket.similarity * 100)}%`,
         '',

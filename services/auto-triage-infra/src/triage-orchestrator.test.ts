@@ -12,8 +12,19 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-import { TriageOrchestrator } from './triage-orchestrator';
-import { classificationCallbackPayloadSchema, type TriageTicket } from './types';
+import { TriageOrchestrator, formatQuotedIssueTitle } from './triage-orchestrator';
+import {
+  classificationCallbackPayloadSchema,
+  duplicateResultSchema,
+  type DuplicateResult,
+  type TriageTicket,
+} from './types';
+import { z } from 'zod';
+
+const postCommentRequestSchema = z.object({
+  ticketId: z.string(),
+  body: z.string(),
+});
 
 const callbackSecret = 'callback-secret';
 const cloudAgentSessionId = 'agent_triage';
@@ -32,7 +43,7 @@ function createTicket(): TriageTicket {
       modelSlug: 'test-model',
     },
     owner: { type: 'user', id: 'user-1', userId: 'user-1' },
-    status: 'analyzing',
+    status: 'pending',
     cloudAgentSessionId,
     callbackSecret,
     updatedAt: '2026-06-10T00:00:00.000Z',
@@ -45,11 +56,13 @@ function createHarness() {
     storedState = structuredClone(value);
   });
   const deleteAlarm = vi.fn(async () => {});
+  const setAlarm = vi.fn(async () => {});
   const context = {
     storage: {
       get: async () => structuredClone(storedState),
       put,
       deleteAlarm,
+      setAlarm,
     },
   } as unknown as DurableObjectState;
   const environment = {
@@ -139,5 +152,230 @@ describe('TriageOrchestrator classification failure callbacks', () => {
         body: JSON.stringify({ status: 'failed', errorMessage: 'legacy wrapper error' }),
       })
     );
+  });
+});
+
+function validDuplicateResult(): DuplicateResult {
+  return {
+    isDuplicate: true,
+    duplicateOfTicketId: 'ticket-2',
+    similarityScore: 0.93,
+    similarTickets: [
+      {
+        ticketId: 'ticket-2',
+        issueNumber: 7,
+        issueTitle: 'Crash on save',
+        similarity: 0.93,
+        repoFullName: 'kilocode/example',
+      },
+    ],
+  };
+}
+
+function runWithDuplicateResponse(
+  responseBody: unknown
+): Promise<{ bodies: string[]; fetchMock: ReturnType<typeof vi.fn> }> {
+  const fetchMock = vi.fn(async (url: unknown, init?: RequestInit): Promise<Response> => {
+    void init;
+    const route = String(url).replace('https://api.example.com/api/internal/', '');
+    if (route === 'triage/check-duplicates') {
+      return new Response(JSON.stringify(responseBody), { status: 200 });
+    }
+    return new Response(null, { status: 200 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const orchestrator = createHarness().orchestrator;
+  return orchestrator.runTriage().then(() => {
+    const bodies = fetchMock.mock.calls
+      .filter(call => String(call[0]).endsWith('/api/internal/triage/post-comment'))
+      .map(call => {
+        const init = call[1];
+        if (!init || typeof init.body !== 'string') {
+          throw new Error('post-comment fetch call without a body');
+        }
+        // postComment wraps the comment in {ticketId, body}; parse it as a schema boundary.
+        const request = postCommentRequestSchema.parse(JSON.parse(init.body));
+        return request.body;
+      });
+    return { bodies, fetchMock };
+  });
+}
+
+describe('TriageOrchestrator duplicate notice formatting', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 200 }))
+    );
+  });
+
+  it('quotes the duplicate title inside one code span', async () => {
+    const title =
+      'Broken <a href="https://attacker.example">link</a> cc @org/team visit https://attacker.example';
+    const { bodies } = await runWithDuplicateResponse({
+      ...validDuplicateResult(),
+      similarTickets: [
+        {
+          ticketId: 'ticket-2',
+          issueNumber: 7,
+          issueTitle: title,
+          similarity: 0.93,
+          repoFullName: 'kilocode/example',
+        },
+      ],
+    });
+
+    expect(bodies).toHaveLength(1);
+    const body = bodies[0];
+    expect(body).toContain(
+      'This issue appears to be a duplicate of https://github.com/kilocode/example/issues/7.'
+    );
+    expect(body).toContain('(#7)');
+    // The quoted line must be exactly one code span holding the full title.
+    const quotedLine = body.split('\n').find(line => line.startsWith('> **'));
+    expect(quotedLine).toBeTruthy();
+    const spanMatch = (quotedLine as string).match(/^> \*\*(`+)(.*)\1\*\* \(#7\)$/);
+    expect(spanMatch).toBeTruthy();
+    if (!spanMatch) return;
+    const { 1: delimiter, 2: spanned } = spanMatch;
+    // The comment body carries the title text unchanged inside the span.
+    expect(spanned).toBe(title);
+    // Delimiter must be longer than any backtick run inside the title (none here).
+    expect(delimiter).toBe('`');
+  });
+
+  it('renders a title made entirely of backticks inside the span', async () => {
+    const title = '`````';
+    const { bodies } = await runWithDuplicateResponse({
+      ...validDuplicateResult(),
+      similarTickets: [
+        {
+          ticketId: 'ticket-2',
+          issueNumber: 7,
+          issueTitle: title,
+          similarity: 0.93,
+          repoFullName: 'kilocode/example',
+        },
+      ],
+    });
+
+    const quotedLine = bodies[0].split('\n').find(line => line.startsWith('> **'));
+    expect(quotedLine).toBeTruthy();
+    const spanMatch = (quotedLine as string).match(/^> \*\*(`+)(.*)\1\*\* \(#7\)$/);
+    expect(spanMatch).toBeTruthy();
+    if (!spanMatch) return;
+    const { 1: delimiter, 2: spanned } = spanMatch;
+    // Longest backtick run in the title is 5, so the delimiter is 6.
+    expect(delimiter).toBe('``````');
+    expect(spanned).toBe(' ````` ');
+  });
+
+  it('caps the quoted title at 280 characters with an ellipsis', async () => {
+    const { bodies } = await runWithDuplicateResponse({
+      ...validDuplicateResult(),
+      similarTickets: [
+        {
+          ticketId: 'ticket-2',
+          issueNumber: 7,
+          issueTitle: 'y'.repeat(300),
+          similarity: 0.93,
+          repoFullName: 'kilocode/example',
+        },
+      ],
+    });
+
+    const quotedLine = bodies[0].split('\n').find(line => line.startsWith('> **'));
+    expect(quotedLine).toBeTruthy();
+    const spanMatch = (quotedLine as string).match(/^> \*\*`+([^\n]*)`+\*\* \(#7\)$/);
+    expect(spanMatch).toBeTruthy();
+    expect(spanMatch![1]).toBe(`${'y'.repeat(280)}…`);
+  });
+
+  it('marks the ticket failed when the duplicate response fails schema validation', async () => {
+    const { bodies, fetchMock } = await runWithDuplicateResponse({
+      ...validDuplicateResult(),
+      similarTickets: [
+        {
+          ticketId: 'ticket-2',
+          issueNumber: 7,
+          issueTitle: 'Crash on save',
+          similarity: 4.2,
+          repoFullName: 'kilocode/example',
+        },
+      ],
+    });
+
+    expect(bodies).toHaveLength(0);
+    const statusCalls = fetchMock.mock.calls.filter(call =>
+      String(call[0]).includes('/api/internal/triage-status/')
+    );
+    expect(statusCalls).toHaveLength(2); // 'analyzing' then 'failed'
+    const lastInit = statusCalls[1][1];
+    if (!lastInit || typeof lastInit.body !== 'string') {
+      throw new Error('status call without a body');
+    }
+    const statusRequest = z
+      .object({ status: z.string(), errorMessage: z.string().optional() })
+      .parse(JSON.parse(lastInit.body));
+    expect(statusRequest.status).toBe('failed');
+    expect(statusRequest.errorMessage).toContain('invalid response');
+  });
+});
+
+describe('formatQuotedIssueTitle', () => {
+  it('wraps titles containing markup, mentions, and URLs in a single span', () => {
+    const title = 'Use `<b>` and @kilo/dev, see https://example.com/x';
+    expect(formatQuotedIssueTitle(title)).toBe(`\`\`${title}\`\``);
+  });
+
+  it('lengthens the delimiter when the title contains backticks', () => {
+    expect(formatQuotedIssueTitle('a `b` c')).toBe('``a `b` c``');
+    expect(formatQuotedIssueTitle('``')).toBe('``` `` ```');
+    expect(formatQuotedIssueTitle('`x`')).toBe('`` `x` ``');
+  });
+
+  it('truncates long titles and appends an ellipsis', () => {
+    expect(formatQuotedIssueTitle('y'.repeat(300))).toBe(`\`${'y'.repeat(280)}…\``);
+  });
+});
+
+describe('duplicateResultSchema', () => {
+  it('accepts a well-formed response', () => {
+    expect(duplicateResultSchema.parse(validDuplicateResult())).toEqual(validDuplicateResult());
+  });
+
+  it.each([
+    [
+      'out-of-range similarity',
+      {
+        ...validDuplicateResult(),
+        similarTickets: [{ ...validDuplicateResult().similarTickets[0], similarity: 1.5 }],
+      },
+    ],
+    [
+      'malformed repo name',
+      {
+        ...validDuplicateResult(),
+        similarTickets: [
+          { ...validDuplicateResult().similarTickets[0], repoFullName: 'not a repo' },
+        ],
+      },
+    ],
+    [
+      'negative issue number',
+      {
+        ...validDuplicateResult(),
+        similarTickets: [{ ...validDuplicateResult().similarTickets[0], issueNumber: -1 }],
+      },
+    ],
+    [
+      'empty ticket id',
+      {
+        ...validDuplicateResult(),
+        similarTickets: [{ ...validDuplicateResult().similarTickets[0], ticketId: '' }],
+      },
+    ],
+  ])('rejects %s', (_label, payload) => {
+    expect(duplicateResultSchema.safeParse(payload).success).toBe(false);
   });
 });

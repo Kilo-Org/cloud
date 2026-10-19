@@ -102,21 +102,25 @@ export interface TriageResponse {
   status: TriageStatus;
 }
 
-export type SimilarTicket = {
-  ticketId: string;
-  issueNumber: number;
-  issueTitle: string;
-  similarity: number;
-  repoFullName: string;
-};
+export const similarTicketSchema = z.object({
+  ticketId: z.string().min(1),
+  issueNumber: z.number().int().positive(),
+  issueTitle: z.string().min(1),
+  similarity: z.number().min(0).max(1),
+  repoFullName: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/),
+});
 
-export interface DuplicateResult {
-  isDuplicate: boolean;
-  duplicateOfTicketId: string | null;
-  similarityScore: number | null;
-  reasoning?: string;
-  similarTickets?: SimilarTicket[];
-}
+export type SimilarTicket = z.infer<typeof similarTicketSchema>;
+
+export const duplicateResultSchema = z.object({
+  isDuplicate: z.boolean(),
+  duplicateOfTicketId: z.string().min(1).nullable(),
+  similarityScore: z.number().min(0).max(1).nullable(),
+  reasoning: z.string().optional(),
+  similarTickets: z.array(similarTicketSchema),
+});
+
+export type DuplicateResult = z.infer<typeof duplicateResultSchema>;
 
 /**
  * Zod schemas for validation

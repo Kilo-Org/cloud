@@ -299,21 +299,20 @@ describe('shouldShowTabLabel', () => {
     expect(shouldShowTabLabel(2, 160 / 5, ['Home'])).toBe(false);
   });
 
-  it('keeps the Arabic labels at a normal phone width', () => {
-    // The Arabic catalog labels on a 393dp phone with the optional fifth tab
-    // hidden: 393/4 = 98.25dp per tab, 88.25dp of label box. Under the old
-    // mono-advance measure الملف الشخصي was estimated at 81.6dp, so a five-tab
-    // bar (68.6dp box) dropped the whole row — the labels and the focused-tab
-    // emphasis with them — while the same bar kept its Japanese labels. The
-    // joined-script advance measures the widest Arabic label at 75.55dp, so
-    // the four-tab bar keeps every label.
+  it('keeps the Arabic labels at the narrow phone width that used to drop them', () => {
+    // The reported geometry: a 360dp window with four tabs gives each tab
+    // 90dp and the label an 80dp box. The old mono-advance measure estimated
+    // الملف الشخصي at 81.6dp, so that bar dropped its whole label row — the
+    // visible labels and their focused/unfocused colour emphasis with it —
+    // while the same window kept its (narrower) Japanese labels. The
+    // RTL-script advance measures the widest Arabic label at 75.55dp, so the
+    // row stays.
     const arabicLabels = ['الرئيسية', 'الوكلاء', 'الدردشة', 'الملف الشخصي'];
-    expect(shouldShowTabLabel(1, 393 / 4, arabicLabels)).toBe(true);
-    // The widest label genuinely cannot fit a five-tab box (68.6dp < 75.55dp),
-    // so the width rule still does its job in Arabic.
-    expect(shouldShowTabLabel(1, 393 / 5, ['الرئيسية', 'الوكلاء', 'الدردشة', 'الملف الشخصي'])).toBe(
-      false
-    );
+    expect(tabLabelWidth(arabicLabels[3])).toBeLessThan(360 / 4 - 10);
+    expect(shouldShowTabLabel(1, 360 / 4, arabicLabels)).toBe(true);
+    // The same labels genuinely cannot fit a five-tab box (68.6dp), so the
+    // width rule still does its job in Arabic.
+    expect(shouldShowTabLabel(1, 360 / 5, arabicLabels)).toBe(false);
   });
 
   it('drops an Arabic label row that genuinely cannot fit its tab', () => {

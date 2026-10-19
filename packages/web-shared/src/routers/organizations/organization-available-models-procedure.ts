@@ -2,6 +2,8 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { addCustomRouterModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
+import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import {
   OrganizationIdInputSchema,
   organizationMemberProcedure,
@@ -29,5 +31,12 @@ export const listAvailableModelsProcedure = organizationMemberProcedure
         message: 'Organization not found',
       });
     }
-    return result;
+    const routers = await listUsableCustomRouters({ userId: ctx.user.id, organizationId });
+    return {
+      ...result,
+      data: addCustomRouterModels(
+        result.data,
+        routers.filter(router => router.ownerType === 'org' && router.ownerId === organizationId)
+      ),
+    };
   });

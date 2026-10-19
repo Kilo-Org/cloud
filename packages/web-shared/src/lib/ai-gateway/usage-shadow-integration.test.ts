@@ -177,8 +177,9 @@ const context: MicrodollarUsageContext = {
 };
 let sent: UsageRecordRequest[];
 let queries: { sql: string; params: unknown[] }[];
-let info: jest.SpiedFunction<typeof console.info>;
-let warn: jest.SpiedFunction<typeof console.warn>;
+let info: jest.MockedFunction<typeof console.info>;
+let completionLogs: string[];
+let warn: jest.MockedFunction<typeof console.warn>;
 
 function requestLifetime(waitUntilAvailable = true) {
   const pending: Promise<unknown>[] = [];
@@ -231,8 +232,19 @@ beforeEach(() => {
   process.env.VERCEL_REGION = 'fra1';
   sent = [];
   queries = [];
-  info = jest.spyOn(console, 'info').mockImplementation(() => {});
-  warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  info = jest.fn();
+  completionLogs = [];
+  jest.spyOn(console, 'info').mockImplementation((...args) => {
+    if (typeof args[0] === 'string' && args[0].includes('"event":"usage_record_completion"')) {
+      completionLogs.push(args[0]);
+    } else info(...args);
+  });
+  warn = jest.fn();
+  jest.spyOn(console, 'warn').mockImplementation((...args) => {
+    if (typeof args[0] === 'string' && args[0].includes('"event":"usage_record_completion"')) {
+      completionLogs.push(args[0]);
+    } else warn(...args);
+  });
   jest.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
     sent.push(JSON.parse(String(init?.body)) as UsageRecordRequest);
     return new Response(null, { status: 202 });
@@ -584,13 +596,52 @@ describe('gateway shadow background integration', () => {
         payload.metadata,
         payload.prior_microdollar_usage,
         null,
-        payload.bouncer_usage_event
+        payload.bouncer_usage_event,
+        { entrypoint: 'writer_endpoint', writer_caller: 'queue' }
       )
     );
     endpoint.close();
     await endpoint.drain();
     expect(sent).toHaveLength(1);
     expect(endpoint.pending).toHaveLength(0);
+    expect(completionLogs.map(value => JSON.parse(value))).toEqual(
+      [
+        { entrypoint: 'gateway', writer_caller: 'unknown' },
+        { entrypoint: 'writer_endpoint', writer_caller: 'queue' },
+      ].map(context => ({
+        level: 'info',
+        event: 'usage_record_completion',
+        sample_rate: 1,
+        usage_id: payload.core.id,
+        outcome: 'recorded',
+        duration_ms: expect.any(Number),
+        event_age_ms: expect.any(Number),
+        execution_region: 'sfo1',
+        ...context,
+      }))
+    );
+  });
+
+  test('Frankfurt direct writes emit the shared completion without publishing', async () => {
+    config.USAGE_SHADOW_PUBLISH_ENABLED = false;
+    const record = await logMicrodollarUsage({ ...stats }, { ...context });
+    expect(record).not.toBeNull();
+    expect(writer).not.toHaveBeenCalled();
+    expect(publisher.enqueueUsage).not.toHaveBeenCalled();
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(completionLogs).toHaveLength(1);
+    expect(JSON.parse(completionLogs[0])).toEqual({
+      level: 'info',
+      event: 'usage_record_completion',
+      sample_rate: 1,
+      usage_id: record?.usageId,
+      outcome: 'recorded',
+      duration_ms: expect.any(Number),
+      event_age_ms: expect.any(Number),
+      execution_region: 'fra1',
+      entrypoint: 'gateway',
+      writer_caller: 'unknown',
+    });
   });
 
   test.each([false, true])(

@@ -43,15 +43,12 @@ describe('mapModelIdToVercel', () => {
       ['anthropic/claude-sonnet-4-5', 'anthropic/claude-sonnet-4.5'],
       ['anthropic/claude-sonnet-4-6', 'anthropic/claude-sonnet-4.6'],
       ['anthropic/claude-sonnet-5-20260630', 'anthropic/claude-sonnet-5'],
-      ['claude-sonnet-4', 'anthropic/claude-sonnet-4'],
       ['claude-sonnet-4.5', 'anthropic/claude-sonnet-4.5'],
       ['claude-sonnet-5', 'anthropic/claude-sonnet-5'],
       ['deepseek-v4-flash', 'deepseek/deepseek-v4-flash'],
       ['deepseek-v4-flash-0731', 'deepseek/deepseek-v4-flash-0731'],
       ['deepseek-v4-pro', 'deepseek/deepseek-v4-pro'],
       ['gemini-2.5-flash-lite', 'google/gemini-2.5-flash-lite'],
-      ['inclusionai/ling-3.1-flash:free', 'inclusionai/ling-3.1-flash-free'],
-      ['minimax-m2.5', 'minimax/minimax-m2.5'],
       ['minimax-m3', 'minimax/minimax-m3'],
       ['minimax/minimax-m2.5-20260211', 'minimax/minimax-m2.5'],
       ['kimi-k3', 'moonshotai/kimi-k3'],
@@ -60,26 +57,29 @@ describe('mapModelIdToVercel', () => {
       ['gpt-4o', 'openai/gpt-4o'],
       ['gpt-4o-mini', 'openai/gpt-4o-mini'],
       ['gpt-5.2', 'openai/gpt-5.2'],
-      ['gpt-5.2-codex', 'openai/gpt-5.2-codex'],
       ['gpt-5.4', 'openai/gpt-5.4'],
       ['gpt-5.4-mini', 'openai/gpt-5.4-mini'],
       ['gpt-5.5', 'openai/gpt-5.5'],
       ['gpt-5.6-luna', 'openai/gpt-5.6-luna'],
       ['gpt-5.6-sol', 'openai/gpt-5.6-sol'],
       ['gpt-5.6-terra', 'openai/gpt-5.6-terra'],
-      ['step-3.5-flash', 'stepfun/step-3.5-flash'],
-      ['mimo-v2.5', 'xiaomi/mimo-v2.5'],
-      ['glm-5.1', 'zai/glm-5.1'],
-      ['glm-5.2', 'zai/glm-5.2'],
     ])('maps %s to %s', async (input, expected) => {
       await expect(mapModelIdToVercel(input)).resolves.toBe(expected);
     });
 
     it.each([
-      ['gpt-4o-2024-08-06', 'gpt-4o-2024-08-06'],
-      ['claude-fable-5', 'claude-fable-5'],
-    ])('does not retain a mapping for %s', async (input, expected) => {
-      await expect(mapModelIdToVercel(input)).resolves.toBe(expected);
+      'gpt-4o-2024-08-06',
+      'claude-fable-5',
+      'claude-sonnet-4',
+      'inclusionai/ling-3.1-flash:free',
+      'minimax-m2.5',
+      'gpt-5.2-codex',
+      'step-3.5-flash',
+      'mimo-v2.5',
+      'glm-5.1',
+      'glm-5.2',
+    ])('does not retain a mapping for %s', async modelId => {
+      await expect(mapModelIdToVercel(modelId)).resolves.toBe(modelId);
     });
   });
 

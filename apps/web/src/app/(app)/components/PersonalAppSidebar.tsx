@@ -18,7 +18,6 @@ import {
   Database,
   List,
   Shield,
-  ListChecks,
   Key,
   Webhook,
   Factory,
@@ -54,7 +53,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   );
 
   // Feature flags
-  const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
   const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
   const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
@@ -166,9 +164,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Shield,
       url: '/security-agent',
     },
-    ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [{ title: 'Auto Triage', icon: ListChecks, url: '/auto-triage' }]
-      : []),
     ...(isDeployEnabled || isDevelopment
       ? [
           {

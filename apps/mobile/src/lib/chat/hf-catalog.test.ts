@@ -141,11 +141,12 @@ describe('a Hugging Face model detail', () => {
     expect(detail.hasGgufFiles).toBe(true);
   });
 
-  it('keeps a quantization of a model whose name contains embedding', () => {
+  it('keeps a quantization of an embedding model named with a version or size', () => {
     const detail = readModelDetail(info({ gguf: { total: 8_000_000_000 } }), [
       file('Qwen3-Embedding-8B-Q8_0.gguf', 8_100_000_000, '1'),
+      file('jina-embeddings-v3-Q8_0.gguf', 8_100_000_000, '2'),
     ]);
-    expect(detail.quants.map(quant => quant.label)).toEqual(['Q8_0']);
+    expect(detail.quants.map(quant => quant.label)).toEqual(['Q8_0', 'Q8_0']);
   });
 
   it('drops an auxiliary embedding file that carries a quantization suffix', () => {
@@ -188,6 +189,25 @@ describe('a Hugging Face model detail', () => {
     ]);
     expect(detail.quants).toEqual([]);
     expect(detail.hasGgufFiles).toBe(true);
+  });
+
+  it('rates nothing when sharded files leave only an unlabeled draft', () => {
+    const detail = readModelDetail(info({ gguf: { total: 27_000_000_000 } }), [
+      file('Model-27B-Q4_K_M-00001-of-00002.gguf', 9_000_000_000, '1'),
+      file('Model-27B-Q4_K_M-00002-of-00002.gguf', 8_000_000_000, '2'),
+      file('Big-27B-FastMTP-32K.gguf', 903_453_952, '3'),
+    ]);
+    expect(detail.quants.map(quant => quant.label)).toEqual(['Big-27B-FastMTP-32K']);
+    expect(
+      smallestDownloadBytes(
+        [
+          file('Model-27B-Q4_K_M-00001-of-00002.gguf', 9_000_000_000, '1'),
+          file('Model-27B-Q4_K_M-00002-of-00002.gguf', 8_000_000_000, '2'),
+          file('Big-27B-FastMTP-32K.gguf', 903_453_952, '3'),
+        ],
+        27_000_000_000
+      )
+    ).toBe(undefined);
   });
 
   it('says a repository without GGUF files has none', () => {

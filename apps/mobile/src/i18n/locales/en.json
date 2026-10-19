@@ -3465,7 +3465,7 @@
       "loadingModel": "Loading model details",
       "couldNotLoadModel": "Couldn't load this model",
       "noFiles": "No files this app can run",
-      "noFilesDescription": "This model's files are split into parts, or are auxiliary weights, so no single file here runs the whole model.",
+      "noFilesDescription": "This app runs models that are one complete GGUF file, and this repository offers none.",
       "tooLargeTitle": "This model may not run",
       "tooLargeMessage": "{{name}} likely needs more memory than this device has. The app can close while the model answers. Download it anyway?",
       "downloadAnyway": "Download anyway"

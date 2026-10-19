@@ -34,12 +34,27 @@ function chineseScriptFor(tag: string): SupportedLanguage | undefined {
  * Portuguese variant resolution. iOS reports a pt-BR device as the bare tag
  * `pt` with the region in `regionCode`, not in `languageTag`, and regionless
  * or region-mismatched tags (`pt-US`) carry no variant either. Everything
- * Portuguese resolves to the Brazilian variant unless the tag names Portugal:
- * `pt-PT`, or bare `pt` with `regionCode: 'PT'`. Runs before the exact-match
- * branch, which a bare `pt` would otherwise win against the Portugal entry.
- * `tag` arrives lowercased from `normalizeLocale`, so the Portugal comparison
- * is against `pt-pt`.
+ * Portuguese resolves to the Brazilian variant unless the tag names a
+ * European-Portuguese region: `pt-PT` (in any subtag order, so `pt-Latn-PT`
+ * counts), the other regions whose norms follow the Portugal catalogue
+ * (`pt-AO`, `pt-MZ`, `pt-CV`, `pt-GW`, `pt-ST`, `pt-TL`, `pt-MO`), or bare
+ * `pt` with one of those regions in `regionCode`. Runs before the
+ * exact-match branch, which a bare `pt` would otherwise win against the
+ * Portugal entry. `tag` arrives lowercased from `normalizeLocale`, so the
+ * region comparisons use lowercase.
  */
+/** Regions whose Portuguese norms follow the Portugal catalogue. */
+const IS_EUROPEAN_PORTUGUESE_REGION = {
+  pt: true,
+  ao: true,
+  mz: true,
+  cv: true,
+  gw: true,
+  st: true,
+  tl: true,
+  mo: true,
+} satisfies Record<string, true>;
+
 function portugueseVariantFor(
   tag: string,
   regionCode: string | null | undefined
@@ -47,10 +62,13 @@ function portugueseVariantFor(
   if (tag.split('-')[0] !== 'pt') {
     return undefined;
   }
-  if (tag === 'pt-pt') {
-    return 'pt';
-  }
-  if (tag === 'pt' && regionCode?.toUpperCase() === 'PT') {
+  // The region subtag, whatever position it sits in (`pt-PT`, `pt-Latn-PT`).
+  const tagRegion = tag
+    .split('-')
+    .slice(1)
+    .find(part => part.length === 2);
+  const region = tagRegion ?? regionCode?.toLowerCase() ?? null;
+  if (region !== null && region in IS_EUROPEAN_PORTUGUESE_REGION) {
     return 'pt';
   }
   return 'pt-BR';

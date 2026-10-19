@@ -1,0 +1,36 @@
+--- a/src/components/Screen.tsx
++++ b/src/components/Screen.tsx
+@@ -202,8 +202,7 @@
+         (shouldFreeze !== undefined ? shouldFreeze : activityState === 0);
+ 
+       return (
+-        <DelayedFreeze freeze={freeze}>
+-          <AnimatedScreen
++        <AnimatedScreen
+             {...props}
+             /**
+              * This messy override is to conform NativeProps used by codegen and
+@@ -279,7 +278,7 @@
+                 .androidResetScreenShadowStateOnOrientationChangeEnabled
+             }>
+             {!isNativeStack ? ( // see comment of this prop in types.tsx for information why it is needed
+-              children
++              <DelayedFreeze freeze={freeze}>{children}</DelayedFreeze>
+             ) : (
+               <TransitionProgressContext.Provider
+                 value={{
+@@ -287,11 +286,12 @@
+                   closing,
+                   goingForward,
+                 }}>
+-                {children}
++                <DelayedFreeze freeze={freeze}>
++                  {children}
++                </DelayedFreeze>
+               </TransitionProgressContext.Provider>
+             )}
+           </AnimatedScreen>
+-        </DelayedFreeze>
+       );
+     } else {
+       // same reason as above

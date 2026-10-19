@@ -239,6 +239,11 @@ patchedDependencies:
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@57.0.24: patches/expo-router@57.0.24.patch
+  # Upstream fix (software-mansion/react-native-screens#4608): move DelayedFreeze
+  # inside the screen so a screen cannot freeze in the same commit as its
+  # deactivation — the suspended subtree never delivers activityState = 0 and a
+  # tab navigator stays on the wrong screen.
+  react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
   # Typed-routes generation must skip colocated tests, exactly like the Metro
   # blockList in apps/mobile/metro.config.js already does for the runtime
   # bundle. A `*.test.tsx` next to a route registers as a route, and a

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness covers the setup states: mount mint failure, press-time re-mint, and reauthorization */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { securityConfigFixture } from './security-config.test-fixture';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
@@ -202,6 +203,25 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
       expect(resolved.searchParams.get('installState')).toBe('install-state');
       expect(resolved.searchParams.get('fromApp')).toBe('1');
       expect(resolved.searchParams.get('organizationId')).toBe(scope === 'personal' ? null : scope);
+    }
+  );
+
+  it.each([false, true])(
+    'keeps the setup mounted during a press-time re-mint with integration=%s',
+    async hasIntegration => {
+      permissionData = { hasIntegration, hasPermissions: false, reauthorizeUrl: null };
+      const root = await mount(scope);
+      const setup = host(root, 'SecurityAgentSetup')[0];
+      if (!setup) {
+        throw new Error('expected the setup screen');
+      }
+      act(() => {
+        void (setup.props.resolveUrl as () => Promise<unknown>)();
+      });
+      expect(host(root, 'SecurityAgentSetup')).toHaveLength(1);
+      expect(host(root, 'Skeleton')).toHaveLength(0);
+      await advanceBy();
+      expect(host(root, 'SecurityAgentSetup')[0]?.props.url).toBeDefined();
     }
   );
 

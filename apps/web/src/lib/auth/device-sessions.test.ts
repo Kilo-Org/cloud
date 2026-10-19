@@ -4,6 +4,7 @@ import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocod
 import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
+  cleanupExpiredDeviceRefreshTokens,
   createDeviceSession,
   issueSessionCredentials,
   rotateRefreshToken,
@@ -248,9 +249,79 @@ describe('device-sessions', () => {
       expect(retry.ok).toBe(true);
 
       // Two holders of the session diverged: refuse and revoke.
-      const replay = await rotateRefreshToken(lost.refreshToken);
+      const replay = await rotateRefreshToken(refreshToken);
       expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
       expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
+    });
+
+    test('a second presentation of a recovered token revokes the session without a new row', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+      if (!lost.ok) return;
+
+      // First presentation after the response was lost: recovers.
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+      if (!retry.ok) return;
+
+      const rowsAfterRecovery = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+
+      // A later presentation of the same token is a replay: refuse, revoke,
+      // and issue no replacement row.
+      const again = await rotateRefreshToken(refreshToken);
+      expect(again).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+      expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
+
+      const rowsAfterReplay = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(rowsAfterReplay).toHaveLength(rowsAfterRecovery.length);
+    });
+
+    test('the consume time of a recovered token does not move', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+      if (!lost.ok) return;
+
+      // Pin the consume stamp to an exact value inside the grace window. A
+      // recovery that restamps the row would replace this value with the
+      // request's read time and the two reads would differ.
+      const pinnedConsumeAt = new Date(Date.now() - 60_000).toISOString();
+      await db
+        .update(device_refresh_tokens)
+        .set({ consumed_at: pinnedConsumeAt })
+        .where(
+          eq(
+            device_refresh_tokens.token_hash,
+            createHash('sha256').update(refreshToken).digest('hex')
+          )
+        );
+
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+
+      const afterRecovery = await db
+        .select({ consumed_at: device_refresh_tokens.consumed_at })
+        .from(device_refresh_tokens)
+        .where(
+          eq(
+            device_refresh_tokens.token_hash,
+            createHash('sha256').update(refreshToken).digest('hex')
+          )
+        );
+      expect(new Date(afterRecovery[0]!.consumed_at!).getTime()).toBe(
+        new Date(pinnedConsumeAt).getTime()
+      );
     });
 
     test('a stale request that read the token before the winning consume retires nothing', async () => {
@@ -576,6 +647,33 @@ describe('device-sessions', () => {
       if (retry.ok) {
         expect(retry.refreshToken).not.toBe(refreshToken);
       }
+    });
+  });
+
+  describe('cleanupExpiredDeviceRefreshTokens', () => {
+    test('deletes expired refresh tokens and keeps live ones', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // An expired row alongside the live one.
+      const expiredHash = createHash('sha256').update('expired-token').digest('hex');
+      await db.insert(device_refresh_tokens).values({
+        token_hash: expiredHash,
+        device_session_id: sessionId,
+        expires_at: new Date(Date.now() - 1000).toISOString(),
+      });
+
+      const deleted = await cleanupExpiredDeviceRefreshTokens();
+
+      expect(deleted).toBeGreaterThanOrEqual(1);
+
+      const remaining = await db
+        .select({ token_hash: device_refresh_tokens.token_hash })
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(remaining.map(row => row.token_hash)).toEqual([
+        createHash('sha256').update(refreshToken).digest('hex'),
+      ]);
     });
   });
 });

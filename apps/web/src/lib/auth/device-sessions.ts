@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
-import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
+import { eq, and, isNull, gt, gte, lt, ne, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
@@ -105,12 +105,13 @@ export async function issueSessionCredentials(
  * An unknown or expired token is refused without revocation.
  *
  * Reuse detection: a consumed token is a replay, and the session is revoked,
- * when the session chain has advanced past it (a later token was consumed) or
- * it was consumed more than `LOST_ROTATION_GRACE_MS` ago. Otherwise the pair
- * it was exchanged for was never used: the client lost the response. The
- * token then rotates again and the unused pair is retired. A retired token is
- * stamped with the original consume time, so a later use of it is a replay
- * and revokes the session. The session keeps one live refresh token.
+ * when the session chain has advanced past it (a later token was consumed),
+ * it was consumed more than `LOST_ROTATION_GRACE_MS` ago, or it was already
+ * recovered once. Otherwise the pair it was exchanged for was never used: the
+ * client lost the response. The token then rotates again and the unused pair
+ * is retired. A retired token is stamped with the original consume time, so a
+ * later use of it is a replay and revokes the session. The session keeps one
+ * live refresh token.
  *
  * Stale requests: a request that read the token before the consume that won
  * is refused without revocation and retires nothing. After a client timeout,
@@ -261,23 +262,30 @@ export async function rotateRefreshToken(
       }
 
       const consumedAt = current.consumed_at;
-      const [laterConsume] = await tx
+      // Recoveries stamp the retired rows with the presented token's consume
+      // time. Consume stamps are per-request database reads, so two rows of a
+      // session share a consume time only through such a recovery. A shared
+      // consume time on a later presentation therefore means this token was
+      // already recovered.
+      const [matchingConsume] = await tx
         .select({ token_hash: device_refresh_tokens.token_hash })
         .from(device_refresh_tokens)
         .where(
           and(
             eq(device_refresh_tokens.device_session_id, lockedSession.id),
-            gt(device_refresh_tokens.consumed_at, consumedAt)
+            gte(device_refresh_tokens.consumed_at, consumedAt),
+            ne(device_refresh_tokens.token_hash, tokenHash)
           )
         )
         .limit(1);
 
-      if (laterConsume || !isWithinLostRotationGrace(consumedAt)) {
+      if (matchingConsume || !isWithinLostRotationGrace(consumedAt)) {
         return { kind: 'reuse_detected' } as const;
       }
 
       // Lost rotation: retire the unused replacement with this token's
-      // consume time, then stamp this token again.
+      // consume time. This token keeps its consume time, so the recovery
+      // window stays anchored to it.
       await tx
         .update(device_refresh_tokens)
         .set({ consumed_at: consumedAt })
@@ -287,10 +295,6 @@ export async function rotateRefreshToken(
             isNull(device_refresh_tokens.consumed_at)
           )
         );
-      await tx
-        .update(device_refresh_tokens)
-        .set({ consumed_at: firstReadAt })
-        .where(eq(device_refresh_tokens.token_hash, tokenHash));
       console.info('[native-refresh] lost rotation recovered', {
         deviceSessionId: lockedSession.id,
       });
@@ -433,4 +437,18 @@ export async function revokeDeviceSession(sessionId: string, reason: string): Pr
       revoked_reason: reason,
     })
     .where(eq(device_sessions.id, sessionId));
+}
+
+/**
+ * Delete refresh tokens whose expiry has passed. Expired tokens are refused
+ * before any other check, so removing them changes no rotation outcome.
+ * @returns the number of deleted rows.
+ */
+export async function cleanupExpiredDeviceRefreshTokens(): Promise<number> {
+  const deleted = await db
+    .delete(device_refresh_tokens)
+    .where(lt(device_refresh_tokens.expires_at, new Date().toISOString()))
+    .returning({ token_hash: device_refresh_tokens.token_hash });
+
+  return deleted.length;
 }

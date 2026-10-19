@@ -15,8 +15,10 @@ import {
 } from '@kilocode/container-usage';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import { VERCEL_BILLING_CAPACITIES } from '../container-usage-context.js';
+import { VERCEL_CREATE_SETTLE_MS } from '../agent-sandbox/vercel/vercel-runtime-state.js';
 import { MeteredBillingLifecycle, type BillingIdentity } from '../metered-billing-lifecycle.js';
 import type { AllocationState, SandboxTimers } from '../control-plane/sandbox/allocation.js';
+import type { StoredProviderPin } from '../control-plane/sandbox/sandbox-do.js';
 import { createVercelBillingRuntime } from '../control-plane/sandbox/vercel-billing-runtime.js';
 import type { ProviderAdapter } from './provider.js';
 import type { VercelSandboxSession } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
@@ -73,7 +75,11 @@ describe('Vercel provider lifetime sink', () => {
       allocationName: 'ses-abc',
     });
     if ('unresolved' in created) throw new Error('Expected a Vercel provider reference');
-    expect(lifetime).toHaveBeenCalledWith({ providerRef: created.providerRef, createdAtMs: 1_000 });
+    expect(lifetime).toHaveBeenCalledWith({
+      providerRef: created.providerRef,
+      allocationId: 'attempt',
+      createdAtMs: 1_000,
+    });
     expect((await provider.observe(created.providerRef)).status).toBe('terminal');
     expect(lifetime).toHaveBeenLastCalledWith({
       providerRef: created.providerRef,
@@ -479,7 +485,7 @@ describe('openIntervalBeforeCreate', () => {
     });
   });
 
-  it('re-acknowledges an existing generation without a second recordStart', async () => {
+  it('revalidates the same reservation generation before another cold create', async () => {
     const { storage, meter, lifecycle } = setup();
     const context = await seedContext(storage);
     await storage.put('container-usage:start-ack-generation:v1', context.generation);
@@ -487,7 +493,11 @@ describe('openIntervalBeforeCreate', () => {
     const outcome = await lifecycle.openIntervalBeforeCreate(IDENTITY, BILLING_INPUT);
 
     expect(outcome).toEqual({ kind: 'acked', generation: context.generation });
-    expect(meter.recordStartInputs).toHaveLength(0);
+    expect(meter.recordStartInputs).toHaveLength(1);
+    expect(meter.recordStartInputs[0]).toMatchObject({
+      startEpochMs: context.startEpochMs,
+      admission: { checkpoint: 'control-plane-create' },
+    });
     expect((await getBillingContext(storage))?.generation).toBe(context.generation);
   });
 
@@ -546,15 +556,16 @@ describe('openIntervalBeforeCreate', () => {
     }
   );
 
-  it('returns uncertain for a generic meter error and retains the generation', async () => {
+  it('fails capacity closed for an uncertain meter result and retains the generation', async () => {
     const { storage, meter, lifecycle } = setup();
     meter.recordStartBehavior = 'reject';
 
-    const outcome = await lifecycle.openIntervalBeforeCreate(IDENTITY, BILLING_INPUT);
-
-    expect(outcome.kind).toBe('uncertain');
-    const generation = (outcome as { generation: string }).generation;
-    expect((await getBillingContext(storage))?.generation).toBe(generation);
+    const rejected = expect(
+      lifecycle.openIntervalBeforeCreate(IDENTITY, BILLING_INPUT)
+    ).rejects.toMatchObject({ code: 'container_capacity_unavailable' });
+    await vi.runAllTimersAsync();
+    await rejected;
+    expect(await getBillingContext(storage)).toBeDefined();
     expect(storage.values.get('container-usage:start-ack-generation:v1')).toBeUndefined();
   });
 });
@@ -701,6 +712,26 @@ describe('deliverSettlement', () => {
     expect(meter.recordStopInputs).toHaveLength(1);
     expect(meter.recordStopInputs[0].usageSinceLast).toBe(100);
   });
+
+  it('bills a reserved Vercel allocation from provider creation rather than admission', async () => {
+    const { storage, meter, billing } = setup();
+    const context = await seedContext(storage, {
+      metadata: { origin: 'cloud-agent', allocation_id: 'allocation-1' },
+    });
+    await saveVercelBillingBinding(
+      storage,
+      bindingFor(context.generation, {
+        createdAtMs: T0 + 10_000,
+        terminalAtMs: T0 + 30_000,
+      })
+    );
+    vi.setSystemTime(T0 + 60_000);
+
+    await billing.deliverSettlement(context.generation);
+
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(20);
+  });
 });
 
 describe('onGenerationClosed', () => {
@@ -766,7 +797,13 @@ describe('createVercelBillingRuntime', () => {
     };
   }
 
-  function harness(options: { requestStop?: () => Promise<void> } = {}) {
+  function harness(
+    options: {
+      requestStop?: () => Promise<void>;
+      observe?: ProviderAdapter['observe'];
+      containerConcurrencyDisabled?: boolean;
+    } = {}
+  ) {
     const { storage, meter, pending, heartbeat } = setup();
     const schedule = helperSchedule();
     let resources: VercelSandboxResources | undefined;
@@ -776,7 +813,13 @@ describe('createVercelBillingRuntime', () => {
     const requestStop = vi.fn(options.requestStop ?? (async () => undefined));
     const runtime = createVercelBillingRuntime({
       storage: storage as unknown as DurableObjectStorage,
-      env: () => ({ CONTAINER_USAGE_METER: meter }) as never,
+      env: () =>
+        ({
+          CONTAINER_USAGE_METER: meter,
+          CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: options.containerConcurrencyDisabled
+            ? 'true'
+            : undefined,
+        }) as never,
       sandboxId: 'ses-abcdef',
       schedule: schedule as unknown as BillingScheduleTable,
       currentProvider: () => 'vercel',
@@ -794,7 +837,7 @@ describe('createVercelBillingRuntime', () => {
       isCreateInFlight: () => false,
       provider: () =>
         ({
-          observe: async () => ({ status: 'unknown' }),
+          observe: options.observe ?? (async () => ({ status: 'unknown' })),
         }) as unknown as ProviderAdapter,
       timers: () =>
         ({ providerStopAttemptMs: 1_000, providerCreateMs: 1_000 }) as unknown as SandboxTimers,
@@ -807,6 +850,7 @@ describe('createVercelBillingRuntime', () => {
     });
     return {
       runtime,
+      meter,
       storage,
       schedule,
       heartbeat,
@@ -822,6 +866,69 @@ describe('createVercelBillingRuntime', () => {
       },
     };
   }
+
+  it.each([
+    { disabled: true, origin: 'cloud-agent' },
+    { disabled: false, origin: 'code-review' },
+  ])(
+    'admits a shadow Vercel create without the unavailable meter when disabled=$disabled and origin=$origin',
+    async ({ disabled, origin }) => {
+      const h = harness({ containerConcurrencyDisabled: disabled });
+      const resources = resourcesFor(capacityA);
+      h.setResources(resources);
+      h.meter.recordStartBehavior = 'reject';
+      const pin: StoredProviderPin = {
+        provider: 'vercel',
+        allocationName: 'ses-abcdef',
+        configuration: { provider: 'vercel', resources },
+        locator: null,
+        containment: null,
+        billing: {
+          ...BILLING_INPUT,
+          sandboxId: 'ses-abcdef',
+          allocationId: 'a1',
+          enforcementRequested: false,
+          metadata: { origin },
+        },
+      };
+
+      await expect(h.runtime.admitCreate(pin)).resolves.toBe('admitted');
+
+      expect(h.meter.recordStartInputs).toEqual([]);
+      expect((await getBillingContext(h.storage))?.metadata?.allocation_id).toBe('a1');
+    }
+  );
+
+  it('releases an unknown create after its deadline and settle window even while observe throws', async () => {
+    const observe = vi.fn(async () => {
+      throw new Error('Vercel API unavailable');
+    });
+    const h = harness({ observe });
+    h.setResources(resourcesFor(capacityA));
+    const active = await h.runtime.ensureRuntime();
+    if (!active?.identity) throw new Error('Expected runtime identity');
+    await active.lifecycle.openIntervalBeforeCreate(active.identity, {
+      ...BILLING_INPUT,
+      allocationId: 'a1',
+    });
+    const context = await getBillingContext(h.storage);
+    if (!context) throw new Error('Expected reservation');
+    h.setAllocation({ kind: 'stopped', allocationId: null, providerRef: null });
+    vi.setSystemTime(T0 + 1_000 + VERCEL_CREATE_SETTLE_MS + 1);
+    const starts = h.meter.recordStartInputs.length;
+    h.schedule.due.push({
+      callback: VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      payload: context.generation,
+    });
+
+    await h.runtime.runAlarm();
+
+    expect(observe).toHaveBeenCalledOnce();
+    expect(h.meter.recordStartInputs).toHaveLength(starts);
+    expect(h.meter.recordStopInputs).toHaveLength(1);
+    expect(h.meter.recordStopInputs[0].usageSinceLast).toBe(0);
+    expect(await getBillingContext(h.storage)).toBeUndefined();
+  });
 
   it('restores from the stored context service and only rebuilds on a resource change after the context closes', async () => {
     const h = harness();

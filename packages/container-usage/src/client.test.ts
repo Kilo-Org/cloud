@@ -5,6 +5,7 @@ import {
   isNonRetryableSkuAdmissionError,
 } from './client';
 import type { ContainerUsageRpcMethods } from './contracts';
+import { ContainerConcurrencyLimitError, getContainerCapacityFailureReason } from './concurrency';
 
 function binding(overrides: Partial<ContainerUsageRpcMethods> = {}): ContainerUsageRpcMethods {
   return {
@@ -123,7 +124,13 @@ describe('ContainerUsageClient', () => {
       retry: { attempts: 2, initialDelayMs: 0 },
     });
 
-    await expect(client.recordStart({ ...context, startEpochMs: 123 })).resolves.toMatchObject({
+    await expect(
+      client.recordStart({
+        ...context,
+        startEpochMs: 123,
+        admission: { checkpoint: 'sandbox-start' },
+      })
+    ).resolves.toMatchObject({
       durable: 'pg',
       dedup: true,
     });
@@ -131,6 +138,8 @@ describe('ContainerUsageClient', () => {
     expect(recordStart.mock.calls[0]?.[0].idempotencyKey).toBe(
       recordStart.mock.calls[1]?.[0].idempotencyKey
     );
+    expect(recordStart.mock.calls[0]?.[0]).toEqual(recordStart.mock.calls[1]?.[0]);
+    expect(recordStart.mock.calls[0]?.[0].admission).toEqual({ checkpoint: 'sandbox-start' });
   });
 
   it('retries recordHeartbeat with the same request', async () => {
@@ -179,6 +188,72 @@ describe('ContainerUsageClient', () => {
       message: 'SKU is not configured',
     });
     expect(recordStart).toHaveBeenCalledOnce();
+  });
+
+  it('reports a closed admission as a normal admission error without retrying or classifying it as a SKU failure', async () => {
+    const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockResolvedValue({
+      success: false,
+      error: { code: 'interval_closed', message: 'The container reservation has ended' },
+    });
+    const client = new ContainerUsageClient(binding({ recordStart }), {
+      service: 'cloud-agent-next',
+      retry: { attempts: 3, initialDelayMs: 0 },
+    });
+    const error = await client
+      .recordStart({
+        ...context,
+        startEpochMs: 123,
+        admission: { checkpoint: 'sandbox-start' },
+      })
+      .catch(error => error);
+    expect(error).toBeInstanceOf(ContainerUsageAdmissionError);
+    expect(error).toMatchObject({
+      code: 'interval_closed',
+      message: 'The container reservation has ended',
+    });
+    expect(isNonRetryableSkuAdmissionError(error)).toBe(false);
+    expect(recordStart).toHaveBeenCalledOnce();
+  });
+
+  it.each(['personal', 'organization'] as const)(
+    'throws the shared %s container-limit error without retrying',
+    async accountType => {
+      const expected = new ContainerConcurrencyLimitError(accountType, 3);
+      const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockResolvedValue({
+        success: false,
+        error: {
+          code: expected.code,
+          message: expected.message,
+          accountType,
+          limit: expected.limit,
+        },
+      });
+      const client = new ContainerUsageClient(binding({ recordStart }), {
+        service: 'cloud-agent-next',
+        retry: { attempts: 3, initialDelayMs: 0 },
+      });
+      const error = await client
+        .recordStart({ ...context, startEpochMs: 123 })
+        .catch(error => error);
+      expect(error).toBeInstanceOf(ContainerConcurrencyLimitError);
+      expect(error).toMatchObject({ accountType, limit: 3, message: expected.message });
+      expect(getContainerCapacityFailureReason(new Error(`remote: ${error.message}`))).toBe(
+        'container_limit_reached'
+      );
+      expect(isNonRetryableSkuAdmissionError(error)).toBe(false);
+      expect(recordStart).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('propagates persistence failure after its bounded retry instead of reporting a limit', async () => {
+    const failure = new Error('postgres unavailable');
+    const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockRejectedValue(failure);
+    const client = new ContainerUsageClient(binding({ recordStart }), {
+      service: 'cloud-agent-next',
+      retry: { attempts: 2, initialDelayMs: 0 },
+    });
+    await expect(client.recordStart({ ...context, startEpochMs: 123 })).rejects.toBe(failure);
+    expect(recordStart).toHaveBeenCalledTimes(2);
   });
 
   it('preserves insufficient-credit balance details without retrying', async () => {

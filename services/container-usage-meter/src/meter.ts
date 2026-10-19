@@ -73,6 +73,17 @@ export class ContainerUsageMeter
   async recordStart(input: RecordStartInput): Promise<RecordStartResult> {
     const result = await this.applyStart(input);
     if (result.kind === 'rejected') {
+      if (result.code === 'container_limit_reached') {
+        return {
+          success: false,
+          error: {
+            code: result.code,
+            message: result.message,
+            accountType: result.accountType,
+            limit: result.limit,
+          },
+        };
+      }
       return {
         success: false,
         error: {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   intervalId,
   recordHeartbeatInputSchema,
+  recordStartInputSchema,
   recordStartResultSchema,
   recordStopInputSchema,
   usageContextSchema,
@@ -121,6 +122,58 @@ describe('container usage contracts', () => {
     expect(intervalId('cloud-agent-next', 'shared-instance', 123)).not.toBe(
       intervalId('gastown', 'shared-instance', 123)
     );
+  });
+
+  it.each(['control-plane-create', 'sandbox-start'] as const)(
+    'accepts optional capacity admission at %s without changing usage context',
+    checkpoint => {
+      const start = { ...personalContext, startEpochMs: 123, idempotencyKey: 'key' };
+      expect(recordStartInputSchema.parse(start)).toEqual(start);
+      expect(recordStartInputSchema.parse({ ...start, admission: { checkpoint } })).toEqual({
+        ...start,
+        admission: { checkpoint },
+      });
+      expect(
+        recordStartInputSchema.safeParse({ ...start, admission: { checkpoint: 'other' } }).success
+      ).toBe(false);
+    }
+  );
+
+  it('requires complete, recognizable container-limit rejection details', () => {
+    const error = {
+      code: 'container_limit_reached',
+      message: 'container_limit_reached: Stop an existing container',
+      accountType: 'organization',
+      limit: 50,
+    };
+    expect(recordStartResultSchema.parse({ success: false, error })).toEqual({
+      success: false,
+      error,
+    });
+    expect(
+      recordStartResultSchema.safeParse({ success: false, error: { ...error, limit: undefined } })
+        .success
+    ).toBe(false);
+    expect(
+      recordStartResultSchema.safeParse({
+        success: false,
+        error: { ...error, accountType: undefined },
+      }).success
+    ).toBe(false);
+    expect(
+      recordStartResultSchema.safeParse({
+        success: false,
+        error: { ...error, message: 'unrelated' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a distinct closed-interval rejection', () => {
+    const result = {
+      success: false,
+      error: { code: 'interval_closed', message: 'The container reservation has ended' },
+    };
+    expect(recordStartResultSchema.parse(result)).toEqual(result);
   });
 
   it('keeps successful starts minimal and preserves insufficient-credit details', () => {

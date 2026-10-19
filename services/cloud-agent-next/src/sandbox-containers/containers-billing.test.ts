@@ -258,6 +258,7 @@ function setup(
     storage?: FakeStorage;
     container?: FakeContainer;
     meter?: FakeMeter;
+    containerConcurrencyDisabled?: boolean;
   } = {}
 ) {
   const container = options.container ?? new FakeContainer();
@@ -281,7 +282,12 @@ function setup(
     },
   } as unknown as DurableObjectState;
   const meter = options.meter ?? new FakeMeter();
-  const instance = new SandboxContainers(ctx, { CONTAINER_USAGE_METER: meter } as unknown as Env);
+  const instance = new SandboxContainers(ctx, {
+    CONTAINER_USAGE_METER: meter,
+    CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: options.containerConcurrencyDisabled
+      ? 'true'
+      : undefined,
+  } as unknown as Env);
   return { storage, container, meter, instance, pendingTasks };
 }
 
@@ -337,6 +343,90 @@ afterEach(() => {
 });
 
 describe('ContainersBilling identity and admission', () => {
+  it.each([
+    { disabled: true, origin: 'cloud-agent' },
+    { disabled: false, origin: 'code-review' },
+  ])(
+    'keeps a shadow native start available during a meter outage when disabled=$disabled and origin=$origin',
+    async ({ disabled, origin }) => {
+      const { instance, container, meter, pendingTasks } = setup({
+        containerConcurrencyDisabled: disabled,
+      });
+      const recordStart = vi
+        .spyOn(meter, 'recordStart')
+        .mockRejectedValue(new Error('Meter unavailable'));
+      await instance.ensureBillingAdmission(
+        {
+          ...BILLING_INPUT,
+          allocationId: 'allocation-1',
+          enforcementRequested: false,
+          metadata: { origin },
+        },
+        'standard-4'
+      );
+      expect(meter.recordStartInputs).toEqual([]);
+      expect(recordStart).not.toHaveBeenCalled();
+
+      await expect(launch(instance, REF_A, 'standard-4')).resolves.toBeDefined();
+      await vi.runAllTimersAsync();
+      await flushPending(pendingTasks);
+
+      expect(container.startCalls).toHaveLength(1);
+      expect(container.running).toBe(true);
+    }
+  );
+
+  it('releases a failed native launch before the container starts with zero usage', async () => {
+    const { instance, container, storage, meter } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    container.startBehavior = 'reject';
+    vi.setSystemTime(T0 + 60_000);
+
+    await expect(launch(instance, REF_A, 'standard-4')).rejects.toThrow('container start failed');
+
+    expect(container.running).toBe(false);
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(0);
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+  });
+
+  it('keeps an unmeasured reservation while the physical container runs', async () => {
+    const { instance, container, storage, meter } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    const generation = readGeneration(storage);
+    container.running = true;
+
+    await instance.releaseBillingAdmission('allocation-1');
+
+    expect(readGeneration(storage)).toBe(generation);
+    expect(readMeasurementStarted(storage)).toBe(false);
+    expect(meter.recordStopInputs).toEqual([]);
+  });
+
+  it('does not void a measured generation after the physical container stops', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const generation = readGeneration(storage);
+    container.running = false;
+
+    await instance.releaseBillingAdmission('allocation-1');
+
+    expect(readGeneration(storage)).toBe(generation);
+    expect(readMeasurementStarted(storage)).toBe(true);
+    expect(meter.recordStopInputs).toEqual([]);
+  });
+
   it('admits on a real continue meter and rejects on a real insufficient_credits admission', async () => {
     const admitted = setup();
 
@@ -386,8 +476,11 @@ describe('ContainersBilling identity and admission', () => {
     meter.startBehavior = 'reject';
 
     const admission = admit(instance, 'standard-4');
+    const rejected = expect(admission).rejects.toMatchObject({
+      code: 'container_capacity_unavailable',
+    });
     await vi.runAllTimersAsync();
-    await expect(admission).resolves.toMatchObject({ success: false, code: 'meter_unavailable' });
+    await rejected;
 
     const context = storage.map.get(BILLING_CONTEXT_KEY) as
       | { generation?: string; measurementStarted?: boolean }
@@ -480,8 +573,6 @@ describe('ContainersBilling physical lifecycle', () => {
       measurementStarted: boolean;
       usageMeasuredAtMs: number;
     };
-    // Containers never use the Vercel pin or `openIntervalBeforeCreate` path:
-    // their first schedule stamps `Date.now()` at launch, not at admission.
     expect(context.measurementStarted).toBe(true);
     expect(context.usageMeasuredAtMs).toBe(launchedAt);
     expect(context.usageMeasuredAtMs).not.toBe(admittedAt);
@@ -524,7 +615,8 @@ describe('ContainersBilling physical lifecycle', () => {
     meter.heartbeatBudget = { verdict: 'continue' };
     await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
     expect(storage.map.get(BLOCK_KEY)).toBeUndefined();
-    expect(meter.recordStartInputs).toHaveLength(2);
+    expect(meter.recordStartInputs).toHaveLength(3);
+    expect(new Set(meter.recordStartInputs.map(input => input.startEpochMs)).size).toBe(2);
   });
 
   it('keeps the block and re-arms billingForceStop when destroy stays retryable', async () => {

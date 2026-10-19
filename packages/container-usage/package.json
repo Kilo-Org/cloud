@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./capacity": "./src/capacity.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",
@@ -14,6 +15,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@kilocode/db": "workspace:*",
+    "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "peerDependencies": {

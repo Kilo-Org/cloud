@@ -15,6 +15,7 @@ import {
   type RecordStopInput,
   type UsageContext,
 } from './contracts';
+import { ContainerConcurrencyLimitError } from './concurrency';
 
 export type ContainerUsageClientOptions = {
   service: string;
@@ -26,7 +27,7 @@ export type ContainerUsageClientOptions = {
 };
 
 export type ClientUsageContext = Omit<UsageContext, 'service'>;
-export type ClientRecordStartInput = ClientUsageContext & { startEpochMs: number };
+export type ClientRecordStartInput = Omit<RecordStartInput, 'service' | 'idempotencyKey'>;
 export type ClientRecordHeartbeatInput = Omit<
   RecordHeartbeatInput,
   'service' | 'idempotencyKey' | 'context'
@@ -121,6 +122,9 @@ export class ContainerUsageClient {
       recordStartResultSchema.parse(await this.binding.recordStart(request))
     );
     if (!result.success) {
+      if (result.error.code === 'container_limit_reached') {
+        throw new ContainerConcurrencyLimitError(result.error.accountType, result.error.limit);
+      }
       throw new ContainerUsageAdmissionError(
         result.error.code,
         result.error.message,

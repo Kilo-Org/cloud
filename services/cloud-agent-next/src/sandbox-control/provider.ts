@@ -13,6 +13,7 @@ export type ProviderCreationCause =
   | 'insufficient_credits'
   | 'stopping'
   | 'meter_unavailable'
+  | 'pre_provisioning_failed'
   | 'invalid_configuration';
 
 export class ProviderCreationError extends AgentSandboxUnavailableError {
@@ -24,7 +25,9 @@ export class ProviderCreationError extends AgentSandboxUnavailableError {
           ? 'Sandbox configuration is invalid or unsupported'
           : code === 'stopping'
             ? 'Sandbox is stopping'
-            : 'Sandbox billing admission is temporarily unavailable',
+            : code === 'pre_provisioning_failed'
+              ? 'Sandbox preparation failed before provisioning'
+              : 'Sandbox billing admission is temporarily unavailable',
       code === 'insufficient_credits'
         ? 'billing_blocked'
         : code === 'invalid_configuration'
@@ -106,6 +109,8 @@ export type ProviderLaunchResult = {
 export type ProviderAdapter = {
   describeRuntime?(ref: string): CloudAgentRunContainer | undefined;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
+  releaseBillingAdmission?(intent: ProviderCreateIntent): Promise<void>;
+  isDefiniteCreateFailure?(error: unknown): boolean;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
     ref: string,

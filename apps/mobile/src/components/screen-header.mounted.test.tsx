@@ -580,6 +580,15 @@ describe('ScreenHeader mounted', () => {
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
       { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
+      { title: 'Agents', size: 'large', reserveTitleSpace: true },
+      { title: longTitle, size: 'large', titleNumberOfLines: 2, reserveTitleSpace: true },
+      {
+        title: longTitle,
+        size: 'large',
+        titleNumberOfLines: 3,
+        headerRight: 'METRICS',
+        reserveTitleSpace: true,
+      },
     ];
 
     for (const props of variants) {

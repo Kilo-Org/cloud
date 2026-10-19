@@ -87,7 +87,7 @@ export function clearHomeWidgetData(): void {
 /** Accept only a confirmed fetch. Render time and failed fetches cannot renew the timestamp. */
 export function rememberHomeWidgetData(data: HomeWidgetData): boolean {
   const snapshot = data.snapshot;
-  if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
+  if (isTerminalGlanceableStatus(snapshot.status)) {
     epoch += 1;
     details = EMPTY_HOME_WIDGET_DETAILS;
     lastData = { snapshot, details };

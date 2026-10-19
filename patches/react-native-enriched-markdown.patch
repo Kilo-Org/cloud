@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..92a8cd39e4ed013f91a02b33467e0a86d10c7e4b 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..8d01f327475950f4635b6af5f98d12e6beb718d2 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 @@ -50,6 +50,14 @@ import kotlin.math.ceil
@@ -17,7 +17,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..92a8cd39e4ed013f91a02b33467e0a86
    private data class PaintParams(
      val typeface: Typeface,
      val fontSize: Float,
-@@ -543,9 +551,26 @@ object MeasurementStore {
+@@ -543,9 +551,27 @@ object MeasurementStore {
              segment.styledText.replaceMathSpansWithPlaceholders(context)
  
              val layout = createStaticLayout(segment.styledText, fontSize, widthPx, id)
@@ -28,14 +28,15 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..92a8cd39e4ed013f91a02b33467e0a86
 +
 +            // Mirror the single-span measure(): the shadow node may be clamped
 +            // below widthPx (maxWidth style), and the display TextView re-wraps
-+            // at the clamped width, so re-measure the height at the hugged
-+            // width when it is narrower. The display's per-run font fallback
-+            // (emoji, combining marks) can add a sub-pixel or two of advance
-+            // over this single TextPaint, which flips a line at the exact hug
-+            // width, so re-measure a hair narrower than the reported line width.
++            // at the clamped width. Only that clamp can change the line count,
++            // so re-measure the height there (a hair narrower than the reported
++            // line width) and leave unclamped text on the widthPx height.
++            // The display's per-run font fallback (emoji, combining marks) can
++            // add a sub-pixel or two of advance over this single TextPaint,
++            // which flips a line at the exact hug width.
 +            val huggedWidth = ceil(segmentMaxLineWidth).toInt()
-+            val huggedMeasureWidth = maxOf(1, huggedWidth - HUG_WIDTH_SAFETY_PX)
-+            if (huggedMeasureWidth < widthPx) {
++            if (huggedWidth < widthPx) {
++              val huggedMeasureWidth = maxOf(1, huggedWidth - HUG_WIDTH_SAFETY_PX)
 +              val huggedLayout = createStaticLayout(segment.styledText, fontSize, huggedMeasureWidth, id)
 +              segmentHeightPx = huggedLayout.height.toFloat()
 +            }
@@ -45,7 +46,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..92a8cd39e4ed013f91a02b33467e0a86
              maxContentWidthPx = maxOf(maxContentWidthPx, ceil(segmentMaxLineWidth))
  
              if (includeBottomMargin) {
-@@ -737,17 +762,62 @@ object MeasurementStore {
+@@ -737,17 +763,61 @@ object MeasurementStore {
  
      val layout = builder.build()
      val visibleLineCount = visibleLineCount(layout, viewId)
@@ -56,18 +57,17 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..92a8cd39e4ed013f91a02b33467e0a86
      val measuredWidth = (0 until visibleLineCount).maxOfOrNull { layout.getLineWidth(it) } ?: 0f
  
 +    // Yoga may clamp this node's width below maxWidth (maxWidth style, a
-+    // percentage cap on an ancestor). When it does, the display TextView
-+    // re-wraps at the clamped width and can grow taller than the height
-+    // measured here, so the text overflows its parent. Re-measure at the
-+    // hugged width so the reported height matches the width Yoga receives.
-+    // The display's per-run font fallback (emoji, combining marks) can add a
++    // percentage cap on an ancestor). Only that clamp can change the line
++    // count: the display TextView re-wraps at the clamped width, which can be
++    // taller than the height measured here, so re-measure at that width. The
++    // display's per-run font fallback (emoji, combining marks) can add a
 +    // sub-pixel or two of advance over this single TextPaint, which flips a
-+    // line at the exact hug width, so re-measure a hair narrower than the
-+    // reported line width.
++    // line at the exact hugged width, so measure a hair narrower than the
++    // reported line width. Unclamped text keeps the height measured above.
 +    if (measuredWidth > 0f) {
 +      val huggedWidth = ceil(measuredWidth).toInt()
-+      val huggedMeasureWidth = maxOf(1, huggedWidth - HUG_WIDTH_SAFETY_PX)
-+      if (huggedMeasureWidth < safeWidth) {
++      if (huggedWidth < safeWidth) {
++        val huggedMeasureWidth = maxOf(1, huggedWidth - HUG_WIDTH_SAFETY_PX)
 +        val huggedLayout = buildLayout(text = content, paint = paint, widthPx = huggedMeasureWidth, viewId = viewId)
 +        val huggedLineCount = visibleLineCount(huggedLayout, viewId)
 +        measuredHeight = truncatedHeight(huggedLayout, huggedLineCount, content)

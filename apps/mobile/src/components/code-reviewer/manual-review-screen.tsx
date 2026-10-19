@@ -54,6 +54,24 @@ function isValidManualReviewUrl(platform: ManualReviewPlatform, url: string): bo
   return URL_HOST_PATTERN[platform].test(url) && matchesCodeReviewUrlSuffix(platform, url);
 }
 
+/**
+ * True when the failure is the client control-plane deadline firing, matched
+ * by error name down the cause chain: tRPC wraps the fetch rejection in a
+ * `TRPCClientError` whose `cause` carries the deadline error, and the
+ * deadline class's identity can be lost across module boundaries (its name
+ * survives). Same bounded walk as `isStalledTransportError`, name-based.
+ */
+function isDeadlineStall(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    if (current.name === 'RequestDeadlineError') {
+      return true;
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -106,11 +124,20 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             );
           },
           onError: error => {
-            settle(
+            // A client-deadline rejection is the stall, not a server reason:
+            // render the localized wait copy instead of the raw timeout text.
+            // Matched by error name, not instanceof: the deadline class can
+            // cross a module boundary where its identity is lost. Anything
+            // else is the server's or transport's own message.
+            if (isDeadlineStall(error)) {
+              settle(t('common.takingLonger'));
+              return;
+            }
+            const message =
               error instanceof Error && error.message
                 ? error.message
-                : t('codeReviewer.unknownError')
-            );
+                : t('codeReviewer.unknownError');
+            settle(message);
           },
         }
       );

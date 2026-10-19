@@ -12,10 +12,17 @@ describe('sessionLiveText', () => {
         40
       )
     ).toBe('abcdefghijklm');
-    expect(sessionLiveText('a\u200Bb\u200Cc\u200Dd\u2060e\uFEFFf', 40)).toBe('abcdef');
+    expect(sessionLiveText('a\u200Bb\u200Ec\u200Fd', 40)).toBe('abcd');
+    expect(sessionLiveText('a\u200Bb\u2060c\uFEFFd', 40)).toBe('abcd');
     expect(sessionLiveText('pnpm\u200B install\uFEFF --frozen-lockfile', 40)).toBe(
       'pnpm install --frozen-lockfile'
     );
+  });
+
+  it('keeps the zero-width joiners that shape adjacent characters', () => {
+    expect(sessionLiveText('a\u200Cb\u200Dc', 40)).toBe('a\u200Cb\u200Dc');
+    expect(sessionLiveText('می\u200Cشود', 40)).toBe('می\u200Cشود');
+    expect(sessionLiveText('👨\u200D👩\u200D👧', 40)).toBe('👨\u200D👩\u200D👧');
   });
 
   it('counts only the characters that draw toward the limit', () => {

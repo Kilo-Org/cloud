@@ -42,11 +42,6 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-// `@/lib/trpc` reaches `expo-secure-store`, whose entry imports expo-modules-core;
-// expo-modules-core reads React Native's `__DEV__` global the node-mounted
-// harness does not define. Stub the native store so the sheet's own wiring
-// stays real (the same stand-in `use-effective-agent-profile.test.ts` uses).
-vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn().mockResolvedValue(null) }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 // The real `QueryError` reaches `@sentry/react-native` through the centered-state
 // geometry chain, and Sentry's entry loads real react-native, whose RN Promise
@@ -119,21 +114,20 @@ type ControlProps = {
 function controls(mounted: Mounted) {
   return (
     mounted.renderer.root
-      // `node.type` is typed as `ElementType` and the host tags are strings; the
-      // tag comparison reads the unknown it is (the same escape hatch
-      // `instance-picker.mounted.test.tsx` uses).
-      .findAll(node => (node.type as unknown) === 'Pressable')
+      // The renderer types `node.type` as RN's host-tag union, which does not
+      // include the test's string stubs, so the tag reads as the unknown it is.
+      .findAll(node => (node.type as string) === 'Pressable')
       .map(node => node.props as ControlProps)
   );
 }
 function text(mounted: Mounted) {
   return mounted.renderer.root
-    .findAll(node => (node.type as unknown) === 'Text')
+    .findAll(node => (node.type as string) === 'Text')
     .flatMap(node => node.children.filter(child => typeof child === 'string'))
     .join('\n');
 }
 function sheetVisible(mounted: Mounted): boolean {
-  const sheet = mounted.renderer.root.find(node => (node.type as unknown) === 'Sheet');
+  const sheet = mounted.renderer.root.find(node => (node.type as string) === 'Sheet');
   return Boolean(sheet.props.visible);
 }
 async function mountSheet() {

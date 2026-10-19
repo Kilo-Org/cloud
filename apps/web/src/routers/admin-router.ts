@@ -68,6 +68,7 @@ import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
 import { adminImpactReferralsRouter } from '@/routers/admin/impact-referrals-router';
 import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
 import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
+import { adminActionAuditLogsRouter } from '@/routers/admin/admin-action-audit-logs-router';
 import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
@@ -137,6 +138,7 @@ import {
   getKiloClawSubscriptionAccessReason,
 } from '@/lib/kiloclaw/access-state';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
+import { recordAdminAction, userActionTarget } from '@/lib/admin/admin-action-audit';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   getKilocodeRepoOpenPullRequestCounts,
@@ -620,20 +622,34 @@ export const adminRouter = createTRPCRouter({
       return { success: (res.rowCount ?? 0) > 0 };
     }),
 
-    resetAPIKey: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input }) => {
+    resetAPIKey: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input, ctx }) => {
       await db
         .update(kilocode_users)
         .set({ api_token_pepper: crypto.randomUUID() })
         .where(eq(kilocode_users.id, input.userId));
 
+      await recordAdminAction(ctx, {
+        action: 'user.api_key.reset',
+        target: userActionTarget(input.userId),
+        message: 'Reset API key (all API tokens invalidated)',
+      });
+
       return successResult();
     }),
 
-    signOutBrowserSessions: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input }) => {
-      await revokeWebSessions(input.userId);
+    signOutBrowserSessions: adminProcedure
+      .input(ResetAPIKeySchema)
+      .mutation(async ({ input, ctx }) => {
+        await revokeWebSessions(input.userId);
 
-      return successResult();
-    }),
+        await recordAdminAction(ctx, {
+          action: 'user.browser_sessions.revoke',
+          target: userActionTarget(input.userId),
+          message: 'Signed out all browser sessions',
+        });
+
+        return successResult();
+      }),
 
     checkKiloPass: adminProcedure.input(CheckKiloPassSchema).mutation(async ({ input }) => {
       const before = await db.query.kilocode_users.findFirst({
@@ -666,7 +682,7 @@ export const adminRouter = createTRPCRouter({
 
     resetToMagicLinkLogin: adminProcedure
       .input(ResetToMagicLinkLoginSchema)
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const user = await findUserById(input.userId);
         if (!user) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
@@ -684,9 +700,17 @@ export const adminRouter = createTRPCRouter({
           }
         }
 
-        await db
+        const removedProviders = await db
           .delete(user_auth_provider)
-          .where(eq(user_auth_provider.kilo_user_id, input.userId));
+          .where(eq(user_auth_provider.kilo_user_id, input.userId))
+          .returning({ provider: user_auth_provider.provider });
+
+        await recordAdminAction(ctx, {
+          action: 'user.login.reset_to_magic_link',
+          target: userActionTarget(input.userId),
+          message: 'Reset login to magic link (removed linked auth providers)',
+          metadata: { removedProviders: removedProviders.map(row => row.provider) },
+        });
 
         return successResult();
       }),
@@ -833,6 +857,12 @@ export const adminRouter = createTRPCRouter({
           }
         });
 
+        await recordAdminAction(ctx, {
+          action: 'user.email.release',
+          target: userActionTarget(input.userId),
+          message: 'Released email address to a placeholder so another account can use it',
+        });
+
         return successResult();
       }),
 
@@ -842,9 +872,13 @@ export const adminRouter = createTRPCRouter({
         const isBlocking = Boolean(input.blocked_reason);
         let didTransition = false;
 
-        await db.transaction(async tx => {
+        const previousBlock = await db.transaction(async tx => {
           const [current] = await tx
-            .select({ blocked_reason: kilocode_users.blocked_reason })
+            .select({
+              blocked_reason: kilocode_users.blocked_reason,
+              blocked_at: kilocode_users.blocked_at,
+              blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+            })
             .from(kilocode_users)
             .where(eq(kilocode_users.id, input.userId))
             .for('update')
@@ -876,10 +910,27 @@ export const adminRouter = createTRPCRouter({
               })
               .where(eq(kilocode_users.id, input.userId));
           }
+
+          return current;
         });
 
         if (didTransition && isBlocking) {
           await revokeGatewayGrantsForBlockedUser(input.userId);
+        }
+
+        // Blocking is attributed on the user row; unblocking clears those
+        // columns, so the audit row is the only record of who lifted it.
+        if (didTransition && !isBlocking) {
+          await recordAdminAction(ctx, {
+            action: 'user.unblock',
+            target: userActionTarget(input.userId),
+            message: 'Unblocked user',
+            metadata: {
+              previousBlockedReason: previousBlock?.blocked_reason ?? null,
+              previousBlockedAt: previousBlock?.blocked_at ?? null,
+              previousBlockedByKiloUserId: previousBlock?.blocked_by_kilo_user_id ?? null,
+            },
+          });
         }
 
         return successResult();
@@ -887,7 +938,7 @@ export const adminRouter = createTRPCRouter({
 
     setPersonalAccountDisabled: adminProcedure
       .input(SetPersonalAccountDisabledSchema)
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const result = await db
           .update(kilocode_users)
           .set({ personal_account_disabled: input.value })
@@ -896,6 +947,13 @@ export const adminRouter = createTRPCRouter({
         if ((result.rowCount ?? 0) === 0) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
+
+        await recordAdminAction(ctx, {
+          action: 'user.personal_account.set_disabled',
+          target: userActionTarget(input.userId),
+          message: input.value ? 'Disabled personal account' : 'Enabled personal account',
+          metadata: { disabled: input.value },
+        });
 
         return successResult();
       }),
@@ -2611,6 +2669,7 @@ export const adminRouter = createTRPCRouter({
   kiloPass: adminKiloPassRouter,
   disputes: adminStripeDisputesRouter,
   earlyFraudWarnings: adminStripeEarlyFraudWarningsRouter,
+  actionAuditLogs: adminActionAuditLogsRouter,
   // Key kept as `securityAdvisorContent` for tRPC client compatibility —
   // admin UI consumers reference `trpc.admin.securityAdvisorContent.*`.
   // Backing router renamed to `adminShellSecurityContentRouter` as part of

@@ -88,6 +88,11 @@ const userManagementItems: MenuItem[] = [
     icon: () => <ShieldCheck />,
   },
   {
+    title: () => 'Admin Action Log',
+    url: '/admin/action-audit-log',
+    icon: () => <FileSearch />,
+  },
+  {
     title: () => 'Organizations',
     url: '/admin/organizations',
     icon: () => <Building2 />,

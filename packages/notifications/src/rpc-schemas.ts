@@ -3,17 +3,10 @@ import { z } from 'zod';
 import {
   instanceLifecycleEventSchema,
   scheduledActionEventSchema,
-  type InstanceLifecycleEvent,
-  type ScheduledActionEvent,
+  securityLifecycleEventSchema,
 } from './notification-events';
+import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
-
-export {
-  instanceLifecycleEventSchema,
-  scheduledActionEventSchema,
-  type InstanceLifecycleEvent,
-  type ScheduledActionEvent,
-};
 
 // ── sendPushForConversation ─────────────────────────────────────────
 
@@ -158,7 +151,7 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   category: cloudAgentSessionCategorySchema.optional(),
   // Needs-input raise detail: which answer the waiting agent wants, and the PR
   // that can be opened from the notification. Absent on status pushes.
-  attentionKind: z.enum(['question', 'permission']).optional(),
+  attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
   prUrl: z.string().optional(),
   // Old producers omit these; remove the optionals when every producer sends keys.
   i18nKey: z.string().min(1).optional(),
@@ -370,21 +363,9 @@ export type InternalDispatchSecurityFindingRequest = z.infer<
   typeof internalDispatchSecurityFindingRequestSchema
 >;
 
-// 1:1 map to the `security_lifecycle` event enum in `push-data.ts` (which in
-// turn maps to SecurityAuditLogAction). Kept as a standalone enum here because
-// the push-data variant declares the enum inline and this package must not
-// import it back.
-export const securityLifecycleEventSchema = z.enum([
-  'analysis_completed',
-  'analysis_failed',
-  'remediation_queued',
-  'remediation_pr_opened',
-  'remediation_failed',
-  'remediation_blocked',
-  'remediation_no_changes_needed',
-  'remediation_cancelled',
-]);
-export type SecurityLifecycleEvent = z.infer<typeof securityLifecycleEventSchema>;
+// The event vocabulary is the shared schema from `notification-events.ts`
+// (the same one the `security_lifecycle` push variant in `push-data.ts`
+// uses); it is exported to package consumers from `notification-events`.
 
 export const internalDispatchSecurityLifecycleRequestSchema = z.object({
   kind: z.literal('security_lifecycle'),

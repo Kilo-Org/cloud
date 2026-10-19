@@ -22,7 +22,10 @@ export type NeedsInputActionId =
  * producer that did not classify the raise; it offers both answer actions
  * because the app cannot tell which one applies.
  */
-export const NEEDS_INPUT_KINDS = ['question', 'permission', 'unknown'] as const;
+export const NEEDS_INPUT_ATTENTION_KINDS = ['question', 'permission'] as const;
+
+/** The producer-facing kinds plus the app-side `unknown` default. */
+export const NEEDS_INPUT_KINDS = [...NEEDS_INPUT_ATTENTION_KINDS, 'unknown'] as const;
 export type NeedsInputKind = (typeof NEEDS_INPUT_KINDS)[number];
 
 const NEEDS_INPUT_CATEGORY_PREFIX = 'kilo-needs-input';

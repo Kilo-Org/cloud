@@ -10,6 +10,7 @@ import {
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionLiveChanges,
   type SessionLiveFailureKind,
+  type SessionLiveOutcomeKind,
   type SessionLivePlan,
   type SessionLiveStep,
 } from './session-live-content';
@@ -46,7 +47,7 @@ export type SessionLiveActivityRow = {
   permissionCommand?: string | null;
   lastActivityAt?: string | null;
   costMicrodollars?: number | null;
-  outcome?: 'pr_opened' | 'changes' | 'none' | null;
+  outcome?: SessionLiveOutcomeKind | null;
   failure?: SessionLiveFailureKind | null;
   startedAt?: string | null;
   /** True when this session has an open pull request; set on a finished row. */
@@ -57,7 +58,6 @@ export type SessionLiveActivityBuildOptions = {
   approvalKey: string | null;
   updatedAt: string;
   statusSinceFallback: string;
-  /** The content the card already shows, so server-only facts survive. */
   /** The content the card already shows, so server-only facts survive a local rebuild. */
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
@@ -81,7 +81,7 @@ function maxCost(
 function outcomeKind(
   row: SessionLiveActivityRow,
   changes: SessionLiveChanges | null
-): 'pr_opened' | 'changes' | 'none' {
+): SessionLiveOutcomeKind {
   if (row.outcome !== null && row.outcome !== undefined) return row.outcome;
   if (row.prOpened === true) return 'pr_opened';
   return changes === null ? 'none' : 'changes';

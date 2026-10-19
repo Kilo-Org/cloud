@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import type { PaidExecutionKey } from './scheduler';
 import { parseKiloRunEvents } from './kilo-events';
 import type { DeciderCase } from './datasets/decider-cases';
@@ -12,6 +13,7 @@ export type CliRunResult = {
   eventCount: number;
   lastEventTypes: string[];
   timedOut: boolean;
+  unavailableModelId?: string;
 };
 
 export const DECIDER_CLI_TIMEOUT_MS = 180_000;
@@ -46,6 +48,24 @@ export function isRetryableContainerAvailabilityError(error: unknown): boolean {
     normalized.includes('max concurrent instance count') ||
     normalized.includes('maximum number of running container instances exceeded')
   );
+}
+
+export function isExactModelUnavailableResult(
+  result: Pick<CliRunResult, 'text' | 'stderrTail' | 'unavailableModelId' | 'costUsd' | 'timedOut'>,
+  requestedModel: string
+): boolean {
+  if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  if (
+    result.unavailableModelId === requestedModel ||
+    result.unavailableModelId === `kilo/${requestedModel}`
+  ) {
+    return true;
+  }
+  const diagnostic = stripVTControlCharacters(result.stderrTail);
+  const model = /(?:^|\n)\s*(?:Error:\s*)?Model not found:\s*(\S+?)(?:\.(?=\s|$)|(?=\s|$))/i.exec(
+    diagnostic
+  )?.[1];
+  return model === requestedModel || model === `kilo/${requestedModel}`;
 }
 
 export type ContainerRunResponse = {
@@ -111,12 +131,13 @@ export async function runDeciderCaseViaCli(
     throw new Error(`container /run failed: HTTP ${response.status} ${detail}`);
   }
 
-  return parseContainerRunResponse(await response.json(), startedAt);
+  return parseContainerRunResponse(await response.json(), startedAt, model);
 }
 
 export function parseContainerRunResponse(
   body: ContainerRunResponse,
-  startedAt: number
+  startedAt: number,
+  requestedModel: string
 ): CliRunResult {
   const { text, costUsd, eventCount, lastEventTypes } = parseKiloRunEvents(body.stdoutLines ?? []);
   const providerThrottled = (body.stdoutLines ?? []).some(line => {
@@ -133,8 +154,49 @@ export function parseContainerRunResponse(
       return false;
     }
   });
+  let unavailableModelId: string | undefined;
+  if (text.length === 0 && (costUsd ?? 0) === 0 && !body.timedOut) {
+    for (const line of body.stdoutLines ?? []) {
+      try {
+        const event: unknown = JSON.parse(line);
+        if (
+          typeof event !== 'object' ||
+          event === null ||
+          !('type' in event) ||
+          event.type !== 'error'
+        ) {
+          continue;
+        }
+        if (!('error' in event) || typeof event.error !== 'object' || event.error === null)
+          continue;
+        const error = event.error;
+        if (
+          !('name' in error && error.name === 'ProviderModelNotFoundError') &&
+          !('_tag' in error && error._tag === 'ProviderModelNotFoundError')
+        )
+          continue;
+        const data =
+          'data' in error && typeof error.data === 'object' && error.data !== null
+            ? error.data
+            : error;
+        if (
+          !('providerID' in data) ||
+          typeof data.providerID !== 'string' ||
+          !('modelID' in data) ||
+          typeof data.modelID !== 'string'
+        )
+          continue;
+        const model = `${data.providerID}/${data.modelID}`;
+        if (model !== requestedModel && model !== `kilo/${requestedModel}`) continue;
+        unavailableModelId = model;
+        break;
+      } catch {
+        continue;
+      }
+    }
+  }
 
-  return {
+  const result: CliRunResult = {
     text,
     costUsd,
     latencyMs: body.durationMs ?? Date.now() - startedAt,
@@ -145,7 +207,12 @@ export function parseContainerRunResponse(
     eventCount,
     lastEventTypes,
     timedOut: body.timedOut ?? false,
+    ...(unavailableModelId ? { unavailableModelId } : {}),
   };
+  if (!result.unavailableModelId && isExactModelUnavailableResult(result, requestedModel)) {
+    result.unavailableModelId = requestedModel;
+  }
+  return result;
 }
 
 // Ad-hoc CLI run for the /admin/debug-cli endpoint: returns raw (truncated)

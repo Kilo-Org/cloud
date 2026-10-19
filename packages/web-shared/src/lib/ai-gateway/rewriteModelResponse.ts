@@ -17,7 +17,7 @@ import type {
   ChatCompletionChunk,
   OpenRouterUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { isDynamicallyOptedIntoRequestLogging } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
@@ -110,12 +110,11 @@ async function createRequestLogCapture(
   logging: RequestLoggingParams
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
-  if (
-    !(await isDynamicallyOptedIntoRequestLogging({
-      accountId: user?.id ?? null,
-      organizationId: organization_id,
-    }))
-  ) {
+  const loggingMode = await getDynamicRequestLoggingMode({
+    accountId: user?.id ?? null,
+    organizationId: organization_id,
+  });
+  if (loggingMode === null) {
     return null;
   }
   const status = response.status;
@@ -154,6 +153,9 @@ async function createRequestLogCapture(
               }
             : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
+      if (loggingMode === 'errors_only' && status < 400 && detectedError === null) {
+        return;
+      }
       const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
         request: JSON.stringify(redactApiRequestLogRequest(request)),
         response: responseText,

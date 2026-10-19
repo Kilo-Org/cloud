@@ -1,4 +1,4 @@
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { GatewayModelListConfigSchema } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
@@ -11,7 +11,7 @@ const HARDCODED_UNAVAILABLE_MODEL_IDS = [GEMMA_4_26B_A4B_IT_FREE_ID];
 
 /** Throws on an invalid stored list, so the cached getter keeps its last valid value. */
 export async function readUnavailableModelIds(): Promise<string[]> {
-  const [row] = await db
+  const [row] = await readDb
     .select({ unavailable_models: ai_gateway_config.unavailable_models })
     .from(ai_gateway_config)
     .where(eq(ai_gateway_config.id, 1))

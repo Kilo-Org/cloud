@@ -3,8 +3,11 @@ import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
-import { USAGE_SHADOW_PUBLISH_ENABLED } from '@kilocode/web-shared/lib/config.server';
-import { enqueueUsage } from './usage-publisher';
+import {
+  USAGE_QUEUE_ONLY_ENABLED,
+  USAGE_SHADOW_PUBLISH_ENABLED,
+} from '@kilocode/web-shared/lib/config.server';
+import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -71,6 +74,7 @@ import type {
   UsageMetaData,
   UsageRecordInsertResult,
   UsageRecordWriteOutcome,
+  UsageAccountingResult,
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
@@ -292,52 +296,72 @@ export async function toInsertableDbUsageRecord(
 function scheduleUsageEnqueue(payload: UsageRecordRequest): void {
   if (!USAGE_SHADOW_PUBLISH_ENABLED) return;
 
+  void enqueueUsageWithinLifetime(payload).then(outcome => {
+    if (outcome.kind === 'accepted') {
+      console.info('usage enqueue accepted', { usageId: payload.core.id });
+    } else if (
+      outcome.kind === 'unavailable' &&
+      (outcome.reason === 'registration_failed' || outcome.reason === 'unexpected_rejection')
+    ) {
+      // Transport failures are already reported by the publisher.
+      console.warn('usage enqueue unavailable', { usageId: payload.core.id, ...outcome });
+    }
+  });
+}
+
+async function enqueueUsageWithinLifetime(
+  payload: UsageRecordRequest
+): Promise<UsageEnqueueOutcome> {
+  const start = Promise.withResolvers<boolean>();
+  const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
+    if (!registered) return { kind: 'unavailable', reason: 'registration_failed' };
+    try {
+      return await enqueueUsage(payload);
+    } catch {
+      return { kind: 'unavailable', reason: 'unexpected_rejection' };
+    }
+  });
   try {
-    // Each promise gets its own lifetime tracking even after an earlier callback queue drains.
-    // Start enqueueing only after registration succeeds, so missing request scope does no I/O.
-    const start = Promise.withResolvers<void>();
-    after(
-      start.promise.then(async () => {
-        try {
-          const outcome = await enqueueUsage(payload);
-          if (outcome.kind === 'accepted') {
-            console.info('usage enqueue accepted', { usageId: payload.core.id });
-          }
-        } catch {
-          console.warn('usage enqueue unavailable', {
-            usageId: payload.core.id,
-            kind: 'unavailable',
-            reason: 'unexpected_rejection',
-          });
-        }
-      })
-    );
-    start.resolve();
+    // Track a promise even if an earlier after() callback queue has already drained.
+    after(publication);
+    start.resolve(true);
   } catch {
-    console.warn('usage enqueue unavailable', {
-      usageId: payload.core.id,
-      kind: 'unavailable',
-      reason: 'registration_failed',
-    });
+    // No request lifetime means no network I/O; preserve usage with the direct writer.
+    start.resolve(false);
   }
+  return publication;
 }
 
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext,
   bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
-): Promise<{ usageId: string; createdAt: string } | null> {
+): Promise<UsageAccountingResult | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
-  scheduleUsageEnqueue({
+  const payload: UsageRecordRequest = {
     core,
     metadata,
     prior_microdollar_usage: usageContext.prior_microdollar_usage,
     posthog_distinct_id: usageContext.posthog_distinct_id ?? null,
     bouncer_usage_event: bouncerUsageEvent,
-  });
+  };
+
+  if (USAGE_QUEUE_ONLY_ENABLED) {
+    const outcome = await enqueueUsageWithinLifetime(payload);
+    if (outcome.kind === 'accepted') {
+      console.info('usage accounting queued', { usageId: core.id });
+      return { status: 'queued', usageId: core.id, createdAt: core.created_at };
+    }
+    console.warn('usage accounting direct fallback', {
+      usageId: core.id,
+      reason: outcome.kind === 'disabled' ? 'publisher_disabled' : outcome.reason,
+    });
+  } else {
+    scheduleUsageEnqueue(payload);
+  }
 
   const inserted = await saveUsageRelatedData(
     core,
@@ -355,7 +379,7 @@ export async function logMicrodollarUsage(
   // Postgres timestamp string (e.g. "2026-04-29 01:16:12.945+00") which is not
   // strict ISO 8601 and will fail downstream datetime validators. core.created_at
   // is always new Date().toISOString() so the format is guaranteed.
-  return inserted ? { usageId: core.id, createdAt: core.created_at } : null;
+  return inserted ? { status: 'recorded', usageId: core.id, createdAt: core.created_at } : null;
 }
 
 /**
@@ -657,9 +681,25 @@ function organizationUsageMutationTask(
 
 async function runPostCommitUsageWork(
   usage: MicrodollarUsage,
-  result: UsageStatementResult
+  result: UsageStatementResult,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
 ): Promise<void> {
   const tasks = [organizationUsageMutationTask(usage, result)].filter(task => task !== null);
+  if (bouncerUsageEvent) {
+    tasks.push({
+      run: async () => {
+        await deliverBouncerUsageEventNow(bouncerUsageEvent.request_id);
+      },
+      reportError: error => {
+        reportPostCommitFailure(
+          'post-commit bouncer usage delivery failed',
+          error,
+          { source: 'postCommitBouncerUsageDelivery' },
+          usage.id
+        );
+      },
+    });
+  }
   await runBestEffortPostCommitTasks(tasks);
 }
 
@@ -778,7 +818,7 @@ export async function insertUsageRecord(
       }
     );
 
-    await runPostCommitUsageWork(coreUsageFields, result.inserted);
+    await runPostCommitUsageWork(coreUsageFields, result.inserted, bouncerUsageEvent);
     scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);
     return {
       usageId: result.inserted.usageId,
@@ -1307,7 +1347,7 @@ export function calculateKiloExclusiveCost_mUsd(
 export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
-): Promise<{ usageId: string; createdAt: string } | null> {
+): Promise<UsageAccountingResult | null> {
   if (!usageStats) {
     captureMessage('SUSPICIOUS: No usage information', {
       level: 'error',
@@ -1401,21 +1441,20 @@ export async function processTokenData(
 }
 
 /**
- * Persists a usage row and reports the same request to bouncer's usage ledger, after the billing
+ * Records or queues usage and reports the same request to bouncer's usage ledger, after the billing
  * cost is final. Chat and transcription reach it through `processTokenData`; FIM, edit,
  * embeddings, and SystemOne call it directly.
  *
- * When the request's decide verdict said `spendWatch`, the usage event is enqueued in the usage
- * write's transaction and delivered from the outbox right after commit; the cron drainer retries a
- * failure. If no outbox row exists afterwards (the write failed, or a Frankfurt usage endpoint from
- * before this change dropped the field), the event falls back to the best-effort send; bouncer
- * dedupes on `requestId`, so a double send counts once. Every other request keeps the best-effort
- * send, which never rejects.
+ * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
+ * transaction and attempts delivery right after commit; the cron drainer retries a failure.
+ * Queued and recorded outcomes leave delivery with that writer/outbox. A failed direct write
+ * keeps the best-effort send; bouncer dedupes on `requestId`. Every other request also keeps the
+ * independent best-effort send, which never rejects.
  */
 export async function logMicrodollarUsageAndReportToBouncer(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
-): Promise<{ usageId: string; createdAt: string } | null> {
+): Promise<UsageAccountingResult | null> {
   const event = bouncerUsageEvent(usageStats, usageContext);
   if (!event || usageContext.bouncer?.spendWatch !== true) {
     const record = await logMicrodollarUsage(usageStats, usageContext);
@@ -1426,7 +1465,7 @@ export async function logMicrodollarUsageAndReportToBouncer(
     request_id: event.requestId,
     payload: usageEventWireBody(event),
   });
-  if (!(await deliverBouncerUsageEventNow(event.requestId))) await reportUsageEvent(event);
+  if (!record) await reportUsageEvent(event);
   return record;
 }
 

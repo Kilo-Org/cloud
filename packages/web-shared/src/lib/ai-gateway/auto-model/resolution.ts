@@ -69,6 +69,7 @@ type ResolveAutoModelParams = {
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   frontierDecision?: () => Promise<AutoRoutingDecision | null>;
   customRouterDecision?: (reference: CustomRouterReference) => Promise<CustomRouterResolution>;
+  legacyPoolRouter?: () => Promise<CustomRouterReference | null>;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -376,8 +377,24 @@ export async function resolveAutoModel(
     };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
+    if (params.legacyPoolRouter) {
+      let reference: CustomRouterReference | null;
+      try {
+        reference = await params.legacyPoolRouter();
+      } catch {
+        return { kind: 'auto_routing_unavailable' };
+      }
+      if (reference) return resolveCustomRouterModel(params, reference);
+    }
     const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
-    const decision = params.efficientDecision ? await params.efficientDecision() : null;
+    let decision: AutoRoutingDecision | null = null;
+    if (params.efficientDecision) {
+      try {
+        decision = await params.efficientDecision();
+      } catch {
+        return { kind: 'auto_routing_unavailable' };
+      }
+    }
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = await resolveAutoRoutingDecisionModel(decision);
       if (resolvedFromDecision) {

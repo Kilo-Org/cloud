@@ -6,6 +6,29 @@ import {
   sendCloudAgentSessionNotificationInputSchema,
 } from './rpc-schemas';
 
+describe('agent briefing dispatch', () => {
+  const request = {
+    kind: 'agent_briefing',
+    userId: 'oauth/github/123',
+    localDate: '2026-10-15',
+    expiresAt: '2026-10-15T12:00:00.000Z',
+  };
+
+  it('accepts a user-scoped dispatch with a local calendar date and UTC expiry', () => {
+    expect(internalDispatchRequestSchema.parse(request)).toEqual(request);
+  });
+
+  it.each([
+    { userId: '' },
+    { localDate: '2026-02-30' },
+    { localDate: '2026-10-15T00:00:00.000Z' },
+    { expiresAt: 'not-a-date' },
+    { expiresAt: undefined },
+  ])('rejects invalid briefing dispatch identity or expiry: %j', invalid => {
+    expect(internalDispatchRequestSchema.safeParse({ ...request, ...invalid }).success).toBe(false);
+  });
+});
+
 describe('internalDispatchSpendAlertRequestSchema', () => {
   const personal = {
     kind: 'spend_alert',

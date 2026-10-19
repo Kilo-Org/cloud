@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -13,7 +13,16 @@ type ChatRequest = Extract<GatewayRequest, { kind: 'chat_completions' }>;
 type MessagesRequest = Extract<GatewayRequest, { kind: 'messages' }>;
 type ResponsesRequest = Extract<GatewayRequest, { kind: 'responses' }>;
 
+const MODEL = 'reflection/beam-free';
 const placeholderDetail = { type: 'reasoning.text', text: REASONING_PLACEHOLDER };
+
+let warn: jest.SpiedFunction<typeof console.warn>;
+beforeEach(() => {
+  warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+});
+afterEach(() => {
+  warn.mockRestore();
+});
 
 function makeChatRequest(assistant: Record<string, unknown>): ChatRequest {
   return {
@@ -48,7 +57,7 @@ describe('addReflectionReasoningPlaceholders for chat completions', () => {
   it('adds a placeholder to an assistant message without reasoning', () => {
     const request = makeChatRequest({});
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(chatAssistant(request).reasoning_details).toEqual([placeholderDetail]);
   });
@@ -59,7 +68,7 @@ describe('addReflectionReasoningPlaceholders for chat completions', () => {
       tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'add', arguments: '{}' } }],
     });
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(chatAssistant(request).reasoning_details).toEqual([placeholderDetail]);
   });
@@ -72,7 +81,7 @@ describe('addReflectionReasoningPlaceholders for chat completions', () => {
   ])('treats $name as missing', ({ name: _name, ...assistant }) => {
     const request = makeChatRequest(assistant);
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(chatAssistant(request).reasoning_details).toContainEqual(placeholderDetail);
   });
@@ -85,7 +94,7 @@ describe('addReflectionReasoningPlaceholders for chat completions', () => {
     };
     const request = makeChatRequest({ reasoning_details: [encrypted] });
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(chatAssistant(request).reasoning_details).toEqual([encrypted, placeholderDetail]);
   });
@@ -98,7 +107,7 @@ describe('addReflectionReasoningPlaceholders for chat completions', () => {
   ])('leaves an assistant message with reasoning unchanged: %j', assistant => {
     const request = makeChatRequest(assistant);
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(chatAssistant(request)).toEqual({ role: 'assistant', content: '4', ...assistant });
   });
@@ -106,7 +115,7 @@ describe('addReflectionReasoningPlaceholders for chat completions', () => {
   it('does not touch user messages', () => {
     const request = makeChatRequest({});
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.messages[0]).toEqual({ role: 'user', content: 'What is 2+2?' });
   });
@@ -135,7 +144,7 @@ describe('addReflectionReasoningPlaceholders for messages', () => {
   it('converts string content to a placeholder thinking block and text', () => {
     const request = makeMessagesRequest('4');
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.messages[1].content).toEqual([
       placeholderBlock,
@@ -148,7 +157,7 @@ describe('addReflectionReasoningPlaceholders for messages', () => {
       { type: 'tool_use', id: 'call-1', name: 'add', input: {} },
     ]);
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.messages[1].content).toEqual([
       placeholderBlock,
@@ -163,7 +172,7 @@ describe('addReflectionReasoningPlaceholders for messages', () => {
     ];
     const request = makeMessagesRequest(structuredClone(content));
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.messages[1].content).toEqual(content);
   });
@@ -210,7 +219,7 @@ describe('addReflectionReasoningPlaceholders for responses', () => {
       user,
     ]);
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.input).toEqual([
       user,
@@ -232,7 +241,7 @@ describe('addReflectionReasoningPlaceholders for responses', () => {
       functionCallOutput,
     ]);
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.input).toEqual([
       user,
@@ -259,7 +268,7 @@ describe('addReflectionReasoningPlaceholders for responses', () => {
     };
     const request = makeResponsesRequest([user, shellCall, shellCallOutput, user]);
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.input).toEqual([
       user,
@@ -274,7 +283,7 @@ describe('addReflectionReasoningPlaceholders for responses', () => {
     const emptyReasoning = { type: 'reasoning' as const, id: 'rs_1', summary: [] };
     const request = makeResponsesRequest([user, emptyReasoning, assistantMessage]);
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.input).toEqual([
       user,
@@ -287,10 +296,77 @@ describe('addReflectionReasoningPlaceholders for responses', () => {
   it('leaves string input unchanged', () => {
     const request = makeResponsesRequest('hello');
 
-    addReflectionReasoningPlaceholders(request);
+    addReflectionReasoningPlaceholders(MODEL, request);
 
     expect(request.body.input).toBe('hello');
   });
+});
+
+describe('addReflectionReasoningPlaceholders logging', () => {
+  it('logs the number of placeholders when the request was mutated', () => {
+    const request = makeChatRequest({});
+    request.body.messages.push({ role: 'assistant', content: '6' });
+
+    addReflectionReasoningPlaceholders(MODEL, request);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      '[addReflectionReasoningPlaceholders] mutated request with reasoning placeholders',
+      { model: MODEL, requestKind: 'chat_completions', placeholderCount: 2 }
+    );
+  });
+
+  it('does not log when every assistant turn has reasoning', () => {
+    const request = makeChatRequest({ reasoning: 'thought' });
+
+    addReflectionReasoningPlaceholders(MODEL, request);
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      kind: 'messages',
+      request: {
+        kind: 'messages',
+        body: {
+          model: MODEL,
+          max_tokens: 1_024,
+          messages: [
+            { role: 'user', content: 'hi' },
+            { role: 'assistant', content: 'hello' },
+            { role: 'assistant', content: [{ type: 'text', text: 'there' }] },
+          ],
+        },
+      },
+    },
+    {
+      kind: 'responses',
+      request: {
+        kind: 'responses',
+        body: {
+          model: MODEL,
+          input: [
+            { role: 'user', content: 'hi' },
+            { role: 'assistant', content: 'hello' },
+            { role: 'user', content: 'again' },
+            { role: 'assistant', content: 'there' },
+          ],
+        },
+      },
+    },
+  ] satisfies { kind: string; request: GatewayRequest }[])(
+    'logs the placeholder count for $kind requests',
+    ({ kind, request }) => {
+      addReflectionReasoningPlaceholders(MODEL, request);
+
+      expect(warn).toHaveBeenCalledWith(expect.any(String), {
+        model: MODEL,
+        requestKind: kind,
+        placeholderCount: 2,
+      });
+    }
+  );
 });
 
 describe('applyProviderSpecificLogic reasoning placeholders', () => {

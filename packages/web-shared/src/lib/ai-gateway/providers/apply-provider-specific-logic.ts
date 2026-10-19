@@ -377,7 +377,7 @@ export async function applyProviderSpecificLogic(
   }
 
   if (isReflectionModel(requestedModel)) {
-    addReflectionReasoningPlaceholders(requestToMutate);
+    addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
   }
 
   if (provider.id === 'vercel') {

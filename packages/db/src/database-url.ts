@@ -14,9 +14,17 @@ export function computeDatabaseUrl(): string {
     );
   }
 
-  return process.env.NODE_ENV === 'test'
-    ? `${postgresUrl}-${process.env.JEST_WORKER_ID || '1'}`
-    : postgresUrl;
+  if (process.env.NODE_ENV !== 'test') {
+    return postgresUrl;
+  }
+
+  // Isolate each Jest worker's database. Append to the path segment so query
+  // parameters such as sslmode stay valid instead of becoming part of the
+  // last parameter's value.
+  const workerId = process.env.JEST_WORKER_ID || '1';
+  const url = new URL(postgresUrl);
+  url.pathname = `${url.pathname}-${workerId}`;
+  return url.toString();
 }
 
 export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {

@@ -92,7 +92,6 @@ const resourceTokenFamilyFlags = {
   chat: 'CHAT_RESOURCE_TOKENS_ENABLED',
   'delegated-resource': 'DELEGATED_RESOURCE_TOKENS_ENABLED',
   'workflow-gateway': 'WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED',
-  benchmark: 'BENCHMARK_RESOURCE_TOKENS_ENABLED',
   'internal-bot': 'INTERNAL_BOT_RESOURCE_TOKENS_ENABLED',
 } as const;
 

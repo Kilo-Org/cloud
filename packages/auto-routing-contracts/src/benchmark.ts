@@ -126,7 +126,10 @@ export const BenchmarkPlatformModelSchema = z.object({
 });
 export type BenchmarkPlatformModel = z.infer<typeof BenchmarkPlatformModelSchema>;
 
-export const DEFAULT_BENCHMARK_USER_ID = '1f7125a8-351a-45a5-af1f-2b7c24ca7dc3';
+// Decider runs mint their CLI token from apps/web's internal bot-token
+// endpoint, which only issues for `bot-internal-*` bot users in an org.
+export const INTERNAL_BOT_USER_ID_PREFIX = 'bot-internal-';
+export const DEFAULT_BENCHMARK_USER_ID = 'bot-internal-benchmark';
 export const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
 // Flags each list entry whose (trimmed) id already appeared earlier in the
@@ -162,6 +165,7 @@ export const BenchmarkConfigSchema = z
     frontierMinAccuracyDelta: z.number().min(0).max(1).default(0),
     // Optional override for the Kilo user whose identity/billing the decider
     // CLI runs execute under. Null means the worker uses DEFAULT_BENCHMARK_USER_ID.
+    // The effective user must be an internal bot (`bot-internal-*`).
     benchmarkUserId: z.string().trim().min(1).nullable(),
     // Optional override for the organization context. Null means the worker
     // uses DEFAULT_BENCHMARK_ORG_ID.
@@ -208,8 +212,15 @@ export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 export function resolveBenchmarkIdentity(
   config: Pick<BenchmarkConfig, 'benchmarkUserId' | 'benchmarkOrgId'>
 ): { benchmarkUserId: string; benchmarkOrgId: string } {
+  const benchmarkUserId = config.benchmarkUserId ?? DEFAULT_BENCHMARK_USER_ID;
+  if (!benchmarkUserId.startsWith(INTERNAL_BOT_USER_ID_PREFIX)) {
+    throw new Error(
+      `benchmarkUserId override "${benchmarkUserId}" is not an internal bot user; ` +
+        `use a ${INTERNAL_BOT_USER_ID_PREFIX}* user or clear the override`
+    );
+  }
   return {
-    benchmarkUserId: config.benchmarkUserId ?? DEFAULT_BENCHMARK_USER_ID,
+    benchmarkUserId,
     benchmarkOrgId: config.benchmarkOrgId ?? DEFAULT_BENCHMARK_ORG_ID,
   };
 }

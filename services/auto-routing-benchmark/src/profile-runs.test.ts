@@ -156,7 +156,7 @@ const configRow = {
   switch_horizon_turns: null,
   low_confidence_threshold: null,
   max_concurrency: 4,
-  benchmark_user_id: 'user-1',
+  benchmark_user_id: 'bot-internal-user-1',
   benchmark_org_id: null,
   classifier_repetitions: 1,
   decider_repetitions: 1,

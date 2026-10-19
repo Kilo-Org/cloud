@@ -62,7 +62,7 @@ describe('a paid case whose queue invocation is canceled (production migrations 
       },
       BENCH_RUNNER: { idFromName: (name: string) => name, get: () => container },
       BENCHMARK_SCHEDULER_CONFIG: SLOTS,
-      INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+      BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-secret' },
       KILO_WEB_API_BASE_URL: 'https://app.test',
       KILO_CLI_API_URL: 'https://api.test',
       BENCH_RESULT_URL: 'https://bench.test/container/case-result',

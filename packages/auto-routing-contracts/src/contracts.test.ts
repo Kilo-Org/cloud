@@ -260,17 +260,26 @@ describe('resolveBenchmarkIdentity', () => {
     });
   });
 
-  it('preserves configured benchmark identity overrides', () => {
+  it('preserves configured internal bot identity overrides', () => {
     expect(
       resolveBenchmarkIdentity({
-        benchmarkUserId: 'override-user',
+        benchmarkUserId: 'bot-internal-override',
         benchmarkOrgId: 'override-org',
       })
     ).toEqual({
-      benchmarkUserId: 'override-user',
+      benchmarkUserId: 'bot-internal-override',
       benchmarkOrgId: 'override-org',
     });
   });
+
+  it.each(['override-user', 'bot-code-review-org-1', 'xbot-internal-x'])(
+    'rejects a %s override instead of falling back to the default user',
+    benchmarkUserId => {
+      expect(() => resolveBenchmarkIdentity({ benchmarkUserId, benchmarkOrgId: null })).toThrow(
+        /is not an internal bot user/
+      );
+    }
+  );
 });
 
 describe('BenchmarkConfigSchema duplicate model ids', () => {

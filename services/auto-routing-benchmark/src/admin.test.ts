@@ -168,6 +168,7 @@ function schedulerDatabase(): D1Database {
 
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
+  BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-secret' },
   BENCH_DB: schedulerDatabase(),
   BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
   BENCHMARK_SCHEDULER_CONFIG: '{}',

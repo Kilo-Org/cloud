@@ -1554,11 +1554,12 @@ async function processDeciderJob(
   const cases = deciderCasesForRouter(state.router).filter(c => caseIds.has(c.id));
   if (cases.length !== message.caseIds.length) throw new Error('Scheduler chunk has unknown cases');
 
-  const { benchmarkUserId } = state;
-  if (!benchmarkUserId) {
+  const { benchmarkUserId, benchmarkOrgId } = state;
+  if (!benchmarkUserId || !benchmarkOrgId) {
     // startRun snapshots the effective default/override identity, so this only
-    // happens if the run row was tampered with; throwing lets the queue retry.
-    throw new Error(`run ${message.runId} has no benchmarkUserId`);
+    // happens for a run row written before the org snapshot existed or one
+    // that was tampered with. The bot-token mint requires both.
+    throw new Error(`run ${message.runId} has no benchmarkUserId or benchmarkOrgId`);
   }
 
   const rep = message.rep ?? 0;
@@ -1630,13 +1631,13 @@ async function processDeciderJob(
     let cli: Promise<string> | undefined;
     const cliToken = () =>
       (cli ??= (async () => {
-        const kiloToken = await fetchBenchmarkUserToken(env, benchmarkUserId, state.benchmarkOrgId);
+        const kiloToken = await fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId);
         await warmUpCliContainer(env, {
           instanceName,
           model: message.model,
           kiloToken,
           kiloApiUrl: env.KILO_CLI_API_URL,
-          orgId: state.benchmarkOrgId,
+          orgId: benchmarkOrgId,
         }).catch(error => {
           if (isRetryableContainerAvailabilityError(error)) throw error;
         });
@@ -1679,7 +1680,7 @@ async function processDeciderJob(
             benchCase,
             kiloToken,
             kiloApiUrl: env.KILO_CLI_API_URL,
-            orgId: state.benchmarkOrgId,
+            orgId: benchmarkOrgId,
             variant: cliVariant,
             resultCallback: { url: env.BENCH_RESULT_URL, execution },
           }).catch(error => {
@@ -1790,25 +1791,22 @@ async function processDeciderJob(
 
 const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.string() });
 
-// Calls apps/web's internal endpoint to mint a short-lived user API token for
-// the decider CLI. Never logs the token.
+// Calls apps/web's internal bot-token endpoint to mint a short-lived token for
+// the internal bot user the decider CLI runs as. Never logs the token.
 export async function fetchBenchmarkUserToken(
   env: Env,
   userId: string,
-  organizationId: string | null = null
+  organizationId: string
 ): Promise<string> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
-  const response = await fetch(
-    `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/token`,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${secret}`,
-      },
-      body: JSON.stringify({ userId, ...(organizationId ? { organizationId } : {}) }),
-    }
-  );
+  const secret = await env.BOT_TOKEN_MINT_SECRET.get();
+  const response = await fetch(`${env.KILO_WEB_API_BASE_URL}/api/internal/bot-token`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${secret}`,
+    },
+    body: JSON.stringify({ userId, organizationId }),
+  });
   if (!response.ok) {
     const detail = (await response.text().catch(() => '')).slice(0, 200);
     throw new Error(`token mint failed: HTTP ${response.status} ${detail}`);

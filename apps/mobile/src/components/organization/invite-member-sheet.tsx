@@ -1,9 +1,8 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-
 import { roleLabel } from '@/components/organization/member-row';
 import { getInviteSuccessMessage } from '@/components/organization/invited-member-row-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -29,10 +28,31 @@ export function InviteMemberSheet() {
   const colors = useThemeColors();
   const { organizationId, role: myRole, org, isResolving } = useOrgBoundary();
   const mutations = useOrganizationMutations(organizationId ?? '');
+  const { invite } = mutations;
   const emailRef = useRef('');
   const [canSubmit, setCanSubmit] = useState(false);
   const isBillingManager = myRole === 'billing_manager';
   const [role, setRole] = useState<OrgRole>('member');
+  // A formSheet route can stay mounted across a dismiss/reopen cycle, so the
+  // form's own state outlives the sheet: the uncontrolled email field, the
+  // derived send gate, the picked role, the field's internal blur-validation
+  // state, and the invite mutation's inline error. Every open starts clean.
+  const [formEpoch, setFormEpoch] = useState(0);
+
+  const inviteReset = invite.reset;
+  useFocusEffect(
+    useCallback(() => {
+      emailRef.current = '';
+      setCanSubmit(false);
+      setRole('member');
+      setFormEpoch(epoch => epoch + 1);
+      // Reset only reads the observer, so it stays referentially stable; the
+      // whole `invite` result is a new object every render and would re-run
+      // this effect, clearing an error the open sheet is showing.
+      inviteReset();
+      return undefined;
+    }, [inviteReset])
+  );
 
   if (isResolving) {
     return (
@@ -50,6 +70,9 @@ export function InviteMemberSheet() {
   }
 
   const onSubmit = () => {
+    if (!canSubmit) {
+      return;
+    }
     const email = emailRef.current.trim().toLowerCase();
     mutations.invite.mutate(
       { email, role: isBillingManager ? 'member' : role },
@@ -77,6 +100,7 @@ export function InviteMemberSheet() {
       </Text>
 
       <FormField
+        key={formEpoch}
         label={t('common.email')}
         required
         placeholder={t('organization.inviteMember.emailPlaceholder')}

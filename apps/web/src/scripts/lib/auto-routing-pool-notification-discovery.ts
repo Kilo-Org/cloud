@@ -13,6 +13,12 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PoolNotificationOwner } from './auto-routing-pool-notifications';
 
+// A parent-organization member is a child's billing contact only when the role both inherits
+// into the child and carries billing authority there.
+const INHERITED_BILLING_ROLES = ORGANIZATION_BILLING_ROLES.filter(role =>
+  ORGANIZATION_PARENT_ACCESS_ROLES.includes(role)
+);
+
 export async function discoverPoolNotificationOwners(
   database: typeof db
 ): Promise<PoolNotificationOwner[]> {
@@ -80,8 +86,7 @@ export async function discoverPoolNotificationOwners(
             .where(
               and(
                 inArray(organizations.id, organizationIds),
-                inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES),
-                inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES),
+                inArray(organization_memberships.role, INHERITED_BILLING_ROLES),
                 eq(kilocode_users.is_bot, false)
               )
             );

@@ -55,12 +55,12 @@ No raw recipient lists are printed or exported. --send requires configured produ
     return;
   }
   const options = parsePoolNotificationOptions(args);
-  if (process.env.DEBUG_QUERY_LOGGING) {
-    throw new PoolNotificationError('Disable DEBUG_QUERY_LOGGING to avoid logging recipient data.');
-  }
   if (options.reconcile) {
     report(await runPoolNotifications(options), options.cutoverAt);
     return;
+  }
+  if (process.env.DEBUG_QUERY_LOGGING) {
+    throw new PoolNotificationError('Disable DEBUG_QUERY_LOGGING to avoid logging recipient data.');
   }
   // Credential-dependent modules are deferred so --help needs no database or mail configuration.
   const { db, pool } = await import('@kilocode/web-shared/lib/drizzle');

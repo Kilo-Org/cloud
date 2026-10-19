@@ -892,7 +892,7 @@
     },
     "autoReviews": "Revisiones automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización y los administradores de facturación pueden conectarlo.",
+      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
       "setupIncomplete": "La configuración está incompleta. Complétala en kilo.ai.",
       "setup": "Configuración de Bitbucket"
     },
@@ -916,7 +916,10 @@
       "starting": "Iniciando revisión…",
       "title": "Revisión manual"
     },
-    "notConnectedReadOnly": "{{platform}} no está conectado. Solo los propietarios de la organización y los administradores de facturación pueden conectarlo.",
+    "notConnectedReadOnly": "{{platform}} no está conectado. Solo los propietarios de la organización y los administradores pueden conectarlo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} no está conectado. Conéctalo para empezar a revisar solicitudes de fusión."
+    },
     "platformList": {
       "activity": "Actividad",
       "checking": "Comprobando…",
@@ -991,7 +994,7 @@
       "noProposalsDescription": "Las propuestas de la memoria de revisión aparecen aquí después de que Kilo analice las respuestas de los responsables del mantenimiento.",
       "off": "La memoria de revisión está desactivada.",
       "offDescription": "Actívala para que Kilo aprenda de las respuestas de los responsables del mantenimiento y proponga directrices para REVIEW.md.",
-      "readOnlyDescription": "Solo los propietarios de la organización y los administradores de facturación pueden activar la memoria de revisión.",
+      "readOnlyDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden activar la memoria de revisión.",
       "title": "Memoria de revisiones"
     },
     "scopeList": {
@@ -1134,7 +1137,7 @@
       "summary": "Resumen del informe",
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría no disponible",
-      "unavailableDescription": "Solo los propietarios de la organización y los administradores de facturación pueden ver los informes de auditoría. Pide a un propietario o a un administrador de facturación que te dé acceso."
+      "unavailableDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden ver los informes de auditoría. Pide a un propietario, a un administrador o a un gestor de facturación que te dé acceso."
     },
     "auditReportButton": {
       "viewA11y": "Ver el informe de auditoría"
@@ -1234,7 +1237,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Este hallazgo ya está resuelto y no se puede descartar.",
-      "cannotDismissDescription": "Solo los propietarios de la organización y los administradores de facturación pueden descartar hallazgos.",
+      "cannotDismissDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden descartar hallazgos.",
       "cannotDismissTitle": "No se puede descartar este hallazgo",
       "commentAccessibility": "Comentario del descarte",
       "commentLabel": "Comentario (opcional)",
@@ -1367,7 +1370,7 @@
       "automationCount": "{{displayCount}} de 3 activadas",
       "couldNotLoadPermissions": "No se pudieron cargar los permisos.",
       "couldNotLoadSettings": "No se pudieron cargar los ajustes del agente de seguridad.",
-      "disabledNoManage": "El agente de seguridad está desactivado. Solo los propietarios de la organización y los administradores de facturación pueden activarlo.",
+      "disabledNoManage": "El agente de seguridad está desactivado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden activarlo.",
       "disabledNoRepo": "Selecciona al menos un repositorio antes de activar el agente de seguridad.",
       "disabledPrompt": "Activa el agente de seguridad para sincronizar las alertas de Dependabot, elegir repositorios y configurar la automatización.",
       "notificationsCount": "{{displayCount}} de 2 activadas",
@@ -1400,7 +1403,7 @@
       "lowDescription": "Impacto mínimo en la seguridad.",
       "medium": "Nivel medio",
       "mediumDescription": "Impacto limitado o condiciones específicas.",
-      "permissionNote": "Solo los propietarios de la organización y los administradores de facturación pueden cambiar estos ajustes.",
+      "permissionNote": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden cambiar estos ajustes.",
       "remediationDeadlineA11y": "Plazo de corrección en días para gravedad {{label}}",
       "title": "Política de SLA"
     },
@@ -3085,7 +3088,7 @@
     "members": {
       "changeRole": "Cambiar rol",
       "emptyDescriptionCanInvite": "Invita a tus compañeros de equipo para empezar a colaborar en esta organización.",
-      "emptyDescriptionCannotInvite": "Pide a un propietario o a un gestor de facturación que invite a tus compañeros de equipo.",
+      "emptyDescriptionCannotInvite": "Pide a un propietario, a un administrador o a un gestor de facturación que invite a tus compañeros de equipo.",
       "emptyTitle": "Aún no hay miembros",
       "invitedDate": "Invitación enviada el {{date}}",
       "limitPerDay": "{{amount}}/día",

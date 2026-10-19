@@ -895,7 +895,7 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji i administratorzy rozliczeń mogą je skonfigurować.",
+      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
       "setupIncomplete": "Konfiguracja jest niekompletna. Dokończ ją na kilo.ai.",
       "setup": "Konfiguracja Bitbucket"
     },
@@ -919,7 +919,10 @@
       "starting": "Rozpoczynanie przeglądu…",
       "title": "Ręczny przegląd"
     },
-    "notConnectedReadOnly": "Brak połączenia z {{platform}}. Tylko właściciele organizacji i administratorzy rozliczeń mogą je skonfigurować.",
+    "notConnectedReadOnly": "Brak połączenia z {{platform}}. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
+    "gitlab": {
+      "notConnectedReadOnly": "Brak połączenia z {{platform}}. Połącz ją, aby rozpocząć przeglądanie wniosków o scalenie."
+    },
     "platformList": {
       "activity": "Aktywność",
       "checking": "Sprawdzanie…",
@@ -994,7 +997,7 @@
       "noProposalsDescription": "Propozycje z pamięci przeglądów pojawią się tutaj, gdy Kilo przeanalizuje odpowiedzi opiekunów repozytorium.",
       "off": "Pamięć przeglądów jest wyłączona.",
       "offDescription": "Włącz ją, aby Kilo uczyło się na podstawie odpowiedzi opiekunów repozytorium i proponowało wytyczne do pliku REVIEW.md.",
-      "readOnlyDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą włączyć pamięć przeglądów.",
+      "readOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą włączyć pamięć przeglądów.",
       "title": "Pamięć przeglądów"
     },
     "scopeList": {
@@ -1137,7 +1140,7 @@
       "summary": "Podsumowanie raportu",
       "title": "Raport audytu",
       "unavailable": "Raport audytu niedostępny",
-      "unavailableDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą przeglądać raporty audytu. Poproś właściciela lub administratora rozliczeń o przyznanie dostępu."
+      "unavailableDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą przeglądać raporty audytu. Poproś właściciela, administratora lub osobę zarządzającą rozliczeniami o przyznanie dostępu."
     },
     "auditReportButton": {
       "viewA11y": "Wyświetl raport audytu"
@@ -1240,7 +1243,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Ten problem został już rozwiązany i nie można go odrzucić.",
-      "cannotDismissDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą odrzucać problemy.",
+      "cannotDismissDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą odrzucać problemy.",
       "cannotDismissTitle": "Nie można odrzucić tego problemu",
       "commentAccessibility": "Komentarz do odrzucenia",
       "commentLabel": "Komentarz (opcjonalnie)",
@@ -1373,7 +1376,7 @@
       "automationCount": "Włączono {{displayCount}} z 3",
       "couldNotLoadPermissions": "Nie udało się wczytać uprawnień.",
       "couldNotLoadSettings": "Nie udało się wczytać ustawień agenta bezpieczeństwa.",
-      "disabledNoManage": "Agent bezpieczeństwa jest wyłączony. Tylko właściciele organizacji i administratorzy rozliczeń mogą go włączyć.",
+      "disabledNoManage": "Agent bezpieczeństwa jest wyłączony. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą go włączyć.",
       "disabledNoRepo": "Wybierz co najmniej jedno repozytorium przed włączeniem agenta bezpieczeństwa.",
       "disabledPrompt": "Włącz agenta bezpieczeństwa, aby synchronizować alerty Dependabot, wybierać repozytoria i konfigurować automatyzację.",
       "notificationsCount": "Włączono {{displayCount}} z 2",
@@ -1407,7 +1410,7 @@
       "lowDescription": "Minimalny wpływ na bezpieczeństwo.",
       "medium": "Poziom średni",
       "mediumDescription": "Ograniczone skutki lub konieczność spełnienia określonych warunków.",
-      "permissionNote": "Tylko właściciele organizacji i administratorzy rozliczeń mogą zmieniać te ustawienia.",
+      "permissionNote": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą zmieniać te ustawienia.",
       "remediationDeadlineA11y": "Termin naprawy w dniach. Krytyczność: {{label}}",
       "title": "Zasady SLA"
     },
@@ -3125,7 +3128,7 @@
     "members": {
       "changeRole": "Zmień rolę",
       "emptyDescriptionCanInvite": "Zaproś członków zespołu, aby rozpocząć współpracę w tej organizacji.",
-      "emptyDescriptionCannotInvite": "Poproś właściciela lub osobę zarządzającą rozliczeniami o zaproszenie członków zespołu.",
+      "emptyDescriptionCannotInvite": "Poproś właściciela, administratora lub osobę zarządzającą rozliczeniami o zaproszenie członków zespołu.",
       "emptyTitle": "Brak członków",
       "invitedDate": "Zaproszono {{date}}",
       "limitPerDay": "{{amount}}/dzień",

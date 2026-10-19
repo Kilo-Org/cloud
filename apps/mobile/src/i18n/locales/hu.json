@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzési memóriát.",
       "off": "A kódellenőrzési memória ki van kapcsolva.",
       "offDescription": "Kapcsold be, hogy a Kilo tanulhasson a karbantartók válaszaiból, és útmutatást javasolhasson a REVIEW.md fájlhoz.",
-      "readOnlyDescription": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők engedélyezhetik a kódellenőrzési memóriát.",
+      "readOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei engedélyezhetik a kódellenőrzési memóriát.",
       "enable": "Kódellenőrzési memória engedélyezése",
       "loadingProposals": "Javaslatok betöltése",
       "couldNotLoadProposals": "Nem sikerült betölteni a javaslatokat.",
@@ -1467,7 +1467,10 @@
       "starting": "Kódellenőrzés indítása…",
       "start": "Kódellenőrzés indítása"
     },
-    "notConnectedReadOnly": "Nincs kapcsolat ezzel a platformmal: {{platform}}. Csak a szervezet tulajdonosai és a számlázásért felelős kezelők csatlakoztathatják.",
+    "notConnectedReadOnly": "Nincs kapcsolat ezzel a platformmal: {{platform}}. Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják.",
+    "gitlab": {
+      "notConnectedReadOnly": "A {{platform}} nincs csatlakoztatva. Csatlakoztasd a merge requestek ellenőrzésének megkezdéséhez."
+    },
     "webhookSetup": "A webhook beállítása hiányos.",
     "webhookSetupDescription": "Előfordulhat, hogy egyes kódtárakban nem fut automatikus kódellenőrzés.",
     "autoReviews": "Automatikus kódellenőrzések",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "A kódtárak REVIEW.md fájljaiban megadott utasítások követése",
     "bitbucket": {
-      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai és a számlázásért felelős kezelők csatlakoztathatják.",
+      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "setupIncomplete": "A beállítás hiányos. Fejezd be a beállítást a kilo.ai oldalon.",
       "setup": "Bitbucket beállítása"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Nem sikerült betölteni ezt a találatot.",
       "couldNotCheckPermissions": "Nem sikerült ellenőrizni az elvetéshez szükséges jogosultságokat.",
       "cannotDismissTitle": "Ez a találat nem vethető el",
-      "cannotDismissDescription": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők vethetnek el találatokat.",
+      "cannotDismissDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei vethetnek el találatokat.",
       "alreadyResolvedDescription": "Ezt a találatot már megoldották, ezért nem vethető el."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Mind kikapcsolva",
       "automationCount": "3 közül {{displayCount}} engedélyezve",
       "notificationsCount": "2 közül {{displayCount}} engedélyezve",
-      "disabledNoManage": "A biztonsági ügynök ki van kapcsolva. Csak a szervezet tulajdonosai és a számlázásért felelős kezelők kapcsolhatják be.",
+      "disabledNoManage": "A biztonsági ügynök ki van kapcsolva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei kapcsolhatják be.",
       "disabledNoRepo": "A biztonsági ügynök engedélyezése előtt válassz ki legalább egy kódtárat.",
       "disabledPrompt": "Kapcsold be a biztonsági ügynököt a Dependabot-riasztások szinkronizálásához, a kódtárak kiválasztásához és az automatizálás beállításához."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "adj meg egy egész számot 1 és 365 között a napok számához.",
       "remediationDeadlineA11y": "{{label}}: hibajavítási határidő napokban",
       "enterWholeNumber": "Adj meg egy 1 és 365 közötti egész számot",
-      "permissionNote": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők módosíthatják ezeket a beállításokat.",
+      "permissionNote": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei módosíthatják ezeket a beállításokat.",
       "enableTracking": "SLA-követés engedélyezése",
       "enableTrackingSubtitle": "A találatok súlyossága alapján határozza meg a hibajavítási határidőket.",
       "deadlinesHeading": "Hibajavítási határidők (nap)"
@@ -1872,7 +1875,7 @@
       "summary": "Jelentés összefoglalója",
       "title": "Auditjelentés",
       "unavailable": "Az auditjelentés nem érhető el",
-      "unavailableDescription": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők tekinthetik meg az auditjelentéseket. Kérj hozzáférést egy tulajdonostól vagy a számlázásért felelős kezelőtől.",
+      "unavailableDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei tekinthetik meg az auditjelentéseket. Kérj hozzáférést egy tulajdonostól, adminisztrátortól vagy számlázási felelőstől.",
       "queryFailed": "A jelentés lekérdezése nem fejeződött be. Próbáld újra."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Szerepkör módosítása",
       "emptyDescriptionCanInvite": "Hívd meg a csapattársaidat, hogy együtt dolgozhassatok ebben a szervezetben.",
-      "emptyDescriptionCannotInvite": "Kérd meg a tulajdonost vagy a számlázási felelőst, hogy hívja meg a csapattársakat.",
+      "emptyDescriptionCannotInvite": "Kérd meg egy tulajdonost, adminisztrátort vagy számlázási felelőst, hogy hívja meg a csapattársakat.",
       "emptyTitle": "Még nincs tag",
       "invitedDate": "Meghívva: {{date}}",
       "limitPerDay": "{{amount}}/nap",

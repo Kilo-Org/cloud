@@ -1466,7 +1466,7 @@
       "couldNotLoad": "Neizdevās ielādēt koda pārskatīšanas atmiņu.",
       "off": "Koda pārskatīšanas atmiņa ir izslēgta.",
       "offDescription": "Ieslēdz to, lai Kilo mācītos no uzturētāju atbildēm un ieteiktu norādījumus REVIEW.md failam.",
-      "readOnlyDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var iespējot koda pārskatīšanas atmiņu.",
+      "readOnlyDescription": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var iespējot koda pārskatīšanas atmiņu.",
       "enable": "Iespējot koda pārskatīšanas atmiņu",
       "loadingProposals": "Tiek ielādēti priekšlikumi",
       "couldNotLoadProposals": "Neizdevās ielādēt priekšlikumus.",
@@ -1486,7 +1486,10 @@
       "starting": "Tiek sākta koda pārskatīšana…",
       "start": "Sākt koda pārskatīšanu"
     },
-    "notConnectedReadOnly": "{{platform}} nav pievienots. To var pievienot tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
+    "notConnectedReadOnly": "{{platform}} nav pievienots. To var pievienot tikai organizācijas īpašnieki un administratori.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} nav pievienots. Pievienojiet to, lai sāktu izskatīt apvienošanas pieprasījumus."
+    },
     "webhookSetup": "Tīmekļa aizķeres iestatīšana nav pabeigta.",
     "webhookSetupDescription": "Dažos repozitorijos, iespējams, nenotiks automātiska koda pārskatīšana.",
     "autoReviews": "Automātiska koda pārskatīšana",
@@ -1494,7 +1497,7 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
+      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "setupIncomplete": "Iestatīšana nav pabeigta. Pabeidz konfigurēšanu vietnē kilo.ai.",
       "setup": "Bitbucket iestatīšana"
     },
@@ -1751,7 +1754,7 @@
       "couldNotLoad": "Neizdevās ielādēt šo konstatējumu.",
       "couldNotCheckPermissions": "Neizdevās pārbaudīt noraidīšanas atļaujas.",
       "cannotDismissTitle": "Šo konstatējumu nevar noraidīt",
-      "cannotDismissDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var noraidīt konstatējumus.",
+      "cannotDismissDescription": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var noraidīt konstatējumus.",
       "alreadyResolvedDescription": "Šis konstatējums jau ir atrisināts, un to vairs nevar noraidīt."
     },
     "findingDetails": {
@@ -1793,7 +1796,7 @@
       "automationAllOff": "Viss izslēgts",
       "automationCount": "Iespējoti {{displayCount}} no 3",
       "notificationsCount": "Iespējoti {{displayCount}} no 2",
-      "disabledNoManage": "Drošības aģents ir atspējots. To var ieslēgt tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
+      "disabledNoManage": "Drošības aģents ir atspējots. To var ieslēgt tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "disabledNoRepo": "Pirms drošības aģenta iespējošanas izvēlies vismaz vienu repozitoriju.",
       "disabledPrompt": "Ieslēdz drošības aģentu, lai sinhronizētu Dependabot brīdinājumus, izvēlētos repozitorijus un iestatītu automatizāciju.",
       "repositoriesCount_zero": "Izvēlēts {{displayCount}} repozitoriju"
@@ -1843,7 +1846,7 @@
       "invalidDayCount": "norādi no 1 līdz 365 dienām, izmantojot tikai veselus skaitļus.",
       "remediationDeadlineA11y": "Labošanas termiņš dienās; smaguma pakāpe: {{label}}",
       "enterWholeNumber": "Ievadi veselu skaitli no 1 līdz 365",
-      "permissionNote": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
+      "permissionNote": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
       "enableTracking": "Iespējot SLA uzraudzību",
       "enableTrackingSubtitle": "Nosaka labošanas termiņus atbilstoši konstatējumu smaguma pakāpei.",
       "deadlinesHeading": "Labošanas termiņi (dienās)"
@@ -1895,7 +1898,7 @@
       "summary": "Ziņojuma kopsavilkums",
       "title": "Audita ziņojums",
       "unavailable": "Audita ziņojums nav pieejams",
-      "unavailableDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var skatīt audita ziņojumus. Lūdz īpašnieku vai norēķinu pārvaldnieku piešķirt tev piekļuvi.",
+      "unavailableDescription": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var skatīt audita ziņojumus. Lūdz īpašnieku, administratoru vai norēķinu pārvaldnieku piešķirt tev piekļuvi.",
       "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz."
     },
     "notifications": {
@@ -3086,7 +3089,7 @@
     "members": {
       "changeRole": "Mainīt lomu",
       "emptyDescriptionCanInvite": "Uzaicini komandas biedrus, lai sāktu sadarbību šajā organizācijā.",
-      "emptyDescriptionCannotInvite": "Palūdz īpašniekam vai norēķinu pārvaldniekam uzaicināt komandas biedrus.",
+      "emptyDescriptionCannotInvite": "Palūdz īpašniekam, administratoram vai norēķinu pārvaldniekam uzaicināt komandas biedrus.",
       "emptyTitle": "Vēl nav dalībnieku",
       "invitedDate": "Uzaicināts {{date}}",
       "limitPerDay": "{{amount}}/dienā",

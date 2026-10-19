@@ -901,7 +901,7 @@
     },
     "autoReviews": "مراجعات تلقائية",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة ومديري الفوترة فقط ربطه.",
+      "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
       "setupIncomplete": "الإعداد غير مكتمل. أكمل الإعداد على kilo.ai.",
       "setup": "إعداد Bitbucket"
     },
@@ -925,7 +925,10 @@
       "starting": "جارٍ بدء المراجعة…",
       "title": "مراجعة يدوية"
     },
-    "notConnectedReadOnly": "{{platform}} غير متصل. يمكن لمالكي المؤسسة ومديري الفوترة فقط ربطه.",
+    "notConnectedReadOnly": "{{platform}} غير متصل. يمكن لمالكي المؤسسة والمشرفين فقط ربطه.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} غير متصل. قم بربطه لبدء مراجعة طلبات الدمج."
+    },
     "platformList": {
       "activity": "النشاط",
       "checking": "جارٍ التحقق…",
@@ -1000,7 +1003,7 @@
       "noProposalsDescription": "تظهر مقترحات ذاكرة المراجعة هنا بعد أن يحلل Kilo ردود المشرفين.",
       "off": "ذاكرة المراجعة معطّلة.",
       "offDescription": "فعّلها ليتعلم Kilo من ردود المشرفين ويقترح إرشادات لملف REVIEW.md.",
-      "readOnlyDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تفعيل ذاكرة المراجعة.",
+      "readOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط تفعيل ذاكرة المراجعة.",
       "title": "ذاكرة المراجعة"
     },
     "scopeList": {
@@ -1143,7 +1146,7 @@
       "summary": "ملخص التقرير",
       "title": "تقرير التدقيق",
       "unavailable": "تقرير التدقيق غير متاح",
-      "unavailableDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط عرض تقارير التدقيق. اطلب من أحدهم منحك صلاحية الوصول."
+      "unavailableDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط عرض تقارير التدقيق. اطلب من مالك أو مشرف أو مدير فوترة منحك صلاحية الوصول."
     },
     "auditReportButton": {
       "viewA11y": "عرض تقرير التدقيق"
@@ -1252,7 +1255,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "عولجت هذه النتيجة بالفعل، ولم يعد من الممكن استبعادها.",
-      "cannotDismissDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط استبعاد النتائج.",
+      "cannotDismissDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط استبعاد النتائج.",
       "cannotDismissTitle": "لا يمكن استبعاد هذه النتيجة",
       "commentAccessibility": "تعليق الاستبعاد",
       "commentLabel": "التعليق (اختياري)",
@@ -1385,7 +1388,7 @@
       "automationCount": "تم تفعيل {{displayCount}} من 3",
       "couldNotLoadPermissions": "تعذّر تحميل الصلاحيات.",
       "couldNotLoadSettings": "تعذّر تحميل إعدادات وكيل الأمان.",
-      "disabledNoManage": "وكيل الأمان معطّل. يمكن لمالكي المؤسسة ومديري الفوترة فقط تفعيله.",
+      "disabledNoManage": "وكيل الأمان معطّل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط تفعيله.",
       "disabledNoRepo": "اختر مستودعًا واحدًا على الأقل قبل تفعيل وكيل الأمان.",
       "disabledPrompt": "فعّل وكيل الأمان لمزامنة تنبيهات Dependabot واختيار المستودعات وضبط إعدادات الأتمتة.",
       "notificationsCount": "تم تفعيل {{displayCount}} من 2",
@@ -1421,7 +1424,7 @@
       "lowDescription": "تأثير أمني ضئيل.",
       "medium": "متوسط",
       "mediumDescription": "تأثير محدود أو شروط معينة.",
-      "permissionNote": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذه الإعدادات.",
+      "permissionNote": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط تغيير هذه الإعدادات.",
       "remediationDeadlineA11y": "مهلة المعالجة بالأيام لمستوى الخطورة {{label}}",
       "title": "سياسة SLA"
     },
@@ -3205,7 +3208,7 @@
     "members": {
       "changeRole": "تغيير الدور",
       "emptyDescriptionCanInvite": "ادعُ زملاء الفريق لبدء التعاون في هذه المؤسسة.",
-      "emptyDescriptionCannotInvite": "اطلب من مالك أو مدير فوترة دعوة زملاء الفريق.",
+      "emptyDescriptionCannotInvite": "اطلب من مالك أو مشرف أو مدير فوترة دعوة زملاء الفريق.",
       "emptyTitle": "لا يوجد أعضاء بعد",
       "invitedDate": "تمت الدعوة في {{date}}",
       "limitPerDay": "{{amount}}/يوم",

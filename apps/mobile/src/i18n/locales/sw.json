@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Imeshindikana kupakia kumbukumbu ya ukaguzi.",
       "off": "Kumbukumbu ya ukaguzi imezimwa.",
       "offDescription": "Iwashe ili Kilo ijifunze kutoka kwa majibu ya watunzaji wa mradi na ipendekeze mwongozo wa REVIEW.md.",
-      "readOnlyDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuwasha kumbukumbu ya ukaguzi.",
+      "readOnlyDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuwasha kumbukumbu ya ukaguzi.",
       "enable": "Washa kumbukumbu ya ukaguzi",
       "loadingProposals": "Inapakia mapendekezo",
       "couldNotLoadProposals": "Imeshindikana kupakia mapendekezo.",
@@ -1467,7 +1467,10 @@
       "starting": "Inaanza ukaguzi…",
       "start": "Anza ukaguzi"
     },
-    "notConnectedReadOnly": "{{platform}} haijaunganishwa. Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuiunganisha.",
+    "notConnectedReadOnly": "{{platform}} haijaunganishwa. Wamiliki na wasimamizi wa shirika pekee wanaweza kuiunganisha.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} haijaunganishwa. Iunganishe ili uanze kukagua maombi ya kuunganisha."
+    },
     "webhookSetup": "Usanidi wa arifa za wavuti haujakamilika.",
     "webhookSetupDescription": "Hazina zingine huenda hazipokei ukaguzi wa kiotomatiki.",
     "autoReviews": "Ukaguzi wa kiotomatiki",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuiunganisha.",
+      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "setupIncomplete": "Usanidi haujakamilika — ukamilishe kwenye kilo.ai.",
       "setup": "Usanidi wa Bitbucket"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Imeshindikana kupakia matokeo haya.",
       "couldNotCheckPermissions": "Imeshindikana kuangalia ruhusa za kuondoa matatizo.",
       "cannotDismissTitle": "Huwezi kuondoa tatizo hili",
-      "cannotDismissDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuondoa matatizo.",
+      "cannotDismissDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuondoa matatizo.",
       "alreadyResolvedDescription": "Tatizo hili tayari limetatuliwa na haliwezi kuondolewa tena."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Zote zimezimwa",
       "automationCount": "{{displayCount}} kati ya 3 zimewashwa",
       "notificationsCount": "{{displayCount}} kati ya 2 zimewashwa",
-      "disabledNoManage": "Wakala wa usalama amezimwa. Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kumwasha.",
+      "disabledNoManage": "Wakala wa usalama amezimwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuwasha.",
       "disabledNoRepo": "Chagua angalau hazina moja kabla ya kuwasha wakala wa usalama.",
       "disabledPrompt": "Washa wakala wa usalama ili kusawazisha arifa za Dependabot, kuchagua hazina na kusanidi utendakazi wa kiotomatiki."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "weka siku 1–365 kwa nambari nzima tu.",
       "remediationDeadlineA11y": "Muda wa mwisho wa urekebishaji wa {{label}} kwa siku",
       "enterWholeNumber": "Ingiza nambari kamili kati ya 1 na 365",
-      "permissionNote": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kubadilisha mipangilio hii.",
+      "permissionNote": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kubadilisha mipangilio hii.",
       "enableTracking": "Washa ufuatiliaji wa SLA",
       "enableTrackingSubtitle": "Weka muda wa mwisho wa urekebishaji kulingana na ukali wa tatizo.",
       "deadlinesHeading": "Muda wa mwisho wa urekebishaji (siku)"
@@ -1872,7 +1875,7 @@
       "summary": "Muhtasari wa ripoti",
       "title": "Ripoti ya ukaguzi",
       "unavailable": "Ripoti ya ukaguzi haipatikani",
-      "unavailableDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuona ripoti za ukaguzi. Mwombe mmiliki au msimamizi wa malipo akupe ruhusa ya kuzifikia.",
+      "unavailableDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuona ripoti za ukaguzi. Mwombe mmiliki, msimamizi, au msimamizi wa bili akupe ruhusa ya kuzifikia.",
       "queryFailed": "Hoja ya kupata ripoti haikukamilika. Jaribu tena."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Badilisha jukumu",
       "emptyDescriptionCanInvite": "Alika wenzako wa timu ili muanze kushirikiana katika shirika hili.",
-      "emptyDescriptionCannotInvite": "Mwombe mmiliki au msimamizi wa bili awaalike wenzako wa timu.",
+      "emptyDescriptionCannotInvite": "Mwombe mmiliki, msimamizi, au msimamizi wa bili awaalike wenzako wa timu.",
       "emptyTitle": "Bado hakuna wanachama",
       "invitedDate": "Alialikwa {{date}}",
       "limitPerDay": "{{amount}}/siku",

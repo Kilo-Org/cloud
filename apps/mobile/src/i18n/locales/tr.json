@@ -889,7 +889,7 @@
     },
     "autoReviews": "Otomatik incelemeler",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri ve faturalandırma yöneticileri bağlayabilir.",
+      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "setupIncomplete": "Kurulum tamamlanmadı. Yapılandırmayı kilo.ai üzerinden tamamla.",
       "setup": "Bitbucket kurulumu"
     },
@@ -913,7 +913,10 @@
       "starting": "İnceleme başlatılıyor…",
       "title": "Manuel inceleme"
     },
-    "notConnectedReadOnly": "{{platform}} bağlı değil. Yalnızca kuruluş sahipleri ve faturalandırma yöneticileri bağlayabilir.",
+    "notConnectedReadOnly": "{{platform}} bağlı değil. Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} bağlı değil. Birleştirme isteklerini incelemeye başlamak için bağlayın."
+    },
     "platformList": {
       "activity": "Etkinlik",
       "checking": "Kontrol ediliyor…",
@@ -988,7 +991,7 @@
       "noProposalsDescription": "Kilo, proje sorumlularının yanıtlarını analiz ettikten sonra inceleme belleğinin önerileri burada görünür.",
       "off": "İnceleme belleği kapalı.",
       "offDescription": "Kilo'nun proje sorumlularının yanıtlarından öğrenmesi ve REVIEW.md yönergeleri önermesi için inceleme belleğini aç.",
-      "readOnlyDescription": "İnceleme belleğini yalnızca kuruluş sahipleri ve faturalandırma yöneticileri etkinleştirebilir.",
+      "readOnlyDescription": "İnceleme belleğini yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri etkinleştirebilir.",
       "title": "İnceleme belleği"
     },
     "scopeList": {
@@ -1131,7 +1134,7 @@
       "summary": "Rapor özeti",
       "title": "Denetim raporu",
       "unavailable": "Denetim raporu kullanılamıyor",
-      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibinden veya faturalandırma yöneticisinden sana erişim vermesini iste."
+      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden sana erişim vermesini iste."
     },
     "auditReportButton": {
       "viewA11y": "Denetim raporunu görüntüle"
@@ -1228,7 +1231,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Bu bulgu zaten çözüldüğü için artık yok sayılamaz.",
-      "cannotDismissDescription": "Bulguları yalnızca kuruluş sahipleri ve faturalandırma yöneticileri yok sayabilir.",
+      "cannotDismissDescription": "Bulguları yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri yok sayabilir.",
       "cannotDismissTitle": "Bu bulgu yok sayılamıyor",
       "commentAccessibility": "Yok sayma yorumu",
       "commentLabel": "Yorum (isteğe bağlı)",
@@ -1361,7 +1364,7 @@
       "automationCount": "Etkin özellik: {{displayCount}} / 3",
       "couldNotLoadPermissions": "İzinler yüklenemedi.",
       "couldNotLoadSettings": "Güvenlik ajanı ayarları yüklenemedi.",
-      "disabledNoManage": "Güvenlik ajanı devre dışı. Yalnızca kuruluş sahipleri ve faturalandırma yöneticileri etkinleştirebilir.",
+      "disabledNoManage": "Güvenlik ajanı devre dışı. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri etkinleştirebilir.",
       "disabledNoRepo": "Güvenlik ajanını etkinleştirmeden önce en az bir depo seç.",
       "disabledPrompt": "Dependabot uyarılarını eşitlemek, depoları seçmek ve otomasyonu yapılandırmak için Güvenlik ajanını etkinleştir.",
       "notificationsCount": "Etkin bildirim: {{displayCount}} / 2",
@@ -1393,7 +1396,7 @@
       "lowDescription": "Güvenliğe etkisi çok düşüktür.",
       "medium": "Orta",
       "mediumDescription": "Etkisi sınırlıdır veya yalnızca belirli koşullarda ortaya çıkar.",
-      "permissionNote": "Bu ayarları yalnızca kuruluş sahipleri ve faturalandırma yöneticileri değiştirebilir.",
+      "permissionNote": "Bu ayarları yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri değiştirebilir.",
       "remediationDeadlineA11y": "{{label}} önem derecesi için gün cinsinden düzeltme süresi",
       "title": "SLA ilkesi"
     },
@@ -3045,7 +3048,7 @@
     "members": {
       "changeRole": "Rolü değiştir",
       "emptyDescriptionCanInvite": "Bu kuruluşta birlikte çalışmak için ekip arkadaşlarını davet et.",
-      "emptyDescriptionCannotInvite": "Kuruluş sahibinden veya faturalandırma yöneticisinden ekip arkadaşlarını davet etmesini iste.",
+      "emptyDescriptionCannotInvite": "Bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden ekip arkadaşlarını davet etmesini iste.",
       "emptyTitle": "Henüz üye yok",
       "invitedDate": "Davet tarihi: {{date}}",
       "limitPerDay": "{{amount}}/gün",

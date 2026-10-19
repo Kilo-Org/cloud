@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
 
 import '@/i18n';
+
 import { PlatformOverviewScreen } from './platform-overview-screen';
 
 const config = vi.hoisted(() => ({
@@ -62,6 +63,10 @@ vi.mock('@/components/code-reviewer/bitbucket-overview', () => ({
 }));
 vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   buildOverviewRows: () => [],
+  connectNoticeKey: (platform: string) =>
+    platform === 'gitlab'
+      ? 'codeReviewer.gitlab.notConnectedReadOnly'
+      : 'codeReviewer.notConnectedReadOnly',
   resolveRowOnPress: () => undefined,
 }));
 vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
@@ -164,11 +169,11 @@ function collectText(node: unknown): string[] {
   return [];
 }
 
-async function renderScreen(): Promise<string[]> {
+async function renderScreen(platform: 'github' | 'gitlab' = 'github'): Promise<string[]> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     ref.current = TestRenderer.create(
-      createElement(PlatformOverviewScreen, { scope: 'personal', platform: 'github' })
+      createElement(PlatformOverviewScreen, { scope: 'personal', platform })
     );
     await Promise.resolve();
   });
@@ -199,6 +204,18 @@ describe('PlatformOverviewScreen disconnected setup', () => {
     await renderScreen();
     expect(centeredState).toHaveBeenCalledOnce();
     expect(scrollView).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['github', "GitHub isn't connected. Only organization owners and admins can connect it."],
+    ['gitlab', "GitLab isn't connected. Connect it to start reviewing merge requests."],
+  ] as const)('states who can connect %s to a read-only viewer', async (platform, copy) => {
+    provider.status = 'disconnected';
+    permission.canEdit = false;
+
+    const texts = await renderScreen(platform);
+
+    expect(texts).toContain(copy);
   });
 });
 

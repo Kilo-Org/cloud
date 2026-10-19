@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Ezin izan da berrikuspen-memoria kargatu.",
       "off": "Berrikuspen-memoria desgaituta dago.",
       "offDescription": "Gaitu aukera hau Kilok mantentzaileen erantzunetatik ikas dezan eta REVIEW.md fitxategirako jarraibideak proposa ditzan.",
-      "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik gaitu dezakete berrikuspen-memoria.",
+      "readOnlyDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik gaitu dezakete berrikuspen-memoria.",
       "enable": "Gaitu berrikuspen-memoria",
       "loadingProposals": "Proposamenak kargatzen",
       "couldNotLoadProposals": "Ezin izan dira proposamenak kargatu.",
@@ -1467,7 +1467,10 @@
       "starting": "Berrikuspena hasten…",
       "start": "Hasi berrikuspena"
     },
-    "notConnectedReadOnly": "{{platform}} ez dago konektatuta. Erakundeko jabeek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+    "notConnectedReadOnly": "{{platform}} ez dago konektatuta. Erakundeko jabeek eta administratzaileek soilik konekta dezakete.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} ez dago konektatuta. Konektatu ezazu konbinazio-eskaerak berrikusten hasteko."
+    },
     "webhookSetup": "Webhook-aren konfigurazioa osatu gabe dago.",
     "webhookSetupDescription": "Baliteke biltegi batzuek berrikuspen automatikorik ez jasotzea.",
     "autoReviews": "Berrikuspen automatikoak",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "Bete REVIEW.md fitxategiko jarraibideak",
     "followReviewMdSubtitle": "Bete biltegi bakoitzeko REVIEW.md fitxategiko jarraibideak",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "setupIncomplete": "Konfigurazioa osatu gabe dago. Amaitu kilo.ai-n.",
       "setup": "Bitbucket-en konfigurazioa"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Ezin izan da antzemandako arazo hau kargatu.",
       "couldNotCheckPermissions": "Ezin izan dira baztertzeko baimenak egiaztatu.",
       "cannotDismissTitle": "Ezin da aurkikuntza hau baztertu",
-      "cannotDismissDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik bazter ditzakete aurkikuntzak.",
+      "cannotDismissDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik bazter ditzakete aurkikuntzak.",
       "alreadyResolvedDescription": "Aurkikuntza hau jada ebatzita dago eta ezin da baztertu."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Guztiak desgaituta",
       "automationCount": "3tik {{displayCount}} gaituta",
       "notificationsCount": "2tik {{displayCount}} gaituta",
-      "disabledNoManage": "Segurtasun-agentea desgaituta dago. Erakundeko jabeek eta fakturazio-kudeatzaileek soilik gaitu dezakete.",
+      "disabledNoManage": "Segurtasun-agentea desgaituta dago. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik gaitu dezakete.",
       "disabledNoRepo": "Hautatu gutxienez biltegi bat segurtasun-agentea gaitu aurretik.",
       "disabledPrompt": "Gaitu segurtasun-agentea Dependabot-en abisuak sinkronizatzeko, biltegiak hautatzeko eta automatizazioa konfiguratzeko."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
       "remediationDeadlineA11y": "Konponketa-epea egunetan, larritasuna: {{label}}",
       "enterWholeNumber": "Sartu 1etik 365era bitarteko zenbaki oso bat",
-      "permissionNote": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",
+      "permissionNote": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",
       "enableTracking": "Gaitu SLAren jarraipena",
       "enableTrackingSubtitle": "Ezarri konponketa-epeak aurkikuntzen larritasunaren arabera.",
       "deadlinesHeading": "Konponketa-epeak (egunak)"
@@ -1872,7 +1875,7 @@
       "summary": "Txostenaren laburpena",
       "title": "Auditoria-txostena",
       "unavailable": "Auditoria-txostena ez dago erabilgarri",
-      "unavailableDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik ikus ditzakete auditoria-txostenak. Eskatu jabe bati edo fakturazio-kudeatzaile bati sarbidea emateko.",
+      "unavailableDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik ikus ditzakete auditoria-txostenak. Eskatu jabe bati, administratzaile bati edo fakturazio-kudeatzaile bati sarbidea emateko.",
       "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Aldatu rola",
       "emptyDescriptionCanInvite": "Gonbidatu lankideak erakunde honetan elkarlanean hasteko.",
-      "emptyDescriptionCannotInvite": "Eskatu jabeari edo fakturazio-kudeatzaileari lankideak gonbidatzeko.",
+      "emptyDescriptionCannotInvite": "Eskatu jabeari, administratzaileari edo fakturazio-kudeatzaileari lankideak gonbidatzeko.",
       "emptyTitle": "Oraindik ez dago kiderik",
       "invitedDate": "Gonbidapen-data: {{date}}",
       "limitPerDay": "{{amount}}/egun",

@@ -11,8 +11,23 @@ import {
 
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
-import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
+import {
+  type PLATFORM_CAPABILITIES,
+  type ReviewConfigData,
+  type ReviewerPlatform,
+} from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+
+/**
+ * The disconnected hint names who can connect the provider. GitHub's install and
+ * GitLab's first connect have different role gates, so each provider has its own
+ * copy; Bitbucket renders its own screen.
+ */
+export function connectNoticeKey(platform: ReviewerPlatform) {
+  return platform === 'gitlab'
+    ? ('codeReviewer.gitlab.notConnectedReadOnly' as const)
+    : ('codeReviewer.notConnectedReadOnly' as const);
+}
 
 const reviewStyleLabels = {
   strict: 'codeReviewer.reviewStyle.strict',

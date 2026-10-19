@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Ülevaatuste mälu ei õnnestunud laadida.",
       "off": "Ülevaatuste mälu on välja lülitatud.",
       "offDescription": "Lülita see sisse, et Kilo saaks hooldajate vastustest õppida ja pakkuda juhiseid faili REVIEW.md.",
-      "readOnlyDescription": "Ülevaatuste mälu saavad sisse lülitada ainult organisatsiooni omanikud ja arveldushaldurid.",
+      "readOnlyDescription": "Ülevaatuste mälu saavad sisse lülitada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "enable": "Luba ülevaatuste mälu",
       "loadingProposals": "Ettepanekute laadimine",
       "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",
@@ -1467,7 +1467,10 @@
       "starting": "Ülevaatuse alustamine…",
       "start": "Alusta ülevaatust"
     },
-    "notConnectedReadOnly": "{{platform}} pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud ja arveldushaldurid.",
+    "notConnectedReadOnly": "{{platform}} pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud ja administraatorid.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} pole ühendatud. Ühenda see, et alustada liitumistaotluste ülevaatamist."
+    },
     "webhookSetup": "Veebihaagi seadistamine pole lõpetatud.",
     "webhookSetupDescription": "Mõnes hoidlas ei pruugi automaatsed ülevaatused toimuda.",
     "autoReviews": "Automaatsed ülevaatused",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud ja arveldushaldurid.",
+      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "setupIncomplete": "Seadistamine pole lõpetatud. Lõpeta see saidil kilo.ai.",
       "setup": "Bitbucketi seadistamine"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Seda leidu ei õnnestunud laadida.",
       "couldNotCheckPermissions": "Kõrvalejätmise õigusi ei õnnestunud kontrollida.",
       "cannotDismissTitle": "Seda leidu ei saa kõrvale jätta",
-      "cannotDismissDescription": "Leide saavad kõrvale jätta ainult organisatsiooni omanikud ja arveldushaldurid.",
+      "cannotDismissDescription": "Leide saavad kõrvale jätta ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "alreadyResolvedDescription": "See leid on juba lahendatud ja seda ei saa enam kõrvale jätta."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Kõik väljas",
       "automationCount": "{{displayCount}} kolmest lubatud",
       "notificationsCount": "{{displayCount}} kahest lubatud",
-      "disabledNoManage": "Turvaagent on välja lülitatud. Seda saavad sisse lülitada ainult organisatsiooni omanikud ja arveldushaldurid.",
+      "disabledNoManage": "Turvaagent on välja lülitatud. Seda saavad sisse lülitada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "disabledNoRepo": "Enne turvaagendi sisselülitamist vali vähemalt üks hoidla.",
       "disabledPrompt": "Lülita turvaagent sisse, et sünkroonida Dependaboti hoiatusi, valida hoidlaid ja seadistada automatiseerimist."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "päevade arv peab olema täisarv vahemikus 1–365.",
       "remediationDeadlineA11y": "{{label}}: parandamise tähtaeg päevades",
       "enterWholeNumber": "Sisesta täisarv vahemikus 1 kuni 365",
-      "permissionNote": "Neid seadeid saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
+      "permissionNote": "Neid seadeid saavad muuta ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "enableTracking": "Luba SLA jälgimine",
       "enableTrackingSubtitle": "Määrab parandamise tähtajad leiu raskusastme järgi.",
       "deadlinesHeading": "Parandamise tähtajad (päevades)"
@@ -1872,7 +1875,7 @@
       "summary": "Aruande kokkuvõte",
       "title": "Auditiaruanne",
       "unavailable": "Auditiaruanne pole saadaval",
-      "unavailableDescription": "Auditiaruandeid saavad vaadata ainult organisatsiooni omanikud ja arveldushaldurid. Palu omanikul või arveldushalduril anda sulle juurdepääs.",
+      "unavailableDescription": "Auditiaruandeid saavad vaadata ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid. Palu omanikul, administraatoril või arveldushalduril anda sulle juurdepääs.",
       "queryFailed": "Aruande päring ei lõppenud. Proovi uuesti."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Muuda rolli",
       "emptyDescriptionCanInvite": "Kutsu meeskonnakaaslasi, et selles organisatsioonis koostööd alustada.",
-      "emptyDescriptionCannotInvite": "Palu omanikul või arveldushalduril meeskonnakaaslasi kutsuda.",
+      "emptyDescriptionCannotInvite": "Palu omanikul, administraatoril või arveldushalduril meeskonnakaaslasi kutsuda.",
       "emptyTitle": "Liikmeid pole veel",
       "invitedDate": "Kutsutud {{date}}",
       "limitPerDay": "{{amount}} päevas",

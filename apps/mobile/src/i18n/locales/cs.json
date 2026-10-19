@@ -1485,7 +1485,7 @@
       "couldNotLoad": "Paměť kontrol se nepodařilo načíst.",
       "off": "Paměť kontrol je vypnutá.",
       "offDescription": "Zapněte paměť kontrol, aby se Kilo mohlo učit z odpovědí správců a navrhovat pokyny do souboru REVIEW.md.",
-      "readOnlyDescription": "Paměť kontrol mohou zapnout pouze vlastníci organizace a správci fakturace.",
+      "readOnlyDescription": "Paměť kontrol mohou zapnout pouze vlastníci organizace, správci a správci fakturace.",
       "enable": "Zapnout paměť kontrol",
       "loadingProposals": "Načítání návrhů",
       "couldNotLoadProposals": "Návrhy se nepodařilo načíst.",
@@ -1505,7 +1505,10 @@
       "starting": "Zahajuje se kontrola…",
       "start": "Zahájit kontrolu"
     },
-    "notConnectedReadOnly": "Služba {{platform}} není připojená. Připojit ji mohou pouze vlastníci organizace a správci fakturace.",
+    "notConnectedReadOnly": "Služba {{platform}} není připojená. Připojit ji mohou pouze vlastníci organizace a správci.",
+    "gitlab": {
+      "notConnectedReadOnly": "Služba {{platform}} není připojená. Připojte ji a začněte kontrolovat žádosti o sloučení."
+    },
     "webhookSetup": "Nastavení webhooku není dokončené.",
     "webhookSetupDescription": "V některých repozitářích nemusí probíhat automatické kontroly.",
     "autoReviews": "Automatické kontroly",
@@ -1513,7 +1516,7 @@
     "followReviewMd": "Řídit se pokyny v REVIEW.md",
     "followReviewMdSubtitle": "Dodržovat pokyny ze souboru REVIEW.md v každém repozitáři",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace a správci fakturace.",
+      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "setupIncomplete": "Nastavení není dokončené. Dokončete ho na kilo.ai.",
       "setup": "Nastavení služby Bitbucket"
     },
@@ -1773,7 +1776,7 @@
       "couldNotLoad": "Toto zjištění se nepodařilo načíst.",
       "couldNotCheckPermissions": "Oprávnění k zamítnutí se nepodařilo ověřit.",
       "cannotDismissTitle": "Tento nález nelze zamítnout",
-      "cannotDismissDescription": "Nálezy mohou zamítat pouze vlastníci organizace a správci fakturace.",
+      "cannotDismissDescription": "Nálezy mohou zamítat pouze vlastníci organizace, správci a správci fakturace.",
       "alreadyResolvedDescription": "Tento nález je již vyřešený a nelze ho zamítnout."
     },
     "findingDetails": {
@@ -1815,7 +1818,7 @@
       "automationAllOff": "Vše vypnuto",
       "automationCount": "Zapnuto: {{displayCount}} ze 3",
       "notificationsCount": "Zapnuto: {{displayCount}} ze 2",
-      "disabledNoManage": "Bezpečnostní agent je vypnutý. Zapnout ho mohou pouze vlastníci organizace a správci fakturace.",
+      "disabledNoManage": "Bezpečnostní agent je vypnutý. Zapnout ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "disabledNoRepo": "Před zapnutím bezpečnostního agenta vyberte alespoň jeden repozitář.",
       "disabledPrompt": "Zapněte bezpečnostního agenta. Pak můžete synchronizovat upozornění Dependabot, vybrat repozitáře a nastavit automatizaci.",
       "repositoriesCount_few": "{{displayCount}} vybrané repozitáře",
@@ -1866,7 +1869,7 @@
       "invalidDayCount": "zadejte počet dní od 1 do 365 jako celé číslo.",
       "remediationDeadlineA11y": "Lhůta pro nápravu ve dnech, závažnost: {{label}}",
       "enterWholeNumber": "Zadej celé číslo od 1 do 365",
-      "permissionNote": "Tato nastavení mohou měnit pouze vlastníci organizace a správci fakturace.",
+      "permissionNote": "Tato nastavení mohou měnit pouze vlastníci organizace, správci a správci fakturace.",
       "enableTracking": "Zapnout sledování SLA",
       "enableTrackingSubtitle": "Termíny nápravy se stanoví podle závažnosti nálezu.",
       "deadlinesHeading": "Lhůty pro nápravu (dny)"
@@ -1918,7 +1921,7 @@
       "summary": "Souhrn zprávy",
       "title": "Zpráva o auditu",
       "unavailable": "Zpráva o auditu není k dispozici",
-      "unavailableDescription": "Zprávy o auditu mohou zobrazovat pouze vlastníci organizace a správci fakturace. Požádejte vlastníka nebo správce fakturace o udělení přístupu.",
+      "unavailableDescription": "Zprávy o auditu mohou zobrazovat pouze vlastníci organizace, správci a správci fakturace. Požádejte vlastníka, správce nebo správce fakturace o udělení přístupu.",
       "queryFailed": "Načítání zprávy se nedokončilo. Zkuste to znovu."
     },
     "notifications": {
@@ -3126,7 +3129,7 @@
     "members": {
       "changeRole": "Změnit roli",
       "emptyDescriptionCanInvite": "Pozvěte kolegy a začněte v této organizaci spolupracovat.",
-      "emptyDescriptionCannotInvite": "Požádejte vlastníka nebo správce fakturace, aby pozval kolegy.",
+      "emptyDescriptionCannotInvite": "Požádejte vlastníka, správce nebo správce fakturace, aby pozval kolegy.",
       "emptyTitle": "Zatím žádní členové",
       "invitedDate": "Pozvánka odeslána {{date}}",
       "limitPerDay": "{{amount}}/den",

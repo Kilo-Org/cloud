@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Hukommelsen for gennemgange kunne ikke indlæses.",
       "off": "Hukommelsen for gennemgange er slået fra.",
       "offDescription": "Slå den til, så Kilo kan lære af svar fra de vedligeholdelsesansvarlige og foreslå retningslinjer til REVIEW.md.",
-      "readOnlyDescription": "Kun organisationsejere og faktureringsadministratorer kan aktivere hukommelsen for gennemgange.",
+      "readOnlyDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan aktivere hukommelsen for gennemgange.",
       "enable": "Aktivér hukommelse for gennemgange",
       "loadingProposals": "Indlæser forslag",
       "couldNotLoadProposals": "Forslagene kunne ikke indlæses.",
@@ -1467,7 +1467,10 @@
       "starting": "Starter gennemgang…",
       "start": "Start gennemgang"
     },
-    "notConnectedReadOnly": "{{platform}} er ikke tilsluttet. Kun organisationsejere og faktureringsadministratorer kan oprette forbindelsen.",
+    "notConnectedReadOnly": "{{platform}} er ikke tilsluttet. Kun organisationsejere og administratorer kan oprette forbindelsen.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} er ikke tilsluttet. Opret forbindelsen for at begynde at gennemgå mergeanmodninger."
+    },
     "webhookSetup": "Opsætningen af webhooks er ikke fuldført.",
     "webhookSetupDescription": "Nogle kodelagre får muligvis ikke automatiske gennemgange.",
     "autoReviews": "Automatiske gennemgange",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere og faktureringsadministratorer kan oprette forbindelsen.",
+      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "setupIncomplete": "Opsætningen er ikke fuldført. Afslut konfigurationen på kilo.ai.",
       "setup": "Bitbucket-opsætning"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Fundet kunne ikke indlæses.",
       "couldNotCheckPermissions": "Dine tilladelser til at afvise fund kunne ikke kontrolleres.",
       "cannotDismissTitle": "Fundet kan ikke afvises",
-      "cannotDismissDescription": "Kun organisationsejere og faktureringsadministratorer kan afvise fund.",
+      "cannotDismissDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan afvise fund.",
       "alreadyResolvedDescription": "Dette fund er allerede løst og kan ikke længere afvises."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Alt slået fra",
       "automationCount": "{{displayCount}} af 3 aktiveret",
       "notificationsCount": "{{displayCount}} af 2 aktiveret",
-      "disabledNoManage": "Security Agent er deaktiveret. Kun organisationsejere og faktureringsadministratorer kan aktivere den.",
+      "disabledNoManage": "Security Agent er deaktiveret. Kun organisationsejere, administratorer og faktureringsansvarlige kan aktivere den.",
       "disabledNoRepo": "Vælg mindst ét kodelager, før du aktiverer Security Agent.",
       "disabledPrompt": "Aktivér Security Agent for at synkronisere Dependabot-advarsler, vælge kodelagre og indstille automatisering."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "angiv 1–365 dage som et helt tal.",
       "remediationDeadlineA11y": "Frist for udbedring i dage ved {{label}} alvorlighed",
       "enterWholeNumber": "Indtast et helt tal mellem 1 og 365",
-      "permissionNote": "Kun organisationsejere og faktureringsadministratorer kan ændre disse indstillinger.",
+      "permissionNote": "Kun organisationsejere, administratorer og faktureringsansvarlige kan ændre disse indstillinger.",
       "enableTracking": "Aktivér SLA-opfølgning",
       "enableTrackingSubtitle": "Angiv frister for udbedring ud fra fundets alvorlighed.",
       "deadlinesHeading": "Frister for udbedring (dage)"
@@ -1872,7 +1875,7 @@
       "summary": "Resumé af rapporten",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapport utilgængelig",
-      "unavailableDescription": "Kun organisationsejere og faktureringsadministratorer kan se revisionsrapporter. Bed en ejer eller faktureringsadministrator om at give dig adgang.",
+      "unavailableDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan se revisionsrapporter. Bed en ejer, administrator eller faktureringsansvarlig om at give dig adgang.",
       "queryFailed": "Forespørgslen om rapporten blev ikke fuldført. Prøv igen."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Skift rolle",
       "emptyDescriptionCanInvite": "Inviter kolleger til at samarbejde i denne organisation.",
-      "emptyDescriptionCannotInvite": "Bed en ejer eller faktureringsansvarlig om at invitere kolleger.",
+      "emptyDescriptionCannotInvite": "Bed en ejer, administrator eller faktureringsansvarlig om at invitere kolleger.",
       "emptyTitle": "Ingen medlemmer endnu",
       "invitedDate": "Inviteret {{date}}",
       "limitPerDay": "{{amount}}/dag",

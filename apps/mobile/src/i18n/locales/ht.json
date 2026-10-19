@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Nou pa t ka chaje memwa revizyon an.",
       "off": "Memwa revizyon an dezaktive.",
       "offDescription": "Aktive li pou Kilo aprann nan repons moun ki responsab antretyen kòd la epi pwopoze direktiv pou REVIEW.md.",
-      "readOnlyDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka aktive memwa revizyon an.",
+      "readOnlyDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka aktive memwa revizyon an.",
       "enable": "Aktive memwa revizyon an",
       "loadingProposals": "Ap chaje pwopozisyon yo",
       "couldNotLoadProposals": "Nou pa t ka chaje pwopozisyon yo.",
@@ -1467,7 +1467,10 @@
       "starting": "Ap kòmanse revizyon an…",
       "start": "Kòmanse revizyon an"
     },
-    "notConnectedReadOnly": "{{platform}} pa konekte. Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka konekte li.",
+    "notConnectedReadOnly": "{{platform}} pa konekte. Se sèlman pwopriyetè òganizasyon an ak administratè yo ki ka konekte li.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} pa konekte. Konekte li pou kòmanse revize demann fizyon yo."
+    },
     "webhookSetup": "Konfigirasyon webhook la pa fini.",
     "webhookSetupDescription": "Kèk depo ka pa resevwa revizyon otomatik.",
     "autoReviews": "Revizyon otomatik",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "Swiv REVIEW.md",
     "followReviewMdSubtitle": "Respekte fichye enstriksyon REVIEW.md nan chak depo",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka konekte li.",
+      "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
       "setupIncomplete": "Konfigirasyon an pa fini. Fini li sou kilo.ai.",
       "setup": "Konfigirasyon Bitbucket"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Nou pa t kapab chaje pwoblèm detekte sa a.",
       "couldNotCheckPermissions": "Nou pa t ka verifye pèmisyon pou rejte konsta yo.",
       "cannotDismissTitle": "Ou pa ka rejte konsta sa a",
-      "cannotDismissDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka rejte konsta yo.",
+      "cannotDismissDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka rejte konsta yo.",
       "alreadyResolvedDescription": "Konsta sa a deja rezoud. Ou pa ka rejte li ankò."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Tout dezaktive",
       "automationCount": "{{displayCount}} sou 3 aktive",
       "notificationsCount": "{{displayCount}} sou 2 aktive",
-      "disabledNoManage": "Ajan sekirite a dezaktive. Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka aktive li.",
+      "disabledNoManage": "Ajan sekirite a dezaktive. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka aktive li.",
       "disabledNoRepo": "Chwazi omwen yon depo anvan ou aktive Ajan sekirite a.",
       "disabledPrompt": "Aktive Ajan sekirite a pou senkronize alèt Dependabot yo, chwazi depo yo epi konfigire otomatizasyon an."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "antre ant 1 ak 365 jou, ak yon nonb antye sèlman.",
       "remediationDeadlineA11y": "Delè koreksyon pou gravite {{label}}, an jou",
       "enterWholeNumber": "Antre yon nonb antye ant 1 ak 365",
-      "permissionNote": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka chanje paramèt sa yo.",
+      "permissionNote": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka chanje paramèt sa yo.",
       "enableTracking": "Aktive swivi SLA",
       "enableTrackingSubtitle": "Fikse dat limit koreksyon yo selon gravite konsta yo.",
       "deadlinesHeading": "Delè koreksyon (jou)"
@@ -1872,7 +1875,7 @@
       "summary": "Rezime rapò",
       "title": "Rapò odit",
       "unavailable": "Rapò odit la pa disponib",
-      "unavailableDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka wè rapò odit yo. Mande yon pwopriyetè oswa yon responsab faktirasyon pou ba ou aksè.",
+      "unavailableDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka wè rapò odit yo. Mande yon pwopriyetè, yon administratè oswa yon responsab faktirasyon pou ba ou aksè.",
       "queryFailed": "Rekèt pou rapò a pa t fini. Eseye ankò."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Chanje wòl",
       "emptyDescriptionCanInvite": "Envite kòlèg pou kòmanse kolabore nan òganizasyon sa a.",
-      "emptyDescriptionCannotInvite": "Mande yon pwopriyetè oswa yon responsab faktirasyon pou envite kòlèg yo.",
+      "emptyDescriptionCannotInvite": "Mande yon pwopriyetè, yon administratè oswa yon responsab faktirasyon pou envite kòlèg yo.",
       "emptyTitle": "Pa gen manm ankò",
       "invitedDate": "Envite {{date}}",
       "limitPerDay": "{{amount}}/jou",

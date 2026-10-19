@@ -1504,7 +1504,7 @@
       "couldNotLoad": "Níorbh fhéidir cuimhne athbhreithnithe a lódáil.",
       "off": "Tá cuimhne athbhreithnithe múchta.",
       "offDescription": "Cumasaigh í chun ligean do Kilo foghlaim ó fhreagraí na gcothaitheoirí agus treoir a mholadh do REVIEW.md.",
-      "readOnlyDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála cuimhne athbhreithnithe a chumasú.",
+      "readOnlyDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta cuimhne athbhreithnithe a chumasú.",
       "enable": "Cumasaigh cuimhne athbhreithnithe",
       "loadingProposals": "Ag lódáil moltaí",
       "couldNotLoadProposals": "Níorbh fhéidir na moltaí a lódáil.",
@@ -1524,7 +1524,10 @@
       "starting": "Ag tosú an athbhreithnithe…",
       "start": "Tosaigh athbhreithniú"
     },
-    "notConnectedReadOnly": "Níl {{platform}} nasctha. Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála é a cheangal.",
+    "notConnectedReadOnly": "Níl {{platform}} nasctha. Ní féidir ach le húinéirí agus riarthóirí eagraíochta é a cheangal.",
+    "gitlab": {
+      "notConnectedReadOnly": "Níl {{platform}} nasctha. Ceangail é chun tús a chur le hathbhreithniú ar iarratais chumaisc."
+    },
     "webhookSetup": "Níl socrú an chrúca gréasáin críochnaithe.",
     "webhookSetupDescription": "Seans nach bhfaighidh roinnt stór athbhreithnithe uathoibríocha.",
     "autoReviews": "Athbhreithnithe uathoibríocha",
@@ -1532,7 +1535,7 @@
     "followReviewMd": "Lean REVIEW.md",
     "followReviewMdSubtitle": "Lean na treoracha sna comhaid REVIEW.md i ngach stór",
     "bitbucket": {
-      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála é a cheangal.",
+      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
       "setupIncomplete": "Níl an socrú críochnaithe. Críochnaigh an chumraíocht ar kilo.ai.",
       "setup": "Socrú Bitbucket"
     },
@@ -1795,7 +1798,7 @@
       "couldNotLoad": "Níorbh fhéidir an toradh seo a lódáil.",
       "couldNotCheckPermissions": "Níorbh fhéidir na ceadanna díbhe a sheiceáil.",
       "cannotDismissTitle": "Ní féidir an toradh seo a dhíbhe",
-      "cannotDismissDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála torthaí a dhíbhe.",
+      "cannotDismissDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta torthaí a dhíbhe.",
       "alreadyResolvedDescription": "Tá an toradh seo réitithe cheana agus ní féidir é a dhíbhe a thuilleadh."
     },
     "findingDetails": {
@@ -1837,7 +1840,7 @@
       "automationAllOff": "Gach ceann múchta",
       "automationCount": "{{displayCount}} as 3 cumasaithe",
       "notificationsCount": "{{displayCount}} as 2 cumasaithe",
-      "disabledNoManage": "Tá an Gníomhaire slándála díchumasaithe. Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála é a chumasú.",
+      "disabledNoManage": "Tá an Gníomhaire slándála díchumasaithe. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a chumasú.",
       "disabledNoRepo": "Roghnaigh stór amháin ar a laghad sula gcumasaíonn tú an Gníomhaire slándála.",
       "disabledPrompt": "Cumasaigh an Gníomhaire slándála chun foláirimh Dependabot a shioncronú, stórtha a roghnú agus uathoibriú a chumrú.",
       "repositoriesCount_two": "{{displayCount}} stór roghnaithe",
@@ -1889,7 +1892,7 @@
       "invalidDayCount": "cuir isteach idir 1 agus 365 lá, in uimhreacha slána amháin.",
       "remediationDeadlineA11y": "Spriocdháta leasaithe i laethanta: {{label}}",
       "enterWholeNumber": "Cuir isteach slánuimhir idir 1 agus 365",
-      "permissionNote": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála na socruithe seo a athrú.",
+      "permissionNote": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta na socruithe seo a athrú.",
       "enableTracking": "Cumasaigh rianú SLA",
       "enableTrackingSubtitle": "Socraigh spriocdhátaí leasaithe bunaithe ar dhéine an toraidh.",
       "deadlinesHeading": "Spriocdhátaí leasaithe (laethanta)"
@@ -1941,7 +1944,7 @@
       "summary": "Achoimre na tuarascála",
       "title": "Tuarascáil iniúchta",
       "unavailable": "Níl an tuarascáil iniúchta ar fáil",
-      "unavailableDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála tuarascálacha iniúchta a fheiceáil. Iarr ar úinéir nó ar bhainisteoir billeála rochtain a thabhairt duit.",
+      "unavailableDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta tuarascálacha iniúchta a fheiceáil. Iarr ar úinéir, ar riarthóir nó ar bhainisteoir billeála rochtain a thabhairt duit.",
       "queryFailed": "Níor críochnaíodh iarratas na tuarascála. Bain triail as arís."
     },
     "notifications": {
@@ -3166,7 +3169,7 @@
     "members": {
       "changeRole": "Athraigh ról",
       "emptyDescriptionCanInvite": "Tabhair cuireadh do chomhghleacaithe chun tosú ag comhoibriú san eagraíocht seo.",
-      "emptyDescriptionCannotInvite": "Iarr ar úinéir nó ar bhainisteoir billeála cuireadh a thabhairt do chomhghleacaithe.",
+      "emptyDescriptionCannotInvite": "Iarr ar úinéir, ar riarthóir nó ar bhainisteoir billeála cuireadh a thabhairt do chomhghleacaithe.",
       "emptyTitle": "Níl aon bhall ann fós",
       "invitedDate": "Cuireadh seolta: {{date}}",
       "limitPerDay": "{{amount}}/lá",

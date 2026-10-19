@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Nuk u ngarkua kujtesa e shqyrtimit.",
       "off": "Kujtesa e shqyrtimit është e çaktivizuar.",
       "offDescription": "Aktivizoje që Kilo të mësojë nga përgjigjet e mirëmbajtësve dhe të propozojë udhëzime për REVIEW.md.",
-      "readOnlyDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta aktivizojnë kujtesën e shqyrtimit.",
+      "readOnlyDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta aktivizojnë kujtesën e shqyrtimit.",
       "enable": "Aktivizo kujtesën e shqyrtimit",
       "loadingProposals": "Duke ngarkuar propozimet",
       "couldNotLoadProposals": "Nuk u ngarkuan propozimet.",
@@ -1467,7 +1467,10 @@
       "starting": "Po nis shqyrtimi…",
       "start": "Fillo shqyrtimin"
     },
-    "notConnectedReadOnly": "{{platform}} nuk është i lidhur. Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta lidhin.",
+    "notConnectedReadOnly": "{{platform}} nuk është i lidhur. Vetëm pronarët e organizatës dhe administratorët mund ta lidhin.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} nuk është i lidhur. Lidheni për të nisur shqyrtimin e kërkesave për bashkim."
+    },
     "webhookSetup": "Konfigurimi i webhook-ut është i paplotë.",
     "webhookSetupDescription": "Disa depo mund të mos marrin shqyrtime automatike.",
     "autoReviews": "Shqyrtimet automatike",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "Ndiq REVIEW.md",
     "followReviewMdSubtitle": "Respekto skedarët e udhëzimeve REVIEW.md të çdo depoje",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nuk është i lidhur. Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta lidhin.",
+      "notConnectedReadOnly": "Bitbucket nuk është i lidhur. Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
       "setupIncomplete": "Konfigurimi është i paplotë. Përfundoje në kilo.ai.",
       "setup": "Konfigurimi i Bitbucket"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Kjo gjetje nuk u ngarkua.",
       "couldNotCheckPermissions": "Nuk u kontrolluan lejet për hedhjen poshtë.",
       "cannotDismissTitle": "Nuk mund ta hedhësh poshtë këtë gjetje",
-      "cannotDismissDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund të hedhin poshtë gjetjet.",
+      "cannotDismissDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund të hedhin poshtë gjetjet.",
       "alreadyResolvedDescription": "Kjo gjetje është zgjidhur tashmë dhe nuk mund të hidhet më poshtë."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Të gjitha të çaktivizuara",
       "automationCount": "{{displayCount}} nga 3 të aktivizuara",
       "notificationsCount": "{{displayCount}} nga 2 të aktivizuara",
-      "disabledNoManage": "Agjenti i sigurisë është i çaktivizuar. Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta aktivizojnë.",
+      "disabledNoManage": "Agjenti i sigurisë është i çaktivizuar. Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta aktivizojnë.",
       "disabledNoRepo": "Zgjidh të paktën një depo përpara se të aktivizosh agjentin e sigurisë.",
       "disabledPrompt": "Aktivizo agjentin e sigurisë për të sinkronizuar njoftimet e Dependabot, për të zgjedhur depot dhe për të konfiguruar automatizimin."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "shkruaj një numër të plotë ditësh nga 1 deri në 365.",
       "remediationDeadlineA11y": "Afati i korrigjimit në ditë për nivelin {{label}}",
       "enterWholeNumber": "Shkruaj një numër të plotë nga 1 deri në 365",
-      "permissionNote": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund t'i ndryshojnë këto cilësime.",
+      "permissionNote": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund t'i ndryshojnë këto cilësime.",
       "enableTracking": "Aktivizo ndjekjen e SLA-së",
       "enableTrackingSubtitle": "Cakto afatet e korrigjimit sipas nivelit të rrezikut të gjetjes.",
       "deadlinesHeading": "Afatet e korrigjimit (ditë)"
@@ -1872,7 +1875,7 @@
       "summary": "Përmbledhja e raportit",
       "title": "Raporti i auditimit",
       "unavailable": "Raporti i auditimit nuk është i disponueshëm",
-      "unavailableDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund të shohin raportet e auditimit. Kërkoji një pronari ose menaxheri të faturimit të të japë qasje.",
+      "unavailableDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund të shohin raportet e auditimit. Kërkoji një pronari, administratori ose menaxheri të faturimit të të japë qasje.",
       "queryFailed": "Kërkimi për raportin nuk përfundoi. Provo përsëri."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Ndrysho rolin",
       "emptyDescriptionCanInvite": "Fto kolegët e ekipit për të nisur bashkëpunimin në këtë organizatë.",
-      "emptyDescriptionCannotInvite": "Kërkoji një pronari ose menaxheri faturimi të ftojë kolegët e ekipit.",
+      "emptyDescriptionCannotInvite": "Kërkoji një pronari, administratori ose menaxheri faturimi të ftojë kolegët e ekipit.",
       "emptyTitle": "Ende nuk ka anëtarë",
       "invitedDate": "Ftuar më {{date}}",
       "limitPerDay": "{{amount}}/ditë",

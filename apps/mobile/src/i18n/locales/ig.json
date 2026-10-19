@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Enweghị ike ibudata ebe nchekwa nyocha.",
       "off": "A gbanyụrụ ebe nchekwa nyocha.",
       "offDescription": "Gbanye ya ka Kilo mụta site na nzaghachi ndị na-elekọta wee tụọ aro nduzi REVIEW.md.",
-      "readOnlyDescription": "Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ịgbanye ebe nchekwa nyocha.",
+      "readOnlyDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ịgbanye ebe nchekwa nyocha.",
       "enable": "Gbanye ebe nchekwa nyocha",
       "loadingProposals": "Na-ebudata aro",
       "couldNotLoadProposals": "Enweghị ike ibudata aro.",
@@ -1467,7 +1467,10 @@
       "starting": "Na-amalite nyocha…",
       "start": "Malite nyocha"
     },
-    "notConnectedReadOnly": "E jikọghị {{platform}}. Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ijikọ ya.",
+    "notConnectedReadOnly": "E jikọghị {{platform}}. Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ijikọ ya.",
+    "gitlab": {
+      "notConnectedReadOnly": "E jikọghị {{platform}}. Jikọọ ya ka ị malite nyochaa arịrịọ njikọta."
+    },
     "webhookSetup": "Nhazi njikọ ngosi ezubeghị.",
     "webhookSetupDescription": "Ụfọdụ ebe nchekwa nwere ike ghara ịnata nyocha akpaaka.",
     "autoReviews": "Nyocha akpaaka",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "Soro REVIEW.md",
     "followReviewMdSubtitle": "Soro ntụziaka faịlụ REVIEW.md dị n'ebe nchekwa ọ bụla",
     "bitbucket": {
-      "notConnectedReadOnly": "E jikọghị Bitbucket. Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ijikọ ya.",
+      "notConnectedReadOnly": "E jikọghị Bitbucket. Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
       "setupIncomplete": "Nhazi ezubeghị. Mechaa nhazi na kilo.ai.",
       "setup": "Nhazi Bitbucket"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Enweghị ike ibudata ihe achọpụtara a.",
       "couldNotCheckPermissions": "Enweghị ike ịlele ikike mwepụ.",
       "cannotDismissTitle": "Enweghị ike iwepụ ihe achọpụtara a",
-      "cannotDismissDescription": "Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike iwepụ ihe achọpụtara.",
+      "cannotDismissDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike iwepụ ihe achọpụtara.",
       "alreadyResolvedDescription": "E dozilarị ihe achọpụtara a, ya mere a pụghịzi iwepụ ya."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Niile gbanyụrụ",
       "automationCount": "{{displayCount}} n'ime 3 gbanyere",
       "notificationsCount": "{{displayCount}} n'ime 2 gbanyere",
-      "disabledNoManage": "A gbanyụrụ onye nnọchi anya nchebe. Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ịgbanye ya.",
+      "disabledNoManage": "A gbanyụrụ onye nnọchi anya nchebe. Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ịgbanye ya.",
       "disabledNoRepo": "Họrọ opekata mpe otu ebe nchekwa tupu ịgbanye onye nnọchi anya nchebe.",
       "disabledPrompt": "Gbanye onye nnọchi anya nchebe iji mekọrịta data ọkwa Dependabot, họrọ ebe nchekwa ma hazie ọrụ akpaaka."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "tinye ụbọchị 1–365; jiri naanị ọnụọgụ zuru ezu.",
       "remediationDeadlineA11y": "Oge njedebe ndozi {{label}} n'ụbọchị",
       "enterWholeNumber": "Tinye ọnụọgụ zuru ezu n'etiti 1 na 365",
-      "permissionNote": "Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ịgbanwe ntọala ndị a.",
+      "permissionNote": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ịgbanwe ntọala ndị a.",
       "enableTracking": "Gbanye nsochi SLA",
       "enableTrackingSubtitle": "Debe oge njedebe ndozi dabere n'ogo njọ ihe achọpụtara.",
       "deadlinesHeading": "Oge njedebe ndozi (ụbọchị)"
@@ -1872,7 +1875,7 @@
       "summary": "Nchịkọta akụkọ",
       "title": "Akụkọ nyocha",
       "unavailable": "Akụkọ nyocha adịghị",
-      "unavailableDescription": "Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ile akụkọ nyocha. Rịọ onye nwe nzukọ ma ọ bụ onye njikwa ịkwụ ụgwọ ka o nye gị ikike ịnweta ha.",
+      "unavailableDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ile akụkọ nyocha. Rịọ onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka o nye gị ikike ịnweta ha.",
       "queryFailed": "A rụchaghị arịrịọ akụkọ ahụ. Nwaa ọzọ."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Gbanwee ọrụ",
       "emptyDescriptionCanInvite": "Kpọ ndị otu ibe gị òkù ka unu malite ịrụkọ ọrụ n'ụlọ ọrụ a.",
-      "emptyDescriptionCannotInvite": "Rịọ onye nwe ma ọ bụ onye njikwa ịgba ụgwọ ka ọ kpọọ ndị otu ibe gị òkù.",
+      "emptyDescriptionCannotInvite": "Rịọ onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ọ kpọọ ndị otu ibe gị òkù.",
       "emptyTitle": "Ọ dịbeghị onye otu",
       "invitedDate": "Akpọrọ òkù na {{date}}",
       "limitPerDay": "{{amount}}/ụbọchị",

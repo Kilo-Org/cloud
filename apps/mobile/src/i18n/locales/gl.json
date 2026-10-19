@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Non se puido cargar a memoria de revisión.",
       "off": "A memoria de revisión está desactivada.",
       "offDescription": "Actívaa para que Kilo aprenda das respostas dos responsables do mantemento e propoña pautas para REVIEW.md.",
-      "readOnlyDescription": "Só os propietarios da organización e os xestores de facturación poden activar a memoria de revisión.",
+      "readOnlyDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden activar a memoria de revisión.",
       "enable": "Activar a memoria de revisión",
       "loadingProposals": "Cargando propostas",
       "couldNotLoadProposals": "Non se puideron cargar as propostas.",
@@ -1467,7 +1467,10 @@
       "starting": "Iniciando a revisión…",
       "start": "Iniciar a revisión"
     },
-    "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os xestores de facturación poden conectalo.",
+    "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os administradores poden conectalo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} non está conectado. Conéctao para comezar a revisar as solicitudes de fusión."
+    },
     "webhookSetup": "A configuración do webhook está incompleta.",
     "webhookSetupDescription": "Algúns repositorios poden non recibir revisións automáticas.",
     "autoReviews": "Revisións automáticas",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respecta as instrucións do ficheiro REVIEW.md de cada repositorio",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización e os xestores de facturación poden conectalo.",
+      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo.",
       "setupIncomplete": "A configuración está incompleta. Remátaa en kilo.ai.",
       "setup": "Configuración de Bitbucket"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Non se puido cargar este problema detectado.",
       "couldNotCheckPermissions": "Non se puideron comprobar os permisos para descartar achados.",
       "cannotDismissTitle": "Non se pode descartar este achado",
-      "cannotDismissDescription": "Só os propietarios da organización e os xestores de facturación poden descartar achados.",
+      "cannotDismissDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden descartar achados.",
       "alreadyResolvedDescription": "Este achado xa está resolto e non se pode descartar."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Todo desactivado",
       "automationCount": "{{displayCount}} de 3 activados",
       "notificationsCount": "{{displayCount}} de 2 activadas",
-      "disabledNoManage": "O axente de seguridade está desactivado. Só os propietarios da organización e os xestores de facturación poden activalo.",
+      "disabledNoManage": "O axente de seguridade está desactivado. Só os propietarios da organización, os administradores e os xestores de facturación poden activalo.",
       "disabledNoRepo": "Selecciona polo menos un repositorio antes de activar o axente de seguridade.",
       "disabledPrompt": "Activa o axente de seguridade para sincronizar os avisos de Dependabot, escoller repositorios e configurar a automatización."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "o prazo debe ser de 1 a 365 días, sen decimais.",
       "remediationDeadlineA11y": "Prazo de corrección para a gravidade {{label}}, en días",
       "enterWholeNumber": "Introduce un número enteiro entre 1 e 365",
-      "permissionNote": "Só os propietarios da organización e os xestores de facturación poden cambiar esta configuración.",
+      "permissionNote": "Só os propietarios da organización, os administradores e os xestores de facturación poden cambiar esta configuración.",
       "enableTracking": "Activar o seguimento do SLA",
       "enableTrackingSubtitle": "Establece prazos de corrección segundo a gravidade do achado.",
       "deadlinesHeading": "Prazos de corrección (días)"
@@ -1872,7 +1875,7 @@
       "summary": "Resumo do informe",
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría non dispoñible",
-      "unavailableDescription": "Só os propietarios da organización e os xestores de facturación poden ver os informes de auditoría. Pídelle a un propietario ou xestor de facturación que che conceda acceso.",
+      "unavailableDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden ver os informes de auditoría. Pídelle a un propietario, administrador ou xestor de facturación que che conceda acceso.",
       "queryFailed": "A consulta do informe non rematou. Téntao de novo."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Cambiar rol",
       "emptyDescriptionCanInvite": "Invita os teus compañeiros de equipo para comezar a colaborar nesta organización.",
-      "emptyDescriptionCannotInvite": "Pídelle a un propietario ou a un xestor de facturación que invite os teus compañeiros de equipo.",
+      "emptyDescriptionCannotInvite": "Pídelle a un propietario, administrador ou xestor de facturación que invite os teus compañeiros de equipo.",
       "emptyTitle": "Aínda non hai membros",
       "invitedDate": "Invitación enviada o {{date}}",
       "limitPerDay": "{{amount}}/día",

@@ -10,6 +10,7 @@ import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import {
   buildOverviewRows,
+  connectNoticeKey,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
@@ -140,7 +141,7 @@ export function PlatformOverviewScreen({
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
           ) : (
             <Text className="text-center text-xs text-muted-foreground">
-              {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
+              {t(connectNoticeKey(platform), { platform: capabilities.label })}
             </Text>
           )}
         </CenteredState>

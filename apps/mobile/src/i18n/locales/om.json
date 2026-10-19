@@ -1447,7 +1447,7 @@
       "couldNotLoad": "Yaadannoo sakatta'aa fe'uun hin danda'amne.",
       "off": "Yaadannoon sakatta'aa cufameera.",
       "offDescription": "Kilo deebii kunuunsitootaa irraa baratee qajeelfama REVIEW.md akka dhiheessuuf isa bani.",
-      "readOnlyDescription": "Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa yaadannoo sakatta'aa banuu danda'u.",
+      "readOnlyDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa yaadannoo sakatta'aa banuu danda'u.",
       "enable": "Yaadannoo sakatta'aa bani",
       "loadingProposals": "Yaadota dhihaatan fe'aa jira",
       "couldNotLoadProposals": "Yaadota dhihaatan fe'uun hin danda'amne.",
@@ -1467,7 +1467,10 @@
       "starting": "Sakatta'a jalqabaa jira…",
       "start": "Sakatta'a jalqabi"
     },
-    "notConnectedReadOnly": "{{platform}} hin walqabsiifamne. Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
+    "notConnectedReadOnly": "{{platform}} hin walqabsiifamne. Abbootiin dhaabbataa fi bulchitootaa qofa isa walqabsiisuu danda'u.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} hin walqabsiifamne. Isa walqabsiisii yaadannoo walitti makuu sakatta'uu jalqabi."
+    },
     "webhookSetup": "Qophiin weebhuukii hin xumuramne.",
     "webhookSetupDescription": "Kuusaawwan koodii tokko tokko sakatta'a ofumaan raawwatamu hin argatan ta'a.",
     "autoReviews": "Sakatta'a ofumaan raawwatamu",
@@ -1475,7 +1478,7 @@
     "followReviewMd": "REVIEW.md hordofi",
     "followReviewMdSubtitle": "Faayiloota qajeelfamaa REVIEW.md kuusaa koodii tokkoon tokkoo keessa jiran kabaji",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
+      "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "setupIncomplete": "Qophiin hin xumuramne — qindaa'ina kilo.ai irratti xumuri.",
       "setup": "Qophii Bitbucket"
     },
@@ -1729,7 +1732,7 @@
       "couldNotLoad": "Argannoo kana fe'uun hin danda'amne.",
       "couldNotCheckPermissions": "Hayyama dhiisuu mirkaneessuun hin danda'amne.",
       "cannotDismissTitle": "Argama kana dhiisuun hin danda'amu",
-      "cannotDismissDescription": "Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa argamoota dhiisuu danda'u.",
+      "cannotDismissDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa argamoota dhiisuu danda'u.",
       "alreadyResolvedDescription": "Argamni kun duraan furameera; kana booda dhiisuun hin danda'amu."
     },
     "findingDetails": {
@@ -1771,7 +1774,7 @@
       "automationAllOff": "Hundi cufamaniiru",
       "automationCount": "3 keessaa {{displayCount}} banamaniiru",
       "notificationsCount": "2 keessaa {{displayCount}} banamaniiru",
-      "disabledNoManage": "Gargaaraan nageenyaa cufameera. Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa isa banuu danda'u.",
+      "disabledNoManage": "Gargaaraan nageenyaa cufameera. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa banuu danda'u.",
       "disabledNoRepo": "Gargaaraa nageenyaa banuu dura yoo xiqqaate kuusaa koodii tokko filadhu.",
       "disabledPrompt": "Akeekkachiisa Dependabot walsimsiisuuf, kuusaawwan koodii filachuuf fi hojii ofumaan raawwatamu qindeessuuf Gargaaraa nageenyaa bani."
     },
@@ -1820,7 +1823,7 @@
       "invalidDayCount": "lakkoofsa guutuu guyyaa 1–365 galchi.",
       "remediationDeadlineA11y": "Daangaa yeroo sirreeffamaa {{label}} guyyaadhaan",
       "enterWholeNumber": "Lakkoofsa guutuu 1 fi 365 gidduu jiru galchi",
-      "permissionNote": "Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa qindaa'ina kana jijjiiruu danda'u.",
+      "permissionNote": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa qindaa'ina kana jijjiiruu danda'u.",
       "enableTracking": "Hordoffii SLA bani",
       "enableTrackingSubtitle": "Cimina argamootaa irratti hundaa'ii daangaa yeroo sirreeffamaa murteessi.",
       "deadlinesHeading": "Daangaa yeroo sirreeffamaa (guyyaa)"
@@ -1872,7 +1875,7 @@
       "summary": "Cuunfaa gabaasaa",
       "title": "Gabaasa qorannoo",
       "unavailable": "Gabaasa qorannoo hin jiru",
-      "unavailableDescription": "Abbootiin dhaabbataa fi bulchitoonni kaffaltii qofa gabaasa qorannoo ilaaluu danda'u. Abbaa dhaabbataa ykn bulchaa kaffaltii hayyama akka siif kennu gaafadhu.",
+      "unavailableDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa gabaasa qorannoo ilaaluu danda'u. Abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii hayyama akka siif kennu gaafadhu.",
       "queryFailed": "Gaaffiin gabaasaa hin xumuramne. Irra deebi'ii yaali."
     },
     "notifications": {
@@ -3046,7 +3049,7 @@
     "members": {
       "changeRole": "Gahee jijjiiri",
       "emptyDescriptionCanInvite": "Dhaabbata kana keessatti waliin hojjechuu jalqabuuf miseensoota garee kee affeeri.",
-      "emptyDescriptionCannotInvite": "Miseensoota garee kee akka affeeru abbaa dhaabbataa yookaan bulchaa kaffaltii gaafadhu.",
+      "emptyDescriptionCannotInvite": "Miseensoota garee kee akka affeeru abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii gaafadhu.",
       "emptyTitle": "Hanga ammaatti miseensonni hin jiran",
       "invitedDate": "{{date}} affeerame",
       "limitPerDay": "{{amount}}/guyyaa",

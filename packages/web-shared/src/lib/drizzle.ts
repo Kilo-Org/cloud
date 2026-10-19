@@ -94,10 +94,17 @@ const max = 10;
 
 const idleTimeoutMillis = 5_000;
 
+// The validated request-path query budget, enforced client side. pg transmits
+// `statement_timeout` in the startup packet, which connection poolers may
+// reject (see lib/replication-health.ts). pg closes the connection on
+// timeout; the pool replenishes it on the next request.
+const queryTimeoutMillis = Number.parseInt(POSTGRES_MAX_QUERY_TIME || '20000');
+
 const sharedPoolConfig: Partial<pg.PoolConfig> = {
   max,
   connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT || '30000'),
   idleTimeoutMillis,
+  query_timeout: queryTimeoutMillis,
 };
 
 // Primary pool - always points to Frankfurt (writes go here)

@@ -179,4 +179,71 @@ describe('getDashboardStats', () => {
       analysisStatus: null,
     });
   });
+
+  it('returns the same aggregates for a repository filter as the owner-wide view restricted to that repository', async () => {
+    const user = await insertTestUser();
+    const otherUser = await insertTestUser();
+    const now = Date.now();
+    const overdueAt = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const fixedAt = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString();
+    const detectedAt = new Date(now - 20 * 24 * 60 * 60 * 1000).toISOString();
+
+    await db.insert(security_findings).values([
+      finding(user.id, 'dashboard-scope-cloud-open', {
+        severity: 'critical',
+        sla_due_at: overdueAt,
+      }),
+      finding(user.id, 'dashboard-scope-cloud-second', {
+        severity: 'low',
+      }),
+      finding(user.id, 'dashboard-scope-web-open', {
+        repo_full_name: 'Kilo-Org/web',
+        severity: 'high',
+        sla_due_at: overdueAt,
+      }),
+      finding(user.id, 'dashboard-scope-cloud-fixed', {
+        severity: 'medium',
+        status: 'fixed',
+        fixed_at: fixedAt,
+        first_detected_at: detectedAt,
+      }),
+      finding(user.id, 'dashboard-scope-web-fixed', {
+        repo_full_name: 'Kilo-Org/web',
+        severity: 'medium',
+        status: 'fixed',
+        fixed_at: fixedAt,
+        first_detected_at: detectedAt,
+      }),
+      finding(otherUser.id, 'dashboard-scope-other-owner', {
+        severity: 'critical',
+      }),
+    ]);
+
+    const ownerWide = await getDashboardStats({
+      owner: { userId: user.id },
+      slaEnabled: true,
+      slaConfig,
+    });
+    const repoScoped = await getDashboardStats({
+      owner: { userId: user.id },
+      repoFullName: 'Kilo-Org/web',
+      slaEnabled: true,
+      slaConfig,
+    });
+
+    // The repo-scoped view equals the owner-wide view restricted to the repo.
+    expect(repoScoped.repositoryCount).toBe(1);
+    expect(repoScoped.repoHealth.map(r => r.repoFullName)).toEqual(['Kilo-Org/web']);
+    expect(repoScoped.repoHealth[0]).toEqual(
+      ownerWide.repoHealth.find(r => r.repoFullName === 'Kilo-Org/web')
+    );
+    expect(repoScoped.status).toEqual({ open: 1, fixed: 1, ignored: 0 });
+    expect(ownerWide.status).toEqual({ open: 3, fixed: 2, ignored: 0 });
+    expect(repoScoped.severity).toEqual({ critical: 0, high: 1, medium: 0, low: 0 });
+    expect(repoScoped.sla.overall).toEqual({ total: 1, withinSla: 0, overdue: 1 });
+    expect(repoScoped.priorityFinding?.repoFullName).toBe('Kilo-Org/web');
+    expect(repoScoped.overdue.every(o => o.repoFullName === 'Kilo-Org/web')).toBe(true);
+    expect(repoScoped.mttr.bySeverity.medium).toMatchObject({ count: 1 });
+    expect(repoScoped.analysis.total).toBe(1);
+  });
 });

@@ -146,12 +146,14 @@ function encryptRecord(
  * On update, `existing` carries the previously stored encrypted envelopes
  * so keys left as the masked placeholder round-trip unchanged.
  *
- * Stored secrets stay bound to the destination they were configured for:
- * placeholder reuse only applies when the server's destination is unchanged —
- * `url` for remote servers, the full argv `command` for local servers. On an
- * update where the destination differs, every value must be supplied again and
- * a placeholder in the update fails with a request error. Create has no stored
- * row, so its behavior is unchanged.
+ * Stored secrets stay bound to the destination they were configured for.
+ * For remote servers the destination is `url`; for local servers it is the
+ * full argv `command` plus the set of environment keys (an endpoint is
+ * commonly supplied through an env var, so a key set change is a destination
+ * change). When an update changes any of these, every value must be supplied
+ * again, and a submission that still carries the placeholder value fails with
+ * the package's request error format. Create has no stored row, so its
+ * behavior is unchanged.
  */
 function buildStoredConfig(
   publicKeyBase64: string,
@@ -159,18 +161,26 @@ function buildStoredConfig(
   existing?: StoredMcpConfig
 ): StoredMcpConfig {
   if (input.type === 'local') {
-    const destinationUnchanged =
+    const commandUnchanged =
       existing !== undefined &&
       'command' in existing &&
       existing.command.length === input.config.command.length &&
       existing.command.every((part, index) => part === input.config.command[index]);
+    const envUnchanged =
+      commandUnchanged &&
+      input.config.environment !== undefined &&
+      existing.environment !== undefined &&
+      Object.keys(existing.environment).length === Object.keys(input.config.environment).length &&
+      Object.entries(input.config.environment).every(
+        ([key, value]) => value === MASKED_SECRET_VALUE || existing.environment?.[key] !== undefined
+      );
     const carriesPlaceholder =
       input.config.environment !== undefined &&
       Object.values(input.config.environment).some(value => value === MASKED_SECRET_VALUE);
-    if (existing !== undefined && !destinationUnchanged && carriesPlaceholder) {
+    if (existing !== undefined && !(commandUnchanged && envUnchanged) && carriesPlaceholder) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: 'Environment values must be re-entered when the command changes',
+        message: 'Environment values must be re-entered when the command or environment changes',
       });
     }
     return {
@@ -178,7 +188,7 @@ function buildStoredConfig(
       environment: encryptRecord(
         publicKeyBase64,
         input.config.environment,
-        destinationUnchanged ? existing.environment : undefined
+        commandUnchanged && envUnchanged ? existing.environment : undefined
       ),
     };
   }

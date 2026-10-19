@@ -174,7 +174,9 @@ describe('evaluateContainerAllocations', () => {
     [999, 'info', 500, 14400],
     [1000, 'ticket', 1000, 14400],
     [1499, 'ticket', 1000, 14400],
-    [1500, 'page', 1500, 900],
+    [1500, 'ticket', 1000, 14400],
+    [4999, 'ticket', 1000, 14400],
+    [5000, 'page', 5000, 900],
   ] as const)(
     'evaluates %i allocations at the exact severity boundary',
     async (total, severity, threshold, ttl) => {
@@ -221,7 +223,7 @@ describe('evaluateContainerAllocations', () => {
   it('allows escalation but suppresses repeat and lower-severity alerts during cooldown', async () => {
     const { env, put } = makeEnv();
     const notify = vi.fn(async (_alert: AlertPayload) => {});
-    for (const total of [500, 500, 1000, 500, 1500, 1500, 1000, 500]) {
+    for (const total of [500, 500, 1000, 500, 5000, 5000, 1000, 500]) {
       await evaluateContainerAllocations(
         env,
         async () => ({ running: total, provisioning: 0, stopping: 0 }),
@@ -235,7 +237,7 @@ describe('evaluateContainerAllocations', () => {
 
   it('does not write a cooldown marker after notification failure and allows retry', async () => {
     const { env, put } = makeEnv();
-    const query = async () => ({ running: 1500, provisioning: 0, stopping: 0 });
+    const query = async () => ({ running: 5000, provisioning: 0, stopping: 0 });
     const notify = vi.fn(async (_alert: AlertPayload) => {});
     notify.mockRejectedValueOnce(new Error('Slack unavailable'));
     await expect(evaluateContainerAllocations(env, query, notify)).rejects.toThrow(
@@ -256,21 +258,21 @@ describe('buildSlackMessage for container allocations', () => {
       provider: 'cloudflare',
       model: NATIVE_CONTAINER_APP,
       clientName: 'containers',
-      allocatedInstances: 1512,
-      thresholdCount: 1500,
-      counts: { running: 1400, provisioning: 100, stopping: 12 },
+      allocatedInstances: 5012,
+      thresholdCount: 5000,
+      counts: { running: 4900, provisioning: 100, stopping: 12 },
     }) as { blocks: { text?: { text: string }; fields?: { text: string }[] }[] };
     const text = message.blocks
       .flatMap(block => [block.text?.text ?? '', ...(block.fields?.map(field => field.text) ?? [])])
       .join('\n');
     expect(text).toContain('PAGE');
     expect(text).toContain(application.name);
-    expect(text).toContain('*Allocated containers:*\n1512');
-    expect(text).toContain('*Alert threshold:*\n1500 containers');
-    expect(text).toContain('*Running:*\n1400');
+    expect(text).toContain('*Allocated containers:*\n5012');
+    expect(text).toContain('*Alert threshold:*\n5000 containers');
+    expect(text).toContain('*Running:*\n4900');
     expect(text).toContain('Provisioning: 100');
     expect(text).toContain('Stopping: 12');
     expect(text).toContain('Threshold is operational, not a Cloudflare limit.');
-    expect(text).not.toMatch(/utilization|maximum|max_instances|\bmax\b|%|1512\s*\//i);
+    expect(text).not.toMatch(/utilization|maximum|max_instances|\bmax\b|%|5012\s*\//i);
   });
 });

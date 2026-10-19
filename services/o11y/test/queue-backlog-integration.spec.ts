@@ -45,7 +45,7 @@ describe('evaluateAlerts infrastructure isolation', () => {
         if (url.includes('/containers/applications/native-id/instances-v2')) {
           return Response.json({
             success: true,
-            result: Array.from({ length: 1500 }, (_, index) => ({
+            result: Array.from({ length: 5000 }, (_, index) => ({
               id: `instance-${index}`,
               status: { state: 'running' },
             })),

@@ -3,7 +3,7 @@ import { recordAlertFired, shouldSuppress } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
 
 export const NATIVE_CONTAINER_APP = 'cloud-agent-next-sandboxcontainers';
-export const CONTAINER_ALLOCATION_THRESHOLDS = { info: 500, ticket: 1000, page: 1500 } as const;
+export const CONTAINER_ALLOCATION_THRESHOLDS = { info: 500, ticket: 1000, page: 5000 } as const;
 
 export type ContainerAllocations = {
   running: number;

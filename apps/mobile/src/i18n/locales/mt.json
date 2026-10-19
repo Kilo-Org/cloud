@@ -818,7 +818,7 @@
       "reviewNotSubmittedTerm": "Din ir-reviżjoni ma tistax tintbagħat hekk kif inhi. Il-{{term}} fori nbidel, jew ma tistax tirrevedi l-{{term}} tiegħek stess.",
       "couldNotPostComment": "Ma setax jiġi ppubblikat il-kumment.",
       "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
-      "rateLimited": "Żżejjed mistoqsijiet. Jekk jogħġbok erġa' pprova aktar tard."
+      "rateLimited": "Żżejjed talbiet. Jekk jogħġbok erġa' pprova aktar tard."
     },
     "operation": {
       "couldNotReply": "Ma stajniex nibagħtu t-tweġiba.",

@@ -53,7 +53,10 @@ type ChatComposerControlState = {
  * failed upload renders Send disabled instead of toasting on press. A session
  * that cannot send (`sendDisabled`) still leaves the input editable: the reader
  * types the next message while Retry sits beside it, and the mode/model toolbar
- * collapses because those pills would be inert until the session recovers.
+ * collapses because those pills would be inert until the session recovers. The
+ * composer's own in-flight send (`isSending`) gates send, the toolbar, voice and
+ * the paperclip the same way, and for the same reason keeps the input editable:
+ * a non-editable input loses the keyboard mid-send.
  */
 export function resolveChatComposerControlState(
   input: ChatComposerControlInput
@@ -90,7 +93,13 @@ export function resolveChatComposerControlState(
     toolbarDisabled || voiceInputActive || attachmentsCount >= attachmentMax;
   // Voice activity no longer makes the input read-only: dictation inserts at
   // the caret, so the user can keep editing (an edit aborts the session).
-  const inputEditable = !(disabled || isSending);
+  // `isSending` is this composer's own in-flight send. It gates the toolbar, the
+  // paperclip, voice and send — but not the input. A focused `TextInput` that is
+  // made non-editable resigns first responder on both platforms, which dropped
+  // the keyboard on every send and left the reader to reopen it to keep typing
+  // (video V1 ~4.4s and ~18.9s). A second message is kept out by the submit lock
+  // and `canSend`, not by taking the input away.
+  const inputEditable = !disabled;
   const showToolbar =
     !sendGated && (isFocused || hasText || attachmentsCount > 0 || voiceInputActive);
   const hasSendableContent = hasText || sendableAttachmentsCount > 0;

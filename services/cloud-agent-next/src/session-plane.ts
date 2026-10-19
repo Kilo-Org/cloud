@@ -141,6 +141,17 @@ export function isCodeReviewControlPlaneOwner(
   );
 }
 
+/** UI gate only: hides the preview button and links; entry still checks session access. */
+export function isPreviewOwner(
+  env: { PREVIEW_ENABLED_IDS?: string },
+  owner: { userId: string; orgId?: string }
+): boolean {
+  return (
+    ownerIdInList(env.PREVIEW_ENABLED_IDS, owner.userId) ||
+    ownerIdInList(env.PREVIEW_ENABLED_IDS, owner.orgId)
+  );
+}
+
 export function sessionPlaneForNewOwner(
   env: ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string },

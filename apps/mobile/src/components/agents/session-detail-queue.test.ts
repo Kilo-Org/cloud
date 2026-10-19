@@ -16,6 +16,7 @@ import type * as ReactI18next from 'react-i18next';
 
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import type * as SessionListHelpers from '@/components/agents/session-list-helpers';
+import type * as SessionDetailContentHelpers from './session-detail-content-helpers';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageBubble } from '@/components/agents/message-bubble';
@@ -67,6 +68,8 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'whenUnlockedThisDeviceOnly',
 }));
+// The Follow control reads ActivityKit and the token graph; this suite renders none.
+vi.mock('@/components/agents/session-follow-button', () => ({ SessionFollowButton: () => null }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
@@ -436,12 +439,16 @@ vi.mock('@/components/agents/child-session-sheet-state', () => ({
 vi.mock('@/components/agents/use-message-copy', () => ({
   performCopy: vi.fn(),
 }));
-vi.mock('@/components/agents/session-detail-content-helpers', () => ({
-  countInFlightMessages: () => 0,
-  lastVisibleMessageFailure: () => null,
-  resolveRetryPrompt: () => null,
-  retryFailedMessage: vi.fn(),
-}));
+vi.mock('@/components/agents/session-detail-content-helpers', async importOriginal => {
+  const actual = await importOriginal<typeof SessionDetailContentHelpers>();
+  return {
+    ...actual,
+    countInFlightMessages: () => 0,
+    lastVisibleMessageFailure: () => null,
+    resolveRetryPrompt: () => null,
+    retryFailedMessage: vi.fn(),
+  };
+});
 vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
   createAndNavigateAgentSession: vi.fn(),
 }));

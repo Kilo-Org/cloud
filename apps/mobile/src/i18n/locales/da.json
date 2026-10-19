@@ -133,10 +133,13 @@
     "status": "Tilstand",
     "truncated": "Afkortet",
     "updated": "Opdateret",
+    "generating": "Genererer…",
     "working": "I gang",
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Afvist",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Ændringer"
   },
   "language": {
@@ -833,7 +836,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Advarsler om saldo",
       "security": "Sikkerhedsfund",
-      "spend": "Forbrugsadvarsler"
+      "spend": "Forbrugsadvarsler",
+      "followedSessions": "Fulgte sessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dine samtaler",
@@ -1256,7 +1260,7 @@
         "stoppedTitle": "Opsætning stoppet",
         "stoppedBody": "Instansen for {{name}} stoppede uventet under opsætningen.",
         "stalledTitle": "Noget gik i stå",
-        "stalledBody": "Vi kunne ikke færdiggøre opsætningen af {{name}}. Prøv igen, eller skriv til hi@kilo.ai, hvis problemet fortsætter.",
+        "stalledBody": "Vi kunne ikke færdiggøre opsætningen af {{name}}. Prøv igen, eller skriv til {{supportEmail}}, hvis problemet fortsætter.",
         "timeoutTitle": "Tager længere tid end forventet",
         "timeoutBody": "Opsætningen af {{name}} tager længere tid end normalt (over {{displayMinutes}} minutter).",
         "continueInBackground": "Fortsæt i baggrunden",
@@ -1314,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Dit abonnement med tidlig adgang kræver en manuel gennemgang, før det kan bruges på mobilen.",
       "iosTitle": "KiloClaw er ikke tilgængelig på iOS",
       "iosBody": "Adgangen til KiloClaw for denne konto administreres uden for iOS-appen.",
-      "iosContact": "Spørgsmål? Kontakt hi@kilo.ai.",
+      "iosContact": "Spørgsmål? Kontakt {{supportEmail}}.",
       "quarantinedCta": "Send en e-mail til vores team",
       "nonCanonicalEarlybirdCta": "Se din plan igennem på kilo.ai"
     },
@@ -1549,7 +1553,7 @@
         "recoveryLabel": "Opdatér GitHub-appen"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer blev deaktiveret, fordi denne GitHub-organisation bruger en liste over tilladte IP-adresser, som blokerer Kilo. Kontakt hi@kilocode.ai for at få hjælp, og aktivér derefter Code Reviewer igen."
+        "description": "Code Reviewer blev deaktiveret, fordi denne GitHub-organisation bruger en liste over tilladte IP-adresser, som blokerer Kilo. Kontakt {{supportEmail}} for at få hjælp, og aktivér derefter Code Reviewer igen."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer blev deaktiveret, fordi Kilo ikke kan oprette et adgangstoken til dette GitLab-projekt. Giv adgang med rollen Maintainer, eller aktivér adgangstokens til projekter, og aktivér derefter Code Reviewer igen.",
@@ -1564,7 +1568,7 @@
         "recoveryLabel": "Opdatér indstillingerne for Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer blev deaktiveret, fordi kloning af kodelageret overskred tidsgrænsen tre gange i dag. Kontakt hi@kilocode.ai for at få hjælp, og aktivér derefter Code Reviewer igen."
+        "description": "Code Reviewer blev deaktiveret, fordi kloning af kodelageret overskred tidsgrænsen tre gange i dag. Kontakt {{supportEmail}} for at få hjælp, og aktivér derefter Code Reviewer igen."
       },
       "title": "Kodegennemgangen kræver din opmærksomhed.",
       "recoveryLabel": "Kontakt support"
@@ -2088,6 +2092,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiér fejloplysninger",
       "backToSessions": "Tilbage til sessioner",
+      "follow": "Følg på låseskærmen",
+      "unfollow": "Stop med at følge på låseskærmen",
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
@@ -2423,6 +2429,7 @@
       "title": "Agenten har brug for svar",
       "skipQuestionsTitle": "Spring spørgsmål over?",
       "skipQuestionsMessage": "Agenten springer dette trin over.",
+      "answerProgress": "{{answered}} af {{total}} besvaret",
       "selectAllThatApply": "Vælg alle relevante svar.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, valgt",
@@ -2491,6 +2498,7 @@
       "title": "Filtrér sessioner",
       "platformCloud": "Skyen",
       "platformExtension": "Udvidelse",
+      "platformDesktop": "Skrivebord",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3100,6 +3108,9 @@
     "ssoError": "Din organisation kræver SSO. Brug '$t(login.moreSignInOptions)'.",
     "blocked": "Denne konto er blokeret. Kontakt support.",
     "signupRateLimited": "For mange forsøg. Prøv igen senere.",
+    "signupStepUp": "Brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
+    "signupStepUpApple": "Brug '$t(login.signInWithApple)' for at færdiggøre oprettelsen af din konto.",
+    "signupStepUpGoogle": "Brug '$t(login.signInWithGoogle)' for at færdiggøre oprettelsen af din konto.",
     "invalidCode": "Koden er forkert. Prøv igen.",
     "codeInProgress": "Din kode behandles. Vent et øjeblik, og prøv igen.",
     "tooManyAttempts": "For mange forsøg. Bed om en ny kode.",
@@ -3170,6 +3181,8 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
+    "finished": "Afsluttet",
+    "followFailed": "Kunne ikke vise denne agent på låseskærmen.",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
     "checked": "Kontrolleret",
     "lastKnown": "Sidst kendt",
@@ -3178,7 +3191,26 @@
     "waitingForYou": "Afventer dig",
     "nextScheduled": "Næste planlagte",
     "answerNeeded": "Afventer svar",
-    "waitingToRetry": "Afventer nyt forsøg"
+    "waitingToRetry": "Afventer nyt forsøg",
+    "step": {
+      "editing": "Redigerer",
+      "reading": "Læser",
+      "running": "Kører",
+      "searching": "Websøgning",
+      "thinking": "Tænker igennem"
+    },
+    "planOf": "af",
+    "filesChanged": "filer ændret",
+    "finishedIn": "Færdig på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request åbnet",
+    "permissionWants": "Vil køre",
+    "failure": {
+      "provider": "Stoppet: udbyderfejl",
+      "tool": "Stoppet: værktøjsfejl",
+      "cancelled": "Stoppet: annulleret",
+      "other": "STOPPET"
+    }
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",
@@ -3214,8 +3246,12 @@
     "list": {
       "loadFailed": "Kunne ikke indlæse chathistorik.",
       "new": "Ny chat",
-      "openHint": "Åbner chatten. Tryk og hold for at slette.",
       "deleteTitle": "Slet denne chat?"
+    },
+    "rename": {
+      "title": "Omdøb chat",
+      "accessibility": "Omdøb chat: {{title}}",
+      "openHint": "Åbner chatten. Tryk og hold for at omdøbe eller slette."
     },
     "beta": "Beta",
     "details": {
@@ -3292,6 +3328,10 @@
     },
     "backends": {
       "title": "Chatservere",
+      "providersTitle": "Chatudbydere",
+      "cloud": "I skyen",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo-modeller er ikke tilgængelige lige nu. Tjek din forbindelse.",
       "manage": "Administrer chatservere",
       "defaultKilo": "$t(consent.kilo) (standard)",
       "kiloHelp": "Den indbyggede chatserver bruger din Kilo-konto og kan ikke redigeres eller slettes.",
@@ -3351,7 +3391,6 @@
     "gguf": {
       "title": "Downloadbare modeller",
       "help": "Download en åben model, og kør den på denne telefon med llama.cpp. Dine prompter og svar bliver på enheden. Modeller er store, så brug Wi-Fi.",
-      "details": "{{size}} · Licens: {{license}}",
       "download": "Download model",
       "pause": "Sæt download på pause",
       "resume": "Genoptag download",
@@ -3363,6 +3402,8 @@
       "url": "Direkte downloadlink",
       "urlHelp": "Indsæt et HTTPS-link til en .gguf-fil, f.eks. et Hugging Face-resolve-link. Download kun modeller fra kilder, du har tillid til.",
       "downloadUrl": "Download fra link",
+      "advanced": "Avanceret",
+      "localPurpose": "Kører på denne enhed med llama.cpp. Prompter og svar bliver på enheden.",
       "deleteTitle": "Slet denne model?",
       "deleteMessage": "Slet {{name}} fra denne enhed? Chats, der bruger den, har brug for en anden model, før de kan fortsætte.",
       "errors": {
@@ -3391,8 +3432,17 @@
         "fits": "Passer",
         "tight": "Passer lige akkurat",
         "tooLarge": "For stor",
-        "noStorage": "Ikke nok lagerplads"
+        "noStorage": "Ikke nok lagerplads",
+        "unknown": "Pasform ukendt"
       },
+      "recommendationsHelp": "En liste, som denne app fastlåser: én fil pr. model fra en udgiver, der angiver en licens. Intet andet rangeres.",
+      "compatibilityHelp": "Pasform sammenligner modelfilen med denne enheds hukommelse og ledige lagerplads. Hukommelsestallet er et skøn, ikke en måling.",
+      "text": "Tekst",
+      "listTextPurpose": "Kun tekstprompter.",
+      "listImagePurpose": "Læser billeder såvel som tekst.",
+      "smallestDownload": "Mindste download: {{size}} · ca. {{memory}} hukommelse",
+      "fullFileName": "Fil: {{name}}",
+      "memoryEstimateNote": "Hukommelsestal er skøn, ikke målinger.",
       "parameters": "Parametre: {{value}}",
       "downloads": "Downloads: {{value}}",
       "likes": "Likes: {{value}}",
@@ -3417,7 +3467,8 @@
     },
     "localModels": {
       "title": "Modeller på enheden",
-      "help": "Modeller på enheden kører på denne telefon. Dine prompter og svar bliver på enheden, og disse modeller kan ikke bruge værktøjer.",
+      "help": "Modeller på enheden kører på denne telefon. Dine prompter og svar bliver på enheden.",
+      "systemPurpose": "Modellen, der er indbygget i denne enheds system. Den kører på enheden.",
       "apple": "Apple Intelligence (på enheden)",
       "checking": "Tjekker tilgængelighed…",
       "ready": "Klar til brug",
@@ -3718,12 +3769,26 @@
       "startNow": "Start uden gennemgang",
       "startNowHint": "Hold nede for at starte uden gennemgang",
       "titleLabel": "Opgavetitel",
+      "renameTitle": "Omdøb opgave",
       "notes": "Noter",
-      "notesPlaceholder": "Tilføj noter i Markdown",
+      "addNotes": "Tilføj noter",
+      "notesPrompt": "Tilføj kontekst, krav eller acceptkriterier.",
+      "markdownSupported": "Markdown understøttet",
       "sessions": "Sessioner tilknyttet",
       "noSessions": "Ingen sessioner endnu",
+      "untitledLinkedSession": "Linket session",
+      "sessionNeedsInput": "Sessionen kræver input",
+      "sessionRunning": "Sessionen kører",
+      "sessionFinished": "Sessionen afsluttet",
+      "sessionPullRequest": "Sessionens PR",
+      "sessionPullRequestNumber": "Sessionens PR #{{number}}",
+      "openSessionHint": "Åbner sessionen.",
+      "unlinkSessionAction": "Fjern link til session",
+      "unlinkConfirmTitle": "Fjern link til {{title}}?",
+      "unlinkConfirmMessage": "Selve sessionen slettes ikke. Kun dens link til denne opgave fjernes.",
+      "startNewSession": "Start ny session",
+      "startNewSessionHint": "Langt tryk for at starte en ny session.",
       "linkSession": "Tilknyt session",
-      "unlinkSession": "Fjern tilknytning til {{title}}",
       "linkFailed": "Kunne ikke tilknytte sessionen til opgaven"
     },
     "linkSession": {
@@ -3741,5 +3806,69 @@
       "title": "Gem på liste",
       "saved": "Gemt på {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Morgenbriefing",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Noget historisk aktivitet kan mangle. ≥ betyder mindst så meget; ukendt er ikke nul.",
+    "available": "Tilgængelige briefinger",
+    "history": "Briefinghistorik",
+    "historyHint": "Rapporter gemmes i 30 dage, også afviste rapporter.",
+    "settings": "Briefingindstillinger",
+    "empty": "Ingen aktivitet i nat",
+    "emptyHint": "Dine cloud- og CLI-kodesessioner vises her efter en aktiv nat.",
+    "loadError": "Kunne ikke indlæse briefinger",
+    "sessions": "Aktive i nat",
+    "pullRequests": "PRs åbnet",
+    "blockers": "Nye blokeringer",
+    "spend": "Forbrug i nat",
+    "view": "Læs briefing",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Vis live-status",
+    "offline": "Offline · gemt briefing",
+    "cached": "Gemt rapport · kan ikke opdateres",
+    "revised": "Revideret · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI-resumé",
+    "summaryDisabled": "Struktureret rapport · AI er slået fra for denne kontekst",
+    "summaryPending": "AI-resuméet er i gang. Det vises her, når det er klar.",
+    "summaryFailed": "AI-resuméet mislykkedes. Et nyt forsøg kan medføre en ny betaling.",
+    "summaryUnavailable": "AI-resumé er ikke tilgængeligt. Din strukturerede rapport er stadig tilgængelig.",
+    "summaryOutdated": "Dette resumé er ældre end den seneste revision af rapporten.",
+    "summaryCharge": "AI opkrævede {{cost}}",
+    "summaryChargePending": "AI-betaling afventer afstemning",
+    "generate": "Generér resumé",
+    "retrySummary": "Prøv betalt resumé igen",
+    "sources": "Dokumentation og artefakter",
+    "timezone": "Tidszone for briefing",
+    "deviceTimezone": "Brug enhedens tidszone",
+    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin. Ændringer i tidsplanen gælder fremtidige nætter.",
+    "nightStart": "Natten starter",
+    "morningStart": "Natten slutter / morgenen starter",
+    "morningEnd": "Morgenen slutter",
+    "timeHint": "Hjem-kortet viser live-status igen, når morgenen slutter, også offline.",
+    "invalidSchedule": "Vælg en gyldig tidszone og nat- og morgenperioder, der ikke er tomme eller overlapper.",
+    "notificationsHint": "Én generisk notifikation hver morgen, når din første rapport er klar. Uafhængigt af betalte AI-resuméer.",
+    "notificationPermission": "Slå enhedsnotifikationer til under $t(common.notifications) for at modtage din briefing.",
+    "aiOptIn": "Betalte AI-resuméer",
+    "aiHint": "Valgfrit og kun for denne kontekst. Udvalgte, redigerede uddrag og strukturerede fakta sendes til din model på appens sprog. Betalinger trækkes fra denne konteksts saldo.",
+    "defaultModel": "Brug Kilos standardmodel",
+    "duration": "Tidsgrænse (minutter)",
+    "spendLimit": "Forbrugsgrænse (USD)",
+    "safeguardHint": "Faste grænser pr. resumé, ikke et dagligt budget. Standard: 10 minutter og $2. En rapport udgives efter højst fem minutter, mens genereringen fortsætter inden for disse grænser.",
+    "invalidSafeguards": "Angiv positive, endelige tids- og forbrugsgrænser.",
+    "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
+    "estimateUnavailable": "Et betalt resumé er ikke tilgængeligt med disse indstillinger.",
+    "estimatePricingUnavailable": "Prissætning for denne model er ikke tilgængelig.",
+    "estimateBalanceUnavailable": "Ikke nok saldo til en betalt opsummering.",
+    "estimateModelNotAllowed": "Denne model er ikke tilladt her.",
+    "estimateSpendLimitTooLow": "Hæv forbrugsgrænsen for at tillade denne opsummering.",
+    "confirmPaid": "Slå betalte resuméer til for {{context}}?",
+    "confirmGeneration": "Generér et betalt resumé?",
+    "paidDisclosure": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} minutter. Der opkræves betaling, selv hvis genereringen mislykkes.",
+    "enable": "Slå betalte resuméer til",
+    "contextSettings": "AI-indstillinger · {{context}}",
+    "allContexts": "Personlige briefinger og organisationsbriefinger holdes adskilt."
   }
 }

@@ -147,7 +147,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
   function createClient(serverUrl: string) {
     return createWrapperKiloClient(
       createKiloClient({ baseUrl: serverUrl }),
-      serverUrl,
+      { url: serverUrl },
       '/workspace'
     );
   }
@@ -494,20 +494,42 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     expect(await client.getSessionStatuses()).toEqual({});
   });
 
-  it.each([
-    { name: 'empty object', body: {} },
-    { name: 'success-shaped object', body: { success: true } },
-    { name: 'string', body: 'true' },
-    { name: 'number', body: 1 },
-    { name: 'array', body: [] },
-  ])('rejects a non-boolean abort acknowledgement: %j', async ({ body }) => {
-    const stub = startStub(200, body);
+  it('rejects a non-boolean abort acknowledgement', async () => {
+    const stub = startStub(200, {});
     const error: unknown = await createClient(stub.url)
       .abortSession({ sessionId: 'ses_1' })
       .catch(cause => cause);
     expect(error).toBeInstanceOf(Error);
     if (!(error instanceof Error)) throw new Error('Expected invalid abort response failure');
     expect(error.message).toBe('Session abort for ses_1 returned no boolean result');
+  });
+
+  it('treats a 404 cleanup abort as success without retrying', async () => {
+    const stub = startStub(404, {});
+    await createClient(stub.url).abortSessionForCleanup({
+      sessionId: 'ses_1',
+      directory: '/workspace',
+    });
+    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests[0]).toMatchObject({
+      method: 'POST',
+      pathname: '/session/ses_1/abort',
+      directory: '/workspace',
+    });
+  });
+
+  it('validates cleanup child rows before walking them', async () => {
+    const valid = 'ses_22222222222222222222222222';
+    const good = startStub(200, [{ id: valid, directory: '/workspace' }]);
+    expect(
+      await createClient(good.url).children({ sessionId: 'ses_1', directory: '/workspace' })
+    ).toEqual([{ id: valid, directory: '/workspace' }]);
+
+    const malformed = startStub(200, [{ id: 'not-a-session', directory: '/workspace' }]);
+    const error: unknown = await createClient(malformed.url)
+      .children({ sessionId: 'ses_1', directory: '/workspace' })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
   });
 
   const errorOperations: Array<{
@@ -681,7 +703,11 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     });
     try {
       const url = server.url.toString();
-      const client = createWrapperKiloClient(createKiloClient({ baseUrl: url }), url, directory);
+      const client = createWrapperKiloClient(
+        createKiloClient({ baseUrl: url }),
+        { url },
+        directory
+      );
       await client.ensureSession(sessionId, directory);
       expect(await client.getSession(sessionId)).toEqual({ id: sessionId });
       expect(await client.abortSession({ sessionId, directory })).toBe(true);

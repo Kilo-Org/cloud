@@ -11,7 +11,6 @@ import {
   type PartDraft,
   type SessionHandle,
   ToolMissingError,
-  zeroUsage,
 } from '@kilocode/harness-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
@@ -27,7 +26,8 @@ import {
   snapshotOf,
 } from './state';
 import { chatLayers, type ChatOrg, organizationIdOf } from './layers';
-import { countUsage, usageSince } from './chat-usage';
+import { answerParts } from './answer-parts';
+import { countSessionUsage } from './chat-usage';
 import {
   ensureKiloMcp,
   mcpEnabledFor,
@@ -109,7 +109,7 @@ type Chat = {
    * counts from zero each time a session opens, so a new session starts here
    * at zero too.
    */
-  counted: ModelUsage;
+  counted: ReadonlyMap<string, ModelUsage>;
   readonly chatScope: string;
   readonly org: ChatOrg;
 };
@@ -260,7 +260,7 @@ export async function startChat(
     answering: undefined,
     waiting: [],
     pendingTools: undefined,
-    counted: zeroUsage,
+    counted: new Map(),
     ...place,
   });
   change(handle.id, {
@@ -403,7 +403,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       answering: undefined,
       waiting: [],
       pendingTools: undefined,
-      counted: zeroUsage,
+      counted: new Map(),
       ...place,
     });
     change(sessionId, {
@@ -482,7 +482,7 @@ export async function say(
     touchChat(await open(), current, at);
     change(current, {
       status: 'working',
-      answering: '',
+      answering: [],
       asked: text,
       askedImages: images,
       askedModel: model,
@@ -500,7 +500,7 @@ export async function say(
     current = snapshotOf(current).sessionId;
     change(current, {
       status: 'idle',
-      answering: '',
+      answering: [],
       asked: text,
       askedImages: images,
       askedModel: model,
@@ -550,28 +550,36 @@ function partsOf({ text, images }: Question): string | readonly PartDraft[] {
   ];
 }
 
-/**
- * Adds what the session used since it was last read to the chat's usage, under
- * the model the session runs on, and writes it down so a reopened chat has it.
- * `last` is the call that just ended: what it put in front of the model is how
- * full the window is now.
- *
- * The count is kept in memory first and the write cannot fail the answer: the
- * column holds the whole tally, so the next write that lands carries this call
- * too.
- */
+/** The tally stays in memory if persistence fails, so the next write includes it. */
 async function countCall(
   sessionId: string,
   chat: Chat,
-  call: { readonly total: ModelUsage; readonly last: ModelUsage }
+  call: {
+    readonly total: ReadonlyMap<string, ModelUsage>;
+    readonly last?: ModelUsage;
+  }
 ): Promise<void> {
   const { total, last } = call;
-  const spent = usageSince(total, chat.counted);
-  chat.counted = total;
   const { model, record } = snapshotOf(sessionId);
-  const usage = countUsage(record.usage, model, spent);
+  const usage = countSessionUsage({
+    usage: record.usage,
+    requested: model,
+    totals: total,
+    counted: chat.counted,
+  });
+  chat.counted = total;
+  if (usage === record.usage && last === undefined) {
+    return;
+  }
   change(sessionId, {
-    record: { ...record, usage, prompted: last.inputTokens + last.cacheReadTokens },
+    record: {
+      ...record,
+      usage,
+      prompted:
+        last === undefined
+          ? record.prompted
+          : last.inputTokens + last.cacheReadTokens + last.cacheWriteTokens + last.outputTokens,
+    },
   });
   try {
     recordUsage(await open(), sessionId, usage);
@@ -586,10 +594,21 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
   if (chat === undefined) {
     return Effect.void;
   }
-  let said = '';
-  return Stream.runForEach(chat.handle.ask(partsOf(question)), (event: ModelEvent) => {
+  let parts = snapshotOf(sessionId).answering;
+  const answer = chat.handle.ask(partsOf(question)).pipe(
+    Stream.tap(event =>
+      Effect.sync(() => {
+        const next = answerParts({ sessionId, parts, event, now: Date.now() });
+        if (next !== parts) {
+          parts = next;
+          change(sessionId, { answering: parts });
+        }
+      })
+    )
+  );
+  return Stream.runForEach(answer, (event: ModelEvent) => {
     if (event.kind === 'done') {
-      return chat.handle.usage.pipe(
+      return chat.handle.usageByModel.pipe(
         Effect.flatMap(total =>
           Effect.promise(async () => {
             await countCall(sessionId, chat, { total, last: event.usage });
@@ -597,12 +616,7 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
         )
       );
     }
-    return Effect.sync(() => {
-      if (event.kind === 'delta') {
-        said += event.text;
-        change(sessionId, { answering: said });
-      }
-    });
+    return Effect.void;
   }).pipe(
     Effect.locally(questionSearches, { used: 0 }),
     Effect.matchCauseEffect({
@@ -660,6 +674,7 @@ async function settle(
     return;
   }
   const turns = await runtime.runPromise(chat.handle.history);
+  await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
   const failed = failure?.reason ?? null;
   if (failed === null) {
     await forgetAsked(sessionId);
@@ -667,7 +682,7 @@ async function settle(
   chat.answering = undefined;
   change(sessionId, {
     turns,
-    answering: '',
+    answering: [],
     status: 'idle',
     asked: failed === null ? null : snapshotOf(sessionId).asked,
     askedImages: failed === null ? [] : snapshotOf(sessionId).askedImages,
@@ -792,10 +807,10 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
           answering: undefined,
           waiting: [],
           pendingTools: undefined,
-          counted: zeroUsage,
+          counted: new Map(),
           ...place,
         }
-      : { ...chat, handle, scope, answering: undefined, counted: zeroUsage }
+      : { ...chat, handle, scope, answering: undefined, counted: new Map() }
   );
   change(handle.id, { ...held, sessionId: handle.id, model, effort, turns });
   /* The chat it moved off is left pointing at the one it became, rather than
@@ -1078,7 +1093,7 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
-  change(sessionId, { status: 'idle', answering: '' });
+  change(sessionId, { status: 'idle', answering: [] });
   return true;
 }
 

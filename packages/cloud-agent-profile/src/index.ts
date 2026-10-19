@@ -11,6 +11,7 @@ export type {
   ProfileSkillResponse,
   ProfileAgentResponse,
   ProfileKiloCommandResponse,
+  ProfileInstructionResponse,
   ProfileResponse,
   ProfileResponseWithOwner,
   ProfileSummary,
@@ -38,6 +39,7 @@ export {
   type MergedSkillForSession,
   type MergedAgentForSession,
   type MergedKiloCommandForSession,
+  type MergedInstructionForSession,
   type ClientMcpServerValue,
   type InlineSkillInput,
   type InlineAgentInput,
@@ -160,6 +162,22 @@ export {
   type KiloCommandForSession,
 } from './profile-kilo-commands-service';
 
+// Instruction CRUD + session helpers
+export {
+  MAX_PROFILE_INSTRUCTIONS,
+  instructionCreateInputSchema,
+  instructionUpdateInputSchema,
+  listInstructionsForProfile,
+  createInstruction,
+  updateInstruction,
+  deleteInstruction,
+  setInstructionEnabled,
+  getInstructionsForSession,
+  type InstructionCreateInput,
+  type InstructionUpdateInput,
+  type InstructionForSession,
+} from './profile-instructions-service';
+
 // Repo binding CRUD
 export {
   bindProfileToRepo,
@@ -189,3 +207,17 @@ export {
   type SandboxAllocationCandidates,
   type RepositoryAllocationSetting,
 } from './sandbox-allocation-settings-service';
+
+// Local config import (preview diff + selective upsert)
+export {
+  buildImportPreview,
+  applyImport,
+  type ConfigImportPreview,
+  type ImportCategoryPreview,
+  type ImportChangedItem,
+  type ImportFieldChange,
+  type PostImportAgent,
+  type PostImportInstruction,
+  type PostImportKiloCommand,
+  type PostImportSkill,
+} from './profile-import-service';

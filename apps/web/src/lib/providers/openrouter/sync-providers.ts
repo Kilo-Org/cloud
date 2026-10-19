@@ -189,7 +189,7 @@ async function syncProviders(params: {
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {
-      if (kfm.status !== 'public') return [];
+      if (unavailableModelIds.has(kfm.public_id)) return [];
       const inferenceProvider = getInferenceProvider(kfm);
       if (!inferenceProvider) return [];
       return [{ kfm, inferenceProvider }];
@@ -277,6 +277,8 @@ async function syncProviders(params: {
         training: data.provider.dataPolicy.training,
         retainsPrompts: data.provider.dataPolicy.retainsPrompts,
         canPublish: data.provider.dataPolicy.canPublish,
+        termsOfServiceURL: data.provider.dataPolicy.termsOfServiceURL,
+        privacyPolicyURL: data.provider.dataPolicy.privacyPolicyURL,
       },
       headquarters: data.provider.headquarters,
       datacenters: data.provider.datacenters,

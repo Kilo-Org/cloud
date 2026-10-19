@@ -41,7 +41,7 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
-import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
@@ -123,7 +123,7 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
   }
 
   if (integration.owned_by_organization_id) {
-    const isMember = await isOrganizationMember(integration.owned_by_organization_id, user.id);
+    const isMember = await isOrganizationMember(db, integration.owned_by_organization_id, user.id);
     if (!isMember) {
       return htmlPage(
         'Link Failed',

@@ -544,6 +544,7 @@ export function createSessionManagementHandlers() {
             variant: sessionMetadata.agent?.variant,
             autoCommit: sessionMetadata.finalization?.autoCommit,
             upstreamBranch: sessionMetadata.repository?.upstreamBranch,
+            branchName: sessionMetadata.workspace?.branchName,
             runtimeAgents: metadataProfile.runtimeAgents?.map(agent => ({
               slug: agent.slug,
               name: agent.name,

@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -45,6 +46,13 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${orgId}/code-reviews`;
 
   switch (template) {
+    case 'autoRoutingPoolNotice':
+      return {
+        cutover_at: 'November 1, 2099 at 12:00:00 UTC (2099-11-01T12:00:00.000Z)',
+        routers: new RawHtml(
+          `<li>Your personal pool<br /><code>kilo-auto/custom/efficient</code><br /><a href="${NEXTAUTH_URL}/profile">Manage this pool</a></li>`
+        ),
+      };
     case 'orgSubscription':
       return { seats: '5 seats', organization_url, invoices_url };
     case 'orgRenewed':
@@ -86,9 +94,8 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       return { reason: 'Card declined', credits_url: `${NEXTAUTH_URL}/credits?show-auto-top-up` };
     case 'codeReviewDisabled':
       return {
-        reason:
-          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
-        recovery_url: 'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts',
+        reason: `Code Reviewer was disabled after three repository clone timeouts today. Contact ${SUPPORT_EMAIL} for help, then enable Code Reviewer again.`,
+        recovery_url: `mailto:${SUPPORT_EMAIL}?subject=Repository%20clone%20timeouts`,
         recovery_label: 'Contact support',
       };
     case 'ossInviteNewUser':
@@ -250,7 +257,7 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         manage_url: `${NEXTAUTH_URL}/organizations/${orgId}/subscriptions/kilo-pass`,
       };
     case 'kiloPassDuplicateCardCanceled':
-      return { support_url: 'mailto:hi@kilocode.ai' };
+      return { support_url: `mailto:${SUPPORT_EMAIL}` };
     case 'userDataExportReady':
       return {
         data_exports_url: `${NEXTAUTH_URL}/data-exports`,

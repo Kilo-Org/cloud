@@ -18,6 +18,7 @@ import {
 import {
   gemma_4_26b_a4b_it_free_model,
   glyph_cluster_stealth_free_model,
+  reflection_beam_free_model,
 } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -31,37 +32,38 @@ describe('rate-limited Kilo-exclusive models', () => {
   });
 });
 
-describe('Step 5 Preview', () => {
-  test('registers the free model with its upstream id, limits, and OpenRouter routing', () => {
-    expect(findKiloExclusiveModel('stepfun/step-5-preview-free')).toMatchObject({
-      public_id: 'stepfun/step-5-preview-free',
-      internal_id: 'stepfun/step-5-preview',
-      display_name: 'StepFun: Step 5 Preview (free)',
-      context_length: 1_000_000,
-      max_completion_tokens: 64_000,
-      status: 'public',
-      provider: { id: 'openrouter' },
-      flags: ['reasoning', 'vision'],
-      pricing: null,
-      inference_provider_restriction: ['stepfun'],
-    });
-    expect(isFreeModel('stepfun/step-5-preview-free')).toBe(true);
-    expect(findKiloExclusiveModel('stepfun/step-3.7-flash:free')).toBeNull();
-  });
-});
-
-describe('Glyph Cluster stealth model', () => {
+describe('Glyph Cluster', () => {
   test('is free, stealth, and requires data collection', () => {
-    expect(isFreeModel('stealth/glyph-cluster')).toBe(true);
-    expect(hasBestEffortGuessDataCollectionRequirement('stealth/glyph-cluster')).toBe(true);
-    expect(shouldRedactModelNameInMicrodollarUsage('vercel', 'stealth/glyph-cluster')).toBe(true);
-    expect(shouldRedactErrorResponse('vercel', 'stealth/glyph-cluster')).toBe(true);
-    expect(getInferenceProvider(glyph_cluster_stealth_free_model)).toEqual({
+    const model = glyph_cluster_stealth_free_model;
+    expect(isFreeModel(model.public_id)).toBe(true);
+    expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
+    expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(true);
+    expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(true);
+    expect(getInferenceProvider(model)).toEqual({
       slug: 'stealth',
       name: 'Stealth',
       training: true,
       retainsPrompts: true,
     });
+  });
+});
+
+describe('Reflection Beam (free)', () => {
+  test('is free, not stealth, requires data collection, and routes only to Reflection', () => {
+    const model = reflection_beam_free_model;
+    expect(isFreeModel(model.public_id)).toBe(true);
+    expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
+    expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(false);
+    expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(false);
+    expect(getInferenceProvider(model)).toEqual({
+      slug: 'reflection',
+      name: 'REFLECTION',
+      training: true,
+      retainsPrompts: true,
+    });
+    expect([...(getKiloExclusiveInferenceProviderRestriction(model.public_id) ?? [])]).toEqual([
+      'reflection',
+    ]);
   });
 });
 
@@ -83,20 +85,6 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('openrouter/free')).toBe(true);
     });
 
-    test('recognizes inclusionai/ling-3.1-flash as free without the suffix', () => {
-      expect(isFreeModel('inclusionai/ling-3.1-flash')).toBe(true);
-    });
-
-    test.each([
-      'inclusionai/ling-3.0-flash',
-      'inclusionai/ling-3.1-flash-preview',
-      'INCLUSIONAI/LING-3.1-FLASH',
-      ' inclusionai/ling-3.1-flash',
-      'inclusionai/ling-3.1-flash ',
-    ])('does not classify %s as free', model => {
-      expect(isFreeModel(model)).toBe(false);
-    });
-
     test('should return true for OpenRouter stealth alpha models', async () => {
       expect(await isFreeModel('stealth/ox-alpha')).toBe(true);
       expect(await isFreeModel('stealth/other-alpha')).toBe(true);
@@ -106,23 +94,14 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('stealth/model-beta')).toBe(false);
     });
 
-    test('should return true for enabled Kilo exclusive models with no pricing', async () => {
-      // Test with known Kilo exclusive models that are enabled and have no pricing (free)
-      const enabledFreeModels = kiloExclusiveModels.filter(
-        m => m.status === 'public' && !m.pricing
-      );
-
-      // All enabled free models should be detected as free
-      for (const model of enabledFreeModels) {
+    test('should return true for Kilo exclusive models with no pricing', async () => {
+      for (const model of kiloExclusiveModels.filter(m => !m.pricing)) {
         expect(await isFreeModel(model.public_id)).toBe(true);
       }
     });
 
-    test('should return false for enabled Kilo exclusive models with pricing', async () => {
-      // Models with pricing should NOT be free
-      const pricedModels = kiloExclusiveModels.filter(m => m.status !== 'disabled' && !!m.pricing);
-
-      for (const model of pricedModels) {
+    test('should return false for Kilo exclusive models with pricing', async () => {
+      for (const model of kiloExclusiveModels.filter(m => !!m.pricing)) {
         expect(await isFreeModel(model.public_id)).toBe(false);
       }
     });
@@ -143,20 +122,6 @@ describe('isFreeModel', () => {
       }
     );
 
-    test('ignores pricing on disabled Kilo exclusive models', () => {
-      const disabledModel = {
-        ...claude_opus_4_7_stealth_model,
-        public_id: 'vendor/disabled-priced-exclusive:free',
-        status: 'disabled' as const,
-      };
-      kiloExclusiveModels.push(disabledModel);
-      try {
-        expect(isFreeModel(disabledModel.public_id)).toBe(true);
-      } finally {
-        kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(disabledModel), 1);
-      }
-    });
-
     test('getInferenceProvider does not crash for any Kilo exclusive model', () => {
       expect(kiloExclusiveModels.length).toBeGreaterThan(0);
       for (const model of kiloExclusiveModels) {
@@ -169,13 +134,16 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
     });
 
-    test.each(['tencent/hy3:free', 'meituan/longcat-2.0-free', 'nex-agi/nex-n2.5-pro:free'])(
-      'removes %s from exclusive models',
-      modelId => {
-        expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
-        expect(findKiloExclusiveModel(modelId)).toBeNull();
-      }
-    );
+    test.each([
+      'tencent/hy3:free',
+      'meituan/longcat-2.0-free',
+      'nex-agi/nex-n2.5-pro:free',
+      'stepfun/step-5-preview-free',
+      'stealth/cat-jam',
+    ])('removes %s from exclusive models', modelId => {
+      expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
+      expect(findKiloExclusiveModel(modelId)).toBeNull();
+    });
 
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
       'inherits %s without an exclusive definition or provider restriction',
@@ -299,9 +267,6 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
 
   test('requires data collection for free models', async () => {
     expect(await hasBestEffortGuessDataCollectionRequirement('openrouter/free')).toBe(true);
-    expect(await hasBestEffortGuessDataCollectionRequirement('inclusionai/ling-3.1-flash')).toBe(
-      true
-    );
   });
 
   test('does not require data collection for regular paid models', async () => {
@@ -343,13 +308,10 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 });
 
 describe('getKiloExclusiveInferenceProviderRestriction', () => {
-  test('returns the routing allow-list for restricted exclusive models', () => {
-    expect(getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')).toEqual(
-      new Set(['stepfun'])
-    );
-  });
-
   test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')
+    ).toBeUndefined();
     expect(
       getKiloExclusiveInferenceProviderRestriction('openai/gpt-5.6-sol-discounted')
     ).toBeUndefined();

@@ -17,6 +17,7 @@ import { MessageCircle, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { type ChatSummary } from '@/lib/chat/store';
@@ -86,7 +87,7 @@ function ScopedChatListScreen() {
     rememberModelFacts(models);
   }, [models]);
 
-  const { chats, isLoading, isError, refetch, remove } = useChatList(place);
+  const { chats, isLoading, isError, refetch, remove, rename } = useChatList(place);
 
   // There is no picker here: a chat starts on the model the latest one is on,
   // and the conversation's own picker switches it from its next message.
@@ -97,7 +98,11 @@ function ScopedChatListScreen() {
   });
 
   const nameOf = useCallback(
-    (id: string) => options.find(model => model.id === id)?.name ?? '',
+    (id: string) =>
+      // Kilo's own Auto models arrive with an English catalogue name that no
+      // catalog translates, so the row resolves it the same way the composer's
+      // chip does and the two never disagree.
+      autoModelLabel(id, options.find(model => model.id === id)?.name ?? ''),
     [options]
   );
 
@@ -169,9 +174,10 @@ function ScopedChatListScreen() {
         last={index === chats.length - 1}
         onPress={open}
         onDelete={drop}
+        onRename={rename}
       />
     ),
-    [chats.length, drop, nameOf, open]
+    [chats.length, drop, nameOf, open, rename]
   );
 
   // Nothing to start a chat with is nothing for the button to do, and an empty

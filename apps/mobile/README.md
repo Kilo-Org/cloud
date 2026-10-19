@@ -78,12 +78,15 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 Kilo remains the default backend. Custom backends use the harness SDK's remote
 model plugin, while the SDK owns conversations, tools, and compaction.
 
-- Open **Chat → Manage backends** to configure an API root, protocol, credentials, headers, and models.
+- Open **Chat → Manage backends** to view **Chat providers** and configure custom endpoints and models.
 - Use Chat Completions, Responses, or Messages with the endpoint's API root, such as `https://api.openai.com/v1`.
 - Chat Completions uses `max_completion_tokens` by default. Select `max_tokens` when the endpoint requires the legacy field.
 - Enter models manually, or discover models when the endpoint supports discovery.
 - Use **Test model connection** to send a short inference request. The provider can charge for this request.
 - Enable tool calls only when the selected model and endpoint support them.
+- Provider choices separate the selected model from its availability and default status.
+- Open **Browse models** for downloadable models. Expand **Advanced** only when using a direct download link.
+- Catalog cards show capabilities, download size, estimated memory, and device compatibility. Open **Details** for technical filenames and licenses.
 
 Profiles and credentials remain on the device and belong to the signed-in
 account. Sign-out and account changes remove them.
@@ -124,6 +127,11 @@ app's minSdk does not change.
 - **Manage backends** shows its status and why it is unavailable: Apple Intelligence off, device not eligible, model not ready, or iOS older than 26.
 - Apple's model receives the chat's tools through Foundation Models tool calling. When the model calls a tool, the generation waits, JavaScript runs the tool through the harness, and the next request resumes the same generation with the results. A tool whose arguments schema Foundation Models cannot express (a union, a reference, a map with free keys) is left out and logged; an optional argument of that kind is left out of its tool.
 - Apple's answer budget is at most half its context window. On iOS 26.4 and later, the native module also subtracts Apple's token count of the complete input (instructions, tools, history, and latest prompt) and reserves one eighth of the window for tool outputs and framing. Earlier iOS releases use a conservative UTF-8-byte input estimate. Requests with no answer space fail before generation. Very large tool outputs can still exhaust the reserve.
+- A transient token-generation failure or empty response before answer text allows one recovery attempt, after all tools complete.
+- Recovery includes saved tool results as data and has no callable tools. It cannot repeat an action.
+- Partial answers, cancellations, guardrail refusals, and pending tool results never use recovery.
+- Empty native completions produce a visible failure instead of saving a blank assistant turn.
+- The harness counts the completed answer and cached input when deciding whether to compact before the next question.
 - Gemini Nano is text-only: the ML Kit GenAI Prompt API has no function calling, so it never receives tool definitions.
 - An unavailable or busy model fails the send with fixed copy. It never falls back to Kilo or another backend.
 - Switching between Kilo, a custom backend, and an on-device model shows the context-transfer warning.
@@ -131,13 +139,13 @@ app's minSdk does not change.
 
 ### Downloaded GGUF models
 
-**Manage backends → Downloadable models** lists small instruct models the app
-can download and run locally with `llama.rn` (llama.cpp). Each entry states its
-size and license and pins one Hugging Face revision, so the bytes cannot change
-underneath a download. A direct HTTPS link to a `.gguf` file works too. The user
-starts every download; it can be paused, resumed, or cancelled, and a cancelled
-or failed download deletes its partial file. Storage is checked before a
-download and again as soon as the server states a length.
+**Chat providers → Downloadable models → Browse models** lists models the app
+can download and run locally with `llama.rn` (llama.cpp). Model details show the
+license and technical filenames. Downloads pin a Hugging Face revision, so the
+bytes cannot change underneath a download. **Advanced** accepts a direct HTTPS
+link to a `.gguf` file. The user starts every download. Downloads can pause,
+resume, or cancel. Cancelled or failed downloads delete their partial files.
+Storage is checked before download and again when the server supplies a length.
 
 - Model files live in the app's document directory. They hold no account data, so the downloaded list survives sign-out and account changes.
 - A downloaded model appears in the picker once its file has been read by llama.cpp, which is where its context window comes from. Only one model is loaded at a time; switching releases the previous one, and the app releases it in the background.

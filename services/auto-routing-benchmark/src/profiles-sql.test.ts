@@ -3,6 +3,7 @@
  * Intentionally does NOT mock drizzle — these tests fail if charged-event
  * column counts drift or the NOT EXISTS guard is missing.
  */
+import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/d1';
@@ -16,6 +17,7 @@ import {
 
 const SCHEMA_SQL = `
   CREATE TABLE benchmark_profiles (
+    router TEXT NOT NULL DEFAULT 'efficient',
     model TEXT NOT NULL,
     variant TEXT NOT NULL DEFAULT '',
     engine_identity TEXT NOT NULL,
@@ -28,12 +30,13 @@ const SCHEMA_SQL = `
     completed_at TEXT,
     platform_requested INTEGER NOT NULL DEFAULT 0,
     user_requested INTEGER NOT NULL DEFAULT 1,
-    PRIMARY KEY (model, variant, engine_identity, repetitions)
+    PRIMARY KEY (router, model, variant, engine_identity, repetitions)
   );
   CREATE TABLE profile_request_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     owner_type TEXT NOT NULL,
     owner_id TEXT NOT NULL,
+    router TEXT NOT NULL DEFAULT 'efficient',
     model TEXT NOT NULL,
     variant TEXT NOT NULL DEFAULT '',
     engine_identity TEXT NOT NULL,
@@ -60,6 +63,7 @@ function runQuery(db: DatabaseSync, q: SqlQuery): void {
 const eventValues = {
   owner_type: 'user',
   owner_id: 'owner-a',
+  router: 'efficient' as const,
   model: 'openai/gpt-4o',
   variant: 'xhigh',
   engine_identity: 'v-test:engine',
@@ -82,7 +86,7 @@ describe('chargedEventInsertStatement (real SQLite)', () => {
     expect(q.sql.toLowerCase()).toContain('insert into "profile_request_events"');
     // Full table column list includes autoincrement id.
     expect(q.sql).toMatch(
-      /"id".*"owner_type".*"owner_id".*"model".*"variant".*"engine_identity".*"repetitions".*"admitted_at"/s
+      /"id".*"owner_type".*"owner_id".*"router".*"model".*"variant".*"engine_identity".*"repetitions".*"admitted_at"/s
     );
     expect(q.sql).toMatch(/null\s+as\s+id/i);
     expect(q.sql.toLowerCase()).toContain('where not exists');
@@ -147,6 +151,27 @@ describe('chargedEventInsertStatement (real SQLite)', () => {
         n: 0,
       });
     }
+  });
+
+  it('charges when the active row belongs to the other base router', () => {
+    execSql(
+      db,
+      `INSERT INTO benchmark_profiles
+        (router, model, variant, engine_identity, repetitions, status, run_id, failure_reason, requested_at, updated_at, completed_at)
+       VALUES ('frontier', ?, ?, ?, ?, 'ready', 'run-1', NULL, ?, ?, NULL)`,
+      [
+        eventValues.model,
+        eventValues.variant,
+        eventValues.engine_identity,
+        eventValues.repetitions,
+        '2026-07-28T11:00:00.000Z',
+        '2026-07-28T11:00:00.000Z',
+      ]
+    );
+    runQuery(db, toSql(chargedEventInsertStatement(orm, eventValues)));
+    expect(db.prepare('SELECT router FROM profile_request_events').all()).toEqual([
+      { router: 'efficient' },
+    ]);
   });
 
   it('charges when the current row is failed (retry path)', () => {
@@ -347,5 +372,41 @@ describe('claimUserRequestedStatement (real SQLite)', () => {
       .prepare(`SELECT user_requested FROM benchmark_profiles WHERE variant = 'high'`)
       .get() as { user_requested: number };
     expect(row.user_requested).toBe(0);
+  });
+
+  it('marks only requested pairs of an expanded pool through one JSON parameter', () => {
+    const efforts = ['', 'low', 'medium', 'high', 'xhigh'];
+    const models = Array.from({ length: 10 }, (_, i) => `vendor/m-${i}`);
+    for (const model of models) {
+      for (const variant of efforts) {
+        execSql(
+          db,
+          `INSERT INTO benchmark_profiles
+             (model, variant, engine_identity, repetitions, status, requested_at, updated_at,
+              platform_requested, user_requested)
+           VALUES (?, ?, ?, 1, 'ready', ?, ?, 1, 0)`,
+          [model, variant, current.engineIdentity, NOW, NOW]
+        );
+      }
+    }
+    const requested: BenchmarkPair[] = [
+      { model: 'vendor/m-0', variant: null },
+      ...models.flatMap(model => ['low', 'high'].map(variant => ({ model, variant }))),
+    ];
+
+    const q = toSql(claimUserRequestedStatement(orm, requested, current, NOW));
+    expect(q.sql.toLowerCase()).toContain('json_each');
+    expect(q.params.length).toBeLessThan(10);
+    runQuery(db, q);
+
+    const marked = db
+      .prepare(
+        `SELECT model, variant FROM benchmark_profiles WHERE user_requested = 1 ORDER BY model, variant`
+      )
+      .all() as Array<{ model: string; variant: string }>;
+    const expected = requested
+      .map(pair => ({ model: pair.model, variant: pair.variant ?? '' }))
+      .sort((a, b) => a.model.localeCompare(b.model) || a.variant.localeCompare(b.variant));
+    expect(marked).toEqual(expected);
   });
 });

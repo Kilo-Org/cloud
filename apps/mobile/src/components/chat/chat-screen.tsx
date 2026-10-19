@@ -1,12 +1,11 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
+import { type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
@@ -16,13 +15,11 @@ import { SessionMessageList } from '@/components/agents/session-message-list';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { MessageCircle, Wrench } from '@/components/ui/icons';
-import { StatusDot } from '@/components/ui/status-dot';
-import { Text } from '@/components/ui/text';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { useChat, useChatPlace } from '@/lib/chat/use-chat';
+import { useChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
@@ -34,13 +31,12 @@ import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
 
-import { BetaPill } from './beta-pill';
+import { ChatTitle } from './chat-title';
+import { ChatComposerArea } from './chat-composer-area';
 import { ChatDetailsSheet } from './chat-details-sheet';
 import { useChatDetails } from './chat-details-state';
-import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
-import { ModelToolsHint } from './model-tools-hint';
 import { useChatMessageActions } from './use-chat-message-actions';
 import { useWebSearchSetting } from './web-search-row';
 
@@ -61,16 +57,6 @@ const NO_REMOTE: RemoteModelState = {
   refresh: 'idle',
 };
 
-/* eslint-disable require-await, @typescript-eslint/require-await, no-empty-function -- the composer's session callbacks; a chat creates, restarts and exits nothing */
-async function noSessionCommand(): Promise<boolean> {
-  return false;
-}
-async function noSessionChange(): Promise<boolean> {
-  return false;
-}
-async function noSessionExit(): Promise<void> {}
-/* eslint-enable require-await, @typescript-eslint/require-await, no-empty-function */
-
 type ChatScreenProps = {
   /** The session the route named. A model switch moves the chat off it. */
   opened: string;
@@ -81,7 +67,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const { chats, rename } = useChatList(place);
+  // A chat is listed once its session is written. Until then it has no row to name.
+  const summary = chats.find(chat => chat.sessionId === state.sessionId);
+  const title = summary === undefined || summary.title === '' ? t('common.chat') : summary.title;
   // The sheet's whole model — the Kilo control, the settings-tools group switch
   // and the remote servers — is read here. The header draws its dot from the
   // Kilo view, so the control and the sheet cannot disagree.
@@ -90,6 +79,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const localModels = useLocalModels();
   const mcp = useMcpSettings(place, state.sessionId);
   const colors = useThemeColors();
+  // What the tools control is in right now, in the same words the sheet's Kilo
+  // row draws. `count` is carried for the available state and ignored by the rest.
+  const mcpStatusText = t(mcp.view.statusKey, { count: mcp.view.toolCount });
 
   const {
     models,
@@ -133,7 +125,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     rememberModelFacts(models);
   }, [models]);
 
-  const selectModel = (modelId: string, variantId: string) => {
+  const selectModel = (modelId: string, variantId: string | null) => {
     const accept = () => {
       setPicked(modelId);
       setPickedVariant(variantId);
@@ -161,18 +153,13 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     );
   };
 
-  useEffect(() => {
-    const shown = Keyboard.addListener('keyboardDidShow', () => {
-      setKeyboardVisible(true);
-    });
-    const hidden = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardVisible(false);
-    });
-    return () => {
-      shown.remove();
-      hidden.remove();
-    };
-  }, []);
+  // The provider control chooses the model this chat sends to, so the choice
+  // goes through the same disclosure-protected switch the model picker uses. It
+  // picks no thinking variant, so the chat's stored effort resolves the variant
+  // the chosen model offers.
+  const selectProviderModel = (modelId: string) => {
+    selectModel(modelId, null);
+  };
 
   const messages = asMessages(state);
   const actions = useChatMessageActions(state, messages, retry);
@@ -217,11 +204,6 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const handleStop = useCallback(() => {
     void stop();
   }, [stop]);
-
-  const { bottom } = useSafeAreaInsets();
-  // A conversation fills the screen: the tab bar is gone and the composer sits
-  // on the home indicator, except while the keyboard covers it.
-  const composerPadding = { paddingBottom: keyboardVisible ? 0 : bottom };
 
   function renderTranscript() {
     if (state.status === 'opening') {
@@ -272,45 +254,23 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       <>
         <View className="flex-1">{renderTranscript()}</View>
 
-        {state.status === 'working' ? (
-          <View className="flex-row items-center gap-2 px-4 py-2">
-            <ActivityIndicator />
-            <Text variant="muted" className="text-xs">
-              {t('common.working')}
-            </Text>
-          </View>
-        ) : null}
-
-        {state.status === 'idle' && state.failureKey !== null ? (
-          <ChatFailureRow
-            failureKey={state.failureKey}
-            onRetry={actions.hasUnanswered ? undefined : () => void retry()}
-          />
-        ) : null}
-
-        <View style={composerPadding}>
-          <ModelToolsHint model={model} backends={backends} localModels={localModels} />
-          <ChatComposer
-            controlRef={actions.composerControlRef}
-            onSend={handleSend}
-            onSendCommand={noSessionCommand}
-            onCreateSession={noSessionChange}
-            onRestartSession={noSessionChange}
-            onExitSession={noSessionExit}
-            onStop={handleStop}
-            isStreaming={state.status === 'working'}
-            placeholder={t('common.message')}
-            model={model}
-            variant={variant}
-            modelOptions={availableOptions}
-            onModelSelect={selectModel}
-            attachmentsEnabled={imagesSupported}
-            attachmentDelivery="local"
-            activeSessionType={null}
-            organizationId={organizationId ?? undefined}
-            disabled={modelsFailed && availableOptions.length === 0}
-          />
-        </View>
+        <ChatComposerArea
+          status={state.status}
+          messages={messages}
+          failureKey={state.failureKey}
+          retryable={!actions.hasUnanswered}
+          onRetry={() => void retry()}
+          onSend={handleSend}
+          composerControlRef={actions.composerControlRef}
+          onStop={handleStop}
+          model={model}
+          variant={variant}
+          onModelSelect={selectModel}
+          modelOptions={availableOptions}
+          attachmentsEnabled={imagesSupported}
+          organizationId={organizationId ?? undefined}
+          disabled={modelsFailed && availableOptions.length === 0}
+        />
       </>
     );
   }
@@ -318,29 +278,34 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('common.chat')}
+        title={title}
         titleContent={
-          <View className="flex-row items-center gap-2">
-            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-              {t('common.chat')}
-            </Text>
-            <BetaPill />
-          </View>
+          <ChatTitle
+            title={title}
+            initialValue={summary?.title ?? ''}
+            canRename={summary !== undefined}
+            onRename={async name => {
+              await rename(state.sessionId, name);
+            }}
+          />
         }
         headerRight={
           <View className="flex-row items-center">
             <SessionContextMetrics {...details.metrics} />
-            <BackendSettingsControl />
+            <BackendSettingsControl selectedModel={model} onSelectModel={selectProviderModel} />
             <Pressable
               onPress={() => {
                 setMcpOpen(true);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('modelChat.mcp.title')}
+              // The header control used to draw an unexplained status dot. The
+              // state it stood for is named here and drawn in full by the sheet
+              // this control opens.
+              accessibilityValue={{ text: mcpStatusText }}
               className="h-11 w-11 items-center justify-center active:opacity-70"
             >
               <Wrench size={22} color={colors.foreground} />
-              <StatusDot tone={mcp.view.tone} className="absolute bottom-1 right-1" />
             </Pressable>
           </View>
         }

@@ -1,6 +1,6 @@
 import { TELEMETRY_DESCRIPTION_KEY, type TelemetryDescription } from '@/lib/telemetry/error-sink';
 
-type CliCommand = 'list_models' | 'list_directories';
+type CliCommand = 'list_models' | 'list_directories' | 'list_agents';
 
 /**
  * The rejection a CLI-command query throws for the SDK's retryable `transport`

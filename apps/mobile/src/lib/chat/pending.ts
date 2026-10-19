@@ -4,6 +4,7 @@ import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
 
 import { EFFORTS } from './effort';
 import { type ChatTarget, type Question } from './state';
+import { type ChatSummary } from './store';
 
 /**
  * The question a chat is waiting on an answer to.
@@ -67,4 +68,22 @@ export async function moveAsked(from: string, to: string): Promise<void> {
     await rememberAsked(to, asked);
   }
   await forgetAsked(from);
+}
+
+/**
+ * Names each row that has no name yet with the question it waits on. A chat
+ * whose only question failed has no stored turn to take a title from, and it
+ * read as untitled although the person can see what they asked.
+ */
+export async function titledByAsked(chats: readonly ChatSummary[]): Promise<ChatSummary[]> {
+  const titled = await Promise.all(
+    chats.map(async chat => {
+      if (chat.title !== '') {
+        return chat;
+      }
+      const asked = await askedIn(chat.sessionId);
+      return { ...chat, title: asked?.text ?? '' };
+    })
+  );
+  return titled;
 }

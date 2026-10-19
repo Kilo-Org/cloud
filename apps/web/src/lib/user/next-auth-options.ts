@@ -45,7 +45,7 @@ import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { linkAccountToExistingUser } from '@/lib/user';
 import { whenOk } from '@kilocode/web-shared/lib/maybe-result';
-import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
+import type { AuthErrorType, SignupStepUpMethod } from '@kilocode/web-shared/lib/auth/constants';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { authFailureRedirectUrl, ssoSignInRedirectUrl } from '@/lib/auth/redirect-urls';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
@@ -970,9 +970,12 @@ export const authOptions: NextAuthOptions = {
       let isAccountLinking: boolean | null = null;
       let linkingSession: AccountLinkingSession | null = null;
       const redirectContext = await getSignInRedirectContext();
-      const redirectUrlForCode = (error: AuthErrorType): string => {
+      const redirectUrlForCode = (
+        error: AuthErrorType,
+        stepUpMethods?: readonly SignupStepUpMethod[]
+      ): string => {
         const redirectUrl = new URL(
-          authFailureRedirectUrl(error, Boolean(isAccountLinking)),
+          authFailureRedirectUrl(error, Boolean(isAccountLinking), stepUpMethods),
           'http://localhost'
         );
         if (!isAccountLinking) {
@@ -1199,6 +1202,7 @@ export const authOptions: NextAuthOptions = {
             'PROVIDER-ALREADY-LINKED',
             'DIFFERENT-OAUTH',
             'SIGNUP-RATE-LIMITED',
+            'SIGNUP-STEP-UP',
             'EMAIL-ALREADY-USED',
           ];
 
@@ -1213,7 +1217,10 @@ export const authOptions: NextAuthOptions = {
               }
             );
           }
-          return redirectUrlForCode(result.error);
+          return redirectUrlForCode(
+            result.error,
+            result.error === 'SIGNUP-STEP-UP' ? result.methods : undefined
+          );
         }
 
         if (result.user.blocked_reason) {

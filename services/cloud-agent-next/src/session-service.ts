@@ -61,7 +61,12 @@ import type {
   CreateSessionForCloudAgentResult,
 } from '@kilocode/session-ingest-contracts';
 import { timedExec } from './sandbox-timeout-logging.js';
-import type { PersistenceEnv, CloudAgentSessionState, RuntimeSkill } from './persistence/types.js';
+import type {
+  PersistenceEnv,
+  CloudAgentSessionState,
+  RuntimeSkill,
+  RuntimeInstruction,
+} from './persistence/types.js';
 import {
   getEffectiveCredentialContainment,
   parseSessionMetadata,
@@ -793,7 +798,41 @@ export async function writeGlobalRules(
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  await sandbox.writeFile(rulesPath, buildCloudAgentRules(bashDefaultTimeoutMs));
+  // This legacy writer always runs on a Cloudflare Sandbox (`SandboxInstance`).
+  await sandbox.writeFile(
+    rulesPath,
+    buildCloudAgentRules({ bashDefaultTimeoutMs, sandboxProvider: 'cloudflare' })
+  );
+}
+
+function isSafeInstructionName(name: string): boolean {
+  // The profile validator owns the reserved-name decision; this guard keeps a
+  // bypassing caller from overwriting the Cloud-Agent-owned rules file.
+  return name !== 'cloud-agent' && /^[a-z0-9][a-z0-9-]*$/.test(name);
+}
+
+/**
+ * Write each runtime instruction to
+ * `${sessionHome}/.kilocode/rules/<name>.md`, alongside the Cloud-Agent-owned
+ * `cloud-agent.md` that {@link writeGlobalRules} owns.
+ */
+export async function writeRuntimeInstructions(
+  sandbox: SandboxInstance,
+  sessionHome: string,
+  instructions: readonly RuntimeInstruction[] | undefined
+): Promise<void> {
+  if (!instructions || instructions.length === 0) return;
+
+  const rulesDir = `${sessionHome}/.kilocode/rules`;
+  await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeRuntimeInstructions.mkdir');
+
+  for (const instruction of instructions) {
+    if (!isSafeInstructionName(instruction.name)) {
+      logger.withFields({ instruction: instruction.name }).warn('Rejected unsafe instruction name');
+      continue;
+    }
+    await sandbox.writeFile(`${rulesDir}/${instruction.name}.md`, instruction.content);
+  }
 }
 
 function shortHash(input: string): string {
@@ -2089,6 +2128,9 @@ export class SessionService {
         ...(materializedSecretEnvKeys.length ? { secretEnvKeys: materializedSecretEnvKeys } : {}),
         ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
         ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
+        ...(profile.runtimeInstructions?.length
+          ? { runtimeInstructions: profile.runtimeInstructions }
+          : {}),
       },
       session,
       ...(plan.preparation
@@ -2349,6 +2391,11 @@ export class SessionService {
 
       await writeAuthFile(sandbox, sessionHome, kiloCapability);
       await writeGlobalRules(sandbox, sessionHome, env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS);
+      await writeRuntimeInstructions(
+        sandbox,
+        sessionHome,
+        readProfileBundle(metadata).runtimeInstructions
+      );
 
       const preferSnapshot =
         metadata.clone !== undefined || metadata.lifecycle.preparedAt !== undefined;

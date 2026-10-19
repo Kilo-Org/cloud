@@ -35,7 +35,7 @@ vi.mock('@shopify/flash-list', () => ({
   }) =>
     createElement(
       'FlashList',
-      props,
+      { ...props, ref: undefined },
       (props.data ?? []).map((item, index) =>
         createElement(
           Fragment,

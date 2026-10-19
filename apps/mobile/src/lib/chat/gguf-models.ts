@@ -213,5 +213,6 @@ export function ggufModelOptions(models: readonly GgufModelRecord[]): SessionMod
     isPreferred: false,
     showGatewayMetadata: false,
     contextWindow: record.contextWindow,
+    capabilities: { tools: record.tools, images: record.vision },
   }));
 }

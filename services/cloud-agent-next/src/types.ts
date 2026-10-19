@@ -15,6 +15,7 @@ import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 // build time, so it cannot make the e2e sink reachable or ship e2e code.
 import type { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 import type { CallbackJob } from './callbacks/index.js';
+import { AGENT_SANDBOX_PROVIDERS, type AgentSandboxProvider } from './shared/sandbox-provider.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
 import type { ContainerUsageRpcMethods } from '@kilocode/container-usage';
@@ -142,9 +143,9 @@ export type SandboxId =
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
-export const agentSandboxProviderSchema = z.enum(['cloudflare', 'vercel', 'cloudflare-containers']);
+export const agentSandboxProviderSchema = z.enum(AGENT_SANDBOX_PROVIDERS);
 
-export type AgentSandboxProvider = z.infer<typeof agentSandboxProviderSchema>;
+export type { AgentSandboxProvider };
 
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}` | `workspace_${string}`;
@@ -651,6 +652,13 @@ export type Env = {
    * authenticates against Hyperdrive, not directly against Postgres.
    */
   HYPERDRIVE: Hyperdrive;
+  /**
+   * Wildcard suffix for hostname-dispatched previews (for example `localhost`
+   * locally or a dedicated zone in production). Unset disables the feature.
+   */
+  PREVIEW_HOST_SUFFIX?: string;
+  /** Comma-separated user or org IDs shown the preview UI. `*` includes personal. Unset shows nobody. */
+  PREVIEW_ENABLED_IDS?: string;
 };
 
 export type ValidatedSessionAccess = AccessibleCloudAgentSession & {

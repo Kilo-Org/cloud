@@ -35,7 +35,7 @@ describe('widget logo placeholders', () => {
 
   it('resolve to the app-group copies in a stringified layout', () => {
     expect(withWidgetLogo(`const a = '${MARK}'; const b = '${GLYPH}';`)).toBe(
-      "const a = 'file:///group/ExpoWidgets/kilo-logo.png'; const b = 'file:///group/ExpoWidgets/kilo-logo-glyph.png';"
+      "const a = 'file:///group/ExpoWidgets/kilo-logo-ffdd00.png'; const b = 'file:///group/ExpoWidgets/kilo-logo-glyph.png';"
     );
   });
 });

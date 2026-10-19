@@ -133,10 +133,13 @@
     "status": "Stato",
     "truncated": "Troncato",
     "updated": "Aggiornato",
+    "generating": "Generazione…",
     "working": "In corso",
     "yourOwnRepositories": "I tuoi repository",
     "dismissed": "Ignorato",
     "agent": "Agente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Modifiche"
   },
   "language": {
@@ -263,7 +266,8 @@
       "kiloclaw": "Attività di KiloClaw",
       "balance": "Avvisi sul saldo",
       "security": "Problemi di sicurezza",
-      "spend": "Avvisi di spesa"
+      "spend": "Avvisi di spesa",
+      "followedSessions": "Sessioni seguite"
     },
     "category": {
       "chatMessagesSubtitle": "risposte nelle tue conversazioni",
@@ -618,7 +622,7 @@
     "redeployTitle": "Ridistribuire l'istanza?",
     "accessRequired": {
       "iosBody": "L'accesso a KiloClaw per questo account è gestito al di fuori dell'app iOS.",
-      "iosContact": "Hai domande? Scrivi a hi@kilo.ai.",
+      "iosContact": "Hai domande? Scrivi a {{supportEmail}}.",
       "iosTitle": "KiloClaw non disponibile su iOS",
       "multipleCurrentConflictBody": "Abbiamo trovato più di un abbonamento attivo sul tuo account, quindi abbiamo sospeso tutto per evitare doppi addebiti.",
       "multipleCurrentConflictCta": "Continua su kilo.ai",
@@ -752,7 +756,7 @@
         "queryErrorBody": "La connessione si è interrotta durante la verifica della configurazione di {{name}}. La configurazione potrebbe essere ancora in corso. Riprova o ricontrolla tra poco.",
         "queryErrorTitle": "Verifica della configurazione non riuscita",
         "settingUp": "Configurazione di {{name}}",
-        "stalledBody": "Non siamo riusciti a completare la configurazione di {{name}}. Riprova oppure scrivi a hi@kilo.ai se il problema persiste.",
+        "stalledBody": "Non siamo riusciti a completare la configurazione di {{name}}. Riprova oppure scrivi a {{supportEmail}} se il problema persiste.",
         "stalledTitle": "Qualcosa si è bloccato",
         "startingSandbox": "Avvio della sandbox",
         "stoppedBody": "L'istanza di {{name}} si è arrestata in modo imprevisto durante la configurazione.",
@@ -1009,7 +1013,7 @@
         "recoveryLabel": "Aggiorna l'app GitHub"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta {{supportEmail}} per assistenza, poi riattiva Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer è stato disattivato perché Kilo non può creare un token di accesso per questo progetto GitLab. Concedi il ruolo Maintainer o attiva i token di accesso al progetto, poi riattiva Code Reviewer.",
@@ -1024,7 +1028,7 @@
         "recoveryLabel": "Aggiorna le impostazioni di Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta {{supportEmail}} per assistenza, poi riattiva Code Reviewer."
       },
       "title": "Il revisore di codice richiede un intervento.",
       "recoveryLabel": "Contatta l'assistenza"
@@ -1557,6 +1561,8 @@
       "title": "Sessione",
       "copyErrorDetails": "Copia i dettagli dell'errore",
       "backToSessions": "Torna alle sessioni",
+      "follow": "Segui nella schermata di blocco",
+      "unfollow": "Smetti di seguire nella schermata di blocco",
       "couldNotLoad": "Impossibile caricare la sessione.",
       "failedToLoadDetails": "Impossibile caricare i dettagli della sessione.",
       "failedToStopExecution": "Impossibile interrompere l'esecuzione.",
@@ -1896,6 +1902,7 @@
       "title": "Richiesta dell'agente",
       "skipQuestionsTitle": "Saltare le domande?",
       "skipQuestionsMessage": "L'agente salterà questo passaggio.",
+      "answerProgress": "{{answered}} di {{total}} risposte",
       "selectAllThatApply": "Seleziona tutte le opzioni pertinenti.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, opzione selezionata",
@@ -1965,6 +1972,7 @@
       "title": "Filtri delle sessioni",
       "platformCloud": "Nel cloud",
       "platformExtension": "Estensione",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3141,6 +3149,9 @@
     "ssoError": "La tua organizzazione richiede l'accesso tramite SSO. Usa «$t(login.moreSignInOptions)».",
     "blocked": "Questo account è stato bloccato. Contatta l'assistenza.",
     "signupRateLimited": "Troppi tentativi. Riprova più tardi.",
+    "signupStepUp": "Per completare la creazione del tuo account, usa \"$t(login.moreSignInOptions)\".",
+    "signupStepUpApple": "Per completare la creazione del tuo account, usa \"$t(login.signInWithApple)\".",
+    "signupStepUpGoogle": "Per completare la creazione del tuo account, usa \"$t(login.signInWithGoogle)\".",
     "invalidCode": "Il codice non è corretto. Riprova.",
     "codeInProgress": "Il tuo codice è in fase di elaborazione. Attendi un momento e riprova.",
     "tooManyAttempts": "Troppi tentativi. Richiedi un nuovo codice.",
@@ -3211,6 +3222,8 @@
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
     "openSession": "Apri",
+    "finished": "Completato",
+    "followFailed": "Impossibile mostrare questo agente nella schermata di blocco.",
     "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare.",
     "checked": "Verificato",
     "lastKnown": "Ultimo stato noto",
@@ -3219,7 +3232,26 @@
     "waitingForYou": "In attesa di te",
     "nextScheduled": "Prossime pianificate",
     "answerNeeded": "In attesa di risposta",
-    "waitingToRetry": "In attesa di riprovare"
+    "waitingToRetry": "In attesa di riprovare",
+    "step": {
+      "editing": "Modifica",
+      "reading": "Lettura",
+      "running": "Esecuzione",
+      "searching": "Ricerca web",
+      "thinking": "Riflessione"
+    },
+    "planOf": "di",
+    "filesChanged": "file modificati",
+    "finishedIn": "Terminato in",
+    "noActivityFor": "Nessuna attività da",
+    "prOpened": "Pull request aperta",
+    "permissionWants": "Vuole eseguire",
+    "failure": {
+      "provider": "Interrotto: errore provider",
+      "tool": "Interrotto: errore strumento",
+      "cancelled": "Interrotto: annullato",
+      "other": "ARRESTATO"
+    }
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",
@@ -3255,8 +3287,12 @@
     "list": {
       "loadFailed": "Impossibile caricare la cronologia della chat.",
       "new": "Nuova chat",
-      "openHint": "Apre la chat. Tieni premuto per eliminare.",
       "deleteTitle": "Eliminare questa chat?"
+    },
+    "rename": {
+      "title": "Rinomina la chat",
+      "accessibility": "Rinomina la chat: {{title}}",
+      "openHint": "Apre la chat. Tieni premuto per rinominare o eliminare."
     },
     "beta": "Beta",
     "details": {
@@ -3333,6 +3369,10 @@
     },
     "backends": {
       "title": "Servizi di chat",
+      "providersTitle": "Provider di chat",
+      "cloud": "Nel cloud",
+      "cloudModel": "Modello: {{model}}",
+      "cloudUnavailable": "I modelli Kilo non sono disponibili al momento. Controlla la connessione.",
       "manage": "Gestisci i servizi",
       "defaultKilo": "$t(consent.kilo) (predefinito)",
       "kiloHelp": "Il servizio integrato usa il tuo account Kilo e non può essere modificato né eliminato.",
@@ -3392,7 +3432,6 @@
     "gguf": {
       "title": "Modelli scaricabili",
       "help": "Scarica un modello aperto e eseguilo su questo telefono con llama.cpp. I tuoi prompt e le risposte restano sul dispositivo. I modelli sono di grandi dimensioni, quindi usa il Wi-Fi.",
-      "details": "{{size}} · Licenza: {{license}}",
       "download": "Scarica modello",
       "pause": "Metti in pausa il download",
       "resume": "Riprendi il download",
@@ -3404,6 +3443,8 @@
       "url": "Link di download diretto",
       "urlHelp": "Incolla un link HTTPS a un file .gguf, ad esempio un link resolve di Hugging Face. Scarica i modelli solo da fonti affidabili.",
       "downloadUrl": "Scarica dal link",
+      "advanced": "Avanzate",
+      "localPurpose": "Funziona su questo dispositivo con llama.cpp. I prompt e le risposte restano sul dispositivo.",
       "deleteTitle": "Eliminare questo modello?",
       "deleteMessage": "Eliminare {{name}} da questo dispositivo? Le chat che lo usano necessitano di un altro modello prima di poter continuare.",
       "errors": {
@@ -3432,8 +3473,17 @@
         "fits": "Adatto",
         "tight": "Al limite",
         "tooLarge": "Troppo grande",
-        "noStorage": "Spazio insufficiente"
+        "noStorage": "Spazio insufficiente",
+        "unknown": "Compatibilità sconosciuta"
       },
+      "recommendationsHelp": "Una selezione fissata da questa app: un file per modello, da un editore che dichiara una licenza. Nient'altro è classificato.",
+      "compatibilityHelp": "La compatibilità confronta il file del modello con la memoria e lo spazio libero di questo dispositivo. Il valore di memoria è una stima, non una misurazione.",
+      "text": "Testo",
+      "listTextPurpose": "Solo prompt di testo.",
+      "listImagePurpose": "Legge immagini oltre al testo.",
+      "smallestDownload": "Download più piccolo: {{size}} · circa {{memory}} di memoria",
+      "fullFileName": "File: {{name}}",
+      "memoryEstimateNote": "I valori di memoria sono stime, non misurazioni.",
       "parameters": "Parametri: {{value}}",
       "downloads": "Download: {{value}}",
       "likes": "Mi piace: {{value}}",
@@ -3458,7 +3508,8 @@
     },
     "localModels": {
       "title": "Modelli sul dispositivo",
-      "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo e questi modelli non possono usare strumenti.",
+      "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo.",
+      "systemPurpose": "Il modello integrato nel sistema di questo dispositivo. Viene eseguito sul dispositivo.",
       "apple": "Apple Intelligence (sul dispositivo)",
       "checking": "Verifica disponibilità…",
       "ready": "Pronto all'uso",
@@ -3763,12 +3814,26 @@
       "startNow": "Avvia senza revisione",
       "startNowHint": "Tieni premuto per avviare senza revisione",
       "titleLabel": "Titolo dell'attività",
+      "renameTitle": "Rinomina attività",
       "notes": "Note",
-      "notesPlaceholder": "Aggiungi note in Markdown",
+      "addNotes": "Aggiungi note",
+      "notesPrompt": "Aggiungi contesto, requisiti o criteri di accettazione.",
+      "markdownSupported": "Markdown supportato",
       "sessions": "Sessioni collegate",
       "noSessions": "Ancora nessuna sessione",
+      "untitledLinkedSession": "Sessione collegata",
+      "sessionNeedsInput": "La sessione richiede input",
+      "sessionRunning": "Sessione in corso",
+      "sessionFinished": "Sessione terminata",
+      "sessionPullRequest": "Pull request della sessione",
+      "sessionPullRequestNumber": "PR della sessione #{{number}}",
+      "openSessionHint": "Apre la sessione.",
+      "unlinkSessionAction": "Scollega sessione",
+      "unlinkConfirmTitle": "Scollegare {{title}}?",
+      "unlinkConfirmMessage": "La sessione in sé non viene eliminata. Viene rimosso solo il suo collegamento a questa attività.",
+      "startNewSession": "Avvia nuova sessione",
+      "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
       "linkSession": "Collega sessione",
-      "unlinkSession": "Scollega {{title}}",
       "linkFailed": "Impossibile collegare la sessione all'attività"
     },
     "linkSession": {
@@ -3786,5 +3851,69 @@
       "title": "Salva nell'elenco",
       "saved": "Salvato in {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Briefing del mattino",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Alcune attività passate potrebbero mancare. ≥ indica almeno questo valore; sconosciuto non significa zero.",
+    "available": "Briefing disponibili",
+    "history": "Cronologia briefing",
+    "historyHint": "I report vengono conservati per 30 giorni, inclusi quelli ignorati.",
+    "settings": "Impostazioni briefing",
+    "empty": "Nessuna attività notturna",
+    "emptyHint": "Le tue sessioni di coding cloud e CLI appariranno qui dopo una notte di attività.",
+    "loadError": "Impossibile caricare i briefing",
+    "sessions": "Attive di notte",
+    "pullRequests": "PRs aperte",
+    "blockers": "Nuovi blocchi",
+    "spend": "Spesa notturna",
+    "view": "Leggi briefing",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Mostra stato live",
+    "offline": "Offline · briefing salvato",
+    "cached": "Report salvato · aggiornamento non disponibile",
+    "revised": "Revisionato · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "Riepilogo AI",
+    "summaryDisabled": "Report strutturato · AI disattivata per questo contesto",
+    "summaryPending": "Riepilogo AI in corso. Verrà allegato qui quando pronto.",
+    "summaryFailed": "Riepilogo AI non riuscito. Riprovare potrebbe comportare un altro addebito.",
+    "summaryUnavailable": "Riepilogo AI non disponibile. Il report strutturato è comunque disponibile.",
+    "summaryOutdated": "Questo riepilogo è precedente all'ultima revisione del report.",
+    "summaryCharge": "Addebito AI: {{cost}}",
+    "summaryChargePending": "Addebito AI in attesa di riconciliazione",
+    "generate": "Genera riepilogo",
+    "retrySummary": "Riprova riepilogo a pagamento",
+    "sources": "Prove e artefatti",
+    "timezone": "Fuso orario briefing",
+    "deviceTimezone": "Usa fuso orario del dispositivo",
+    "timezoneHint": "Fuso orario IANA, ad esempio Europe/Berlin. Le modifiche agli orari valgono dalle notti successive.",
+    "nightStart": "Inizio notte",
+    "morningStart": "Fine notte / inizio mattina",
+    "morningEnd": "Fine mattina",
+    "timeHint": "La scheda Home ripristina lo stato live a fine mattina, anche offline.",
+    "invalidSchedule": "Scegli un fuso orario valido e periodi notte e mattina non vuoti e non sovrapposti.",
+    "notificationsHint": "Una notifica generica ogni mattina quando il primo report è pronto. Indipendente dai riepiloghi AI a pagamento.",
+    "notificationPermission": "Attiva le notifiche del dispositivo in $t(common.notifications) per ricevere il briefing.",
+    "aiOptIn": "Riepiloghi AI a pagamento",
+    "aiHint": "Facoltativo, solo per questo contesto. Estratti selezionati e oscurati e dati strutturati vengono inviati al tuo modello nella lingua dell'app. Gli addebiti usano il saldo di questo contesto.",
+    "defaultModel": "Usa il modello predefinito di Kilo",
+    "duration": "Limite di tempo (minuti)",
+    "spendLimit": "Limite di spesa (USD)",
+    "safeguardHint": "Limiti finiti per singolo riepilogo, non un budget giornaliero. Predefiniti: 10 minuti e $2. Un report viene pubblicato entro cinque minuti mentre la generazione continua entro questi limiti.",
+    "invalidSafeguards": "Inserisci limiti di tempo e spesa positivi e finiti.",
+    "estimate": "Stima {{estimate}} · massimo {{maximum}}",
+    "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni.",
+    "confirmPaid": "Attivare i riepiloghi a pagamento per {{context}}?",
+    "confirmGeneration": "Generare un riepilogo a pagamento?",
+    "paidDisclosure": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} minuti. L'addebito si applica anche se la generazione non riesce.",
+    "enable": "Attiva riepiloghi a pagamento",
+    "contextSettings": "Impostazioni AI · {{context}}",
+    "allContexts": "I briefing personali e dell'organizzazione restano separati.",
+    "estimatePricingUnavailable": "Prezzi non disponibili per questo modello.",
+    "estimateBalanceUnavailable": "Saldo insufficiente per un riepilogo a pagamento.",
+    "estimateModelNotAllowed": "Questo modello non è consentito qui.",
+    "estimateSpendLimitTooLow": "Aumenta la tutela di spesa per consentire questo riepilogo."
   }
 }

@@ -2,8 +2,9 @@ import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import { logger } from '../../src/logger.js';
 import migrations from '../../src/control-plane/sandbox/drizzle/migrations.js';
 import {
   routes as routesTable,
@@ -270,7 +271,8 @@ async function setup(
 async function prepareWarmRoute(
   stub: DurableObjectStub<SandboxControlV2>,
   provider: FakeProvider,
-  input: ControlPlanePrepareInput = prepareInput(SESSION)
+  input: ControlPlanePrepareInput = prepareInput(SESSION),
+  runtimeContract: 'legacy' | 'worktree' = 'worktree'
 ): Promise<{
   wrapper: FakeWrapper;
   prepareFrame: ControlPlaneWrapperFrame | null;
@@ -285,7 +287,7 @@ async function prepareWarmRoute(
   const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
-  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential, runtimeContract });
   expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
     type: 'welcome',
     protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
@@ -400,6 +402,7 @@ async function reconstructPreB(
         },
         onEvents: async () => {},
         onOutcome: async () => {},
+        getRuntimeProxyDelegationExpiresAt: async () => Date.now() + 24 * 60 * 60_000,
         issueRuntimeCredentialProxyGrant: async () => null,
       }),
     });
@@ -688,57 +691,98 @@ describe('SandboxControlV2 credentials (B3)', () => {
     }
   );
 
-  it('keeps modern and legacy backing authorities separate for repository-only mixed scopes', async () => {
-    const provider = createFakeProvider();
-    const broker = createFakeCredentialBroker();
-    const stub = await setupVercel(provider, broker);
-    const input = (sessionId: string, modern: boolean) =>
-      prepareInput(
-        sessionId,
-        {
-          ...credentialsSource(sessionId, {
-            repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
-          }),
-          scopeId: 'mixed',
-          ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
-        },
-        {
-          ...routeSpec(sessionId),
-          directory: '/workspace/mixed',
-          ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
-        }
+  it.each([false, true])(
+    'preserves mixed repository credentials on an older allocation (modern-first=%s)',
+    async modernFirst => {
+      const provider = createFakeProvider();
+      const stub = await setupVercel(provider, createFakeCredentialBroker());
+      const input = (sessionId: string, modern: boolean) =>
+        prepareInput(
+          sessionId,
+          {
+            ...credentialsSource(sessionId, {
+              repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+              ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
+            }),
+            scopeId: 'mixed_class',
+          },
+          {
+            ...routeSpec(sessionId),
+            directory: '/workspace/mixed_class',
+            ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
+          }
+        );
+      const { wrapper, prepareFrame } = await prepareWarmRoute(
+        stub,
+        provider,
+        input(SESSION, modernFirst),
+        'legacy'
       );
-    const { wrapper, prepareFrame } = await prepareWarmRoute(stub, provider, input(SESSION, false));
-    await stub.prepare(input(SESSION_NEXT, true));
-    const modern = await wrapper.next();
-    if (
-      prepareFrame?.type !== 'session.prepare' ||
-      modern?.type !== 'session.prepare' ||
-      !modern.credentials.proxy
-    )
-      throw new Error('missing mixed preparation');
-    await runInDurableObject(stub, (_instance, state) => {
-      const db = drizzle(state.storage);
-      expect(db.select().from(scopeGrants).all()).toHaveLength(2);
-      expect(readScopeGrant(db, 'mixed:legacy')?.kilo.runtimeProxy).toBeUndefined();
+      if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare');
+      expect(prepareFrame.spec.runtimeIsolation).toBe(modernFirst ? 'per-session' : undefined);
+      expect((await stub.prepare(input(SESSION_NEXT, !modernFirst))).state).toBe('preparing');
+      const sibling = await wrapper.next();
+      if (sibling?.type !== 'session.prepare') throw new Error('missing sibling prepare');
+      expect(sibling.spec.runtimeIsolation).toBe(modernFirst ? undefined : 'per-session');
+      wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready')
+      );
+      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
       expect(
-        readScopeGrant(db, 'mixed:runtime')?.kilo.runtimeProxy?.members.map(
-          member => member.sessionId
-        )
-      ).toEqual([SESSION_NEXT]);
-      expect(Object.keys(readScopeGrant(db, 'mixed:runtime')?.kilo.capabilities ?? {})).toEqual([]);
-    });
-    expect(broker.kiloIssued()).toBe(0);
-    await stub.release({ sessionId: SESSION_NEXT });
-    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
-    expect((await stub.getAllocationState()).kind).toBe('connected');
-    expect(
-      JSON.stringify(provider.policyCalls.at(-1)).includes(prepareFrame.credentials.kilo.token)
-    ).toBe(true);
-    expect(
-      JSON.stringify(provider.policyCalls.at(-1)).includes(modern.credentials.proxy.handle)
-    ).toBe(false);
-  });
+        await stub.deliver({ sessionId: SESSION, messages: [promptPayload('refresh_legacy')] })
+      ).toBe('sent');
+      expect((await wrapper.next())?.type).toBe('session.credentials');
+      expect((await wrapper.next())?.type).toBe('session.prompt');
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
+      expect(provider.launchEnvs).toHaveLength(1);
+    }
+  );
+
+  it.each([false, true])(
+    'rejects the other credential class for a directory sharing one checkout (modern-first=%s)',
+    async modernFirst => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker();
+      const stub = await setupVercel(provider, broker);
+      const directory = '/workspace/mixed_class';
+      const input = (sessionId: string, modern: boolean) =>
+        prepareInput(
+          sessionId,
+          {
+            ...credentialsSource(sessionId, {
+              repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+              ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
+            }),
+            scopeId: 'mixed_class',
+          },
+          {
+            ...routeSpec(sessionId),
+            directory,
+            // Negotiated sharing removes compatibility isolation at the wire boundary.
+            ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
+          }
+        );
+      const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION, modernFirst));
+      const before = (await readRouteRow(stub, SESSION))?.grant;
+      const diagnostics: Record<string, unknown>[] = [];
+      const spy = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (bounded.diagnosticEvent === 'route_failed') diagnostics.push(bounded);
+        return logger;
+      });
+      expect((await stub.prepare(input(SESSION_NEXT, !modernFirst))).state).toBe('failed');
+      spy.mockRestore();
+      expect(diagnostics.some(diagnostic => diagnostic.stage === 'mixed_credential_class')).toBe(
+        true
+      );
+      expect((await readRouteRow(stub, SESSION))?.grant === before).toBe(true);
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+      // The joiner fails at admission, before any prepare frame reaches the wrapper.
+      expect(await wrapper.next(100)).toBeNull();
+    }
+  );
 
   it('does not publish a runtime handle whose Vercel policy update failed', async () => {
     const provider = createFakeProvider();
@@ -1306,9 +1350,14 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(broker.githubIssued()).toBe(1);
   });
 
-  it.each(['standard', 'lite'] as const)(
-    'derives the %s publisher from the issued app and preserves review permissions through projection and refresh',
-    async appType => {
+  it.each([
+    { appType: 'standard', runtimeContract: 'legacy' },
+    { appType: 'lite', runtimeContract: 'legacy' },
+    { appType: 'standard', runtimeContract: 'worktree' },
+    { appType: 'lite', runtimeContract: 'worktree' },
+  ] as const)(
+    'derives the $appType publisher for $runtimeContract allocations from the issued app and preserves review permissions through projection and refresh',
+    async ({ appType, runtimeContract }) => {
       const provider = createFakeProvider();
       const broker = createFakeCredentialBroker(appType);
       const stub = await setup(provider, broker);
@@ -1326,7 +1375,12 @@ describe('SandboxControlV2 credentials (B3)', () => {
       });
       input.spec.permission = { question: 'deny', edit: 'deny', bash: { 'git push': 'deny' } };
       input.spec.runtimeIsolation = 'per-session';
-      const { prepareFrame, wrapper } = await prepareWarmRoute(stub, provider, input);
+      const { prepareFrame, wrapper } = await prepareWarmRoute(
+        stub,
+        provider,
+        input,
+        runtimeContract
+      );
       if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
       const expectedTarget = {
         repo: 'acme/widgets',
@@ -1336,7 +1390,9 @@ describe('SandboxControlV2 credentials (B3)', () => {
       };
       expect(prepareFrame.spec.githubReviewTarget).toEqual(expectedTarget);
       expect(prepareFrame.spec.permission).toEqual(input.spec.permission);
-      expect(prepareFrame.spec.runtimeIsolation).toBe('per-session');
+      expect(prepareFrame.spec.runtimeIsolation).toBe(
+        runtimeContract === 'legacy' ? 'per-session' : undefined
+      );
       await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
       expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
         'sent'

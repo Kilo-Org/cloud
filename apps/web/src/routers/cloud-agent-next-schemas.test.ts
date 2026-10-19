@@ -248,6 +248,16 @@ describe('baseGetSessionNextOutputSchema', () => {
     expect(baseGetSessionNextOutputSchema.parse(response)).toEqual(response);
   });
 
+  it('preserves the assigned branch before runtime preparation', () => {
+    const response = baseGetSessionNextOutputSchema.parse({
+      ...baseSession,
+      branchName: 'kilo/assigned',
+    });
+
+    expect(response.branchName).toBe('kilo/assigned');
+    expect(response.preparedAt).toBeUndefined();
+  });
+
   it('preserves explicit null ownership fields when no ownership row exists', () => {
     const response = baseGetSessionNextOutputSchema.parse({
       ...baseSession,
@@ -516,6 +526,19 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     }
   });
 
+  it('enforces explicit egress mode on clone-only inputs', () => {
+    for (const schema of [personalPrepareSessionNextSchema, organizationPrepareSessionNextSchema]) {
+      const input = { ...cloneOnlyInput, organizationId: MESSAGE_UUID };
+      const parsed = schema.parse({ ...input, egressMode: 'allowlist' });
+      expect(parsed.egressMode).toBe('allowlist');
+      expect(parsed.egressAllowlist).toBeUndefined();
+      expect(schema.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
+      expect(
+        schema.safeParse({ ...input, egressMode: 'unrestricted', egressAllowlist: [] }).success
+      ).toBe(false);
+    }
+  });
+
   it('rejects a clone-only input that also carries a prompt', () => {
     expect(
       basePrepareSessionNextSchema.safeParse({ ...cloneOnlyInput, prompt: 'Continue the clone' })
@@ -734,6 +757,74 @@ describe('prepare session sandbox selection', () => {
     model: 'kilo/test-model',
   };
   const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
+  it.each([[], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'preserves canonical API-only policy %j',
+    ({ egressAllowlist }) => {
+      const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
+      expect(
+        personalPrepareSessionNextSchema.parse({
+          ...baseInput,
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).egressAllowlist
+      ).toEqual(expected);
+      expect(
+        organizationPrepareSessionNextSchema.parse({
+          ...organizationInput,
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).egressAllowlist
+      ).toEqual(expected);
+    }
+  );
+
+  it.each([{}, { egressMode: 'unrestricted' }, { egressMode: 'allowlist' }])(
+    'preserves omitted lists without inferring modes: %j',
+    policy => {
+      for (const parsed of [
+        personalPrepareSessionNextSchema.parse({ ...baseInput, ...policy }),
+        organizationPrepareSessionNextSchema.parse({ ...organizationInput, ...policy }),
+      ]) {
+        expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+        expect(parsed.egressAllowlist).toBeUndefined();
+      }
+    }
+  );
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'deny-all' },
+    { egressMode: null },
+  ])('rejects ambiguous or unsupported egress policies: %j', policy => {
+    expect(personalPrepareSessionNextSchema.safeParse({ ...baseInput, ...policy }).success).toBe(
+      false
+    );
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, ...policy }).success
+    ).toBe(false);
+  });
+
+  it('rejects non-domain API policies', () => {
+    for (const egressAllowlist of [['*'], ['127.1'], ['https://example.com'], null]) {
+      expect(
+        personalPrepareSessionNextSchema.safeParse({
+          ...baseInput,
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).success
+      ).toBe(false);
+      expect(
+        organizationPrepareSessionNextSchema.safeParse({
+          ...organizationInput,
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).success
+      ).toBe(false);
+    }
+  });
   const allocations = SELECTABLE_SANDBOX_ALLOCATIONS;
   const requests: SelectableSandboxAllocationRequest[] = [
     ...allocations.map(allocation => getSandboxAllocationRequest(allocation)),

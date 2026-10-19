@@ -101,17 +101,6 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
-  stage-global-app:
-    needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
-    uses: ./.github/workflows/stage-vercel-deployment.yml
-    with:
-      target_environment: production
-      vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
-      source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
-
   stage-ai-gateway:
     needs: check-changes
     if: needs.check-changes.outputs.should_deploy == 'true'
@@ -131,14 +120,6 @@ jobs:
       axiom_annotation_dataset: kilocode-app
     secrets:
       AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-  promote-global-app:
-    needs: [stage-global-app, check-production-db-startup, run-migrations]
-    uses: ./.github/workflows/promote-vercel-deployment.yml
-    with:
-      deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
-    secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   promote-ai-gateway:
@@ -162,10 +143,8 @@ jobs:
         run-migrations,
         check-changes,
         stage-app,
-        stage-global-app,
         stage-ai-gateway,
         promote-app,
-        promote-global-app,
         promote-ai-gateway,
       ]
     if: >-
@@ -175,10 +154,8 @@ jobs:
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-ai-gateway.result)
       }}
     uses: ./.github/workflows/deploy-workers.yml
@@ -272,10 +249,8 @@ jobs:
         check-changes,
         detect-gastown-wasteland-changes,
         stage-app,
-        stage-global-app,
         stage-ai-gateway,
         promote-app,
-        promote-global-app,
         promote-ai-gateway,
       ]
     if: >-
@@ -286,10 +261,8 @@ jobs:
         needs.run-migrations.result == 'success' &&
         needs.detect-gastown-wasteland-changes.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-ai-gateway.result) &&
         (
           needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true' ||
@@ -350,10 +323,8 @@ jobs:
         check-production-db-startup,
         run-migrations,
         stage-app,
-        stage-global-app,
         stage-ai-gateway,
         promote-app,
-        promote-global-app,
         promote-ai-gateway,
         deploy-workers,
         detect-gastown-wasteland-changes,
@@ -366,10 +337,8 @@ jobs:
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
         needs.stage-app.result == 'success' &&
-        needs.stage-global-app.result == 'success' &&
         needs.stage-ai-gateway.result == 'success' &&
         needs.promote-app.result == 'success' &&
-        needs.promote-global-app.result == 'success' &&
         needs.promote-ai-gateway.result == 'success' &&
         needs.deploy-workers.result == 'success' &&
         needs.detect-gastown-wasteland-changes.result == 'success' &&

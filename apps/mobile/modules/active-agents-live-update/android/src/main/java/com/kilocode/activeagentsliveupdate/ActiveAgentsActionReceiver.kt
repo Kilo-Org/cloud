@@ -9,7 +9,9 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 
 /**
- * Answers the ongoing notification's Approve action without an Activity.
+ * Answers the ongoing notification's Approve action, a session
+ * notification's dismissal, and a session notification's quiet alarm, without
+ * an Activity.
  *
  * The receiver only enqueues and returns: a broadcast has a short budget, and a
  * background `startService` is restricted on Android 8+, so the answer runs as
@@ -25,22 +27,78 @@ import androidx.work.WorkManager
  */
 class ActiveAgentsActionReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
-    if (intent.action != ACTION_APPROVE) {
+    val action = intent.action ?: return
+    if (action != ACTION_APPROVE && action != ACTION_DISMISS && action != ACTION_QUIET) {
       return
     }
+    val sessionId = intent.getStringExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID)
+    if (action == ACTION_QUIET) {
+      // The card itself changes, so no JS runs: the stored card has the quiet form.
+      if (sessionId != null) {
+        SessionNotifications.postQuiet(context, sessionId, intent.getLongExtra(EXTRA_QUIET_AT, 0))
+      }
+      return
+    }
+    if (action == ACTION_DISMISS) {
+      if (sessionId == null) {
+        return
+      }
+      // A dismissal is an Unfollow (spec "Android: actions" rule 3). Drop the
+      // stored card now, so no later update re-posts it; then the headless JS
+      // stops following the session and deletes its server row. Each session
+      // has its own unique work: a clear-all dismisses several cards at once,
+      // and one shared name would let `KEEP` drop all but the first.
+      SessionNotifications.cancel(context, sessionId)
+      enqueueHeadless(context, "$DISMISS_WORK_PREFIX$sessionId", ACTION_DISMISS, sessionId, null)
+      return
+    }
+    enqueueHeadless(
+      context,
+      ActiveAgentsApproveWorker.UNIQUE_WORK_NAME,
+      ACTION_APPROVE,
+      sessionId,
+      intent.getStringExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY)
+    )
+  }
+
+  /** Run one action as headless JS through the approval worker. */
+  private fun enqueueHeadless(
+    context: Context,
+    uniqueName: String,
+    action: String,
+    sessionId: String?,
+    approvalKey: String?
+  ) {
     val request = OneTimeWorkRequest.Builder(ActiveAgentsApproveWorker::class.java)
       .setInputData(
         Data.Builder()
-          .putString(ActiveAgentsApproveWorker.KEY_ACTION, ACTION_APPROVE)
+          .putString(ActiveAgentsApproveWorker.KEY_ACTION, action)
+          .putString(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
+          .putString(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
           .build()
       )
       .build()
     WorkManager.getInstance(context)
-      .enqueueUniqueWork(ActiveAgentsApproveWorker.UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+      .enqueueUniqueWork(uniqueName, ExistingWorkPolicy.KEEP, request)
   }
 
   companion object {
     /** Explicit action on the notification's Approve PendingIntent. */
     const val ACTION_APPROVE = "com.kilocode.activeagentsliveupdate.action.APPROVE"
+
+    /**
+     * The user dismissed a session notification (a swipe or a clear-all). The
+     * card is gone either way, so the app stops following that session.
+     */
+    const val ACTION_DISMISS = "com.kilocode.activeagentsliveupdate.action.DISMISS"
+
+    /** A Working session card reached its quiet moment; see `SessionNotifications.postQuiet`. */
+    const val ACTION_QUIET = "com.kilocode.activeagentsliveupdate.action.QUIET"
+
+    /** The quiet moment the alarm was armed for, in epoch milliseconds. */
+    const val EXTRA_QUIET_AT = "quiet_at"
+
+    /** Unique work per dismissed session; see `onReceive`. */
+    private const val DISMISS_WORK_PREFIX = "active-agents-dismiss:"
   }
 }

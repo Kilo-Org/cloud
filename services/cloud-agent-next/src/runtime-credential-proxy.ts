@@ -6,12 +6,12 @@ import {
   resolveRuntimeCredentialProxyRoute,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
+import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from './shared/runtime-credential-proxy-handle.js';
 import type { Env } from './types.js';
 
-const AUDIENCE = 'cloud-agent-next:runtime-credential-proxy';
 const sessionClaimsSchema = z
   .object({
-    aud: z.literal(AUDIENCE),
+    aud: z.literal(RUNTIME_CREDENTIAL_PROXY_AUDIENCE),
     grantId: z.string().uuid(),
     authorizationId: z.string().uuid(),
     sessionId: z.string().min(1),
@@ -147,7 +147,7 @@ export async function issueRuntimeCredentialProxyHandle(
   if (exp <= iat) throw new Error('Runtime proxy grant has expired');
   return jwt.sign(
     {
-      aud: AUDIENCE,
+      aud: RUNTIME_CREDENTIAL_PROXY_AUDIENCE,
       grantId: grant.grantId,
       authorizationId: grant.authorizationId,
       sessionId: grant.sessionId,
@@ -172,6 +172,27 @@ export async function verifyRuntimeCredentialProxyHandle(
     const verified = jwt.verify(value, secret, { algorithms: ['HS256'] });
     const claims = sessionClaimsSchema.safeParse(verified);
     return claims.success ? claims.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verifies a handle's signature while tolerating an expired `exp`, so a caller
+ * can tell a genuinely expired handle from an unreadable one and fail only on
+ * proven expiry. Returns the expiry in milliseconds, or null when the value is
+ * not a signed handle.
+ */
+export async function verifyRuntimeCredentialProxyHandleExpiresAt(
+  env: Pick<Env, 'NEXTAUTH_SECRET'>,
+  value: string
+): Promise<number | null> {
+  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  if (!secret || value.length > 4096) return null;
+  try {
+    const verified = jwt.verify(value, secret, { algorithms: ['HS256'], ignoreExpiration: true });
+    const claims = sessionClaimsSchema.safeParse(verified);
+    return claims.success ? claims.data.exp * 1000 : null;
   } catch {
     return null;
   }

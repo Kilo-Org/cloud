@@ -133,10 +133,13 @@
     "status": "Olek",
     "truncated": "Kärbitud",
     "updated": "Uuendatud",
+    "generating": "Genereerimine…",
     "working": "Töös",
     "yourOwnRepositories": "Sinu enda hoidlad",
     "dismissed": "Kõrvale jäetud",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Muudatused"
   },
   "language": {
@@ -833,7 +836,8 @@
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
       "security": "Turvaleiud",
-      "spend": "Kulutushoiatused"
+      "spend": "Kulutushoiatused",
+      "followedSessions": "Jälgitud seansid"
     },
     "category": {
       "chatMessagesSubtitle": "vastused sinu vestlustes",
@@ -1256,7 +1260,7 @@
         "stoppedTitle": "Seadistamine peatati",
         "stoppedBody": "{{name}} eksemplar peatus seadistamise ajal ootamatult.",
         "stalledTitle": "Midagi takerdus",
-        "stalledBody": "Seadistust ei õnnestunud lõpule viia ({{name}}). Proovi uuesti. Kui probleem kordub, kirjuta aadressile hi@kilo.ai.",
+        "stalledBody": "Seadistust ei õnnestunud lõpule viia ({{name}}). Proovi uuesti. Kui probleem kordub, kirjuta aadressile {{supportEmail}}.",
         "timeoutTitle": "Võtab oodatust kauem aega",
         "timeoutBody": "{{name}} seadistamine võtab tavapärasest kauem aega (üle {{displayMinutes}} minuti).",
         "continueInBackground": "Jätka taustal",
@@ -1314,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Sinu varajase ligipääsu pakett vajab enne mobiilis kasutamist käsitsi kontrollimist.",
       "iosTitle": "KiloClaw pole iOS-is saadaval",
       "iosBody": "Selle konto juurdepääsu KiloClaw’ teenusele hallatakse väljaspool iOS-i rakendust.",
-      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile hi@kilo.ai.",
+      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile {{supportEmail}}.",
       "quarantinedCta": "Kirjuta meie meeskonnale",
       "nonCanonicalEarlybirdCta": "Vaata oma pakett üle kilo.ai-s"
     },
@@ -1549,7 +1553,7 @@
         "recoveryLabel": "Uuenda GitHubi rakendust"
       },
       "githubIpAllowList": {
-        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil {{supportEmail}} ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koodiülevaataja lülitati välja, sest Kilo ei saa luua sellele GitLabi projektile juurdepääsutunnust. Anna hooldaja õigused või luba projekti juurdepääsutunnused ja lülita koodiülevaataja uuesti sisse.",
@@ -1564,7 +1568,7 @@
         "recoveryLabel": "Uuenda koodiülevaataja seadeid"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil {{supportEmail}} ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "title": "Koodiülevaataja vajab tähelepanu.",
       "recoveryLabel": "Võta ühendust toega"
@@ -2088,6 +2092,8 @@
       "title": "Seanss",
       "copyErrorDetails": "Kopeeri vea üksikasjad",
       "backToSessions": "Tagasi seansside juurde",
+      "follow": "Jälgi lukustuskuval",
+      "unfollow": "Lõpeta lukustuskuval jälgimine",
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
       "failedToStopExecution": "Täitmise peatamine ebaõnnestus.",
@@ -2423,6 +2429,7 @@
       "title": "Agent vajab vastust",
       "skipQuestionsTitle": "Kas jätta küsimused vahele?",
       "skipQuestionsMessage": "Agent jätab selle sammu vahele.",
+      "answerProgress": "Vastatud {{answered}}/{{total}}",
       "selectAllThatApply": "Vali kõik sobivad variandid.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, valitud",
@@ -2491,6 +2498,7 @@
       "title": "Filtreeri seansse",
       "platformCloud": "Pilv",
       "platformExtension": "Laiendus",
+      "platformDesktop": "Töölaud",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3100,6 +3108,9 @@
     "ssoError": "Sinu organisatsioon nõuab SSO-d. Kasuta valikut „$t(login.moreSignInOptions)“.",
     "blocked": "See konto on blokeeritud. Võta ühendust toega.",
     "signupRateLimited": "Liiga palju katseid. Proovi hiljem uuesti.",
+    "signupStepUp": "Konto loomise lõpetamiseks kasuta valikut „$t(login.moreSignInOptions)“.",
+    "signupStepUpApple": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithApple)“.",
+    "signupStepUpGoogle": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithGoogle)“.",
     "invalidCode": "See kood on vale. Proovi uuesti.",
     "codeInProgress": "Sinu koodi töödeldakse. Oota hetk ja proovi uuesti.",
     "tooManyAttempts": "Liiga palju katseid. Küsi uus kood.",
@@ -3170,6 +3181,8 @@
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
+    "finished": "Lõpetatud",
+    "followFailed": "Seda agenti ei õnnestunud lukustuskuval kuvada.",
     "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
     "checked": "Kontrollitud",
     "lastKnown": "Viimane teadaolev",
@@ -3178,7 +3191,26 @@
     "waitingForYou": "Ootab sind",
     "nextScheduled": "Järgmisena ajastatud",
     "answerNeeded": "Vajab vastust",
-    "waitingToRetry": "Ootab uut katset"
+    "waitingToRetry": "Ootab uut katset",
+    "step": {
+      "editing": "Redigeerimine",
+      "reading": "Lugemine",
+      "running": "Käivitamine",
+      "searching": "Veebiotsing",
+      "thinking": "Läbimõtlemine"
+    },
+    "planOf": "viiest",
+    "filesChanged": "muudetud failid",
+    "finishedIn": "Valmis",
+    "noActivityFor": "Tegevuseta",
+    "prOpened": "Pull request avatud",
+    "permissionWants": "Soovib käivitada",
+    "failure": {
+      "provider": "Peatatud: teenusepakkuja viga",
+      "tool": "Peatatud: tööriista viga",
+      "cancelled": "Peatatud: tühistatud",
+      "other": "PEATATUD"
+    }
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
@@ -3214,8 +3246,12 @@
     "list": {
       "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
       "new": "Uus vestlus",
-      "openHint": "Avab vestluse. Kustutamiseks hoia all.",
       "deleteTitle": "Kas kustutada see vestlus?"
+    },
+    "rename": {
+      "title": "Nimeta vestlus ümber",
+      "accessibility": "Nimeta vestlus ümber: {{title}}",
+      "openHint": "Avab vestluse. Ümbernimetamiseks või kustutamiseks hoia all."
     },
     "beta": "Beeta",
     "details": {
@@ -3292,6 +3328,10 @@
     },
     "backends": {
       "title": "Vestluse taustsüsteemid",
+      "providersTitle": "Vestluse pakkujad",
+      "cloud": "Pilves",
+      "cloudModel": "Mudel: {{model}}",
+      "cloudUnavailable": "Kilo mudelid pole praegu saadaval. Kontrolli ühendust.",
       "manage": "Halda taustsüsteeme",
       "defaultKilo": "$t(consent.kilo) (vaikimisi)",
       "kiloHelp": "Sisseehitatud taustsüsteem kasutab sinu Kilo kontot ning seda ei saa muuta ega kustutada.",
@@ -3351,7 +3391,6 @@
     "gguf": {
       "title": "Allalaaditavad mudelid",
       "help": "Laadi avatud mudel alla ja käivita see selles telefonis programmiga llama.cpp. Sinu päringud ja vastused jäävad seadmesse. Mudelid on suured, seega kasuta Wi-Fi-t.",
-      "details": "{{size}} · Litsents: {{license}}",
       "download": "Laadi mudel alla",
       "pause": "Peata allalaadimine",
       "resume": "Jätka allalaadimist",
@@ -3363,6 +3402,8 @@
       "url": "Otsene allalaadimislink",
       "urlHelp": "Kleebi HTTPS-link .gguf failile, näiteks Hugging Face'i resolve-link. Laadi mudeleid alla ainult usaldusväärsetest allikatest.",
       "downloadUrl": "Laadi alla lingilt",
+      "advanced": "Täpsem",
+      "localPurpose": "Töötab selles seadmes llama.cpp-ga. Viibad ja vastused jäävad seadmesse.",
       "deleteTitle": "Kas kustutada see mudel?",
       "deleteMessage": "Kas kustutada {{name}} sellest seadmest? Vestlused, mis seda kasutavad, vajavad jätkamiseks teist mudelit.",
       "errors": {
@@ -3391,8 +3432,17 @@
         "fits": "Sobib",
         "tight": "Napilt sobib",
         "tooLarge": "Liiga suur",
-        "noStorage": "Pole piisavalt salvestusruumi"
+        "noStorage": "Pole piisavalt salvestusruumi",
+        "unknown": "Sobivus teadmata"
       },
+      "recommendationsHelp": "Nimekiri, mille see rakendus kinnitab: üks fail mudeli kohta, avaldajalt, kes märgib litsentsi. Midagi muud ei järjestata.",
+      "compatibilityHelp": "Sobivus võrdleb mudelifaili selle seadme mälu ja vaba salvestusruumiga. Mälunäitaja on hinnang, mitte mõõtmine.",
+      "text": "Tekst",
+      "listTextPurpose": "Ainult tekstiviibad.",
+      "listImagePurpose": "Loeb nii pilte kui ka teksti.",
+      "smallestDownload": "Väikseim allalaadimine: {{size}} · umbes {{memory}} mälu",
+      "fullFileName": "Fail: {{name}}",
+      "memoryEstimateNote": "Mälunäitajad on hinnangud, mitte mõõtmised.",
       "parameters": "Parameetrid: {{value}}",
       "downloads": "Allalaadimised: {{value}}",
       "likes": "Meeldimised: {{value}}",
@@ -3417,7 +3467,8 @@
     },
     "localModels": {
       "title": "Seadmesisesed mudelid",
-      "help": "Seadmesisesed mudelid töötavad selles telefonis. Sinu päringud ja vastused jäävad seadmesse ning need mudelid ei saa tööriistu kasutada.",
+      "help": "Seadmesisesed mudelid töötavad selles telefonis. Sinu päringud ja vastused jäävad seadmesse.",
+      "systemPurpose": "Selle seadme süsteemi sisseehitatud mudel. See töötab seadmes.",
       "apple": "Apple Intelligence (seadmes)",
       "checking": "Saadavuse kontrollimine…",
       "ready": "Kasutusvalmis",
@@ -3718,12 +3769,26 @@
       "startNow": "Käivita ilma ülevaatuseta",
       "startNowHint": "Ülevaatuseta käivitamiseks vajuta pikalt",
       "titleLabel": "Ülesande pealkiri",
+      "renameTitle": "Nimeta ülesanne ümber",
       "notes": "Märkmed",
-      "notesPlaceholder": "Lisa märkmed Markdownis",
+      "addNotes": "Lisa märkmeid",
+      "notesPrompt": "Lisa kontekst, nõuded või vastuvõtukriteeriumid.",
+      "markdownSupported": "Markdown on toetatud",
       "sessions": "Seotud seansid",
       "noSessions": "Seansse veel pole",
+      "untitledLinkedSession": "Lingitud seanss",
+      "sessionNeedsInput": "Seanss vajab sisendit",
+      "sessionRunning": "Seanss töötab",
+      "sessionFinished": "Seanss lõpetatud",
+      "sessionPullRequest": "Seansi PR",
+      "sessionPullRequestNumber": "Seansi PR #{{number}}",
+      "openSessionHint": "Avab seansi.",
+      "unlinkSessionAction": "Eemalda seansi link",
+      "unlinkConfirmTitle": "Kas eemaldada link üksuselt {{title}}?",
+      "unlinkConfirmMessage": "Seanssi ennast ei kustutata. Eemaldatakse ainult selle link selle ülesandega.",
+      "startNewSession": "Alusta uut seanssi",
+      "startNewSessionHint": "Uue seansi alustamiseks vajuta pikalt.",
       "linkSession": "Seo seanss",
-      "unlinkSession": "Eemalda seos: {{title}}",
       "linkFailed": "Seanssi ei õnnestunud ülesandega siduda"
     },
     "linkSession": {
@@ -3741,5 +3806,69 @@
       "title": "Salvesta loendisse",
       "saved": "Salvestatud loendisse {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Hommikune ülevaade",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Osa varasemast tegevusest võib puududa. ≥ tähendab vähemalt nii palju; teadmata ei tähenda null.",
+    "available": "Saadaolevad ülevaated",
+    "history": "Ülevaadete ajalugu",
+    "historyHint": "Aruandeid säilitatakse 30 päeva, sh suletud aruandeid.",
+    "settings": "Ülevaate seaded",
+    "empty": "Öist tegevust pole",
+    "emptyHint": "Sinu pilve- ja CLI-koodimisseansid ilmuvad siia pärast aktiivset ööd.",
+    "loadError": "Ülevaateid ei õnnestunud laadida",
+    "sessions": "Öösel aktiivsed",
+    "pullRequests": "Avatud PRs",
+    "blockers": "Uued takistused",
+    "spend": "Öised kulud",
+    "view": "Loe ülevaadet",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Näita reaalajas olekut",
+    "offline": "Võrguühenduseta · salvestatud ülevaade",
+    "cached": "Salvestatud aruanne · värskendamine pole saadaval",
+    "revised": "Muudetud · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI kokkuvõte",
+    "summaryDisabled": "Struktureeritud aruanne · AI on selles kontekstis välja lülitatud",
+    "summaryPending": "AI kokkuvõtet koostatakse. See lisatakse siia, kui on valmis.",
+    "summaryFailed": "AI kokkuvõte ebaõnnestus. Uuesti proovimine võib kaasa tuua uue tasu.",
+    "summaryUnavailable": "AI kokkuvõte pole saadaval. Struktureeritud aruanne on endiselt saadaval.",
+    "summaryOutdated": "See kokkuvõte on vanem kui aruande viimane versioon.",
+    "summaryCharge": "AI tasu {{cost}}",
+    "summaryChargePending": "AI tasu ootab kinnitamist",
+    "generate": "Koosta kokkuvõte",
+    "retrySummary": "Proovi tasulist kokkuvõtet uuesti",
+    "sources": "Tõendid ja artefaktid",
+    "timezone": "Ülevaate ajavöönd",
+    "deviceTimezone": "Kasuta seadme ajavööndit",
+    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin. Ajakava muudatused kehtivad järgmistest öödest.",
+    "nightStart": "Öö algab",
+    "morningStart": "Öö lõpeb / hommik algab",
+    "morningEnd": "Hommik lõpeb",
+    "timeHint": "Avakuva kaart taastab hommiku lõppedes reaalajas oleku, ka võrguühenduseta.",
+    "invalidSchedule": "Vali kehtiv ajavöönd ning mittekattuvad ja mittetühjad öö- ja hommikuperioodid.",
+    "notificationsHint": "Üks üldine teavitus hommikus, kui esimene aruanne on valmis. Ei sõltu tasulistest AI kokkuvõtetest.",
+    "notificationPermission": "Ülevaate saamiseks luba seadme teavitused jaotises $t(common.notifications).",
+    "aiOptIn": "Tasulised AI kokkuvõtted",
+    "aiHint": "Valikuline ainult selles kontekstis. Valitud, redigeeritud väljavõtted ja struktureeritud faktid saadetakse sinu mudelile rakenduse keeles. Tasud arvestatakse selle konteksti saldost.",
+    "defaultModel": "Kasuta Kilo vaikemudelit",
+    "duration": "Ajapiirang (minutid)",
+    "spendLimit": "Kulupiirang (USD)",
+    "safeguardHint": "Lõplikud piirangud kokkuvõtte kohta, mitte päevaeelarve. Vaikimisi: 10 minutit ja $2. Aruanne avaldatakse hiljemalt viie minuti pärast, samal ajal kui koostamine jätkub nende piirides.",
+    "invalidSafeguards": "Sisesta positiivsed ja lõplikud aja- ja kulupiirangud.",
+    "estimate": "Hinnang {{estimate}} · maksimaalselt {{maximum}}",
+    "estimateUnavailable": "Nende seadetega pole tasuline kokkuvõte saadaval.",
+    "estimatePricingUnavailable": "Selle mudeli hinnad pole saadaval.",
+    "estimateBalanceUnavailable": "Tasuliseks kokkuvõtteks pole piisavalt saldot.",
+    "estimateModelNotAllowed": "See mudel pole siin lubatud.",
+    "estimateSpendLimitTooLow": "Kulutuse piirangu tõstmisel saaks selle kokkuvõtte lubada.",
+    "confirmPaid": "Kas lubada tasulised kokkuvõtted kontekstis {{context}}?",
+    "confirmGeneration": "Kas koostada tasuline kokkuvõte?",
+    "paidDisclosure": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, ajapiiranguga {{minutes}} minutit. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
+    "enable": "Luba tasulised kokkuvõtted",
+    "contextSettings": "AI seaded · {{context}}",
+    "allContexts": "Isiklikud ja organisatsiooni ülevaated hoitakse eraldi."
   }
 }

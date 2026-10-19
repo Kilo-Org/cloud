@@ -9,6 +9,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { gitAuthorSchema, sessionAttachMcpServersSchema } from './sandbox-control-protocol.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -198,6 +199,40 @@ export const controlPlaneWorkspaceFailureSubtypeSchema = z.enum(
   CONTROL_PLANE_WORKSPACE_FAILURE_SUBTYPES
 );
 
+// Bounded run-container facts are duplicated locally (type-only import above)
+// so the standalone wrapper bundle never contains worker-utils. The drift
+// guards below and control-plane-run-container.test.ts contain the drift risk.
+export const CONTROL_PLANE_RUN_CONTAINER_PROVIDERS = [
+  'cloudflare',
+  'vercel',
+  'cloudflare-containers',
+] as const satisfies readonly CloudAgentRunContainer['provider'][];
+
+const controlPlaneRunContainerIdentifierSchema = z.string().min(1).max(128);
+
+export const controlPlaneRunContainerSchema = z
+  .object({
+    provider: z.enum(CONTROL_PLANE_RUN_CONTAINER_PROVIDERS),
+    sandboxId: controlPlaneRunContainerIdentifierSchema,
+    allocationId: controlPlaneRunContainerIdentifierSchema.optional(),
+    instanceId: controlPlaneRunContainerIdentifierSchema.optional(),
+    instanceType: controlPlaneRunContainerIdentifierSchema.optional(),
+    region: controlPlaneRunContainerIdentifierSchema.optional(),
+    imageRef: z.string().min(1).max(1024).optional(),
+    snapshotId: controlPlaneRunContainerIdentifierSchema.optional(),
+    runtimeBuildId: controlPlaneRunContainerIdentifierSchema.optional(),
+    startSource: z.enum(['image', 'snapshot']).optional(),
+  })
+  .strict();
+export type ControlPlaneRunContainer = z.infer<typeof controlPlaneRunContainerSchema>;
+
+type _RunContainerMissingFactDriftGuard = AssertNever<
+  Exclude<CloudAgentRunContainer, ControlPlaneRunContainer>
+>;
+type _RunContainerExtraFactDriftGuard = AssertNever<
+  Exclude<ControlPlaneRunContainer, CloudAgentRunContainer>
+>;
+
 // Kilo final-error reasons are free text from the wrapper; the closed set above
 // covers only control-plane reasons.
 export const controlPlaneOutcomeReasonSchema = z.string().min(1).max(4096);
@@ -281,6 +316,10 @@ export const controlPlaneRouteSpecSchema = z
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
+    /**
+     * Preserves the runtime key and HOME of existing allocations. The Sandbox
+     * omits it only after negotiating worktree sharing for a new allocation.
+     */
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
     /**
@@ -297,23 +336,7 @@ export const controlPlaneRouteSpecSchema = z
      */
     secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
-  .strict()
-  .superRefine((spec, context) => {
-    if (
-      (spec.permission ||
-        spec.githubReviewTarget ||
-        spec.runtimeSkills?.length ||
-        spec.runtimeAgents?.length ||
-        spec.kiloCommands?.length) &&
-      spec.runtimeIsolation !== 'per-session'
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['runtimeIsolation'],
-        message: 'Runtime permissions and profiles require per-session isolation',
-      });
-    }
-  });
+  .strict();
 
 /**
  * Route spec accepted at the registration boundary. `secretEnvKeys` is
@@ -336,7 +359,7 @@ export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSche
  * DO-only credential source (plan "Clarification (2026-09-27, B3 credentials)").
  * The Session DO has the session metadata; the Sandbox DO does not. `prepare`
  * carries this minimal issue-time snapshot privately so the Sandbox DO can mint
- * and re-issue the per-session Git and Kilo credential grant. It must never be
+ * and re-issue the route's Git and Kilo credential grant. It must never be
  * serialized into a wrapper frame.
  */
 export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type', [
@@ -550,13 +573,22 @@ const controlPlaneRoutePreparingSchema = z
     attemptId: z.string().min(1).max(128),
     step: controlPlanePreparationStepSchema.optional(),
     detail: controlPlanePreparationDetailSchema.optional(),
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 const controlPlaneRouteReadySchema = z
-  .object({ state: z.literal('ready'), attemptId: z.string().min(1).max(128) })
+  .object({
+    state: z.literal('ready'),
+    attemptId: z.string().min(1).max(128),
+    container: controlPlaneRunContainerSchema.optional(),
+  })
   .strict();
 const controlPlaneRouteReconnectingSchema = z
-  .object({ state: z.literal('reconnecting'), attemptId: z.string().min(1).max(128) })
+  .object({
+    state: z.literal('reconnecting'),
+    attemptId: z.string().min(1).max(128),
+    container: controlPlaneRunContainerSchema.optional(),
+  })
   .strict();
 const controlPlaneRouteFailedSchema = z
   .object({
@@ -564,6 +596,7 @@ const controlPlaneRouteFailedSchema = z
     attemptId: z.string().min(1).max(128),
     reason: controlPlaneFailureReasonSchema,
     subtype: controlPlaneWorkspaceFailureSubtypeSchema.optional().catch(undefined),
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 const controlPlaneRouteLostSchema = z
@@ -571,6 +604,7 @@ const controlPlaneRouteLostSchema = z
     state: z.literal('lost'),
     attemptId: z.string().min(1).max(128),
     reason: controlPlaneFailureReasonSchema,
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 
@@ -627,6 +661,7 @@ export const controlPlaneDeliverPayloadSchema = z
   .object({
     sessionId: z.string().min(1),
     messages: z.array(controlPlanePromptPayloadSchema).min(1),
+    allocationId: z.string().min(1).max(128).optional(),
   })
   .strict();
 
@@ -964,8 +999,6 @@ const controlPlaneWorktreeDeleteFrameSchema = z
     payload: controlPlaneWorktreeDeletionPayloadSchema,
   })
   .strict();
-
-// --- terminals (B10) --------------------------------------------------------
 
 /**
  * Session DO -> Sandbox DO terminal request (spec §10). The Sandbox DO forwards

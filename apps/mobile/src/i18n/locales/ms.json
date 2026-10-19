@@ -133,10 +133,13 @@
     "status": "Keadaan",
     "truncated": "Dipotong",
     "updated": "Dikemas kini",
+    "generating": "Menjana…",
     "working": "Memproses…",
     "yourOwnRepositories": "Repositori anda sendiri",
     "dismissed": "Diketepikan",
     "agent": "ejen",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Perubahan"
   },
   "language": {
@@ -833,7 +836,8 @@
       "kiloclaw": "Aktiviti KiloClaw",
       "balance": "Amaran baki",
       "security": "Dapatan keselamatan",
-      "spend": "Amaran perbelanjaan"
+      "spend": "Amaran perbelanjaan",
+      "followedSessions": "Sesi diikuti"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam perbualan anda",
@@ -1256,7 +1260,7 @@
         "stoppedTitle": "Persediaan dihentikan",
         "stoppedBody": "Tika {{name}} terhenti secara tidak dijangka semasa persediaan.",
         "stalledTitle": "Proses tergendala",
-        "stalledBody": "Kami tidak dapat menyiapkan {{name}}. Cuba lagi atau hantar e-mel ke hi@kilo.ai jika masalah ini berulang.",
+        "stalledBody": "Kami tidak dapat menyiapkan {{name}}. Cuba lagi atau hantar e-mel ke {{supportEmail}} jika masalah ini berulang.",
         "timeoutTitle": "Mengambil masa lebih lama daripada jangkaan",
         "timeoutBody": "Persediaan untuk {{name}} mengambil masa lebih lama daripada biasa (lebih daripada {{displayMinutes}} minit).",
         "continueInBackground": "Teruskan di latar belakang",
@@ -1314,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Pelan akses awal anda memerlukan semakan manual sebelum boleh digunakan pada peranti mudah alih.",
       "iosTitle": "KiloClaw tidak tersedia dalam iOS",
       "iosBody": "Akses KiloClaw diuruskan di luar apl iOS untuk akaun ini.",
-      "iosContact": "Ada soalan? Hubungi hi@kilo.ai.",
+      "iosContact": "Ada soalan? Hubungi {{supportEmail}}.",
       "quarantinedCta": "Hantar e-mel kepada pasukan kami",
       "nonCanonicalEarlybirdCta": "Semak pelan anda di kilo.ai"
     },
@@ -1549,7 +1553,7 @@
         "recoveryLabel": "Kemas kini apl GitHub"
       },
       "githubIpAllowList": {
-        "description": "Penyemak Kod dinyahdayakan kerana senarai alamat IP yang dibenarkan oleh organisasi GitHub ini menyekat Kilo. Hubungi hi@kilocode.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
+        "description": "Penyemak Kod dinyahdayakan kerana senarai alamat IP yang dibenarkan oleh organisasi GitHub ini menyekat Kilo. Hubungi {{supportEmail}} untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
       },
       "gitlabProjectAccessRequired": {
         "description": "Penyemak Kod dinyahdayakan kerana Kilo tidak dapat mencipta token akses projek GitLab untuk projek ini. Berikan akses penyelenggara atau dayakan token akses projek, kemudian dayakan Penyemak Kod semula.",
@@ -1564,7 +1568,7 @@
         "recoveryLabel": "Kemas kini tetapan Penyemak Kod"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Penyemak Kod dinyahdayakan selepas tiga percubaan mengklon repositori melebihi had masa hari ini. Hubungi hi@kilocode.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
+        "description": "Penyemak Kod dinyahdayakan selepas tiga percubaan mengklon repositori melebihi had masa hari ini. Hubungi {{supportEmail}} untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
       },
       "title": "Penyemak kod memerlukan perhatian anda.",
       "recoveryLabel": "Hubungi sokongan"
@@ -2088,6 +2092,8 @@
       "title": "Sesi",
       "copyErrorDetails": "Salin butiran ralat",
       "backToSessions": "Kembali ke sesi",
+      "follow": "Ikuti pada Skrin Kunci",
+      "unfollow": "Berhenti mengikuti pada Skrin Kunci",
       "couldNotLoad": "Tidak dapat memuatkan sesi.",
       "failedToLoadDetails": "Gagal memuatkan butiran sesi.",
       "failedToStopExecution": "Gagal menghentikan pelaksanaan.",
@@ -2423,6 +2429,7 @@
       "title": "Ejen memerlukan maklumat",
       "skipQuestionsTitle": "Langkau soalan?",
       "skipQuestionsMessage": "Ejen akan melangkau langkah ini.",
+      "answerProgress": "{{answered}} daripada {{total}} dijawab",
       "selectAllThatApply": "Pilih semua yang berkenaan.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, dipilih",
@@ -2491,6 +2498,7 @@
       "title": "Tapis sesi",
       "platformCloud": "Awan",
       "platformExtension": "Sambungan",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3100,6 +3108,9 @@
     "ssoError": "Organisasi anda memerlukan SSO. Gunakan '$t(login.moreSignInOptions)'.",
     "blocked": "Akaun ini telah disekat. Sila hubungi sokongan.",
     "signupRateLimited": "Terlalu banyak percubaan. Sila cuba lagi kemudian.",
+    "signupStepUp": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.moreSignInOptions)'.",
+    "signupStepUpApple": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.signInWithApple)'.",
+    "signupStepUpGoogle": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.signInWithGoogle)'.",
     "invalidCode": "Kod itu tidak betul. Sila cuba lagi.",
     "codeInProgress": "Kod anda sedang diproses. Tunggu seketika dan cuba lagi.",
     "tooManyAttempts": "Terlalu banyak percubaan. Sila minta kod baharu.",
@@ -3170,6 +3181,8 @@
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
     "openSession": "Buka",
+    "finished": "Selesai",
+    "followFailed": "Tidak dapat memaparkan ejen ini pada Skrin Kunci.",
     "approveFailed": "Tidak dapat meluluskan. Ketik $t(common.approve) untuk mencuba semula.",
     "checked": "Disemak",
     "lastKnown": "Terakhir diketahui",
@@ -3178,7 +3191,26 @@
     "waitingForYou": "Menunggu anda",
     "nextScheduled": "Jadual seterusnya",
     "answerNeeded": "Perlu jawapan",
-    "waitingToRetry": "Menunggu cubaan semula"
+    "waitingToRetry": "Menunggu cubaan semula",
+    "step": {
+      "editing": "Menyunting",
+      "reading": "Membaca",
+      "running": "Jalankan",
+      "searching": "Carian web",
+      "thinking": "Sedang berfikir"
+    },
+    "planOf": "daripada",
+    "filesChanged": "fail diubah",
+    "finishedIn": "Selesai dalam",
+    "noActivityFor": "Tiada aktiviti selama",
+    "prOpened": "Permintaan tarik dibuka",
+    "permissionWants": "Ingin menjalankan",
+    "failure": {
+      "provider": "Berhenti: ralat pembekal",
+      "tool": "Berhenti: ralat alat",
+      "cancelled": "Berhenti: dibatalkan",
+      "other": "DIHENTIKAN"
+    }
   },
   "transcriptionModel": {
     "title": "Model transkripsi",
@@ -3214,8 +3246,12 @@
     "list": {
       "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
       "new": "Sembang baharu",
-      "openHint": "Membuka sembang. Tekan lama untuk memadam.",
       "deleteTitle": "Padam sembang ini?"
+    },
+    "rename": {
+      "title": "Namakan semula sembang",
+      "accessibility": "Namakan semula sembang: {{title}}",
+      "openHint": "Membuka sembang. Tekan lama untuk menamakan semula atau memadam."
     },
     "beta": "Beta",
     "details": {
@@ -3292,6 +3328,10 @@
     },
     "backends": {
       "title": "Sistem pelayan sembang",
+      "providersTitle": "Penyedia sembang",
+      "cloud": "Di awan",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Model Kilo tidak tersedia buat masa ini. Semak sambungan anda.",
       "manage": "Urus sistem pelayan",
       "defaultKilo": "$t(consent.kilo) (lalai)",
       "kiloHelp": "Sistem pelayan terbina dalam menggunakan akaun Kilo anda dan tidak boleh diedit atau dipadam.",
@@ -3351,7 +3391,6 @@
     "gguf": {
       "title": "Model yang boleh dimuat turun",
       "help": "Muat turun model terbuka dan jalankannya pada telefon ini dengan llama.cpp. Gesaan dan balasan anda kekal pada peranti. Model bersaiz besar, jadi gunakan Wi-Fi.",
-      "details": "{{size}} · Lesen: {{license}}",
       "download": "Muat turun model",
       "pause": "Jeda muat turun",
       "resume": "Sambung muat turun",
@@ -3363,6 +3402,8 @@
       "url": "Pautan muat turun terus",
       "urlHelp": "Tampal pautan HTTPS ke fail .gguf, seperti pautan resolve Hugging Face. Muat turun model hanya daripada sumber yang anda percaya.",
       "downloadUrl": "Muat turun daripada pautan",
+      "advanced": "Lanjutan",
+      "localPurpose": "Berjalan pada peranti ini dengan llama.cpp. Gesaan dan balasan kekal pada peranti.",
       "deleteTitle": "Padam model ini?",
       "deleteMessage": "Padam {{name}} daripada peranti ini? Sembang yang menggunakannya memerlukan model lain sebelum boleh diteruskan.",
       "errors": {
@@ -3391,8 +3432,17 @@
         "fits": "Sesuai",
         "tight": "Hampir tidak muat",
         "tooLarge": "Terlalu besar",
-        "noStorage": "Storan tidak mencukupi"
+        "noStorage": "Storan tidak mencukupi",
+        "unknown": "Kesesuaian tidak diketahui"
       },
+      "recommendationsHelp": "Senarai pendek yang disematkan oleh apl ini: satu fail setiap model, daripada penerbit yang menyatakan lesen. Tiada yang lain diberi kedudukan.",
+      "compatibilityHelp": "Kesesuaian membandingkan fail model dengan memori dan storan bebas peranti ini. Angka memori ialah anggaran, bukan ukuran.",
+      "text": "Teks",
+      "listTextPurpose": "Gesaan teks sahaja.",
+      "listImagePurpose": "Membaca imej serta teks.",
+      "smallestDownload": "Muat turun terkecil: {{size}} · kira-kira {{memory}} memori",
+      "fullFileName": "Fail: {{name}}",
+      "memoryEstimateNote": "Angka memori ialah anggaran, bukan ukuran.",
       "parameters": "Parameter: {{value}}",
       "downloads": "Muat turun: {{value}}",
       "likes": "Suka: {{value}}",
@@ -3417,7 +3467,8 @@
     },
     "localModels": {
       "title": "Model pada peranti",
-      "help": "Model pada peranti berjalan pada telefon ini. Gesaan dan balasan anda kekal pada peranti, dan model ini tidak boleh menggunakan alat.",
+      "help": "Model pada peranti berjalan pada telefon ini. Gesaan dan balasan anda kekal pada peranti.",
+      "systemPurpose": "Model yang terbina dalam sistem peranti ini. Ia berjalan pada peranti.",
       "apple": "Apple Intelligence (pada peranti)",
       "checking": "Menyemak ketersediaan…",
       "ready": "Sedia untuk digunakan",
@@ -3718,12 +3769,26 @@
       "startNow": "Mulakan tanpa semakan",
       "startNowHint": "Tekan lama untuk mulakan tanpa semakan",
       "titleLabel": "Tajuk tugasan",
+      "renameTitle": "Namakan semula tugasan",
       "notes": "Nota",
-      "notesPlaceholder": "Tambah nota dalam Markdown",
+      "addNotes": "Tambah nota",
+      "notesPrompt": "Tambah konteks, keperluan atau kriteria penerimaan.",
+      "markdownSupported": "Markdown disokong",
       "sessions": "Sesi dipautkan",
       "noSessions": "Belum ada sesi",
+      "untitledLinkedSession": "Sesi berpaut",
+      "sessionNeedsInput": "Sesi perlukan input",
+      "sessionRunning": "Sesi sedang berjalan",
+      "sessionFinished": "Sesi selesai",
+      "sessionPullRequest": "Permintaan tarik sesi",
+      "sessionPullRequestNumber": "PR sesi #{{number}}",
+      "openSessionHint": "Membuka sesi.",
+      "unlinkSessionAction": "Nyahpaut sesi",
+      "unlinkConfirmTitle": "Nyahpaut {{title}}?",
+      "unlinkConfirmMessage": "Sesi itu sendiri tidak dipadamkan. Hanya pautannya pada tugasan ini dialihkan.",
+      "startNewSession": "Mulakan sesi baharu",
+      "startNewSessionHint": "Tekan lama untuk memulakan sesi baharu.",
       "linkSession": "Pautkan sesi",
-      "unlinkSession": "Nyahpaut {{title}}",
       "linkFailed": "Tidak dapat memautkan sesi pada tugasan"
     },
     "linkSession": {
@@ -3741,5 +3806,69 @@
       "title": "Simpan ke senarai",
       "saved": "Disimpan ke {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Taklimat pagi",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Sesetengah aktiviti lampau mungkin tiada. ≥ bermaksud sekurang-kurangnya sebanyak ini; tidak diketahui bukan bermakna sifar.",
+    "available": "Taklimat tersedia",
+    "history": "Sejarah taklimat",
+    "historyHint": "Laporan disimpan selama 30 hari, termasuk laporan yang ditolak.",
+    "settings": "Tetapan taklimat",
+    "empty": "Tiada aktiviti semalaman",
+    "emptyHint": "Sesi pengekodan awan dan CLI anda akan muncul di sini selepas malam yang aktif.",
+    "loadError": "Tidak dapat memuatkan taklimat",
+    "sessions": "Aktif semalaman",
+    "pullRequests": "PRs dibuka",
+    "blockers": "Penghalang baharu",
+    "spend": "Perbelanjaan semalaman",
+    "view": "Baca taklimat",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Tunjukkan status langsung",
+    "offline": "Luar talian · taklimat disimpan",
+    "cached": "Laporan disimpan · muat semula tidak tersedia",
+    "revised": "Disemak · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "Ringkasan AI",
+    "summaryDisabled": "Laporan berstruktur · AI dimatikan untuk konteks ini",
+    "summaryPending": "Ringkasan AI sedang diproses. Ia akan dilampirkan di sini apabila sedia.",
+    "summaryFailed": "Ringkasan AI gagal. Mencuba lagi mungkin dikenakan caj lain.",
+    "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan berstruktur anda masih tersedia.",
+    "summaryOutdated": "Ringkasan ini lebih awal daripada semakan laporan terkini.",
+    "summaryCharge": "Caj AI {{cost}}",
+    "summaryChargePending": "Caj AI menunggu penyelarasan",
+    "generate": "Jana ringkasan",
+    "retrySummary": "Cuba lagi ringkasan berbayar",
+    "sources": "Bukti dan artifak",
+    "timezone": "Zon waktu taklimat",
+    "deviceTimezone": "Guna zon waktu peranti",
+    "timezoneHint": "Zon waktu IANA, contohnya Europe/Berlin. Perubahan jadual berkuat kuasa untuk malam akan datang.",
+    "nightStart": "Malam bermula",
+    "morningStart": "Malam tamat / pagi bermula",
+    "morningEnd": "Pagi tamat",
+    "timeHint": "Kad Utama memulihkan status langsung apabila pagi tamat, walaupun luar talian.",
+    "invalidSchedule": "Pilih zon waktu yang sah serta tempoh malam dan pagi yang tidak bertindih dan tidak kosong.",
+    "notificationsHint": "Satu pemberitahuan umum setiap pagi apabila laporan pertama anda sedia. Bebas daripada ringkasan AI berbayar.",
+    "notificationPermission": "Dayakan pemberitahuan peranti dalam $t(common.notifications) untuk menerima taklimat anda.",
+    "aiOptIn": "Ringkasan AI berbayar",
+    "aiHint": "Pilihan untuk konteks ini sahaja. Petikan terpilih yang disunting dan fakta berstruktur dihantar ke model anda dalam bahasa aplikasi anda. Caj menggunakan baki konteks ini.",
+    "defaultModel": "Guna model lalai Kilo",
+    "duration": "Had masa (minit)",
+    "spendLimit": "Had perbelanjaan (USD)",
+    "safeguardHint": "Had terhingga bagi setiap ringkasan, bukan bajet harian. Lalai: 10 minit dan $2. Laporan diterbitkan selepas paling lama lima minit sementara penjanaan diteruskan dalam had ini.",
+    "invalidSafeguards": "Masukkan had masa dan perbelanjaan yang positif dan terhingga.",
+    "estimate": "Anggaran {{estimate}} · maksimum {{maximum}}",
+    "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini.",
+    "confirmPaid": "Dayakan ringkasan berbayar untuk {{context}}?",
+    "confirmGeneration": "Jana ringkasan berbayar?",
+    "paidDisclosure": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
+    "enable": "Dayakan ringkasan berbayar",
+    "contextSettings": "Tetapan AI · {{context}}",
+    "allContexts": "Taklimat peribadi dan organisasi kekal berasingan.",
+    "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
+    "estimateBalanceUnavailable": "Baki tidak mencukupi untuk ringkasan berbayar.",
+    "estimateModelNotAllowed": "Model ini tidak dibenarkan di sini.",
+    "estimateSpendLimitTooLow": "Naikkan had perbelanjaan untuk membenarkan ringkasan ini."
   }
 }

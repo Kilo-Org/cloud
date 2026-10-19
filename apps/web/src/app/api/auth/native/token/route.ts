@@ -21,6 +21,7 @@ import {
   findUserByNormalizedEmail,
   findUserIdByAuthProvider,
   type CreateOrUpdateUserArgs,
+  type CreateOrUpdateUserResult,
 } from '@/lib/user';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
@@ -62,6 +63,20 @@ function eligibilityResponse(
         : {}),
     },
     { status: eligibility.status }
+  );
+}
+
+/**
+ * A refused user settlement. An unavailable signup is retryable (503); a step-up names the
+ * sign-in methods that can finish the signup.
+ */
+function settlementFailureResponse(failure: Extract<CreateOrUpdateUserResult, { success: false }>) {
+  if (failure.error === 'SIGNUP-STEP-UP') {
+    return NextResponse.json({ error: failure.error, methods: failure.methods }, { status: 403 });
+  }
+  return NextResponse.json(
+    { error: failure.error },
+    { status: failure.error === 'SIGNUP-UNAVAILABLE' ? 503 : 403 }
   );
 }
 
@@ -367,10 +382,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       );
       if (!result.success) {
         phase = 'release';
-        return NextResponse.json(
-          { error: result.error },
-          { status: result.error === 'SIGNUP-UNAVAILABLE' ? 503 : 403 }
-        );
+        return settlementFailureResponse(result);
       }
 
       if (result.user.blocked_reason) {
@@ -550,10 +562,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     true
   );
   if (!result.success) {
-    return NextResponse.json(
-      { error: result.error },
-      { status: result.error === 'SIGNUP-UNAVAILABLE' ? 503 : 403 }
-    );
+    return settlementFailureResponse(result);
   }
 
   if (result.user.blocked_reason) {

@@ -53,6 +53,10 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 // starter/`hasText` gating can be observed across a re-render, not just the
 // mount-time initial value.
 const stateSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
+const keyboardState = vi.hoisted(() => ({ height: 0 }));
+const keyboardProgress = vi.hoisted(() => ({ value: 0 }));
+const sharedSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
+const toolbarShown = vi.hoisted(() => ({ value: true }));
 const returnSendsPref = vi.hoisted(() => ({ returnSendsMessage: false }));
 const reducedMotionOn = vi.hoisted(() => ({ value: false }));
 
@@ -99,10 +103,7 @@ vi.mock('react-native', () => ({
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
-  Keyboard: {
-    addListener: vi.fn(() => ({ remove: vi.fn() })),
-    dismiss: vi.fn(),
-  },
+  Keyboard: { dismiss: vi.fn() },
   I18nManager: layoutDirection,
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
@@ -113,6 +114,12 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeAreaInsets,
+}));
+
+// The composer reads the keyboard from the provider, not from a listener of its own.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T>(selector: (state: { height: number }) => T) => selector(keyboardState),
+  useReanimatedKeyboardAnimation: () => ({ progress: keyboardProgress, height: { value: 0 } }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -156,6 +163,12 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useSharedValue: <T>(initial: T) => {
+    const index = sharedSlots.cursor;
+    sharedSlots.cursor += 1;
+    return (sharedSlots.slots[index] ??= { value: initial as unknown }) as { value: T };
+  },
+  useAnimatedStyle: (style: () => unknown) => style(),
 }));
 vi.mock('@/lib/a11y/motion', () => ({
   selectReducedMotionEntrance: <T>(reduced: boolean, entrance: T) =>
@@ -256,7 +269,7 @@ vi.mock('@/components/agents/chat-composer-input-state', () => ({
       inputAccessibilityDisabled: false,
       inputEditable: true,
       paperclipDisabled: false,
-      showToolbar: true,
+      showToolbar: toolbarShown.value,
       toolbarDisabled: false,
       voiceDisabled: false,
     };
@@ -493,12 +506,14 @@ function findNode(
 async function mount(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.slots.length = 0;
   stateSlots.slots.length = 0;
+  sharedSlots.slots.length = 0;
   return rerender(props);
 }
 
 async function rerender(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.cursor = 0;
   stateSlots.cursor = 0;
+  sharedSlots.cursor = 0;
   const { ChatComposer } = await import('./chat-composer');
   return ChatComposer(props);
 }
@@ -518,6 +533,9 @@ beforeEach(() => {
   returnSendsPref.returnSendsMessage = false;
   reducedMotionOn.value = false;
   layoutDirection.isRTL = false;
+  keyboardState.height = 0;
+  keyboardProgress.value = 0;
+  toolbarShown.value = true;
   voiceStatus.value = 'idle';
   safeAreaInsets.bottom = 0;
   safeAreaInsets.left = 0;
@@ -850,6 +868,82 @@ describe('ChatComposer reduced motion', () => {
     const toolbarView = findNode(render, type => type === 'Animated.View');
     expect(toolbarView).not.toBeNull();
     expect(toolbarView?.props.entering).toBeUndefined();
+  });
+});
+
+type LayoutHandler = (event: { nativeEvent: { layout: { height: number } } }) => void;
+function isLayoutHandler(value: unknown): value is LayoutHandler {
+  return typeof value === 'function';
+}
+
+describe('ChatComposer toolbar row on keyboard dismiss', () => {
+  function toolbarRow(render: React.ReactElement) {
+    const row = findNode(
+      render,
+      (type, props) => type === 'Animated.View' && typeof props.onLayout === 'function'
+    );
+    if (row === null) {
+      throw new Error('toolbar row not found');
+    }
+    const { style, onLayout } = row.props;
+    if (
+      typeof style !== 'object' ||
+      style === null ||
+      !('maxHeight' in style) ||
+      typeof style.maxHeight !== 'number' ||
+      !isLayoutHandler(onLayout)
+    ) {
+      throw new Error('toolbar row has no clamped style or layout handler');
+    }
+    return {
+      maxHeight: style.maxHeight,
+      layout: (height: number) => {
+        onLayout({ nativeEvent: { layout: { height } } });
+      },
+    };
+  }
+
+  it('gives the hidden row height back in step with the keyboard, not after it lands', async () => {
+    const props = makeProps({});
+    keyboardState.height = 300;
+    keyboardProgress.value = 1;
+    toolbarRow(await mount(props)).layout(38);
+
+    // Blur: the chip hides while the JS keyboard height still reports open.
+    toolbarShown.value = false;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+
+    keyboardProgress.value = 0.5;
+    const halfway = toolbarRow(await rerender(props));
+    expect(halfway.maxHeight).toBe(19);
+    // A layout pass at the clamped height must not replace the row's natural
+    // height, or an interactive dismiss that reverses would reopen it short.
+    halfway.layout(19);
+    keyboardProgress.value = 1;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+
+    // The keyboard has landed but its JS height has not reached zero yet: the
+    // row already takes no space, so its later unmount moves nothing.
+    keyboardProgress.value = 0;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(0);
+  });
+
+  it('unclamps a row that mounted collapsed once the chip is shown', async () => {
+    const props = makeProps({});
+    keyboardState.height = 300;
+    keyboardProgress.value = 1;
+    toolbarShown.value = false;
+    expect(toolbarRow(await mount(props)).maxHeight).toBe(0);
+
+    // Focus lands after the keyboard started: the row must open to its
+    // natural height instead of staying at the collapsed height.
+    toolbarShown.value = true;
+    const shown = toolbarRow(await rerender(props));
+    expect(shown.maxHeight).toBeGreaterThan(1000);
+    shown.layout(38);
+
+    toolbarShown.value = false;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
   });
 });
 

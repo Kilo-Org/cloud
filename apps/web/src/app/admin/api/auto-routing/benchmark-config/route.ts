@@ -1,4 +1,8 @@
-import { BenchmarkConfigSchema } from '@kilocode/auto-routing-contracts';
+import {
+  AutoRouterSchema,
+  BenchmarkConfigSchema,
+  DEFAULT_AUTO_ROUTER,
+} from '@kilocode/auto-routing-contracts';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -8,11 +12,15 @@ import {
 import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from '@/lib/model-api-kinds';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
-export async function GET() {
+export async function GET(request?: NextRequest) {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const result = await getBenchmarkConfig();
+  const router = AutoRouterSchema.safeParse(
+    request?.nextUrl.searchParams.get('router') ?? DEFAULT_AUTO_ROUTER
+  );
+  if (!router.success) return NextResponse.json({ error: 'Invalid router' }, { status: 400 });
+  const result = await getBenchmarkConfig(router.data);
   return NextResponse.json(result.body, { status: result.status });
 }
 

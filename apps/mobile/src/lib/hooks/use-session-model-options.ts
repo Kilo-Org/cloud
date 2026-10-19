@@ -35,6 +35,11 @@ export type SessionModelOption = {
   overrideSource?: RemoteModelOverride['source'];
   showGatewayMetadata: boolean;
   unavailable?: boolean;
+  /**
+   * What a custom or on-device chat model receives. Absent for Kilo models: all
+   * of them receive tools, and the attach control shows which read images.
+   */
+  capabilities?: { tools: boolean; images: boolean };
 };
 
 type BuildSessionModelOptionsInput = {

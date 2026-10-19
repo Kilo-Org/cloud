@@ -203,6 +203,13 @@ const config: ExpoConfig = {
       // be enabled on the App ID (`com.kilocode.kiloapp`) in the Apple
       // Developer portal for a provisioning profile to include it.
       'com.apple.developer.usernotifications.time-sensitive': true,
+      // A GGUF context for on-device llama.rn inference needs the raised memory
+      // ceiling. These stay on for every build profile: EAS syncs App ID
+      // capabilities from the entitlements of whichever build or `eas
+      // credentials` run touches `com.kilocode.kiloapp`, so a run without them
+      // disables both capabilities and the App Store profile loses them.
+      'com.apple.developer.kernel.extended-virtual-addressing': true,
+      'com.apple.developer.kernel.increased-memory-limit': true,
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -232,7 +239,7 @@ const config: ExpoConfig = {
     googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',
     adaptiveIcon: {
-      backgroundColor: '#FAF74F',
+      backgroundColor: '#FFDD00',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
@@ -318,14 +325,16 @@ const config: ExpoConfig = {
         },
       },
     ],
-    // llama.cpp for on-device GGUF inference. The two options are the defaults
-    // turned off: the podspec already compiles itself as C++20, and the app
-    // offloads nothing to Android GPUs, so neither global Podfile flags nor
-    // Qualcomm native libraries belong in the manifest. iOS memory entitlements
-    // stay on: a GGUF context needs the raised ceiling.
+    // llama.cpp for on-device GGUF inference. Each option below turns off a
+    // plugin behavior that is on by default. The podspec already compiles
+    // itself as C++20, and the app offloads nothing to Android GPUs, so neither
+    // global Podfile flags nor Qualcomm native libraries belong in the
+    // manifest. The plugin adds the iOS memory entitlements only under the
+    // production profile, so ios.entitlements declares them for every profile.
     [
       'llama.rn',
       {
+        enableEntitlements: false,
         forceCxx20: false,
         enableOpenCLAndHexagon: false,
       },
@@ -368,7 +377,7 @@ const config: ExpoConfig = {
       'expo-notifications',
       {
         icon: './assets/images/android-notification-icon.png',
-        color: '#FAF74F',
+        color: '#FFDD00',
         // Name the channel Firebase falls back to when a message omits
         // `channel_id`. Without it FirebaseMessaging logs "Missing Default
         // Notification Channel metadata in AndroidManifest" on every message.
@@ -407,7 +416,7 @@ const config: ExpoConfig = {
       './plugins/withBrandedSplash',
       {
         image: './assets/images/logo-mark.png',
-        backgroundColor: '#FAF74F',
+        backgroundColor: '#FFDD00',
         imageWidth: 100,
       },
     ],

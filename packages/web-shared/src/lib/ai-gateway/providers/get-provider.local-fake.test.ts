@@ -15,7 +15,10 @@ import {
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  ReasoningDetailsTransform,
+  type TransformRequestContext,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
@@ -55,7 +58,6 @@ function providerInput(requestedModel: string) {
     } satisfies GatewayRequest,
     user,
     organizationId: undefined,
-    taskId: undefined,
   };
 }
 
@@ -68,7 +70,6 @@ function responsesInput(requestedModel: string) {
     } satisfies GatewayRequest,
     user,
     organizationId: undefined,
-    taskId: undefined,
     clientIp: null,
     machineId: null,
   };
@@ -192,7 +193,6 @@ describe('getProvider local fake deterministic routing', () => {
         expect(shouldRouteToVercel).toHaveBeenCalledWith(
           modelId,
           input.request,
-          user.id,
           expect.any(Function)
         );
       }
@@ -206,17 +206,14 @@ describe('getProvider exclusive model routing', () => {
     jest.mocked(getModelUserByokProviders).mockReset().mockResolvedValue([]);
   });
 
-  test.each(kiloExclusiveModels)(
-    'routes $public_id to its provider unless disabled',
-    async model => {
-      const result = await getProvider(providerInput(model.public_id));
-      expect(result.kind).toBe('provider');
-      if (result.kind !== 'provider') throw new Error('Expected a provider');
-      expect(result.provider).toBe(model.status === 'disabled' ? OPENROUTER : model.provider);
-      expect(result.userByok).toBeNull();
-      expect(result.bypassAccessCheck).toBe(false);
-    }
-  );
+  test.each(kiloExclusiveModels)('routes $public_id to its provider', async model => {
+    const result = await getProvider(providerInput(model.public_id));
+    expect(result.kind).toBe('provider');
+    if (result.kind !== 'provider') throw new Error('Expected a provider');
+    expect(result.provider).toBe(model.provider);
+    expect(result.userByok).toBeNull();
+    expect(result.bypassAccessCheck).toBe(false);
+  });
 
   test.each(kiloExclusiveModels.filter(({ provider }) => provider === MARTIAN))(
     'does not divert $public_id to Vercel or BYOK',
@@ -426,7 +423,7 @@ describe('getProvider direct BYOK routing', () => {
           base_url: 'https://direct-byok.example/v1',
           base_url_overrides: {},
           supported_chat_apis: ['chat_completions', 'responses', 'messages'],
-          default_ai_sdk_provider: 'openai-compatible',
+          reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
           transformRequest: directByokTransform,
           models: async () => [],
         },
@@ -465,6 +462,7 @@ describe('getProvider direct BYOK routing', () => {
       });
 
       expect(result.provider.id).toBe('direct-byok');
+      expect(result.provider.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
       expect(result.userByok).toEqual([{ decryptedAPIKey: 'user-direct-key', providerId }]);
       expect(directByokTransform).toHaveBeenCalledTimes(1);
       expect(request.body).not.toHaveProperty('provider');

@@ -133,10 +133,13 @@
     "status": "Estat",
     "truncated": "Truncat",
     "updated": "Actualitzat",
+    "generating": "Generant…",
     "working": "En curs",
     "yourOwnRepositories": "Els teus repositoris",
     "dismissed": "Descartat",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Canvis"
   },
   "language": {
@@ -849,7 +852,8 @@
       "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",
       "security": "Problemes de seguretat",
-      "spend": "Alertes de despesa"
+      "spend": "Alertes de despesa",
+      "followedSessions": "Sessions seguides"
     },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",
@@ -1274,7 +1278,7 @@
         "stoppedTitle": "Configuració aturada",
         "stoppedBody": "La instància de {{name}} s'ha aturat inesperadament durant la configuració.",
         "stalledTitle": "Alguna cosa s'ha encallat",
-        "stalledBody": "No hem pogut acabar de configurar {{name}}. Torna-ho a provar o escriu a hi@kilo.ai si el problema persisteix.",
+        "stalledBody": "No hem pogut acabar de configurar {{name}}. Torna-ho a provar o escriu a {{supportEmail}} si el problema persisteix.",
         "timeoutTitle": "Tarda més del previst",
         "timeoutBody": "La configuració de {{name}} tarda més del normal (més de {{displayMinutes}} minuts).",
         "continueInBackground": "Continua en segon pla",
@@ -1332,7 +1336,7 @@
       "nonCanonicalEarlybirdBody": "El teu pla d'accés anticipat requereix una revisió manual abans de poder-se utilitzar al mòbil.",
       "iosTitle": "KiloClaw no està disponible a iOS",
       "iosBody": "L'accés d'aquest compte a KiloClaw es gestiona fora de l'aplicació per a iOS.",
-      "iosContact": "Tens preguntes? Contacta amb hi@kilo.ai.",
+      "iosContact": "Tens preguntes? Contacta amb {{supportEmail}}.",
       "quarantinedCta": "Escriu al nostre equip",
       "nonCanonicalEarlybirdCta": "Revisa el teu pla a kilo.ai"
     },
@@ -1568,7 +1572,7 @@
         "recoveryLabel": "Actualitza l'aplicació de GitHub"
       },
       "githubIpAllowList": {
-        "description": "El revisor de codi s'ha desactivat perquè aquesta organització de GitHub utilitza una llista d'adreces IP permeses que bloqueja Kilo. Contacta amb hi@kilocode.ai per demanar ajuda i torna a activar el revisor de codi."
+        "description": "El revisor de codi s'ha desactivat perquè aquesta organització de GitHub utilitza una llista d'adreces IP permeses que bloqueja Kilo. Contacta amb {{supportEmail}} per demanar ajuda i torna a activar el revisor de codi."
       },
       "gitlabProjectAccessRequired": {
         "description": "El revisor de codi s'ha desactivat perquè Kilo no pot crear un testimoni d'accés per a aquest projecte de GitLab. Concedeix accés de mantenidor o activa els testimonis d'accés al projecte i torna a activar el revisor de codi.",
@@ -1583,7 +1587,7 @@
         "recoveryLabel": "Actualitza la configuració del revisor de codi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "El revisor de codi s'ha desactivat perquè avui s'ha superat tres cops el temps límit per clonar el repositori. Contacta amb hi@kilocode.ai per demanar ajuda i torna a activar el revisor de codi."
+        "description": "El revisor de codi s'ha desactivat perquè avui s'ha superat tres cops el temps límit per clonar el repositori. Contacta amb {{supportEmail}} per demanar ajuda i torna a activar el revisor de codi."
       },
       "title": "El revisor de codi necessita la teva atenció.",
       "recoveryLabel": "Contacta amb l'equip de suport"
@@ -2116,6 +2120,8 @@
       "title": "Sessió",
       "copyErrorDetails": "Copia els detalls de l'error",
       "backToSessions": "Torna a les sessions",
+      "follow": "Segueix a la pantalla de bloqueig",
+      "unfollow": "Deixa de seguir a la pantalla de bloqueig",
       "couldNotLoad": "No s'ha pogut carregar la sessió.",
       "failedToLoadDetails": "No s'han pogut carregar els detalls de la sessió.",
       "failedToStopExecution": "No s'ha pogut aturar l'execució.",
@@ -2455,6 +2461,7 @@
       "title": "L'agent necessita una resposta",
       "skipQuestionsTitle": "Vols ometre les preguntes?",
       "skipQuestionsMessage": "L'agent ometrà aquest pas.",
+      "answerProgress": "{{answered}} de {{total}} respostes",
       "selectAllThatApply": "Selecciona totes les opcions que corresponguin.",
       "option": "Opció: {{label}}",
       "optionSelected": "{{label}}, seleccionada",
@@ -2524,6 +2531,7 @@
       "title": "Filtre de sessions",
       "platformCloud": "Núvol",
       "platformExtension": "Extensió",
+      "platformDesktop": "Escriptori",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3141,6 +3149,9 @@
     "ssoError": "La teva organització requereix SSO. Utilitza «$t(login.moreSignInOptions)».",
     "blocked": "Aquest compte s'ha bloquejat. Contacta amb el servei d'assistència.",
     "signupRateLimited": "Has fet massa intents. Torna-ho a provar més tard.",
+    "signupStepUp": "Per acabar de crear el teu compte, utilitza «$t(login.moreSignInOptions)».",
+    "signupStepUpApple": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithApple)».",
+    "signupStepUpGoogle": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithGoogle)».",
     "invalidCode": "Aquest codi és incorrecte. Torna-ho a provar.",
     "codeInProgress": "S'està processant el teu codi. Espera un moment i torna-ho a provar.",
     "tooManyAttempts": "Has fet massa intents. Sol·licita un codi nou.",
@@ -3211,6 +3222,8 @@
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
     "openSession": "Obre",
+    "finished": "Acabat",
+    "followFailed": "No s'ha pogut mostrar aquest agent a la pantalla de bloqueig.",
     "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar.",
     "checked": "Comprovat",
     "lastKnown": "Últim estat conegut",
@@ -3219,7 +3232,26 @@
     "waitingForYou": "Esperant-te",
     "nextScheduled": "Properes programades",
     "answerNeeded": "Pendent de resposta",
-    "waitingToRetry": "Pendent de reintent"
+    "waitingToRetry": "Pendent de reintent",
+    "step": {
+      "editing": "Edició",
+      "reading": "Lectura",
+      "running": "Execució",
+      "searching": "Cerca web",
+      "thinking": "Pensant-ho bé"
+    },
+    "planOf": "de",
+    "filesChanged": "fitxers modificats",
+    "finishedIn": "Acabat en",
+    "noActivityFor": "Sense activitat durant",
+    "prOpened": "Sol·licitud d'extracció oberta",
+    "permissionWants": "Vol executar",
+    "failure": {
+      "provider": "Aturat: error del proveïdor",
+      "tool": "Aturat: error de l'eina",
+      "cancelled": "Aturat: cancel·lat",
+      "other": "ATURAT"
+    }
   },
   "transcriptionModel": {
     "title": "Model de transcripció",
@@ -3255,8 +3287,12 @@
     "list": {
       "loadFailed": "No s'ha pogut carregar l'historial del xat.",
       "new": "Xat nou",
-      "openHint": "Obre el xat. Mantén premut per suprimir.",
       "deleteTitle": "Vols suprimir aquest xat?"
+    },
+    "rename": {
+      "title": "Reanomena el xat",
+      "accessibility": "Reanomena el xat: {{title}}",
+      "openHint": "Obre el xat. Mantén premut per reanomenar-lo o suprimir-lo."
     },
     "beta": "Beta",
     "details": {
@@ -3333,6 +3369,10 @@
     },
     "backends": {
       "title": "Servidors de xat",
+      "providersTitle": "Proveïdors de xat",
+      "cloud": "Al núvol",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Els models de Kilo no estan disponibles ara mateix. Comprova la connexió.",
       "manage": "Gestiona els servidors",
       "defaultKilo": "$t(consent.kilo) (predeterminat)",
       "kiloHelp": "El servidor integrat utilitza el teu compte de Kilo i no es pot editar ni eliminar.",
@@ -3392,7 +3432,6 @@
     "gguf": {
       "title": "Models descarregables",
       "help": "Descarrega un model obert i executa'l en aquest telèfon amb llama.cpp. Les teves peticions i respostes es queden al dispositiu. Els models són grans, així que fes servir Wi-Fi.",
-      "details": "{{size}} · Llicència: {{license}}",
       "download": "Descarrega el model",
       "pause": "Pausa la descàrrega",
       "resume": "Reprèn la descàrrega",
@@ -3404,6 +3443,8 @@
       "url": "Enllaç de descàrrega directa",
       "urlHelp": "Enganxa un enllaç HTTPS a un fitxer .gguf, com ara un enllaç resolve de Hugging Face. Descarrega models només de fonts de confiança.",
       "downloadUrl": "Descarrega des de l'enllaç",
+      "advanced": "Avançat",
+      "localPurpose": "S'executa en aquest dispositiu amb llama.cpp. Les indicacions i les respostes es queden al dispositiu.",
       "deleteTitle": "Vols eliminar aquest model?",
       "deleteMessage": "Vols eliminar {{name}} d'aquest dispositiu? Els xats que el fan servir necessiten un altre model abans de poder continuar.",
       "errors": {
@@ -3432,8 +3473,17 @@
         "fits": "Hi cap",
         "tight": "Just",
         "tooLarge": "Massa gran",
-        "noStorage": "No hi ha prou espai"
+        "noStorage": "No hi ha prou espai",
+        "unknown": "Encaix desconegut"
       },
+      "recommendationsHelp": "Una llista que aquesta aplicació fixa: un fitxer per model, d'un editor que declara una llicència. No es classifica res més.",
+      "compatibilityHelp": "L'encaix compara el fitxer del model amb la memòria i l'emmagatzematge lliure d'aquest dispositiu. La xifra de memòria és una estimació, no una mesura.",
+      "text": "Text",
+      "listTextPurpose": "Només indicacions de text.",
+      "listImagePurpose": "Llegeix imatges i també text.",
+      "smallestDownload": "Descàrrega més petita: {{size}} · uns {{memory}} de memòria",
+      "fullFileName": "Fitxer: {{name}}",
+      "memoryEstimateNote": "Les xifres de memòria són estimacions, no mesures.",
       "parameters": "Paràmetres: {{value}}",
       "downloads": "Baixades: {{value}}",
       "likes": "M'agrada: {{value}}",
@@ -3458,7 +3508,8 @@
     },
     "localModels": {
       "title": "Models al dispositiu",
-      "help": "Els models al dispositiu s'executen en aquest telèfon. Les teves peticions i respostes es queden al dispositiu, i aquests models no poden fer servir eines.",
+      "help": "Els models al dispositiu s'executen en aquest telèfon. Les teves peticions i respostes es queden al dispositiu.",
+      "systemPurpose": "El model integrat al sistema d'aquest dispositiu. S'executa al dispositiu.",
       "apple": "Apple Intelligence (al dispositiu)",
       "checking": "S'està comprovant la disponibilitat…",
       "ready": "A punt per fer servir",
@@ -3763,12 +3814,26 @@
       "startNow": "Inicia sense revisió",
       "startNowHint": "Mantén premut per iniciar sense revisió",
       "titleLabel": "Títol de la tasca",
+      "renameTitle": "Canvia el nom de la tasca",
       "notes": "Notes",
-      "notesPlaceholder": "Afegeix notes en Markdown",
+      "addNotes": "Afegeix notes",
+      "notesPrompt": "Afegeix context, requisits o criteris d'acceptació.",
+      "markdownSupported": "Markdown compatible",
       "sessions": "Sessions vinculades",
       "noSessions": "Encara no hi ha sessions",
+      "untitledLinkedSession": "Sessió enllaçada",
+      "sessionNeedsInput": "La sessió necessita entrada",
+      "sessionRunning": "Sessió en marxa",
+      "sessionFinished": "Sessió acabada",
+      "sessionPullRequest": "PR de la sessió",
+      "sessionPullRequestNumber": "PR de la sessió #{{number}}",
+      "openSessionHint": "Obre la sessió.",
+      "unlinkSessionAction": "Desenllaça la sessió",
+      "unlinkConfirmTitle": "Vols desenllaçar {{title}}?",
+      "unlinkConfirmMessage": "La sessió en si no se suprimeix. Només se'n treu l'enllaç amb aquesta tasca.",
+      "startNewSession": "Inicia una sessió nova",
+      "startNewSessionHint": "Mantén premut per iniciar una sessió nova.",
       "linkSession": "Vincula una sessió",
-      "unlinkSession": "Desvincula {{title}}",
       "linkFailed": "No s'ha pogut vincular la sessió a la tasca"
     },
     "linkSession": {
@@ -3786,5 +3851,69 @@
       "title": "Desa a la llista",
       "saved": "Desada a {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Resum del matí",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Pot faltar part de l'activitat històrica. ≥ vol dir com a mínim aquesta quantitat; desconegut no és zero.",
+    "available": "Resums disponibles",
+    "history": "Historial de resums",
+    "historyHint": "Els informes es conserven 30 dies, inclosos els descartats.",
+    "settings": "Configuració del resum",
+    "empty": "Cap activitat durant la nit",
+    "emptyHint": "Les teves sessions de programació al núvol i a la CLI apareixeran aquí després d'una nit activa.",
+    "loadError": "No s'han pogut carregar els resums",
+    "sessions": "Actives durant la nit",
+    "pullRequests": "PRs obertes",
+    "blockers": "Nous bloquejos",
+    "spend": "Despesa nocturna",
+    "view": "Llegeix el resum",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Mostra l'estat en directe",
+    "offline": "Sense connexió · resum desat",
+    "cached": "Informe desat · no es pot actualitzar",
+    "revised": "Revisat · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "Resum d'AI",
+    "summaryDisabled": "Informe estructurat · AI desactivada per a aquest context",
+    "summaryPending": "El resum d'AI està en curs. S'adjuntarà aquí quan estigui llest.",
+    "summaryFailed": "El resum d'AI ha fallat. Tornar-ho a provar pot generar un altre càrrec.",
+    "summaryUnavailable": "El resum d'AI no està disponible. L'informe estructurat continua disponible.",
+    "summaryOutdated": "Aquest resum és anterior a la darrera revisió de l'informe.",
+    "summaryCharge": "Càrrec d'AI: {{cost}}",
+    "summaryChargePending": "Càrrec d'AI pendent de conciliació",
+    "generate": "Genera el resum",
+    "retrySummary": "Torna a provar el resum de pagament",
+    "sources": "Proves i artefactes",
+    "timezone": "Zona horària del resum",
+    "deviceTimezone": "Usa la zona horària del dispositiu",
+    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin. Els canvis d'horari s'apliquen a les nits futures.",
+    "nightStart": "Inici de la nit",
+    "morningStart": "Fi de la nit / inici del matí",
+    "morningEnd": "Fi del matí",
+    "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba el matí, fins i tot sense connexió.",
+    "invalidSchedule": "Tria una zona horària vàlida i períodes de nit i matí no buits i que no se solapin.",
+    "notificationsHint": "Una notificació genèrica cada matí quan el primer informe estigui llest. Independent dels resums d'AI de pagament.",
+    "notificationPermission": "Activa les notificacions del dispositiu a $t(common.notifications) per rebre el resum.",
+    "aiOptIn": "Resums d'AI de pagament",
+    "aiHint": "Opcional només per a aquest context. S'envien al teu model fragments seleccionats i anonimitzats i dades estructurades en l'idioma de l'app. Els càrrecs usen el saldo d'aquest context.",
+    "defaultModel": "Usa el model per defecte de Kilo",
+    "duration": "Límit de temps (minuts)",
+    "spendLimit": "Límit de despesa (USD)",
+    "safeguardHint": "Límits finits per resum, no un pressupost diari. Per defecte: 10 minuts i $2. L'informe es publica com a màxim al cap de cinc minuts mentre la generació continua dins d'aquests límits.",
+    "invalidSafeguards": "Introdueix límits de temps i despesa positius i finits.",
+    "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
+    "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració.",
+    "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
+    "confirmGeneration": "Vols generar un resum de pagament?",
+    "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} minuts. Els càrrecs s'apliquen encara que la generació falli.",
+    "enable": "Activa els resums de pagament",
+    "contextSettings": "Configuració d'AI · {{context}}",
+    "allContexts": "Els resums personals i d'organització es mantenen separats.",
+    "estimatePricingUnavailable": "El preu d'aquest model no està disponible.",
+    "estimateBalanceUnavailable": "No hi ha prou saldo per a un resum de pagament.",
+    "estimateModelNotAllowed": "Aquest model no està permès aquí.",
+    "estimateSpendLimitTooLow": "Augmenta la salvaguarda de despesa per permetre aquest resum."
   }
 }

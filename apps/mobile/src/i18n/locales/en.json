@@ -1,4 +1,68 @@
 {
+  "agentBriefing": {
+    "title": "Morning briefing",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Some historical activity may be missing. ≥ means at least this much; unknown is not zero.",
+    "available": "Available briefings",
+    "history": "Briefing history",
+    "historyHint": "Reports are kept for 30 days, including dismissed reports.",
+    "settings": "Briefing settings",
+    "empty": "No overnight activity",
+    "emptyHint": "Your cloud and CLI coding sessions will appear here after an active night.",
+    "loadError": "Could not load briefings",
+    "sessions": "Active overnight",
+    "pullRequests": "PRs opened",
+    "blockers": "New blockers",
+    "spend": "Overnight spend",
+    "view": "Read briefing",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Show live status",
+    "offline": "Offline · saved briefing",
+    "cached": "Saved report · refresh unavailable",
+    "revised": "Revised · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI summary",
+    "summaryDisabled": "Structured report · AI is off for this context",
+    "summaryPending": "AI summary is in progress. It will attach here when ready.",
+    "summaryFailed": "AI summary failed. Retrying may incur another charge.",
+    "summaryUnavailable": "AI summary unavailable. Your structured report is still available.",
+    "summaryOutdated": "This summary predates the latest report revision.",
+    "summaryCharge": "AI charged {{cost}}",
+    "summaryChargePending": "AI charge pending reconciliation",
+    "generate": "Generate summary",
+    "retrySummary": "Retry paid summary",
+    "sources": "Evidence and artifacts",
+    "timezone": "Briefing time zone",
+    "deviceTimezone": "Use device time zone",
+    "timezoneHint": "IANA time zone, for example Europe/Berlin. Schedule changes apply to future nights.",
+    "nightStart": "Night starts",
+    "morningStart": "Night ends / morning starts",
+    "morningEnd": "Morning ends",
+    "timeHint": "The Home card restores live status when morning ends, even offline.",
+    "invalidSchedule": "Choose a valid time zone and non-overlapping, non-empty night and morning periods.",
+    "notificationsHint": "One generic notification per morning when your first report is ready. Independent of paid AI summaries.",
+    "notificationPermission": "Enable device notifications in $t(common.notifications) to receive your briefing.",
+    "aiOptIn": "Paid AI summaries",
+    "aiHint": "Optional for this context only. Selected, redacted excerpts and structured facts are sent to your model in your app language. Charges use this context’s balance.",
+    "defaultModel": "Use Kilo’s default model",
+    "duration": "Time safeguard (minutes)",
+    "spendLimit": "Spend safeguard (USD)",
+    "safeguardHint": "Finite per-summary safeguards, not a daily budget. Defaults: 10 minutes and $2. A report publishes after at most five minutes while generation continues within these limits.",
+    "invalidSafeguards": "Enter positive, finite time and spend limits.",
+    "estimate": "Estimate {{estimate}} · maximum {{maximum}}",
+    "estimateUnavailable": "A paid summary is not available for these settings.",
+    "estimatePricingUnavailable": "Pricing for this model is unavailable.",
+    "estimateBalanceUnavailable": "Not enough balance for a paid summary.",
+    "estimateModelNotAllowed": "This model isn’t allowed here.",
+    "estimateSpendLimitTooLow": "Raise the spend safeguard to allow this summary.",
+    "confirmPaid": "Enable paid summaries for {{context}}?",
+    "confirmGeneration": "Generate a paid summary?",
+    "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}} minute limit. Charges apply even if generation fails.",
+    "enable": "Enable paid summaries",
+    "contextSettings": "AI settings · {{context}}",
+    "allContexts": "Personal and organization briefings stay separate."
+  },
   "common": {
     "cancel": "Cancel",
     "done": "Done",
@@ -134,9 +198,12 @@
     "status": "Status",
     "truncated": "Truncated",
     "updated": "Updated",
+    "generating": "Generating…",
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
     "dismissed": "Dismissed",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Changes"
   },
   "language": {
@@ -833,7 +900,8 @@
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
       "security": "Security findings",
-      "spend": "Spend alerts"
+      "spend": "Spend alerts",
+      "followedSessions": "Followed sessions"
     },
     "category": {
       "chatMessagesSubtitle": "replies in your conversations",
@@ -1256,7 +1324,7 @@
         "stoppedTitle": "Setup stopped",
         "stoppedBody": "{{name}}'s instance stopped unexpectedly during setup.",
         "stalledTitle": "Something stalled",
-        "stalledBody": "We couldn't finish setting up {{name}}. Try again, or email hi@kilo.ai if this keeps happening.",
+        "stalledBody": "We couldn't finish setting up {{name}}. Try again, or email {{supportEmail}} if this keeps happening.",
         "timeoutTitle": "Taking longer than expected",
         "timeoutBody": "Setup for {{name}} is taking longer than usual (over {{displayMinutes}} minutes).",
         "continueInBackground": "Continue in background",
@@ -1314,7 +1382,7 @@
       "nonCanonicalEarlybirdBody": "Your early-access plan needs a manual review before it can be used on mobile.",
       "iosTitle": "KiloClaw unavailable in iOS",
       "iosBody": "KiloClaw access is managed outside the iOS app for this account.",
-      "iosContact": "Questions? Contact hi@kilo.ai.",
+      "iosContact": "Questions? Contact {{supportEmail}}.",
       "quarantinedCta": "Email our team",
       "nonCanonicalEarlybirdCta": "Review your plan on kilo.ai"
     },
@@ -1549,7 +1617,7 @@
         "recoveryLabel": "Update GitHub App"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilocode.ai for help, then enable Code Reviewer again."
+        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact {{supportEmail}} for help, then enable Code Reviewer again."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.",
@@ -1564,7 +1632,7 @@
         "recoveryLabel": "Update Code Reviewer settings"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again."
+        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact {{supportEmail}} for help, then enable Code Reviewer again."
       },
       "title": "Code Reviewer needs attention",
       "recoveryLabel": "Contact support"
@@ -2088,6 +2156,8 @@
       "title": "Session",
       "copyErrorDetails": "Copy error details",
       "backToSessions": "Back to sessions",
+      "follow": "Follow on Lock Screen",
+      "unfollow": "Stop following on Lock Screen",
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
       "failedToStopExecution": "Failed to stop execution",
@@ -2442,6 +2512,7 @@
       "title": "Agent needs input",
       "skipQuestionsTitle": "Skip questions?",
       "skipQuestionsMessage": "The agent will skip this step.",
+      "answerProgress": "{{answered}} of {{total}} answered",
       "selectAllThatApply": "Select all that apply",
       "option": "{{label}}",
       "optionSelected": "{{label}}, selected",
@@ -2510,6 +2581,7 @@
       "title": "Filter sessions",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3113,6 +3185,9 @@
     "ssoError": "Your organization requires SSO. Use '$t(login.moreSignInOptions)'.",
     "blocked": "This account has been blocked. Please contact support.",
     "signupRateLimited": "Too many attempts. Please try again later.",
+    "signupStepUp": "To finish creating your account, use '$t(login.moreSignInOptions)'.",
+    "signupStepUpApple": "To finish creating your account, use '$t(login.signInWithApple)'.",
+    "signupStepUpGoogle": "To finish creating your account, use '$t(login.signInWithGoogle)'.",
     "invalidCode": "That code is incorrect. Please try again.",
     "codeInProgress": "Your code is being processed. Wait a moment and try again.",
     "tooManyAttempts": "Too many attempts. Please request a new code.",
@@ -3170,6 +3245,8 @@
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
+    "finished": "Finished",
+    "followFailed": "Couldn't show this agent on the Lock Screen.",
     "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
     "checked": "Checked",
     "lastKnown": "Last known",
@@ -3178,7 +3255,26 @@
     "waitingForYou": "Waiting for you",
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",
-    "waitingToRetry": "Waiting to retry"
+    "waitingToRetry": "Waiting to retry",
+    "step": {
+      "editing": "Editing",
+      "reading": "Reading",
+      "running": "Run",
+      "searching": "Web search",
+      "thinking": "Thinking it through"
+    },
+    "planOf": "of",
+    "filesChanged": "files changed",
+    "finishedIn": "Finished in",
+    "noActivityFor": "No activity for",
+    "prOpened": "Pull request opened",
+    "permissionWants": "Wants to run",
+    "failure": {
+      "provider": "Stopped: provider error",
+      "tool": "Stopped: tool error",
+      "cancelled": "Stopped: cancelled",
+      "other": "Stopped"
+    }
   },
   "transcriptionModel": {
     "title": "Transcription model",
@@ -3214,8 +3310,12 @@
     "list": {
       "loadFailed": "Could not load chat history.",
       "new": "New chat",
-      "openHint": "Opens the chat. Long press to delete.",
       "deleteTitle": "Delete this chat?"
+    },
+    "rename": {
+      "title": "Rename chat",
+      "accessibility": "Rename chat: {{title}}",
+      "openHint": "Opens the chat. Long press to rename or delete."
     },
     "beta": "Beta",
     "details": {
@@ -3233,6 +3333,10 @@
     },
     "backends": {
       "title": "Chat backends",
+      "providersTitle": "Chat providers",
+      "cloud": "In the cloud",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo models aren't available right now. Check your connection.",
       "manage": "Manage backends",
       "defaultKilo": "$t(consent.kilo) (default)",
       "kiloHelp": "The built-in backend uses your Kilo account and cannot be edited or deleted.",
@@ -3292,7 +3396,6 @@
     "gguf": {
       "title": "Downloadable models",
       "help": "Download an open model and run it on this phone with llama.cpp. Your prompts and replies stay on the device. Models are large, so use Wi-Fi.",
-      "details": "{{size}} · License: {{license}}",
       "download": "Download model",
       "pause": "Pause download",
       "resume": "Resume download",
@@ -3304,6 +3407,8 @@
       "url": "Direct download link",
       "urlHelp": "Paste an HTTPS link to a .gguf file, such as a Hugging Face resolve link. Only download models from sources you trust.",
       "downloadUrl": "Download from link",
+      "advanced": "Advanced",
+      "localPurpose": "Runs on this device with llama.cpp. Prompts and replies stay on the device.",
       "deleteTitle": "Delete this model?",
       "deleteMessage": "Delete {{name}} from this device? Chats that use it need another model before they can continue.",
       "errors": {
@@ -3332,8 +3437,17 @@
         "fits": "Fits",
         "tight": "Tight fit",
         "tooLarge": "Too large",
-        "noStorage": "Not enough storage"
+        "noStorage": "Not enough storage",
+        "unknown": "Fit unknown"
       },
+      "recommendationsHelp": "A shortlist this app pins: one file per model, from a publisher that states a license. Nothing else is ranked.",
+      "compatibilityHelp": "Fit compares the model file with this device's memory and free storage. The memory figure is an estimate, not a measurement.",
+      "text": "Text",
+      "listTextPurpose": "Text prompts only.",
+      "listImagePurpose": "Reads images as well as text.",
+      "smallestDownload": "Smallest download: {{size}} · about {{memory}} of memory",
+      "fullFileName": "File: {{name}}",
+      "memoryEstimateNote": "Memory figures are estimates, not measurements.",
       "parameters": "Parameters: {{value}}",
       "downloads": "Downloads: {{value}}",
       "likes": "Likes: {{value}}",
@@ -3358,7 +3472,8 @@
     },
     "localModels": {
       "title": "On-device models",
-      "help": "On-device models run on this phone. Your prompts and replies stay on the device, and these models can't use tools.",
+      "help": "On-device models run on this phone. Your prompts and replies stay on the device.",
+      "systemPurpose": "The model built into this device's system. It runs on the device.",
       "apple": "Apple Intelligence (on device)",
       "checking": "Checking availability…",
       "ready": "Ready to use",
@@ -3718,12 +3833,26 @@
       "startNow": "Start without review",
       "startNowHint": "Long-press to start without review",
       "titleLabel": "To-do title",
+      "renameTitle": "Rename task",
       "notes": "Notes",
-      "notesPlaceholder": "Add notes in Markdown",
+      "addNotes": "Add notes",
+      "notesPrompt": "Add context, requirements, or acceptance criteria.",
+      "markdownSupported": "Markdown supported",
       "sessions": "Sessions linked",
       "noSessions": "No sessions yet",
+      "untitledLinkedSession": "Linked session",
+      "sessionNeedsInput": "Session needs input",
+      "sessionRunning": "Session running",
+      "sessionFinished": "Session finished",
+      "sessionPullRequest": "Session pull request",
+      "sessionPullRequestNumber": "Session PR #{{number}}",
+      "openSessionHint": "Opens the session.",
+      "unlinkSessionAction": "Unlink session",
+      "unlinkConfirmTitle": "Unlink {{title}}?",
+      "unlinkConfirmMessage": "The session itself is not deleted. Only its link to this to-do is removed.",
+      "startNewSession": "Start new session",
+      "startNewSessionHint": "Long-press to start a new session.",
       "linkSession": "Link session",
-      "unlinkSession": "Unlink {{title}}",
       "linkFailed": "Couldn’t link the session to the to-do"
     },
     "linkSession": {

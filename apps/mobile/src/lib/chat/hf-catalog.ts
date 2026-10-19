@@ -227,10 +227,13 @@ export function smallestDownloadBytes(tree: unknown): number | undefined {
 
 const CURATED = new Map(GGUF_CATALOG.map(model => [model.sha256, model]));
 
-/** The repository name without the conventional GGUF suffix. */
+/** The repository name without the conventional GGUF suffix, read as words. */
 export function hfModelName(id: string): string {
   const name = id.split('/').pop() ?? id;
-  return name.replace(/[-_.]gguf$/i, '');
+  return name
+    .replace(/[-_.]gguf$/i, '')
+    .replaceAll(/-+/g, ' ')
+    .trim();
 }
 
 /**

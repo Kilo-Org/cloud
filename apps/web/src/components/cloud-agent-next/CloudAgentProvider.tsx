@@ -19,7 +19,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@kilocode/web-shared/lib/constants';
-import { normalizeAlias, selectAssignedSessionBranch } from './session-config';
+import { normalizeAlias } from './session-config';
 import { usePostHog } from 'posthog-js/react';
 import { fetchWebSessionSnapshotPage } from './session-page-adapter';
 import type { CloudAgentApi } from '@kilocode/cloud-agent-sdk/transport';
@@ -362,7 +362,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           title: sessionResult.title,
           organizationId: sessionResult.organization_id,
           gitUrl: sessionResult.git_url,
-          gitBranch: selectAssignedSessionBranch(rs?.upstreamBranch, sessionResult.git_branch),
+          gitBranch: sessionResult.git_branch,
           worktreeId: sessionResult.cloud_agent_worktree_id ?? null,
           mode: normalizeAlias(rs?.mode),
           model: rs?.model ?? null,

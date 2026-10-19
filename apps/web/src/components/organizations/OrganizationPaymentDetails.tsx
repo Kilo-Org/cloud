@@ -37,7 +37,7 @@ export function OrganizationPaymentDetails({ organizationId, role, isAutoTopUpEn
   const session = useSession();
   const isKiloAdmin = session?.data?.isAdmin ?? false;
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const { expiringBlocks, expiring_mUsd, earliestExpiry } = useExpiringCredits(organizationId);
+  const expiringCreditGroups = useExpiringCredits(organizationId);
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -130,14 +130,18 @@ export function OrganizationPaymentDetails({ organizationId, role, isAutoTopUpEn
           )}
         </div>
 
-        {expiringBlocks.length > 0 && earliestExpiry && (
+        {expiringCreditGroups.length > 0 && (
           <Card>
-            <CardContent className="flex items-center gap-2 py-3">
-              <Clock className="h-4 w-4 shrink-0 text-amber-500" />
-              <span className="text-sm">
-                {formatDollars(fromMicrodollars(expiring_mUsd))} in credits expiring at{' '}
-                {formatIsoDateTime_IsoOrderNoSeconds(earliestExpiry)}
-              </span>
+            <CardContent className="space-y-2 py-3">
+              {expiringCreditGroups.map(group => (
+                <div key={group.expiry_date} className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0 text-amber-500" />
+                  <span className="text-sm">
+                    {formatDollars(fromMicrodollars(group.balance_mUsd))} in credits expiring at{' '}
+                    {formatIsoDateTime_IsoOrderNoSeconds(group.expiry_date)}
+                  </span>
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}

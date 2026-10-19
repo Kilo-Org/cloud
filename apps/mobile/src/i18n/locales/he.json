@@ -133,10 +133,13 @@
     "status": "סטטוס",
     "truncated": "קוצר",
     "updated": "עודכן",
+    "generating": "יוצר…",
     "working": "בפעולה",
     "yourOwnRepositories": "המאגרים שלך",
     "dismissed": "סומן להתעלמות",
     "agent": "סוֹכֵן",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "שינויים"
   },
   "language": {
@@ -321,7 +324,8 @@
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
       "security": "ממצאי אבטחה",
-      "spend": "התראות הוצאות"
+      "spend": "התראות הוצאות",
+      "followedSessions": "הפעלות במעקב"
     },
     "category": {
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
@@ -649,7 +653,7 @@
     "redeployTitle": "פריסה מחדש של המופע",
     "accessRequired": {
       "iosBody": "בחשבון הזה, הגישה ל-KiloClaw מנוהלת מחוץ לאפליקציה ל-iOS.",
-      "iosContact": "שאלות? צור קשר בכתובת hi@kilo.ai.",
+      "iosContact": "שאלות? צור קשר בכתובת {{supportEmail}}.",
       "iosTitle": "KiloClaw אינו זמין ב-iOS",
       "multipleCurrentConflictBody": "מצאנו יותר ממינוי פעיל אחד בחשבון שלך, ולכן השהינו את הפעילות כדי למנוע חיוב כפול.",
       "multipleCurrentConflictCta": "המשך באתר kilo.ai",
@@ -783,7 +787,7 @@
         "queryErrorBody": "החיבור נותק בזמן בדיקת ההגדרה של {{name}}. ייתכן שההגדרה עדיין מתבצעת. נסה שוב או חזור לבדוק בעוד רגע.",
         "queryErrorTitle": "לא ניתן היה לבדוק את התקדמות ההגדרה",
         "settingUp": "הגדרת {{name}}",
-        "stalledBody": "לא הצלחנו להשלים את ההגדרה של {{name}}. נסה שוב, ואם הבעיה חוזרת, שלח אימייל ל-hi@kilo.ai.",
+        "stalledBody": "לא הצלחנו להשלים את ההגדרה של {{name}}. נסה שוב, ואם הבעיה חוזרת, שלח אימייל ל-{{supportEmail}}.",
         "stalledTitle": "משהו נתקע",
         "startingSandbox": "הפעלת הסביבה המבודדת",
         "stoppedBody": "המופע של {{name}} נעצר באופן בלתי צפוי במהלך ההגדרה.",
@@ -1040,7 +1044,7 @@
         "recoveryLabel": "עדכון אפליקציית GitHub"
       },
       "githubIpAllowList": {
-        "description": "סוקר הקוד הושבת כי רשימת כתובות ה-IP המורשות בארגון הזה ב-GitHub חוסמת את Kilo. פנה לעזרה בכתובת hi@kilocode.ai והפעל שוב את סוקר הקוד."
+        "description": "סוקר הקוד הושבת כי רשימת כתובות ה-IP המורשות בארגון הזה ב-GitHub חוסמת את Kilo. פנה לעזרה בכתובת {{supportEmail}} והפעל שוב את סוקר הקוד."
       },
       "gitlabProjectAccessRequired": {
         "description": "סוקר הקוד הושבת כי Kilo לא יכול ליצור אסימון גישה לפרויקט הזה ב-GitLab. תן הרשאת מתחזק או אפשר יצירת אסימוני גישה לפרויקט, והפעל שוב את סוקר הקוד.",
@@ -1055,7 +1059,7 @@
         "recoveryLabel": "עדכון הגדרות סוקר הקוד"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "סוקר הקוד הושבת לאחר ששלושה ניסיונות לשכפול המאגר חרגו היום מהזמן המוקצב. פנה לעזרה בכתובת hi@kilocode.ai והפעל שוב את סוקר הקוד."
+        "description": "סוקר הקוד הושבת לאחר ששלושה ניסיונות לשכפול המאגר חרגו היום מהזמן המוקצב. פנה לעזרה בכתובת {{supportEmail}} והפעל שוב את סוקר הקוד."
       },
       "title": "נדרש טיפול בסוקר הקוד.",
       "recoveryLabel": "פנייה לתמיכה"
@@ -1588,6 +1592,8 @@
       "title": "סשן",
       "copyErrorDetails": "העתקת פרטי השגיאה",
       "backToSessions": "חזרה לסשנים",
+      "follow": "מעקב במסך הנעילה",
+      "unfollow": "הפסקת מעקב במסך הנעילה",
       "couldNotLoad": "לא ניתן היה לטעון את הסשן.",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי הסשן.",
       "failedToStopExecution": "לא ניתן היה לעצור את ההרצה.",
@@ -1927,6 +1933,7 @@
       "title": "הסוכן ממתין לתשובה",
       "skipQuestionsTitle": "לדלג על השאלות?",
       "skipQuestionsMessage": "הסוכן ידלג על השלב הזה.",
+      "answerProgress": "נענו {{answered}} מתוך {{total}}",
       "selectAllThatApply": "בחר את כל האפשרויות הרלוונטיות.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, האפשרות נבחרה",
@@ -1996,6 +2003,7 @@
       "title": "סינון סשנים",
       "platformCloud": "ענן",
       "platformExtension": "תוסף",
+      "platformDesktop": "שולחן עבודה",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3141,6 +3149,9 @@
     "ssoError": "הארגון שלך דורש התחברות באמצעות SSO. בחר ב-'$t(login.moreSignInOptions)'.",
     "blocked": "החשבון הזה נחסם. פנה לתמיכה.",
     "signupRateLimited": "יותר מדי ניסיונות. נסה שוב מאוחר יותר.",
+    "signupStepUp": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.moreSignInOptions)'.",
+    "signupStepUpApple": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithApple)'.",
+    "signupStepUpGoogle": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithGoogle)'.",
     "invalidCode": "הקוד שגוי. נסה שוב.",
     "codeInProgress": "הקוד שלך נבדק. המתן רגע ונסה שוב.",
     "tooManyAttempts": "יותר מדי ניסיונות. בקש קוד חדש.",
@@ -3211,6 +3222,8 @@
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
     "openSession": "פתח",
+    "finished": "הסתיים",
+    "followFailed": "לא ניתן להציג את הסוכן הזה במסך הנעילה.",
     "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב.",
     "checked": "נבדק",
     "lastKnown": "מצב אחרון ידוע",
@@ -3219,7 +3232,26 @@
     "waitingForYou": "ממתין לך",
     "nextScheduled": "התזמונים הבאים",
     "answerNeeded": "נדרשת תשובה",
-    "waitingToRetry": "ממתין לניסיון חוזר"
+    "waitingToRetry": "ממתין לניסיון חוזר",
+    "step": {
+      "editing": "עריכה",
+      "reading": "קריאה",
+      "running": "הרצה",
+      "searching": "חיפוש באינטרנט",
+      "thinking": "חשיבה מעמיקה"
+    },
+    "planOf": "מתוך",
+    "filesChanged": "קבצים שונו",
+    "finishedIn": "הסתיים תוך",
+    "noActivityFor": "אין פעילות במשך",
+    "prOpened": "בקשת משיכה נפתחה",
+    "permissionWants": "רוצה להריץ",
+    "failure": {
+      "provider": "נעצר: שגיאת ספק",
+      "tool": "נעצר: שגיאת כלי",
+      "cancelled": "נעצר: בוטל",
+      "other": "עצור"
+    }
   },
   "transcriptionModel": {
     "title": "מודל תמלול",
@@ -3255,8 +3287,12 @@
     "list": {
       "loadFailed": "לא ניתן היה לטעון את היסטוריית השיחה.",
       "new": "צ'אט חדש",
-      "openHint": "פותח את הצ'אט. לחיצה ארוכה למחיקה.",
       "deleteTitle": "למחוק את הצ'אט הזה?"
+    },
+    "rename": {
+      "title": "שינוי שם הצ׳אט",
+      "accessibility": "שינוי שם הצ׳אט: {{title}}",
+      "openHint": "פותח את הצ'אט. לחיצה ארוכה לשינוי שם או למחיקה."
     },
     "beta": "בטא",
     "details": {
@@ -3333,6 +3369,10 @@
     },
     "backends": {
       "title": "שרתי צ׳אט",
+      "providersTitle": "ספקי צ'אט",
+      "cloud": "בענן",
+      "cloudModel": "מודל: {{model}}",
+      "cloudUnavailable": "מודלי Kilo אינם זמינים כעת. בדוק את החיבור שלך.",
       "manage": "ניהול שרתי צ׳אט",
       "defaultKilo": "$t(consent.kilo) (ברירת מחדל)",
       "kiloHelp": "השרת המובנה משתמש בחשבון Kilo שלך ואין אפשרות לערוך או למחוק אותו.",
@@ -3392,7 +3432,6 @@
     "gguf": {
       "title": "מודלים להורדה",
       "help": "הורד מודל פתוח והרץ אותו בטלפון הזה עם llama.cpp. ההנחיות והתשובות שלך נשארות במכשיר. המודלים גדולים, לכן השתמש ב-Wi-Fi.",
-      "details": "{{size}} · רישיון: {{license}}",
       "download": "הורד מודל",
       "pause": "השהה הורדה",
       "resume": "המשך הורדה",
@@ -3404,6 +3443,8 @@
       "url": "קישור הורדה ישיר",
       "urlHelp": "הדבק קישור HTTPS לקובץ .gguf, כגון קישור resolve של Hugging Face. הורד מודלים רק ממקורות שאתה סומך עליהם.",
       "downloadUrl": "הורד מהקישור",
+      "advanced": "מתקדם",
+      "localPurpose": "פועל במכשיר הזה עם llama.cpp. ההנחיות והתשובות נשארות במכשיר.",
       "deleteTitle": "למחוק את המודל הזה?",
       "deleteMessage": "למחוק את {{name}} מהמכשיר הזה? צ'אטים שמשתמשים בו זקוקים למודל אחר לפני שיוכלו להמשיך.",
       "errors": {
@@ -3432,8 +3473,17 @@
         "fits": "מתאים",
         "tight": "בקושי מתאים",
         "tooLarge": "גדול מדי",
-        "noStorage": "אין מספיק אחסון"
+        "noStorage": "אין מספיק אחסון",
+        "unknown": "התאמה לא ידועה"
       },
+      "recommendationsHelp": "רשימה קצרה שהאפליקציה הזו קובעת: קובץ אחד לכל מודל, ממו״ל שמציין רישיון. שום דבר אחר לא מדורג.",
+      "compatibilityHelp": "ההתאמה משווה את קובץ המודל לזיכרון ולשטח הפנוי במכשיר הזה. נתון הזיכרון הוא הערכה, לא מדידה.",
+      "text": "טקסט",
+      "listTextPurpose": "הנחיות טקסט בלבד.",
+      "listImagePurpose": "קורא תמונות וגם טקסט.",
+      "smallestDownload": "ההורדה הקטנה ביותר: {{size}} · בערך {{memory}} זיכרון",
+      "fullFileName": "קובץ: {{name}}",
+      "memoryEstimateNote": "נתוני הזיכרון הם הערכות, לא מדידות.",
       "parameters": "פרמטרים: {{value}}",
       "downloads": "הורדות: {{value}}",
       "likes": "לייקים: {{value}}",
@@ -3458,7 +3508,8 @@
     },
     "localModels": {
       "title": "מודלים במכשיר",
-      "help": "מודלים במכשיר פועלים בטלפון הזה. ההנחיות והתשובות שלך נשארות במכשיר, והמודלים האלה לא יכולים להשתמש בכלים.",
+      "help": "מודלים במכשיר פועלים בטלפון הזה. ההנחיות והתשובות שלך נשארות במכשיר.",
+      "systemPurpose": "המודל המובנה במערכת של המכשיר הזה. הוא פועל במכשיר.",
       "apple": "Apple Intelligence (במכשיר)",
       "checking": "בודק זמינות…",
       "ready": "מוכן לשימוש",
@@ -3763,12 +3814,26 @@
       "startNow": "התחלה בלי סקירה",
       "startNowHint": "לחיצה ארוכה כדי להתחיל בלי סקירה",
       "titleLabel": "כותרת המשימה",
+      "renameTitle": "שנה שם משימה",
       "notes": "הערות",
-      "notesPlaceholder": "הוספת הערות ב-Markdown",
+      "addNotes": "הוסף הערות",
+      "notesPrompt": "הוסף הקשר, דרישות או תנאי קבלה.",
+      "markdownSupported": "Markdown נתמך",
       "sessions": "סשנים מקושרים",
       "noSessions": "אין סשנים עדיין",
+      "untitledLinkedSession": "סשן מקושר",
+      "sessionNeedsInput": "הסשן צריך קלט",
+      "sessionRunning": "הסשן פועל",
+      "sessionFinished": "הסשן הסתיים",
+      "sessionPullRequest": "PR של הסשן",
+      "sessionPullRequestNumber": "PR של הסשן #{{number}}",
+      "openSessionHint": "פותח את הסשן.",
+      "unlinkSessionAction": "בטל קישור סשן",
+      "unlinkConfirmTitle": "לבטל קישור של {{title}}?",
+      "unlinkConfirmMessage": "הסשן עצמו לא נמחק. רק הקישור שלו למשימה הזו מוסר.",
+      "startNewSession": "התחל סשן חדש",
+      "startNewSessionHint": "לחץ לחיצה ארוכה כדי להתחיל סשן חדש.",
       "linkSession": "קישור סשן",
-      "unlinkSession": "ביטול הקישור של {{title}}",
       "linkFailed": "לא הצלחנו לקשר את הסשן למשימה"
     },
     "linkSession": {
@@ -3786,5 +3851,69 @@
       "title": "שמירה ברשימה",
       "saved": "נשמר ברשימה {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "תדריך בוקר",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "ייתכן שחלק מהפעילות ההיסטורית חסר. ≥ פירושו לפחות כמות זו; לא ידוע אינו אפס.",
+    "available": "תדריכים זמינים",
+    "history": "היסטוריית תדריכים",
+    "historyHint": "הדוחות נשמרים למשך 30 יום, כולל דוחות שנסגרו.",
+    "settings": "הגדרות תדריך",
+    "empty": "אין פעילות לילית",
+    "emptyHint": "סשנים של קוד בענן וב-CLI יופיעו כאן אחרי לילה פעיל.",
+    "loadError": "לא ניתן לטעון תדריכים",
+    "sessions": "פעילים בלילה",
+    "pullRequests": "PRs שנפתחו",
+    "blockers": "חסמים חדשים",
+    "spend": "הוצאה לילית",
+    "view": "קריאת התדריך",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "הצגת סטטוס חי",
+    "offline": "לא מקוון · תדריך שמור",
+    "cached": "דוח שמור · רענון לא זמין",
+    "revised": "עודכן · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "סיכום AI",
+    "summaryDisabled": "דוח מובנה · AI כבוי בהקשר זה",
+    "summaryPending": "סיכום ה-AI בהכנה. הוא יצורף כאן כשיהיה מוכן.",
+    "summaryFailed": "סיכום ה-AI נכשל. ניסיון חוזר עלול לגרור חיוב נוסף.",
+    "summaryUnavailable": "סיכום ה-AI אינו זמין. הדוח המובנה עדיין זמין.",
+    "summaryOutdated": "סיכום זה קודם לגרסת הדוח האחרונה.",
+    "summaryCharge": "חיוב AI: {{cost}}",
+    "summaryChargePending": "חיוב AI ממתין להתאמה",
+    "generate": "יצירת סיכום",
+    "retrySummary": "ניסיון חוזר לסיכום בתשלום",
+    "sources": "ראיות ותוצרים",
+    "timezone": "אזור זמן לתדריך",
+    "deviceTimezone": "שימוש באזור הזמן של המכשיר",
+    "timezoneHint": "אזור זמן IANA, לדוגמה Europe/Berlin. שינויים בלוח הזמנים יחולו על לילות עתידיים.",
+    "nightStart": "תחילת הלילה",
+    "morningStart": "סוף הלילה / תחילת הבוקר",
+    "morningEnd": "סוף הבוקר",
+    "timeHint": "כרטיס הבית חוזר לסטטוס חי בסוף הבוקר, גם במצב לא מקוון.",
+    "invalidSchedule": "יש לבחור אזור זמן תקין ותקופות לילה ובוקר לא ריקות שאינן חופפות.",
+    "notificationsHint": "התראה כללית אחת בכל בוקר כשהדוח הראשון מוכן. לא תלויה בסיכומי AI בתשלום.",
+    "notificationPermission": "יש להפעיל התראות מכשיר ב$t(common.notifications) כדי לקבל את התדריך.",
+    "aiOptIn": "סיכומי AI בתשלום",
+    "aiHint": "אופציונלי להקשר זה בלבד. קטעים נבחרים ומושחרים ועובדות מובנות נשלחים למודל שלך בשפת האפליקציה. החיובים מתבצעים מהיתרה של הקשר זה.",
+    "defaultModel": "שימוש במודל ברירת המחדל של Kilo",
+    "duration": "מגבלת זמן (דקות)",
+    "spendLimit": "מגבלת הוצאה (USD)",
+    "safeguardHint": "מגבלות סופיות לכל סיכום, לא תקציב יומי. ברירות מחדל: 10 דקות ו-$2. דוח מתפרסם אחרי חמש דקות לכל היותר, והיצירה ממשיכה בתוך המגבלות.",
+    "invalidSafeguards": "יש להזין מגבלות זמן והוצאה חיוביות וסופיות.",
+    "estimate": "הערכת עלות {{estimate}} · מקסימום {{maximum}}",
+    "estimateUnavailable": "סיכום בתשלום אינו זמין עבור הגדרות אלה.",
+    "confirmPaid": "להפעיל סיכומים בתשלום עבור {{context}}?",
+    "confirmGeneration": "ליצור סיכום בתשלום?",
+    "paidDisclosure": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דקות. החיוב חל גם אם היצירה נכשלת.",
+    "enable": "הפעלת סיכומים בתשלום",
+    "contextSettings": "הגדרות AI · {{context}}",
+    "allContexts": "תדריכים אישיים ותדריכי ארגון נשמרים בנפרד.",
+    "estimatePricingUnavailable": "מחיר עבור המודל הזה אינו זמין.",
+    "estimateBalanceUnavailable": "אין מספיק יתרה לסיכום בתשלום.",
+    "estimateModelNotAllowed": "המודל הזה אינו מותר כאן.",
+    "estimateSpendLimitTooLow": "העלה את מגבלת ההוצאות כדי לאפשר סיכום זה."
   }
 }

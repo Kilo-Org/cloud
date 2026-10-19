@@ -1,6 +1,6 @@
 import {
   type ModelClientService,
-  ModelError,
+  type ModelError,
   type ModelEvent,
   type ModelRequest,
   type ModelUsage,
@@ -9,7 +9,8 @@ import {
 import { Chunk, Effect, Stream } from 'effect';
 import { z } from 'zod';
 
-import { LocalModelError, type LocalModelProblem } from './local-model-error';
+import { nativeModelFailure } from './native-model-error';
+import { estimatedTokens, inputTokensOf } from './native-model-usage';
 import {
   nativeRequest,
   type NativeRequest,
@@ -66,95 +67,25 @@ export type NativeModelBridge = {
 };
 
 /** A generation that asked for tools and waits, between two harness rounds, for their results. */
-type ToolLoop = { waiting?: { readonly id: string; readonly calls: readonly string[] } };
+type ToolLoop = {
+  waiting?: { readonly id: string; readonly calls: readonly string[]; readonly hasText: boolean };
+};
 
 /** One native module and the tool round it may hold open. */
 type Provider = { readonly bridge: NativeModelBridge; readonly loop: ToolLoop };
 
-/** Reasons that mean the model cannot run here now, as opposed to a failed answer. */
-const UNAVAILABLE_REASONS = new Set([
-  'unsupported_os',
-  'device_not_eligible',
-  'apple_intelligence_disabled',
-  'model_not_ready',
-  'model_unavailable',
-  // Android AICore: the model still needs, or is in, its system download.
-  'model_download_required',
-  'model_downloading',
-  // Android AICore: the system service must be updated first.
-  'aicore_incompatible',
-  'system_update_required',
-  // Android AICore: the per-app battery quota for inference is spent.
-  'battery_quota_exceeded',
-]);
-
 /** A native promise rejection carries its stable reason as an Expo error code. */
 const codedRejection = z.object({ code: z.string() });
 
-/**
- * Foundation Models sometimes fails a long answer before its first token, and
- * a fresh generation usually answers it. Only the Apple module reports this.
- */
-const TRANSIENT_REASON = 'token_generation_failed';
-
-/** What the model reads for a call it makes in a round that offers no tools. */
 const TOOLS_CLOSED =
   'No tool can run for the rest of this answer. Answer now with the results you already have.';
 
+const TRANSIENT_REASON = 'token_generation_failed';
 let sequence = 0;
 
 function nextRequestId(): string {
   sequence += 1;
   return `quick-chat-${sequence}`;
-}
-
-function problemOf(reason: string | undefined): LocalModelProblem {
-  if (reason === 'busy') {
-    return 'busy';
-  }
-  // Android runs the model only while the app is in front; Retry works after returning.
-  if (reason === 'background_use_blocked') {
-    return 'background';
-  }
-  return reason !== undefined && UNAVAILABLE_REASONS.has(reason) ? 'unavailable' : 'failed';
-}
-
-/** Fixed copy only: the native reason picks the key and is not shown or logged. */
-function failure(problem: LocalModelProblem, started: boolean): ModelError {
-  return new ModelError({
-    reason: started ? 'stream' : 'unsupported',
-    cause: new LocalModelError(problem),
-  });
-}
-
-/**
- * A deliberately high guess of about three characters per token. It is not a
- * count: it exists so a session on a small on-device window still compacts
- * when the provider reports no usage and cannot count tokens.
- */
-function estimatedTokens(text: string): number {
-  return Math.ceil(text.length / 3);
-}
-
-/** Input usage without native counts: the provider's token counter, else the estimate. */
-async function inputTokensOf(
-  bridge: NativeModelBridge,
-  availability: NativeAvailability,
-  request: NativeRequest
-): Promise<number> {
-  if (bridge.countTokens !== undefined && availability.tokenCounting !== false) {
-    try {
-      return await bridge.countTokens(request);
-    } catch {
-      // The count is optional; the estimate below keeps compaction working.
-    }
-  }
-  const texts = request.messages.map(message =>
-    message.role === 'toolCalls'
-      ? message.calls.map(call => call.name + call.arguments).join('')
-      : message.text
-  );
-  return estimatedTokens(request.system + texts.join(''));
 }
 
 function answer(
@@ -183,6 +114,7 @@ function answer(
         ? { id: waiting.id, results }
         : undefined;
     let id = resumption?.id ?? native.id;
+    const hasPreviousText = resumption !== undefined && waiting?.hasText === true;
     // `running` is the only state that owns a live native inference. `waiting`
     // hands it to the next round, which answers its tool calls. `retrying`
     // waits for the failed attempt to settle before a fresh one starts.
@@ -192,10 +124,14 @@ function answer(
     let retries = resumption === undefined ? 1 : 0;
     const fail = (reason: string | undefined) => {
       state = 'over';
-      void emit.fail(failure(problemOf(reason), output !== ''));
+      void emit.fail(nativeModelFailure(reason, hasPreviousText || output !== ''));
     };
     const failOrRetry = (reason: string | undefined) => {
-      if (reason === TRANSIENT_REASON && output === '' && retries > 0) {
+      if (
+        (reason === TRANSIENT_REASON || reason === 'empty_response') &&
+        output === '' &&
+        retries > 0
+      ) {
         retries -= 1;
         state = 'retrying';
       } else {
@@ -203,6 +139,10 @@ function answer(
       }
     };
     const finish = async (done: Extract<NativeModelEvent, { kind: 'done' }>) => {
+      if (!hasPreviousText && output.trim() === '') {
+        fail('empty_response');
+        return;
+      }
       state = 'finishing';
       const counts = done.usageSource === 'unavailable' ? undefined : done;
       const usage: ModelUsage = {
@@ -222,7 +162,11 @@ function answer(
     // The round ends here; the native generation waits for the next round's results.
     const pause = async (calls: readonly NativeToolCall[]) => {
       state = 'waiting';
-      loop.waiting = { id, calls: calls.map(call => call.id) };
+      loop.waiting = {
+        id,
+        calls: calls.map(call => call.id),
+        hasText: hasPreviousText || output.trim() !== '',
+      };
       output += calls.map(call => call.name + call.arguments).join('');
       await emit.chunk(
         Chunk.fromIterable(
@@ -291,7 +235,6 @@ function answer(
         void finish(event);
       }
     });
-    // A rejection with no terminal event (Android reports busy this way).
     const rejected = (error: unknown) => {
       if (state === 'running') {
         const coded = codedRejection.safeParse(error);
@@ -364,11 +307,11 @@ export function nativeModelClient(bridge: NativeModelBridge): ModelClientService
             const availability = await bridge.availability();
             return availability;
           },
-          catch: () => failure('unavailable', false),
+          catch: () => nativeModelFailure('model_unavailable', false),
         }).pipe(
           Effect.filterOrFail(
             availability => availability.status === 'available',
-            () => failure('unavailable', false)
+            () => nativeModelFailure('model_unavailable', false)
           ),
           Effect.map(availability => answer(provider, availability, request))
         )

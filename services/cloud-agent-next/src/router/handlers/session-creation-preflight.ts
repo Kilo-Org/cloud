@@ -136,6 +136,7 @@ function applyProfileResolution(
         runtimeSkills: resolved.skills,
         runtimeAgents: resolved.agents,
         kiloCommands: resolved.kiloCommands ?? input.profile?.resolved?.kiloCommands,
+        runtimeInstructions: resolved.instructions ?? input.profile?.resolved?.runtimeInstructions,
       },
     },
   };

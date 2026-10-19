@@ -36,6 +36,8 @@ export const perRecipientOutcomeSchema = z.enum([
   'suppressed_presence',
   'suppressed_preference',
   'no_tokens',
+  'suppressed_expired',
+  'suppressed_access',
   'duplicate',
   'failed',
 ]);
@@ -191,6 +193,15 @@ export const refreshGlanceableSessionsInputSchema = z.object({
    * had no approval change.
    */
   approvalChangedSessionIds: z.array(z.string().min(1)).optional(),
+  /**
+   * Sessions in `cliSessionIds` whose refresh must not happen unless a session
+   * card follows them. The ingest service refreshes the card content after it
+   * persists a new summary; a session nobody follows would otherwise pay for a
+   * whole snapshot build. The notifications side checks the follow with one
+   * indexed read and skips this call when none of the named sessions is
+   * followed. Omitting the field keeps the previous behavior.
+   */
+  cardFollowSessionIds: z.array(z.string().min(1)).optional(),
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 
@@ -265,10 +276,16 @@ export type SendAgentSessionNotificationResult = z.infer<
 
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
+export const agentBriefingDispatchWindowSchema = z.object({
+  localDate: z.string().date(),
+  expiresAt: z.string().datetime(),
+});
+
 export const dispatchPushInputSchema = z.object({
   userId: z.string().min(1),
   presenceContext: z.string().min(1).nullable(),
   idempotencyKey: z.string().min(1),
+  agentBriefing: agentBriefingDispatchWindowSchema.optional(),
   badge: z
     .object({
       badgeBucket: z.string().min(1),
@@ -303,6 +320,9 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
   z.object({ kind: z.literal('suppressed_presence') }),
   z.object({ kind: z.literal('suppressed_rate_limit') }),
+  z.object({ kind: z.literal('suppressed_preference') }),
+  z.object({ kind: z.literal('suppressed_expired') }),
+  z.object({ kind: z.literal('suppressed_access') }),
   z.object({ kind: z.literal('no_tokens') }),
   z.object({ kind: z.literal('duplicate') }),
   z.object({ kind: z.literal('failed'), error: z.string() }),
@@ -390,10 +410,19 @@ export type InternalDispatchSecurityLifecycleRequest = z.infer<
   typeof internalDispatchSecurityLifecycleRequestSchema
 >;
 
+export const internalDispatchAgentBriefingRequestSchema = agentBriefingDispatchWindowSchema.extend({
+  kind: z.literal('agent_briefing'),
+  userId: z.string().min(1),
+});
+export type InternalDispatchAgentBriefingRequest = z.infer<
+  typeof internalDispatchAgentBriefingRequestSchema
+>;
+
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
   internalDispatchSpendAlertRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
   internalDispatchSecurityLifecycleRequestSchema,
+  internalDispatchAgentBriefingRequestSchema,
 ]);
 export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

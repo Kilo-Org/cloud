@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { SessionStore, type Turn } from '@kilocode/harness-sdk';
 import { layerNodeStore } from '@kilocode/harness-sdk/plugins/store/node';
 import { Effect } from 'effect';
+import { monotonicFactory } from 'ulid';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -15,6 +16,7 @@ import {
   recordOfChat,
   recordUsage,
   rememberChat,
+  renameChat,
   scopeOfChat,
   toolsOfSession,
   wipeChats,
@@ -27,7 +29,11 @@ import {
  * breaks this suite rather than passing against a copy that no longer matches.
  */
 
-const CHATS = ['0001_safe_hellfire_club.sql', '0002_majestic_old_lace.sql']
+const CHATS = [
+  '0001_safe_hellfire_club.sql',
+  '0002_majestic_old_lace.sql',
+  '0003_quick_chat_titles.sql',
+]
   .map(file => readFileSync(new URL(`../../../drizzle/${file}`, import.meta.url), 'utf8'))
   .join('--> statement-breakpoint');
 
@@ -39,11 +45,18 @@ const chatDatabase = (database: DatabaseSync): ChatDatabase => ({
   },
 });
 
+/**
+ * Part ids order by insertion in the store's own schema — an id is a ULID — and
+ * both the title and the preview subqueries read them in that order. The fixture
+ * ids therefore have to be monotonic rather than merely unique.
+ */
+const nextId = monotonicFactory();
+
 const said = (sessionId: string, role: Turn['role'], body: string): Turn => ({
-  id: `${sessionId}-${role}`,
+  id: nextId(),
   sessionId,
   role,
-  parts: [{ id: `${sessionId}-${role}-1`, kind: 'text', body }],
+  parts: [{ id: nextId(), kind: 'text', body }],
 });
 
 let database = new DatabaseSync(':memory:');
@@ -88,8 +101,14 @@ describe('listChats', () => {
     rememberChat(db, { sessionId: 's3', scope: 'me:acme', at: 300 });
 
     expect(listChats(db, 'me:personal')).toEqual([
-      { sessionId: 's2', model: 'kilo/two', title: 'and a functor', updatedAt: 200 },
-      { sessionId: 's1', model: 'kilo/one', title: 'what is a monad', updatedAt: 100 },
+      { sessionId: 's2', model: 'kilo/two', title: 'and a functor', preview: 'ok', updatedAt: 200 },
+      {
+        sessionId: 's1',
+        model: 'kilo/one',
+        title: 'what is a monad',
+        preview: 'ok',
+        updatedAt: 100,
+      },
     ]);
   });
 
@@ -151,10 +170,23 @@ describe('moveChat', () => {
     moveChat(db, { from: 'old', to: 'new', at: 400 });
 
     expect(listChats(db, 'me:personal')).toEqual([
-      { sessionId: 'new', model: 'kilo/two', title: 'hello', updatedAt: 400 },
+      { sessionId: 'new', model: 'kilo/two', title: 'hello', preview: 'ok', updatedAt: 400 },
     ]);
     expect(scopeOfChat(db, 'old')).toBeNull();
     expect(scopeOfChat(db, 'new')).toBe('me:personal');
+  });
+
+  it('keeps the name a person gave the chat', async () => {
+    await write(conversation('old', 'kilo/one', 'hello'));
+    await write(conversation('new', 'kilo/two', 'hello'));
+    rememberChat(db, { sessionId: 'old', scope: 'me:personal', at: 100 });
+    renameChat(db, 'old', 'Greetings');
+
+    moveChat(db, { from: 'old', to: 'new', at: 400 });
+
+    expect(listChats(db, 'me:personal')).toEqual([
+      { sessionId: 'new', model: 'kilo/two', title: 'Greetings', preview: 'ok', updatedAt: 400 },
+    ]);
   });
 });
 

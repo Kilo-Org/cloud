@@ -97,6 +97,335 @@
     ],
     "searchBlob": "activeSessions.widgetSnapshot Get the home widget snapshot of active agents and sessions for the current user, optionally scoped to an organization, for rendering a glanceable dashboard widget. Use this to fetch the widget's data payload. activesessions widgetsnapshot organizationid organizationId"
   },
+  "agentBriefing.dismiss": {
+    "path": "agentBriefing.dismiss",
+    "kind": "mutation",
+    "summary": "Dismiss or hide an agent briefing report for the current user.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "dismiss",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.dismiss Dismiss or hide an agent briefing report for the current user. agentbriefing dismiss reportid reportId"
+  },
+  "agentBriefing.estimateSummary": {
+    "path": "agentBriefing.estimateSummary",
+    "kind": "query",
+    "summary": "Preview or estimate the content and cost of an agent briefing summary before generating it for a user or organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "maxSpendMicrodollars": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxDurationSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "estimatesummary",
+      "organizationid",
+      "model",
+      "maxspendmicrodollars",
+      "maxdurationseconds",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.estimateSummary Preview or estimate the content and cost of an agent briefing summary before generating it for a user or organization. agentbriefing estimatesummary organizationid model maxspendmicrodollars maxdurationseconds reportid organizationId model maxSpendMicrodollars maxDurationSeconds reportId"
+  },
+  "agentBriefing.get": {
+    "path": "agentBriefing.get",
+    "kind": "query",
+    "summary": "Fetch a single agent briefing report by ID, including its full contents.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "get",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.get Fetch a single agent briefing report by ID, including its full contents. agentbriefing get reportid reportId"
+  },
+  "agentBriefing.list": {
+    "path": "agentBriefing.list",
+    "kind": "query",
+    "summary": "List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "all",
+            "personal",
+            "organization"
+          ]
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cursor": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "currentOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "list",
+      "scope",
+      "organizationid",
+      "cursor",
+      "limit",
+      "currentonly"
+    ],
+    "searchBlob": "agentBriefing.list List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
+  },
+  "agentBriefing.preferences": {
+    "path": "agentBriefing.preferences",
+    "kind": "query",
+    "summary": "Get the current user's agent briefing preferences, such as timezone, language, and notification schedule.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "preferences",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.preferences Get the current user's agent briefing preferences, such as timezone, language, and notification schedule. agentbriefing preferences timezone language timezone language"
+  },
+  "agentBriefing.read": {
+    "path": "agentBriefing.read",
+    "kind": "mutation",
+    "summary": "Mark an agent briefing report as read for the current user.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "read",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.read Mark an agent briefing report as read for the current user. agentbriefing read reportid reportId"
+  },
+  "agentBriefing.updatePreferences": {
+    "path": "agentBriefing.updatePreferences",
+    "kind": "mutation",
+    "summary": "Update agent briefing settings for the current user, including timezone, language, and notification windows.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        },
+        "nightStart": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "morningStart": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "morningEnd": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "notificationsEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "updatepreferences",
+      "timezone",
+      "language",
+      "nightstart",
+      "morningstart",
+      "morningend",
+      "notificationsenabled"
+    ],
+    "searchBlob": "agentBriefing.updatePreferences Update agent briefing settings for the current user, including timezone, language, and notification windows. agentbriefing updatepreferences timezone language nightstart morningstart morningend notificationsenabled timezone language nightStart morningStart morningEnd notificationsEnabled"
+  },
+  "agentProfiles.applyConfigImport": {
+    "path": "agentProfiles.applyConfigImport",
+    "kind": "mutation",
+    "summary": "Import an agent configuration archive into a profile, creating its instructions. Fails if the archive has unresolved issues; use preview first.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "archive": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection": {
+          "type": "object",
+          "properties": {
+            "agents": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "commands": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "skills": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "instructions": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          },
+          "required": [
+            "agents",
+            "commands",
+            "skills",
+            "instructions"
+          ]
+        }
+      },
+      "required": [
+        "profileId",
+        "archive",
+        "selection"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "applyconfigimport",
+      "profileid",
+      "organizationid",
+      "archive",
+      "selection"
+    ],
+    "searchBlob": "agentProfiles.applyConfigImport Import an agent configuration archive into a profile, creating its instructions. Fails if the archive has unresolved issues; use preview first. agentprofiles applyconfigimport profileid organizationid archive selection profileId organizationId archive selection"
+  },
   "agentProfiles.bindToRepo": {
     "path": "agentProfiles.bindToRepo",
     "kind": "mutation",
@@ -991,6 +1320,52 @@
     ],
     "searchBlob": "agentProfiles.createCustomSkill Add a custom skill to an agent profile by supplying its name, description, markdown instructions, and files. agentprofiles createcustomskill profileid organizationid name description rawmarkdown files enabled profileId organizationId name description rawMarkdown files enabled"
   },
+  "agentProfiles.createInstruction": {
+    "path": "agentProfiles.createInstruction",
+    "kind": "mutation",
+    "summary": "Add a new custom instruction or rule to an agent profile so the agent follows it. Creates an instruction with a name and content under a profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "profileId",
+        "name",
+        "content"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "createinstruction",
+      "profileid",
+      "organizationid",
+      "name",
+      "content"
+    ],
+    "searchBlob": "agentProfiles.createInstruction Add a new custom instruction or rule to an agent profile so the agent follows it. Creates an instruction with a name and content under a profile. agentprofiles createinstruction profileid organizationid name content profileId organizationId name content"
+  },
   "agentProfiles.createKiloCommand": {
     "path": "agentProfiles.createKiloCommand",
     "kind": "mutation",
@@ -1268,6 +1643,44 @@
     ],
     "searchBlob": "agentProfiles.deleteAgent Delete a subagent from an agent profile. agentprofiles deleteagent profileid organizationid agentid profileId organizationId agentId"
   },
+  "agentProfiles.deleteInstruction": {
+    "path": "agentProfiles.deleteInstruction",
+    "kind": "mutation",
+    "summary": "Remove an instruction from an agent profile permanently. Deletes a custom rule or guideline from a profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "deleteinstruction",
+      "profileid",
+      "organizationid",
+      "instructionid"
+    ],
+    "searchBlob": "agentProfiles.deleteInstruction Remove an instruction from an agent profile permanently. Deletes a custom rule or guideline from a profile. agentprofiles deleteinstruction profileid organizationid instructionid profileId organizationId instructionId"
+  },
   "agentProfiles.deleteKiloCommand": {
     "path": "agentProfiles.deleteKiloCommand",
     "kind": "mutation",
@@ -1520,6 +1933,43 @@
     ],
     "searchBlob": "agentProfiles.listRepoBindings List repository bindings that associate repos with agent profiles for the current user or an organization. agentprofiles listrepobindings organizationid organizationId"
   },
+  "agentProfiles.previewConfigImport": {
+    "path": "agentProfiles.previewConfigImport",
+    "kind": "mutation",
+    "summary": "Preview what an agent config archive would import into a profile before committing it. Shows parsed instructions and any issues without applying changes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "archive": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "profileId",
+        "archive"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "previewconfigimport",
+      "profileid",
+      "organizationid",
+      "archive"
+    ],
+    "searchBlob": "agentProfiles.previewConfigImport Preview what an agent config archive would import into a profile before committing it. Shows parsed instructions and any issues without applying changes. agentprofiles previewconfigimport profileid organizationid archive profileId organizationId archive"
+  },
   "agentProfiles.reorderKiloCommands": {
     "path": "agentProfiles.reorderKiloCommands",
     "kind": "mutation",
@@ -1632,6 +2082,49 @@
       "commands"
     ],
     "searchBlob": "agentProfiles.setCommands Set the commands of an agent profile, replacing all existing commands. agentprofiles setcommands profileid organizationid commands profileId organizationId commands"
+  },
+  "agentProfiles.setInstructionEnabled": {
+    "path": "agentProfiles.setInstructionEnabled",
+    "kind": "mutation",
+    "summary": "Turn a profile instruction on or off without deleting it. Enable or disable a custom rule so it is included or ignored.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId",
+        "enabled"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "setinstructionenabled",
+      "profileid",
+      "organizationid",
+      "instructionid",
+      "enabled"
+    ],
+    "searchBlob": "agentProfiles.setInstructionEnabled Turn a profile instruction on or off without deleting it. Enable or disable a custom rule so it is included or ignored. agentprofiles setinstructionenabled profileid organizationid instructionid enabled profileId organizationId instructionId enabled"
   },
   "agentProfiles.setKiloCommandEnabled": {
     "path": "agentProfiles.setKiloCommandEnabled",
@@ -2611,6 +3104,57 @@
       "config"
     ],
     "searchBlob": "agentProfiles.updateAgent Edit an existing subagent in an agent profile, such as its name, slug, or configuration. agentprofiles updateagent profileid organizationid agentid slug name config profileId organizationId agentId slug name config"
+  },
+  "agentProfiles.updateInstruction": {
+    "path": "agentProfiles.updateInstruction",
+    "kind": "mutation",
+    "summary": "Edit the name or content of an existing instruction on an agent profile. Updates a custom rule's text in place.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "updateinstruction",
+      "profileid",
+      "organizationid",
+      "instructionid",
+      "name",
+      "content"
+    ],
+    "searchBlob": "agentProfiles.updateInstruction Edit the name or content of an existing instruction on an agent profile. Updates a custom rule's text in place. agentprofiles updateinstruction profileid organizationid instructionid name content profileId organizationId instructionId name content"
   },
   "agentProfiles.updateKiloCommand": {
     "path": "agentProfiles.updateKiloCommand",
@@ -6132,6 +6676,43 @@
     ],
     "searchBlob": "cloudAgentNext.closeTerminal Close a terminal session running in a cloud agent session. cloudagentnext closeterminal cloudagentsessionid ptyid cloudAgentSessionId ptyId"
   },
+  "cloudAgentNext.createPreview": {
+    "path": "cloudAgentNext.createPreview",
+    "kind": "mutation",
+    "summary": "Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^\\/.*"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "port"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "createpreview",
+      "cloudagentsessionid",
+      "port",
+      "path"
+    ],
+    "searchBlob": "cloudAgentNext.createPreview Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser. cloudagentnext createpreview cloudagentsessionid port path cloudAgentSessionId port path"
+  },
   "cloudAgentNext.createTerminal": {
     "path": "cloudAgentNext.createTerminal",
     "kind": "mutation",
@@ -6413,6 +6994,36 @@
       "cloudagentsessionid"
     ],
     "searchBlob": "cloudAgentNext.getPendingInteractions Fetch the pending interactions for a cloud agent session that are still waiting on a response, such as approvals or questions requiring user input. Use this to check whether a running agent session is blocked and needs the user to act. cloudagentnext getpendinginteractions cloudagentsessionid cloudAgentSessionId"
+  },
+  "cloudAgentNext.getPreviewOptions": {
+    "path": "cloudAgentNext.getPreviewOptions",
+    "kind": "query",
+    "summary": "Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getpreviewoptions",
+      "cloudagentsessionid",
+      "organizationid"
+    ],
+    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid organizationid cloudAgentSessionId organizationId"
   },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
@@ -7790,6 +8401,29 @@
         {
           "type": "object",
           "properties": {
+            "egressMode": {
+              "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+              "type": "string",
+              "enum": [
+                "unrestricted",
+                "allowlist"
+              ]
+            },
+            "egressAllowlist": {
+              "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 254,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
             "sandboxAllocation": {
               "anyOf": [
                 {
@@ -7924,9 +8558,11 @@
     "tags": [
       "cloudagentnext",
       "preparesession",
+      "egressmode",
+      "egressallowlist",
       "sandboxallocation"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession sandboxallocation sandboxAllocation"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist sandboxallocation egressMode egressAllowlist sandboxAllocation"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -17650,6 +18286,26 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
+            }
+          ]
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
             }
           ]
         }
@@ -17663,9 +18319,10 @@
       "autotopup",
       "changepaymentmethod",
       "organizationid",
-      "amountcents"
+      "amountcents",
+      "thresholdcents"
     ],
-    "searchBlob": "organizations.autoTopUp.changePaymentMethod Start the flow to set a new payment method for an organization's automatic top-up. Use to replace the card on file. organizations autotopup changepaymentmethod organizationid amountcents organizationId amountCents"
+    "searchBlob": "organizations.autoTopUp.changePaymentMethod Start the flow to set a new payment method for an organization's automatic top-up. Use to replace the card on file. organizations autotopup changepaymentmethod organizationid amountcents thresholdcents organizationId amountCents thresholdCents"
   },
   "organizations.autoTopUp.getConfig": {
     "path": "organizations.autoTopUp.getConfig",
@@ -17748,6 +18405,26 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
+            }
+          ]
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
             }
           ]
         }
@@ -17763,9 +18440,10 @@
       "toggle",
       "organizationid",
       "currentenabled",
-      "amountcents"
+      "amountcents",
+      "thresholdcents"
     ],
-    "searchBlob": "organizations.autoTopUp.toggle Turn automatic balance top-up on or off for an organization, or start payment-method setup. Use to enable or disable auto top-up. organizations autotopup toggle organizationid currentenabled amountcents organizationId currentEnabled amountCents"
+    "searchBlob": "organizations.autoTopUp.toggle Turn automatic balance top-up on or off for an organization, or start payment-method setup. Use to enable or disable auto top-up. organizations autotopup toggle organizationid currentenabled amountcents thresholdcents organizationId currentEnabled amountCents thresholdCents"
   },
   "organizations.autoTopUp.updateAmount": {
     "path": "organizations.autoTopUp.updateAmount",
@@ -17793,6 +18471,10 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
             }
           ]
         }
@@ -17810,6 +18492,50 @@
       "amountcents"
     ],
     "searchBlob": "organizations.autoTopUp.updateAmount Set the amount an organization automatically tops up when its balance is low. Use to change the auto top-up amount. organizations autotopup updateamount organizationid amountcents organizationId amountCents"
+  },
+  "organizations.autoTopUp.updateThreshold": {
+    "path": "organizations.autoTopUp.updateThreshold",
+    "kind": "mutation",
+    "summary": "Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "thresholdCents"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "autotopup",
+      "updatethreshold",
+      "organizationid",
+      "thresholdcents"
+    ],
+    "searchBlob": "organizations.autoTopUp.updateThreshold Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account. organizations autotopup updatethreshold organizationid thresholdcents organizationId thresholdCents"
   },
   "organizations.autoTriage.getAutoTriageConfig": {
     "path": "organizations.autoTriage.getAutoTriageConfig",
@@ -18696,6 +19422,51 @@
       "ptyid"
     ],
     "searchBlob": "organizations.cloudAgentNext.closeTerminal Close an open terminal in a cloud agent session. Use to end a terminal session. organizations cloudagentnext closeterminal organizationid cloudagentsessionid ptyid organizationId cloudAgentSessionId ptyId"
+  },
+  "organizations.cloudAgentNext.createPreview": {
+    "path": "organizations.cloudAgentNext.createPreview",
+    "kind": "mutation",
+    "summary": "Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^\\/.*"
+        }
+      },
+      "required": [
+        "organizationId",
+        "cloudAgentSessionId",
+        "port"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "createpreview",
+      "organizationid",
+      "cloudagentsessionid",
+      "port",
+      "path"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.createPreview Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview. organizations cloudagentnext createpreview organizationid cloudagentsessionid port path organizationId cloudAgentSessionId port path"
   },
   "organizations.cloudAgentNext.createTerminal": {
     "path": "organizations.cloudAgentNext.createTerminal",
@@ -20606,6 +21377,29 @@
             {
               "type": "object",
               "properties": {
+                "egressMode": {
+                  "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+                  "type": "string",
+                  "enum": [
+                    "unrestricted",
+                    "allowlist"
+                  ]
+                },
+                "egressAllowlist": {
+                  "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "pattern": "^[A-Za-z0-9.-]+$"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
                 "organizationId": {
                   "type": "string",
                   "format": "uuid",
@@ -20752,9 +21546,11 @@
       "cloudagentnext",
       "preparesession",
       "organizationid",
+      "egressmode",
+      "egressallowlist",
       "sandboxallocation"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid sandboxallocation organizationId sandboxAllocation"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist sandboxallocation organizationId egressMode egressAllowlist sandboxAllocation"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",
@@ -29415,6 +30211,14 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "audience": {
+          "default": "member",
+          "type": "string",
+          "enum": [
+            "member",
+            "shared_services"
+          ]
         }
       },
       "required": [
@@ -29425,9 +30229,10 @@
       "organizations",
       "settings",
       "listavailablemodels",
-      "organizationid"
+      "organizationid",
+      "audience"
     ],
-    "searchBlob": "organizations.settings.listAvailableModels List the AI models available to an organization's members according to its model access policy. organizations settings listavailablemodels organizationid organizationId"
+    "searchBlob": "organizations.settings.listAvailableModels List the AI models available to an organization's members according to its model access policy. organizations settings listavailablemodels organizationid audience organizationId audience"
   },
   "organizations.settings.setOrganizationAutoRoute": {
     "path": "organizations.settings.setOrganizationAutoRoute",
@@ -37612,7 +38417,9 @@
           "enum": [
             "ios_push_to_start",
             "ios_activity",
-            "android_ongoing"
+            "ios_session_activity",
+            "android_ongoing",
+            "android_session_ongoing"
           ]
         },
         "platform": {
@@ -37632,6 +38439,10 @@
               "type": "null"
             }
           ]
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -37647,9 +38458,10 @@
       "token",
       "kind",
       "platform",
-      "organizationid"
+      "organizationid",
+      "sessionid"
     ],
-    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid token kind platform organizationId"
+    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid sessionid token kind platform organizationId sessionId"
   },
   "user.registerPushToken": {
     "path": "user.registerPushToken",
@@ -38022,6 +38834,10 @@
         "token": {
           "type": "string",
           "minLength": 1
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -38031,9 +38847,10 @@
     "tags": [
       "user",
       "unregisteractivitytoken",
-      "token"
+      "token",
+      "sessionid"
     ],
-    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token token"
+    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token sessionid token sessionId"
   },
   "user.unregisterPushToken": {
     "path": "user.unregisterPushToken",

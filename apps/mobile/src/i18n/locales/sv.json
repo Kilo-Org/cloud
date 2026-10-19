@@ -133,10 +133,13 @@
     "status": "Läge",
     "truncated": "Avkortat",
     "updated": "Uppdaterad",
+    "generating": "Genererar…",
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
     "dismissed": "Avskriven",
     "agent": "Ombud",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Ändringar"
   },
   "language": {
@@ -833,7 +836,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarningar",
       "security": "Säkerhetsanmärkningar",
-      "spend": "Utgiftsvarningar"
+      "spend": "Utgiftsvarningar",
+      "followedSessions": "Följda sessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dina konversationer",
@@ -1256,7 +1260,7 @@
         "stoppedTitle": "Installationen har stoppats",
         "stoppedBody": "Instansen för {{name}} stoppades oväntat under installationen.",
         "stalledTitle": "Installationen har fastnat",
-        "stalledBody": "Vi kunde inte slutföra installationen av {{name}}. Försök igen eller mejla hi@kilo.ai om problemet kvarstår.",
+        "stalledBody": "Vi kunde inte slutföra installationen av {{name}}. Försök igen eller mejla {{supportEmail}} om problemet kvarstår.",
         "timeoutTitle": "Tar längre tid än förväntat",
         "timeoutBody": "Installationen av {{name}} tar längre tid än vanligt (över {{displayMinutes}} minuter).",
         "continueInBackground": "Fortsätt i bakgrunden",
@@ -1314,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Ditt abonnemang för tidig åtkomst behöver granskas manuellt innan det kan användas i mobilen.",
       "iosTitle": "KiloClaw är inte tillgängligt på iOS",
       "iosBody": "För det här kontot hanteras åtkomsten till KiloClaw utanför iOS-appen.",
-      "iosContact": "Frågor? Kontakta hi@kilo.ai.",
+      "iosContact": "Frågor? Kontakta {{supportEmail}}.",
       "quarantinedCta": "Skicka e-post till vårt team",
       "nonCanonicalEarlybirdCta": "Granska ditt abonnemang på kilo.ai"
     },
@@ -1549,7 +1553,7 @@
         "recoveryLabel": "Uppdatera GitHub-appen"
       },
       "githubIpAllowList": {
-        "description": "Kodgranskaren inaktiverades eftersom GitHub-organisationens lista över tillåtna IP-adresser blockerar Kilo. Kontakta hi@kilocode.ai för att få hjälp och aktivera sedan kodgranskaren igen."
+        "description": "Kodgranskaren inaktiverades eftersom GitHub-organisationens lista över tillåtna IP-adresser blockerar Kilo. Kontakta {{supportEmail}} för att få hjälp och aktivera sedan kodgranskaren igen."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kodgranskaren inaktiverades eftersom Kilo inte kan skapa en åtkomsttoken för det här projektet i GitLab. Ge behörighet som projektansvarig eller aktivera åtkomsttoken för projekt och aktivera sedan kodgranskaren igen.",
@@ -1564,7 +1568,7 @@
         "recoveryLabel": "Uppdatera kodgranskarens inställningar"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kodgranskaren inaktiverades efter att kloningen av kodarkivet överskred tidsgränsen tre gånger i dag. Kontakta hi@kilocode.ai för att få hjälp och aktivera sedan kodgranskaren igen."
+        "description": "Kodgranskaren inaktiverades efter att kloningen av kodarkivet överskred tidsgränsen tre gånger i dag. Kontakta {{supportEmail}} för att få hjälp och aktivera sedan kodgranskaren igen."
       },
       "title": "Kodgranskaren kräver en åtgärd.",
       "recoveryLabel": "Kontakta supporten"
@@ -2088,6 +2092,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiera felinformation",
       "backToSessions": "Tillbaka till sessionerna",
+      "follow": "Följ på låsskärmen",
+      "unfollow": "Sluta följa på låsskärmen",
       "couldNotLoad": "Det gick inte att läsa in sessionen.",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
@@ -2423,6 +2429,7 @@
       "title": "Agenten behöver ett svar",
       "skipQuestionsTitle": "Hoppa över frågorna?",
       "skipQuestionsMessage": "Agenten hoppar över det här steget.",
+      "answerProgress": "{{answered}} av {{total}} besvarade",
       "selectAllThatApply": "Markera alla alternativ som stämmer.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, markerat",
@@ -2491,6 +2498,7 @@
       "title": "Filtrera sessioner",
       "platformCloud": "Molnet",
       "platformExtension": "Tillägg",
+      "platformDesktop": "Skrivbord",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3100,6 +3108,9 @@
     "ssoError": "Din organisation kräver SSO. Välj ”$t(login.moreSignInOptions)”.",
     "blocked": "Det här kontot har blockerats. Kontakta supporten.",
     "signupRateLimited": "För många försök. Försök igen senare.",
+    "signupStepUp": "Välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
+    "signupStepUpApple": "Välj ”$t(login.signInWithApple)” för att slutföra skapandet av ditt konto.",
+    "signupStepUpGoogle": "Välj ”$t(login.signInWithGoogle)” för att slutföra skapandet av ditt konto.",
     "invalidCode": "Koden är felaktig. Försök igen.",
     "codeInProgress": "Din kod behandlas. Vänta en stund och försök igen.",
     "tooManyAttempts": "För många försök. Begär en ny kod.",
@@ -3170,6 +3181,8 @@
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
+    "finished": "Slutförd",
+    "followFailed": "Det gick inte att visa agenten på låsskärmen.",
     "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
     "checked": "Kontrollerad",
     "lastKnown": "Senast kända",
@@ -3178,7 +3191,26 @@
     "waitingForYou": "Väntar på dig",
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",
-    "waitingToRetry": "Väntar på nytt försök"
+    "waitingToRetry": "Väntar på nytt försök",
+    "step": {
+      "editing": "Redigerar",
+      "reading": "Läser",
+      "running": "Kör",
+      "searching": "Webbsökning",
+      "thinking": "Tänker igenom"
+    },
+    "planOf": "av",
+    "filesChanged": "filer ändrade",
+    "finishedIn": "Klart på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request öppnad",
+    "permissionWants": "Vill köra",
+    "failure": {
+      "provider": "Stoppad: leverantörsfel",
+      "tool": "Stoppad: verktygsfel",
+      "cancelled": "Stoppad: avbruten",
+      "other": "STOPPAD"
+    }
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",
@@ -3214,8 +3246,12 @@
     "list": {
       "loadFailed": "Det gick inte att läsa in chatthistoriken.",
       "new": "Ny chatt",
-      "openHint": "Öppnar chatten. Tryck länge för att ta bort.",
       "deleteTitle": "Ta bort den här chatten?"
+    },
+    "rename": {
+      "title": "Byt namn på chatten",
+      "accessibility": "Byt namn på chatten: {{title}}",
+      "openHint": "Öppnar chatten. Tryck länge för att byta namn eller ta bort."
     },
     "beta": "Beta",
     "details": {
@@ -3292,6 +3328,10 @@
     },
     "backends": {
       "title": "Chattbackends",
+      "providersTitle": "Chattleverantörer",
+      "cloud": "I molnet",
+      "cloudModel": "Modell: {{model}}",
+      "cloudUnavailable": "Kilo-modeller är inte tillgängliga just nu. Kontrollera anslutningen.",
       "manage": "Hantera backends",
       "defaultKilo": "$t(consent.kilo) (standard)",
       "kiloHelp": "Den inbyggda backenden använder ditt Kilo-konto och kan inte redigeras eller tas bort.",
@@ -3351,7 +3391,6 @@
     "gguf": {
       "title": "Nedladdningsbara modeller",
       "help": "Ladda ner en öppen modell och kör den på den här telefonen med llama.cpp. Dina frågor och svar stannar på enheten. Modellerna är stora, så använd Wi-Fi.",
-      "details": "{{size}} · Licens: {{license}}",
       "download": "Ladda ner modell",
       "pause": "Pausa nedladdningen",
       "resume": "Återuppta nedladdningen",
@@ -3363,6 +3402,8 @@
       "url": "Direkt nedladdningslänk",
       "urlHelp": "Klistra in en HTTPS-länk till en .gguf-fil, till exempel en resolve-länk från Hugging Face. Ladda bara ner modeller från källor du litar på.",
       "downloadUrl": "Ladda ner från länk",
+      "advanced": "Avancerat",
+      "localPurpose": "Körs på den här enheten med llama.cpp. Prompter och svar stannar på enheten.",
       "deleteTitle": "Ta bort den här modellen?",
       "deleteMessage": "Ta bort {{name}} från den här enheten? Chattar som använder den behöver en annan modell innan de kan fortsätta.",
       "errors": {
@@ -3391,8 +3432,17 @@
         "fits": "Passar",
         "tight": "Knappt",
         "tooLarge": "För stor",
-        "noStorage": "Inte tillräckligt med lagringsutrymme"
+        "noStorage": "Inte tillräckligt med lagringsutrymme",
+        "unknown": "Passning okänd"
       },
+      "recommendationsHelp": "En kortlista som appen fäster: en fil per modell, från en utgivare som anger en licens. Inget annat rangordnas.",
+      "compatibilityHelp": "Passning jämför modellfilen med den här enhetens minne och lediga lagringsutrymme. Minnesvärdet är en uppskattning, inte en mätning.",
+      "text": "Text",
+      "listTextPurpose": "Endast textprompter.",
+      "listImagePurpose": "Läser bilder liksom text.",
+      "smallestDownload": "Minsta nedladdning: {{size}} · cirka {{memory}} minne",
+      "fullFileName": "Fil: {{name}}",
+      "memoryEstimateNote": "Minnesvärden är uppskattningar, inte mätningar.",
       "parameters": "Parametrar: {{value}}",
       "downloads": "Nedladdningar: {{value}}",
       "likes": "Gillningar: {{value}}",
@@ -3417,7 +3467,8 @@
     },
     "localModels": {
       "title": "Modeller på enheten",
-      "help": "Modeller på enheten körs på den här telefonen. Dina frågor och svar stannar på enheten, och de här modellerna kan inte använda verktyg.",
+      "help": "Modeller på enheten körs på den här telefonen. Dina frågor och svar stannar på enheten.",
+      "systemPurpose": "Modellen som är inbyggd i enhetens system. Den körs på enheten.",
       "apple": "Apple Intelligence (på enheten)",
       "checking": "Kontrollerar tillgänglighet …",
       "ready": "Redo att använda",
@@ -3718,12 +3769,26 @@
       "startNow": "Starta utan granskning",
       "startNowHint": "Håll nedtryckt för att starta utan granskning",
       "titleLabel": "Uppgiftens titel",
+      "renameTitle": "Byt namn på uppgift",
       "notes": "Anteckningar",
-      "notesPlaceholder": "Lägg till anteckningar i Markdown",
+      "addNotes": "Lägg till anteckningar",
+      "notesPrompt": "Lägg till sammanhang, krav eller acceptanskriterier.",
+      "markdownSupported": "Markdown stöds",
       "sessions": "Länkade sessioner",
       "noSessions": "Inga sessioner ännu",
+      "untitledLinkedSession": "Länkad session",
+      "sessionNeedsInput": "Sessionen behöver inmatning",
+      "sessionRunning": "Sessionen körs",
+      "sessionFinished": "Sessionen klar",
+      "sessionPullRequest": "Sessionens PR",
+      "sessionPullRequestNumber": "Sessionens PR #{{number}}",
+      "openSessionHint": "Öppnar sessionen.",
+      "unlinkSessionAction": "Koppla från session",
+      "unlinkConfirmTitle": "Koppla från {{title}}?",
+      "unlinkConfirmMessage": "Själva sessionen tas inte bort. Endast dess länk till den här uppgiften tas bort.",
+      "startNewSession": "Starta ny session",
+      "startNewSessionHint": "Håll in för att starta en ny session.",
       "linkSession": "Länka session",
-      "unlinkSession": "Ta bort länken till {{title}}",
       "linkFailed": "Kunde inte länka sessionen till uppgiften"
     },
     "linkSession": {
@@ -3741,5 +3806,69 @@
       "title": "Spara i lista",
       "saved": "Sparat i {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Morgonsammanfattning",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Viss historisk aktivitet kan saknas. ≥ betyder minst så mycket; okänt är inte noll.",
+    "available": "Tillgängliga sammanfattningar",
+    "history": "Sammanfattningshistorik",
+    "historyHint": "Rapporter sparas i 30 dagar, även avfärdade rapporter.",
+    "settings": "Inställningar för sammanfattning",
+    "empty": "Ingen aktivitet under natten",
+    "emptyHint": "Dina kodningssessioner i molnet och CLI visas här efter en aktiv natt.",
+    "loadError": "Det gick inte att läsa in sammanfattningar",
+    "sessions": "Aktiva under natten",
+    "pullRequests": "Öppnade PRs",
+    "blockers": "Nya hinder",
+    "spend": "Kostnad under natten",
+    "view": "Läs sammanfattning",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Visa livestatus",
+    "offline": "Offline · sparad sammanfattning",
+    "cached": "Sparad rapport · kan inte uppdateras",
+    "revised": "Reviderad · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI-sammanfattning",
+    "summaryDisabled": "Strukturerad rapport · AI är avstängt för detta sammanhang",
+    "summaryPending": "AI-sammanfattningen pågår. Den bifogas här när den är klar.",
+    "summaryFailed": "AI-sammanfattningen misslyckades. Ett nytt försök kan medföra en ny avgift.",
+    "summaryUnavailable": "AI-sammanfattningen är inte tillgänglig. Din strukturerade rapport finns fortfarande.",
+    "summaryOutdated": "Den här sammanfattningen är äldre än rapportens senaste revision.",
+    "summaryCharge": "AI debiterade {{cost}}",
+    "summaryChargePending": "AI-avgiften väntar på avstämning",
+    "generate": "Skapa sammanfattning",
+    "retrySummary": "Försök igen med betald sammanfattning",
+    "sources": "Underlag och artefakter",
+    "timezone": "Tidszon för sammanfattning",
+    "deviceTimezone": "Använd enhetens tidszon",
+    "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin. Schemaändringar gäller kommande nätter.",
+    "nightStart": "Natten börjar",
+    "morningStart": "Natten slutar / morgonen börjar",
+    "morningEnd": "Morgonen slutar",
+    "timeHint": "Hem-kortet återgår till livestatus när morgonen slutar, även offline.",
+    "invalidSchedule": "Välj en giltig tidszon och natt- och morgonperioder som inte är tomma eller överlappar.",
+    "notificationsHint": "En allmän avisering per morgon när din första rapport är klar. Oberoende av betalda AI-sammanfattningar.",
+    "notificationPermission": "Aktivera enhetsaviseringar i $t(common.notifications) för att få din sammanfattning.",
+    "aiOptIn": "Betalda AI-sammanfattningar",
+    "aiHint": "Valfritt, endast för detta sammanhang. Utvalda, maskerade utdrag och strukturerade fakta skickas till din modell på appens språk. Avgifter dras från detta sammanhangs saldo.",
+    "defaultModel": "Använd Kilos standardmodell",
+    "duration": "Tidsgräns (minuter)",
+    "spendLimit": "Kostnadsgräns (USD)",
+    "safeguardHint": "Fasta gränser per sammanfattning, inte en daglig budget. Standard: 10 minuter och $2. En rapport publiceras efter högst fem minuter medan genereringen fortsätter inom dessa gränser.",
+    "invalidSafeguards": "Ange positiva, ändliga tids- och kostnadsgränser.",
+    "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
+    "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar.",
+    "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
+    "confirmGeneration": "Skapa en betald sammanfattning?",
+    "paidDisclosure": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} minuter. Avgifter tas ut även om genereringen misslyckas.",
+    "enable": "Aktivera betalda sammanfattningar",
+    "contextSettings": "AI-inställningar · {{context}}",
+    "allContexts": "Personliga sammanfattningar och organisationssammanfattningar hålls åtskilda.",
+    "estimatePricingUnavailable": "Prissättning för denna modell är inte tillgänglig.",
+    "estimateBalanceUnavailable": "Inte tillräcklig saldo för en betald sammanfattning.",
+    "estimateModelNotAllowed": "Denna modell är inte tillåten här.",
+    "estimateSpendLimitTooLow": "Höj utgiftsskyddet för att tillåta denna sammanfattning."
   }
 }

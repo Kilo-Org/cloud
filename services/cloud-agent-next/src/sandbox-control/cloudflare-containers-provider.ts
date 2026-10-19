@@ -1,5 +1,5 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
-import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -50,6 +50,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   logicalSandboxId: string;
   allocationName: string;
   instance?: ContainerInstanceSize;
+  egressAllowlist?: string[];
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
@@ -95,7 +96,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       try {
         admission = await container.ensureBillingAdmission(input, instance);
       } catch (error) {
-        if (isContainerConcurrencyLimitError(error)) throw error;
+        if (getContainerCapacityFailureReason(error)) throw error;
         admission = {
           success: false,
           code: 'meter_unavailable',
@@ -116,6 +117,16 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     ensureBillingAdmission,
+    describeRuntime(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (parsed === null) return undefined;
+      return {
+        provider: 'cloudflare-containers',
+        sandboxId: deps.logicalSandboxId,
+        instanceId: parsed.instanceId,
+        instanceType: instance,
+      };
+    },
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeIntentProviderRef(intent);
       await ensureBillingAdmission(providerRef, intent.billing);
@@ -134,6 +145,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         allocationRef: ref,
         instance,
         containment: owned.containment,
+        ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
         ...(options?.repoKey === undefined ? {} : { repoKey: options.repoKey }),
         ...(options?.skipRepository === true ? { skipRepository: true as const } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),

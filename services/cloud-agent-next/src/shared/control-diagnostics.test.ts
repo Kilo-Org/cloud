@@ -83,7 +83,7 @@ describe('control diagnostic schema compatibility', () => {
         {
           phase: 'failed',
           workloadPhase: 'protection',
-          workloadFailure: 'write_failed',
+          workloadFailure: 'oom_score_write_failed',
           scopeId: 'scope_1',
         },
         1
@@ -120,7 +120,7 @@ describe('control diagnostic schema compatibility', () => {
       {
         phase: 'failed',
         workloadPhase: 'protection',
-        workloadFailure: 'write_failed',
+        workloadFailure: 'oom_score_write_failed',
         scopeId: 'scope_1',
       },
       { phase: 'completed', workloadPhase: 'protection', serverMinBytes: 1_073_741_824 },

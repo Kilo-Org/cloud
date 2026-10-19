@@ -1,12 +1,14 @@
 import type { WorkerDb } from '@kilocode/db/client';
-import { container_usage_interval } from '@kilocode/db/schema';
+import { container_usage_interval, kilocode_users, organizations } from '@kilocode/db/schema';
 import { withTimeout } from '@kilocode/worker-utils';
-import { and, count, eq, gt, like, ne, notLike, sql } from 'drizzle-orm';
+import { and, count, eq, gt, like, ne, notLike, sql, type SQL } from 'drizzle-orm';
 import { getPgDb } from './db/pg.js';
 import { logger } from './logger.js';
 import type { Env } from './types.js';
 
-export const PERSONAL_CONTAINER_LIMIT = 20;
+export const USER_CONTAINER_LIMIT = 20;
+export const LOW_BALANCE_CONTAINER_LIMIT = 3;
+export const FUNDED_CONTAINER_MINIMUM_MICRODOLLARS = 3_000_000;
 export const ORGANIZATION_CONTAINER_LIMIT = 50;
 
 /**
@@ -16,6 +18,7 @@ export const ORGANIZATION_CONTAINER_LIMIT = 50;
  */
 const LIVE_INTERVAL_WINDOW = sql`now() - interval '11 minutes'`;
 const COUNT_TIMEOUT_MS = 10_000;
+const CHECK_RETRY_DELAY_MS = 250;
 const CLOUD_AGENT_SERVICE_PATTERN = 'cloud-agent-next-%';
 const CODE_REVIEW_SERVICE_PATTERN = '%code-review%';
 
@@ -25,6 +28,7 @@ export type ContainerCapacityCheckpoint = 'control-plane-create' | 'sandbox-star
 
 export type ContainerCapacityRequest = {
   subject: ContainerConcurrencySubject;
+  actor: { type: 'user' | 'bot'; id: string };
   /**
    * Billing instance id (the sandbox id) of the container being started. A
    * restarted sandbox can still have an open interval from its previous
@@ -32,6 +36,7 @@ export type ContainerCapacityRequest = {
    */
   instanceId: string;
   checkpoint: ContainerCapacityCheckpoint;
+  billingOrigin?: string;
 };
 
 export class ContainerConcurrencyLimitError extends Error {
@@ -42,17 +47,30 @@ export class ContainerConcurrencyLimitError extends Error {
     readonly limit: number
   ) {
     super(
-      `container_limit_reached: The ${accountType} account has reached its limit of ${limit} concurrent containers. Stop an existing container before starting another.`
+      `container_limit_reached: The ${accountType === 'personal' ? 'user' : 'organization'} has reached its limit of ${limit} concurrent containers. Stop an existing container before starting another.`
     );
     this.name = 'ContainerConcurrencyLimitError';
   }
 }
 
-/** Recognizes the denial after Durable Object RPC has reduced it to a message. */
-export function isContainerConcurrencyLimitError(error: unknown): boolean {
-  if (error instanceof ContainerConcurrencyLimitError) return true;
+export class ContainerCapacityUnavailableError extends Error {
+  readonly code = 'container_capacity_unavailable';
+
+  constructor() {
+    super(
+      'container_capacity_unavailable: Cannot verify container capacity or account balance. Try again shortly.'
+    );
+    this.name = 'ContainerCapacityUnavailableError';
+  }
+}
+
+/** Recognizes admission failures even after Durable Object RPC flattens them. */
+export function getContainerCapacityFailureReason(
+  error: unknown
+): 'container_limit_reached' | 'billing_unavailable' | undefined {
   if (typeof error === 'object' && error !== null && 'code' in error) {
-    if (error.code === 'container_limit_reached') return true;
+    if (error.code === 'container_limit_reached') return 'container_limit_reached';
+    if (error.code === 'container_capacity_unavailable') return 'billing_unavailable';
   }
   const message =
     typeof error === 'string'
@@ -63,66 +81,137 @@ export function isContainerConcurrencyLimitError(error: unknown): boolean {
           typeof error.message === 'string'
         ? error.message
         : '';
-  return message.includes('container_limit_reached:');
+  if (message.includes('container_limit_reached:')) return 'container_limit_reached';
+  if (message.includes('container_capacity_unavailable:')) return 'billing_unavailable';
+  return undefined;
 }
 
-export function isContainerConcurrencyExempt(sandboxId: string): boolean {
-  return sandboxId.startsWith('crv-');
+export function isContainerConcurrencyExempt(request: ContainerCapacityRequest): boolean {
+  return request.billingOrigin === 'code-review' || request.instanceId.startsWith('crv-');
 }
 
-export function containerLimitFor(subject: ContainerConcurrencySubject): number {
-  return subject.type === 'org' ? ORGANIZATION_CONTAINER_LIMIT : PERSONAL_CONTAINER_LIMIT;
-}
-
-export async function countLiveContainers(
+async function countLiveContainers(
   db: WorkerDb,
-  request: ContainerCapacityRequest
+  instanceId: string,
+  scope: SQL | undefined
 ): Promise<number> {
   const [row] = await db
     .select({ live: count() })
     .from(container_usage_interval)
     .where(
       and(
-        eq(container_usage_interval.subject_type, request.subject.type),
-        eq(container_usage_interval.subject_id, request.subject.id),
+        scope,
         eq(container_usage_interval.status, 'open'),
         gt(container_usage_interval.last_seen_at, LIVE_INTERVAL_WINDOW),
         like(container_usage_interval.service, CLOUD_AGENT_SERVICE_PATTERN),
         notLike(container_usage_interval.service, CODE_REVIEW_SERVICE_PATTERN),
         notLike(container_usage_interval.instance_id, 'crv-%'),
-        ne(container_usage_interval.instance_id, request.instanceId)
+        sql`coalesce(${container_usage_interval.metadata}->>'origin', '') <> 'code-review'`,
+        ne(container_usage_interval.instance_id, instanceId)
       )
     );
   return row?.live ?? 0;
 }
 
+export type ContainerCapacityCheck = {
+  subject: ContainerConcurrencySubject;
+  live: number;
+  limit: number;
+};
+
+async function readAccountBalance(
+  db: WorkerDb,
+  subject: ContainerConcurrencySubject
+): Promise<number> {
+  const account = subject.type === 'org' ? organizations : kilocode_users;
+  const [row] = await db
+    .select({
+      balance: sql`${account.total_microdollars_acquired} - ${account.microdollars_used}`.mapWith(
+        Number
+      ),
+    })
+    .from(account)
+    .where(eq(account.id, subject.id));
+  return row?.balance ?? 0;
+}
+
+export async function readContainerCapacity(
+  db: WorkerDb,
+  request: ContainerCapacityRequest
+): Promise<ContainerCapacityCheck[]> {
+  const checks: ContainerCapacityCheck[] = [];
+  if (request.actor.type === 'user') {
+    const [live, balance] = await Promise.all([
+      countLiveContainers(
+        db,
+        request.instanceId,
+        and(
+          eq(container_usage_interval.actor_type, 'user'),
+          eq(container_usage_interval.actor_id, request.actor.id)
+        )
+      ),
+      readAccountBalance(db, request.subject),
+    ]);
+    checks.push({
+      subject: { type: 'user', id: request.actor.id },
+      live,
+      limit:
+        balance < FUNDED_CONTAINER_MINIMUM_MICRODOLLARS
+          ? LOW_BALANCE_CONTAINER_LIMIT
+          : USER_CONTAINER_LIMIT,
+    });
+  }
+  // Bots retain their billing-account limits. Human starts also share the
+  // organization's existing cap, in addition to their cross-organization cap.
+  if (request.subject.type === 'org' || request.actor.type === 'bot') {
+    checks.push({
+      subject: request.subject,
+      live: await countLiveContainers(
+        db,
+        request.instanceId,
+        and(
+          eq(container_usage_interval.subject_type, request.subject.type),
+          eq(container_usage_interval.subject_id, request.subject.id)
+        )
+      ),
+      limit: request.subject.type === 'org' ? ORGANIZATION_CONTAINER_LIMIT : USER_CONTAINER_LIMIT,
+    });
+  }
+  return checks;
+}
+
 type CapacityDependencies = {
-  countLive?: (request: ContainerCapacityRequest) => Promise<number>;
+  readCapacity?: (request: ContainerCapacityRequest) => Promise<ContainerCapacityCheck[]>;
 };
 
 /**
- * Soft per-account cap on concurrently running Cloud Agent containers, read
+ * Soft per-user and per-organization caps on Cloud Agent containers, read
  * from the usage meter's open intervals. Concurrent starts can overshoot by the
- * number in flight, and an unavailable database admits the start: the cap
- * guards against runaway usage and must not turn a Postgres outage into a
- * Cloud Agent outage.
+ * number in flight. An unavailable database rejects new starts after one
+ * bounded retry; running containers do not need a fresh admission check.
  */
 export async function assertContainerCapacity(
   env: Pick<Env, 'HYPERDRIVE' | 'CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED'>,
   request: ContainerCapacityRequest,
   dependencies: CapacityDependencies = {}
 ): Promise<void> {
-  // The e2e Worker runs one funded test account through the whole suite, so it
-  // would otherwise trip the per-account cap on the suite's own churn. Only that
-  // Worker sets the flag; production leaves it unset and stays enforced.
+  // Test Workers use fake providers or share one funded test account across
+  // the suite. Production leaves this flag unset and enforces admission.
   if (env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true') return;
-  const countLive = dependencies.countLive ?? (input => countLiveContainers(getPgDb(env), input));
-  let live: number;
-  let limit: number;
+  const readCapacity =
+    dependencies.readCapacity ?? (input => readContainerCapacity(getPgDb(env), input));
+  let checks: ContainerCapacityCheck[];
   try {
-    if (isContainerConcurrencyExempt(request.instanceId)) return;
-    limit = containerLimitFor(request.subject);
-    live = await withTimeout(countLive(request), COUNT_TIMEOUT_MS, 'Container capacity count');
+    if (isContainerConcurrencyExempt(request)) return;
+    const readWithRetry = async () => {
+      try {
+        return await readCapacity(request);
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, CHECK_RETRY_DELAY_MS));
+        return readCapacity(request);
+      }
+    };
+    checks = await withTimeout(readWithRetry(), COUNT_TIMEOUT_MS, 'Container capacity check');
   } catch (error) {
     logger
       .withTags({ logTag: 'container_limit_check_unavailable', sandboxId: request.instanceId })
@@ -131,22 +220,24 @@ export async function assertContainerCapacity(
         errorName: error instanceof Error ? error.name : 'unknown',
         errorMessage: error instanceof Error ? error.message : String(error),
       })
-      .warn('Container capacity check unavailable; admitting start');
-    return;
+      .warn('Container capacity check unavailable; refusing start');
+    throw new ContainerCapacityUnavailableError();
   }
-  if (live < limit) return;
+  const exceeded = checks.find(check => check.live >= check.limit);
+  if (!exceeded) return;
+  const { subject, live, limit } = exceeded;
   logger
     .withTags({ logTag: 'container_limit_reached', sandboxId: request.instanceId })
     .withFields({
       checkpoint: request.checkpoint,
-      subjectType: request.subject.type,
-      subjectId: request.subject.id,
+      subjectType: subject.type,
+      subjectId: subject.id,
       live,
       limit,
     })
     .error('Container concurrency limit reached');
   throw new ContainerConcurrencyLimitError(
-    request.subject.type === 'org' ? 'organization' : 'personal',
+    subject.type === 'org' ? 'organization' : 'personal',
     limit
   );
 }

@@ -152,7 +152,7 @@ These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
 
-Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app`, `kilocode-global-app`, and `kilocode-ai-gateway` together for Development, Staging, and Production. A project that does not exist in Vercel yet is skipped and listed in the plan:
+Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app` and `kilocode-ai-gateway` together for Development, Staging, and Production. A project that does not exist in Vercel yet is skipped and listed in the plan:
 
 ```bash
 pnpm web:env set EXAMPLE_API_TOKEN
@@ -177,7 +177,7 @@ Remote updates are sequential rather than transactional. If a provider fails par
 To fill a new project with an existing project's variables, copy them:
 
 ```bash
-pnpm web:env copy --from kilocode-global-app --to kilocode-ai-gateway --dry-run
+pnpm web:env copy --from kilocode-app --to kilocode-ai-gateway --dry-run
 ```
 
 The command reads every Development, Staging, and Production variable of the source project and writes it to the destination with the same sensitivity. Vercel decrypts non-sensitive values, but never returns sensitive ones, so those are read from the `Kilo Web ENV Production` items that `pnpm web:env set` maintains. That requires read access to the vault. The plan lists every variable it does not copy, with the reason: ones managed by an integration such as Sentry or Axiom, sensitive ones without a 1Password value, ones Vercel did not decrypt, empty ones, branch-specific ones, unsupported Vercel types, and any passed with `--exclude VARIABLE`. Add the destination project to those integrations instead; they manage their variables per project. Add the missing ones with `pnpm web:env set`. Use `--only ENVIRONMENT` to copy one environment. Staging needs a `staging` custom environment in both projects. The copy does not redeploy; the destination's next deployment picks up the values.
@@ -388,6 +388,18 @@ The application consists of the Next.js app plus several Cloudflare Worker servi
 
 AI inference works locally without any extra services. The Next.js app includes an OpenRouter proxy route (`/api/openrouter/[...path]`) that calls real AI providers using API keys from `.env.local`. There are no mocks or local stubs — all inference hits real APIs (OpenRouter, OpenAI, Anthropic, Mistral, etc.).
 
+### Sign in with ChatGPT usage limits
+
+The gateway records plan limits on the connection that serves the request.
+The personal, organization-member, and shared-services settings cards show the recorded notice.
+
+- Consumer limits retain the **Manage usage** action.
+- `subscription_sharing_workplace_individual_usage_limit_exceeded` selects the Business notice.
+- **Copy request for admin** copies a message for the user's ChatGPT workspace admin.
+- Copying does not send the message, change the limit, or switch billing.
+- If clipboard access fails, the notice reveals a selectable request for manual copying.
+- A successful request or a reconnect clears the recorded notice.
+
 ### Running workers locally
 
 Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_NEXT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.
@@ -570,3 +582,24 @@ If image/video files appear as small text files with `oid sha256:...`, run:
 ```bash
 git lfs pull
 ```
+
+## Agent morning briefings
+
+The mobile Home briefing summarizes overnight coding sessions separately for Personal and each organization.
+Users configure a saved timezone, night start, shared night-end/morning-start, and morning end.
+Dismissal restores live status across devices; report history remains available.
+
+The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
+AI summaries and briefing notifications require separate opt-ins.
+Summary settings include a model override and finite generation time and spend limits.
+The default summary model is `~deepseek/deepseek-flash-latest`.
+The structured report remains available when generation fails or reaches a limit.
+
+Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
+The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
+Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
+
+The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
+They use the existing cron authorization, database, gateway, and notification configuration.
+Local verification must use an isolated database and fake accounts.
+Use a local notification sink and fixture inference provider to avoid real pushes or upstream charges.

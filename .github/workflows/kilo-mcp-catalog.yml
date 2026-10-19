@@ -46,6 +46,7 @@ on:
   # is required on main, so every main push triggers the workflow and the job
   # gates its own work against the pushed diff.
   pull_request:
+  merge_group:
   push:
     branches: [main]
 

@@ -329,6 +329,25 @@ describe('MeteredBillingLifecycle placed sandbox admission', () => {
     }
   );
 
+  it('retains Code Reviewer attribution before and after billing admission', async () => {
+    const { lifecycle, container } = setup();
+    container.running = false;
+    const identity = { sandboxClassName: 'Sandbox' } as const;
+    const input = { ...placedInput('code-review'), metadata: { origin: 'code-review' } };
+    await lifecycle.configureBilling(identity, input);
+    const expected = {
+      subject: input.subject,
+      actor: input.actor,
+      instanceId: PLACED_ID,
+      billingOrigin: 'code-review',
+    };
+    expect(await lifecycle.getStartAttribution()).toEqual(expected);
+    await expect(lifecycle.ensureBillingAdmission(identity, input)).resolves.toEqual({
+      success: true,
+    });
+    expect(await lifecycle.getStartAttribution()).toEqual(expected);
+  });
+
   it("rejects a placed sandbox admitted outside its kind's classes", async () => {
     const { lifecycle, meter } = setup();
 

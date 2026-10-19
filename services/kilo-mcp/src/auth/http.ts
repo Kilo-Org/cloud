@@ -105,9 +105,9 @@ export function escapeHtml(value: string): string {
 // canvas, raised charcoal card, brand-primary CTA. Dark-only, like the product.
 const PAGE_STYLE =
   ':root{color-scheme:dark;--background:#151515;--card:#202020;--overlay:#333333;' +
-  '--hover:#3a3a3a;--foreground:#fafafa;--muted:#a3a3a3;--primary:#f7f586;' +
-  '--primary-hover:#e6e475;--primary-foreground:#1f1f1f;--border:#ffffff1a;' +
-  '--border-strong:#ffffff2e;--input:#ffffff0a;--ring:#f7f58659;--danger:#ef4444}' +
+  '--hover:#3a3a3a;--foreground:#fafafa;--muted:#a3a3a3;--primary:#ffdd00;' +
+  '--primary-hover:#edcd00;--primary-foreground:#1f1f1f;--border:#ffffff1a;' +
+  '--border-strong:#ffffff2e;--input:#ffffff0a;--ring:#ffdd0059;--danger:#ef4444}' +
   '*{box-sizing:border-box}' +
   'body{margin:0;background:var(--background);color:var(--foreground);' +
   'font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;' +

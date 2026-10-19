@@ -133,10 +133,13 @@
     "status": "Statusi",
     "truncated": "Shkurtuar",
     "updated": "Përditësuar",
+    "generating": "Duke gjeneruar…",
     "working": "Duke punuar",
     "yourOwnRepositories": "Depot e tua",
     "dismissed": "E hedhur poshtë",
     "agent": "Agjenti",
+    "durationMinuteShort": "min",
+    "durationHourShort": "orë",
     "changes": "Ndryshimet"
   },
   "language": {
@@ -833,7 +836,8 @@
       "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",
       "security": "Gjetjet e sigurisë",
-      "spend": "Njoftime për shpenzimet"
+      "spend": "Njoftime për shpenzimet",
+      "followedSessions": "Sesione të ndjekura"
     },
     "category": {
       "chatMessagesSubtitle": "përgjigje në bisedat e tua",
@@ -1256,7 +1260,7 @@
         "stoppedTitle": "Konfigurimi u ndal",
         "stoppedBody": "Instanca e {{name}} u ndal papritur gjatë konfigurimit.",
         "stalledTitle": "Diçka u bllokua",
-        "stalledBody": "Nuk arritëm ta përfundonim konfigurimin e {{name}}. Provo përsëri ose shkruaj në hi@kilo.ai nëse kjo vazhdon të ndodhë.",
+        "stalledBody": "Nuk arritëm ta përfundonim konfigurimin e {{name}}. Provo përsëri ose shkruaj në {{supportEmail}} nëse kjo vazhdon të ndodhë.",
         "timeoutTitle": "Po zgjat më shumë nga sa pritej",
         "timeoutBody": "Konfigurimi i {{name}} po zgjat më shumë se zakonisht (mbi {{displayMinutes}} minuta).",
         "continueInBackground": "Vazhdo në sfond",
@@ -1314,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Plani yt i qasjes së hershme kërkon rishikim manual përpara se ta përdorësh në telefon.",
       "iosTitle": "KiloClaw i padisponueshëm në iOS",
       "iosBody": "Qasja te KiloClaw menaxhohet jashtë aplikacionit iOS për këtë llogari.",
-      "iosContact": "Ke pyetje? Shkruaj në hi@kilo.ai.",
+      "iosContact": "Ke pyetje? Shkruaj në {{supportEmail}}.",
       "quarantinedCta": "Dërgo email për ekipin tonë",
       "nonCanonicalEarlybirdCta": "Shqyrto planin tënd në kilo.ai"
     },
@@ -1549,7 +1553,7 @@
         "recoveryLabel": "Përditëso aplikacionin GitHub"
       },
       "githubIpAllowList": {
-        "description": "Shqyrtuesi i kodit u çaktivizua sepse kjo organizatë në GitHub përdor një listë adresash IP të lejuara që bllokon Kilo. Kontakto hi@kilocode.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
+        "description": "Shqyrtuesi i kodit u çaktivizua sepse kjo organizatë në GitHub përdor një listë adresash IP të lejuara që bllokon Kilo. Kontakto {{supportEmail}} për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
       },
       "gitlabProjectAccessRequired": {
         "description": "Shqyrtuesi i kodit u çaktivizua sepse Kilo nuk mund të krijojë një token qasjeje për këtë projekt në GitLab. Jep qasje me rolin e mirëmbajtësit ose aktivizo tokenët e qasjes në projekt, pastaj aktivizo përsëri shqyrtuesin e kodit.",
@@ -1564,7 +1568,7 @@
         "recoveryLabel": "Përditëso cilësimet e shqyrtuesit të kodit"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Shqyrtuesi i kodit u çaktivizua pasi klonimi i depos tejkaloi kohën e lejuar tri herë sot. Kontakto hi@kilocode.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
+        "description": "Shqyrtuesi i kodit u çaktivizua pasi klonimi i depos tejkaloi kohën e lejuar tri herë sot. Kontakto {{supportEmail}} për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
       },
       "title": "Shqyrtuesi i kodit kërkon vëmendje.",
       "recoveryLabel": "Kontakto mbështetjen"
@@ -2088,6 +2092,8 @@
       "title": "Seanca",
       "copyErrorDetails": "Kopjo detajet e gabimit",
       "backToSessions": "Kthehu te seancat",
+      "follow": "Ndiq në ekranin e kyçjes",
+      "unfollow": "Ndalo ndjekjen në ekranin e kyçjes",
       "couldNotLoad": "Nuk u ngarkua seanca.",
       "failedToLoadDetails": "Nuk u ngarkuan detajet e seancës.",
       "failedToStopExecution": "Nuk u ndal ekzekutimi.",
@@ -2423,6 +2429,7 @@
       "title": "Agjenti kërkon përgjigjen tënde",
       "skipQuestionsTitle": "Të anashkalohen pyetjet?",
       "skipQuestionsMessage": "Agjenti do ta anashkalojë këtë hap.",
+      "answerProgress": "{{answered}} nga {{total}} të përgjigjura",
       "selectAllThatApply": "Zgjidh të gjitha opsionet që vlejnë.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, zgjedhur",
@@ -2491,6 +2498,7 @@
       "title": "Filtro seancat",
       "platformCloud": "Reja",
       "platformExtension": "Shtesa",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -3100,6 +3108,9 @@
     "ssoError": "Organizata jote kërkon SSO. Përdor '$t(login.moreSignInOptions)'.",
     "blocked": "Kjo llogari është bllokuar. Kontakto ekipin e mbështetjes.",
     "signupRateLimited": "Ke bërë shumë përpjekje. Provo përsëri më vonë.",
+    "signupStepUp": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.moreSignInOptions)'.",
+    "signupStepUpApple": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithApple)'.",
+    "signupStepUpGoogle": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithGoogle)'.",
     "invalidCode": "Kodi është i pasaktë. Provo përsëri.",
     "codeInProgress": "Kodi yt po përpunohet. Prit pak dhe provo përsëri.",
     "tooManyAttempts": "Ke bërë shumë përpjekje. Kërko një kod të ri.",
@@ -3170,6 +3181,8 @@
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
+    "finished": "Përfundoi",
+    "followFailed": "Ky agjent nuk mund të shfaqej në ekranin e kyçjes.",
     "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
     "checked": "Kontrolluar",
     "lastKnown": "Gjendja e fundit e njohur",
@@ -3178,7 +3191,26 @@
     "waitingForYou": "Pret ty",
     "nextScheduled": "Të planifikuara në vijim",
     "answerNeeded": "Pret përgjigje",
-    "waitingToRetry": "Në pritje për të riprovuar"
+    "waitingToRetry": "Në pritje për të riprovuar",
+    "step": {
+      "editing": "Duke redaktuar",
+      "reading": "Duke lexuar",
+      "running": "Ekzekutim",
+      "searching": "Kërkim në web",
+      "thinking": "Duke e menduar"
+    },
+    "planOf": "nga",
+    "filesChanged": "skedarë të ndryshuar",
+    "finishedIn": "Përfundoi në",
+    "noActivityFor": "Pa aktivitet për",
+    "prOpened": "U hap kërkesa për tërheqje",
+    "permissionWants": "Dëshiron të ekzekutojë",
+    "failure": {
+      "provider": "U ndal: gabim ofruesi",
+      "tool": "U ndal: gabim mjeti",
+      "cancelled": "U ndal: anuluar",
+      "other": "U NDAL"
+    }
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
@@ -3214,8 +3246,12 @@
     "list": {
       "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
       "new": "Bisedë e re",
-      "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
       "deleteTitle": "Ta fshini këtë bisedë?"
+    },
+    "rename": {
+      "title": "Riemërto bisedën",
+      "accessibility": "Riemërto bisedën: {{title}}",
+      "openHint": "Hap bisedën. Shtypni gjatë për ta riemërtuar ose fshirë."
     },
     "beta": "Beta",
     "details": {
@@ -3292,6 +3328,10 @@
     },
     "backends": {
       "title": "Shërbimet mbështetëse të bisedës",
+      "providersTitle": "Ofruesit e bisedave",
+      "cloud": "Në re",
+      "cloudModel": "Modeli: {{model}}",
+      "cloudUnavailable": "Modelet Kilo nuk janë të disponueshme tani. Kontrollo lidhjen tënde.",
       "manage": "Menaxho shërbimet mbështetëse",
       "defaultKilo": "$t(consent.kilo) (i parazgjedhur)",
       "kiloHelp": "Shërbimi mbështetës i integruar përdor llogarinë tënde Kilo dhe nuk mund të modifikohet ose fshihet.",
@@ -3351,7 +3391,6 @@
     "gguf": {
       "title": "Modelet e shkarkueshme",
       "help": "Shkarko një model të hapur dhe ekzekutoje në këtë telefon me llama.cpp. Kërkesat dhe përgjigjet e tua mbeten në pajisje. Modelet janë të mëdha, prandaj përdor Wi-Fi.",
-      "details": "{{size}} · Licenca: {{license}}",
       "download": "Shkarko modelin",
       "pause": "Pauzo shkarkimin",
       "resume": "Rifillo shkarkimin",
@@ -3363,6 +3402,8 @@
       "url": "Lidhje e drejtpërdrejtë shkarkimi",
       "urlHelp": "Ngjit një lidhje HTTPS për një skedar .gguf, si një lidhje resolve nga Hugging Face. Shkarko modele vetëm nga burime që i beson.",
       "downloadUrl": "Shkarko nga lidhja",
+      "advanced": "Të avancuara",
+      "localPurpose": "Funksionon në këtë pajisje me llama.cpp. Kërkesat dhe përgjigjet qëndrojnë në pajisje.",
       "deleteTitle": "Të fshihet ky model?",
       "deleteMessage": "Të fshihet {{name}} nga kjo pajisje? Bisedat që e përdorin kanë nevojë për një model tjetër përpara se të vazhdojnë.",
       "errors": {
@@ -3391,8 +3432,17 @@
         "fits": "Përshtatet",
         "tight": "Mezi përshtatet",
         "tooLarge": "Shumë i madh",
-        "noStorage": "Hapësirë e pamjaftueshme"
+        "noStorage": "Hapësirë e pamjaftueshme",
+        "unknown": "Përshtatja e panjohur"
       },
+      "recommendationsHelp": "Një listë e shkurtër që kjo aplikacion fikson: një skedar për model, nga një botues që deklaron një licencë. Asgjë tjetër nuk renditet.",
+      "compatibilityHelp": "Përshtatja krahason skedarin e modelit me memorien dhe hapësirën e lirë të kësaj pajisjeje. Shifra e memories është një vlerësim, jo një matje.",
+      "text": "Tekst",
+      "listTextPurpose": "Vetëm kërkesa teksti.",
+      "listImagePurpose": "Lexon imazhe ashtu si tekst.",
+      "smallestDownload": "Shkarkimi më i vogël: {{size}} · rreth {{memory}} memorie",
+      "fullFileName": "Skedari: {{name}}",
+      "memoryEstimateNote": "Shifrat e memories janë vlerësime, jo matje.",
       "parameters": "Parametra: {{value}}",
       "downloads": "Shkarkime: {{value}}",
       "likes": "Pëlqime: {{value}}",
@@ -3417,7 +3467,8 @@
     },
     "localModels": {
       "title": "Modelet në pajisje",
-      "help": "Modelet në pajisje funksionojnë në këtë telefon. Kërkesat dhe përgjigjet e tua mbeten në pajisje dhe këto modele nuk mund të përdorin mjete.",
+      "help": "Modelet në pajisje funksionojnë në këtë telefon. Kërkesat dhe përgjigjet e tua mbeten në pajisje.",
+      "systemPurpose": "Modeli i integruar në sistemin e kësaj pajisjeje. Funksionon në pajisje.",
       "apple": "Apple Intelligence (në pajisje)",
       "checking": "Po kontrollohet disponueshmëria…",
       "ready": "Gati për përdorim",
@@ -3718,12 +3769,26 @@
       "startNow": "Nis pa shqyrtim",
       "startNowHint": "Shtypni gjatë për të nisur pa shqyrtim",
       "titleLabel": "Titulli i detyrës",
+      "renameTitle": "Riemërto detyrën",
       "notes": "Shënime",
-      "notesPlaceholder": "Shto shënime në Markdown",
+      "addNotes": "Shto shënime",
+      "notesPrompt": "Shto kontekst, kërkesa ose kritere pranimi.",
+      "markdownSupported": "Markdown i mbështetur",
       "sessions": "Seancat e lidhura",
       "noSessions": "Ende pa seanca",
+      "untitledLinkedSession": "Sesion i lidhur",
+      "sessionNeedsInput": "Sesioni kërkon të dhëna hyrëse",
+      "sessionRunning": "Sesioni po funksionon",
+      "sessionFinished": "Sesioni përfundoi",
+      "sessionPullRequest": "Kërkesë tërheqjeje e sesionit",
+      "sessionPullRequestNumber": "PR i sesionit #{{number}}",
+      "openSessionHint": "Hap sesionin.",
+      "unlinkSessionAction": "Shkëput sesionin",
+      "unlinkConfirmTitle": "Të shkëputet {{title}}?",
+      "unlinkConfirmMessage": "Vetë sesioni nuk fshihet. Hiqet vetëm lidhja e tij me këtë detyrë.",
+      "startNewSession": "Nis sesion të ri",
+      "startNewSessionHint": "Shtyp gjatë për të nisur një sesion të ri.",
       "linkSession": "Lidh seancën",
-      "unlinkSession": "Shkëput {{title}}",
       "linkFailed": "Seanca nuk u lidh me detyrën"
     },
     "linkSession": {
@@ -3741,5 +3806,69 @@
       "title": "Ruaj në listë",
       "saved": "U ruajt në {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Përmbledhja e mëngjesit",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Mund të mungojë një pjesë e aktivitetit të mëparshëm. ≥ do të thotë të paktën kaq; e panjohura nuk është zero.",
+    "available": "Përmbledhjet e disponueshme",
+    "history": "Historiku i përmbledhjeve",
+    "historyHint": "Raportet ruhen për 30 ditë, përfshirë raportet e mbyllura.",
+    "settings": "Cilësimet e përmbledhjes",
+    "empty": "Asnjë aktivitet gjatë natës",
+    "emptyHint": "Seancat e kodimit në cloud dhe CLI do të shfaqen këtu pas një nate aktive.",
+    "loadError": "Përmbledhjet nuk u ngarkuan",
+    "sessions": "Aktive gjatë natës",
+    "pullRequests": "PRs të hapura",
+    "blockers": "Pengesa të reja",
+    "spend": "Shpenzimi i natës",
+    "view": "Lexo përmbledhjen",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Shfaq statusin live",
+    "offline": "Jashtë linje · përmbledhje e ruajtur",
+    "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
+    "revised": "Rishikuar · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "Përmbledhje AI",
+    "summaryDisabled": "Raport i strukturuar · AI është joaktive për këtë kontekst",
+    "summaryPending": "Përmbledhja AI është në proces. Do të shtohet këtu kur të jetë gati.",
+    "summaryFailed": "Përmbledhja AI dështoi. Riprovimi mund të sjellë një tarifë tjetër.",
+    "summaryUnavailable": "Përmbledhja AI nuk është e disponueshme. Raporti i strukturuar mbetet i disponueshëm.",
+    "summaryOutdated": "Kjo përmbledhje është para rishikimit të fundit të raportit.",
+    "summaryCharge": "AI tarifoi {{cost}}",
+    "summaryChargePending": "Tarifa AI në pritje të rakordimit",
+    "generate": "Gjenero përmbledhjen",
+    "retrySummary": "Riprovo përmbledhjen me pagesë",
+    "sources": "Prova dhe artefakte",
+    "timezone": "Zona kohore e përmbledhjes",
+    "deviceTimezone": "Përdor zonën kohore të pajisjes",
+    "timezoneHint": "Zonë kohore IANA, p.sh. Europe/Berlin. Ndryshimet e orarit zbatohen për netët e ardhshme.",
+    "nightStart": "Nata fillon",
+    "morningStart": "Nata mbaron / mëngjesi fillon",
+    "morningEnd": "Mëngjesi mbaron",
+    "timeHint": "Karta Kreu rikthen statusin live kur mbaron mëngjesi, edhe jashtë linje.",
+    "invalidSchedule": "Zgjidh një zonë kohore të vlefshme dhe periudha nate e mëngjesi jo bosh që nuk mbivendosen.",
+    "notificationsHint": "Një njoftim i përgjithshëm çdo mëngjes kur raporti i parë është gati. I pavarur nga përmbledhjet AI me pagesë.",
+    "notificationPermission": "Aktivizo njoftimet e pajisjes te $t(common.notifications) për të marrë përmbledhjen.",
+    "aiOptIn": "Përmbledhje AI me pagesë",
+    "aiHint": "Opsionale vetëm për këtë kontekst. Fragmente të zgjedhura e të redaktuara dhe fakte të strukturuara dërgohen te modeli yt në gjuhën e aplikacionit. Tarifat përdorin balancën e këtij konteksti.",
+    "defaultModel": "Përdor modelin e parazgjedhur të Kilo",
+    "duration": "Kufiri i kohës (minuta)",
+    "spendLimit": "Kufiri i shpenzimit (USD)",
+    "safeguardHint": "Kufij të fundëm për çdo përmbledhje, jo buxhet ditor. Parazgjedhjet: 10 minuta dhe $2. Raporti publikohet pas maksimumi pesë minutash, ndërsa gjenerimi vazhdon brenda këtyre kufijve.",
+    "invalidSafeguards": "Fut kufij kohe dhe shpenzimi pozitivë dhe të fundëm.",
+    "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
+    "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime.",
+    "confirmPaid": "Të aktivizohen përmbledhjet me pagesë për {{context}}?",
+    "confirmGeneration": "Të gjenerohet një përmbledhje me pagesë?",
+    "paidDisclosure": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} minuta. Tarifat zbatohen edhe nëse gjenerimi dështon.",
+    "enable": "Aktivizo përmbledhjet me pagesë",
+    "contextSettings": "Cilësimet AI · {{context}}",
+    "allContexts": "Përmbledhjet personale dhe të organizatës mbahen të ndara.",
+    "estimatePricingUnavailable": "Çmimi për këtë model nuk është i disponueshëm.",
+    "estimateBalanceUnavailable": "Balanca nuk mjafton për një përmbledhje me pagesë.",
+    "estimateModelNotAllowed": "Ky model nuk lejohet këtu.",
+    "estimateSpendLimitTooLow": "Rrite kufirin e shpenzimit për ta lejuar këtë përmbledhje."
   }
 }

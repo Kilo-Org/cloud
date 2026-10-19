@@ -27,8 +27,10 @@
     "./bouncer-usage-event-outbox": "./src/bouncer-usage-event-outbox.ts"
   },
   "dependencies": {
+    "@kilocode/ai-gateway-secure-proxy-contracts": "workspace:*",
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
+    "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "drizzle-orm": "catalog:",
     "pg": "8.20.0",

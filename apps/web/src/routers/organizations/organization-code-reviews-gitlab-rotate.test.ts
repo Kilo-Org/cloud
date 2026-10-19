@@ -220,6 +220,27 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
 
       expect(status).toEqual({ connected: false, integration: null });
     });
+
+    it('keeps the row-based answer for a Kilo admin, whom the broker cannot authorize', async () => {
+      const { organization } = await makeOrgAndOwner();
+      const admin = await insertTestUser({ is_admin: true });
+      SEED_USER_IDS.push(admin.id);
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+      });
+      mockIsGitLabCredentialConnected.mockResolvedValue(false);
+
+      const caller = await createCallerForUser(admin.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status.connected).toBe(true);
+      expect(status.integration).toEqual(
+        expect.objectContaining({ isValid: true, instanceUrl: 'https://gitlab.example.com' })
+      );
+      expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+    });
   });
 
   describe('organization review agent router: rotateGitLabWebhookSecret P1-D-32', () => {

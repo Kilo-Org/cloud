@@ -9,6 +9,8 @@ import {
   ensureOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getIntegrationForOrganization,
   updateIntegrationMetadata,
@@ -500,7 +502,15 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     // token service to resolve it, exactly as a review read would, so an
     // expired or revoked credential reports as not connected instead of
     // sending the settings surface into review-only content.
+    //
+    // The broker authorizes only a direct member of the integration's
+    // organization, so this consult runs for direct members only. Kilo admins
+    // and parent-organization role holders (no membership row) keep the
+    // row-based answer — the broker would refuse them as not_connected and
+    // fake a broken connection for a healthy organization.
+    const isDirectMember = await isOrganizationMember(db, input.organizationId, ctx.user.id);
     if (
+      isDirectMember &&
       !(await isGitLabCredentialConnected(integration, {
         userId: ctx.user.id,
         organizationId: input.organizationId,

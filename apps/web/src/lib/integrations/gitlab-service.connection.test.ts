@@ -65,4 +65,30 @@ describe('isGitLabCredentialConnected', () => {
     mockFetchGitLabCredential.mockResolvedValue({ status: 'temporarily_unavailable' });
     await expect(isGitLabCredentialConnected(integration, actor)).resolves.toBe(true);
   });
+
+  it('fails open on a short deadline when the broker hangs', async () => {
+    jest.useFakeTimers();
+    try {
+      mockFetchGitLabCredential.mockReturnValue(
+        new Promise(resolve => {
+          // Resolves long after the 3s deadline: only the deadline can answer.
+          setTimeout(
+            () =>
+              resolve({
+                status: 'available',
+                token: 'late',
+                instanceUrl: 'https://gitlab.com',
+                glabIsOAuth2: true,
+              }),
+            60_000
+          );
+        })
+      );
+      const pending = isGitLabCredentialConnected(integration, actor);
+      await jest.advanceTimersByTimeAsync(3_000);
+      await expect(pending).resolves.toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

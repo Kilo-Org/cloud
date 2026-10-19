@@ -7,8 +7,8 @@ import { PrReviewContextLine } from './pr-review-context-line';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
-  type RenderWithProvidersResult,
   renderWithProviders,
+  type RenderWithProvidersResult,
   waitFor,
 } from '@/test/render-with-providers';
 

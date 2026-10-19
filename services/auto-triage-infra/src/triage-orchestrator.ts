@@ -50,7 +50,7 @@ const RESERVED_AUTOMATION_LABELS: Record<string, true> = {
 
 /** Remove worker-reserved labels from a model-provided label list. */
 function stripReservedLabels(labels: string[]): string[] {
-  return labels.filter(label => !RESERVED_AUTOMATION_LABELS[label]);
+  return labels.filter(label => !Object.hasOwn(RESERVED_AUTOMATION_LABELS, label));
 }
 
 export class TriageOrchestrator extends DurableObject<Env> {
@@ -333,7 +333,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
       ? await fetchRepoLabels(this.state.sessionInput.repoFullName, githubToken)
       : DEFAULT_LABELS;
     const availableLabels = repoLabels.filter(
-      label => !excludedLabels.has(label) && RESERVED_AUTOMATION_LABELS[label] !== true
+      label => !excludedLabels.has(label) && !Object.hasOwn(RESERVED_AUTOMATION_LABELS, label)
     );
 
     console.log('[auto-triage:labels] Available labels for prompt', {

@@ -668,6 +668,51 @@ describe('SheetHeader', () => {
   );
 
   it.each(['ios', 'android'])(
+    'drops the top clearance for a never-inset sheet on both platforms (%s)',
+    async os => {
+      // Half-detent-only sheets cannot reach the window top, so the inset the
+      // header reads would only be a dead band above the title.
+      rn.os = os;
+      rn.statusHeight = 48;
+      safeArea.top = 24;
+      const renderer = await mount({
+        title: 'Voice language',
+        onDone: () => undefined,
+        onCancel: () => undefined,
+        topInset: 'never',
+      });
+
+      expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['ios', 'android'])(
+    'keeps landscape side insets for a never-inset sheet while dropping the top clearance (%s)',
+    async os => {
+      rn.os = os;
+      rn.statusHeight = 48;
+      safeArea.top = 24;
+      safeArea.left = 47;
+      safeArea.right = 59;
+      const renderer = await mount({
+        title: 'Voice language',
+        onDone: () => undefined,
+        onCancel: () => undefined,
+        topInset: 'never',
+      });
+
+      expect(findSafeAreaWrapper(renderer.root).props.style).toEqual({
+        paddingLeft: 47,
+        paddingRight: 59,
+      });
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['ios', 'android'])(
     'drops the top clearance for a pageSheet header on both platforms (%s)',
     async os => {
       // The SessionPageSheet surface owns the top of the window on both

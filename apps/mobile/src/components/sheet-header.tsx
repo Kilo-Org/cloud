@@ -25,8 +25,11 @@ import { useScreenInsets } from '@/lib/screen-insets';
  *   Modal pads its own top inset (session-page-sheet). `useSafeAreaInsets`
  *   still reports the window's inset inside either Modal, so reading it in the
  *   header would leave a dead band above the title.
+ * - 'never': the surface can never reach the window top (half-detent-only
+ *   sheets), so the header reserves no top clearance on either platform —
+ *   the inset would only be a dead band above the title.
  */
-export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet' | 'ios-page-sheet';
+export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet' | 'ios-page-sheet' | 'never';
 
 export function SheetHeader({
   title,
@@ -82,6 +85,7 @@ export function SheetHeader({
   // inset — either way its header reserves nothing.
   const dropsTopInset =
     topInset === 'ios-page-sheet' ||
+    topInset === 'never' ||
     (topInset === 'bottom-form-sheet' && Platform.OS !== 'android');
   const topInsetHeight = dropsTopInset ? 0 : resolvedTopInset;
   const safeAreaStyle =

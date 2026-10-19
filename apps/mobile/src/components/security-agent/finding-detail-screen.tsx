@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
 import { FindingDetailsPanel } from '@/components/security-agent/finding-details-panel';
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
+import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,6 +57,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const colors = useThemeColors();
   const { t } = useTranslation();
   const [tab, setTab] = useState<FindingTab>('details');
+  // Bumped after the boundary's recovery action runs, so the boundary
+  // remounts with clean state instead of pinning its fallback over the
+  // recovered panel.
+  const [panelRetryCount, setPanelRetryCount] = useState(0);
   const findingQuery = useSecurityFinding(scope, findingId);
   const analysisQuery = useSecurityAnalysis(scope, findingId);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
@@ -251,24 +256,42 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         </TabScreenScrollView>
       )}
       {tab === 'analysis' && (
-        <FindingAnalysisPanel
-          scope={scope}
-          findingId={findingId}
-          analysis={analysisQuery.data}
-          isLoading={analysisQuery.isLoading}
-          isError={analysisQuery.isError}
-          onRetry={() => void analysisQuery.refetch()}
-        />
+        <PanelErrorBoundary
+          key={`analysis-${panelRetryCount}`}
+          onRetry={() => {
+            void analysisQuery.refetch();
+            setPanelRetryCount(count => count + 1);
+          }}
+          fallbackMessage={t('securityAgent.analysis.couldNotLoad')}
+        >
+          <FindingAnalysisPanel
+            scope={scope}
+            findingId={findingId}
+            analysis={analysisQuery.data}
+            isLoading={analysisQuery.isLoading}
+            isError={analysisQuery.isError}
+            onRetry={() => void analysisQuery.refetch()}
+          />
+        </PanelErrorBoundary>
       )}
       {tab === 'remediation' && (
-        <FindingRemediationPanel
-          scope={scope}
-          findingId={findingId}
-          analysis={analysisQuery.data}
-          isLoading={analysisQuery.isLoading}
-          isError={analysisQuery.isError}
-          onRetry={() => void analysisQuery.refetch()}
-        />
+        <PanelErrorBoundary
+          key={`remediation-${panelRetryCount}`}
+          onRetry={() => {
+            void analysisQuery.refetch();
+            setPanelRetryCount(count => count + 1);
+          }}
+          fallbackMessage={t('securityAgent.remediation.couldNotLoad')}
+        >
+          <FindingRemediationPanel
+            scope={scope}
+            findingId={findingId}
+            analysis={analysisQuery.data}
+            isLoading={analysisQuery.isLoading}
+            isError={analysisQuery.isError}
+            onRetry={() => void analysisQuery.refetch()}
+          />
+        </PanelErrorBoundary>
       )}
     </View>
   );

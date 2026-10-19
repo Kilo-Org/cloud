@@ -1,7 +1,7 @@
 import {
   buildGlanceableSnapshot,
-  glanceableAgentsSnapshotSchema,
   type GlanceableAgentsSnapshot,
+  glanceableAgentsSnapshotSchema,
   type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { EMPTY_HOME_WIDGET_DETAILS, type HomeWidgetData } from '@kilocode/app-shared/home-widget';

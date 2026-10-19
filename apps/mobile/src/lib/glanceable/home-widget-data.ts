@@ -1,7 +1,7 @@
 import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
-  isTerminalGlanceableStatus,
   type GlanceableAgentsSnapshot,
+  isTerminalGlanceableStatus,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   EMPTY_HOME_WIDGET_DETAILS,

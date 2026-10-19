@@ -244,7 +244,10 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
   let oldest: number | null = null;
   let oldestIso: string | null = null;
   for (const session of sessions) {
-    if (glanceableNeedsInputKind(session.status) === null || session.statusUpdatedAt === undefined) {
+    if (
+      glanceableNeedsInputKind(session.status) === null ||
+      session.statusUpdatedAt === undefined
+    ) {
       continue;
     }
     const at = Date.parse(session.statusUpdatedAt);

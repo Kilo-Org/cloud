@@ -254,18 +254,14 @@ describe('cleanup', () => {
     const { sink, calls } = makeSink();
     registerGlanceableSink(sink);
     try {
-      for (const [index, now] of [
-        '2026-08-27T01:00:00.000Z',
-        '2026-08-27T07:59:59.999Z',
-      ].entries()) {
+      const staleAt = ['2026-08-27T01:00:00.000Z', '2026-08-27T07:59:59.999Z'];
+      const expiredAt = ['2026-08-27T08:00:00.000Z', '2026-08-27T09:00:00.000Z'];
+      for (const [index, now] of staleAt.entries()) {
         vi.setSystemTime(new Date(now));
         republishLastSnapshotStale();
         expect(lastSnapshot(calls)).toEqual({ ...seeded, revision: index + 4, status: 'stale' });
       }
-      for (const [index, now] of [
-        '2026-08-27T08:00:00.000Z',
-        '2026-08-27T09:00:00.000Z',
-      ].entries()) {
+      for (const [index, now] of expiredAt.entries()) {
         vi.setSystemTime(new Date(now));
         republishLastSnapshotStale();
         expect(lastSnapshot(calls)).toEqual({

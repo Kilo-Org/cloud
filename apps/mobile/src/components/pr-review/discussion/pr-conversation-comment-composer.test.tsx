@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the draft/confirm suite and the inline-error contract share one module mock harness */
 // Clear-rule and state coverage for the conversation (issue) comment
 // composer's durable draft: cleared on a successful post and on a confirmed
 // discard, kept on every failure path and on a keep-editing discard.

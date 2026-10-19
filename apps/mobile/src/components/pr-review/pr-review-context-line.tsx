@@ -50,9 +50,10 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
 
   // The memberships query can fail on first load: without handling, the line
   // would show the generic noun forever with no way to retry or pick. Mirror
-  // `ContextControl`'s load-failure surface (a retry under the label) and its
-  // missing-membership message; the personal scope has no membership to lose.
-  const nameError = organizations.isError && organizationId !== null;
+  // `ContextControl`'s load-failure surface (a retry under the label) on both
+  // scopes — a personal reader whose list fetch failed still loses the picker
+  // — plus its missing-membership message for a stale organization selection.
+  const nameError = organizations.isError;
   const unavailable =
     !organizations.isError && orgs !== undefined && organizationId !== null && !selected;
   let statusMessage: string | null = null;

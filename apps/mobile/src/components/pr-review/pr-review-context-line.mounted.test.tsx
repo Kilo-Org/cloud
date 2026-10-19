@@ -185,6 +185,19 @@ describe('PrReviewContextLine', () => {
     await waitFor(() => texts(ui).includes('For Acme'));
   });
 
+  it('offers a retry on the personal scope when the memberships query fails', async () => {
+    list.mockRejectedValue(new Error('list failed'));
+    const ui = await mount();
+    await waitFor(() => texts(ui).includes('For Personal'));
+    const retry = ui.renderer.root.find(node => node.props.accessibilityLabel === 'Retry');
+    list.mockResolvedValue([ORG_A, ORG_B]);
+    await press(retry);
+    // A personal selection persists across the failed first load, so the
+    // recovery brings back the switcher rather than an organization label.
+    await waitFor(() => ui.renderer.root.findAllByType(ChevronDown).length > 0);
+    expect(line(ui)).toBeDefined();
+  });
+
   it('names the unavailable scope when the persisted organization left the list', async () => {
     storage.read.mockResolvedValue('gone-org');
     const ui = await mount();

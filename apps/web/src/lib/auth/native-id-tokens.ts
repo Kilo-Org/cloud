@@ -55,17 +55,14 @@ export async function verifyNativeAppleIdToken(
   // token payload as-is (no second hash).  The server must compute SHA-256 of the raw
   // nonce the mobile client sent and compare against payload.nonce.
   //
-  // The digest is also recorded so each one is accepted once while the token is
-  // valid: the insert below succeeds only for a digest that has never been
-  // accepted, so a captured nonce/token pair cannot be replayed.
+  // Each digest is accepted once: the record below exists only for a digest that
+  // is not yet present, and it expires with the token.
   const expectedNonce = createHash('sha256').update(nonce).digest('hex');
   if (payload.nonce !== expectedNonce) {
     throw new NativeIdTokenError('Apple nonce mismatch');
   }
-  // Each nonce digest is accepted once: SET NX succeeds only for a digest
-  // that is not yet recorded, and the record expires with the token. A store
-  // write that cannot complete refuses the sign-in, keeping the acceptance
-  // rule uniform.
+  // A store write that cannot complete refuses the sign-in, keeping the
+  // acceptance rule uniform.
   let recorded: string | null = null;
   try {
     recorded = await redisClient.set(`auth:apple-signin-nonce:${expectedNonce}`, '1', {

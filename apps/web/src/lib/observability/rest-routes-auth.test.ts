@@ -78,7 +78,10 @@ import { issueAdmissionChallenge } from '@/lib/auth/native-admission';
 import { rotateRefreshToken } from '@/lib/auth/device-sessions';
 import { createSignInCode } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
-import { checkEmailSignInEligibility, checkGlobalSendBudget } from '@/lib/auth/email-signin-eligibility';
+import {
+  checkEmailSignInEligibility,
+  checkGlobalSendBudget,
+} from '@/lib/auth/email-signin-eligibility';
 
 const mockIssueAdmissionChallenge = jest.mocked(issueAdmissionChallenge);
 const mockRotateRefreshToken = jest.mocked(rotateRefreshToken);

@@ -11,6 +11,7 @@ import {
   BODY_LINE_HEIGHT,
   BODY_MAX_LINES_CLOSED,
   BODY_MAX_LINES_OPEN,
+  BODY_VERTICAL_PADDING,
   resolveCommentBodyFade,
   resolveCommentBodyMaxHeight,
 } from '@/components/pr-review/comment-body-geometry';
@@ -70,6 +71,7 @@ export function CommentBodyField({
   const maxHeight = keyboardVisible
     ? resolveCommentBodyMaxHeight(BODY_MAX_LINES_OPEN)
     : resolveCommentBodyMaxHeight(BODY_MAX_LINES_CLOSED);
+  const inset = BODY_VERTICAL_PADDING / 2;
   // Content and frame heights come from the same scroll view, so their
   // comparison is scrollability regardless of padding conventions.
   const [contentHeight, setContentHeight] = useState<number | null>(null);
@@ -94,15 +96,22 @@ export function CommentBodyField({
         }}
         multiline
         textAlignVertical="top"
-        // Explicit line-height (no `text-center` per the repo's iOS rule).
-        // Whole-line max height so the bottom line is never clipped mid-glyph;
-        // multiline still grows on type until the cap, then scrolls.
+        // Geometry is set here, not through utility classes, so the rendered
+        // box and the cap arithmetic share one source: the 20pt line box and
+        // the 6pt-per-side inset. The cap ends on a whole line, so the bottom
+        // line is never clipped mid-glyph; multiline still grows on type until
+        // the cap, then scrolls.
         className={cn(
-          'rounded-md border border-input bg-background pl-3 pr-3 py-1.5 text-sm leading-5 text-foreground',
+          'rounded-md border border-input bg-background pl-3 pr-3 text-sm text-foreground',
           'focus:border-ring',
           keyboardVisible ? 'min-h-12' : 'min-h-14'
         )}
-        style={{ maxHeight, lineHeight: BODY_LINE_HEIGHT }}
+        style={{
+          maxHeight,
+          lineHeight: BODY_LINE_HEIGHT,
+          paddingTop: inset,
+          paddingBottom: inset,
+        }}
       />
       {overflowing ? (
         <LinearGradient

@@ -110,7 +110,11 @@ const CREATE_VARS = {
   modelSlug: 'claude-opus-4-7',
 } as const;
 
-function getOptions(hook: 'cancel' | 'retrigger' | 'create', scope = 'personal'): MutationOptions {
+function getOptions(
+  hook: 'cancel' | 'retrigger' | 'create',
+  scope = 'personal',
+  createOptions?: { silent?: boolean }
+): MutationOptions {
   lastCapturedOptions = null;
   if (hook === 'cancel') {
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -120,7 +124,7 @@ function getOptions(hook: 'cancel' | 'retrigger' | 'create', scope = 'personal')
     useRetriggerReview(scope);
   } else {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    useCreateManualReview(scope);
+    useCreateManualReview(scope, createOptions);
   }
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!lastCapturedOptions) {
@@ -308,6 +312,20 @@ describe('useCreateManualReview wiring', () => {
     opts.onSuccess?.({ reviewId: 'rev_abc123', outputMode: 'provider' }, undefined);
 
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('stays silent in silent mode so a screen that renders the failure inline owns the channel', async () => {
+    const opts = getOptions('create', 'personal', { silent: true });
+    personalCreateMutateMock.mockResolvedValue({
+      success: false,
+      error: 'Insufficient balance',
+    });
+
+    await opts.mutationFn?.(CREATE_VARS).catch(error => {
+      opts.onError?.(error);
+    });
+
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { type Href } from 'expo-router';
-import { toast } from 'sonner-native';
-import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
+import {
+  type RemoteSpawnFailure,
+  type UseRemoteSpawnDispatchArgs,
+  type UseRemoteSpawnDispatchResult,
+} from './use-remote-spawn-dispatch-types';
+import { useAttemptWatchdog } from './use-attempt-watchdog';
+import { useLatestRef } from './use-latest-ref';
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { i18n } from '@/i18n';
@@ -22,149 +27,22 @@ import {
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
-  remoteSpawnNonRetryableToast,
   remoteSpawnRetryableToast,
+  resolveRemoteSpawnFailure,
   resolveRemoteSubmitOutcome,
 } from '@/lib/remote-submit-outcome';
 import { resolveRemoteSpawnAdmission } from '@/lib/remote-spawn-admission';
-import { type SharePayload } from '@/lib/share-payload';
 import { withComposerHandoff } from '@/lib/share-navigation';
 
+export type { RemoteSpawnFailure, UseRemoteSpawnDispatchArgs, UseRemoteSpawnDispatchResult };
+
 /**
- * Refetch signature matching the slice of
- * `useQuery(...).refetch()` we need: returns the new data on
- * success, throws on failure. We type it narrowly so this hook
- * stays a thin wrapper without dragging TanStack Query types into
- * the call site.
+ * Budget for a remote spawn attempt to settle before the form stops showing
+ * the busy button and offers the retry. Matches the SDK's own command
+ * timeout (`COMMAND_TIMEOUT_MS` in `@kilocode/cloud-agent-sdk`), so the
+ * watchdog fires only once the transport timeout has also run out.
  */
-type InstancesRefetch = () => Promise<{
-  data: { instances: InstancePickerInstance[] } | undefined;
-}>;
-
-type UseRemoteSpawnDispatchArgs = {
-  organizationId: string | undefined;
-  /**
-   * The current new-session agent mode for the spawn target. Omitted for
-   * callers without a mode (share-gate); the CLI then uses its default.
-   */
-  mode?: string;
-  /**
-   * The validated wire model selection for the active target. Never inherited:
-   * the caller owns it because it depends on the target instance's catalog.
-   * Undefined means "let the CLI use its default".
-   */
-  selection?: ModelSelection;
-  runOnInstance: InstancePickerInstance | null;
-  setRunOnInstance: (next: InstancePickerInstance | null) => void;
-  /**
-   * Existing `activeSessions.listInstances` query's `refetch`. The
-   * route already owns this query (it's what powers the selector's
-   * `instanceList`); we reuse it here so a retryable spawn failure
-   * refreshes the same source of truth the picker reads from.
-   */
-  refetchInstances: InstancesRefetch;
-  /**
-   * The most recent list the route knows about. Used as the
-   * membership fallback if the refetch fails.
-   */
-  instanceList: InstancePickerInstance[];
-  /**
-   * Relative launch folder for the new remote session (`""` means the CLI's
-   * own launch directory). Omitted from the wire when empty (undefined).
-   */
-  directory?: string;
-  /**
-   * Snapshot of the composer, read once at press time. When it returns a
-   * payload the ready path stages it, and the destination composer submits it
-   * once. Optional: a caller with no composer omits it.
-   */
-  getSubmitPayload?: () => SharePayload | null;
-  /**
-   * Kilo session id the clone/continue form clones from. When set, the spawn
-   * carries `cloneFromKiloSessionId` only if the selected instance advertises
-   * `sessionClone`, and clone/import failures surface through
-   * `onCloneImportFailure` instead of the generic spawn toast.
-   */
-  cloneFromKiloSessionId?: string | null;
-  /**
-   * Inclusive fork cut ("Fork from here"). Sent beside the clone source only
-   * when the instance advertises `sessionCloneAtMessage`; otherwise the spawn
-   * is refused with the inline "update the CLI" reason (fail closed: an old
-   * CLI would ignore the cut and clone the whole session).
-   */
-  cloneUpToMessageId?: string | null;
-  /**
-   * Composer text for the new session (a forked user message). Delivered as a
-   * one-shot composer prefill that the user sends themselves.
-   */
-  forkPrefillText?: string | null;
-  /**
-   * Invoked with an inline failure i18n key when a clone/import spawn fails
-   * non-retryably (delivered CLI clone error, or the instance lacks
-   * `sessionClone`). The route shows the key under "Run on" and disables Start.
-   */
-  onCloneImportFailure?: (key: string) => void;
-  /**
-   * Invoked when `onStart` admits the press-time snapshot and commits to a
-   * spawn attempt: the caller already passed voice settlement (it only calls
-   * `onStart` after the voice input settled) and `resolveRemoteSpawnAdmission`
-   * allowed the payload. A tap that never reaches a spawn — blocked
-   * admission, cancelled voice submit, or a `null` selection — never fires
-   * this, so callers can arm draft clearing on exactly the attempts that
-   * happened.
-   */
-  onSpawnAdmitted?: () => void;
-  /**
-   * Invoked when a committed spawn settles without navigating (retryable or
-   * non-retryable). Callers use it to re-arm an abandon guard that
-   * `onSpawnAdmitted` armed, so a later back/swipe still confirms.
-   */
-  onSpawnFailed?: () => void;
-  /**
-   * Invoked right before a `ready` spawn navigates (the success replace). The
-   * clone entry uses it to arm a one-shot busy leave-lock bypass so the
-   * success navigation is not intercepted as an abandon.
-   */
-  onSpawnReady?: () => void;
-  /**
-   * Invoked with the spawned session id when a `ready` spawn navigates, so a
-   * caller that started from a to-do can link the session to it. Runs before
-   * the navigation, beside `onSpawnReady`.
-   */
-  onSpawnSucceeded?: (sessionId: string) => void;
-};
-
-type UseRemoteSpawnDispatchResult = {
-  /**
-   * `true` while the spawn hook has a request in flight. Mirrors
-   * `remoteSpawn.status.status === 'inFlight'`, surfaced for the
-   * route's "is the start button disabled?" check.
-   */
-  isSpawningRemote: boolean;
-  /**
-   * `true` after a retryable spawn failure reset the selection
-   * because the previously-selected `connectionId` dropped off the
-   * refetched list. Drives the inline "disconnected" note under
-   * the selector.
-   */
-  showInstanceDisconnectedNote: boolean;
-  /**
-   * `onStart` for the route's "Start session" CTA when a remote
-   * target is selected. No-op when the selection is `null` (the
-   * route should have routed the cloud-agent path through
-   * `submitCreate` instead, but the guard is defensive). Fires
-   * `onSpawnAdmitted` only once a spawn attempt is actually
-   * committed to (voice settlement + admission passed).
-   */
-  onStart: () => void;
-  /**
-   * Called by the "Run on" selector when the user picks a new
-   * instance or switches back to Cloud Agent. Clears the inline
-   * "disconnected" note — the note is only meaningful while the
-   * selector is on the post-fallback default.
-   */
-  onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
-};
+export const REMOTE_SPAWN_START_DEADLINE_MS = 30_000;
 
 /**
  * Wires `useRemoteInstanceSpawn` into the route's existing state and
@@ -214,10 +92,22 @@ export function useRemoteSpawnDispatch({
     ) => Promise<CreateSessionOutcome>;
   } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
-  // `true` while `onStart`'s async head refetches the instance list and
-  // resolves the live instance (a rebooted host's new connectionId). Surfaced
-  // so the route keeps the Start button disabled during that window.
+  // The spawn's inline-rendered failure; the dispatch does not toast it.
+  const [remoteSpawnFailure, setRemoteSpawnFailure] = useState<RemoteSpawnFailure | null>(null);
+  // `true` only while the pre-spawn window is open: the instance refetch, the
+  // live resolution, and the spawn itself. The post-failure refetch runs
+  // outside this flag so the button releases at the outcome.
   const [isResolvingInstance, setIsResolvingInstance] = useState(false);
+  // Watchdog for the whole admitted attempt: when the spawn outlives the SDK
+  // command timeout, `timedOut` releases the button (the spawn hook's
+  // inFlight status no longer holds it busy) and the form flips to the
+  // inline retryable failure; a late success still navigates.
+  const spawnWatchdog = useAttemptWatchdog(REMOTE_SPAWN_START_DEADLINE_MS, () => {
+    setIsResolvingInstance(false);
+    setRemoteSpawnFailure({ retryable: true, message: remoteSpawnRetryableToast() });
+    onSpawnFailedRef.current?.();
+  });
+  const { arm: armWatchdog, disarm: clearWatchdog } = spawnWatchdog;
   // P1-A-08b: one `operationKey` per spawn intent, so a retryable failure keeps
   // the key and the relay dedupes the retry.
   const { getKey, rotateKey } = useHoistedOperationKey();
@@ -231,15 +121,12 @@ export function useRemoteSpawnDispatch({
   // finishes). A ref always reflects the latest selection so the tail can
   // check "is my selection still the current one?" against real current
   // state, not a stale snapshot.
-  const runOnInstanceRef = useRef(runOnInstance);
-  useEffect(() => {
-    runOnInstanceRef.current = runOnInstance;
-  }, [runOnInstance]);
+  const runOnInstanceRef = useLatestRef(runOnInstance);
 
   // Read the press-time inputs through refs so `onStart` stays stable across
   // renders while always seeing the route's latest values.
-  const getSubmitPayloadRef = useRef(getSubmitPayload);
-  const spawnFieldsRef = useRef({
+  const getSubmitPayloadRef = useLatestRef(getSubmitPayload);
+  const spawnFieldsRef = useLatestRef({
     mode,
     selection,
     organizationId,
@@ -248,42 +135,11 @@ export function useRemoteSpawnDispatch({
     cloneUpToMessageId,
     forkPrefillText,
   });
-  const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
-  const onSpawnFailedRef = useRef(onSpawnFailed);
-  const onSpawnReadyRef = useRef(onSpawnReady);
-  const onCloneImportFailureRef = useRef(onCloneImportFailure);
-  const onSpawnSucceededRef = useRef(onSpawnSucceeded);
-  useEffect(() => {
-    getSubmitPayloadRef.current = getSubmitPayload;
-    spawnFieldsRef.current = {
-      mode,
-      selection,
-      organizationId,
-      directory,
-      cloneFromKiloSessionId,
-      cloneUpToMessageId,
-      forkPrefillText,
-    };
-    onSpawnAdmittedRef.current = onSpawnAdmitted;
-    onSpawnFailedRef.current = onSpawnFailed;
-    onSpawnReadyRef.current = onSpawnReady;
-    onCloneImportFailureRef.current = onCloneImportFailure;
-    onSpawnSucceededRef.current = onSpawnSucceeded;
-  }, [
-    getSubmitPayload,
-    mode,
-    selection,
-    organizationId,
-    directory,
-    cloneFromKiloSessionId,
-    cloneUpToMessageId,
-    forkPrefillText,
-    onSpawnAdmitted,
-    onSpawnFailed,
-    onSpawnReady,
-    onCloneImportFailure,
-    onSpawnSucceeded,
-  ]);
+  const onSpawnAdmittedRef = useLatestRef(onSpawnAdmitted);
+  const onSpawnFailedRef = useLatestRef(onSpawnFailed);
+  const onSpawnReadyRef = useLatestRef(onSpawnReady);
+  const onCloneImportFailureRef = useLatestRef(onCloneImportFailure);
+  const onSpawnSucceededRef = useLatestRef(onSpawnSucceeded);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
@@ -297,7 +153,7 @@ export function useRemoteSpawnDispatch({
       payload: submitPayload,
     });
     if (!admission.allowed) {
-      toast.error(admission.toast);
+      setRemoteSpawnFailure({ retryable: false, message: admission.toast });
       return;
     }
     // Clone entry: a full clone is refused only by an explicit
@@ -313,6 +169,11 @@ export function useRemoteSpawnDispatch({
     // commit to the spawn attempt. The route arms its draft-clearing marker
     // here, so a tap that stops at admission can never clear the draft.
     onSpawnAdmittedRef.current?.();
+    // A fresh attempt replaces the previous failure with either the session
+    // or the new failure state; the watchdog re-arms for it.
+    setRemoteSpawnFailure(null);
+    clearWatchdog();
+    armWatchdog();
     const createInput = buildCreateRemoteSessionInput({
       mode: fields.mode,
       selection: fields.selection,
@@ -323,6 +184,19 @@ export function useRemoteSpawnDispatch({
     });
     void (async () => {
       setIsResolvingInstance(true);
+      // `settled` guards the watchdog race: after the deadline has flipped
+      // the form to the inline failure, a late tail must not re-assert busy
+      // state or overwrite the failure with a second report of the same
+      // attempt.
+      let settled = false;
+      const settle = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearWatchdog();
+        setIsResolvingInstance(false);
+      };
       try {
         // Refetch the live instance list so a rebooted host's new
         // connectionId replaces the stale selection before spawn.
@@ -338,7 +212,8 @@ export function useRemoteSpawnDispatch({
           // No live row matches the selection (neither the connectionId nor
           // the name + projectName pair). Surface the retryable copy and let
           // the next Start tap re-resolve against a refreshed list.
-          toast.error(remoteSpawnRetryableToast());
+          settle();
+          setRemoteSpawnFailure({ retryable: true, message: remoteSpawnRetryableToast() });
           onSpawnFailedRef.current?.();
           return;
         }
@@ -353,12 +228,14 @@ export function useRemoteSpawnDispatch({
           payload: submitPayload,
         });
         if (!liveAdmission.allowed) {
-          toast.error(liveAdmission.toast);
+          settle();
+          setRemoteSpawnFailure({ retryable: false, message: liveAdmission.toast });
           onSpawnFailedRef.current?.();
           return;
         }
         const liveCloneRefusal = resolveCloneCapabilityRefusal(fields, live);
         if (liveCloneRefusal !== null) {
+          settle();
           onCloneImportFailureRef.current?.(liveCloneRefusal);
           onSpawnFailedRef.current?.();
           return;
@@ -386,6 +263,7 @@ export function useRemoteSpawnDispatch({
           operationKey,
         });
         if (outcome.status === 'ready') {
+          settle();
           // The spawn settled; the next submit is a fresh intent.
           rotateKey();
           const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId, {
@@ -404,8 +282,10 @@ export function useRemoteSpawnDispatch({
           );
           return;
         }
-        // Not ready: the spawn settled without navigating. Re-arm the caller's
-        // abandon guard so a later back/swipe still confirms.
+        // Not ready: the spawn settled without navigating. Release the busy
+        // button and re-arm the caller's abandon guard so a later back/swipe
+        // still confirms.
+        settle();
         onSpawnFailedRef.current?.();
         if (outcome.status === 'nonRetryable') {
           // A typed non-retryable rejection ends the intent.
@@ -415,22 +295,27 @@ export function useRemoteSpawnDispatch({
             : null;
           if (cloneFailureKey !== null) {
             // Delivered clone/import error: surface the inline reason under
-            // "Run on" instead of the generic spawn toast.
+            // "Run on" instead of the generic spawn failure.
             onCloneImportFailureRef.current?.(cloneFailureKey);
             return;
           }
-          toast.error(remoteSpawnNonRetryableToast());
-          return;
         }
         // outcome.status === 'retryable': a clone/import retry keeps the form
         // and re-enables Start; the selection is never reset to Cloud Agent.
-        if (fields.cloneFromKiloSessionId) {
-          toast.error(i18n.t('agentChat.session.cloneFailedRetry'));
+        if (outcome.status === 'retryable' && fields.cloneFromKiloSessionId) {
+          setRemoteSpawnFailure({
+            retryable: true,
+            message: i18n.t('agentChat.session.cloneFailedRetry'),
+          });
           return;
         }
-        // Non-clone retryable: refetch the instance list and re-evaluate
-        // whether the previously-selected instance is still present.
-        toast.error(remoteSpawnRetryableToast());
+        const failure = resolveRemoteSpawnFailure({ outcome });
+        if (failure !== null) {
+          setRemoteSpawnFailure(failure);
+        }
+        if (outcome.status !== 'retryable') {
+          return;
+        }
         // Seed from the fresh pre-spawn list, not the press-time
         // `instanceList`: if the spawn remapped the selection to a live
         // connectionId above, the press-time list still holds the stale id. A
@@ -468,17 +353,30 @@ export function useRemoteSpawnDispatch({
           setShowInstanceDisconnectedNote(action.showInstanceDisconnectedNote);
         }
       } finally {
-        setIsResolvingInstance(false);
+        // A tail that exits without an explicit settle (a thrown helper, a
+        // defensive return) still releases the busy window; the watchdog
+        // covers the hang case.
+        settle();
       }
     })();
   }, [
+    armWatchdog,
+    clearWatchdog,
+    getSubmitPayloadRef,
     instanceList,
+    onCloneImportFailureRef,
+    onSpawnAdmittedRef,
+    onSpawnFailedRef,
+    onSpawnReadyRef,
+    onSpawnSucceededRef,
     organizationId,
     refetchInstances,
     remoteSpawn,
     router,
     runOnInstance,
+    runOnInstanceRef,
     setRunOnInstance,
+    spawnFieldsRef,
     getKey,
     rotateKey,
   ]);
@@ -486,6 +384,8 @@ export function useRemoteSpawnDispatch({
   const onChangeRunOnInstance = useCallback(
     (next: InstancePickerInstance | null) => {
       setRunOnInstance(next);
+      // A new target invalidates the previous attempt's failure.
+      setRemoteSpawnFailure(null);
       if (showInstanceDisconnectedNote) {
         setShowInstanceDisconnectedNote(false);
       }
@@ -494,7 +394,9 @@ export function useRemoteSpawnDispatch({
   );
 
   return {
-    isSpawningRemote: remoteSpawn.status.status === 'inFlight' || isResolvingInstance,
+    isSpawningRemote:
+      (remoteSpawn.status.status === 'inFlight' && !spawnWatchdog.timedOut) || isResolvingInstance,
+    remoteSpawnFailure,
     showInstanceDisconnectedNote,
     onStart,
     onChangeRunOnInstance,

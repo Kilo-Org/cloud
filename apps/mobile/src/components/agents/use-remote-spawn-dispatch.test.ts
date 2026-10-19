@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- spawn-input, navigation, and admission suites share the hook harness. */
 import * as React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSessionId, type ModelSelection } from '@kilocode/cloud-agent-sdk';
 import { CommandDeliveredError } from '@kilocode/cloud-agent-sdk/user-web-connection';
 
@@ -18,7 +18,10 @@ import {
 import { remoteSpawnFilesNotSupportedToast } from '@/lib/remote-spawn-admission';
 import { remoteSpawnRetryableToast } from '@/lib/remote-submit-outcome';
 
-import { useRemoteSpawnDispatch } from './use-remote-spawn-dispatch';
+import {
+  REMOTE_SPAWN_START_DEADLINE_MS,
+  useRemoteSpawnDispatch,
+} from './use-remote-spawn-dispatch';
 
 const spawnMock = vi.hoisted(() =>
   vi.fn(async (): Promise<CreateSessionOutcome> => {
@@ -122,6 +125,32 @@ const INSTANCE: InstancePickerInstance = {
   gitBranch: null,
 };
 
+/** Stub spawned session id for the watchdog's late-success case. */
+const SESSION_ID = 'ses_12345678901234567890123456' as KiloSessionId;
+
+/**
+ * A spawn promise the test resolves by hand, for the watchdog's
+ * still-in-flight-at-deadline case.
+ */
+function withDeferredOutcome(): {
+  promise: Promise<CreateSessionOutcome>;
+  resolve: (outcome: CreateSessionOutcome) => void;
+} {
+  const settle = { resolve: undefined as ((outcome: CreateSessionOutcome) => void) | undefined };
+  const promise = new Promise<CreateSessionOutcome>(resolve => {
+    settle.resolve = resolve;
+  });
+  return {
+    promise,
+    resolve: outcome => {
+      const resolve = settle.resolve;
+      if (resolve !== undefined) {
+        resolve(outcome);
+      }
+    },
+  };
+}
+
 /** Stub payload for the ready-path-with-payload case. */
 const samplePayload: SharePayload = { text: 'hello', files: [], failedFiles: [] };
 const filesPayload: SharePayload = {
@@ -162,6 +191,12 @@ async function runStartAndWaitForReplace(onStart: () => void) {
  * `use-interaction-handlers.test.ts` so we can exercise
  * `useRemoteSpawnDispatch` without pulling react-native into vitest.
  */
+/**
+ * The render closure of the most recent `runHook` mount, so
+ * `rerenderLastHook` can re-run it for fresh state.
+ */
+let lastRunResult: (() => ReturnType<typeof useRemoteSpawnDispatch>) | null = null;
+
 function runHook(args: {
   organizationId: string | undefined;
   mode?: string;
@@ -272,7 +307,21 @@ function runHook(args: {
     }
   };
 
-  return render();
+  const result = render();
+  lastRunResult = () => render();
+  return result;
+}
+
+/**
+ * Re-renders the most recent `runHook` mount and returns the fresh hook
+ * result, so a test can read state that an async tail updated after its
+ * first render.
+ */
+function rerenderLastHook() {
+  if (lastRunResult === null) {
+    throw new Error('rerenderLastHook called before any runHook');
+  }
+  return lastRunResult();
 }
 
 describe('useRemoteSpawnDispatch spawn input chain', () => {
@@ -490,7 +539,10 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     onStart();
     expect(onSpawnAdmitted).not.toHaveBeenCalled();
     expect(spawnMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnFilesNotSupportedToast());
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: false,
+      message: remoteSpawnFilesNotSupportedToast(),
+    });
   });
 
   it('admits files when the instance capability is unknown (optimistic default)', async () => {
@@ -588,7 +640,10 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     onStart();
     await vi.waitFor(() => {
-      expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnFilesNotSupportedToast());
+      expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+        retryable: false,
+        message: remoteSpawnFilesNotSupportedToast(),
+      });
     });
     // The press-time row admitted the file payload because its capability was
     // unknown, so the refreshed row's explicit refusal has to stop the spawn
@@ -690,7 +745,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 
-  it('a retryable clone error toasts cloneFailedRetry and keeps the form enabled for a retry', async () => {
+  it('a retryable clone error renders the inline retryable failure and keeps the form enabled for a retry', async () => {
     spawnMock.mockResolvedValueOnce({
       status: 'retryable',
       reason: 'transport failure',
@@ -712,7 +767,10 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     onStart();
     await vi.waitFor(() => {
-      expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('agentChat.session.cloneFailedRetry'));
+      expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+        retryable: true,
+        message: i18n.t('agentChat.session.cloneFailedRetry'),
+      });
     });
     // The clone retry surfaces no inline reason and never resets the selection
     // to Cloud Agent, so Start stays enabled for the retry.
@@ -961,7 +1019,7 @@ describe('useRemoteSpawnDispatch live-instance remap', () => {
     expect(setRunOnInstanceMock).not.toHaveBeenCalledWith(null);
   });
 
-  it('toasts the retryable copy and calls onSpawnFailed when no live instance resolves', async () => {
+  it('renders the retryable failure and calls onSpawnFailed when no live instance resolves', async () => {
     const onSpawnFailedMock = vi.fn();
     const setRunOnInstanceMock = vi.fn();
     const { onStart } = runHook({
@@ -980,8 +1038,73 @@ describe('useRemoteSpawnDispatch live-instance remap', () => {
     await vi.waitFor(() => {
       expect(onSpawnFailedMock).toHaveBeenCalledTimes(1);
     });
-    expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnRetryableToast());
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
     expect(spawnMock).not.toHaveBeenCalled();
     expect(setRunOnInstanceMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useRemoteSpawnDispatch stall watchdog', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    spawnMock.mockClear();
+    useRemoteInstanceSpawnMock.mockClear();
+    routerReplace.mockClear();
+    toastErrorMock.mockClear();
+    __resetSharePayloadStoreForTests();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('releases the busy button and renders the retryable failure when the spawn outlives the budget', async () => {
+    const deferred = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => deferred.promise);
+    const { onStart } = runHook({ organizationId: 'org-xyz' });
+
+    onStart();
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS);
+    const fresh = rerenderLastHook();
+    expect(fresh.isSpawningRemote).toBe(false);
+    expect(fresh.remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
+
+    // A late success still navigates.
+    deferred.resolve({ status: 'ready', sessionID: SESSION_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('a settled failure releases the busy button before the watchdog fires', async () => {
+    spawnMock.mockResolvedValueOnce({
+      status: 'retryable',
+      reason: 'transport failure',
+      cause: new Error('socket gone'),
+    });
+    const { onStart } = runHook({ organizationId: 'org-xyz' });
+
+    onStart();
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    const fresh = rerenderLastHook();
+    expect(fresh.isSpawningRemote).toBe(false);
+    expect(fresh.remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
+    // The deadline never fires: no double report.
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS + 1);
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
   });
 });

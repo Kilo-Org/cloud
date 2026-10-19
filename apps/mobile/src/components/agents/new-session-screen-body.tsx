@@ -1078,6 +1078,8 @@ export function NewSessionScreenBody() {
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
+        remoteSpawnFailure={remoteSpawn.remoteSpawnFailure}
+        onRetryRemoteSpawn={handleStartSession}
       />
       {/* The discard confirm: a Modal overlay, so the composer behind it keeps
           its layout while the destructive choice keeps its red fill. */}

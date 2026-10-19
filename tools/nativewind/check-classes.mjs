@@ -113,10 +113,6 @@ function checkScrollPadding(relative, text) {
  * paragraph direction, so its copy stays left-aligned in Arabic, Farsi and
  * Hebrew while everything beside it mirrors. Importing it under an alias is
  * fine: `type Text as RNText` is how callers type a ref.
- *
- * The exemption is a hidden node measured for height. It must not inherit the
- * shared component's base font classes, or the measurement stops matching the
- * input it mirrors.
  */
 const RAW_TEXT_IMPORT = /import\s*\{([^}]*)\}\s*from\s*'react-native'/gs;
 const RAW_TEXT_EXEMPT = new Set([

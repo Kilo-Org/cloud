@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, StatusBar, View } from 'react-native';
 
@@ -77,16 +78,24 @@ export function SheetHeader({
   // without branching on Platform.OS.
   const statusBarHeight = StatusBar.currentHeight ?? 0;
   const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
-  // A bottom formSheet owns the top of the window on Android
-  // (sheetShouldOverflowTopInset), so its header reserves the status-bar
-  // inset there; on iOS the native sheet presents below the status bar and
-  // the inset would only be a dead band. SessionPageSheet presents below the
-  // status bar on iOS too, and the Android full-window Modal pads its own top
-  // inset — either way its header reserves nothing.
+  // On Android a bottom formSheet surface reaches the window top only at its
+  // largest detent (`sheetShouldOverflowTopInset`), so the header reserves the
+  // status-bar inset only while it actually sits at the window top, measured
+  // against the sheet's own window. At smaller detents the surface starts
+  // below the status bar and the inset would only be a dead band above the
+  // title. The native detent index is not observable from JS on Android, so
+  // the header measures its own window position once per layout settle.
+  const [reachesWindowTop, setReachesWindowTop] = useState(true);
+  // On iOS the native sheet presents below the status bar, so the header
+  // reserves no top clearance there — the window inset would only be a dead
+  // band. SessionPageSheet presents below the status bar on iOS too, and the
+  // Android full-window Modal pads its own top inset — either way its header
+  // reserves nothing. 'never' marks half-detent-only sheets that can never
+  // reach the window top.
   const dropsTopInset =
     topInset === 'ios-page-sheet' ||
     topInset === 'never' ||
-    (topInset === 'bottom-form-sheet' && Platform.OS !== 'android');
+    (topInset === 'bottom-form-sheet' && (Platform.OS !== 'android' || !reachesWindowTop));
   const topInsetHeight = dropsTopInset ? 0 : resolvedTopInset;
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0
@@ -98,11 +107,30 @@ export function SheetHeader({
       : undefined;
   // Native row direction and logical margin keep Cancel/Share leading and Done
   // trailing. Do not derive sides from i18n.dir() or the stale I18nManager.isRTL.
+  const containerRef = useRef<View | null>(null);
+  const remeasureWindowTop = useCallback(() => {
+    // A detent change (user drag) re-lays the sheet; re-measure so the
+    // clearance follows the surface to the window top.
+    containerRef.current?.measureInWindow((x, y) => {
+      setReachesWindowTop(y <= (StatusBar.currentHeight ?? 0) + 1);
+    });
+  }, []);
+  const setContainerRef = useCallback((view: View | null) => {
+    containerRef.current = view;
+    view?.measureInWindow((x, y) => {
+      setReachesWindowTop(y <= (StatusBar.currentHeight ?? 0) + 1);
+    });
+  }, []);
   return (
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
-    <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
+    <View
+      ref={setContainerRef}
+      collapsable={false}
+      className="border-b border-border bg-background px-4 pb-3 pt-4"
+      onLayout={remeasureWindowTop}
+    >
       <View style={safeAreaStyle}>
         <View className="min-h-11 flex-row items-center gap-x-3">
           {onShare !== undefined ? (

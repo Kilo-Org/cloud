@@ -66,8 +66,10 @@ capitals, as shown here.
   the payment provider (past-due, unpaid, or defensive terminal
   fallback).
 - **Credit balance**: The user's available credit balance, computed as
-  `total_microdollars_acquired - microdollars_used`. Credits enter the
-  system by incrementing the acquired counter (purchases, grants,
+  `total_microdollars_acquired - microdollars_used - inference_microdollars_held`.
+  Enrollment, renewal, checkout eligibility, and their previews use this available balance.
+  Temporary inference holds restrict availability but do not constitute credit spend.
+  Credits enter the system by incrementing the acquired counter (purchases, grants,
   bonuses). Credits leave the system by incrementing the used counter
   (inference usage, pure-credit hosting deductions). The balance MUST
   NOT change as a result of Stripe-funded settlement (see

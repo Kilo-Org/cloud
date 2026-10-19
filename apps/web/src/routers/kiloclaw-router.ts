@@ -1791,6 +1791,7 @@ async function getPersonalBillingStatus(user: {
   id: string;
   total_microdollars_acquired: number;
   microdollars_used: number;
+  inference_microdollars_held: number;
   kilo_pass_threshold: number | null;
 }): Promise<ClawBillingStatus> {
   const now = new Date();
@@ -1926,7 +1927,8 @@ async function getPersonalBillingStatus(user: {
   ]);
 
   const creditIntroEligible = !(await hadPriorPaidSubscription(user.id));
-  const creditBalanceMicrodollars = user.total_microdollars_acquired - user.microdollars_used;
+  const creditBalanceMicrodollars =
+    user.total_microdollars_acquired - user.microdollars_used - user.inference_microdollars_held;
   const creditEnrollmentPriceVersion = resolveKiloClawEnrollmentPriceVersion(
     sub
       ? {
@@ -2028,6 +2030,7 @@ async function getCreditReprovisionRecoveryEligibility(params: {
     id: string;
     total_microdollars_acquired: number;
     microdollars_used: number;
+    inference_microdollars_held: number;
     kilo_pass_threshold: number | null;
   };
   currentRow: {
@@ -2050,7 +2053,9 @@ async function getCreditReprovisionRecoveryEligibility(params: {
     plan: 'standard',
   });
   const balanceMicrodollars =
-    params.user.total_microdollars_acquired - params.user.microdollars_used;
+    params.user.total_microdollars_acquired -
+    params.user.microdollars_used -
+    params.user.inference_microdollars_held;
   const preview = await getEffectiveCreditBalancePreview({
     userId: params.user.id,
     balanceMicrodollars,
@@ -5298,7 +5303,9 @@ export const kiloclawRouter = createTRPCRouter({
         useStandardIntro,
       });
       const creditBalanceMicrodollars =
-        ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
+        ctx.user.total_microdollars_acquired -
+        ctx.user.microdollars_used -
+        ctx.user.inference_microdollars_held;
       const activationPreview = await getKiloPassUpsellActivationPreview({
         userId: ctx.user.id,
         tier: kiloPassTier,

@@ -409,7 +409,7 @@ describe('enrollWithCredits', () => {
     );
   });
 
-  it('rejects direct credit enrollment when inference holds reserve the required funds', async () => {
+  it('keeps credit previews consistent with enrollment while inference funds are held', async () => {
     const instance = await createCreditEnrollmentAnchor(user.id);
     await giveUserCredits(user.id, 55_000_000);
     await db
@@ -424,6 +424,33 @@ describe('enrollWithCredits', () => {
 
     try {
       expect(await reserveInferenceCredits(db, reservation)).toMatchObject({ kind: 'reserved' });
+      const caller = await createCallerForUser(user.id);
+      const billing = await caller.kiloclaw.getBillingStatus();
+      expect(billing).toMatchObject({
+        creditBalanceMicrodollars: 54_999_999,
+        creditEnrollmentPreview: {
+          standard: {
+            costMicrodollars: 55_000_000,
+            projectedKiloPassBonusMicrodollars: 0,
+            effectiveBalanceMicrodollars: 54_999_999,
+          },
+          commit: {
+            costMicrodollars: 306_000_000,
+            projectedKiloPassBonusMicrodollars: 0,
+            effectiveBalanceMicrodollars: 54_999_999,
+          },
+        },
+        creditReprovisionRecovery: {
+          eligible: false,
+          costMicrodollars: 55_000_000,
+          effectiveBalanceMicrodollars: 54_999_999,
+          shortfallMicrodollars: 1,
+        },
+      });
+      await expect(caller.kiloclaw.getPersonalBillingSummary()).resolves.toMatchObject({
+        creditBalanceMicrodollars: billing.creditBalanceMicrodollars,
+        creditEnrollmentPreview: billing.creditEnrollmentPreview,
+      });
       await expect(
         enrollWithCredits({
           userId: user.id,
@@ -450,6 +477,22 @@ describe('enrollWithCredits', () => {
           .from(credit_transactions)
           .where(eq(credit_transactions.kilo_user_id, user.id))
       ).toHaveLength(0);
+
+      await db.transaction(tx => releaseInferenceCredits(tx, reservation));
+      const refreshedCaller = await createCallerForUser(user.id);
+      await expect(
+        refreshedCaller.kiloclaw.getActivePersonalBillingStatus()
+      ).resolves.toMatchObject({
+        creditBalanceMicrodollars: 55_000_000,
+        creditEnrollmentPreview: {
+          standard: { effectiveBalanceMicrodollars: 55_000_000 },
+        },
+        creditReprovisionRecovery: {
+          eligible: false,
+          effectiveBalanceMicrodollars: 55_000_000,
+          shortfallMicrodollars: 0,
+        },
+      });
     } finally {
       await db.transaction(tx => releaseInferenceCredits(tx, reservation));
       await db

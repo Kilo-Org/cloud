@@ -19,6 +19,7 @@ import {
   credit_transactions,
   kilo_pass_subscriptions,
   user_affiliate_attributions,
+  inference_reservations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@kilocode/worker-utils/sandbox-id';
@@ -26,6 +27,10 @@ import { createOrganization } from '@kilocode/web-shared/lib/organizations/organ
 import type Stripe from 'stripe';
 import { KiloPassTier, KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import {
+  releaseInferenceCredits,
+  reserveInferenceCredits,
+} from '@kilocode/db/inference-reservations';
 
 describe('createSubscriptionCheckout', () => {
   it('rejects Commit checkout at the retirement cutoff and directs to Standard', async () => {
@@ -707,6 +712,67 @@ describe('createKiloPassUpsellCheckout', () => {
       }),
       { timeout: 10_000 }
     );
+  });
+
+  it('excludes inference holds from Kilo Pass upsell previews and checkout eligibility', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 5_000_000, microdollars_used: 1_000_000 })
+      .where(eq(kilocode_users.id, user.id));
+    const reservation = {
+      requestId: crypto.randomUUID(),
+      userId: user.id,
+      amountMicrodollars: 1_000_000,
+    };
+
+    try {
+      expect(await reserveInferenceCredits(db, reservation)).toMatchObject({ kind: 'reserved' });
+      const caller = await createCallerForUser(user.id);
+      const billing = await caller.kiloclaw.getPersonalBillingSummary();
+      expect(billing.creditBalanceMicrodollars).toBe(3_000_000);
+      expect(billing.kiloPassUpsellPreview.standard.monthly['49']).toEqual({
+        eligible: false,
+        costMicrodollars: 55_000_000,
+        projectedKiloPassBaseMicrodollars: 49_000_000,
+        projectedKiloPassBonusMicrodollars: 2_450_000,
+        effectiveBalanceMicrodollars: 54_450_000,
+        shortfallMicrodollars: 550_000,
+      });
+      await expect(
+        caller.kiloclaw.createKiloPassUpsellCheckout({
+          instanceId: instance.id,
+          tier: '49',
+          cadence: 'monthly',
+          hostingPlan: 'standard',
+        })
+      ).rejects.toThrow(
+        'Selected Kilo Pass option cannot auto-activate Standard hosting. Choose a larger tier or add credits first.'
+      );
+      expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+
+      await db.transaction(tx => releaseInferenceCredits(tx, reservation));
+      const refreshedCaller = await createCallerForUser(user.id);
+      const refreshedBilling = await refreshedCaller.kiloclaw.getPersonalBillingSummary();
+      expect(refreshedBilling.kiloPassUpsellPreview.standard.monthly['49']).toMatchObject({
+        eligible: true,
+        projectedKiloPassBonusMicrodollars: 2_450_000,
+        effectiveBalanceMicrodollars: 55_450_000,
+        shortfallMicrodollars: 0,
+      });
+    } finally {
+      await db.transaction(tx => releaseInferenceCredits(tx, reservation));
+      await db
+        .delete(inference_reservations)
+        .where(eq(inference_reservations.request_id, reservation.requestId));
+    }
   });
 
   it('allows current Standard hosting when balance plus selected tier projection covers the first charge', async () => {

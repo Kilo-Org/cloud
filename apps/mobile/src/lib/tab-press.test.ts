@@ -99,9 +99,10 @@ describe('planProfileTabPress', () => {
 });
 
 describe('form sheet route declarations', () => {
-  // The registry in lib/form-sheet.ts must name every screen a layout presents
-  // with useFormSheetScreenOptions, or the tab layer would reset a tab over a
-  // live sheet. Read the layouts and fail when a declaration is missing.
+  // FORM_SHEET_ROUTE_SUFFIXES in lib/form-sheet-routes.ts must name every
+  // screen a layout presents with useFormSheetScreenOptions, or the tab layer
+  // would reset a tab over a live sheet. Read the layouts and fail when a
+  // declaration is missing.
   const appDir = fileURLToPath(new URL('../app', import.meta.url));
 
   function layoutFiles(dir: string): string[] {

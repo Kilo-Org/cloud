@@ -6,8 +6,8 @@
  * resetting the tab to its root over the sheet's typed state.
  *
  * Lives apart from the `react-native`-importing `form-sheet.ts` so the pure
- * node test project can read it. `form-sheet-routes.test.ts` (in
- * `tab-press.test.ts`) reads every layout that passes the options hook to a
+ * node test project can read it. The `form sheet route declarations` suite in
+ * `tab-press.test.ts` reads every layout that passes the options hook to a
  * screen and fails when a declared sheet route is missing here.
  */
 export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [

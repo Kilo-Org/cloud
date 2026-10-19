@@ -163,6 +163,17 @@ describe('artifacts File Provider extension contract', () => {
     expect(fetchContentsBody).toContain('requestedVersion.contentVersion');
   });
 
+  it('registers the domain with the dev-only testing mode', () => {
+    // A fresh file-provider domain is disabled until the user enables it; the
+    // dev-only testing-mode entitlement plus `testingModes = [.alwaysEnabled]`
+    // skips that step so the Files app opens the location on development
+    // builds. The entitlement must never ship: it is App-Store-forbidden, so
+    // the contract pins where it lives and the paired code.
+    expect(entitlements).toContain('com.apple.developer.fileprovider.testing-mode');
+    expect(pluginSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");
+    expect(providerModuleSource).toContain('domain.testingModes = [.alwaysEnabled]');
+  });
+
   it('shows the session label the mirror sanitizes into one path component', () => {
     // The extension takes the manifest label as written. That is only a valid
     // `NSFileProviderItem.filename` because the mirror sanitizes the session

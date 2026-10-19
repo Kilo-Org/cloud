@@ -6,5 +6,10 @@
 	<array>
 		<string>group.com.kilocode.kiloapp</string>
 	</array>
+	<!-- Dev-only: lets the domain set testingModes on simulator builds so the
+	     Files app can open the location without the manual enable step. Must be
+	     removed before any App Store submission. -->
+	<key>com.apple.developer.fileprovider.testing-mode</key>
+	<true/>
 </dict>
 </plist>

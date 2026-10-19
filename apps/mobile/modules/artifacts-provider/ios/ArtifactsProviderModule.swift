@@ -99,10 +99,16 @@ public final class ArtifactsProviderModule: Module {
   }
 
   private static var fileProviderDomain: NSFileProviderDomain {
-    NSFileProviderDomain(
+    let domain = NSFileProviderDomain(
       identifier: NSFileProviderDomainIdentifier(rawValue: domainIdentifier),
       displayName: domainDisplayName
     )
+    // Dev-only: automatically enables the domain so the Files app can open the
+    // location without the per-user enable step. The testing-mode entitlement
+    // gates this; the domain's mode is read once at registration, and iOS
+    // rejects any non-App-Store build that sets it without the entitlement.
+    domain.testingModes = [.alwaysEnabled]
+    return domain
   }
 
   /** Whether the domain this app owns is in a list of registered domains. */

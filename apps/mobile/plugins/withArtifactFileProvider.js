@@ -174,6 +174,9 @@ function withFileProviderEasConfig(config) {
                   bundleIdentifier: BUNDLE_IDENTIFIER,
                   entitlements: {
                     'com.apple.security.application-groups': [APP_GROUP_IDENTIFIER],
+                    // Dev-only: pairs with the domain's testingModes so the
+                    // Files app opens the location on development builds.
+                    'com.apple.developer.fileprovider.testing-mode': true,
                   },
                 },
               ],

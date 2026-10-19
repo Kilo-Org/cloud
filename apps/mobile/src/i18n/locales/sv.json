@@ -756,6 +756,7 @@
       "truncationBanner_other": "Visar de första {{limit}} av {{total}} ändrade filerna på grund av en begränsning i GitHubs API."
     },
     "linkPasteClipboardEmpty": "Urklipp är tomt.",
+    "linkPasteDenied": "Åtkomst till klistra in nekades. Tillåt inklistring och försök igen.",
     "linkPasteNotAPullRequest": "Länken leder inte till en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publicerad",

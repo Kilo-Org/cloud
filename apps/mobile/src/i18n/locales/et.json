@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHubi API piirangu tõttu kuvatakse {{total}} muudetud failist esimesed {{limit}}."
     },
     "linkPasteClipboardEmpty": "Lõikelaud on tühi.",
+    "linkPasteDenied": "Kleepimisjuurdepääs keelati. Luba kleepimine ja proovi uuesti.",
     "linkPasteNotAPullRequest": "See pole tõmbetaotluse ega liitmistaotluse link",
     "announce": {
       "commentPosted": "Kommentaar on postitatud",

@@ -2956,6 +2956,7 @@
       "truncationBanner_many": "Exibindo os primeiros {{limit}} de {{total}} arquivos alterados devido ao limite da API do GitHub."
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia.",
+    "linkPasteDenied": "O acesso para colar foi negado. Permita a ação de colar e tente novamente.",
     "linkPasteNotAPullRequest": "Este link não é de um pull request ou merge request",
     "announce": {
       "commentPosted": "Comentário publicado",

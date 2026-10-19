@@ -788,6 +788,7 @@
       "truncationBanner_many": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub."
     },
     "linkPasteClipboardEmpty": "Буфер абмену пусты.",
+    "linkPasteDenied": "Доступ да ўстаўкі быў адхілены. Дазвольце ўстаўку і паспрабуйце зноў.",
     "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё або merge-запыт",
     "announce": {
       "commentPosted": "Каментар апублікаваны",

@@ -756,6 +756,7 @@
       "truncationBanner_other": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی."
     },
     "linkPasteClipboardEmpty": "کلیپبورډ تش دی.",
+    "linkPasteDenied": "د پېسټ لاسرسی رد شو. پېسټ ته اجازه ورکړئ او بیاځلي هڅه وکړئ.",
     "linkPasteNotAPullRequest": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک نه دی",
     "announce": {
       "commentPosted": "تبصره خپره شوه",

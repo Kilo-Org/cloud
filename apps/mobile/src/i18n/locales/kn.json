@@ -756,6 +756,7 @@
       "truncationBanner_other": "ಬದಲಾದ {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ಫೈಲ್‌ಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ — ಇದು GitHub API ಮಿತಿ."
     },
     "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್‌ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ.",
+    "linkPasteDenied": "ಅಂಟಿಸುವ ಪ್ರವೇಶವನ್ನು ನಿರಾಕರಿಸಲಾಗಿದೆ. ಅಂಟಿಸಲು ಅನುಮತಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "linkPasteNotAPullRequest": "ಇದು ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
     "announce": {
       "commentPosted": "ಕಾಮೆಂಟ್ ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ",

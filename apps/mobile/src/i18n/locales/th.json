@@ -756,6 +756,7 @@
       "truncationBanner_other": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
+    "linkPasteDenied": "การเข้าถึงการวางถูกปฏิเสธ อนุญาตการวางแล้วลองอีกครั้ง",
     "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์พูลรีเควสต์หรือ merge request",
     "announce": {
       "commentPosted": "โพสต์ความคิดเห็นแล้ว",

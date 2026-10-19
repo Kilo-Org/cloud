@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHub API-ийн хязгаараас шалтгаалан өөрчлөгдсөн {{total}} файлаас эхний {{limit}} файлыг харуулж байна."
     },
     "linkPasteClipboardEmpty": "Хуулах санах ой хоосон байна.",
+    "linkPasteDenied": "Оруулах эрхээс татгалзсан. Оруулахыг зөвшөөрөөд дахин оролдоно уу.",
     "linkPasteNotAPullRequest": "Энэ татах эсвэл нэгтгэх хүсэлтийн холбоос биш байна.",
     "announce": {
       "commentPosted": "Сэтгэгдэл нийтлэгдсэн",

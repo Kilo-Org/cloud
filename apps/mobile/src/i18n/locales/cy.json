@@ -820,6 +820,7 @@
       "truncationBanner_many": "Mae'r {{limit}} ffeil gyntaf o {{total}} o ffeiliau sydd wedi newid yn cael eu dangos — dyma derfyn API GitHub."
     },
     "linkPasteClipboardEmpty": "Mae'r clipfwrdd yn wag.",
+    "linkPasteDenied": "Gwrthodwyd mynediad i ludo. Caniatewch ludo a cheisiwch eto.",
     "linkPasteNotAPullRequest": "Nid dolen cais tynnu neu gais uno yw hon",
     "announce": {
       "commentPosted": "Sylw wedi'i bostio",

@@ -2916,6 +2916,7 @@
       "truncationBanner_other": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다."
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다.",
+    "linkPasteDenied": "붙여넣기 권한이 거부되었습니다. 붙여넣기를 허용한 후 다시 시도하세요.",
     "linkPasteNotAPullRequest": "풀 리퀘스트 또는 머지 요청 링크가 아닙니다",
     "announce": {
       "commentPosted": "댓글이 게시되었습니다",

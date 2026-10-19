@@ -788,6 +788,7 @@
       "truncationBanner_many": "Zobrazujú sa prvé zmenené súbory ({{limit}} z {{total}}) — limit API služby GitHub."
     },
     "linkPasteClipboardEmpty": "Schránka je prázdna.",
+    "linkPasteDenied": "Prístup na vloženie bol zamietnutý. Povoľte vloženie a skúste to znova.",
     "linkPasteNotAPullRequest": "Nie je to odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentár bol odoslaný",

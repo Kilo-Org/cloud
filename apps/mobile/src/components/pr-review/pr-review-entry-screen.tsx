@@ -19,13 +19,16 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
+import { prLinkDraft } from '@/lib/pr-review/pr-link-draft';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import {
   decidePrLinkOpen,
   decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
   prLinkToastInvalidCopy,
+  prLinkToastPasteDeniedCopy,
   selectPrLinkClearButtonVisible,
+  selectPrLinkPasteEmptyReason,
 } from '@/lib/pr-review/pr-link-paste';
 import {
   getRecentPrs,
@@ -46,16 +49,32 @@ export function PrReviewEntryScreen() {
   // The TextInput component ref is for focus() and setNativeProps on
   // programmatic paste.
   const inputRef = useRef<TextInput>(null);
-  const inputValueRef = useRef<string>('');
+  const inputValueRef = useRef<string>(prLinkDraft.text);
   // FIFO of values written via setNativeProps. Matching onChangeText values
   // are treated as programmatic echoes (do not clobber ref).
   // Order-agnostic membership so double-taps and delayed native echoes work.
   const pendingProgrammaticTextsRef = useRef<string[]>([]);
-  const [hasInput, setHasInput] = useState(false);
+  const [hasInput, setHasInput] = useState(inputValueRef.current.length > 0);
   const [recent, setRecent] = useState<RecentPr[] | null>(null);
+
+  const applyFieldText = useCallback((text: string) => {
+    pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
+      pendingProgrammaticTextsRef.current,
+      text
+    );
+    inputValueRef.current = text;
+    prLinkDraft.text = text;
+    inputRef.current?.setNativeProps({ text });
+    setHasInput(text.length > 0);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
+      // A review push unmounts this screen; the module draft brings the link
+      // back when Back remounts it, so a cancelled open needs no re-paste.
+      if (prLinkDraft.text.length > 0) {
+        applyFieldText(prLinkDraft.text);
+      }
       const state = { cancelled: false };
       void (async () => {
         const list = await getRecentPrs();
@@ -66,18 +85,8 @@ export function PrReviewEntryScreen() {
       return () => {
         state.cancelled = true;
       };
-    }, [])
+    }, [applyFieldText])
   );
-
-  const applyFieldText = (text: string) => {
-    pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
-      pendingProgrammaticTextsRef.current,
-      text
-    );
-    inputValueRef.current = text;
-    inputRef.current?.setNativeProps({ text });
-    setHasInput(text.length > 0);
-  };
 
   const handleSubmit = () => {
     const decision = decidePrLinkOpen(inputValueRef.current);
@@ -98,7 +107,14 @@ export function PrReviewEntryScreen() {
     const clipboard = await Clipboard.getStringAsync();
     const decision = decidePrLinkPaste(clipboard);
     if (decision.kind === 'empty') {
-      announcingToast.error(prLinkToastClipboardEmptyCopy());
+      // iOS answers a denied prompt with an empty read, so ask the prompt-free
+      // probe whether the clipboard still holds text before calling it empty.
+      const clipboardHasString = await Clipboard.hasStringAsync();
+      announcingToast.error(
+        selectPrLinkPasteEmptyReason(clipboard, clipboardHasString) === 'denied'
+          ? prLinkToastPasteDeniedCopy()
+          : prLinkToastClipboardEmptyCopy()
+      );
       return;
     }
     // Replace entire field (never append-at-cursor): native field + ref + hasInput.
@@ -237,7 +253,7 @@ export function PrReviewEntryScreen() {
         >
           <Input
             ref={inputRef}
-            defaultValue=""
+            defaultValue={inputValueRef.current}
             placeholder={urlPlaceholder}
             // The native hint is not reliably one line: Android lays it out
             // on a second line the one-line field clips. Both platforms draw
@@ -262,6 +278,7 @@ export function PrReviewEntryScreen() {
                 return;
               }
               inputValueRef.current = value;
+              prLinkDraft.text = value;
               setHasInput(value.length > 0);
             }}
             // The shared single-line box (`@/components/ui/input`) supplies the
@@ -286,6 +303,7 @@ export function PrReviewEntryScreen() {
                 // applyFieldText('') (paste-only path) and do not push an
                 // echo for '' — a non-arriving echo would stale the FIFO.
                 inputValueRef.current = '';
+                prLinkDraft.text = '';
                 setHasInput(false);
                 inputRef.current?.clear();
                 inputRef.current?.focus();

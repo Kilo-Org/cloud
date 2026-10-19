@@ -756,6 +756,7 @@
       "truncationBanner_other": "Faayiloota jijjiiraman {{total}} keessaa {{limit}} jalqabaa agarsiisaa jirra — kun daangaa API GitHub ti."
     },
     "linkPasteClipboardEmpty": "Gabateen waraabbii duwwaadha.",
+    "linkPasteDenied": "Seensa maxxansaa diidame. Maxxansaa hayyomadhuu deebisee yaali.",
     "linkPasteNotAPullRequest": "Liinkii gaaffii walitti makuu miti",
     "announce": {
       "commentPosted": "Yaadni maxxanfameera",

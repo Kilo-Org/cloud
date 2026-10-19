@@ -756,6 +756,7 @@
       "truncationBanner_other": "Показват се първите {{limit}} от {{total}} променени файла поради ограничение на API на GitHub."
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен.",
+    "linkPasteDenied": "Достъпът за поставяне е отказан. Разрешете поставянето и опитайте отново.",
     "linkPasteNotAPullRequest": "Това не е връзка към заявка за сливане или merge заявка",
     "announce": {
       "commentPosted": "Коментарът е публикуван",

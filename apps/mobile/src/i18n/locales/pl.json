@@ -2996,6 +2996,7 @@
       "truncationBanner_many": "Widoczne są tylko pierwsze pliki spośród {{total}} zmienionych plików. Ich liczbę ogranicza limit API GitHub: {{limit}}."
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty.",
+    "linkPasteDenied": "Odmówiono dostępu do wklejania. Zezwól na wklejanie i spróbuj ponownie.",
     "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",
     "announce": {
       "commentPosted": "Opublikowano komentarz",

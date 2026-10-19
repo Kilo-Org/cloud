@@ -772,6 +772,7 @@
       "truncationBanner_few": "Prikazuje se prvih {{limit}} od {{total}} izmijenjenih datoteka zbog ograničenja GitHub API-ja."
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan.",
+    "linkPasteDenied": "Pristanak za lijepljenje odbijen je. Dopustite lijepljenje i pokušajte ponovno.",
     "linkPasteNotAPullRequest": "Ovo nije poveznica na zahtjev za spajanje ni merge request",
     "announce": {
       "commentPosted": "Komentar objavljen",

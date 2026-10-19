@@ -756,6 +756,7 @@
       "truncationBanner_other": "Ana nuna fayiloli {{limit}} na farko cikin {{total}} da aka canza — iyakar API na GitHub."
     },
     "linkPasteClipboardEmpty": "Babu komai a allon kwafi.",
+    "linkPasteDenied": "An hana izinin liƙawa. Ba da izinin liƙawa sannan a sake gwadawa.",
     "linkPasteNotAPullRequest": "Ba mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa ba ne",
     "announce": {
       "commentPosted": "An wallafa tsokaci",

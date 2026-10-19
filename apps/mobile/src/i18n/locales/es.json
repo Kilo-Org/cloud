@@ -2956,6 +2956,7 @@
       "truncationBanner_many": "Se muestran los primeros {{limit}} de {{total}} archivos modificados debido al límite de la API de GitHub."
     },
     "linkPasteClipboardEmpty": "El portapapeles está vacío.",
+    "linkPasteDenied": "Se denegó el permiso para pegar. Permite pegar e inténtalo de nuevo.",
     "linkPasteNotAPullRequest": "No es un enlace a una PR o una merge request",
     "announce": {
       "commentPosted": "Comentario publicado",

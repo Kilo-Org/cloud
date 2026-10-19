@@ -756,6 +756,7 @@
       "truncationBanner_other": "Ny rakitra {{limit}} voalohany amin'ny {{total}} novaina no aseho — fetran'ny API GitHub."
     },
     "linkPasteClipboardEmpty": "Foana ny fitahirizana vonjimaika.",
+    "linkPasteDenied": "Nolavina ny alalana hampiditra. Omeo alalana ny fampidirana ary andramo indray.",
     "linkPasteNotAPullRequest": "Tsy rohy fangatahana fampiraisana izany",
     "announce": {
       "commentPosted": "Navoaka ny hevitra",

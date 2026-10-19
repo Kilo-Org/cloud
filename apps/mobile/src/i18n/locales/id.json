@@ -2916,6 +2916,7 @@
       "truncationBanner_other": "Hanya {{limit}} file pertama dari {{total}} file yang diubah ditampilkan karena batas API GitHub."
     },
     "linkPasteClipboardEmpty": "Papan klip kosong.",
+    "linkPasteDenied": "Akses tempel ditolak. Izinkan tempel dan coba lagi.",
     "linkPasteNotAPullRequest": "Ini bukan tautan PR atau merge request",
     "announce": {
       "commentPosted": "Komentar terkirim",

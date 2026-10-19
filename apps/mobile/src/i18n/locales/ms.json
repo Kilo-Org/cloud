@@ -756,6 +756,7 @@
       "truncationBanner_other": "Memaparkan {{limit}} fail pertama daripada {{total}} fail yang diubah — had API GitHub."
     },
     "linkPasteClipboardEmpty": "Papan keratan kosong.",
+    "linkPasteDenied": "Akses tampal telah ditolak. Benarkan tampal dan cuba lagi.",
     "linkPasteNotAPullRequest": "Ini bukan pautan permintaan tarik atau permintaan gabungan",
     "announce": {
       "commentPosted": "Komen disiarkan",

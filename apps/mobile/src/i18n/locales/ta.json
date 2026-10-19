@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHub API வரம்பு காரணமாக மாற்றப்பட்ட {{total}} கோப்புகளில் முதல் {{limit}} கோப்புகள் காட்டப்படுகின்றன."
     },
     "linkPasteClipboardEmpty": "கிளிப்போர்டு காலியாக உள்ளது.",
+    "linkPasteDenied": "ஒட்டுவதற்கான அணுகல் மறுக்கப்பட்டது. ஒட்டுவதற்கு அனுமதித்து மீண்டும் முயற்சிக்கவும்.",
     "linkPasteNotAPullRequest": "இது இணைப்புக் கோரிக்கை இணைப்பு அல்ல",
     "announce": {
       "commentPosted": "கருத்து இடுகையிடப்பட்டது",

@@ -2916,6 +2916,7 @@
       "truncationBanner_other": "受 GitHub API 限制，僅顯示 {{total}} 個變更檔案中的前 {{limit}} 個。"
     },
     "linkPasteClipboardEmpty": "剪貼簿沒有內容。",
+    "linkPasteDenied": "貼上的存取權遭拒。請允許貼上並再試一次。",
     "linkPasteNotAPullRequest": "不是提取請求或合併請求連結",
     "announce": {
       "commentPosted": "留言已發佈",

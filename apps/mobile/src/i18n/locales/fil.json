@@ -756,6 +756,7 @@
       "truncationBanner_other": "Ipinapakita ang unang {{limit}} sa {{total}} na binagong file — ito ang limitasyon ng GitHub API."
     },
     "linkPasteClipboardEmpty": "Walang laman ang clipboard.",
+    "linkPasteDenied": "Tinanggihan ang pahintulot na i-paste. Ipayag ang pag-paste at subukang muli.",
     "linkPasteNotAPullRequest": "Hindi ito link ng pull request o merge request",
     "announce": {
       "commentPosted": "Na-post ang komento",

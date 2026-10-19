@@ -756,6 +756,7 @@
       "truncationBanner_other": "A GitHub API korlátja miatt a {{total}} módosított fájl közül csak az első {{limit}} látható."
     },
     "linkPasteClipboardEmpty": "A vágólap üres.",
+    "linkPasteDenied": "A beillesztéshez való hozzáférés elutasítva. Engedélyezze a beillesztést, és próbálja újra.",
     "linkPasteNotAPullRequest": "Ez nem egy PR vagy merge request hivatkozása",
     "announce": {
       "commentPosted": "Hozzászólás közzétéve",

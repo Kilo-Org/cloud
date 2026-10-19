@@ -756,6 +756,7 @@
       "truncationBanner_other": "ნაჩვენებია {{total}} შეცვლილი ფაილიდან პირველი {{limit}} — GitHub API-ის შეზღუდვა."
     },
     "linkPasteClipboardEmpty": "გაცვლის ბუფერი ცარიელია.",
+    "linkPasteDenied": "ჩასმის წვდომა აკრძალულია. მიეცით ჩასმას ნება და ისევ სცადეთ.",
     "linkPasteNotAPullRequest": "ეს PR-ის ან შერწყმის მოთხოვნის ბმული არ არის",
     "announce": {
       "commentPosted": "კომენტარი გამოქვეყნდა",

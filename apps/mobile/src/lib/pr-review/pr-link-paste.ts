@@ -53,9 +53,27 @@ export function selectPrLinkClearButtonVisible(input: PrLinkClearButtonInput): b
   return input.hasInput;
 }
 
+type PrLinkPasteEmptyReason = 'denied' | 'empty';
+
+/**
+ * A read that trims to nothing is either a truly empty clipboard or a denied
+ * iOS paste: iOS returns an empty string when the prompt was declined while
+ * `hasStringAsync()` still sees the clipboard text.
+ */
+export function selectPrLinkPasteEmptyReason(
+  clipboard: string | null | undefined,
+  clipboardHasString: boolean
+): PrLinkPasteEmptyReason {
+  return (clipboard ?? '').length === 0 && clipboardHasString ? 'denied' : 'empty';
+}
+
 /** Toast copy when paste finds an empty clipboard. */
 export function prLinkToastClipboardEmptyCopy(): string {
   return i18n.t('prReview.linkPasteClipboardEmpty');
+}
+/** Toast copy when the reader denied the paste prompt. */
+export function prLinkToastPasteDeniedCopy(): string {
+  return i18n.t('prReview.linkPasteDenied');
 }
 /** Toast copy when paste or Open gets a link no provider serves. */
 export function prLinkToastInvalidCopy(): string {

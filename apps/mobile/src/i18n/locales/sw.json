@@ -756,6 +756,7 @@
       "truncationBanner_other": "Inaonyesha faili {{limit}} za kwanza kati ya {{total}} zilizobadilishwa — hiki ndicho kikomo cha API ya GitHub."
     },
     "linkPasteClipboardEmpty": "Ubao wa kunakili ni tupu.",
+    "linkPasteDenied": "Ufikiaji wa kuweka umekataliwa. Ruhusu kuweka kisha ujaribu tena.",
     "linkPasteNotAPullRequest": "Sio kiungo cha ombi la kuunganisha",
     "announce": {
       "commentPosted": "Maoni yamechapishwa",

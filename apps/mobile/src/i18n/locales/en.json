@@ -820,6 +820,7 @@
       "emptyLine": "(empty)"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
+    "linkPasteDenied": "Paste access was denied. Allow paste and try again.",
     "linkPasteNotAPullRequest": "Not a pull request or merge request link",
     "announce": {
       "commentPosted": "Comment posted",

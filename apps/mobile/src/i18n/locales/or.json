@@ -756,6 +756,7 @@
       "truncationBanner_other": "GitHub API ସୀମା ଯୋଗୁଁ ମୋଟ {{total}} ପରିବର୍ତ୍ତିତ ଫାଇଲ୍ ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ଦେଖାଯାଉଛି।"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପବୋର୍ଡ ଖାଲି ଅଛି।",
+    "linkPasteDenied": "ପେଷ୍ଟ କରିବା ପାଇଁ ଅନୁମତି ଦିଆଗଲି ନାହିଁ। ପେଷ୍ଟ କରିବାକୁ ଅନୁମତି ଦିଅନ୍ତୁ ଏବଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "linkPasteNotAPullRequest": "ଏହା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
     "announce": {
       "commentPosted": "ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା",

@@ -756,6 +756,7 @@
       "truncationBanner_other": "Se premye {{limit}} sou {{total}} fichye ki chanje yo ki parèt — limit API GitHub la."
     },
     "linkPasteClipboardEmpty": "Près-papye a vid.",
+    "linkPasteDenied": "Aksè pou kole a te refize. Otorize kole a epi eseye ankò.",
     "linkPasteNotAPullRequest": "Sa a pa yon lyen demann fizyon ni merge request",
     "announce": {
       "commentPosted": "Kòmantè pibliye",

@@ -183,11 +183,10 @@ export function orgPickerPage(input: {
   // shows that enrolled state and the tick must survive every re-render and
   // reload. The revealed subsection also exists only before verification.
   const verifiedAuthenticator = input.authenticator?.verified === true;
-  // The enrolment material (secret + otpauth URI) is response-body evidence of
-  // a bearer-equivalent MFA credential, so it renders ONLY in a response to an
-  // explicit reveal action from the cookie-bound browser (`authenticatorRevealed`):
-  // the enroll POST, or a refused opt-in submit that must keep its prompt. The
-  // plain picker GET carries no secret at all and offers the enroll button
+  // The enrolment material (secret + otpauth URI) renders ONLY in a response
+  // to an explicit reveal action from the cookie-bound browser
+  // (`authenticatorRevealed`): the enroll POST, or a refused opt-in submit
+  // that must keep its prompt. The plain picker GET offers the enroll button
   // instead; a verified admin keeps the ticked checkbox and no subsection.
   const otpSectionHtml =
     input.showAdminOption &&

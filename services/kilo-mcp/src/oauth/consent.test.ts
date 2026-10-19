@@ -706,8 +706,8 @@ describe('GET /authorize/status', () => {
     expect(response.status).toBe(405);
   });
 
-  it('answers unknown without the flow cookie or with a foreign cookie, leaving the record untouched', async () => {
-    for (const cookie of [null, flowCookie('attacker-tok')]) {
+  it('answers unknown without the flow cookie, with a wrong name, or a wrong token', async () => {
+    for (const cookie of [null, flowCookie('pa-other', FLOW_TOKEN), flowCookie('pa-1', 'wrong-tok')]) {
       const store = createFakeStore();
       const id = await seedPaired(store);
       const handler = createDefaultHandler(deps(store, flowFetch()));
@@ -1693,7 +1693,7 @@ describe('GET/POST /authorize/org', () => {
     }
   });
 
-  it('rejects a foreign flow cookie like a missing one and mints nothing', async () => {
+  it('rejects a wrong flow token like a missing one and mints nothing', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
     seedAuthenticator(store, 'u-1');
@@ -1704,7 +1704,8 @@ describe('GET/POST /authorize/org', () => {
         method: 'POST',
         headers: {
           'content-type': 'application/x-www-form-urlencoded',
-          Cookie: flowCookie('attacker-tok'),
+          // The record's own cookie name with a token that is not its own.
+          Cookie: flowCookie(id, 'wrong-tok'),
         },
         body: new URLSearchParams({
           organization_id: 'org-2',

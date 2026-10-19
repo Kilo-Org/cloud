@@ -276,9 +276,9 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
   if (!record || record.expiresAt <= nowIso || record.status === 'completed') {
     return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
   }
-  // The poll must come from the browser that opened /authorize: anything else
-  // answers exactly like an expired record (`unknown`), so an id alone (the
-  // initiating client's user agent, or a phished id) drives nothing.
+  // The poll must present the flow cookie recorded for this id: any other
+  // caller gets the same `unknown` an expired record gets, and the record is
+  // left untouched.
   if (flowCookieToken(request.headers.get('Cookie'), id) !== record.flowToken) {
     return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
   }
@@ -378,11 +378,9 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   ) {
     return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
   }
-  // The picker must be served to, and submitted from, the browser that opened
-  // /authorize. A mismatched or absent cookie gets the same page as a stale
-  // id — indistinguishable from expiry, and nothing about the record leaks:
-  // the pending id alone (the initiating client's user agent, or a phished
-  // id) can render the picker, submit a choice, or complete the flow.
+  // The picker is served to, and submitted from, the browser that presents
+  // the flow cookie recorded for this id. Any other caller gets the same
+  // page a stale id gets, and the record is left untouched.
   if (flowCookieToken(request.headers.get('Cookie'), id) !== record.flowToken) {
     return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
   }

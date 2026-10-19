@@ -101,6 +101,21 @@ async function mapBounded<T, R>(
   return results;
 }
 
+function logPostFailure(
+  stage: string,
+  batchSize: number,
+  detail: Record<string, unknown> = {}
+): void {
+  console.warn(
+    JSON.stringify({
+      event: 'auto_routing_owner_pool_conversion_post_failed',
+      stage,
+      batchSize,
+      ...detail,
+    })
+  );
+}
+
 export async function postOwnerPoolConversions(
   env: Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'>,
   chunk: readonly OwnerPoolConversion[]
@@ -113,18 +128,30 @@ export async function postOwnerPoolConversions(
       headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
       body: JSON.stringify({ conversions: chunk }),
       signal: AbortSignal.timeout(BATCH_TIMEOUT_MS),
-      // The internal secret must never follow a redirect.
-      redirect: 'error',
+      // Workers reject redirect: 'error'. With 'manual' the internal secret never follows a
+      // redirect, and a 3xx is not ok, so the batch fails.
+      redirect: 'manual',
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      logPostFailure('http_status', chunk.length, { status: response.status });
+      return null;
+    }
     const parsed = OwnerPoolConversionResponseSchema.safeParse(await response.json());
-    if (!parsed.success || parsed.data.results.length !== chunk.length) return null;
+    if (!parsed.success || parsed.data.results.length !== chunk.length) {
+      logPostFailure('invalid_response', chunk.length, { status: response.status });
+      return null;
+    }
     const inOrder = parsed.data.results.every(
       (result, index) =>
         result.owner.type === chunk[index]?.owner.type && result.owner.id === chunk[index]?.owner.id
     );
+    if (!inOrder) logPostFailure('result_mismatch', chunk.length, { status: response.status });
     return inOrder ? parsed.data.results : null;
-  } catch {
+  } catch (error) {
+    logPostFailure('exception', chunk.length, {
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message.slice(0, 300) : null,
+    });
     return null;
   }
 }

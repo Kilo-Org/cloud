@@ -203,7 +203,10 @@ describe('HTML deploy bearer authentication', () => {
   it('accepts legacy five-year API and one-hour device tokens', async () => {
     for (const value of [
       await token({ expiresInSeconds: 157_680_000 }),
-      await token({ expiresInSeconds: 3600, extra: { deviceSessionId: 'test-device-session' } }),
+      await token({
+        expiresInSeconds: 3600,
+        extra: { deviceSessionId: '11111111-1111-4111-8111-111111111111' },
+      }),
     ]) {
       expect((await fetch(value)).response.status).toBe(429);
     }

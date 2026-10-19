@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { useContextPicker } from '@/components/context-control';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
@@ -47,6 +48,19 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
   const options = (orgs?.length ?? 0) + 1;
   const switchable = orgs !== undefined && options > 1;
 
+  // The memberships query can fail on first load: without handling, the line
+  // would show the generic noun forever with no way to retry or pick. Mirror
+  // `ContextControl`'s load-failure surface (a retry under the label) and its
+  // missing-membership message; the personal scope has no membership to lose.
+  const nameError = organizations.isError && organizationId !== null;
+  const unavailable =
+    !organizations.isError && orgs !== undefined && organizationId !== null && !selected;
+  const statusMessage = nameError
+    ? t('organization.boundary.loadErrorTitle')
+    : unavailable
+      ? t('organization.boundary.organizationUnavailable')
+      : null;
+
   const line = (
     <Text
       className="text-center text-sm leading-[normal] text-muted-foreground"
@@ -75,6 +89,21 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
       ) : (
         <View className="min-h-11 max-w-full justify-center px-2">{line}</View>
       )}
+      {statusMessage ? (
+        <AccessibleStatus message={statusMessage} className="text-center text-xs" tone="error" />
+      ) : null}
+      {nameError ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.retry')}
+          onPress={() => {
+            void organizations.refetch();
+          }}
+          className="min-h-11 items-center justify-center px-2 active:opacity-70"
+        >
+          <Text className="text-sm text-muted-foreground">{t('common.retry')}</Text>
+        </Pressable>
+      ) : null}
       {instanceHint ? (
         <Text
           className="text-center text-xs leading-[normal] text-muted-foreground"

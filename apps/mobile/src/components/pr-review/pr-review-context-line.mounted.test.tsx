@@ -169,4 +169,26 @@ describe('PrReviewContextLine', () => {
     await waitFor(() => texts(result).includes('For Acme'));
     expect(texts(result)).toContain('https://gitlab.example.com');
   });
+
+  it('offers a retry when the memberships query fails', async () => {
+    storage.read.mockResolvedValue('org-a');
+    list.mockRejectedValue(new Error('list failed'));
+    const ui = await mount();
+    await waitFor(
+      () => ui.renderer.root.findAll(node => node.props.accessibilityLabel === 'Retry').length > 0
+    );
+
+    expect(texts(ui)).toContain('For Organization');
+    const retry = ui.renderer.root.find(node => node.props.accessibilityLabel === 'Retry');
+    list.mockResolvedValue([ORG_A, ORG_B]);
+    await press(retry);
+    await waitFor(() => texts(ui).includes('For Acme'));
+  });
+
+  it('names the unavailable scope when the persisted organization left the list', async () => {
+    storage.read.mockResolvedValue('gone-org');
+    const ui = await mount();
+    await waitFor(() => texts(ui).includes('For Organization'));
+    expect(texts(ui)).toContain('Organization unavailable');
+  });
 });

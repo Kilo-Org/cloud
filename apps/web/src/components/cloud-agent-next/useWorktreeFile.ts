@@ -2,34 +2,42 @@
 
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { useSavedWorktreeChanges } from './useSavedWorktreeChanges';
+import { getWorktreeFileQueryKey } from './worktree-changes';
 import { getSavedWorktreeFileState } from './worktree-file';
 
 export function useWorktreeFile({
   cloudAgentSessionId,
   organizationId,
+  worktreeId,
   path,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
+  worktreeId?: string;
   path: string;
 }) {
-  const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
   const { saved } = useSavedWorktreeChanges({
     cloudAgentSessionId,
     organizationId,
+    worktreeId,
     enabled: true,
   });
   const snapshot = saved.data?.snapshot;
   const selectedEntry = snapshot?.files.find(file => file.path === path);
   const expectedRevision = selectedEntry?.revision ?? 1;
   const input = { cloudAgentSessionId, path, expectedRevision };
-  const queryOptions = organizationId
-    ? trpc.organizations.cloudAgentNext.getWorktreeFile.queryOptions({ ...input, organizationId })
-    : trpc.cloudAgentNext.getWorktreeFile.queryOptions(input);
   const file = useQuery({
-    ...queryOptions,
+    queryKey: getWorktreeFileQueryKey({ ...input, organizationId, worktreeId }),
+    queryFn: ({ signal }) =>
+      organizationId
+        ? trpcClient.organizations.cloudAgentNext.getWorktreeFile.query(
+            { ...input, organizationId },
+            { signal }
+          )
+        : trpcClient.cloudAgentNext.getWorktreeFile.query(input, { signal }),
     enabled: !saved.isError && selectedEntry !== undefined,
     staleTime: Infinity,
     retry: false,

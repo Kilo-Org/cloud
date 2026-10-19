@@ -199,6 +199,9 @@ async function setup(
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
       NEXTAUTH_SECRET: WORKER_SECRET,
+      // A local `.dev.vars` WORKER_URL turns on log upload, which adds a
+      // per-launch wrapper instance ID to the launch env.
+      WORKER_URL: undefined,
       ...extraEnv,
     });
     Object.assign(instance, {

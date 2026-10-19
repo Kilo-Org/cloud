@@ -16,6 +16,7 @@ type CreateWorktreeChatOptions = {
   headersList?: Headers;
   sourceKiloSessionId: string;
   operationKey: string;
+  kiloSessionId?: string;
   organizationId?: string;
 };
 
@@ -95,6 +96,7 @@ export async function createWorktreeChat({
   headersList,
   sourceKiloSessionId,
   operationKey,
+  kiloSessionId,
   organizationId,
 }: CreateWorktreeChatOptions): Promise<CreateWorktreeChatOutput> {
   if (isMobileClient(headersList)) {
@@ -161,6 +163,7 @@ export async function createWorktreeChat({
       sourceKiloSessionId,
       sourceCloudAgentSessionId: source.cloudAgentSessionId,
       operationKey,
+      ...(kiloSessionId ? { kiloSessionId } : {}),
       ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),
       clientProvenance: 'browser',
     });

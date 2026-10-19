@@ -35,6 +35,9 @@ const rowRenders = vi.hoisted(
 // so the provider-scoped keying (s6, identity rule 17) is proven at the call
 // site rather than only in the store's unit tests.
 const viewedFilesCalls = vi.hoisted(() => [] as unknown[][]);
+// Records every scroll request the navigator emits, so the bridge identity
+// wiring (rule 17) is proven at the call site too.
+const scrollRequests = vi.hoisted(() => [] as unknown[]);
 
 // Captures the latest FlashList props so tests can read `onEndReached`.
 const flashListProps = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
@@ -70,7 +73,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
 vi.mock('@/lib/pr-review/file-navigator-bridge', () => ({
-  requestScrollToFile: vi.fn(),
+  requestScrollToFile: (...args: unknown[]) => {
+    scrollRequests.push(args[0]);
+  },
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -608,6 +613,8 @@ describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
 
   beforeEach(() => {
     viewedFilesCalls.length = 0;
+    scrollRequests.length = 0;
+    rowRenders.length = 0;
     listQueryResult = {
       query: {
         isLoading: false,
@@ -647,6 +654,35 @@ describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
     expect(viewedFilesCalls[0]).toEqual([
       { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 7 },
       'sha',
+    ]);
+  });
+
+  // The scroll request carries the same live ref the viewed set uses, so the
+  // bridge resolves its provider-scoped key (rule 17) from the identity the
+  // call site hands it.
+  it('carries the provider ref on the scroll request under the provider scope', async () => {
+    await renderWithProviders(
+      <ProviderPrScopeProvider value={{ ref: GITLAB_REF, organizationId: null }}>
+        <PrDiffFileNavigator {...BASE_PROPS} />
+      </ProviderPrScopeProvider>
+    );
+
+    const row = rowRenders.find(entry => entry.path === 'src/a.ts');
+    if (!row) {
+      throw new Error('navigator row for src/a.ts did not render');
+    }
+    act(() => {
+      row.onSelect();
+    });
+
+    expect(scrollRequests).toEqual([
+      {
+        owner: 'octocat',
+        repo: 'hello-world',
+        number: 7,
+        ref: GITLAB_REF,
+        path: 'src/a.ts',
+      },
     ]);
   });
 });

@@ -115,6 +115,7 @@ export function PrReviewFileList({
     owner,
     repo,
     number,
+    ref: scope.ref,
     viewMode,
     isTablet,
   });
@@ -122,12 +123,13 @@ export function PrReviewFileList({
   // When the component unmounts (user navigates away from the PR or
   // pops the PR screen off the stack), drop the bridge so a stale
   // selection can never leak into the next mount. Re-mounting this
-  // list always starts with no selection.
+  // list always starts with no selection. The identity rule 17 ref
+  // keeps the clear under the same provider-scoped key the writes use.
   useEffect(
     () => () => {
-      clearDiffSelection({ owner, repo, number });
+      clearDiffSelection({ owner, repo, number, ref: scope.ref });
     },
-    [owner, repo, number]
+    [owner, repo, number, scope.ref]
   );
 
   // The write bar renders on every provider (s6): its two routes — the
@@ -244,6 +246,7 @@ export function PrReviewFileList({
     owner,
     repo,
     number,
+    ref: scope.ref,
     items,
     listRef,
     setExpanded,

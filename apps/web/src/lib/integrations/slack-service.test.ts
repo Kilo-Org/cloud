@@ -41,8 +41,13 @@ jest.mock('@slack/web-api', () => ({
 }));
 
 const mockWriteSlackCredential = jest.fn();
+const mockGetSlackCredentialByIntegrationId = jest.fn();
+const mockDecryptSlackBotToken = jest.fn();
 jest.mock('@/lib/integrations/platforms/slack/credential-store', () => ({
   writeSlackCredential: (...args: unknown[]) => mockWriteSlackCredential(...args),
+  getSlackCredentialByIntegrationId: (...args: unknown[]) =>
+    mockGetSlackCredentialByIntegrationId(...args),
+  decryptSlackBotToken: (...args: unknown[]) => mockDecryptSlackBotToken(...args),
 }));
 
 const mockCaptureException = jest.fn();
@@ -86,7 +91,11 @@ describe('slack-service uninstallApp', () => {
     mockUpdateReturning.mockReset();
     mockDeleteWhere.mockReset();
     mockAuthRevoke.mockReset();
+    mockGetSlackCredentialByIntegrationId.mockReset();
+    mockDecryptSlackBotToken.mockReset();
     mockAuthRevoke.mockResolvedValue({ ok: true });
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue({ id: 'credential-1' });
+    mockDecryptSlackBotToken.mockReturnValue('xoxb-token');
     mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
     mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
     mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
@@ -155,6 +164,17 @@ describe('slack-service uninstallApp', () => {
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
 
+  it('revokes the credential-store token for an active integration', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+
+    await uninstallApp(owner);
+
+    expect(mockGetSlackCredentialByIntegrationId).toHaveBeenCalledWith('integration-1');
+    expect(mockDecryptSlackBotToken).toHaveBeenCalledWith({ id: 'credential-1' }, owner);
+    expect(mockAuthRevoke).toHaveBeenCalledTimes(1);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+
   it('disconnects suspended integrations without deleting shared Slack installation state', async () => {
     mockLimit.mockResolvedValue([
       buildSlackIntegration({
@@ -200,6 +220,10 @@ describe('slack-service testConnection', () => {
   beforeEach(() => {
     mockLimit.mockReset();
     mockAuthTest.mockReset();
+    mockGetSlackCredentialByIntegrationId.mockReset();
+    mockDecryptSlackBotToken.mockReset();
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue({ id: 'credential-1' });
+    mockDecryptSlackBotToken.mockReturnValue('xoxb-token');
   });
 
   it('returns success when auth.test succeeds', async () => {
@@ -220,8 +244,29 @@ describe('slack-service testConnection', () => {
     expect(mockAuthTest).not.toHaveBeenCalled();
   });
 
-  it('returns failure when the access token is missing from metadata', async () => {
+  it('reads the token from the encrypted credential store', async () => {
     mockLimit.mockResolvedValue([buildSlackIntegration({ metadata: {} })]);
+    mockAuthTest.mockResolvedValue({ ok: true });
+
+    await expect(testConnection(owner)).resolves.toEqual({ success: true });
+    expect(mockGetSlackCredentialByIntegrationId).toHaveBeenCalledWith('integration-1');
+    expect(mockDecryptSlackBotToken).toHaveBeenCalledWith({ id: 'credential-1' }, owner);
+  });
+
+  it('returns failure when no credential row exists', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration({ metadata: {} })]);
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue(null);
+
+    await expect(testConnection(owner)).resolves.toEqual({
+      success: false,
+      error: 'No access token found',
+    });
+    expect(mockAuthTest).not.toHaveBeenCalled();
+  });
+
+  it('returns failure when the credential cannot be decrypted', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration({ metadata: {} })]);
+    mockDecryptSlackBotToken.mockReturnValue(null);
 
     await expect(testConnection(owner)).resolves.toEqual({
       success: false,
@@ -277,11 +322,13 @@ describe('upsertSlackInstallation', () => {
     mockInsertValues.mockReturnValue({ returning: mockInsertReturning });
     mockInsertReturning.mockResolvedValue([buildSlackIntegration()]);
     mockWriteSlackCredential.mockReset();
+    mockGetSlackCredentialByIntegrationId.mockReset();
+    mockDecryptSlackBotToken.mockReset();
     mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
     mockCaptureException.mockReset();
   });
 
-  it('preserves the selected model when refreshing an existing installation', async () => {
+  it('preserves the selected model and scrubs any stale metadata token when refreshing an existing installation', async () => {
     mockLimit.mockResolvedValue([
       buildSlackIntegration({
         metadata: {
@@ -303,12 +350,11 @@ describe('upsertSlackInstallation', () => {
 
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({
-        metadata: expect.objectContaining({
-          access_token: 'xoxb-new-token',
+        metadata: {
           bot_user_id: 'U_NEW_BOT',
           incoming_webhook: { channel: '#general', channelId: 'C123', url: 'https://example.com' },
           model_slug: 'anthropic/claude-sonnet-4.5',
-        }),
+        },
         platform_installation_id: 'T123',
       })
     );
@@ -328,12 +374,16 @@ describe('upsertSlackInstallation', () => {
     expect(mockInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({
-          access_token: 'xoxb-new-token',
           bot_user_id: 'U_NEW_BOT',
           model_slug: DEFAULT_BOT_MODEL,
         }),
       })
     );
+    const insertedMetadata = mockInsertValues.mock.calls[0][0].metadata as Record<
+      string,
+      unknown
+    >;
+    expect(insertedMetadata).not.toHaveProperty('access_token');
   });
 
   it('rejects installing a Slack workspace connected to another owner', async () => {
@@ -372,7 +422,7 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
-  it('dual-writes the bot token into the encrypted credential store on a new install', async () => {
+  it('writes the bot token into the encrypted credential store on a new install', async () => {
     mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const installation = {
@@ -392,7 +442,7 @@ describe('upsertSlackInstallation', () => {
     });
   });
 
-  it('dual-writes the bot token when refreshing an existing install', async () => {
+  it('writes the bot token into the credential store when refreshing an existing install', async () => {
     mockLimit.mockResolvedValue([buildSlackIntegration()]);
 
     const installation = {
@@ -408,10 +458,9 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
-  // The encrypted store is write-only until reads move onto it, so a failure there
-  // must not take down Slack installs. This expectation flips in the step that
-  // repoints the read paths.
-  it('still completes the install when the credential store write fails', async () => {
+  // The store is the system of record: if its write fails, the installation would
+  // have no readable credential anywhere, so the install fails and the user retries.
+  it('fails the install when the credential store write fails', async () => {
     mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     mockWriteSlackCredential.mockRejectedValue(new Error('encryption not configured'));
 
@@ -423,10 +472,6 @@ describe('upsertSlackInstallation', () => {
 
     await expect(
       upsertSlackInstallation({ owner, teamId: 'T123', installation })
-    ).resolves.toMatchObject({ id: 'integration-1' });
-
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
-    // The report must not carry token material.
-    expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain('xoxb-new-token');
+    ).rejects.toThrow('encryption not configured');
   });
 });

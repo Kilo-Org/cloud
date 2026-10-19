@@ -17,9 +17,10 @@ import {
 /**
  * System of record for Slack bot credentials.
  *
- * Nothing in production reads this store yet — Step 2 only dual-writes it alongside
- * the existing plaintext `platform_integrations.metadata.access_token`, so the change
- * is reversible. Step 3 repoints the read paths here and deletes the plaintext copy.
+ * Install writes go through here and all server read paths decrypt from here; the
+ * legacy plaintext `platform_integrations.metadata.access_token` copy is no longer
+ * written and is removed from existing rows by the backfill script
+ * (`src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts`).
  */
 
 export type WriteSlackCredentialInput = {
@@ -73,7 +74,7 @@ export async function writeSlackCredential(
  * Creates the credential row only when the integration does not have one yet.
  *
  * For callers whose token comes from a snapshot rather than from a live Slack
- * response — the Step 2 backfill reads `platform_integrations.metadata` up front — a
+ * response — the backfill script reads `platform_integrations.metadata` up front — a
  * reinstall part-way through the run writes a fresh credential that a blind replace
  * would overwrite with the by-then-revoked snapshot token. Existence is therefore
  * re-checked inside the same locked transaction as the write.

@@ -1,24 +1,29 @@
 /**
- * Backfills existing plaintext Slack bot tokens from
- * `platform_integrations.metadata.access_token` into the encrypted
- * `slack_oauth_credentials` store.
+ * Backfills existing Slack bot tokens from
+ * `platform_integrations.metadata` into the encrypted
+ * `slack_oauth_credentials` store, then removes the plaintext token from
+ * metadata.
  *
- * This is Step 2 of the Slack bot token remediation. It is additive only: the
- * plaintext copy is left in place, and nothing reads the new store yet. Deleting the
- * plaintext copy happens in a later step, after reads have moved over and been
- * verified.
+ * The copy pass is idempotent: integrations that already have a credential row are
+ * skipped rather than re-encrypted, so re-running does not churn `credential_version`
+ * (each bump invalidates the previous ciphertext, since the version is inside the
+ * AAD). The skip is enforced by the write itself, so a reinstall that lands mid-run
+ * keeps its fresh token instead of being overwritten by this run's older metadata
+ * snapshot.
  *
- * Idempotent by design: integrations that already have a credential row are skipped
- * rather than re-encrypted, so re-running does not churn `credential_version` (each
- * bump invalidates the previous ciphertext, since the version is inside the AAD). The
- * skip is enforced by the write itself, so a reinstall that lands mid-run keeps its
- * fresh token instead of being overwritten by this run's older metadata snapshot.
+ * The scrub pass (on by default with --execute; opt out with --no-scrub) deletes
+ * `metadata.access_token` for every Slack integration that has a credential row,
+ * preserving all other metadata keys. Rows without a credential row keep their
+ * plaintext token and are reported, so the operation is safe to re-run after fixing
+ * them. Run this only after the cutover that reads tokens from the credential store
+ * is deployed.
  *
  * Requires SLACK_CREDENTIAL_KEYSET_JSON. Never prints token material.
  *
  * Usage:
  *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts
  *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts --execute
+ *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts --execute --no-scrub
  */
 
 import '../lib/load-env';
@@ -36,15 +41,20 @@ type SkipReason =
   | 'no_plaintext_token'
   | 'no_owner'
   | 'no_team_id'
-  | 'write_failed';
+  | 'write_failed'
+  | 'scrub_no_credential'
+  | 'scrub_failed';
 
-function parseArgs(): { execute: boolean; batchSize: number } {
+function parseArgs(): { execute: boolean; scrub: boolean; batchSize: number } {
   let execute = false;
+  let scrub = true;
   let batchSize = 200;
 
   for (const arg of process.argv.slice(2)) {
     if (arg === '--execute') {
       execute = true;
+    } else if (arg === '--no-scrub') {
+      scrub = false;
     } else if (arg.startsWith('--batch-size=')) {
       const parsed = Number(arg.slice('--batch-size='.length));
       if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -56,7 +66,7 @@ function parseArgs(): { execute: boolean; batchSize: number } {
     }
   }
 
-  return { execute, batchSize };
+  return { execute, scrub, batchSize };
 }
 
 function readPlaintextToken(metadata: unknown): string | null {
@@ -67,7 +77,7 @@ function readPlaintextToken(metadata: unknown): string | null {
 }
 
 async function main(): Promise<void> {
-  const { execute, batchSize } = parseArgs();
+  const { execute, scrub, batchSize } = parseArgs();
 
   // Fail fast rather than discovering a bad keyset partway through a run.
   const { active } = requireSlackCredentialKeyset();
@@ -100,9 +110,12 @@ async function main(): Promise<void> {
     no_owner: 0,
     no_team_id: 0,
     write_failed: 0,
+    scrub_no_credential: 0,
+    scrub_failed: 0,
   };
   let migrated = 0;
   let eligible = 0;
+  let scrubbed = 0;
 
   for (let offset = 0; offset < integrations.length; offset += batchSize) {
     const batch = integrations.slice(offset, offset + batchSize);
@@ -174,6 +187,50 @@ async function main(): Promise<void> {
     }
   }
 
+  // Scrub pass: once every plaintext token has an encrypted copy, remove the
+  // plaintext from metadata. Rows without a credential row are left untouched —
+  // deleting their only token copy would make the integration unrecoverable — and
+  // are reported so they can be fixed and the script re-run (it is idempotent).
+  if (execute && scrub) {
+    for (const integration of integrations) {
+      const metadata = integration.metadata;
+      if (metadata === null || typeof metadata !== 'object') continue;
+      if (!('access_token' in metadata)) continue;
+
+      const [credential] = await db
+        .select({ id: slack_oauth_credentials.id })
+        .from(slack_oauth_credentials)
+        .where(eq(slack_oauth_credentials.platform_integration_id, integration.id))
+        .limit(1);
+
+      if (!credential) {
+        skipped.scrub_no_credential += 1;
+        console.warn(
+          `Kept plaintext token for integration ${integration.id}: no encrypted credential row`
+        );
+        continue;
+      }
+
+      try {
+        const rest: Record<string, unknown> = { ...metadata };
+        delete rest.access_token;
+        await db
+          .update(platform_integrations)
+          .set({
+            metadata: rest,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(platform_integrations.id, integration.id));
+        scrubbed += 1;
+      } catch (error) {
+        skipped.scrub_failed += 1;
+        console.error(
+          `Failed to scrub integration ${integration.id}: ${error instanceof Error ? error.message : 'unknown error'}`
+        );
+      }
+    }
+  }
+
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(slack_oauth_credentials);
@@ -181,6 +238,11 @@ async function main(): Promise<void> {
   console.log('\n--- Summary ---');
   console.log(`Eligible for backfill:       ${eligible}`);
   console.log(`Migrated:                    ${migrated}`);
+  console.log(`Scrubbed plaintext tokens:   ${scrubbed}`);
+  console.log(
+    `Kept (no credential row):    ${skipped.scrub_no_credential}`
+  );
+  console.log(`Failed scrubs:               ${skipped.scrub_failed}`);
   console.log(`Skipped (already migrated):  ${skipped.already_migrated}`);
   console.log(`Skipped (no plaintext):      ${skipped.no_plaintext_token}`);
   console.log(`Skipped (no owner):          ${skipped.no_owner}`);

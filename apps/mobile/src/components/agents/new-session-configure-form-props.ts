@@ -101,7 +101,7 @@ export type NewSessionConfigureFormProps = {
    * connect flow, or force-refresh the repository lists — or null when the
    * reason needs no footer control.
    */
-  startBlockedAction?: { label: string; onPress: () => void } | null;
+  startBlockedAction?: { label: string; onPress: () => void; isBusy?: boolean } | null;
   onStartSession: () => void;
   /** The last cloud-create rejection, or null before one. */
   cloudCreateError?: CloudCreateFailure | null;

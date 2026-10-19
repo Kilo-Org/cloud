@@ -11,9 +11,7 @@ import { getNewAgentSessionPath } from '@/components/agents/session-list-routes'
  * Single-push navigation to the new-session composer. Every composer entry
  * point uses this hook, so two taps in quick succession open the composer
  * once: a second push while the first was still in flight left a second
- * `agent-chat/new` screen on the native stack, and on iOS the mid-transition
- * press could surface the session route with no usable id instead of the
- * composer.
+ * `agent-chat/new` screen on the native stack.
  *
  * The guard state clears when the calling screen regains focus, so a tap right
  * after the user returns from the composer always navigates. `useFocusEffect`

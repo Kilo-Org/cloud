@@ -1361,6 +1361,21 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(body.error).toContain('/byok');
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
+  it('answers an inaccessible custom LLM like an unknown model instead of falling back', async () => {
+    mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-unavailable' });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/private-model')) as never
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'model_not_found',
+      error: expect.stringContaining("The requested model 'acme/private-model' does not exist."),
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
 });
 
 describe.each([

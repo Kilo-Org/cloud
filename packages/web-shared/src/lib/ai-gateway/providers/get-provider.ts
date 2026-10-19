@@ -57,7 +57,9 @@ export type GetProviderProviderResult = {
 
 export type GetProviderResult =
   | GetProviderProviderResult
-  | { kind: 'chatgpt-reconnect'; message: string };
+  | { kind: 'chatgpt-reconnect'; message: string }
+  /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
+  | { kind: 'custom-llm-unavailable' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -115,17 +117,26 @@ async function resolveCustomLlmAuth(
   }
 }
 
-async function checkCustomLlm(
-  { definition: customLlm, encrypted_api_key }: CustomLlm,
-  organizationId: string,
-  kiloUserId: string
-): Promise<GetProviderProviderResult | null> {
-  if (!(await userHasCustomLlmAccess(customLlm, organizationId, kiloUserId))) {
-    return null;
+/**
+ * A custom LLM owns its id: a caller without access, or a definition with
+ * unusable credentials, must not fall back to another upstream for the same id.
+ */
+async function resolveCustomLlmProvider(
+  { public_id, definition: customLlm, encrypted_api_key }: CustomLlm,
+  user: User | AnonymousUserContext,
+  organizationId: string | undefined
+): Promise<GetProviderResult> {
+  if (
+    isAnonymousContext(user) ||
+    !organizationId ||
+    !(await userHasCustomLlmAccess(customLlm, organizationId, user.id))
+  ) {
+    return { kind: 'custom-llm-unavailable' };
   }
 
   if (!encrypted_api_key) {
-    return null;
+    console.error('Custom LLM has no stored credentials', public_id);
+    return { kind: 'custom-llm-unavailable' };
   }
 
   const decrypted = decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY);
@@ -133,11 +144,13 @@ async function checkCustomLlm(
   try {
     parsedJson = JSON.parse(decrypted);
   } catch {
-    return null;
+    console.error('Custom LLM credentials are not valid JSON', public_id);
+    return { kind: 'custom-llm-unavailable' };
   }
   const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
   if (!parsedCredentials.success) {
-    return null;
+    console.error('Custom LLM credentials do not match the schema', public_id);
+    return { kind: 'custom-llm-unavailable' };
   }
 
   return {
@@ -206,6 +219,11 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     }
   }
 
+  const customLlm = await findCustomLlm(requestedModel);
+  if (customLlm) {
+    return await resolveCustomLlmProvider(customLlm, user, organizationId);
+  }
+
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
     return directByokByok;
@@ -241,14 +259,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   }
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-
-  if (organizationId && !isAnonymousContext(user)) {
-    const customLlm = await findCustomLlm(requestedModel);
-    const customLlmResult = customLlm && (await checkCustomLlm(customLlm, organizationId, user.id));
-    if (customLlmResult) {
-      return customLlmResult;
-    }
-  }
 
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import {
+  customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
@@ -133,25 +134,59 @@ describe('model access predicates', () => {
   });
 
   describe('custom LLMs', () => {
+    const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
+    const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+    const restrictions = {
+      requireModelInCurrentSnapshot: true,
+      providerAllowList: [],
+      modelDenyList: ['acme/org-model', 'acme/group-model'],
+    };
+
     beforeAll(async () => {
-      await insertCustomLlmForTest('acme/private-model');
+      await insertCustomLlmForTest(
+        'acme/org-model',
+        customLlmDefinition({ organization_ids: [ORG_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/group-model',
+        customLlmDefinition({ organization_ids: [], group_ids: [GROUP_ID] })
+      );
     });
 
     afterAll(async () => {
-      await deleteCustomLlmForTest('acme/private-model');
+      await deleteCustomLlmForTest('acme/org-model');
+      await deleteCustomLlmForTest('acme/group-model');
     });
 
-    test('keeps a custom LLM exempt from Enterprise model restrictions', async () => {
+    test.each([
+      ['an allowlisted organization', 'acme/org-model', { organizationId: ORG_ID, groupIds: [] }],
+      [
+        'an allowlisted group',
+        'acme/group-model',
+        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [GROUP_ID] },
+      ],
+    ])('exempts a custom LLM granted to %s', async (_grant, modelId, customLlmGrantee) => {
       const isAllowed = createAllowPredicateFromRestrictions(
-        {
-          requireModelInCurrentSnapshot: true,
-          providerAllowList: [],
-          modelDenyList: ['acme/private-model'],
-        },
+        { ...restrictions, customLlmGrantee },
         lookup({})
       );
 
-      await expect(isAllowed('acme/private-model')).resolves.toBe(true);
+      await expect(isAllowed(modelId)).resolves.toBe(true);
+    });
+
+    test.each([
+      [
+        'another organization',
+        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [] },
+      ],
+      ['no grantee', undefined],
+    ])('applies restrictions to a custom LLM for %s', async (_grant, customLlmGrantee) => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { ...restrictions, customLlmGrantee },
+        lookup({})
+      );
+
+      await expect(isAllowed('acme/org-model')).resolves.toBe(false);
     });
 
     test('does not exempt a kilo-internal/ id without a custom LLM', async () => {

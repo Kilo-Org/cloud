@@ -852,6 +852,10 @@ export async function handleLlmProxyRequest(
     // instead of silently serving the request through another billing path.
     return chatGptReconnectResponse(providerResult.message);
   }
+  if (providerResult.kind === 'custom-llm-unavailable') {
+    // Same response as an unknown model id, so callers cannot probe for custom LLMs.
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
   const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {

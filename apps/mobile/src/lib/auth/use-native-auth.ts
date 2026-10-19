@@ -68,7 +68,7 @@ async function tokenRefusalMessage(
 export type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | undefined;
 
 /** Outcome of an email-code verification attempt: a token, or an inline refusal message. */
-export type EmailCodeVerifyResult = { ok: true } | { ok: false; message: string };
+type EmailCodeVerifyResult = { ok: true } | { ok: false; message: string };
 
 type NativeAuthResult = {
   busy: BusyAction;

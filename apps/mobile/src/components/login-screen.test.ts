@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // the native modules stubbed.
 
 import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
+import { type DeviceAuthError } from '@/lib/auth/device-auth-state';
 import { i18n } from '@/i18n';
 import {
   clearPersistedLoginDrafts,
@@ -26,7 +27,7 @@ const deviceAuth = vi.hoisted(() => ({
   code: undefined as string | undefined,
   refreshToken: undefined as string | undefined,
   expiresIn: undefined as number | undefined,
-  error: undefined as string | undefined,
+  error: undefined as DeviceAuthError | undefined,
   verificationUrl: undefined as string | undefined,
   resumed: false,
 }));
@@ -237,8 +238,14 @@ describe('login-screen error mapping', () => {
     expect(errorMessage('denied', undefined)).toBe('Access was denied.');
   });
 
-  it('falls back to the provided error for unknown status', () => {
-    expect(errorMessage('error', 'custom error')).toBe('custom error');
+  it('translates a keyed error descriptor at render', () => {
+    expect(errorMessage('error', { kind: 'key', key: 'authErrors.networkError' })).toBe(
+      'Network error. Please try again.'
+    );
+  });
+
+  it('passes a server-authored error text through untranslated', () => {
+    expect(errorMessage('error', { kind: 'text', text: 'custom error' })).toBe('custom error');
   });
 
   it('falls back to default when no error is provided', () => {
@@ -444,7 +451,7 @@ describe('login-screen timeout error dismissal', () => {
     deviceAuth.code = undefined;
     deviceAuth.refreshToken = undefined;
     deviceAuth.expiresIn = undefined;
-    deviceAuth.error = i18n.t('authErrors.signInTimedOut');
+    deviceAuth.error = { kind: 'key', key: 'authErrors.signInTimedOut' };
     deviceAuth.verificationUrl = undefined;
     deviceAuth.resumed = false;
     clearDeviceError.mockClear();

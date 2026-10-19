@@ -37,9 +37,23 @@ export function retryableAdmissionError(): string {
   return i18n.t('authErrors.retryableAdmission');
 }
 
-export function mapError(errorCode: string | undefined): string {
+export type AuthErrorMessageKey =
+  | (typeof AUTH_ERROR_KEYS)[keyof typeof AUTH_ERROR_KEYS]
+  | 'authErrors.default';
+
+/**
+ * Server error code to catalog key, untranslated. Render-time translation (an
+ * inline field error or a banner that survives a language switch) must call
+ * `t` on this key when it renders, not store `mapError`'s output — an already
+ * translated string freezes the language it was mapped in.
+ */
+export function mapErrorKey(errorCode: string | undefined): AuthErrorMessageKey {
   const key = errorCode && AUTH_ERROR_KEYS[errorCode as keyof typeof AUTH_ERROR_KEYS];
-  return key ? i18n.t(key) : defaultErrorMessage();
+  return key ?? 'authErrors.default';
+}
+
+export function mapError(errorCode: string | undefined): string {
+  return i18n.t(mapErrorKey(errorCode));
 }
 
 /**

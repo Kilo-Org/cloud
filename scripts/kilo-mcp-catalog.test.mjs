@@ -525,6 +525,14 @@ for (const [name, defect] of [
     },
   ],
   [
+    'a job-level env block declares the credential',
+    workflow => {
+      workflow.jobs[summariesJobName].env = {
+        KILO_API_KEY: '${{ steps.mint.outputs.token }}',
+      };
+    },
+  ],
+  [
     'mint exports the token through the job environment',
     workflow => {
       const step = workflow.jobs[summariesJobName].steps.find(item => item.id === 'mint');

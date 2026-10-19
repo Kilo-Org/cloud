@@ -6,8 +6,6 @@ import { registerSandboxReadRoutes } from '../routes/sandbox-reads';
 import { withTestExecutionCtx } from './helpers';
 import { isDefiniteUnreachable } from '../services/bot-status-request';
 
-// ── isDefiniteUnreachable unit tests ────────────────────────────────────────
-
 describe('isDefiniteUnreachable', () => {
   it('classifies missing-routing errors as definitive', () => {
     expect(isDefiniteUnreachable(new Error('No routing target for sandbox-foo'))).toBe(true);
@@ -67,8 +65,6 @@ describe('isDefiniteUnreachable', () => {
   });
 });
 
-// ── handleRequestBotStatus decision-table tests ──────────────────────────────
-//
 // These tests exercise the trust-window decision table via the Hono handler.
 // We seed a record with a specific updatedAt by writing directly to the DO's
 // storage via putBotStatus (which sets updatedAt = Date.now()), then advance

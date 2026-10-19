@@ -65,8 +65,6 @@ import {
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-
 async function parseBody<T>(c: HonoCtx, schema: ZodSchema<T>) {
   let raw: unknown;
   try {
@@ -129,8 +127,6 @@ export function makeSchedule(c: HonoCtx): DeferCtx {
   return { waitUntil: p => c.executionCtx.waitUntil(p) };
 }
 
-// ─── createMessage ──────────────────────────────────────────────────────────
-
 export async function handleCreateMessage(c: HonoCtx) {
   const body = await parseBody(c, createMessageRequestSchema);
   if (!body.ok) return body.response;
@@ -152,8 +148,6 @@ export async function handleCreateMessage(c: HonoCtx) {
     201
   );
 }
-
-// ─── editMessage ────────────────────────────────────────────────────────────
 
 export async function handleEditMessage(c: HonoCtx) {
   const msgId = parseMessageId(c);
@@ -184,8 +178,6 @@ export async function handleEditMessage(c: HonoCtx) {
   return c.json({ messageId: result.messageId } satisfies EditMessageResponse);
 }
 
-// ─── deleteMessage ──────────────────────────────────────────────────────────
-
 export async function handleDeleteMessage(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
@@ -214,8 +206,6 @@ export async function handleDeleteMessage(c: HonoCtx) {
   }
   return c.json({ ok: true } satisfies OkResponse);
 }
-
-// ─── executeAction ──────────────────────────────────────────────────────────
 
 export async function handleExecuteAction(c: HonoCtx) {
   const convId = parseConversationId(c);
@@ -251,8 +241,6 @@ export async function handleExecuteAction(c: HonoCtx) {
   return c.json(result satisfies ExecuteActionResponse);
 }
 
-// ─── redeliverMessage ───────────────────────────────────────────────────────
-
 export async function handleRedeliverMessage(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
@@ -273,8 +261,6 @@ export async function handleRedeliverMessage(c: HonoCtx) {
   // by a delayed clear event.
   return c.json({ ok: true } satisfies OkResponse);
 }
-
-// ─── messageDeliveryFailed (bot-reported) ───────────────────────────────────
 
 export async function handleMessageDeliveryFailed(c: HonoCtx) {
   const convId = parseConversationId(c);
@@ -310,8 +296,6 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   }
   return c.json({ ok: true } satisfies OkResponse);
 }
-
-// ─── actionDeliveryFailed (bot-reported) ────────────────────────────────────
 
 export async function handleActionDeliveryFailed(c: HonoCtx) {
   const convId = parseConversationId(c);
@@ -361,8 +345,6 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
   return c.json({ ok: true } satisfies OkResponse);
 }
 
-// ─── addReaction ─────────────────────────────────────────────────────────────
-
 export async function handleAddReaction(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
@@ -388,8 +370,6 @@ export async function handleAddReaction(c: HonoCtx) {
   }
   return c.json({ id: result.id } satisfies AddReactionResponse, result.added ? 201 : 200);
 }
-
-// ─── removeReaction ──────────────────────────────────────────────────────────
 
 export async function handleRemoveReaction(c: HonoCtx) {
   const msgId = parseMessageId(c);
@@ -425,8 +405,6 @@ export async function handleRemoveReaction(c: HonoCtx) {
   return c.json(response, 200);
 }
 
-// ─── listMessages ────────────────────────────────────────────────────────────
-
 export async function handleListMessages(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
@@ -459,8 +437,6 @@ export async function handleListMessages(c: HonoCtx) {
   return c.json(result satisfies MessageListResponse);
 }
 
-// ─── getMembers ──────────────────────────────────────────────────────────────
-
 export async function handleGetMembers(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
@@ -491,8 +467,6 @@ export async function handleGetMembers(c: HonoCtx) {
   return c.json({ members: enrichedMembers } satisfies BotGetMembersResponse);
 }
 
-// ─── setTyping ───────────────────────────────────────────────────────────────
-
 export async function handleSetTyping(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
@@ -516,8 +490,6 @@ export async function handleStopTyping(c: HonoCtx) {
   }
   return c.json({ ok: true } satisfies OkResponse);
 }
-
-// ─── listBotConversations ────────────────────────────────────────────────────
 
 export async function handleListBotConversations(c: HonoCtx) {
   const sbx = parseSandboxId(c);
@@ -545,7 +517,6 @@ export async function handleListBotConversations(c: HonoCtx) {
     'MembershipDO.listConversations'
   );
 
-  // Step 1: Fetch info for all conversations in parallel
   const conversationsWithInfo = await Promise.all(
     conversations.map(async conv => {
       const info = await withDORetry(
@@ -557,7 +528,6 @@ export async function handleListBotConversations(c: HonoCtx) {
     })
   );
 
-  // Step 2: Batch-resolve all user display info
   const allUserIds = [
     ...new Set(
       conversationsWithInfo.flatMap(({ members }) =>
@@ -570,7 +540,6 @@ export async function handleListBotConversations(c: HonoCtx) {
       ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, allUserIds)
       : new Map<string, UserDisplayInfo>();
 
-  // Step 3: Build enriched response
   const enriched = conversationsWithInfo.map(({ conv, members }) => ({
     conversationId: conv.conversationId,
     title: conv.title,
@@ -588,8 +557,6 @@ export async function handleListBotConversations(c: HonoCtx) {
     nextCursor,
   } satisfies BotListConversationsResponse);
 }
-
-// ─── createBotConversation ──────────────────────────────────────────────────
 
 export async function handleCreateBotConversation(c: HonoCtx) {
   const sbx = parseSandboxId(c);
@@ -621,8 +588,6 @@ export async function handleCreateBotConversation(c: HonoCtx) {
     201
   );
 }
-
-// ─── attachmentInit ─────────────────────────────────────────────────────────
 
 export async function handleAttachmentInit(c: HonoCtx) {
   const body = await parseBody(c, attachmentInitRequestSchema);
@@ -665,8 +630,6 @@ export async function handleAttachmentInit(c: HonoCtx) {
     putUrlExpiresAt: Math.floor(Date.now() / 1000) + PUT_URL_TTL_SECONDS,
   });
 }
-
-// ─── attachmentGetUrl ───────────────────────────────────────────────────────
 
 const PUT_URL_TTL_SECONDS = 900;
 const GET_URL_TTL_SECONDS = 3600;
@@ -732,8 +695,6 @@ export async function handleAttachmentGetUrl(c: HonoCtx) {
     expiresAt: Math.floor(Date.now() / 1000) + GET_URL_TTL_SECONDS,
   });
 }
-
-// ─── renameConversation ─────────────────────────────────────────────────────
 
 export async function handleRenameConversation(c: HonoCtx) {
   const convId = parseConversationId(c);

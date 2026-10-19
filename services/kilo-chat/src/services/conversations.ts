@@ -20,8 +20,6 @@ import type { DeferCtx } from './messages';
 import type { ConversationDO, UpdateTitleIfMemberResult } from '../do/conversation-do';
 import { logger } from '../util/logger';
 
-// ─── partial-failure rollback helpers ──────────────────────────────────────
-
 type MemberAddParams = {
   conversationId: string;
   title: string | null;
@@ -81,8 +79,6 @@ async function rollbackConversationCreation(
   });
   await Promise.allSettled([convStub.destroyAndReturnMembers(), ...membershipRemovals]);
 }
-
-// ─── createConversation ────────────────────────────────────────────────────
 
 export type CreateConversationParams = {
   sandboxId: string;
@@ -148,8 +144,6 @@ export async function createConversationFor(
 
   return { ok: true, conversationId, conversation };
 }
-
-// ─── createBotConversation ─────────────────────────────────────────────────
 
 export type CreateBotConversationParams = {
   sandboxId: string;
@@ -233,8 +227,6 @@ export async function createBotConversationFor(
   return { ok: true, conversationId, conversation };
 }
 
-// ─── renameConversation ────────────────────────────────────────────────────
-
 export type RenameConversationParams = {
   conversationId: string;
   title: string;
@@ -285,8 +277,6 @@ export async function renameConversationFor(
   return { ok: true };
 }
 
-// ─── leaveConversation ─────────────────────────────────────────────────────
-
 export type LeaveConversationParams = {
   conversationId: string;
 };
@@ -335,8 +325,6 @@ export async function leaveConversationFor(
 
   return { ok: true };
 }
-
-// ─── markRead ──────────────────────────────────────────────────────────────
 
 export type MarkReadParams = {
   conversationId: string;

@@ -102,12 +102,10 @@ describe('bot-status route -> service -> DO -> read end-to-end capabilities', ()
     );
     expect(postRes.status).toBe(200);
 
-    // Verify event push included capabilities
     expect(pushEvent).toHaveBeenCalledOnce();
     const pushedPayload = pushEvent.mock.calls[0]![3] as { capabilities?: string[] };
     expect(pushedPayload.capabilities).toEqual(['attachments']);
 
-    // GET returns capabilities
     const readApp = makeReadAppAs(userId);
     const getRes = await readApp.request(`/v1/sandboxes/${sandboxId}/bot-status`, {}, testEnv);
     expect(getRes.status).toBe(200);

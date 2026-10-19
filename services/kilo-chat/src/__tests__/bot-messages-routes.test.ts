@@ -79,7 +79,6 @@ async function setupData(suffix: string, pushEvent?: ReturnType<typeof vi.fn>) {
 
   grantSandbox(userId, sandboxId);
 
-  // Minimal app with mock auth for setup
   const setupAppBase = new Hono<{ Bindings: Env; Variables: AuthContext }>();
   setupAppBase.use('*', async (c, next) => {
     c.set('callerId', userId);
@@ -124,8 +123,6 @@ async function setupData(suffix: string, pushEvent?: ReturnType<typeof vi.fn>) {
 }
 
 const sampleContent = [{ type: 'text', text: 'Hello from bot' }];
-
-// ─── POST /bot/v1/sandboxes/:sandboxId/messages ───────────────────────────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
   it('creates a message and returns 201 with { messageId }', async () => {
@@ -235,8 +232,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
     expect(deleteAfterLeaveRes.status).toBe(403);
   });
 });
-
-// ─── POST .../messages/:messageId/delivery-failed ──────────────────────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-failed', () => {
   it('flips deliveryFailed and returns ok', async () => {
@@ -372,8 +367,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
   });
 });
 
-// ─── POST .../actions/:groupId/delivery-failed ─────────────────────────────
-
 describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed', () => {
   async function setupWithResolvedAction(suffix: string, pushEvent?: ReturnType<typeof vi.fn>) {
     const userId = `user-${suffix}`;
@@ -381,7 +374,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     grantSandbox(userId, sandboxId);
 
     const setupAppBase = new Hono<{ Bindings: Env; Variables: AuthContext }>();
-    // user app for conv + message creation
     setupAppBase.use('*', async (c, next) => {
       c.set('callerId', userId);
       c.set('callerKind', 'user');
@@ -408,7 +400,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     );
     const { conversationId } = await convRes.json<{ conversationId: string }>();
 
-    // bot creates a message with an actions block
     const botApp = makeBotApp();
     const token = await tokenFor(sandboxId);
     const msgRes = await botApp.request(
@@ -432,7 +423,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     expect(msgRes.status).toBe(201);
     const { messageId } = await msgRes.json<{ messageId: string }>();
 
-    // user resolves the action
     const execRes = await setupApp.request(
       `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
       {
@@ -592,7 +582,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages (auth edge cases)', () => {
 
   it('returns 403 when bot is not a member of the conversation', async () => {
     const { conversationId, testEnv } = await setupData('bot-create-notmember');
-    // Use a DIFFERENT sandboxId than the one that created the conversation
     const otherSandboxId = 'other-sandbox-123';
     const app = makeBotApp();
     const token = await tokenFor(otherSandboxId);
@@ -610,8 +599,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages (auth edge cases)', () => {
     expect(res.status).toBe(403);
   });
 });
-
-// ─── PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId ──────────────────
 
 describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
   it('edits a bot-owned message and returns 200 with { messageId }', async () => {
@@ -666,7 +653,6 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // First edit with timestamp 1000
     await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
       {
@@ -681,7 +667,6 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
       testEnv
     );
 
-    // Second edit with older timestamp
     const editRes = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
       {
@@ -774,7 +759,6 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 
   it("returns 403 when editing another bot's message", async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-edit-forbidden');
-    // messageId was created by the user in setupData; the bot is a member but didn't author it
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
@@ -795,8 +779,6 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     expect(editRes.status).toBe(403);
   });
 });
-
-// ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId ─────────────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
   it('soft-deletes a bot-owned message and returns ok', async () => {
@@ -901,8 +883,6 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
   });
 });
 
-// ─── POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing ───
-
 describe('POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing', () => {
   it('returns ok for a member bot', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-typing-ok');
@@ -970,8 +950,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing
     expect(res.status).toBe(400);
   });
 });
-
-// ─── POST /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ─────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () => {
   it('returns 201 on first add, returns { id }', async () => {
@@ -1074,8 +1052,6 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () =
   });
 });
 
-// ─── GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/messages ──
-
 describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/messages', () => {
   it('returns messages for a valid bot member', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-list-1');
@@ -1116,8 +1092,6 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/message
   });
 });
 
-// ─── GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members ───
-
 describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members', () => {
   it('returns members for a valid bot member (200)', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-members-1');
@@ -1138,7 +1112,6 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members
       members: { id: string; kind: string; displayName: string | null; avatarUrl: string | null }[];
     }>();
     expect(Array.isArray(body.members)).toBe(true);
-    // Should contain the user (created the conversation) and the bot (sandboxId)
     const ids = body.members.map(m => m.id);
     expect(ids).toContain(`user-bot-members-1`);
     expect(ids).toContain(`bot:kiloclaw:${sandboxId}`);
@@ -1167,15 +1140,12 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members
   });
 });
 
-// ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ────────
-
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () => {
   it('returns the remove operation id after removing a reaction via query params', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
-    // Add first
     const addRes = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions`,
       {
@@ -1260,8 +1230,6 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
     expect(res.status).toBe(400);
   });
 });
-
-// ─── PATCH /bot/v1/sandboxes/:sandboxId/conversations/:conversationId ────────
 
 describe('PATCH /bot/v1/sandboxes/:sandboxId/conversations/:conversationId', () => {
   it('renames a conversation as a member bot (200)', async () => {
@@ -1393,8 +1361,6 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/conversations/:conversationId', () 
   });
 });
 
-// ─── GET /bot/v1/sandboxes/:sandboxId/conversations ─────────────────────────
-
 describe('GET /bot/v1/sandboxes/:sandboxId/conversations', () => {
   it('returns conversations the bot is a member of (200)', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-list-convs-1');
@@ -1456,8 +1422,6 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations', () => {
     expect(typeof body.hasMore).toBe('boolean');
   });
 });
-
-// ─── POST /bot/v1/sandboxes/:sandboxId/conversations ────────────────────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/conversations', () => {
   it('creates a conversation with sandbox owner as implicit member (201)', async () => {

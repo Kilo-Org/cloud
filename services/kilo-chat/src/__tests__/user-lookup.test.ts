@@ -14,7 +14,6 @@ vi.mock('@kilocode/db', () => ({
   }),
 }));
 
-// Minimal chainable query builder that captures calls
 function makeChain(result: unknown[]) {
   const chain = {
     from: vi.fn().mockReturnThis(),
@@ -30,8 +29,6 @@ const CONN = 'postgres://fake/db';
 beforeEach(() => {
   vi.clearAllMocks();
 });
-
-// ─── resolveUserDisplayInfo ───────────────────────────────────────────────────
 
 describe('resolveUserDisplayInfo', () => {
   it('returns empty Map for empty input', async () => {
@@ -210,8 +207,6 @@ describe('resolveUserDisplayInfo', () => {
     });
   });
 });
-
-// ─── validateUserIds ──────────────────────────────────────────────────────────
 
 describe('validateUserIds', () => {
   it('returns empty lists for empty input', async () => {

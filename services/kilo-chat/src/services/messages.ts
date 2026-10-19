@@ -69,8 +69,6 @@ function getReplyToSnapshot(
   );
 }
 
-// ─── createMessage ──────────────────────────────────────────────────────────
-
 export type CreateMessageParams = {
   conversationId: string;
   content: ContentBlock[];
@@ -153,7 +151,6 @@ export async function postCommitFanOut(
     return replyParentPromise;
   };
 
-  // ── Block A: Deliver webhook to bot members ──────────────────────────
   // Webhook delivery is enqueued on the ConversationDO's per-conversation
   // chain so back-to-back sends land on the bot in the same order the DO
   // assigned their ULIDs. The DO returns as soon as the delivery is chained;
@@ -208,7 +205,6 @@ export async function postCommitFanOut(
   };
   const autoTitle = computeAutoTitle();
 
-  // Persist the auto-title on the ConversationDO in parallel with fan-out.
   const conversationDoTitleWrite = async (): Promise<boolean> => {
     if (autoTitle === null) return false;
     try {
@@ -224,7 +220,6 @@ export async function postCommitFanOut(
     }
   };
 
-  // ── Block B: Push message.created ────────────────────────────────────
   const pushMessageEvents = async (): Promise<void> => {
     if (!sandboxId) return;
     const replyParent = getReplyParent();
@@ -248,8 +243,6 @@ export async function postCommitFanOut(
     );
   };
 
-  // Run webhook delivery, ConversationDO title write, and event push in
-  // parallel; membership updates run after commit side effects settle.
   const [, autoTitleApplied] = await Promise.all([
     webhookDelivery(),
     conversationDoTitleWrite(),
@@ -257,7 +250,6 @@ export async function postCommitFanOut(
   ]);
   const appliedAutoTitle = autoTitleApplied ? autoTitle : null;
 
-  // ── Block C: Single MembershipDO RPC per member ──────────────────────
   // Combines autoTitle, lastActivityAt, and lastReadAt into one round-trip.
   //
   // Per-member semantics:
@@ -288,7 +280,6 @@ export async function postCommitFanOut(
     }
   }
 
-  // ── Block D: Instance-level conversation events ──────────────────────
   if (sandboxId) {
     const instanceEvents: Promise<unknown>[] = [];
     if (appliedAutoTitle !== null) {
@@ -322,7 +313,6 @@ export async function postCommitFanOut(
     await Promise.allSettled(instanceEvents);
   }
 
-  // ── Block E: Push notification fanout ─────────────────────────────────
   // User-authored messages notify other human members. Bot-authored message
   // notifications are gated by ConversationDO state because bot messages
   // stream through create + edit operations.
@@ -341,8 +331,6 @@ export async function postCommitFanOut(
     });
   }
 }
-
-// ─── editMessage ────────────────────────────────────────────────────────────
 
 export type EditMessageParams = {
   conversationId: string;
@@ -412,8 +400,6 @@ export async function editMessageFor(
   };
 }
 
-// ─── deleteMessage ──────────────────────────────────────────────────────────
-
 export type DeleteMessageParams = { conversationId: string; messageId: string };
 
 export type DeleteMessageResult =
@@ -454,8 +440,6 @@ export async function deleteMessageFor(
 
   return { ok: true };
 }
-
-// ─── executeAction ─────────────────────────────────────────────────────────
 
 export type ExecuteActionParams = {
   conversationId: string;

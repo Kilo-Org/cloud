@@ -288,7 +288,6 @@ describe('GET /v1/conversations/:id/messages', () => {
   it('returns messages in reverse chronological order', async () => {
     const { conversationId, userApp } = await createConversation('msg-list-1');
 
-    // Create a few messages
     await userApp.request(
       '/v1/messages',
       {
@@ -323,7 +322,6 @@ describe('GET /v1/conversations/:id/messages', () => {
     const body = await res.json<{ messages: Array<{ id: string; content: string }> }>();
     expect(Array.isArray(body.messages)).toBe(true);
     expect(body.messages.length).toBe(3);
-    // Should be in reverse chronological order (newest first — desc by id)
     expect(body.messages[0].id > body.messages[1].id).toBe(true);
     expect(body.messages[1].id > body.messages[2].id).toBe(true);
   });
@@ -331,7 +329,6 @@ describe('GET /v1/conversations/:id/messages', () => {
   it('supports cursor pagination via ?before param', async () => {
     const { conversationId, userApp } = await createConversation('msg-list-paged');
 
-    // Create 3 messages
     const msgIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const res = await userApp.request(
@@ -347,7 +344,6 @@ describe('GET /v1/conversations/:id/messages', () => {
       msgIds.push(b.messageId);
     }
 
-    // List with limit=2 (get first page — newest 2)
     const page1Res = await userApp.request(
       `/v1/conversations/${conversationId}/messages?limit=2`,
       {},
@@ -363,7 +359,6 @@ describe('GET /v1/conversations/:id/messages', () => {
     expect(page1.hasMore).toBe(true);
     expect(page1.nextCursor).toBe(page1.messages[1]?.id);
 
-    // Paginate using cursor
     const cursor = page1.nextCursor;
     expect(cursor).not.toBeNull();
     const page2Res = await userApp.request(
@@ -380,7 +375,6 @@ describe('GET /v1/conversations/:id/messages', () => {
     expect(page2.messages.length).toBe(1);
     expect(page2.hasMore).toBe(false);
     expect(page2.nextCursor).toBeNull();
-    // All page2 ids should be less than cursor
     for (const msg of page2.messages) {
       expect(cursor && msg.id < cursor).toBe(true);
     }
@@ -400,7 +394,6 @@ describe('PATCH /v1/messages/:id', () => {
   it('edits a message and returns { messageId, version }', async () => {
     const { conversationId, userApp } = await createConversation('msg-edit-1');
 
-    // Create a message
     const createRes = await userApp.request(
       '/v1/messages',
       {
@@ -445,7 +438,6 @@ describe('PATCH /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // First edit with timestamp 1000
     await userApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -460,7 +452,6 @@ describe('PATCH /v1/messages/:id', () => {
       env
     );
 
-    // Second edit with older timestamp — should be rejected as conflict
     const editRes = await userApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -518,7 +509,6 @@ describe('PATCH /v1/messages/:id', () => {
     } = await createConversation('msg-edit-forbidden');
     const userApp = makeApp(userId, 'user');
 
-    // User creates a message
     const createRes = await userApp.request(
       '/v1/messages',
       {
@@ -530,7 +520,6 @@ describe('PATCH /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Bot tries to edit user's message
     const editRes = await botApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -675,7 +664,6 @@ describe('DELETE /v1/messages/:id', () => {
   it('soft-deletes a message and returns ok', async () => {
     const { conversationId, userApp } = await createConversation('msg-delete-1');
 
-    // Create a message
     const createRes = await userApp.request(
       '/v1/messages',
       {
@@ -687,7 +675,6 @@ describe('DELETE /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Delete it (conversationId goes in query string, not body)
     const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await userApp.request(
       `/v1/messages/${messageId}?${delQs.toString()}`,
@@ -701,7 +688,6 @@ describe('DELETE /v1/messages/:id', () => {
     expect(deleteRes.status).toBe(200);
     await expect(deleteRes.json()).resolves.toEqual({ ok: true });
 
-    // Verify message is soft-deleted (appears in list but marked deleted)
     const convStub = getConvStub(conversationId);
     const listResult = await convStub.listMessages({ limit: 10 });
     const deletedMsg = listResult.messages.find(m => m.id === messageId);
@@ -718,7 +704,6 @@ describe('DELETE /v1/messages/:id', () => {
     } = await createConversation('msg-delete-forbidden');
     const userApp = makeApp(userId, 'user');
 
-    // User creates a message
     const createRes = await userApp.request(
       '/v1/messages',
       {
@@ -730,7 +715,6 @@ describe('DELETE /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Bot tries to delete user's message
     const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await botApp.request(
       `/v1/messages/${messageId}?${delQs.toString()}`,
@@ -869,7 +853,6 @@ describe('input size limits', () => {
     expect(res.status).toBe(201);
     const { messageId } = await res.json<{ messageId: string }>();
 
-    // Read back the message and confirm it was stored trimmed
     const listRes = await userApp.request(
       `/v1/conversations/${conversationId}/messages?limit=10`,
       {},
@@ -887,7 +870,6 @@ describe('input size limits', () => {
 
   it('rejects PATCH with whitespace-only text', async () => {
     const { conversationId, userApp } = await createConversation('msg-blank-text-patch');
-    // Seed a message first
     const seedRes = await userApp.request(
       '/v1/messages',
       {
@@ -977,7 +959,6 @@ describe('Webhook reply context', () => {
     const sandboxId = 'sandbox-reply-context-1';
     const userApp = makeApp(userId, 'user');
 
-    // Create conversation
     const convRes = await userApp.request(
       '/v1/conversations',
       {
@@ -990,7 +971,6 @@ describe('Webhook reply context', () => {
     expect(convRes.status).toBe(201);
     const { conversationId } = await convRes.json<{ conversationId: string }>();
 
-    // Create first message (the parent)
     const parentRes = await userApp.request(
       '/v1/messages',
       {
@@ -1006,7 +986,6 @@ describe('Webhook reply context', () => {
     expect(parentRes.status).toBe(201);
     const { messageId: parentMessageId } = await parentRes.json<{ messageId: string }>();
 
-    // Create second message as a reply to the first
     const replyRes = await userApp.request(
       '/v1/messages',
       {
@@ -1042,7 +1021,6 @@ describe('Webhook reply context', () => {
     const sandboxId = 'sandbox-reply-deleted-1';
     const userApp = makeApp(userId, 'user');
 
-    // Create conversation
     const convRes = await userApp.request(
       '/v1/conversations',
       {
@@ -1055,7 +1033,6 @@ describe('Webhook reply context', () => {
     expect(convRes.status).toBe(201);
     const { conversationId } = await convRes.json<{ conversationId: string }>();
 
-    // Create parent message then delete it
     const parentRes = await userApp.request(
       '/v1/messages',
       {
@@ -1086,7 +1063,6 @@ describe('Webhook reply context', () => {
     await waitForWebhookCalls(cs => cs.some(c => c.messageId === deletedParentId));
     await recordingKiloclaw.__clearWebhookCalls();
 
-    // Create message replying to the deleted parent
     const res = await userApp.request(
       '/v1/messages',
       {
@@ -1102,7 +1078,6 @@ describe('Webhook reply context', () => {
     );
     expect(res.status).toBe(201);
 
-    // Webhook should have been delivered without body/sender (parent was deleted).
     const calls = await waitForWebhookCalls(cs =>
       cs.some(c => c.inReplyToMessageId === deletedParentId)
     );
@@ -1118,7 +1093,6 @@ describe('sender conversation read state after sending', () => {
     const { conversationId, userId, sandboxId, userApp } =
       await createConversation('msg-sender-unread');
 
-    // Check initial state — both should be null
     const memberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
     const before = await memberStub.listConversations({ sandboxId });
     const convBefore = before.conversations.find(c => c.conversationId === conversationId);
@@ -1126,7 +1100,6 @@ describe('sender conversation read state after sending', () => {
     expect(convBefore!.lastActivityAt).toBeNull();
     expect(convBefore!.lastReadAt).toBeNull();
 
-    // User sends a message
     const res = await userApp.request(
       '/v1/messages',
       {
@@ -1138,12 +1111,10 @@ describe('sender conversation read state after sending', () => {
     );
     expect(res.status).toBe(201);
 
-    // Check sender's MembershipDO — both should be bumped
     const after = await memberStub.listConversations({ sandboxId });
     const convAfter = after.conversations.find(c => c.conversationId === conversationId);
     expect(convAfter).toBeDefined();
     expect(convAfter!.lastActivityAt).not.toBeNull();
-    // Sender's lastReadAt is updated so the conversation doesn't look unread
     expect(convAfter!.lastReadAt).not.toBeNull();
     expect(convAfter!.lastReadAt).toBe(convAfter!.lastActivityAt);
   });
@@ -1570,13 +1541,11 @@ describe('POST /v1/conversations/:conversationId/messages/:messageId/redeliver',
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });
 
-    // The existing row is intact with the flag cleared — no new message.
     const list = await convStub.listMessages({ limit: 10 });
     const messagesById = list.messages.filter(m => m.id === messageId);
     expect(messagesById).toHaveLength(1);
     expect(messagesById[0]!.deliveryFailed).toBe(false);
 
-    // The same message was re-delivered to the bot.
     const calls = await waitForWebhookCalls(cs => cs.some(call => call.messageId === messageId));
     expect(calls.find(call => call.messageId === messageId)).toMatchObject({
       messageId,
@@ -1698,7 +1667,6 @@ describe('auto-title on first message', () => {
     const sandboxId = 'sandbox-autotitle';
     const userApp = makeApp(userId, 'user');
 
-    // Create conversation WITHOUT a title
     const convRes = await userApp.request(
       '/v1/conversations',
       {
@@ -1714,7 +1682,6 @@ describe('auto-title on first message', () => {
     const convStub = getConvStub(conversationId);
     expect((await convStub.getInfo())!.title).toBeNull();
 
-    // Send a message — triggers auto-title
     const res = await userApp.request(
       '/v1/messages',
       {

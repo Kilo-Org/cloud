@@ -55,7 +55,6 @@ app.use(
   })
 );
 
-// ── Structured logging context ──────────────────────────────────────────
 // Establishes AsyncLocalStorage context so all downstream logs are tagged.
 // Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
 app.use('*', useWorkersLogger('kilo-chat') as unknown as MiddlewareHandler);
@@ -82,7 +81,6 @@ app.use('/v1/*', authMiddleware);
 registerConversationRoutes(app);
 registerSandboxReadRoutes(app);
 
-// Messages
 app.post('/v1/messages', handleCreateMessage);
 app.get('/v1/conversations/:conversationId/messages', handleListMessages);
 app.patch('/v1/messages/:messageId', handleEditMessage);
@@ -91,17 +89,14 @@ app.post(
   '/v1/conversations/:conversationId/messages/:messageId/execute-action',
   handleExecuteAction
 );
-app.post('/v1/conversations/:conversationId/messages/:messageId/redeliver', handleRedeliverMessage);
+app.post('/v1/messages/:messageId/redeliver', handleRedeliverMessage);
 
-// Reactions
 app.post('/v1/messages/:messageId/reactions', handleAddReaction);
 app.delete('/v1/messages/:messageId/reactions', handleRemoveReaction);
 
-// Typing
 app.post('/v1/conversations/:conversationId/typing', handleSetTyping);
 app.post('/v1/conversations/:conversationId/typing/stop', handleStopTyping);
 
-// Attachments
 app.post('/v1/attachments/init', handleAttachmentInit);
 app.get('/v1/attachments/:id/url', handleAttachmentGetUrl);
 
@@ -149,7 +144,6 @@ export class KiloChatService extends WorkerEntrypoint<Env> {
     sandboxId: string
   ): Promise<{ ok: boolean; conversationsDeleted: number; failedConversations: string[] }> {
     const botId = `bot:kiloclaw:${sandboxId}`;
-    // Discover all conversations for this sandbox, paginating through all results.
     const allConversationIds: string[] = [];
     const PAGE_SIZE = 100;
     let cursor: ConversationCursor | null = null;
@@ -167,8 +161,6 @@ export class KiloChatService extends WorkerEntrypoint<Env> {
       if (!cursor) break;
     }
 
-    // Fan out with concurrency limit: for each conversation, clean up
-    // member MembershipDOs then destroy ConversationDO.
     const limit = pLimit(10);
     const failedConversations: string[] = [];
     const results = await Promise.allSettled(
@@ -211,11 +203,9 @@ export class KiloChatService extends WorkerEntrypoint<Env> {
       }
     }
 
-    // Final sweep: bulk-delete any remaining entries in the bot's MembershipDO.
     const botMembership = this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(botId));
     await botMembership.removeConversationsBySandbox(sandboxId);
 
-    // Wipe persisted bot + conversation status for this sandbox.
     await withDORetry(
       () => this.env.SANDBOX_STATUS_DO.get(this.env.SANDBOX_STATUS_DO.idFromName(sandboxId)),
       stub => stub.destroy(),

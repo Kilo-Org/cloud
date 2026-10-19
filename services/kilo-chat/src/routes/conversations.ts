@@ -28,7 +28,6 @@ import { makeSchedule } from './handler';
 export function registerConversationRoutes(
   app: Hono<{ Bindings: Env; Variables: AuthContext }>
 ): void {
-  // POST /v1/conversations — create
   app.post('/v1/conversations', async c => {
     const callerKind = c.get('callerKind');
     if (callerKind !== 'user') {
@@ -64,7 +63,6 @@ export function registerConversationRoutes(
     );
   });
 
-  // GET /v1/conversations — list my conversations, optionally filtered by sandboxId
   app.get('/v1/conversations', async c => {
     const callerId = c.get('callerId');
 
@@ -90,7 +88,6 @@ export function registerConversationRoutes(
     return c.json({ conversations, hasMore, nextCursor } satisfies ConversationListResponse);
   });
 
-  // GET /v1/conversations/:id — get conversation details
   app.get('/v1/conversations/:id', async c => {
     const idParam = ulidSchema.safeParse(c.req.param('id'));
     if (!idParam.success) {
@@ -124,7 +121,6 @@ export function registerConversationRoutes(
     return c.json(enrichedInfo satisfies ConversationDetailResponse);
   });
 
-  // PATCH /v1/conversations/:id — rename
   app.patch('/v1/conversations/:id', async c => {
     const idParam = ulidSchema.safeParse(c.req.param('id'));
     if (!idParam.success) {
@@ -161,7 +157,6 @@ export function registerConversationRoutes(
     return c.json({ ok: true } satisfies OkResponse);
   });
 
-  // POST /v1/conversations/:id/leave — leave conversation
   app.post('/v1/conversations/:id/leave', async c => {
     const callerKind = c.get('callerKind');
     if (callerKind !== 'user') {
@@ -183,7 +178,6 @@ export function registerConversationRoutes(
     return c.json({ ok: true } satisfies OkResponse);
   });
 
-  // POST /v1/conversations/:id/mark-read — mark conversation as read
   app.post('/v1/conversations/:id/mark-read', async c => {
     const idParam = ulidSchema.safeParse(c.req.param('id'));
     if (!idParam.success) {

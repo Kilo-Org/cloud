@@ -100,7 +100,6 @@ const SaveAutoTriageConfigInputSchema = z.object({
   skip_labels: z.array(z.string()).optional(),
   required_labels: z.array(z.string()).optional(),
   duplicate_threshold: z.number().min(0).max(1).optional(),
-  auto_fix_threshold: z.number().min(0).max(1).optional(),
   auto_create_pr_threshold: z.number().min(0).max(1).optional(),
   max_concurrent_per_owner: z.number().int().positive().optional(),
   custom_instructions: z.string().nullable().optional(),
@@ -179,8 +178,6 @@ export function createAutoTriageRouter({
         required_labels: cfg.required_labels || [],
         duplicate_threshold:
           cfg.duplicate_threshold || AUTO_TRIAGE_CONSTANTS.DEFAULT_DUPLICATE_THRESHOLD,
-        auto_fix_threshold:
-          cfg.auto_fix_threshold || AUTO_TRIAGE_CONSTANTS.DEFAULT_AUTO_PR_THRESHOLD,
         auto_create_pr_threshold:
           cfg.auto_create_pr_threshold || AUTO_TRIAGE_CONSTANTS.DEFAULT_AUTO_PR_THRESHOLD,
         max_concurrent_per_owner:
@@ -224,8 +221,6 @@ export function createAutoTriageRouter({
               required_labels: input.required_labels || [],
               duplicate_threshold:
                 input.duplicate_threshold ?? AUTO_TRIAGE_CONSTANTS.DEFAULT_DUPLICATE_THRESHOLD,
-              auto_fix_threshold:
-                input.auto_fix_threshold ?? AUTO_TRIAGE_CONSTANTS.DEFAULT_AUTO_PR_THRESHOLD,
               auto_create_pr_threshold:
                 input.auto_create_pr_threshold ?? AUTO_TRIAGE_CONSTANTS.DEFAULT_AUTO_PR_THRESHOLD,
               max_concurrent_per_owner:
@@ -288,7 +283,6 @@ export function createAutoTriageRouter({
               skip_labels: currentConfig.skip_labels,
               required_labels: currentConfig.required_labels,
               duplicate_threshold: currentConfig.duplicate_threshold,
-              auto_fix_threshold: currentConfig.auto_fix_threshold,
               max_concurrent_per_owner: currentConfig.max_concurrent_per_owner,
               custom_instructions: currentConfig.custom_instructions,
               model_slug: currentConfig.model_slug,

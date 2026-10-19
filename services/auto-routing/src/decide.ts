@@ -419,6 +419,8 @@ export type DecisionTarget = {
 export type DecisionRun = {
   response: AutoRoutingDecisionResponse;
   routingTable: RoutingTable | null;
+  capabilities: ModelCapabilitiesMap;
+  constraints: RoutingConstraints | undefined;
 };
 
 function platformTarget(
@@ -756,6 +758,8 @@ export async function runDecision(
     return {
       response: { cost: 0, decision: outcome.decision, classifierResult: null },
       routingTable,
+      capabilities,
+      constraints,
     };
   }
   if (outcome.kind === 'cache_hit') {
@@ -823,7 +827,12 @@ export async function runDecision(
         shadow
       );
     }
-    return { response: decisionResponse(cached, payload.input, decision), routingTable };
+    return {
+      response: decisionResponse(cached, payload.input, decision),
+      routingTable,
+      capabilities,
+      constraints,
+    };
   }
 
   try {
@@ -886,6 +895,8 @@ export async function runDecision(
     return {
       response: decisionResponse(classifier.classification, payload.input, decision),
       routingTable,
+      capabilities,
+      constraints,
     };
   } catch (error) {
     recordDecision(
@@ -898,7 +909,7 @@ export async function runDecision(
       sticky,
       speculative ? 'speculative' : 'sync'
     );
-    return { response: emptyDecisionResponse(), routingTable };
+    return { response: emptyDecisionResponse(), routingTable, capabilities, constraints };
   }
 }
 

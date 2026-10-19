@@ -384,4 +384,51 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     expect(chunkCount('abandoned')).toBe(materialized);
     expect(initialized('abandoned')).toBe(false);
   });
+
+  it('finalizes a run whose only pending chunks belong to a dead-lettered lane', async () => {
+    insertRun('dead-lane', 'platform', 2, 1);
+    const [dead, live] = ['dead-lane/model-0', 'dead-lane/model-1'];
+    const caseIds = DECIDER_CASES.map(benchCase => benchCase.id);
+    await scheduleRunChunks(setupDb, {
+      runId: 'dead-lane',
+      entries: [dead, live].map(model => ({ model, variant: null, providers: ['deepinfra'] })),
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+    });
+    const profile = sqlite.prepare(`
+      INSERT INTO benchmark_profiles
+        (model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at)
+      VALUES (?, '', 'scheduler-init-test', 1, 'running', 'dead-lane', ?, ?)
+    `);
+    for (const model of [dead, live]) {
+      profile.run(model, new Date(NOW).toISOString(), new Date(NOW).toISOString());
+    }
+    const result = sqlite.prepare(`
+      INSERT INTO case_results (run_id, model, variant, case_id, score, latency_ms, rep)
+      VALUES ('dead-lane', ?, '', ?, 1, 100, 0)
+    `);
+    for (const caseId of caseIds) result.run(live, caseId);
+    sqlite.prepare("UPDATE scheduler_chunks SET status = 'completed' WHERE model = ?").run(live);
+    sqlite
+      .prepare(`INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at)
+        VALUES ('dead-lane', ?, '', 0, 0, 0, ?)`)
+      .run(dead, new Date(NOW).toISOString());
+
+    await dispatchScheduler(env);
+
+    expect(
+      sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'dead-lane'").get()
+    ).toEqual({ status: 'completed' });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT model, status FROM benchmark_profiles WHERE run_id = 'dead-lane' ORDER BY model"
+        )
+        .all()
+    ).toEqual([
+      { model: dead, status: 'failed' },
+      { model: live, status: 'ready' },
+    ]);
+  });
 });

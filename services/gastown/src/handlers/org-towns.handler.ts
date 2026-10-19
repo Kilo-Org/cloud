@@ -4,7 +4,6 @@ import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { checkTownCreationEligibility } from '../util/town-creation.util';
 import type { GastownEnv } from '../gastown.worker';
 
 const ORG_TOWNS_LOG = '[org-towns.handler]';
@@ -32,11 +31,6 @@ export async function handleCreateOrgTown(c: Context<GastownEnv>, params: { orgI
 
   const userId = c.get('kiloUserId');
   if (!userId) return c.json(resError('Authentication required'), 401);
-
-  const eligibility = await checkTownCreationEligibility(c.env, userId);
-  if (!eligibility.allowed) {
-    return c.json(resError(eligibility.message), eligibility.code === 'FORBIDDEN' ? 403 : 503);
-  }
 
   const orgDO = getGastownOrgStub(c.env, params.orgId);
   const town = await orgDO.createTown({

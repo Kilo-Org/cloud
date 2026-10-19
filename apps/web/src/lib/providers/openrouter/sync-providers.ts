@@ -32,7 +32,10 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
-import { injectExtraProviderModels } from '@/lib/providers/openrouter/inject-extra-provider-models';
+import {
+  injectExtraProviderModels,
+  injectVercelOnlyProviders,
+} from '@/lib/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
@@ -186,6 +189,7 @@ async function syncProviders(params: {
   );
 
   injectExtraProviderModels(vercelModels, providerModelData);
+  injectVercelOnlyProviders(vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm =>

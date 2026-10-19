@@ -24,6 +24,10 @@ export function SyncProvidersContent() {
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
 
   const lastSyncQuery = useQuery(trpc.admin.syncProviders.getLastSync.queryOptions());
+  const manualSyncEnabledQuery = useQuery(
+    trpc.admin.syncProviders.getManualSyncEnabled.queryOptions()
+  );
+  const manualSyncEnabled = manualSyncEnabledQuery.data === true;
 
   const testAlertMutation = useMutation(
     trpc.admin.syncProviders.postTestStaleAlert.mutationOptions({
@@ -107,12 +111,18 @@ export function SyncProvidersContent() {
         <CardContent className="flex flex-col gap-4">
           <Button
             onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
+            disabled={!manualSyncEnabled || syncMutation.isPending}
             className="w-fit"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
             {syncMutation.isPending ? 'Syncing...' : 'Run Sync'}
           </Button>
+          {manualSyncEnabledQuery.data === false && (
+            <p className="text-muted-foreground text-sm">
+              Manual sync is disabled in production. The cron keeps provider and model data up to
+              date.
+            </p>
+          )}
 
           {lastResult && (
             <div className="rounded-lg border p-4 text-sm">

@@ -27,7 +27,6 @@ import {
   User,
   UserCog,
   Webhook,
-  Wrench,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import {
@@ -177,11 +176,6 @@ const cloudItems: SidebarStoryItem[] = [
     title: 'Auto Triage',
     icon: ListChecks,
     url: '/auto-triage',
-  },
-  {
-    title: 'Auto Fix',
-    icon: Wrench,
-    url: '/auto-fix',
   },
   {
     title: 'Deploy',

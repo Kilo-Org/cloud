@@ -6,6 +6,16 @@
   "main": "src/ai-attribution.worker.ts",
   "compatibility_date": "2024-12-01",
   "compatibility_flags": ["nodejs_compat"],
+  "ratelimits": [
+    {
+      "name": "ATTRIBUTION_TRACK_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      },
+    },
+  ],
   "dev": { "port": 8787 },
   "logpush": true,
   "observability": {
@@ -78,6 +88,16 @@
           },
         ],
       },
+      "ratelimits": [
+        {
+          "name": "ATTRIBUTION_TRACK_RATE_LIMITER",
+          "namespace_id": "1001",
+          "simple": {
+            "limit": 60,
+            "period": 60
+          },
+        },
+      ],
     },
   },
 }

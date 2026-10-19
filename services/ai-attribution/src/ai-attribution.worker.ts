@@ -4,6 +4,7 @@
 
 import { Hono, type MiddlewareHandler } from 'hono';
 import { useWorkersLogger } from 'workers-tagged-logger';
+import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { AttributionTrackerDO, getAttributionTrackerDO } from './dos/AttributionTracker.do';
 import { logger } from './util/logger';
 import { resError, resSuccess } from '@kilocode/worker-utils';
@@ -14,6 +15,7 @@ import {
   AdminDeleteAttributionParams,
   AttributionsTrackRequestBody,
   AttributionEventResponse,
+  MAX_TRACK_BODY_BYTES,
 } from './schemas';
 
 export { AttributionTrackerDO };
@@ -64,14 +66,39 @@ app.post('/attributions/track', async c => {
   const user_id = c.get('user_id');
   const organization_id = c.get('organization_id');
 
+  // Read the body with a bounded reader against the fixed byte budget.
+  const declaredLength = Number(c.req.header('Content-Length') ?? Number.NaN);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_TRACK_BODY_BYTES) {
+    return c.json(resError('Request body too large'), 413);
+  }
+  let bodyText: string | undefined;
+  if (c.req.raw.body !== null) {
+    const bounded = await readBoundedStream(
+      c.req.raw.body as ReadableStream<Uint8Array>,
+      MAX_TRACK_BODY_BYTES
+    );
+    if (!bounded.ok) {
+      return c.json(resError('Request body too large'), 413);
+    }
+    bodyText = new TextDecoder().decode(bounded.bytes);
+  }
+
   // Parse and validate request body
   let payload: AttributionsTrackRequestBody;
   try {
-    const body: unknown = await c.req.json();
+    const body: unknown = bodyText === undefined ? {} : JSON.parse(bodyText);
     payload = AttributionsTrackRequestBody.parse(body);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     return c.json(resError('Invalid request payload:\n' + errMsg), 400);
+  }
+
+  // Share the per-organization and per-user counter before the Durable Object call.
+  const rateLimitOutcome = await env.ATTRIBUTION_TRACK_RATE_LIMITER?.limit({
+    key: `${organization_id}:${user_id}`,
+  });
+  if (rateLimitOutcome && !rateLimitOutcome.success) {
+    return c.json(resError('Too many attribution requests, slow down'), 429);
   }
 
   // Get DurableObject stub

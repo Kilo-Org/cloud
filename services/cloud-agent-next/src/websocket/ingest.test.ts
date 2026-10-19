@@ -360,6 +360,106 @@ describe('createIngestHandler', () => {
       });
     });
 
+    it('persists and broadcasts a projected retry part error', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        createFakeDOContext()
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      const rawError = {
+        name: 'APIError',
+        data: {
+          message: 'Too Many Requests',
+          statusCode: 429,
+          isRetryable: true,
+          responseHeaders: { authorization: 'Bearer redacted-token-1' },
+          responseBody: 'redacted-provider-body-1',
+          metadata: { 'x-internal-trace': 'redacted-trace-1' },
+        },
+      };
+
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessage('message.part.updated', {
+          sessionID: 'kilo_1',
+          part: { type: 'retry', id: 'retry_1', messageID: 'asst_1', attempt: 1, error: rawError },
+        })
+      );
+
+      const persisted = JSON.parse(vi.mocked(eventQueries.upsert).mock.calls[0][0].payload);
+      expect(persisted).toEqual({
+        event: 'message.part.updated',
+        properties: {
+          sessionID: 'kilo_1',
+          part: {
+            type: 'retry',
+            id: 'retry_1',
+            messageID: 'asst_1',
+            attempt: 1,
+            error: 'Assistant request was rate limited',
+          },
+        },
+      });
+      expect(broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: JSON.stringify({
+            event: 'message.part.updated',
+            properties: {
+              sessionID: 'kilo_1',
+              part: {
+                type: 'retry',
+                id: 'retry_1',
+                messageID: 'asst_1',
+                attempt: 1,
+                error: 'Assistant request was rate limited',
+              },
+            },
+          }),
+        })
+      );
+      expect(JSON.stringify(vi.mocked(eventQueries.upsert).mock.calls)).not.toContain(
+        'redacted-token-1'
+      );
+      expect(JSON.stringify(broadcast.mock.calls)).not.toContain('redacted-provider-body-1');
+    });
+
+    it('keeps a retry part without an error field unchanged', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        createFakeDOContext()
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      const properties = {
+        sessionID: 'kilo_1',
+        part: { type: 'retry', id: 'retry_2', messageID: 'asst_1', attempt: 2 },
+      };
+
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessage('message.part.updated', properties)
+      );
+
+      expect(JSON.parse(vi.mocked(eventQueries.upsert).mock.calls[0][0].payload)).toEqual({
+        event: 'message.part.updated',
+        properties,
+      });
+      expect(broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: JSON.stringify({ event: 'message.part.updated', properties }),
+        })
+      );
+    });
+
     it.each([
       'message.part.removed',
       'session.created',

@@ -124,6 +124,25 @@ function sanitizeKilocodeEventData(data: unknown): unknown {
     };
   }
 
+  if (eventData.event === 'message.part.updated') {
+    if (typeof properties.part !== 'object' || properties.part === null) return data;
+    const part = properties.part as Record<string, unknown>;
+    if (part.error === undefined || part.error === null) return data;
+    return {
+      ...eventData,
+      properties: {
+        ...properties,
+        part: {
+          ...part,
+          // The classify fallback covers unrecognized shapes so no raw
+          // provider error object survives the projection either way.
+          error:
+            projectSafeAssistantError(part.error) ?? classifyAssistantFailureMessage(part.error),
+        },
+      },
+    };
+  }
+
   if (eventData.event === 'session.error') {
     return {
       ...eventData,

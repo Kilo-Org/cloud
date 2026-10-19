@@ -139,6 +139,9 @@ function truncateReviewMemoryFeedbackExcerpt(value: string): string {
   return value.slice(0, REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH);
 }
 
+// Deliberately stricter than the Auto Fix review-comment gate: review
+// feedback is trusted only from admin or write collaborators. `maintain`
+// is a valid lookup result but is not trusted here.
 function isTrustedRepositoryPermission(permission: CollaboratorPermission): boolean {
   return permission === 'admin' || permission === 'write';
 }

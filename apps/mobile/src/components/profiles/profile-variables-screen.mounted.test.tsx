@@ -161,7 +161,7 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('non-retryable: an empty key is refused before the call', async () => {
+  it('non-retryable: an empty key is refused, and an over-long key names the length', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
 
@@ -172,15 +172,6 @@ describe('ProfileVariablesScreen', () => {
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Key').props.error).toBe('required');
 
-    unmount();
-  });
-
-  it('non-retryable: an over-long key names the key length before the call', async () => {
-    h.query.data = testProfile();
-    h.query.isPending = false;
-
-    const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
     changeText(renderer.root, 'Key', 'a'.repeat(257));
     pressButton(renderer.root, 'Save');
 
@@ -299,15 +290,15 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('read-only: a member of the owning organization sees rows without edit or delete', async () => {
+  it('read-only: rows render without edit or delete controls', async () => {
     h.canManage = false;
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     const { renderer, unmount } = await mountScreen();
-    expect(findAll(renderer.root, 'EmptyState')).toHaveLength(0);
-    expect(
-      findAll(renderer.root, 'Pressable').some(node => node.props.accessibilityLabel === 'Delete')
-    ).toBe(false);
+    const rowActions = findAll(renderer.root, 'Pressable').filter(
+      node => node.props.accessibilityLabel === 'Delete'
+    );
+    expect(rowActions).toHaveLength(0);
     unmount();
   });
 

@@ -48,7 +48,6 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   AUTO_DECISION_HEADER,
@@ -232,14 +231,17 @@ export function checkExclusiveModelProviderAllowed(
   if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
-  const inferenceProvider = getInferenceProvider(exclusiveModel)?.slug;
-  if (!inferenceProvider) return null;
+  const inferenceProviders = exclusiveModel.inference_providers;
+  if (inferenceProviders.length === 0) return null;
   if (
-    (!provider.only || provider.only.includes(inferenceProvider)) &&
-    (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+    inferenceProviders.some(
+      inferenceProvider =>
+        (!provider.only || provider.only.includes(inferenceProvider)) &&
+        (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+    )
   )
     return null;
-  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProvider}`;
+  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {
       error: error,

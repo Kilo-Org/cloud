@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { destroyDeciderCliContainer, runDeciderCaseViaCli, warmUpCliContainer } from './cli-runner';
+import {
+  destroyDeciderCliContainer,
+  isExactModelUnavailableResult,
+  parseContainerRunResponse,
+  runDeciderCaseViaCli,
+  warmUpCliContainer,
+} from './cli-runner';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import { materializeLongContext } from './datasets/long-context';
 
@@ -171,6 +177,141 @@ describe('runDeciderCaseViaCli', () => {
       latencyMs: 37,
       stderrTail: '\nHTTP 429 provider throttle',
     });
+  });
+});
+
+describe('exact CLI model unavailability', () => {
+  const emptyResult = { text: '', stderrTail: '', costUsd: null, timedOut: false };
+
+  it.each([
+    { providerID: 'kilo', modelID: 'candidate/model', expected: true },
+    { providerID: 'candidate', modelID: 'model', expected: true },
+    { providerID: 'kilo', modelID: 'another/model', expected: false },
+    { providerID: 'another', modelID: 'candidate/model', expected: false },
+  ])(
+    'matches structured lookup errors to the exact requested model: %j',
+    ({ expected, ...data }) => {
+      const result = parseContainerRunResponse(
+        {
+          exitCode: 0,
+          durationMs: 12,
+          stdoutLines: [
+            JSON.stringify({ type: 'error', error: { name: 'ProviderModelNotFoundError', data } }),
+          ],
+          stderrTail: '',
+        },
+        Date.now(),
+        'candidate/model'
+      );
+      expect(isExactModelUnavailableResult(result, 'candidate/model')).toBe(expected);
+      expect(isExactModelUnavailableResult(result, 'different/model')).toBe(false);
+    }
+  );
+
+  it('matches ANSI-colored diagnostics without confusing a different model or assistant output', () => {
+    for (const diagnostic of [
+      'Error: Model not found: kilo/candidate/model\nTry: `kilo models` to list available models',
+      '\u001b[31mError:\u001b[0m Model not found: candidate/model',
+      'Error: Model not found: kilo/candidate/model. No models are currently available.',
+      'Error: Model not found: kilo/candidate/model. Did you mean: candidate/other?',
+    ]) {
+      expect(
+        isExactModelUnavailableResult({ ...emptyResult, stderrTail: diagnostic }, 'candidate/model')
+      ).toBe(true);
+    }
+    expect(
+      isExactModelUnavailableResult(
+        { ...emptyResult, stderrTail: 'Model not found: kilo/another/model' },
+        'candidate/model'
+      )
+    ).toBe(false);
+    expect(
+      isExactModelUnavailableResult(
+        { ...emptyResult, text: 'Model not found: candidate/model' },
+        'candidate/model'
+      )
+    ).toBe(false);
+    expect(
+      isExactModelUnavailableResult(
+        { ...emptyResult, text: 'answer', stderrTail: 'Model not found: candidate/model' },
+        'candidate/model'
+      )
+    ).toBe(false);
+  });
+
+  it('persists stderr lookup failures even when the CLI returns a successful process exit', () => {
+    const result = parseContainerRunResponse(
+      {
+        exitCode: 0,
+        durationMs: 10,
+        stdoutLines: [],
+        stderrTail:
+          'Error: Model not found: kilo/candidate/model. No models are currently available.',
+      },
+      Date.now(),
+      'candidate/model'
+    );
+    expect(result.unavailableModelId).toBe('candidate/model');
+    expect(isExactModelUnavailableResult(result, 'different/model')).toBe(false);
+  });
+
+  it.each([
+    { costUsd: 0.01, timedOut: false },
+    { costUsd: null, timedOut: true },
+  ])('preserves billed or timed-out failures as measurements: %j', measured => {
+    const failure = {
+      ...emptyResult,
+      ...measured,
+      stderrTail: 'Model not found: kilo/candidate/model',
+    };
+    expect(isExactModelUnavailableResult(failure, 'candidate/model')).toBe(false);
+    expect(
+      isExactModelUnavailableResult(
+        { ...failure, unavailableModelId: 'kilo/candidate/model' },
+        'candidate/model'
+      )
+    ).toBe(false);
+    const result = parseContainerRunResponse(
+      {
+        exitCode: 1,
+        durationMs: 12,
+        stdoutLines: [
+          JSON.stringify({
+            type: 'error',
+            error: {
+              name: 'ProviderModelNotFoundError',
+              data: { providerID: 'kilo', modelID: 'candidate/model' },
+            },
+          }),
+          JSON.stringify({ type: 'step_finish', part: { cost: measured.costUsd ?? 0 } }),
+        ],
+        stderrTail: failure.stderrTail,
+        timedOut: measured.timedOut,
+      },
+      Date.now(),
+      'candidate/model'
+    );
+    expect(result.unavailableModelId).toBeUndefined();
+    expect(isExactModelUnavailableResult(result, 'candidate/model')).toBe(false);
+  });
+
+  it('does not treat missing lookup identity or ordinary provider API failures as unavailability', () => {
+    for (const error of [
+      { name: 'ProviderModelNotFoundError', data: { modelID: 'candidate/model' } },
+      { name: 'APIError', data: { statusCode: 404 } },
+    ]) {
+      const failure = parseContainerRunResponse(
+        {
+          exitCode: 1,
+          durationMs: 12,
+          stdoutLines: [JSON.stringify({ type: 'error', error })],
+          stderrTail: 'Provider API failed: resource not found',
+        },
+        Date.now(),
+        'candidate/model'
+      );
+      expect(isExactModelUnavailableResult(failure, 'candidate/model')).toBe(false);
+    }
   });
 });
 

@@ -3,7 +3,7 @@ import { focusManager, onlineManager } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';
+import { type ConnectivityState, connectivityStatus, isOnline } from '@/lib/connectivity-online';
 import {
   getCommittedConnectivityStatus,
   subscribeCommittedConnectivityStatus,
@@ -54,7 +54,17 @@ export function installQueryClientNativeLifecycle({
     managers.focus.setFocused(nextState === 'active');
   });
   const removeConnectivityListener = sources.onConnectivityChange(nextState => {
-    managers.online.setOnline(isOnline(nextState));
+    // An `unknown` NetInfo report (reachability not settled) pauses the manager
+    // even when the app's probe has already confirmed reachability. That
+    // unknown never re-fires and the probe store never re-commits an unchanged
+    // state, so an unchanged committed-online would stay latched offline.
+    // The probe's committed state is the better answer there: a handover
+    // (Wi-Fi → cellular) with confirmed reachability stays online.
+    managers.online.setOnline(
+      isOnline(nextState) ||
+        (connectivityStatus(nextState) === 'unknown' &&
+          getCommittedConnectivityStatus() === 'online')
+    );
   });
   // NetInfo can commit `isConnected: true` with `isInternetReachable: null`
   // after the radio returns and never fire again, leaving the manager offline

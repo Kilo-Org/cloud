@@ -163,6 +163,46 @@ describe('installQueryClientNativeLifecycle', () => {
     expect(setOnline).toHaveBeenNthCalledWith(4, true);
   });
 
+  it('keeps a confirmed-online handover online when reachability stays unknown', () => {
+    const native = createSources();
+    const setFocused = createBooleanSetterMock();
+    const manager = createOnlineManager(true);
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: { focus: { setFocused }, online: manager.online },
+    });
+
+    // Wi-Fi → cellular handover: the radio reports connected while its
+    // reachability probe never answers, and the probe store has already
+    // confirmed online. The manager must not latch offline with no recovery
+    // edge, so the unknown state reads the committed state.
+    committedConnectivity.status = 'online';
+    native.setConnectivity({ isConnected: true, isInternetReachable: null });
+    cleanup();
+
+    expect(manager.setOnline).toHaveBeenNthCalledWith(1, true);
+  });
+
+  it('keeps an unconfirmed unknown state offline during a handover', () => {
+    const native = createSources();
+    const setFocused = createBooleanSetterMock();
+    const manager = createOnlineManager(false);
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: { focus: { setFocused }, online: manager.online },
+    });
+
+    // The probe has not confirmed anything yet (boot, no probe answer): the
+    // unknown state still pauses the manager.
+    committedConnectivity.status = 'unknown';
+    native.setConnectivity({ isConnected: true, isInternetReachable: null });
+    cleanup();
+
+    expect(manager.setOnline).toHaveBeenNthCalledWith(1, false);
+  });
+
   it('flapping unknown → offline → online → offline is online only on the confirmed online state', () => {
     const native = createSources();
     const setFocused = createBooleanSetterMock();

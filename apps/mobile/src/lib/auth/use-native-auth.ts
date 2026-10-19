@@ -74,7 +74,7 @@ async function tokenRefusalMessage(
 type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | undefined;
 
 /** The email-field error keys the inline slot can carry; translated at render. */
-export type EmailErrorKey = 'login.pleaseEnterEmail' | AuthErrorMessageKey;
+type EmailErrorKey = 'login.pleaseEnterEmail' | AuthErrorMessageKey;
 
 type NativeAuthResult = {
   busy: BusyAction;

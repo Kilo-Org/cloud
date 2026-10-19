@@ -1,5 +1,5 @@
 {
-  "id": "76fe7c4c-df4b-4112-8121-19bd527544b5",
+  "id": "8279e365-4d4e-4ed5-848f-50a86bab4683",
   "prevId": "3817863b-1d7c-4d90-a0d1-4b8da3398992",
   "version": "7",
   "dialect": "postgresql",
@@ -15991,8 +15991,8 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_inference_reservations_active_org_user": {
-          "name": "IDX_inference_reservations_active_org_user",
+        "IDX_inference_reservations_org_user_status": {
+          "name": "IDX_inference_reservations_org_user_status",
           "columns": [
             {
               "expression": "organization_id",
@@ -16005,10 +16005,16 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
           "isUnique": false,
-          "where": "\"inference_reservations\".\"status\" = 'reserved' AND \"inference_reservations\".\"organization_id\" IS NOT NULL",
+          "where": "\"inference_reservations\".\"organization_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

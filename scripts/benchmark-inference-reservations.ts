@@ -686,25 +686,21 @@ async function main() {
                 microdollars_balance: credit - history,
                 inference_microdollars_held: historyHeld,
               });
-              await db
-                .insert(organization_memberships)
-                .values(
-                  payer.userIds.map(userId => ({
-                    organization_id: organizationId,
-                    kilo_user_id: userId,
-                    role: 'owner' as const,
-                  }))
-                );
-              await db
-                .insert(organization_user_limits)
-                .values(
-                  payer.userIds.map(userId => ({
-                    organization_id: organizationId,
-                    kilo_user_id: userId,
-                    limit_type: 'daily' as const,
-                    microdollar_limit: credit,
-                  }))
-                );
+              await db.insert(organization_memberships).values(
+                payer.userIds.map(userId => ({
+                  organization_id: organizationId,
+                  kilo_user_id: userId,
+                  role: 'owner' as const,
+                }))
+              );
+              await db.insert(organization_user_limits).values(
+                payer.userIds.map(userId => ({
+                  organization_id: organizationId,
+                  kilo_user_id: userId,
+                  limit_type: 'daily' as const,
+                  microdollar_limit: credit,
+                }))
+              );
               await db.insert(organization_user_usage).values(
                 payer.userIds.map((userId, index) => ({
                   organization_id: organizationId,

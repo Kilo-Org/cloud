@@ -3361,9 +3361,9 @@ export const inference_reservations = pgTable(
       )`
     ),
     index('IDX_inference_reservations_user').on(table.kilo_user_id),
-    index('IDX_inference_reservations_active_org_user')
-      .on(table.organization_id, table.kilo_user_id)
-      .where(sql`${table.status} = 'reserved' AND ${table.organization_id} IS NOT NULL`),
+    index('IDX_inference_reservations_org_user_status')
+      .on(table.organization_id, table.kilo_user_id, table.status)
+      .where(sql`${table.organization_id} IS NOT NULL`),
   ]
 );
 

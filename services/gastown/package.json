@@ -33,7 +33,7 @@
     "hono": "catalog:",
     "jose": "catalog:",
     "jsonwebtoken": "catalog:",
-    "pg": "8.20.0",
+    "pg": "8.23.1",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },

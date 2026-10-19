@@ -29,4 +29,4 @@ ALTER TABLE "organizations" ADD COLUMN "inference_microdollars_held" bigint DEFA
 ALTER TABLE "inference_reservations" ADD CONSTRAINT "inference_reservations_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "inference_reservations" ADD CONSTRAINT "inference_reservations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "IDX_inference_reservations_user" ON "inference_reservations" USING btree ("kilo_user_id");--> statement-breakpoint
-CREATE INDEX "IDX_inference_reservations_active_org_user" ON "inference_reservations" USING btree ("organization_id","kilo_user_id") WHERE "inference_reservations"."status" = 'reserved' AND "inference_reservations"."organization_id" IS NOT NULL;
+CREATE INDEX "IDX_inference_reservations_org_user_status" ON "inference_reservations" USING btree ("organization_id","kilo_user_id","status") WHERE "inference_reservations"."organization_id" IS NOT NULL;

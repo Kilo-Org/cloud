@@ -587,6 +587,8 @@ export async function exchangeGitHubOAuthCode(
 
 const KILO_REVIEW_COMMENTS_PER_PAGE = 100;
 const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
+const MAX_PR_INLINE_COMMENT_BODY_BYTES = 64 * 1024;
+const MAX_PR_INLINE_COMMENT_BODY_CHARS = 60;
 
 /**
  * Looks for the <!-- kilo-review --> marker in issue comments.
@@ -723,31 +725,39 @@ export async function fetchPRInlineComments(
     user: { login: string };
   }> = [];
 
-  let page = 1;
-  const perPage = 100;
+  let reachedPageLimit = false;
+  let reachedByteLimit = false;
+  let storedBodyBytes = 0;
 
-  while (true) {
+  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
     const { data } = await octokit.pulls.listReviewComments({
       owner,
       repo,
       pull_number: prNumber,
-      per_page: perPage,
+      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
       page,
     });
 
-    comments.push(
-      ...data.map(c => ({
+    for (const c of data) {
+      const body = c.body.slice(0, MAX_PR_INLINE_COMMENT_BODY_CHARS);
+      storedBodyBytes += Buffer.byteLength(body);
+      comments.push({
         id: c.id,
         path: c.path,
         line: c.line ?? null,
-        body: c.body,
+        body,
         isOutdated: c.position === null, // null position = outdated
         user: { login: c.user?.login ?? 'unknown' },
-      }))
-    );
+      });
 
-    if (data.length < perPage) break;
-    page++;
+      if (storedBodyBytes >= MAX_PR_INLINE_COMMENT_BODY_BYTES) {
+        reachedByteLimit = true;
+        break;
+      }
+    }
+
+    if (reachedByteLimit || data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
+    reachedPageLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
   }
 
   logExceptInTest('[fetchPRInlineComments] Fetched comments', {
@@ -755,6 +765,8 @@ export async function fetchPRInlineComments(
     repo,
     prNumber,
     totalComments: comments.length,
+    reachedPageLimit,
+    reachedByteLimit,
   });
 
   return comments;

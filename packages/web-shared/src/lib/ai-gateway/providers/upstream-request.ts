@@ -347,6 +347,7 @@ export async function upstreamRequest({
           urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
           providerId: provider.id,
           vercelRequestId,
+          signal: combinedSignal,
         })
       : null;
     if (urlRejection) {

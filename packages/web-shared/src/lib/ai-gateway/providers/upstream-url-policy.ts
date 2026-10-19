@@ -30,6 +30,7 @@ const PUBLIC_HOSTNAME_CACHE_TTL_MS = 60 * 1000;
 const PUBLIC_HOSTNAME_CACHE_MAX_ENTRIES = 1000;
 const DNS_LOOKUP_ATTEMPTS = 2;
 const DNS_RETRY_DELAY_MS = 100;
+const DNS_LOOKUP_TIMEOUT_MS = 2_000;
 const publicHostnameExpiresAt = new Map<string, number>();
 
 const REJECTION_MESSAGES = {
@@ -44,13 +45,14 @@ const REJECTION_MESSAGES = {
 } as const satisfies Record<UpstreamUrlRejection, string>;
 
 /**
- * Enforced on the deployed staging and production gateways. Local development
- * reaches the fake LLM over plain HTTP on localhost, so it stays exempt.
- * `NODE_ENV` is `production` on previews too, so it cannot be used here.
+ * Enforced on the deployed staging gateway only. Enable it for production
+ * (`VERCEL_TARGET_ENV === 'production'`) once testing on staging is complete.
+ * Local development reaches the fake LLM over plain HTTP on localhost, so it
+ * stays exempt. `NODE_ENV` is `production` on previews too, so it cannot be
+ * used here.
  */
 export function isUpstreamUrlPolicyEnforced(): boolean {
-  const targetEnv = process.env.VERCEL_TARGET_ENV;
-  return targetEnv === 'production' || targetEnv === 'staging';
+  return process.env.VERCEL_TARGET_ENV === 'staging';
 }
 
 async function resolveWithSystemResolver(hostname: string): Promise<string[]> {
@@ -86,18 +88,49 @@ function cachePublicHostname(hostname: string, now: number): void {
   publicHostnameExpiresAt.set(hostname, now + PUBLIC_HOSTNAME_CACHE_TTL_MS);
 }
 
-/** One retry absorbs a transient resolver failure such as `EAI_AGAIN`. */
+/**
+ * Settles with `promise`, or rejects with the abort reason as soon as `signal`
+ * aborts. `dns.lookup` cannot be cancelled, so a stalled getaddrinfo keeps its
+ * thread-pool slot, but the request no longer waits for it.
+ */
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
+
+/**
+ * One retry absorbs a transient resolver failure such as `EAI_AGAIN`. Each
+ * attempt has its own deadline, so a stalled resolver ends in
+ * `dns_lookup_failed` within about two deadlines instead of holding the
+ * request. An abort of `signal` (client disconnect or the request budget)
+ * rejects at once with its reason.
+ */
 async function resolveWithRetry(
   hostname: string,
-  resolveHostAddresses: ResolveHostAddresses
+  resolveHostAddresses: ResolveHostAddresses,
+  signal: AbortSignal | undefined
 ): Promise<string[] | null> {
   for (let attempt = 0; attempt < DNS_LOOKUP_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) await new Promise(resolve => setTimeout(resolve, DNS_RETRY_DELAY_MS));
+    if (attempt > 0) {
+      const delay = new Promise(resolve => setTimeout(resolve, DNS_RETRY_DELAY_MS));
+      await (signal ? untilAborted(delay, signal) : delay);
+    }
+    signal?.throwIfAborted();
+    const deadline = AbortSignal.timeout(DNS_LOOKUP_TIMEOUT_MS);
     try {
-      const addresses = await resolveHostAddresses(hostname);
+      const addresses = await untilAborted(
+        resolveHostAddresses(hostname),
+        signal ? AbortSignal.any([signal, deadline]) : deadline
+      );
       if (addresses.length > 0) return addresses;
     } catch {
-      // Retried below; the caller reports dns_lookup_failed once attempts run out.
+      if (signal?.aborted) throw signal.reason;
+      // A failed or timed-out attempt is retried; the caller reports
+      // dns_lookup_failed once attempts run out.
     }
   }
   return null;
@@ -111,10 +144,15 @@ export function clearUpstreamUrlPolicyCache(): void {
  * Checks that an upstream URL uses HTTPS and that its host, and every address
  * it resolves to, is publicly routable. The fetch resolves the name again, so
  * this does not stop DNS rebinding.
+ *
+ * Rejects with the abort reason when `signal` aborts during the DNS lookup.
  */
 export async function findUpstreamUrlViolation(
   value: string,
-  resolveHostAddresses: ResolveHostAddresses = resolveWithSystemResolver
+  {
+    resolveHostAddresses = resolveWithSystemResolver,
+    signal,
+  }: { resolveHostAddresses?: ResolveHostAddresses; signal?: AbortSignal } = {}
 ): Promise<UpstreamUrlViolation | null> {
   let url: URL;
   try {
@@ -139,7 +177,7 @@ export async function findUpstreamUrlViolation(
 
   // A public-looking name can still point at a private address, for example
   // `metadata.attacker.example` with an A record of 169.254.169.254.
-  const addresses = await resolveWithRetry(hostname, resolveHostAddresses);
+  const addresses = await resolveWithRetry(hostname, resolveHostAddresses, signal);
   if (!addresses) return 'dns_lookup_failed';
   if (addresses.some(address => !isPublicIp(address))) return 'non_public_address';
 
@@ -190,17 +228,23 @@ function rejectionResponse({
   );
 }
 
-/** Returns the error response for the first URL that violates the policy, or null. */
+/**
+ * Returns the error response for the first URL that violates the policy, or
+ * null. Rejects with the abort reason when `signal` aborts, exactly like the
+ * upstream fetch would, so the caller's fetch-failure handling applies.
+ */
 export async function rejectDisallowedUpstreamUrls({
   urls,
   providerId,
   vercelRequestId,
+  signal,
 }: {
   urls: string[];
   providerId: string;
   vercelRequestId: string | null | undefined;
+  signal: AbortSignal;
 }): Promise<NextResponse | null> {
-  const violations = await Promise.all(urls.map(url => findUpstreamUrlViolation(url)));
+  const violations = await Promise.all(urls.map(url => findUpstreamUrlViolation(url, { signal })));
   const index = violations.findIndex(violation => violation !== null);
   const violation = violations[index];
   if (!violation) return null;

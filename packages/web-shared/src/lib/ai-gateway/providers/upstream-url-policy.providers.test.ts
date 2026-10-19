@@ -45,9 +45,11 @@ describe('hard-coded provider URLs', () => {
   // address; this checks the scheme and host each URL is written with.
   it.each(PROVIDER_URLS)('%s (%s) passes the upstream URL policy', async (_name, url) => {
     const resolvedHosts: string[] = [];
-    const violation = await findUpstreamUrlViolation(url, async hostname => {
-      resolvedHosts.push(hostname);
-      return ['104.18.2.115'];
+    const violation = await findUpstreamUrlViolation(url, {
+      resolveHostAddresses: async hostname => {
+        resolvedHosts.push(hostname);
+        return ['104.18.2.115'];
+      },
     });
 
     expect(violation).toBeNull();

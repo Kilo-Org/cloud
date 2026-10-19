@@ -1,6 +1,9 @@
+import { lookup } from 'node:dns/promises';
 import { buildDirectProvider } from './build-direct-provider';
 import { upstreamRequest } from './upstream-request';
 import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
+
+jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -48,7 +51,7 @@ function mockFetch(response: Response = new Response('{}')) {
   return fetchMock;
 }
 
-function send(provider: ReturnType<typeof directProvider>) {
+function send(provider: ReturnType<typeof directProvider>, signal?: AbortSignal) {
   return upstreamRequest({
     chatApi: 'chat_completions',
     search: '',
@@ -56,10 +59,13 @@ function send(provider: ReturnType<typeof directProvider>) {
     body: { model: 'upstream-model', messages: [{ role: 'user', content: 'hi' }] },
     extraHeaders: {},
     provider,
+    signal,
     vercelRequestId: 'fra1::abc',
     reasoningEffort: null,
   });
 }
+
+const lookupMock = jest.mocked(lookup);
 
 function setTargetEnv(value: string | undefined) {
   if (value === undefined) delete process.env.VERCEL_TARGET_ENV;
@@ -69,6 +75,7 @@ function setTargetEnv(value: string | undefined) {
 describe('upstreamRequest upstream URL policy', () => {
   beforeEach(() => {
     clearUpstreamUrlPolicyCache();
+    lookupMock.mockReset();
   });
 
   afterEach(() => {
@@ -76,9 +83,9 @@ describe('upstreamRequest upstream URL policy', () => {
     setTargetEnv(originalTargetEnv);
   });
 
-  describe.each(['production', 'staging'])('when VERCEL_TARGET_ENV is %s', targetEnv => {
+  describe('when VERCEL_TARGET_ENV is staging', () => {
     beforeEach(() => {
-      setTargetEnv(targetEnv);
+      setTargetEnv('staging');
     });
 
     it('sends to a public HTTPS upstream without following redirects', async () => {
@@ -116,15 +123,31 @@ describe('upstreamRequest upstream URL policy', () => {
     });
 
     it('reports an unresolvable host as temporarily unavailable', async () => {
+      lookupMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND llm.example.com'));
       const fetchMock = mockFetch();
 
-      const result = await send(directProvider('https://upstream-url-policy-test.invalid/v1'));
+      const result = await send(directProvider('https://llm.example.com/v1'));
 
       expect(fetchMock).not.toHaveBeenCalled();
       expect(result.response.status).toBe(503);
       const body = await result.response.json();
       expect(body.error_type).toBe('temporarily_unavailable');
       expect(body.error).toContain('could not resolve the upstream provider host');
+    });
+
+    it('releases the request when the client disconnects during a stalled DNS lookup', async () => {
+      lookupMock.mockReturnValue(new Promise(() => {}));
+      const fetchMock = mockFetch();
+      const client = new AbortController();
+
+      const pending = send(directProvider('https://llm.example.com/v1'), client.signal);
+      client.abort(new DOMException('client went away', 'AbortError'));
+      const result = await pending;
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.type).toBe('error');
+      expect(result.response.status).toBe(499);
+      expect((await result.response.json()).error_type).toBe('client_disconnect');
     });
 
     it('rejects a secure proxy request whose upstream URL is not public', async () => {
@@ -157,7 +180,7 @@ describe('upstreamRequest upstream URL policy', () => {
     });
   });
 
-  it.each(['preview', undefined])(
+  it.each(['production', 'preview', undefined])(
     'leaves the request unchecked when VERCEL_TARGET_ENV is %s',
     async targetEnv => {
       setTargetEnv(targetEnv);

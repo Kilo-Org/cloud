@@ -437,8 +437,8 @@ export async function makeErrorReadable({
     const byokMessage = await byokErrorMessage(response, userByokProviderIds);
     if (byokMessage) {
       if (specificByokMessage !== undefined) {
-        // Provider text is returned to the key owner but kept out of logs,
-        // since some providers echo a masked fragment of the key.
+        // Log only the fixed text so this line stays stable to search on;
+        // captureProxyError already logs the upstream body.
         warnExceptInTest(`Responding with ${response.status} ${specificByokMessage}`);
       }
       return NextResponse.json(

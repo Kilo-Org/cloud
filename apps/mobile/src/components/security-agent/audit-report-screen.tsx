@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatCalendarDate, formatDate, formatNumber } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -70,9 +70,9 @@ function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>
   const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
     timeZone: 'UTC',
   });
-  const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
-    timeZone: 'UTC',
-  });
+  // `displayEnd` is a date-only calendar day, not an instant: format its
+  // calendar components so its rendered day matches the backend value.
+  const end = formatCalendarDate(report.period.displayEnd, i18n.language);
   const generatedAt = formatDate(parseTimestamp(report.generatedAt), i18n.language, {
     timeZone: 'UTC',
   });
@@ -162,9 +162,7 @@ function AuditReportView({
     const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
       timeZone: 'UTC',
     });
-    const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
-      timeZone: 'UTC',
-    });
+    const end = formatCalendarDate(report.period.displayEnd, i18n.language);
     // Explorer security-audit finding 3: CenteredState's measured path painted
     // the icon bubble but collapsed the copy, so the screen owns the layout and
     // EmptyState renders its plain content (`placement="static"`).

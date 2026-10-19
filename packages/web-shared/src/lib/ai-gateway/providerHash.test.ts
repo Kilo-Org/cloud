@@ -92,14 +92,15 @@ describe('session tracking identifiers', () => {
     );
   });
 
-  it('does not set an OpenRouter user on Vercel messages requests', () => {
+  it('sets the Vercel user hash on Vercel messages requests', () => {
     const request: GatewayRequest = {
       kind: 'messages',
       body: { model: 'test-model', messages: [], max_tokens: 100 },
     };
-    applyTrackingIds(request, VERCEL_AI_GATEWAY, userId, sessionId);
+    applyTrackingIds(request, VERCEL_AI_GATEWAY, userId, null);
 
-    expect(request.body).not.toHaveProperty('user');
+    expect(request.body).toHaveProperty('user', generateVercelDownstreamSafetyIdentifier(userId));
+    expect(request.body).not.toHaveProperty('session_id');
   });
 
   const promptCacheKeyRequests = (promptCacheKey: string): GatewayRequest[] => [

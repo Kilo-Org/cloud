@@ -69,11 +69,11 @@ export function applyTrackingIds(
   const taskHash = taskId ? generateProviderSpecificSessionHash(userId, taskId, provider) : '';
   if (request.kind === 'messages') {
     request.body.metadata = { ...request.body.metadata, user_id: userHash };
-    if (provider.id === 'openrouter') {
+    if (provider.id === 'openrouter' || provider.id === 'vercel') {
       request.body.user = userHash;
-    }
-    if (taskHash && (provider.id === 'openrouter' || provider.id === 'vercel')) {
-      request.body.session_id = taskHash;
+      if (taskHash) {
+        request.body.session_id = taskHash;
+      }
     }
   } else {
     const clientCacheKey = request.body.prompt_cache_key;

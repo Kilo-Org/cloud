@@ -53,7 +53,7 @@ describe('GET /api/device-auth/codes/[code] (status only)', () => {
     expect(await response.json()).toEqual({ status: 'pending' });
   });
 
-  test('reports 202 pending for an approved request', async () => {
+  test('reports 410 expired for an approved request', async () => {
     mockGet.mockResolvedValue({
       status: 'approved',
       expires_at: new Date(Date.now() + 60_000).toISOString(),
@@ -62,10 +62,8 @@ describe('GET /api/device-auth/codes/[code] (status only)', () => {
     const response = await GET(new NextRequest(SAMPLE_URL), {
       params: Promise.resolve({ code: SAMPLE_CODE }),
     });
-    expect(response.status).toBe(202);
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(body['status']).toBe('pending');
-    expect(body).toEqual({ status: 'pending' });
+    expect(response.status).toBe(410);
+    expect(await response.json()).toEqual({ status: 'expired' });
   });
 
   test('reports 403 denied', async () => {

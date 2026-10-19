@@ -40,9 +40,10 @@ export const GET = withRestTiming(
         return NextResponse.json({ status: 'pending' }, { status: 202 });
       case 'denied':
         return NextResponse.json({ status: 'denied' }, { status: 403 });
-      case 'approved':
       default:
-        return NextResponse.json({ status: 'pending' }, { status: 202 });
+        // Approved or unknown: the caller cannot complete sign-in through
+        // this endpoint, so answer with the terminal status.
+        return NextResponse.json({ status: 'expired' }, { status: 410 });
     }
   }
 );

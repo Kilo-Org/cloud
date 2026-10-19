@@ -29,7 +29,7 @@ import { resolveSecret } from '../../auth.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
 import {
   assertContainerCapacity,
-  isContainerConcurrencyLimitError,
+  getContainerCapacityFailureReason,
 } from '../../container-concurrency.js';
 import { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
 import { createVercelBillingRuntime, type VercelBillingRuntime } from './vercel-billing-runtime.js';
@@ -3918,6 +3918,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (pin.billing) {
           await assertContainerCapacity(this.env, {
             subject: pin.billing.subject,
+            actor: pin.billing.actor,
             instanceId: pin.billing.sandboxId,
             checkpoint: 'control-plane-create',
             billingOrigin: pin.billing.metadata?.origin,
@@ -4131,8 +4132,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           },
           'warn'
         );
-        if (isContainerConcurrencyLimitError(error)) {
-          await this.failCreationRoutes(allocationId, false, 'container_limit_reached');
+        const capacityFailure = getContainerCapacityFailureReason(error);
+        if (capacityFailure) {
+          await this.failCreationRoutes(allocationId, false, capacityFailure);
           return;
         }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {

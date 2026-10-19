@@ -18,18 +18,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
 jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
-  kiloExclusiveModels: [
-    {
-      public_id: 'kilo/hidden-model',
-      status: 'hidden',
-    },
-    {
-      public_id: 'kilo/public-model',
-      status: 'public',
-    },
-  ],
-}));
 
 const { getEnhancedOpenRouterModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
@@ -152,26 +140,6 @@ describe('auto-routing-pool-validation', () => {
         error: expect.objectContaining({
           reason: 'virtual_model',
           message: poolValidationMessage('virtual_model'),
-        }),
-      });
-    });
-
-    test('rejects hidden exclusive models', async () => {
-      mockedGetEnhanced.mockResolvedValue({
-        data: [model('kilo/hidden-model')],
-      });
-
-      const result = await validatePoolEntries({
-        user: { id: 'user-1' },
-        organizationId: null,
-        entries: [{ model: 'kilo/hidden-model' }],
-      });
-
-      expect(result).toEqual({
-        ok: false,
-        error: expect.objectContaining({
-          reason: 'hidden_model',
-          message: poolValidationMessage('hidden_model'),
         }),
       });
     });

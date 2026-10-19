@@ -33,6 +33,7 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     last_event_types: null,
     rep: 0,
     timed_out: 0,
+    prompt_revision: 2,
     ...overrides,
   };
 }

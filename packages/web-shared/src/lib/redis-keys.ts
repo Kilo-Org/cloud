@@ -5,6 +5,8 @@
  * collisions when adding new features.
  */
 
+import { BLACKLISTED_DOMAINS_REDIS_KEY } from '@kilocode/worker-utils/account-access';
+
 declare const redisKeyBrand: unique symbol;
 
 export type RedisKey = string & {
@@ -13,7 +15,7 @@ export type RedisKey = string & {
 
 const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as Key & RedisKey;
 
-export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
+export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey(BLACKLISTED_DOMAINS_REDIS_KEY);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 

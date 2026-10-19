@@ -50,6 +50,7 @@ import {
   device_sessions,
   native_attested_keys,
   auto_top_up_configs,
+  auto_routing_custom_routers,
   platform_integrations,
   platform_oauth_credentials,
   platform_access_token_credentials,
@@ -129,6 +130,10 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
+  agent_briefing_reports,
+  agent_briefing_events,
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
@@ -997,7 +1002,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, review memory feedback/proposals,
- *   device_auth_requests, auto_top_up_configs,
+ *   device_auth_requests, auto_top_up_configs, auto_routing_custom_routers,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences)
@@ -1521,6 +1526,9 @@ export async function anonymizeCloudUserData(
   // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
   await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
   await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
+  await tx
+    .delete(auto_routing_custom_routers)
+    .where(eq(auto_routing_custom_routers.owned_by_user_id, userId));
   await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
   await tx
     .update(kiloclaw_cli_runs)
@@ -1559,6 +1567,14 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
+  await tx.delete(agent_briefing_reports).where(eq(agent_briefing_reports.kilo_user_id, userId));
+  await tx.delete(agent_briefing_events).where(eq(agent_briefing_events.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_context_preferences)
+    .where(eq(agent_briefing_context_preferences.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_preferences)
+    .where(eq(agent_briefing_preferences.kilo_user_id, userId));
   // Spend alerts are account-owned configuration, counters, and delivery
   // payloads; delivery recipients carry billing contact PII. Personal scope
   // keys use `user:<id>`, and deleting the settings row cascades to its rules

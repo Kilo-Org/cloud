@@ -110,6 +110,8 @@ type ContainersRecord = {
   lastSnapshot: { id: string; sourceAllocation: string } | null;
   /** How this allocation's container was started; absent on a record that predates it. */
   startSource?: ContainersStartSource;
+  /** Image selected for this allocation; absent on records written before image pinning. */
+  startImage?: string;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: WrapperAttempt;
@@ -118,6 +120,7 @@ type ContainersRecord = {
 };
 
 type ResolvedStart = {
+  image: string;
   source: ContainersStartSource;
   options: ContainerStartupOptions;
   snapshotId: string | null;
@@ -394,6 +397,7 @@ export class SandboxContainers extends DurableObject<Env> {
       stopOpId: null,
       wrapperAttempt: 'exec_pending',
       startSource: start.source,
+      startImage: start.image,
     };
     if (input.egressAllowlist === undefined) {
       delete launching.egressPolicy;
@@ -428,10 +432,13 @@ export class SandboxContainers extends DurableObject<Env> {
     input: ContainersLaunchInput,
     allowRepository: boolean
   ): Promise<ResolvedStart> {
+    const image = this.containerImage();
     const imageStart: ResolvedStart = {
+      image,
       source: 'image',
       options: this.startOptions(
         input.instance,
+        image,
         this.nativeLaunchEnv(
           input.env,
           input.containment === true || input.egressAllowlist !== undefined
@@ -449,7 +456,7 @@ export class SandboxContainers extends DurableObject<Env> {
       this.logSnapshotLookup('image', 'no_repo_key');
       return imageStart;
     }
-    const indexKey = await repoSnapshotIndexKey(input.repoKey, this.containerImage());
+    const indexKey = await repoSnapshotIndexKey(input.repoKey, image);
     if (input.skipRepository === true) {
       this.logSnapshotLookup('image', 'skipped');
       return imageStart;
@@ -477,9 +484,11 @@ export class SandboxContainers extends DurableObject<Env> {
       size: entry.size,
     });
     return {
+      image,
       source: 'repository',
       options: this.startOptions(
         input.instance,
+        image,
         this.nativeLaunchEnv(
           input.env,
           input.containment === true || input.egressAllowlist !== undefined
@@ -1066,6 +1075,7 @@ export class SandboxContainers extends DurableObject<Env> {
 
   private startOptions(
     instance: ContainerInstanceSize,
+    image: string,
     env: Record<string, string>,
     egressAllowlist?: string[],
     snapshotId?: string
@@ -1073,9 +1083,7 @@ export class SandboxContainers extends DurableObject<Env> {
     // Native issuance: the main process is the supervisor, not the image default
     // `sleep infinity`. The supervisor script is already in the image.
     return {
-      ...(snapshotId === undefined
-        ? { image: this.containerImage() }
-        : { containerSnapshot: { id: snapshotId } }),
+      ...(snapshotId === undefined ? { image } : { containerSnapshot: { id: snapshotId } }),
       instance,
       enableInternet: egressAllowlist === undefined,
       entrypoint: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
@@ -1249,7 +1257,7 @@ export class SandboxContainers extends DurableObject<Env> {
 
   /**
    * Snapshot the running container's root filesystem as the repository snapshot
-   * for `repoKey` and this image. It does not take the operation queue: a capture
+   * for `repoKey` and its recorded start image. It does not take the operation queue: a capture
    * of unknown duration must not delay a stop or a launch. The snapshot is
    * published only while `allocationRef` is still the running allocation, and
    * any failure is a `false` the caller may ignore; a capture never fails a start.
@@ -1262,7 +1270,13 @@ export class SandboxContainers extends DurableObject<Env> {
     const index = this.repoSnapshotIndex();
     const container = this.ctx.container;
     if (index === null || !container || container.running !== true) return false;
-    if (!(await this.isRunningAllocation(allocationRef))) return false;
+    const record = await this.readRecord();
+    if (
+      record.state !== 'running' ||
+      record.allocationRef !== allocationRef ||
+      record.startImage === undefined
+    )
+      return false;
     const startedAt = Date.now();
     try {
       const snapshot = await withTimeout(
@@ -1276,7 +1290,7 @@ export class SandboxContainers extends DurableObject<Env> {
         logRepositoryCapture('abandoned', snapshotMs, { size });
         return false;
       }
-      const key = await repoSnapshotIndexKey(repoKey, this.containerImage());
+      const key = await repoSnapshotIndexKey(repoKey, record.startImage);
       // The capture start bounds the contents' age from above, so an age logged on
       // use never understates how stale the repository is.
       const stored = await index.store(key, {

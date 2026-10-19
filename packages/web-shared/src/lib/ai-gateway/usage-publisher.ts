@@ -13,7 +13,7 @@ export type UsageEnqueueOutcome =
   | { kind: 'accepted' }
   | { kind: 'unavailable'; reason: string };
 
-/** Enqueues usage through the authenticated endpoint; currently has no gateway callers. */
+/** HTTP 202 confirms enqueueing, not a committed usage row. */
 export async function enqueueUsage(payload: UsageRecordRequest): Promise<UsageEnqueueOutcome> {
   if (!USAGE_INGEST_URL || !USAGE_INGEST_PUBLISH_SECRET) return { kind: 'disabled' };
 

@@ -10,6 +10,7 @@ import {
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
+  getGitHubConnectionStatusForOwner,
   getIntegrationForOrganization,
   updateIntegrationMetadata,
 } from '@/lib/integrations/db/platform-integrations';
@@ -441,27 +442,12 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
   /**
    * Gets the GitHub App installation status
-   * (Replaces getGitHubStatus - now checks for GitHub App instead of OAuth)
    */
   getGitHubStatus: organizationMemberProcedure.query(async ({ input }) => {
-    const integration = await getIntegrationForOrganization(input.organizationId, 'github');
-
-    if (!isPlatformIntegrationHealthy(integration)) {
-      return {
-        connected: false,
-        integration: null,
-      };
-    }
-
-    return {
-      connected: true,
-      integration: {
-        accountLogin: integration.platform_account_login,
-        repositorySelection: integration.repository_access,
-        installedAt: integration.installed_at,
-        isValid: true,
-      },
-    };
+    return await getGitHubConnectionStatusForOwner({
+      type: 'org',
+      id: input.organizationId,
+    });
   }),
 
   /**

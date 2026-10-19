@@ -2,6 +2,7 @@ import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/i
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
+  getGitHubConnectionStatusForOwner,
   getIntegrationForOwner,
   updateIntegrationMetadataForOwner,
 } from '@/lib/integrations/db/platform-integrations';
@@ -168,24 +169,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
    */
   getGitHubStatus: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
-    const integration = await getIntegrationForOwner(owner, 'github');
-
-    if (!integration || integration.integration_status !== 'active') {
-      return {
-        connected: false,
-        integration: null,
-      };
-    }
-
-    return {
-      connected: true,
-      integration: {
-        accountLogin: integration.platform_account_login,
-        repositorySelection: integration.repository_access,
-        installedAt: integration.installed_at,
-        isValid: !integration.suspended_at,
-      },
-    };
+    return await getGitHubConnectionStatusForOwner(owner);
   }),
 
   /**

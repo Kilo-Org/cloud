@@ -1073,6 +1073,43 @@ export async function getIntegrationForOwner(
   return integration || null;
 }
 
+/** Connection-status shape consumed by the reviewer status surfaces. */
+export type GitHubConnectionStatus = {
+  connected: boolean;
+  integration: {
+    accountLogin: string | null;
+    repositorySelection: string | null;
+    installedAt: string | null;
+    isValid: boolean;
+  } | null;
+};
+
+/**
+ * One connection rule for the GitHub reviewer surfaces: the owner's workflow
+ * installation (org owners resolve to their healthy primary row) counts as
+ * connected only when the integration is healthy, matching what the
+ * repository picker, Security Agent, and every operational caller require.
+ */
+export async function getGitHubConnectionStatusForOwner(
+  owner: Owner
+): Promise<GitHubConnectionStatus> {
+  const integration = await getIntegrationForOwner(owner, PLATFORM.GITHUB);
+
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return { connected: false, integration: null };
+  }
+
+  return {
+    connected: true,
+    integration: {
+      accountLogin: integration.platform_account_login,
+      repositorySelection: integration.repository_access,
+      installedAt: integration.installed_at,
+      isValid: !integration.suspended_at,
+    },
+  };
+}
+
 /**
  * Gets all platform integrations for an owner (user or organization)
  */

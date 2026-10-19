@@ -4034,3 +4034,100 @@ describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
     expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
   });
 });
+
+describe('personalReviewAgent.getGitHubStatus connection rule', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function seedGitHubIntegration(
+    overrides: Partial<typeof platform_integrations.$inferInsert> = {}
+  ) {
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `inst-${crypto.randomUUID()}`,
+        github_app_type: 'standard',
+        github_connection_role: 'workflow',
+        integration_status: 'active',
+        repository_access: 'all',
+        platform_account_login: 'octocat',
+        installed_at: '2026-01-01T00:00:00Z',
+        ...overrides,
+      })
+      .returning();
+    return row;
+  }
+
+  it('reports the healthy active workflow installation as connected', async () => {
+    await seedGitHubIntegration();
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octocat',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+        isValid: true,
+      },
+    });
+  });
+
+  it('reports a locally disconnected installation as not connected', async () => {
+    // Regression: the status must use the same health rule as the repository
+    // picker and Security Agent, so a disconnected installation cannot reach
+    // reviewer screens whose every repository call then fails.
+    await seedGitHubIntegration({ github_disconnected_at: '2026-02-01T00:00:00Z' });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports a suspended installation as not connected', async () => {
+    await seedGitHubIntegration({
+      integration_status: 'suspended',
+      suspended_at: '2026-02-01T00:00:00Z',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports an installation awaiting reauthorization as not connected', async () => {
+    await seedGitHubIntegration({ auth_invalid_at: '2026-02-01T00:00:00Z' });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports not connected without any installation', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+});

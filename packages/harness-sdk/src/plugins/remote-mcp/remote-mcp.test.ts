@@ -156,7 +156,9 @@ describe('a tool with an MCP Apps view', () => {
   });
 
   it('reads no view out of metadata that names something else', () => {
-    expect(uiResourceUriOf({ _meta: { 'ui/resourceUri': 'https://work/chart.html' } })).toBeUndefined();
+    expect(
+      uiResourceUriOf({ _meta: { 'ui/resourceUri': 'https://work/chart.html' } })
+    ).toBeUndefined();
   });
 
   it('keeps the model-facing tool untouched by any of it', async () => {
@@ -189,7 +191,9 @@ describe('reading a resource off a remote server', () => {
     const served = await serve(chartApp);
     const error = await run(
       Effect.flip(
-        remoteMcpClient(serverFor('work', served.url, token), deps()).resource('ui://work/gone.html')
+        remoteMcpClient(serverFor('work', served.url, token), deps()).resource(
+          'ui://work/gone.html'
+        )
       )
     );
     expect(error.kind).toBe('protocol');

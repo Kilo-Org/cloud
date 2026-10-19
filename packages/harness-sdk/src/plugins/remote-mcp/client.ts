@@ -133,10 +133,5 @@ const remoteMcpClient = (server: RemoteMcpServer, deps: RemoteMcpClientDeps): Re
     ),
 });
 
-export type {
-  RemoteMcpClient,
-  RemoteMcpClientDeps,
-  RemoteMcpResource,
-  RemoteMcpTool,
-};
+export type { RemoteMcpClient, RemoteMcpClientDeps, RemoteMcpResource, RemoteMcpTool };
 export { defaultCallTimeoutMs, remoteMcpClient };

@@ -1,11 +1,6 @@
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import type {
-  jsonSchemaValidator,
-} from '@modelcontextprotocol/sdk/validation/types.js';
-import type {
-  RemoteMcpAbort,
-  RemoteMcpRequest,
-} from './http.js';
+import type { jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
+import type { RemoteMcpAbort, RemoteMcpRequest } from './http.js';
 import type { RemoteMcpToken } from './credential.js';
 import type { RemoteMcpError } from './server.js';
 

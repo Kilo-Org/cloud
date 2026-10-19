@@ -1,19 +1,9 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Effect } from 'effect';
-import {
-  authProviderFor,
-  credentialFor,
-  type RemoteMcpOAuthOption,
-} from './credential.js';
+import { authProviderFor, credentialFor, type RemoteMcpOAuthOption } from './credential.js';
 import { failed } from './failure.js';
-import {
-  bounded,
-  defaultCallTimeoutMs,
-  headersFor,
-  makeDeadline,
-  type Deadline,
-} from './http.js';
+import { bounded, defaultCallTimeoutMs, headersFor, makeDeadline, type Deadline } from './http.js';
 import type { RemoteMcpClientDeps } from './deps.js';
 import type { RemoteMcpError, RemoteMcpServer } from './server.js';
 import type { RemoteMcpTransport } from './transport.js';

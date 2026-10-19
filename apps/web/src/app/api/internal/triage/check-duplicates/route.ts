@@ -16,13 +16,12 @@
  * Protected by internal API secret
  */
 
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getTriageTicketById, updateTriageTicketStatus } from '@/lib/auto-triage/db/triage-tickets';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { createEmbeddingService } from '@/lib/embeddings/embedding-providers';
 import { getMilvusClient } from '@/lib/code-indexing/milvus';
 import { createHash } from 'crypto';
@@ -171,10 +170,8 @@ async function findSimilarTickets(
 export async function POST(req: NextRequest) {
   try {
     // Validate internal API secret
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const unauthorized = authorizeInternalApiRequest(req);
+    if (unauthorized) return unauthorized;
 
     const body: CheckDuplicatesRequest = await req.json();
     const { ticketId, threshold = SIMILARITY_THRESHOLD, limit = SEARCH_LIMIT } = body;

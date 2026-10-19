@@ -87,12 +87,12 @@ describe('stripImageMetadata', () => {
     expect(mocks.captureException).not.toHaveBeenCalled();
   });
 
-  it('reports the caught cause, the input extension, and a per-extension fingerprint when every attempt fails', async () => {
-    const firstError = new Error('jpeg encode failed');
+  it('reports the caught cause, the input extension, and a per-extension fingerprint when the retry also fails', async () => {
+    const firstError = new Error('webp encode failed');
     const retryError = new Error('jpeg retry failed');
     mocks.manipulateAsync.mockRejectedValueOnce(firstError).mockRejectedValueOnce(retryError);
 
-    const result = await stripImageMetadata('file:///cache/original.heic', 'heic');
+    const result = await stripImageMetadata('file:///cache/original.webp', 'webp');
 
     expect(mocks.manipulateAsync).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ ok: false });
@@ -104,7 +104,18 @@ describe('stripImageMetadata', () => {
     expect(reported).toBeInstanceOf(Error);
     expect(reported.message).toBe('Attachment image metadata strip failed');
     expect(reported.cause).toBe(retryError);
-    expect(options.extra).toEqual({ inputExtension: 'heic' });
-    expect(options.fingerprint).toEqual(['agent-attachments-strip-image-metadata', 'heic']);
+    expect(options.extra).toEqual({ inputExtension: 'webp' });
+    expect(options.fingerprint).toEqual(['agent-attachments-strip-image-metadata', 'webp']);
+  });
+
+  it('skips the retry for JPEG-family inputs whose only format already is JPEG', async () => {
+    mocks.manipulateAsync.mockRejectedValue(new Error('jpeg encode failed'));
+
+    const result = await stripImageMetadata('file:///cache/original.heic', 'heic');
+
+    expect(mocks.manipulateAsync).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ ok: false });
+    const [reported] = mocks.captureException.mock.calls[0] as [Error];
+    expect(reported.cause).toMatchObject({ message: 'jpeg encode failed' });
   });
 });

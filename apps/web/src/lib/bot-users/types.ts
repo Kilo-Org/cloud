@@ -64,6 +64,7 @@ export function getBotDisplayName(botType: BotType): string {
 
 /** Internal bots are platform-owned workload users, not per-org product bots. */
 export const INTERNAL_BOT_USER_ID_PREFIX = 'bot-internal-';
+const INTERNAL_BOT_EMAIL_DOMAIN = 'kilocode.internal';
 export const INTERNAL_BOT_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
 export function internalBotUserId(slug: string): string {
@@ -71,5 +72,5 @@ export function internalBotUserId(slug: string): string {
 }
 
 export function internalBotUserEmail(slug: string): string {
-  return `${slug}-internal-bot@kilocode.internal`;
+  return `${slug}-internal-bot@${INTERNAL_BOT_EMAIL_DOMAIN}`;
 }

@@ -58,11 +58,7 @@ import { fetchCustomRoutingTable } from './benchmark-origin';
 import { getRoutingTable } from './routing-table';
 import { getEffectiveAutoRoutingSettings } from './routing-mode';
 import type { HonoEnv } from './hono-env';
-import {
-  inheritedLegacyPoolMode,
-  resolveLegacyPoolRouting,
-  type LegacyPoolRouting,
-} from './legacy-pool-overlap';
+import { resolveLegacyPoolRouting, type LegacyPoolRouting } from './legacy-pool-overlap';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilitiesMap } from './model-capabilities';
 import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
@@ -906,9 +902,8 @@ async function decideCustomRouter(
     const owner = customRouterOwner(reference, payload);
     const stored = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
     if (!stored) throw new CustomRouterError('router_not_found', 'Custom router not found');
-    const router = await inheritedLegacyPoolMode(c.env, stored, payload);
     const routing = customRouting(
-      router,
+      stored,
       payload.clientEntries ?? [],
       new Set(payload.routingPolicy?.deniedModelIds ?? [])
     );

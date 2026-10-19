@@ -514,12 +514,6 @@ function applyUpdate(
   current: CustomRouterDefinition,
   input: z.infer<typeof UpdateCustomRouterRequestSchema>
 ): CustomRouterDefinition {
-  if (current.legacyPool && input.baseRouter !== undefined && input.baseRouter !== 'efficient') {
-    throw new CustomRouterApiError(
-      'invalid_request',
-      'The migrated pool base router cannot change during the notice period'
-    );
-  }
   const next: CustomRouterDefinition = {
     ...current,
     name: input.name ?? current.name,

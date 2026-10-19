@@ -1,48 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   customRouterEntryKey,
+  type AutoRoutingMode,
   type CustomRouterDefinition,
 } from '@kilocode/auto-routing-contracts';
-import type * as DbModule from '@kilocode/db';
 import type * as CustomRouterStoreModule from './custom-router-store';
 import type * as RoutingModeModule from './routing-mode';
-import {
-  getSharedOwnerSettings,
-  inheritedLegacyPoolMode,
-  resolveLegacyPoolRouting,
-  updateSharedPoolRouter,
-} from './legacy-pool-overlap';
+import { getSharedOwnerSettings, resolveLegacyPoolRouting } from './legacy-pool-overlap';
 
 const findLegacyPoolRouter = vi.hoisted(() => vi.fn());
 const getConfiguredAutoRoutingSettings = vi.hoisted(() => vi.fn());
-const clearCustomRouterCache = vi.hoisted(() => vi.fn());
-const dbSet = vi.hoisted(() => vi.fn());
-const dbReturning = vi.hoisted(() => vi.fn());
-const dbRead = vi.hoisted(() => vi.fn());
+const getConfiguredAutoRoutingMode = vi.hoisted(() => vi.fn());
 
 vi.mock('./custom-router-store', async importOriginal => ({
   ...(await importOriginal<typeof CustomRouterStoreModule>()),
   findLegacyPoolRouter,
-  clearCustomRouterCache,
 }));
 vi.mock('./routing-mode', async importOriginal => ({
   ...(await importOriginal<typeof RoutingModeModule>()),
   getCachedAutoRoutingSettings: getConfiguredAutoRoutingSettings,
   getConfiguredAutoRoutingSettings,
+  getConfiguredAutoRoutingMode,
 }));
-vi.mock('@kilocode/db', async importOriginal => {
-  const tx = {
-    execute: async () => {},
-    select: () => ({ from: () => ({ where: () => ({ limit: dbRead }) }) }),
-    update: () => ({ set: dbSet }),
-  };
-  return {
-    ...(await importOriginal<typeof DbModule>()),
-    getWorkerDb: () => ({
-      transaction: async (work: (transaction: typeof tx) => Promise<unknown>) => work(tx),
-    }),
-  };
-});
 
 const env = {
   HYPERDRIVE: { connectionString: 'postgres://worker' },
@@ -65,48 +44,33 @@ function router(overrides: Partial<CustomRouterDefinition> = {}): CustomRouterDe
   };
 }
 
-function storedRow(definition: CustomRouterDefinition) {
-  return {
-    id: definition.id,
-    owned_by_user_id: definition.ownerType === 'user' ? definition.ownerId : null,
-    owned_by_organization_id: definition.ownerType === 'org' ? definition.ownerId : null,
-    slug: definition.slug,
-    name: definition.name,
-    base_router: definition.baseRouter,
-    mode: definition.mode,
-    entries: definition.entries,
-    default_entry_key: definition.defaultEntryKey,
-    legacy_pool: true,
-    legacy_mode_inherited: definition.legacyModeInherited ?? false,
-  };
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   findLegacyPoolRouter.mockResolvedValue(null);
   getConfiguredAutoRoutingSettings.mockResolvedValue({ mode: null, pool: null });
-  dbRead.mockResolvedValue([storedRow(router())]);
-  dbSet.mockImplementation(values => {
-    dbReturning.mockResolvedValue([{ ...storedRow(router()), ...values }]);
-    return { where: () => ({ returning: dbReturning }) };
-  });
+  getConfiguredAutoRoutingMode.mockResolvedValue(null);
 });
 
-describe('shared legacy pool overlap', () => {
-  it('uses the canonical row without reading its old DO snapshot or relying on a conversion marker', async () => {
-    const canonical = router();
+describe('legacy pool overlap', () => {
+  it('reads the canonical pool and the DO mode without consulting the old pool snapshot', async () => {
+    const canonical = router({ mode: 'best_accuracy' });
     findLegacyPoolRouter.mockResolvedValue(canonical);
     await expect(
       getSharedOwnerSettings(env, { ownerType: 'user', ownerId: caller.userId })
-    ).resolves.toMatchObject({
-      mode: canonical.mode,
+    ).resolves.toEqual({
+      mode: null,
       pool: [{ model: 'pool/current' }],
       router: canonical,
     });
+    expect(getConfiguredAutoRoutingMode).toHaveBeenCalledWith(env, {
+      ownerType: 'user',
+      ownerId: caller.userId,
+    });
     expect(getConfiguredAutoRoutingSettings).not.toHaveBeenCalled();
+    expect(canonical.mode).toBe('best_accuracy');
   });
 
-  it('preserves independent organization mode precedence over a migrated personal pool', async () => {
+  it('applies the organization DO mode to the platform alias without mutating custom mode', async () => {
     const canonical = router();
     findLegacyPoolRouter.mockImplementation(async (_env, owner) =>
       owner.type === 'user' ? canonical : null
@@ -116,11 +80,7 @@ describe('shared legacy pool overlap', () => {
       mode: 'best_accuracy',
       router: { id: canonical.id, mode: 'best_accuracy', entries: canonical.entries },
     });
-    await expect(inheritedLegacyPoolMode(env, canonical, caller)).resolves.toMatchObject({
-      id: canonical.id,
-      mode: 'best_accuracy',
-      entries: canonical.entries,
-    });
+    expect(canonical.mode).toBe('cost_per_accuracy');
   });
 
   it('keeps an unmigrated org pool ahead of a migrated personal pool', async () => {
@@ -138,133 +98,49 @@ describe('shared legacy pool overlap', () => {
     });
   });
 
-  it('uses the migrated org pool before personal settings and leaves an explicit personal ID personal', async () => {
-    const personal = router();
-    const org = router({ ownerType: 'org', ownerId: caller.organizationId, mode: 'best_accuracy' });
+  it.each([
+    { personal: 'best_accuracy', org: null, expected: 'best_accuracy' },
+    { personal: 'best_accuracy', org: 'cost_per_accuracy', expected: 'cost_per_accuracy' },
+    { personal: 'cost_per_accuracy', org: 'best_accuracy', expected: 'best_accuracy' },
+    { personal: null, org: null, expected: 'cost_per_accuracy' },
+  ] satisfies {
+    personal: AutoRoutingMode | null;
+    org: AutoRoutingMode | null;
+    expected: AutoRoutingMode;
+  }[])('uses DO mode precedence even when both owners have migrated pools: %j', async modes => {
+    const personal = router({ mode: 'cost_per_accuracy', legacyModeInherited: false });
+    const org = router({
+      ownerType: 'org',
+      ownerId: caller.organizationId,
+      mode: 'best_accuracy',
+      legacyModeInherited: true,
+    });
     findLegacyPoolRouter.mockImplementation(async (_env, owner) =>
       owner.type === 'org' ? org : personal
     );
-    await expect(resolveLegacyPoolRouting(env, caller)).resolves.toMatchObject({ router: org });
-    await expect(inheritedLegacyPoolMode(env, personal, caller)).resolves.toMatchObject({
-      ownerType: 'user',
-      ownerId: personal.ownerId,
-      mode: 'best_accuracy',
+    getConfiguredAutoRoutingMode.mockImplementation(async (_env, owner) =>
+      owner.ownerType === 'org' ? modes.org : modes.personal
+    );
+    await expect(resolveLegacyPoolRouting(env, caller)).resolves.toMatchObject({
+      mode: modes.expected,
+      router: { ...org, mode: modes.expected },
     });
-  });
-
-  it.each([true, false])(
-    'preserves null versus explicit default org mode (inherited=%s)',
-    async inherited => {
-      const personal = router({ mode: 'best_accuracy' });
-      const org = router({
-        ownerType: 'org',
-        ownerId: caller.organizationId,
-        legacyModeInherited: inherited,
-      });
-      findLegacyPoolRouter.mockImplementation(async (_env, owner) =>
-        owner.type === 'org' ? org : personal
-      );
-      const expected = inherited ? 'best_accuracy' : 'cost_per_accuracy';
-      expect((await resolveLegacyPoolRouting(env, caller))?.mode).toBe(expected);
-      expect((await inheritedLegacyPoolMode(env, org, caller)).mode).toBe(expected);
-    }
-  );
-
-  it.each([true, false])(
-    'preserves null versus explicit default personal mode (inherited=%s)',
-    async inherited => {
-      const personal = router({ legacyModeInherited: inherited });
-      findLegacyPoolRouter.mockImplementation(async (_env, owner) =>
-        owner.type === 'user' ? personal : null
-      );
-      const settings = await getSharedOwnerSettings(env, {
-        ownerType: 'user',
-        ownerId: caller.userId,
-      });
-      expect(settings.mode).toBe(inherited ? null : 'cost_per_accuracy');
-      expect(
-        (await inheritedLegacyPoolMode(env, personal, { ...caller, organizationId: null })).mode
-      ).toBe('cost_per_accuracy');
-    }
-  );
-
-  it('fails closed on canonical storage failures instead of reading DO settings', async () => {
-    findLegacyPoolRouter.mockRejectedValue(new Error('database unavailable'));
-    await expect(resolveLegacyPoolRouting(env, caller)).rejects.toThrow('database unavailable');
+    expect(personal.mode).toBe('cost_per_accuracy');
+    expect(org.mode).toBe('best_accuracy');
     expect(getConfiguredAutoRoutingSettings).not.toHaveBeenCalled();
   });
 
-  it('writes old gateway pool edits into the canonical row and preserves a surviving default', async () => {
-    const current = router();
-    const updated = await updateSharedPoolRouter(env, current, {
-      mode: 'best_accuracy',
-      settings: { mode: 'best_accuracy', pool: [{ model: 'pool/new' }, { model: 'pool/current' }] },
-    });
-    expect(updated.defaultEntryKey).toBe(current.defaultEntryKey);
-    expect(dbSet).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mode: 'best_accuracy',
-        entries: [
-          { kind: 'gateway', model: 'pool/new' },
-          { kind: 'gateway', model: 'pool/current' },
-        ],
-        default_entry_key: current.defaultEntryKey,
-      })
-    );
-    expect(clearCustomRouterCache).toHaveBeenCalledOnce();
-  });
-
-  it('moves a removed default to the first new entry and rejects clearing the migrated pool', async () => {
-    const updated = await updateSharedPoolRouter(env, router(), {
-      mode: null,
-      settings: { mode: null, pool: [{ model: 'pool/new' }] },
-    });
-    expect(updated.defaultEntryKey).toBe(
-      customRouterEntryKey({ kind: 'gateway', model: 'pool/new' })
-    );
-    expect(updated.legacyModeInherited).toBe(true);
+  it('falls back to DO pool settings for nonmigrated owners', async () => {
+    getConfiguredAutoRoutingSettings.mockResolvedValue({ mode: 'best_accuracy', pool: null });
     await expect(
-      updateSharedPoolRouter(env, router(), {
-        mode: null,
-        settings: { mode: null, pool: null },
-      })
-    ).rejects.toThrow('cannot be cleared');
+      getSharedOwnerSettings(env, { ownerType: 'user', ownerId: caller.userId })
+    ).resolves.toEqual({ mode: 'best_accuracy', pool: null, router: null });
+    await expect(resolveLegacyPoolRouting(env, caller)).resolves.toBeUndefined();
   });
 
-  it('does not let an old editor silently discard client entries', async () => {
-    const current = router({
-      entries: [
-        { kind: 'gateway', model: 'pool/current' },
-        {
-          kind: 'client',
-          provider: 'ollama',
-          model: 'local-model',
-          variants: [],
-          capabilities: {
-            contextLength: null,
-            inputModalities: ['text'],
-            toolCall: false,
-            reasoning: false,
-          },
-          pricing: null,
-        },
-      ],
-    });
-    dbRead.mockResolvedValue([storedRow(current)]);
-    await expect(
-      updateSharedPoolRouter(env, current, {
-        mode: 'best_accuracy',
-        settings: { mode: 'best_accuracy', pool: [{ model: 'pool/new' }] },
-      })
-    ).rejects.toThrow('contains client entries');
-    expect(dbSet).not.toHaveBeenCalled();
-  });
-
-  it('persists mode-only edits without changing canonical entries or default', async () => {
-    const updated = await updateSharedPoolRouter(env, router(), { mode: 'best_accuracy' });
-    expect(updated.entries).toEqual(router().entries);
-    expect(updated.defaultEntryKey).toBe(router().defaultEntryKey);
-    expect(updated.legacyModeInherited).toBe(false);
-    expect(dbSet).toHaveBeenCalledWith({ mode: 'best_accuracy', legacy_mode_inherited: false });
+  it('fails closed on canonical storage failures instead of reading old pool settings', async () => {
+    findLegacyPoolRouter.mockRejectedValue(new Error('database unavailable'));
+    await expect(resolveLegacyPoolRouting(env, caller)).rejects.toThrow('database unavailable');
+    expect(getConfiguredAutoRoutingSettings).not.toHaveBeenCalled();
   });
 });

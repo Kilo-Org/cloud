@@ -103,7 +103,6 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
   const [draft, setDraft] = useState<Draft>(() => initialDraft(router));
   const [addModelId, setAddModelId] = useState<string | undefined>();
   const [submitted, setSubmitted] = useState(false);
-  const [modeEdited, setModeEdited] = useState(false);
   const modelsQuery = useModelSelectorList(organizationId);
 
   const entryKeys = useMemo(() => new Set(draft.entries.map(customRouterEntryKey)), [draft]);
@@ -131,7 +130,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
       const fields = {
         name: draft.name.trim(),
         baseRouter: draft.baseRouter,
-        ...(!router?.legacyModeInherited || modeEdited ? { mode: draft.mode } : {}),
+        mode: draft.mode,
         entries: draft.entries,
         defaultEntryKey: draft.defaultEntryKey,
       };
@@ -139,9 +138,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         ? {
             name: fields.name,
             ...(draft.baseRouter !== router.baseRouter ? { baseRouter: draft.baseRouter } : {}),
-            ...((router.legacyModeInherited ? modeEdited : draft.mode !== router.mode)
-              ? { mode: draft.mode }
-              : {}),
+            ...(draft.mode !== router.mode ? { mode: draft.mode } : {}),
             ...(draft.entries.length !== router.entries.length ||
             draft.entries.some(
               (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
@@ -265,15 +262,15 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor={fieldId('base')}>Base router</Label>
+              <Label htmlFor={fieldId('base')}>Benchmark difficulty</Label>
               <Select
                 value={draft.baseRouter}
-                disabled={pending || router?.legacyPool}
+                disabled={pending}
                 onValueChange={value =>
                   setDraft(current => ({ ...current, baseRouter: AutoRouterSchema.parse(value) }))
                 }
               >
-                <SelectTrigger id={fieldId('base')}>
+                <SelectTrigger id={fieldId('base')} aria-describedby={fieldId('base-help')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -284,31 +281,24 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-xs">
-                {router?.legacyPool
-                  ? 'The base stays Efficient while this pool also serves kilo-auto/efficient.'
-                  : 'Sets the benchmark dataset and routing thresholds.'}
+              <p id={fieldId('base-help')} className="text-muted-foreground text-xs">
+                Uses the Efficient or Frontier benchmark dataset and routing thresholds. Does not
+                change this router&apos;s mode or model pool.
               </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor={fieldId('mode')}>Routing mode</Label>
               <Select
-                value={router?.legacyModeInherited && !modeEdited ? 'inherit' : draft.mode}
+                value={draft.mode}
                 disabled={pending}
-                onValueChange={value => {
-                  setModeEdited(value !== 'inherit');
-                  if (value !== 'inherit') {
-                    setDraft(current => ({ ...current, mode: AutoRoutingModeSchema.parse(value) }));
-                  }
-                }}
+                onValueChange={value =>
+                  setDraft(current => ({ ...current, mode: AutoRoutingModeSchema.parse(value) }))
+                }
               >
                 <SelectTrigger id={fieldId('mode')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {router?.legacyModeInherited ? (
-                    <SelectItem value="inherit">Keep inherited mode</SelectItem>
-                  ) : null}
                   {MODE_OPTIONS.map(option => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
@@ -316,6 +306,9 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-muted-foreground text-xs">
+                Only applies to this custom router, independently of the platform routing mode.
+              </p>
             </div>
           </div>
 

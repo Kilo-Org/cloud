@@ -16,8 +16,7 @@ import {
   fetchBenchmarkProfileStatuses,
   registerBenchmarkProfiles,
 } from './benchmark-origin';
-import { CustomRouterError, customRouterErrorResponse } from './caller-auth';
-import { getSharedOwnerSettings, updateSharedPoolRouter } from './legacy-pool-overlap';
+import { getSharedOwnerSettings } from './legacy-pool-overlap';
 import type { HonoEnv } from './hono-env';
 import { migrateOwnerPoolForSettings } from './owner-pool-conversion';
 import {
@@ -25,6 +24,9 @@ import {
   LEGACY_POOL_MIGRATION_WRITE_ERROR,
   setAutoRoutingSettings,
 } from './routing-mode';
+
+const MIGRATED_ROUTING_SETTINGS_ERROR =
+  'Edit migrated pools in custom router settings and platform mode at /admin/routing-mode.';
 
 function settingsResponse(params: {
   ownerType: AutoRoutingModeOwnerType;
@@ -112,16 +114,11 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
       503
     );
   }
+  if (configured.router) {
+    return c.json({ error: MIGRATED_ROUTING_SETTINGS_ERROR, retryable: false }, 409);
+  }
   let poolStatuses: BenchmarkProfileEntryStatus[] = [];
   if (pool !== null) {
-    if (configured.router?.entries.some(entry => entry.kind === 'client')) {
-      return customRouterErrorResponse(
-        new CustomRouterError(
-          'invalid_request',
-          'This pool contains client entries; edit it in custom router settings'
-        )
-      );
-    }
     try {
       const registered = await registerBenchmarkProfiles(c.env, {
         ownerType,
@@ -143,7 +140,7 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
       return c.json({ error: 'Failed to register benchmark profiles' }, 502);
     }
   }
-  if (!configured.router && pool !== null) {
+  if (pool !== null) {
     try {
       const outcome = await migrateOwnerPoolForSettings(c.env, owner, { mode, pool });
       if (outcome !== 'created' && outcome !== 'exists') {
@@ -157,6 +154,9 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
       }
       configured = await getSharedOwnerSettings(c.env, owner);
       if (!configured.router) throw new Error('Migrated pool is unavailable');
+      if (JSON.stringify(configured.pool) !== JSON.stringify(pool)) {
+        return c.json({ error: MIGRATED_ROUTING_SETTINGS_ERROR, retryable: false }, 409);
+      }
     } catch {
       return c.json(
         { error: 'Pool migration is unavailable. Retry this edit.', retryable: true },
@@ -166,28 +166,15 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
   }
 
   if (configured.router) {
-    try {
-      const updated = await updateSharedPoolRouter(c.env, configured.router, {
-        mode,
-        settings: { mode, pool },
-      });
-      clearAutoRoutingSettingsCache();
-      return c.json(
-        settingsResponse({
-          ownerType,
-          ownerId,
-          configuredMode: updated.legacyModeInherited ? null : updated.mode,
-          configuredPool: pool,
-          poolStatuses,
-        })
-      );
-    } catch (error) {
-      if (error instanceof CustomRouterError) return customRouterErrorResponse(error);
-      return c.json(
-        { error: 'Pool settings are unavailable. Retry this edit.', retryable: true },
-        503
-      );
-    }
+    return c.json(
+      settingsResponse({
+        ownerType,
+        ownerId,
+        configuredMode: configured.mode,
+        configuredPool: configured.pool,
+        poolStatuses,
+      })
+    );
   }
 
   try {

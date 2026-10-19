@@ -19,7 +19,11 @@ import { asc, gt } from 'drizzle-orm';
 import type { Handler } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
-import type { AutoRoutingOwnerSettings, StoredOwnerSettings } from './routing-mode';
+import {
+  clearAutoRoutingSettingsCache,
+  type AutoRoutingOwnerSettings,
+  type StoredOwnerSettings,
+} from './routing-mode';
 
 const READ_CONCURRENCY = 10;
 const OUTAGE_CONSECUTIVE_FAILURES = 5;
@@ -133,6 +137,7 @@ export async function migrateOwnerPoolForSettings(
   const namespace = env.AUTO_ROUTING_MODE_CONFIG;
   const stub = namespace.get(namespace.idFromName(`${owner.ownerType}:${owner.ownerId}`));
   const settings: StoredOwnerSettings = await stub.beginConversion(requested);
+  clearAutoRoutingSettingsCache();
   if (settings.pool === null) return null;
   const conversion: OwnerPoolConversion = {
     owner: { type: owner.ownerType, id: owner.ownerId },

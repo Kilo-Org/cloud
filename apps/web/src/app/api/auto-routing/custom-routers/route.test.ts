@@ -279,23 +279,32 @@ describe('/api/auto-routing/custom-routers', () => {
       });
     });
 
-    test('preserves the migrated slug, base, and row while allowing normal edits', async () => {
+    test('preserves the migrated slug and row while allowing benchmark difficulty edits', async () => {
       await create(routerBody({ slug: 'efficient' }));
       await db
         .update(auto_routing_custom_routers)
         .set({ legacy_pool: true })
         .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
 
-      for (const body of [{ baseRouter: 'frontier' }, { slug: 'renamed', name: 'Edited' }]) {
-        expect(
-          (
-            await updateRouter(
-              request('/user/efficient', { method: 'PATCH', body }),
-              params('user', 'efficient')
-            )
-          ).status
-        ).toBe(400);
-      }
+      expect(
+        (
+          await updateRouter(
+            request('/user/efficient', {
+              method: 'PATCH',
+              body: { slug: 'renamed', name: 'Edited' },
+            }),
+            params('user', 'efficient')
+          )
+        ).status
+      ).toBe(400);
+      expect(
+        (
+          await updateRouter(
+            request('/user/efficient', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
+            params('user', 'efficient')
+          )
+        ).status
+      ).toBe(200);
       expect(
         (
           await deleteRouter(
@@ -305,7 +314,7 @@ describe('/api/auto-routing/custom-routers', () => {
         ).status
       ).toBe(400);
       const [row] = await db.select().from(auto_routing_custom_routers);
-      expect(row).toMatchObject({ slug: 'efficient', base_router: 'efficient', legacy_pool: true });
+      expect(row).toMatchObject({ slug: 'efficient', base_router: 'frontier', legacy_pool: true });
     });
 
     test.each(['member', 'billing_manager'] as const)(

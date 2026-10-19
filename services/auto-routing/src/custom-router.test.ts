@@ -7,6 +7,7 @@ import {
   CUSTOM_ROUTER_TABLE_PATH,
   CustomRouterDecideResponseSchema,
   verifyAutoDecision,
+  type AutoRoutingMode,
   type CustomRouterDefinition,
   type CustomRouterEntry,
   type MirrorPayload,
@@ -179,6 +180,8 @@ const classification = {
 const benchmarkFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>();
 const recordUsage = vi.fn(async (_usage: UsageRecordRequest) => {});
 const cacheIdFromName = vi.fn((name: string) => name);
+const platformModes = new Map<string, AutoRoutingMode>();
+const getPlatformMode = vi.fn(async (key: string) => platformModes.get(key) ?? null);
 let customTable: RoutingTable | null = rankedTable;
 
 const env = {
@@ -204,7 +207,14 @@ const env = {
   },
   AUTO_ROUTING_MODE_CONFIG: {
     idFromName: (name: string) => name,
-    get: () => ({ getSettings: async () => ({ mode: null, pool: null }) }),
+    get: (key: string) => ({
+      getMode: () => getPlatformMode(key),
+      setMode: async (mode: AutoRoutingMode | null) => {
+        if (mode === null) platformModes.delete(key);
+        else platformModes.set(key, mode);
+      },
+      getSettings: async () => ({ mode: platformModes.get(key) ?? null, pool: null }),
+    }),
   },
 };
 
@@ -311,6 +321,8 @@ beforeEach(() => {
   clearClassificationHotCache();
   clearOrganizationPolicyCache();
   backgroundTasks.length = 0;
+  platformModes.clear();
+  getPlatformMode.mockClear();
   customTable = rankedTable;
   gatewayDeniedModelIds = [];
   gatewayFailuresLeft = 0;
@@ -376,6 +388,73 @@ afterEach(async () => {
 });
 
 describe('public custom router decide', () => {
+  it.each(['efficient', 'frontier'] as const)(
+    'uses the saved %s custom mode independently of platform modes and inheritance markers',
+    async baseRouter => {
+      let router = customRouter({
+        baseRouter,
+        mode: 'best_accuracy',
+        legacyPool: true,
+        legacyModeInherited: true,
+      });
+      findCustomRouter.mockImplementation(async () => router);
+      platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
+      platformModes.set(`org:${ORG_ID}`, 'cost_per_accuracy');
+      customTable = table({
+        [ROUTE]: [
+          {
+            model: 'client:ollama/qwen3:32b',
+            accuracy: 0.8,
+            avgCostUsd: 0,
+            meetsThreshold: true,
+            variant: null,
+          },
+          { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+        ],
+      });
+      const headers = { 'X-KiloCode-OrganizationId': ORG_ID };
+      const first = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers));
+      expect(first.decision).toMatchObject({ model: SONNET, fallback: false });
+
+      router = { ...router, mode: 'cost_per_accuracy' };
+      const edited = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers));
+      expect(edited.decision).toMatchObject({ model: 'client:ollama/qwen3:32b', fallback: false });
+      expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
+      expect(platformModes.get(`org:${ORG_ID}`)).toBe('cost_per_accuracy');
+      for (const [ownerType, ownerId] of [
+        ['user', USER_ID],
+        ['org', ORG_ID],
+      ] as const) {
+        const updated = await app.request(
+          'https://auto-routing.example.com/admin/routing-mode',
+          {
+            method: 'PUT',
+            headers: {
+              authorization: 'Bearer internal-secret',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ ownerType, ownerId, mode: 'best_accuracy' }),
+          },
+          env,
+          executionCtx
+        );
+        expect(updated.status).toBe(200);
+      }
+      const afterPlatformEdit = await decisionOf(
+        await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers)
+      );
+      expect(afterPlatformEdit.decision).toMatchObject({
+        model: 'client:ollama/qwen3:32b',
+        fallback: false,
+      });
+      expect(router.mode).toBe('cost_per_accuracy');
+      expect(getPlatformMode).not.toHaveBeenCalled();
+      expect(findLegacyPoolRouter).not.toHaveBeenCalled();
+      expect(platformModes.get(`user:${USER_ID}`)).toBe('best_accuracy');
+      expect(platformModes.get(`org:${ORG_ID}`)).toBe('best_accuracy');
+    }
+  );
+
   it('picks a servable client entry, flags its stale measurement, and signs the decision', async () => {
     const { decision, decisionId } = await decisionOf(
       await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())
@@ -742,6 +821,49 @@ describe('internal custom router decide', () => {
     expect(recordUsage.mock.calls.map(([usage]) => usage.core.requested_model)).toContain(
       'kilo-auto/efficient'
     );
+  });
+
+  it('shares the canonical pool but not mode between a platform alias and explicit custom ID', async () => {
+    const canonical = customRouter({
+      slug: 'efficient',
+      legacyPool: true,
+      legacyModeInherited: true,
+      mode: 'best_accuracy',
+    });
+    findLegacyPoolRouter.mockResolvedValue(canonical);
+    findCustomRouter.mockResolvedValue(canonical);
+    platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
+    customTable = table({
+      [ROUTE]: [
+        {
+          model: 'client:ollama/qwen3:32b',
+          accuracy: 0.8,
+          avgCostUsd: 0,
+          meetsThreshold: true,
+          variant: null,
+        },
+        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+    const clientEntries = [{ provider: 'ollama', model: 'qwen3:32b' }];
+    const alias = await internalDecide(
+      { router: 'efficient', clientEntries },
+      'kilo-auto/efficient'
+    );
+    const explicit = await internalDecide({
+      customRouter: { scope: 'user', slug: 'efficient' },
+      clientEntries,
+    });
+    expect(alias.status).toBe(200);
+    expect(explicit.status).toBe(200);
+    await expect(alias.json()).resolves.toMatchObject({
+      decision: { model: 'client:ollama/qwen3:32b', fallback: false },
+    });
+    await expect(explicit.json()).resolves.toMatchObject({
+      decision: { model: SONNET, fallback: false },
+    });
+    expect(canonical.mode).toBe('best_accuracy');
+    expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
   });
 
   it('never falls back outside a migrated legacy pool when policy denies its only gateway entry', async () => {

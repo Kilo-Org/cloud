@@ -7,13 +7,8 @@ import {
   type AutoRoutingModeResponse,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import {
-  clearAutoRoutingSettingsCache,
-  LEGACY_POOL_MIGRATION_WRITE_ERROR,
-  setAutoRoutingMode,
-} from './routing-mode';
+import { readConfiguredAutoRoutingMode, setAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
-import { getSharedOwnerSettings, updateSharedPoolRouter } from './legacy-pool-overlap';
 
 function responseBody(params: {
   ownerType: AutoRoutingModeOwnerType;
@@ -38,8 +33,16 @@ export const getRoutingModeHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid routing mode owner' }, 400);
   }
 
-  const { mode: configuredMode } = await getSharedOwnerSettings(c.env, parsed.data);
-  return c.json(responseBody({ ...parsed.data, configuredMode }));
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const configuredMode = await readConfiguredAutoRoutingMode(c.env, parsed.data);
+      return c.json(responseBody({ ...parsed.data, configuredMode }));
+    } catch {
+      if (attempt === 1) {
+        return c.json({ error: 'Could not load the saved platform mode. Please retry.' }, 503);
+      }
+    }
+  }
 };
 
 export const putRoutingModeHandler: Handler<HonoEnv> = async c => {
@@ -55,26 +58,6 @@ export const putRoutingModeHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid routing mode' }, 400);
   }
 
-  const configured = await getSharedOwnerSettings(c.env, parsed.data);
-  if (configured.router) {
-    const updated = await updateSharedPoolRouter(c.env, configured.router, {
-      mode: parsed.data.mode,
-    });
-    return c.json(
-      responseBody({
-        ...parsed.data,
-        configuredMode: updated.legacyModeInherited ? null : updated.mode,
-      })
-    );
-  }
-  try {
-    await setAutoRoutingMode(c.env, parsed.data, parsed.data.mode);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes(LEGACY_POOL_MIGRATION_WRITE_ERROR)) {
-      return c.json({ error: LEGACY_POOL_MIGRATION_WRITE_ERROR }, 409);
-    }
-    throw error;
-  }
-  clearAutoRoutingSettingsCache();
+  await setAutoRoutingMode(c.env, parsed.data, parsed.data.mode);
   return c.json(responseBody({ ...parsed.data, configuredMode: parsed.data.mode }));
 };

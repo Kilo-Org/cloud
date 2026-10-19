@@ -119,6 +119,16 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
           settings.pool.map(entry => ({ kind: 'gateway', model: entry.model }))
         ).success
       ) {
+        if (
+          requested &&
+          !stored.has(CONVERSION_PENDING_KEY) &&
+          !stored.has(POOL_MIGRATED_KEY) &&
+          JSON.stringify(requested.pool) === JSON.stringify(settings.pool)
+        ) {
+          settings = { ...settings, mode: requested.mode, invalidMode: false };
+          if (requested.mode === null) await txn.delete(MODE_STORAGE_KEY);
+          else await txn.put(MODE_STORAGE_KEY, requested.mode);
+        }
         await txn.put(CONVERSION_PENDING_KEY, { mode: settings.mode, pool: settings.pool });
       }
       return settings;
@@ -151,11 +161,8 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 
   async setMode(mode: AutoRoutingMode | null): Promise<void> {
-    await this.ctx.storage.transaction(async txn => {
-      await this.assertLegacyWritesAllowed(txn);
-      if (mode === null) await txn.delete(MODE_STORAGE_KEY);
-      else await txn.put(MODE_STORAGE_KEY, mode);
-    });
+    if (mode === null) await this.ctx.storage.delete(MODE_STORAGE_KEY);
+    else await this.ctx.storage.put(MODE_STORAGE_KEY, mode);
   }
 
   async getPool(): Promise<EfficientModelPool | null> {
@@ -223,22 +230,27 @@ function modeStub(env: AutoRoutingModeEnv, ownerType: AutoRoutingModeOwnerType, 
   return namespace.get(namespace.idFromName(modeKey(ownerType, ownerId)));
 }
 
+export function readConfiguredAutoRoutingMode(
+  env: AutoRoutingModeEnv,
+  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+): Promise<AutoRoutingMode | null> {
+  return modeStub(env, owner.ownerType, owner.ownerId).getMode();
+}
+
 export async function getConfiguredAutoRoutingMode(
   env: AutoRoutingModeEnv,
   owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
 ): Promise<AutoRoutingMode | null> {
-  return modeStub(env, owner.ownerType, owner.ownerId)
-    .getMode()
-    .catch((error: unknown) => {
-      console.warn(
-        JSON.stringify({
-          event: 'auto_routing_config_read_failed',
-          key: modeKey(owner.ownerType, owner.ownerId),
-          ...formatError(error),
-        })
-      );
-      return null;
-    });
+  return readConfiguredAutoRoutingMode(env, owner).catch((error: unknown) => {
+    console.warn(
+      JSON.stringify({
+        event: 'auto_routing_config_read_failed',
+        key: modeKey(owner.ownerType, owner.ownerId),
+        ...formatError(error),
+      })
+    );
+    return null;
+  });
 }
 
 async function readAutoRoutingSettings(
@@ -298,8 +310,13 @@ export async function getAutoRoutingMode(
   env: AutoRoutingModeEnv,
   owner: { userId: string; organizationId: string | null }
 ): Promise<AutoRoutingMode> {
-  const settings = await getEffectiveAutoRoutingSettings(env, owner);
-  return settings.mode;
+  const [orgMode, userMode] = await Promise.all([
+    owner.organizationId
+      ? getConfiguredAutoRoutingMode(env, { ownerType: 'org', ownerId: owner.organizationId })
+      : null,
+    getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: owner.userId }),
+  ]);
+  return orgMode ?? userMode ?? DEFAULT_AUTO_ROUTING_MODE;
 }
 
 /**
@@ -335,6 +352,7 @@ export async function setAutoRoutingMode(
   mode: AutoRoutingMode | null
 ): Promise<void> {
   await modeStub(env, owner.ownerType, owner.ownerId).setMode(mode);
+  clearAutoRoutingSettingsCache();
 }
 
 export async function setAutoRoutingSettings(

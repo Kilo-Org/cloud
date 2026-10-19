@@ -1170,28 +1170,6 @@ describe('auto routing worker', () => {
       let poolValue: EfficientModelPool | null = initial?.pool ?? null;
       let canonical: AutoRoutingCustomRouter | null = null;
       let pending: StoredOwnerSettings | null = null;
-      const ownerLock = vi.fn(async () => {});
-      const tx = {
-        execute: ownerLock,
-        select: () => ({
-          from: () => ({ where: () => ({ limit: async () => (canonical ? [canonical] : []) }) }),
-        }),
-        update: () => ({
-          set: (values: Partial<AutoRoutingCustomRouter>) => ({
-            where: () => ({
-              returning: async () => {
-                if (!canonical) return [];
-                canonical = { ...canonical, ...values };
-                return [canonical];
-              },
-            }),
-          }),
-        }),
-      };
-      getWorkerDb.mockReturnValue({
-        select: dbSelect,
-        transaction: async (work: (transaction: typeof tx) => Promise<unknown>) => work(tx),
-      });
       findLegacyPoolRouter.mockImplementation(async () =>
         canonical ? toCustomRouterDefinition(canonical) : null
       );
@@ -1249,6 +1227,12 @@ describe('auto routing worker', () => {
         setSettings,
         beginConversion: vi.fn(
           async (requested: { mode: AutoRoutingMode | null; pool: EfficientModelPool | null }) => {
+            if (
+              pending === null &&
+              (poolValue === null || JSON.stringify(poolValue) === JSON.stringify(requested.pool))
+            ) {
+              mode = requested.mode;
+            }
             pending ??= {
               mode: poolValue ? mode : requested.mode,
               pool: poolValue ?? requested.pool,
@@ -1273,7 +1257,6 @@ describe('auto routing worker', () => {
         get canonical() {
           return canonical;
         },
-        ownerLock,
       };
     }
 
@@ -1387,12 +1370,12 @@ describe('auto routing worker', () => {
       });
       expect(store.setSettings).not.toHaveBeenCalled();
       expect(store.pool).toBeNull();
+      expect(store.mode).toBe('best_accuracy');
       expect(store.canonical).toMatchObject({
         mode: 'best_accuracy',
         entries: [{ kind: 'gateway', model: 'custom/chat' }],
         legacy_pool: true,
       });
-      expect(store.ownerLock).toHaveBeenCalledOnce();
       expect(benchmarkFetch).toHaveBeenCalledWith(
         expect.stringContaining('/admin/profiles/register'),
         expect.objectContaining({ method: 'POST' })
@@ -1403,20 +1386,21 @@ describe('auto routing worker', () => {
       );
     });
 
-    it('keeps the migrated pool unchanged when admission rejects a replacement', async () => {
+    it('does not overwrite a newer platform mode when the first pool migration finishes', async () => {
       const store = ownerSettingsStore();
-      let exhausted = false;
-      benchmarkFetch.mockImplementation(async () =>
-        exhausted
-          ? {
-              ok: false,
-              status: 429,
-              json: async () => ({ error: 'quota exceeded', retryAt: '2099-01-01T00:00:00.000Z' }),
-              text: async () => 'quota exceeded',
-            }
-          : { ok: true, status: 200, json: async () => ({ statuses }) }
-      );
-      const save = (models: EfficientModelPool) =>
+      benchmarkFetch.mockImplementation(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ statuses }),
+      }));
+      const convert = mockedFetch.getMockImplementation();
+      if (!convert) throw new Error('Expected a conversion fixture');
+      const blocked = Promise.withResolvers<void>();
+      mockedFetch.mockImplementation(async (input, init) => {
+        await blocked.promise;
+        return convert(input, init);
+      });
+      const pending = Promise.resolve(
         request('/admin/routing-settings', {
           method: 'PUT',
           headers: {
@@ -1427,13 +1411,126 @@ describe('auto routing worker', () => {
             ownerType: 'user',
             ownerId: 'user-1',
             mode: 'best_accuracy',
+            pool,
+          }),
+        })
+      );
+      try {
+        await vi.waitFor(() => expect(mockedFetch).toHaveBeenCalledOnce());
+        expect(store.mode).toBe('best_accuracy');
+        const updated = await request('/admin/routing-mode', {
+          method: 'PUT',
+          headers: {
+            authorization: 'Bearer classifier-token',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            ownerType: 'user',
+            ownerId: 'user-1',
+            mode: 'cost_per_accuracy',
+          }),
+        });
+        expect(updated.status).toBe(200);
+      } finally {
+        blocked.resolve();
+        await pending;
+      }
+      const response = await pending;
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        configuredMode: 'cost_per_accuracy',
+        configuredPool: pool,
+      });
+      expect(store.mode).toBe('cost_per_accuracy');
+      expect(store.canonical?.mode).toBe('best_accuracy');
+    });
+
+    it('rejects a mixed replacement when migration preserves an existing different pool', async () => {
+      const oldPool = [{ model: 'previous/model' }];
+      const store = ownerSettingsStore({ mode: 'best_accuracy', pool: oldPool });
+      benchmarkFetch.mockImplementation(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ statuses }),
+      }));
+      const response = await request('/admin/routing-settings', {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer classifier-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerType: 'user',
+          ownerId: 'user-1',
+          mode: 'cost_per_accuracy',
+          pool,
+        }),
+      });
+      expect(response.status).toBe(409);
+      expect(store.mode).toBe('best_accuracy');
+      expect(store.pool).toEqual(oldPool);
+      expect(store.canonical?.entries).toEqual([{ kind: 'gateway', model: 'previous/model' }]);
+    });
+
+    it('rejects mixed writes after migration without changing custom mode or pool', async () => {
+      const store = ownerSettingsStore();
+      benchmarkFetch.mockImplementation(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ statuses }),
+      }));
+      const save = (mode: AutoRoutingMode | null, models: EfficientModelPool | null) =>
+        request('/admin/routing-settings', {
+          method: 'PUT',
+          headers: {
+            authorization: 'Bearer classifier-token',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            ownerType: 'user',
+            ownerId: 'user-1',
+            mode,
             pool: models,
           }),
         });
-      expect((await save(pool)).status).toBe(200);
-      exhausted = true;
-      expect((await save([{ model: 'replacement/model' }])).status).toBe(429);
-      expect(store.canonical?.entries).toEqual([{ kind: 'gateway', model: 'custom/chat' }]);
+      expect((await save('best_accuracy', pool)).status).toBe(200);
+      const registrations = benchmarkFetch.mock.calls.length;
+      for (const replacement of [[{ model: 'replacement/model' }], null]) {
+        const rejected = await save('cost_per_accuracy', replacement);
+        expect(rejected.status).toBe(409);
+        await expect(rejected.json()).resolves.toMatchObject({
+          error: expect.stringContaining('/admin/routing-mode'),
+          retryable: false,
+        });
+      }
+      expect(benchmarkFetch).toHaveBeenCalledTimes(registrations);
+      expect(store.mode).toBe('best_accuracy');
+      expect(store.canonical).toMatchObject({
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: 'custom/chat' }],
+      });
+
+      const modeUpdate = await request('/admin/routing-mode', {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer classifier-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerType: 'user',
+          ownerId: 'user-1',
+          mode: 'cost_per_accuracy',
+        }),
+      });
+      expect(modeUpdate.status).toBe(200);
+      expect(store.mode).toBe('cost_per_accuracy');
+      expect(store.canonical?.mode).toBe('best_accuracy');
+      const platformMode = await request('/admin/routing-mode?ownerType=user&ownerId=user-1', {
+        headers: { authorization: 'Bearer classifier-token' },
+      });
+      await expect(platformMode.json()).resolves.toMatchObject({
+        configuredMode: 'cost_per_accuracy',
+      });
     });
 
     it('PUT maps register 429 to 429 with retryAt and persists nothing', async () => {
@@ -1548,6 +1645,7 @@ describe('auto routing worker', () => {
       });
       expect(store.setSettings).not.toHaveBeenCalled();
       expect(store.pool).toBeNull();
+      expect(store.mode).toBe('best_accuracy');
       expect(store.canonical).toMatchObject({
         mode: 'best_accuracy',
         entries: [{ kind: 'gateway', model: 'custom/chat' }],

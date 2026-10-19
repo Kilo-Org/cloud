@@ -198,7 +198,7 @@ function CustomRouterItem({
           <p className="font-medium">{router.name}</p>
           <p className="text-muted-foreground truncate font-mono text-sm">{router.modelId}</p>
           <p className="text-muted-foreground text-sm">
-            {baseLabel} base · {modeLabel}
+            Benchmark difficulty: {baseLabel} · {modeLabel}
             {defaultEntry ? ` · Default: ${entryLabel(defaultEntry.entry)}` : null}
           </p>
           {router.legacyPool ? (

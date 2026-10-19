@@ -31,6 +31,12 @@ function createStorage() {
       Array.isArray(key)
         ? new Map(key.filter(name => entries.has(name)).map(name => [name, entries.get(name)]))
         : entries.get(key),
+    put: async (key: string, value: unknown) => {
+      entries.set(key, value);
+    },
+    delete: async (key: string) => {
+      entries.delete(key);
+    },
     transaction: <T>(work: (txn: DurableObjectTransaction) => Promise<T>): Promise<T> => {
       const result = transactions.then(async () => {
         const shadow = new Map(entries);
@@ -174,165 +180,140 @@ afterEach(() => {
 
 describe('old settings writes during pool conversion', () => {
   it.each([null, 'best_accuracy'] as const)(
-    'converts the first pool for an unenumerated or previously mode-only owner (mode=%s)',
+    'converts a first pool without blocking a concurrent platform mode change (mode=%s)',
     async mode => {
-      if (mode !== null) {
-        await modeDO.setMode(mode);
-        expect((await modeDO.beginConversion()).pool).toBeNull();
-      }
+      await modeDO.setMode(mode);
       webFetch.mockImplementationOnce(async (url, init) => {
-        await expect(modeDO.getSettings()).resolves.toEqual({ mode, pool: null });
-        await expect(modeDO.setMode('cost_per_accuracy')).rejects.toThrow('Retry the edit');
+        await expect(modeDO.getMode()).resolves.toBe(mode);
+        await modeDO.setMode('cost_per_accuracy');
         return convertRequest(url, init);
       });
-
-      const response = await putSettings();
-
+      const response = await putSettings(requestedPool, mode);
       expect(response.status).toBe(200);
       expect(canonical).toMatchObject({
         legacy_pool: true,
         entries: [{ kind: 'gateway', model: 'requested/model' }],
-        legacy_mode_inherited: true,
+        mode: mode ?? 'cost_per_accuracy',
       });
-      expect(ownerLock).toHaveBeenCalledOnce();
+      await expect(modeDO.getMode()).resolves.toBe('cost_per_accuracy');
       expect(entries.has('poolMigratedAt')).toBe(true);
       expect(entries.has('conversionPending')).toBe(false);
-      await expect(modeDO.getSettings()).resolves.toEqual({ mode, pool: null });
-      const read = await app.request(
-        'https://worker.example.test/settings?ownerType=user&ownerId=owner-1',
-        {},
-        env
-      );
-      await expect(read.json()).resolves.toMatchObject({ configuredPool: requestedPool });
     }
   );
 
   it.each(['slug_taken', 'router_cap_reached', 'failed'] as const)(
-    'returns retryable %s without losing acknowledged legacy settings, then applies the latest retry',
+    'retries a %s snapshot but rejects later mixed edits to the migrated router',
     async failure => {
       const original = { mode: 'best_accuracy', pool: [{ model: 'original/model' }] } as const;
       await modeDO.setSettings({ ...original, pool: [...original.pool] });
       outcome = failure;
-
       const failed = await putSettings();
-
       expect(failed.status).toBe(503);
-      await expect(failed.json()).resolves.toMatchObject({ retryable: true });
       expect(canonical).toBeNull();
-      expect(entries.has('convertedAt')).toBe(false);
       await expect(modeDO.getSettings()).resolves.toEqual(original);
-      await expect(modeDO.setPool(repairedPool)).rejects.toThrow('Retry the edit');
-      expect((await modeDO.beginConversion()).pool).toEqual(original.pool);
       outcome = 'created';
-
-      const repaired = await putSettings(repairedPool, 'cost_per_accuracy');
-
-      expect(repaired.status).toBe(200);
-      await expect(repaired.json()).resolves.toMatchObject({
-        configuredMode: 'cost_per_accuracy',
-        configuredPool: repairedPool,
-      });
+      expect((await putSettings([...original.pool], original.mode)).status).toBe(200);
+      expect((await putSettings(repairedPool, 'cost_per_accuracy')).status).toBe(409);
       expect(canonical).toMatchObject({
-        mode: 'cost_per_accuracy',
-        entries: [{ kind: 'gateway', model: 'repaired/model' }],
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: 'original/model' }],
       });
-      await expect(modeDO.getSettings()).resolves.toEqual(original);
+      await expect(modeDO.getMode()).resolves.toBe('best_accuracy');
     }
   );
 
-  it('persists a pending first-pool snapshot without changing live mode-only settings and retries a newer edit', async () => {
+  it('recovers a pending first pool without replacing a newer platform mode', async () => {
     await modeDO.setMode('best_accuracy');
     webFetch.mockRejectedValueOnce(new Error('web unavailable'));
-
-    expect((await putSettings()).status).toBe(503);
-    await expect(modeDO.getSettings()).resolves.toEqual({ mode: 'best_accuracy', pool: null });
+    expect((await putSettings(requestedPool, 'best_accuracy')).status).toBe(503);
     expect((await modeDO.readStoredSettings()).pool).toEqual(requestedPool);
-    expect((await modeDO.beginConversion()).pool).toEqual(requestedPool);
-
-    const response = await putSettings(repairedPool, 'best_accuracy');
-
+    await modeDO.setMode('cost_per_accuracy');
+    const response = await putSettings(requestedPool, 'best_accuracy');
     expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ configuredMode: 'cost_per_accuracy' });
     expect(canonical).toMatchObject({
-      entries: [{ kind: 'gateway', model: 'repaired/model' }],
+      entries: [{ kind: 'gateway', model: 'requested/model' }],
       mode: 'best_accuracy',
     });
+    await expect(modeDO.getMode()).resolves.toBe('cost_per_accuracy');
   });
 
-  it('recovers an uncertain committed conversion without replacing a later acknowledged canonical edit', async () => {
+  it('preserves an acknowledged custom edit while recovering an uncertain conversion commit', async () => {
     webFetch.mockImplementationOnce(async (url, init) => {
       await convertRequest(url, init);
       throw new Error('response lost after commit');
     });
-    expect((await putSettings()).status).toBe(503);
-    expect(entries.has('conversionPending')).toBe(true);
+    expect((await putSettings(requestedPool, 'best_accuracy')).status).toBe(503);
+    if (!canonical) throw new Error('Expected the uncertain conversion to have committed');
+    canonical = {
+      ...canonical,
+      entries: [{ kind: 'gateway', model: 'repaired/model' }],
+      default_entry_key: 'gateway:repaired/model',
+      mode: 'cost_per_accuracy',
+    };
+    expect((await putSettings(repairedPool, 'best_accuracy')).status).toBe(409);
+    await expect(
+      migrateOwnerPoolForSettings(env as unknown as Env, owner, {
+        mode: 'best_accuracy',
+        pool: requestedPool,
+      })
+    ).resolves.toBe('exists');
+    expect(canonical).toMatchObject({
+      entries: [{ kind: 'gateway', model: 'repaired/model' }],
+      mode: 'cost_per_accuracy',
+    });
+    expect(entries.has('conversionPending')).toBe(false);
+    await expect(modeDO.getMode()).resolves.toBe('best_accuracy');
+  });
 
-    expect((await putSettings(repairedPool, 'best_accuracy')).status).toBe(200);
+  it('reports a lookup failure without acknowledging or creating a pool', async () => {
+    getWorkerDb.mockImplementationOnce(() => {
+      throw new Error('database unavailable');
+    });
+    const response = await putSettings();
+    expect(response.status).toBe(503);
+    expect(canonical).toBeNull();
+    expect(entries.has('conversionPending')).toBe(false);
+    expect((await putSettings()).status).toBe(200);
+  });
+
+  it('recovers a failed marker without rewriting the canonical pool', async () => {
+    vi.spyOn(modeDO, 'markConverted').mockRejectedValueOnce(new Error('storage unavailable'));
+    expect((await putSettings()).status).toBe(503);
+    expect((await putSettings(repairedPool, 'best_accuracy')).status).toBe(409);
     await expect(
       migrateOwnerPoolForSettings(env as unknown as Env, owner, {
         mode: null,
         pool: requestedPool,
       })
     ).resolves.toBe('exists');
-
-    expect(canonical).toMatchObject({
-      entries: [{ kind: 'gateway', model: 'repaired/model' }],
-      mode: 'best_accuracy',
-    });
+    expect(canonical).toMatchObject({ entries: [{ kind: 'gateway', model: 'requested/model' }] });
     expect(entries.has('conversionPending')).toBe(false);
-    expect(entries.has('poolMigratedAt')).toBe(true);
   });
 
-  it.each(['lookup', 'canonical update', 'migration marker'] as const)(
-    'returns an explicit retryable error on %s failure instead of acknowledging a legacy-only write',
-    async failure => {
-      if (failure === 'lookup') {
-        getWorkerDb.mockImplementationOnce(() => {
-          throw new Error('database unavailable');
-        });
-      } else if (failure === 'canonical update') {
-        ownerLock.mockRejectedValueOnce(new Error('database unavailable'));
-      } else {
-        vi.spyOn(modeDO, 'markConverted').mockRejectedValueOnce(new Error('storage unavailable'));
-      }
-
-      const failed = await putSettings();
-
-      expect(failed.status).toBe(503);
-      await expect(failed.json()).resolves.toMatchObject({ retryable: true });
-      await expect(modeDO.getSettings()).resolves.toEqual({ mode: null, pool: null });
-
-      const retry = await putSettings(repairedPool, 'best_accuracy');
-
-      expect(retry.status).toBe(200);
-      expect(canonical).toMatchObject({
-        entries: [{ kind: 'gateway', model: 'repaired/model' }],
-        mode: 'best_accuracy',
-      });
-    }
-  );
-
-  it('preserves a settings edit when a scanner posts its fenced snapshot afterward', async () => {
-    await modeDO.setSettings({ mode: null, pool: [{ model: 'original/model' }] });
+  it('does not acknowledge a different pool while a delayed scan converts its frozen snapshot', async () => {
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: [{ model: 'original/model' }] });
     const snapshot = await modeDO.beginConversion();
-
-    expect((await putSettings(repairedPool, 'best_accuracy')).status).toBe(200);
+    expect((await putSettings(repairedPool, 'cost_per_accuracy')).status).toBe(409);
     const result = await postOwnerPoolConversions(env as unknown as Env, [
       {
         owner: { type: 'user', id: owner.ownerId },
-        mode: 'cost_per_accuracy',
-        configuredMode: null,
+        mode: 'best_accuracy',
+        configuredMode: 'best_accuracy',
         models: snapshot.pool?.map(entry => entry.model) ?? [],
       },
     ]);
-
     expect(result?.[0]?.outcome).toBe('exists');
     expect(canonical).toMatchObject({
-      entries: [{ kind: 'gateway', model: 'repaired/model' }],
       mode: 'best_accuracy',
+      entries: [{ kind: 'gateway', model: 'original/model' }],
     });
+    await modeDO.setMode('cost_per_accuracy');
+    await expect(modeDO.getMode()).resolves.toBe('cost_per_accuracy');
+    expect(canonical?.mode).toBe('best_accuracy');
   });
 
-  it('keeps ordinary legacy mode-only writes allowed without conversion', async () => {
+  it('keeps ordinary mode-only settings without creating a custom router', async () => {
     const response = await app.request(
       'https://worker.example.test/settings',
       {
@@ -342,10 +323,9 @@ describe('old settings writes during pool conversion', () => {
       },
       env
     );
-
     expect(response.status).toBe(200);
-    await expect(modeDO.getSettings()).resolves.toEqual({ mode: 'best_accuracy', pool: null });
-    expect(webFetch).not.toHaveBeenCalled();
+    await expect(modeDO.getMode()).resolves.toBe('best_accuracy');
+    expect(canonical).toBeNull();
     expect(entries.has('conversionPending')).toBe(false);
   });
 });

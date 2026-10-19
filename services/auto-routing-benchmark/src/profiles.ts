@@ -14,7 +14,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { benchmarkProfiles, profileRequestEvents } from './db-schema';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
@@ -402,6 +402,69 @@ export function chargedEventInsertStatement(
   );
 }
 
+type ProfileRequestEventRow = typeof profileRequestEvents.$inferSelect;
+
+type AdmissionQuotaScope = {
+  ownerType: ProfileOwnerType;
+  ownerId: string;
+  router: AutoRouter;
+  windowStartIso: string;
+};
+
+/**
+ * Last statement of a charged admission batch. SQLite has no RAISE outside triggers, so
+ * it fails the batch with a NOT NULL violation when the batch's own events pushed the
+ * rolling count over the limit; D1 then rolls back every write of that batch. Writer
+ * serialization makes concurrent admissions count each other's committed events.
+ */
+function admissionQuotaGuardStatement(orm: DrizzleD1Database, scope: AdmissionQuotaScope) {
+  return Object.assign(
+    orm.insert(profileRequestEvents).select(sql`
+      SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+      WHERE (
+        SELECT COUNT(*) FROM ${profileRequestEvents}
+        WHERE ${profileRequestEvents.owner_type} = ${scope.ownerType}
+          AND ${profileRequestEvents.owner_id} = ${scope.ownerId}
+          AND ${profileRequestEvents.router} = ${scope.router}
+          AND ${profileRequestEvents.admitted_at} >= ${scope.windowStartIso}
+      ) > ${PROFILE_ADMISSION_LIMIT}
+    `),
+    { __stmt: { kind: 'quota_guard' as const } }
+  );
+}
+
+function recentAdmissionEvents(
+  orm: DrizzleD1Database,
+  scope: AdmissionQuotaScope
+): Promise<ProfileRequestEventRow[]> {
+  return orm
+    .select()
+    .from(profileRequestEvents)
+    .where(
+      and(
+        eq(profileRequestEvents.owner_type, scope.ownerType),
+        eq(profileRequestEvents.owner_id, scope.ownerId),
+        eq(profileRequestEvents.router, scope.router),
+        gte(profileRequestEvents.admitted_at, scope.windowStartIso)
+      )
+    )
+    .orderBy(asc(profileRequestEvents.admitted_at));
+}
+
+function profileQuotaExceeded(
+  recentEvents: ReadonlyArray<{ admitted_at: string }>,
+  now: Date
+): ProfileQuotaExceededError {
+  const retryAt = computeQuotaRetryAt(
+    recentEvents[0]?.admitted_at ?? now.toISOString(),
+    now.getTime()
+  );
+  return new ProfileQuotaExceededError({
+    error: `Profile benchmark request limit reached. New benchmarks can be requested after ${retryAt}.`,
+    retryAt,
+  });
+}
+
 export type RegisterProfilesInput = {
   ownerType: ProfileOwnerType;
   ownerId: string;
@@ -467,26 +530,15 @@ export async function registerProfiles(
   }
 
   const orm = drizzle(db);
-  const recentEvents = await orm
-    .select()
-    .from(profileRequestEvents)
-    .where(
-      and(
-        eq(profileRequestEvents.owner_type, input.ownerType),
-        eq(profileRequestEvents.owner_id, input.ownerId),
-        eq(profileRequestEvents.router, router),
-        gte(profileRequestEvents.admitted_at, windowStartIso)
-      )
-    )
-    .orderBy(asc(profileRequestEvents.admitted_at));
-
+  const quotaScope: AdmissionQuotaScope = {
+    ownerType: input.ownerType,
+    ownerId: input.ownerId,
+    router,
+    windowStartIso,
+  };
+  const recentEvents = await recentAdmissionEvents(orm, quotaScope);
   if (recentEvents.length + chargedModels.size > PROFILE_ADMISSION_LIMIT) {
-    const oldest = recentEvents[0]?.admitted_at ?? nowIso;
-    const retryAt = computeQuotaRetryAt(oldest, now.getTime());
-    throw new ProfileQuotaExceededError({
-      error: `Profile benchmark request limit reached. New benchmarks can be requested after ${retryAt}.`,
-      retryAt,
-    });
+    throw profileQuotaExceeded(recentEvents, now);
   }
 
   const admissions = [...chargedAdmissions, ...freeAdmissions];
@@ -525,7 +577,20 @@ export async function registerProfiles(
       claimUserRequestedStatement(orm, input.pairs, current, nowIso) as BatchItem<'sqlite'>
     );
 
-    await orm.batch(stmts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+    if (chargedModels.size > 0) {
+      stmts.push(admissionQuotaGuardStatement(orm, quotaScope) as BatchItem<'sqlite'>);
+    }
+
+    try {
+      await orm.batch(stmts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+    } catch (error) {
+      if (chargedModels.size === 0) throw error;
+      const committedEvents = await recentAdmissionEvents(orm, quotaScope);
+      if (committedEvents.length + chargedModels.size > PROFILE_ADMISSION_LIMIT) {
+        throw profileQuotaExceeded(committedEvents, now);
+      }
+      throw error;
+    }
   }
 
   // Derive reported statuses for admitted entries from post-batch rows so a

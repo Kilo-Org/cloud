@@ -22,6 +22,7 @@ type EventRow = {
 type PendingStmt =
   | { kind: 'event'; values: Omit<EventRow, 'id'>; guarded: boolean }
   | { kind: 'claim_user_requested'; entries: string[] }
+  | { kind: 'quota_guard' }
   | {
       kind: 'profile';
       values: ProfileRow;
@@ -275,6 +276,11 @@ vi.mock('drizzle-orm/d1', () => {
       // Not simulated: this mock does not read the claim's WHERE tree, so it
       // cannot know which rows to touch. What the claim updates is verified
       // against real SQLite in profiles-sql.test.ts.
+      return;
+    }
+    if (stmt.kind === 'quota_guard') {
+      // Not simulated: the in-batch quota check runs against real SQLite in
+      // profile-quota-sql.test.ts.
       return;
     }
     if (stmt.kind === 'event') {

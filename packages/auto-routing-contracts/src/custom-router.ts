@@ -271,7 +271,8 @@ export const CustomRouterDecisionSchema = z
     model: z.string().min(1),
     variant: z.string().trim().min(1).nullable(),
     stale: z.boolean(),
-    // True when the classifier produced no decision and the default or first servable entry was used.
+    // True when no routing decision named a servable entry, so the default or first servable
+    // entry was used. taskType and subtaskType still report the classification, if any.
     fallback: z.boolean(),
     sticky: z.boolean(),
     taskType: ClassifierTaskTypeSchema.nullable(),
@@ -296,6 +297,7 @@ export type CustomRouterDecideResponse = z.infer<typeof CustomRouterDecideRespon
 
 export const AUTO_DECISION_HEADER = 'x-kilo-auto-decision';
 export const AUTO_DECISION_TTL_MS = 5 * 60 * 1000;
+const AUTO_DECISION_CLOCK_SKEW_MS = 30 * 1000;
 const AUTO_DECISION_TOKEN_VERSION = 'v1';
 
 export const AutoDecisionPayloadSchema = z.object({
@@ -389,6 +391,11 @@ export async function verifyAutoDecision(
   const payload = AutoDecisionPayloadSchema.safeParse(json);
   if (!payload.success) return { ok: false, reason: 'malformed' };
   if (payload.data.expiresAt <= nowMs) return { ok: false, reason: 'expired' };
+  // The signer never issues a longer lifetime; the margin covers clock skew between the
+  // signing worker and the verifying gateway.
+  if (payload.data.expiresAt > nowMs + AUTO_DECISION_TTL_MS + AUTO_DECISION_CLOCK_SKEW_MS) {
+    return { ok: false, reason: 'malformed' };
+  }
   return { ok: true, payload: payload.data };
 }
 

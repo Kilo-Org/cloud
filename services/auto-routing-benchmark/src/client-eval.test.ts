@@ -444,6 +444,25 @@ describe('client eval (real SQLite)', () => {
     expect(second?.id).not.toBe(first?.id);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_results').get()).toEqual({ n: 1 });
   });
+
+  it('resends the stored grader usage on retry when removing an unbilled upload fails', async () => {
+    const judged = { caseId: judgedCase.id };
+    sqlite.exec(
+      "CREATE TRIGGER keep_case_results BEFORE DELETE ON client_case_results BEGIN SELECT RAISE(ABORT, 'delete failed'); END"
+    );
+    writeUsage.mockResolvedValueOnce({ kind: 'unavailable', reason: 'http_error' });
+    await expect(gradeClientEvalResult(db, CONFIG, upload(judged), deps)).rejects.toThrow();
+
+    expect(await gradeClientEvalResult(db, CONFIG, upload(judged), deps)).toEqual({ score: 0.75 });
+    expect(await gradeClientEvalResult(db, CONFIG, upload(judged), deps)).toEqual({ score: 0.75 });
+    expect(writeUsage).toHaveBeenCalledTimes(2);
+    const [first, resent] = writeUsage.mock.calls.map(([usage]) => usage);
+    expect(resent).toEqual(first);
+    expect(judge).toHaveBeenCalledOnce();
+    expect(
+      sqlite.prepare('SELECT pending_grader_usage AS pending FROM client_case_results').get()
+    ).toEqual({ pending: null });
+  });
 });
 
 describe('clientEvalCase', () => {

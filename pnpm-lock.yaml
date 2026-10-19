@@ -188,7 +188,7 @@ patchedDependencies:
   expo-task-manager@57.0.21: 7b144f9d84c386dfc1bc93db75d62887c20db3f652bad1f5c01b01ebb531315c
   expo-widgets@57.0.22: 1c69b613e94332d7166d8c9255b5fd297f56412de480f0b51e8440b768283e81
   react-native-appsflyer@7.0.2-v2: 390902fe7a6476a9911a4f2c41e89c8b9035104468c266647d4498d5a913ab73
-  react-native-enriched-markdown@1.1.0: 02a258b4316e30b59546bed5cfd68ab0542e979773524a08d99bf70212cb0705
+  react-native-enriched-markdown@1.1.0: 2e8c6d3e99e2b4726bf50f5ff81f07475a1afd1da43071b9d40a74bad4da6a7f
   react-native@0.86.3: 113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9
 
 importers:
@@ -749,7 +749,7 @@ importers:
         version: 3.0.7(@expo/metro-config@57.0.12(bufferutil@4.1.0)(expo@57.0.26)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       react-native-enriched-markdown:
         specifier: 1.1.0
-        version: 1.1.0(patch_hash=02a258b4316e30b59546bed5cfd68ab0542e979773524a08d99bf70212cb0705)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
+        version: 1.1.0(patch_hash=2e8c6d3e99e2b4726bf50f5ff81f07475a1afd1da43071b9d40a74bad4da6a7f)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       react-native-gesture-handler:
         specifier: 2.32.0
         version: 2.32.0(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -38011,7 +38011,7 @@ snapshots:
       use-latest-callback: 0.2.6(react@19.2.6)
     optional: true
 
-  react-native-enriched-markdown@1.1.0(patch_hash=02a258b4316e30b59546bed5cfd68ab0542e979773524a08d99bf70212cb0705)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3):
+  react-native-enriched-markdown@1.1.0(patch_hash=2e8c6d3e99e2b4726bf50f5ff81f07475a1afd1da43071b9d40a74bad4da6a7f)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3):
     dependencies:
       react: 19.2.3
       react-native: 0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)

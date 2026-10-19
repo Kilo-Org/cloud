@@ -22,7 +22,7 @@ import {
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
@@ -51,9 +51,10 @@ function chatGptByokOwner(
 export async function getAvailableModelsForOrganization(
   organizationId: string,
   subject: OrganizationPolicySubject,
-  audience: OrganizationModelAudience = 'member'
+  audience: OrganizationModelAudience = 'member',
+  fromDb: typeof db = db
 ): Promise<OpenRouterModelsResponse | null> {
-  const context = await getOrganizationGroupPolicyContext({ organizationId, subject });
+  const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 

@@ -3,7 +3,7 @@ import {
   DEFAULT_VERCEL_ROUTING_ENABLED,
   GatewayRoutingConfigSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -19,7 +19,7 @@ const DEFAULT_RUNTIME_GATEWAY_ROUTING_CONFIG: RuntimeGatewayRoutingConfig = {
 
 export const getRuntimeGatewayRoutingConfig = createCachedFetch<RuntimeGatewayRoutingConfig>(
   async () => {
-    const [row] = await db
+    const [row] = await readDb
       .select({ config: ai_gateway_config.config })
       .from(ai_gateway_config)
       .where(eq(ai_gateway_config.id, 1))

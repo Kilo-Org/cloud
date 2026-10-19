@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { ai_gateway_request_logging_opt_ins } from '@kilocode/db/schema';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 
 export const RequestLoggingOptInSchema = z.object({
@@ -36,8 +36,10 @@ export function resolveRequestLoggingMode(
   return matching.every(entry => entry.errors_only) ? 'errors_only' : 'all';
 }
 
-export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> {
-  const [row] = await db
+export async function getRequestLoggingOptIns(
+  fromDb: typeof db = db
+): Promise<RequestLoggingOptIn[]> {
+  const [row] = await fromDb
     .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
     .from(ai_gateway_request_logging_opt_ins)
     .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
@@ -46,7 +48,7 @@ export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> 
 }
 
 const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
-  getRequestLoggingOptIns,
+  () => getRequestLoggingOptIns(readDb),
   REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS,
   []
 );

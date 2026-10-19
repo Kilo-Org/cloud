@@ -31,6 +31,7 @@ it.each([undefined, 'staging'])(
         {
           configPath: new URL('../wrangler.jsonc', import.meta.url),
           env,
+          ...(env === 'staging' ? { vars: { USAGE_INGEST_MODE: 'receipt' } } : {}),
           secrets: { USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret' },
         },
       ],

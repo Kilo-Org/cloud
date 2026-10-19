@@ -334,11 +334,12 @@ describe('organization model producer publication', () => {
     mockAutoEnabled = true;
     const defaultSubject: OrganizationPolicySubject = { type: 'defaultAccess' };
     const results = await Promise.all([resultFor(), resultFor(defaultSubject), resultFor()]);
-    expect(mockGetContext).toHaveBeenCalledWith({ organizationId: 'fixture-org', subject });
-    expect(mockGetContext).toHaveBeenCalledWith({
-      organizationId: 'fixture-org',
-      subject: defaultSubject,
-    });
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', subject })
+    );
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', subject: defaultSubject })
+    );
     expect(mockEvaluatePolicy).toHaveBeenCalledWith(mockContext);
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group']);
     expect(mockByok).toHaveBeenCalledWith('fixture-org');

@@ -65,6 +65,10 @@ export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
 export const USAGE_SHADOW_PUBLISH_ENABLED =
   getEnvVariable('USAGE_SHADOW_PUBLISH_ENABLED') === 'true';
+export const USAGE_QUEUE_ONLY_ENABLED =
+  getEnvVariable('USAGE_QUEUE_ONLY_ENABLED') === 'true' &&
+  getEnvVariable('VERCEL_TARGET_ENV') === 'staging' &&
+  getEnvVariable('VERCEL_ENV') !== 'production';
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.
@@ -482,5 +486,3 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign
 // the user's email so the widget can verify the end user's identity.
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
-
-export const SUPPORT_API_SECRET = getEnvVariable('SUPPORT_API_SECRET') || '';

@@ -83,18 +83,32 @@ describe('ensureInternalBotUser', () => {
   });
 
   it.each([
-    ['a non-bot user', { is_bot: false }],
-    ['a bot with blocked_at set', { is_bot: true, blocked_at: '2026-10-01T00:00:00.000Z' }],
-    ['a soft-deleted bot', { is_bot: true, blocked_reason: 'soft-deleted' }],
-    ['a bot with an empty pepper', { is_bot: true, api_token_pepper: '' }],
-  ])('refuses to adopt %s that holds the internal bot id', async (_label, overrides) => {
+    ['a non-bot user', { is_bot: false }, /is not a bot/],
+    [
+      'a bot with blocked_at set',
+      { is_bot: true, blocked_at: '2026-10-01T00:00:00.000Z' },
+      /is blocked/,
+    ],
+    ['a soft-deleted bot', { is_bot: true, blocked_reason: 'soft-deleted' }, /is blocked/],
+    ['a bot with an empty pepper', { is_bot: true, api_token_pepper: '' }, /no API token pepper/],
+  ])('refuses to adopt %s that holds the internal bot id', async (_label, overrides, reason) => {
     const org = await newOrganization();
     const slug = `t-${randomUUID().slice(0, 8)}`;
-    await insertTestUser({ id: `bot-internal-${slug}`, ...overrides });
+    // Every fixture except the empty-pepper case has a valid pepper, so each
+    // case fails only on the condition it names.
+    await insertTestUser({
+      id: `bot-internal-${slug}`,
+      api_token_pepper: 'a'.repeat(64),
+      ...overrides,
+    });
 
-    await expect(
-      ensureInternalBotUser({ slug, displayName: 'Test Bot', organizationId: org.id })
-    ).rejects.toBeInstanceOf(InternalBotUnusableError);
+    const attempt = ensureInternalBotUser({
+      slug,
+      displayName: 'Test Bot',
+      organizationId: org.id,
+    });
+    await expect(attempt).rejects.toBeInstanceOf(InternalBotUnusableError);
+    await expect(attempt).rejects.toThrow(reason);
     expect(await membershipsOf(`bot-internal-${slug}`)).toHaveLength(0);
   });
 

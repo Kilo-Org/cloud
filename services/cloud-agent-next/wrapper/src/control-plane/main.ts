@@ -180,7 +180,6 @@ export function createControlPlaneSessionHost(options: {
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
-  hasRecentTerminalInput(): boolean;
 }) {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
@@ -198,11 +197,7 @@ export function createControlPlaneSessionHost(options: {
     runtimes,
     turns: manager,
     getHeartbeat: () => ({
-      active:
-        options.isPreparing() ||
-        runtimes.needsCompute() ||
-        manager.hasPendingWork() ||
-        options.hasRecentTerminalInput(),
+      active: options.isPreparing() || runtimes.needsCompute() || manager.hasPendingWork(),
       degraded: runtimes.suspected(),
     }),
   };
@@ -387,7 +382,6 @@ export async function runControlPlaneWrapper(
       onNativeDiagnostic: projector,
     },
     isPreparing: () => preparationRef.current?.isPreparing() ?? false,
-    hasRecentTerminalInput: () => terminalsRef.current?.hasRecentInput() ?? false,
   });
   const { runtimes } = host;
   turnsRef.current = host.turns;

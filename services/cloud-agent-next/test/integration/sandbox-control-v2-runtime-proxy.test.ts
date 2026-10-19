@@ -186,7 +186,7 @@ function createProvider(): FakeProvider {
     async create(intent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },

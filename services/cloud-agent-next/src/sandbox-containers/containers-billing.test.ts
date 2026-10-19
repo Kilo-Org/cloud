@@ -1,3 +1,4 @@
+import { preinstalledStartup } from '../sandbox-control/preinstalled-startup.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { DurableObjectMock } = vi.hoisted(() => ({
@@ -234,6 +235,10 @@ class FakeContainer {
     if (this.destroyBehavior === 'reject') throw new Error('container destroy failed');
     this.running = false;
   }
+
+  async monitor(): Promise<void> {
+    if (!this.stopAfterStart) await new Promise<void>(() => {});
+  }
 }
 
 function execProcess(exitCode: number): ExecProcess {
@@ -324,7 +329,12 @@ async function launch(
   allocationRef: string,
   instanceSize: ContainerInstanceSize
 ) {
-  return instance.launchWrapper({ allocationRef, env: {}, instance: instanceSize });
+  return instance.launchWrapper({
+    command: preinstalledStartup(),
+    allocationRef,
+    env: {},
+    instance: instanceSize,
+  });
 }
 
 beforeEach(() => {
@@ -435,6 +445,35 @@ describe('ContainersBilling identity and admission', () => {
 });
 
 describe('ContainersBilling physical lifecycle', () => {
+  it('activates metering when an issued start becomes running during PID 1 confirmation', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-3');
+    const generation = readGeneration(storage);
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      start(options);
+      container.running = false;
+    });
+    const exec = container.exec.bind(container);
+    vi.spyOn(container, 'exec').mockImplementation(async cmd => {
+      await Promise.resolve();
+      container.running = true;
+      return exec(cmd);
+    });
+
+    await expect(launch(instance, REF_A, 'standard-3')).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    await flushPending(pendingTasks);
+
+    expect(readGeneration(storage)).toBe(generation);
+    expect(readMeasurementStarted(storage)).toBe(true);
+    expect(readSchedules(storage)?.billingHeartbeatTick).toMatchObject({ payload: generation });
+    expect(meter.recordStartInputs).toHaveLength(1);
+    expect(container.startCalls).toHaveLength(1);
+  });
+
   it('activates metering when a resumed sleep container execs and the wrapper exec throws', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup({
       record: {
@@ -490,7 +529,12 @@ describe('ContainersBilling physical lifecycle', () => {
   it('budget stop blocks, schedules force-stop, destroys, settles, and a fresh admission succeeds', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');
-    await instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'standard-4' });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+    });
     await flushPending(pendingTasks);
 
     const heartbeatDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs;
@@ -530,7 +574,12 @@ describe('ContainersBilling physical lifecycle', () => {
   it('keeps the block and re-arms billingForceStop when destroy stays retryable', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');
-    await instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'standard-4' });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+    });
     await flushPending(pendingTasks);
 
     container.destroyBehavior = 'reject';
@@ -692,7 +741,12 @@ describe('ContainersBilling inert without persisted attribution', () => {
       const { instance, container, storage, meter } = setup();
 
       await expect(
-        instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: instanceSize })
+        instance.launchWrapper({
+          command: preinstalledStartup(),
+          allocationRef: REF_A,
+          env: {},
+          instance: instanceSize,
+        })
       ).resolves.toEqual({ started: true, startSource: 'image' });
       expect(readRecord(storage).instance).toBe(instanceSize);
       expect(readRecord(storage).billingConfigured).toBeUndefined();
@@ -701,7 +755,12 @@ describe('ContainersBilling inert without persisted attribution', () => {
       expect(meter.recordStartInputs).toHaveLength(0);
 
       await expect(
-        instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: instanceSize })
+        instance.launchWrapper({
+          command: preinstalledStartup(),
+          allocationRef: REF_A,
+          env: {},
+          instance: instanceSize,
+        })
       ).resolves.toEqual({ started: false, startSource: 'image' });
       expect(container.startCalls).toHaveLength(1);
 
@@ -724,7 +783,12 @@ describe('ContainersBilling inert without persisted attribution', () => {
   it('stays inert for a billable instance that was never admitted', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
 
-    await instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'standard-4' });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+    });
 
     expect(container.startCalls[0]).toMatchObject({ instance: 'standard-4' });
     expect(readRecord(storage).billingConfigured).toBeUndefined();
@@ -998,7 +1062,12 @@ describe('ContainersBilling resumed launch activation', () => {
     });
 
     await expect(
-      resumed.instance.launchWrapper({ allocationRef: 'ref-b', env: {}, instance: 'standard-4' })
+      resumed.instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: 'ref-b',
+        env: {},
+        instance: 'standard-4',
+      })
     ).resolves.toEqual({ started: true, startSource: 'image' });
     await flushPending(resumed.pendingTasks);
 

@@ -368,13 +368,12 @@ describe('processJob — scheduler-owned execution', () => {
 
     await processJob(env, deciderMessage());
 
-    // fetchBenchmarkUserToken passes a string URL and a JSON string body.
     const mintCalls = vi
       .mocked(fetch)
-      .mock.calls.filter(([url]) => (url as string).includes('/api/internal/bot-token'));
+      .mock.calls.filter(([url]) => (url as URL).href.includes('/api/internal/bot-token'));
     expect(mintCalls).toHaveLength(1);
     const [url, init] = mintCalls[0]!;
-    expect(url).toBe(`${env.KILO_WEB_API_BASE_URL}/api/internal/bot-token`);
+    expect((url as URL).href).toBe(`${env.KILO_WEB_API_BASE_URL}/api/internal/bot-token`);
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer mint-secret');
     expect(JSON.parse(init?.body as string)).toEqual({
       userId: 'benchmark-user',
@@ -393,7 +392,7 @@ describe('processJob — scheduler-owned execution', () => {
 
     await processJob(env, deciderMessage());
     expect(
-      vi.mocked(fetch).mock.calls.some(([u]) => (u as string).includes('/api/internal/bot-token'))
+      vi.mocked(fetch).mock.calls.some(([u]) => (u as URL).href.includes('/api/internal/bot-token'))
     ).toBe(false);
   });
 

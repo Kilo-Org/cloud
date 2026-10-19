@@ -7,6 +7,7 @@ import {
   CustomRouterBenchmarkContextSchema,
   type AutoRouter,
   DEFAULT_AUTO_ROUTER,
+  DEFAULT_BENCHMARK_DECIDER_MODEL_IDS,
   BenchmarkConfigSchema,
   BenchmarkSchedulerOverridesSchema,
   BenchmarkKindSchema,
@@ -15,8 +16,10 @@ import {
   CustomRoutingTableRequestSchema,
   RegisterBenchmarkProfilesRequestSchema,
   RequeueBenchmarkRegistryRequestSchema,
+  SyncBenchmarkSubscriptionsRequestSchema,
   type BenchmarkRegistryQueue,
   type BenchmarkIdentity,
+  resolveBenchmarkIdentity,
   resolvePolicySettings,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
@@ -27,6 +30,7 @@ import {
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import { registerProfileRefreshRoute } from './admin-profile-refresh';
 import { debugRunCli } from './cli-runner';
 import { assembleCustomRoutingTable } from './custom-routing-table';
 import { assembleCustomRouterTable, lookupCustomRouterStatuses } from './custom-routers';
@@ -41,9 +45,8 @@ import {
   BenchmarkRunConfigError,
   computeEngineIdentity,
   drainQueues,
-  fetchBenchmarkUserToken,
-  resolveRunIdentity,
   publishPlatformRoutingTable,
+  resolveRunIdentity,
   RunAlreadyActiveError,
   startRun,
   sweepStaleRuns,
@@ -60,12 +63,22 @@ import {
 import { loadRunProgress } from './run-progress';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
+import { fetchBenchmarkUserToken } from './benchmark-token';
+import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
   catalogCandidatePrices,
+  catalogSupportsBenchmarkPair,
   fetchBenchmarkModelCatalog,
-  mapProfileStatusesToRequestedModels,
-  platformRegistryEntries,
 } from './platform-models';
+import {
+  loadSubscriptionSnapshot,
+  mapSubscriptionStatuses,
+  PLATFORM_SUBSCRIPTION_OWNER,
+  resolveSubscriptionSnapshot,
+  servingSubscriptionSnapshot,
+  snapshotPairs,
+  syncSubscriptionSnapshot,
+} from './subscriptions';
 import { planPromptTransportRemeasure } from './remeasure';
 
 const RemeasureRequestSchema = z.object({
@@ -88,6 +101,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     if (!router.success) return c.json({ error: 'Invalid router' }, 400);
     await next();
   });
+  registerProfileRefreshRoute(app);
   app.get('/admin/config', async c => {
     const config = await getBenchmarkConfig(c.env.BENCH_DB, requestRouter(c));
     return c.json({
@@ -101,10 +115,17 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     zodJsonValidator(BenchmarkConfigSchema, { errorMessage: 'Invalid benchmark config' }),
     async c => {
       const updatedBy = c.req.header('x-updated-by') ?? null;
-      const router = AutoRouterSchema.parse(c.req.query('router') ?? c.req.valid('json').router);
+      const body = c.req.valid('json');
+      const router = AutoRouterSchema.parse(c.req.query('router') ?? body.router);
+      const rawBody: unknown = await c.req.json();
+      const hasSelectedPool =
+        typeof rawBody === 'object' && rawBody !== null && 'deciderModels' in rawBody;
+      const deciderModels = hasSelectedPool
+        ? body.deciderModels
+        : [{ id: DEFAULT_BENCHMARK_DECIDER_MODEL_IDS[router] }];
       const saved = await saveBenchmarkConfig(
         c.env.BENCH_DB,
-        { ...c.req.valid('json'), router },
+        { ...body, router, deciderModels },
         updatedBy
       );
       await syncPlatformRegistry(c.env, fetch, router);
@@ -388,35 +409,34 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
-        const catalog = await fetchBenchmarkModelCatalog(c.env);
-        const available = new Set(catalog.data.map(model => model.id));
-        for (const entry of body.entries) {
-          if (!available.has(entry.model)) {
-            throw new ProfileValidationError(
-              `Model is unavailable in the current catalog: ${entry.model}`
-            );
-          }
-        }
-        const pairs = platformRegistryEntries(
-          { deciderModels: body.entries.map(entry => ({ id: entry.model })) },
-          catalog
+        const owner = { ownerType: body.ownerType, ownerId: body.ownerId };
+        const catalog = await fetchExecutableBenchmarkModelCatalog(
+          c.env,
+          resolveBenchmarkIdentity(config)
+        );
+        const previous = await loadSubscriptionSnapshot(c.env.BENCH_DB, config.router, owner);
+        const snapshot = resolveSubscriptionSnapshot(body.entries, previous, catalog, false, true);
+        const pairs = snapshotPairs(snapshot).filter(pair =>
+          catalogSupportsBenchmarkPair(catalog, pair)
         );
         const retryModels = new Set((body.retryEntries ?? []).map(entry => entry.model));
-        const result = await registerProfiles(c.env.BENCH_DB, config, {
-          ownerType: body.ownerType,
-          ownerId: body.ownerId,
-          pairs,
-          retryPairs: platformRegistryEntries(
-            {
-              deciderModels: body.entries
-                .filter(entry => retryModels.has(entry.model))
-                .map(entry => ({ id: entry.model })),
-            },
-            catalog
-          ),
+        const result =
+          pairs.length > 0
+            ? await registerProfiles(c.env.BENCH_DB, config, {
+                ...owner,
+                pairs,
+                retryPairs: snapshotPairs(
+                  snapshot.filter(entry => retryModels.has(entry.model))
+                ).filter(pair => catalogSupportsBenchmarkPair(catalog, pair)),
+              })
+            : { statuses: [] };
+        const saved = await syncSubscriptionSnapshot(c.env, config, owner, body.entries, {
+          catalog,
+          admit: false,
+          retryUnresolved: true,
         });
         return c.json({
-          statuses: mapProfileStatusesToRequestedModels(body.entries, catalog, result.statuses),
+          statuses: mapSubscriptionStatuses(saved, result.statuses),
         });
       } catch (error) {
         if (error instanceof ProfileQuotaExceededError) {
@@ -427,6 +447,27 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         }
         throw error;
       }
+    }
+  );
+
+  app.post(
+    '/admin/profiles/subscriptions',
+    zodJsonValidator(SyncBenchmarkSubscriptionsRequestSchema, {
+      errorMessage: 'Invalid benchmark subscription request',
+    }),
+    async c => {
+      const body = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      if (!config) return c.json({ error: 'Benchmark config is not configured.' }, 400);
+      const snapshot = await syncSubscriptionSnapshot(c.env, config, body, body.entries ?? [], {
+        restorePrevious: body.restorePrevious,
+      });
+      const pairs = snapshotPairs(snapshot);
+      const result =
+        pairs.length > 0
+          ? await lookupProfileStatuses(c.env.BENCH_DB, config, { pairs })
+          : { statuses: [] };
+      return c.json({ statuses: mapSubscriptionStatuses(snapshot, result.statuses) });
     }
   );
 
@@ -449,28 +490,19 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
-        const catalog = await fetchBenchmarkModelCatalog(c.env);
-        const available = new Set(catalog.data.map(model => model.id));
-        const supported = body.entries.filter(entry => available.has(entry.model));
-        const pairs = platformRegistryEntries(
-          { deciderModels: supported.map(entry => ({ id: entry.model })) },
-          catalog
-        );
+        const owner =
+          body.ownerType && body.ownerId
+            ? { ownerType: body.ownerType, ownerId: body.ownerId }
+            : PLATFORM_SUBSCRIPTION_OWNER;
+        const saved = await loadSubscriptionSnapshot(c.env.BENCH_DB, config.router, owner);
+        const snapshot = resolveSubscriptionSnapshot(body.entries, saved, null);
+        const pairs = snapshotPairs(snapshot);
         const result =
           pairs.length > 0
             ? await lookupProfileStatuses(c.env.BENCH_DB, config, { pairs })
             : { statuses: [] };
         return c.json({
-          statuses: [
-            ...mapProfileStatusesToRequestedModels(supported, catalog, result.statuses),
-            ...body.entries
-              .filter(entry => !available.has(entry.model))
-              .map(entry => ({
-                entry: { model: entry.model, variant: null },
-                status: 'failed',
-                failureReason: 'Model is unavailable in the current catalog.',
-              })),
-          ],
+          statuses: mapSubscriptionStatuses(snapshot, result.statuses),
         });
       } catch (error) {
         if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
@@ -501,15 +533,15 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
-        const catalog = await fetchBenchmarkModelCatalog(c.env);
-        const available = new Set(catalog.data.map(model => model.id));
-        const pairs = platformRegistryEntries(
-          {
-            deciderModels: body.entries
-              .filter(entry => available.has(entry.model))
-              .map(entry => ({ id: entry.model })),
-          },
-          catalog
+        const owner =
+          body.ownerType && body.ownerId
+            ? { ownerType: body.ownerType, ownerId: body.ownerId }
+            : PLATFORM_SUBSCRIPTION_OWNER;
+        const snapshot = await servingSubscriptionSnapshot(c.env.BENCH_DB, config, owner);
+        const requested = new Set(body.entries.map(entry => entry.model));
+        const pairs = snapshotPairs(
+          snapshot.filter(entry => requested.has(entry.model)),
+          true
         );
         return c.json(
           pairs.length > 0

@@ -336,7 +336,7 @@ async function requestPlatformBenchmarks(params: {
     ) {
       throw new CustomRouterApiError(
         'invalid_request',
-        `baseRouter: Benchmarks for the ${params.baseRouter} base router are not available yet. Choose another base router.`
+        `baseRouter: Benchmarks for the ${params.baseRouter} benchmark difficulty are not available yet. Choose another benchmark difficulty.`
       );
     }
     if (result.status === 400) {

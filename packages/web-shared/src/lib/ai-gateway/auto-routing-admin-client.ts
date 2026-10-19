@@ -1,6 +1,9 @@
 import {
   AutoRoutingClassifierAnalyticsResponseSchema,
   AutoRoutingClassifierModelResponseSchema,
+  AutoRoutingModeResponseSchema,
+  type AutoRoutingModeOwnerQuery,
+  type UpdateAutoRoutingModeRequest,
   type AutoRoutingAnalyticsPeriod,
 } from '@kilocode/auto-routing-contracts';
 import { AUTO_ROUTING_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
@@ -40,5 +43,28 @@ export function getAutoRoutingClassifierAnalytics(period: AutoRoutingAnalyticsPe
       method: 'GET',
     },
     AutoRoutingClassifierAnalyticsResponseSchema
+  );
+}
+
+export function getAutoRoutingMode(owner: AutoRoutingModeOwnerQuery) {
+  const searchParams = new URLSearchParams(owner);
+  return fetchAutoRoutingAdmin(
+    `/admin/routing-mode?${searchParams}`,
+    {
+      method: 'GET',
+    },
+    AutoRoutingModeResponseSchema
+  );
+}
+
+export function updateAutoRoutingMode(owner: UpdateAutoRoutingModeRequest) {
+  return fetchAutoRoutingAdmin(
+    '/admin/routing-mode',
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(owner),
+    },
+    AutoRoutingModeResponseSchema
   );
 }

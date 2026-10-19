@@ -4,9 +4,12 @@ import {
   AutoRoutingClassifierModelResponseSchema,
   AutoRoutingDecisionResponseSchema,
   AutoRoutingDecisionSchema,
+  AutoRoutingModeOwnerQuerySchema,
+  AutoRoutingModeResponseSchema,
   MirrorPayloadSchema,
   RoutingConstraintsSchema,
   UpdateClassifierModelRequestSchema,
+  UpdateAutoRoutingModeRequestSchema,
   detectRequiredInputModalities,
   estimateRoutingTokens,
 } from './index';
@@ -20,6 +23,44 @@ import {
   RegisterBenchmarkProfilesRequestSchema,
   resolveBenchmarkIdentity,
 } from './benchmark';
+
+describe('platform routing mode contracts', () => {
+  it.each(['user', 'org'] as const)(
+    'preserves %s mode overrides and null inheritance',
+    ownerType => {
+      const owner = { ownerType, ownerId: 'owner-1' };
+      expect(AutoRoutingModeOwnerQuerySchema.parse(owner)).toEqual(owner);
+      for (const mode of ['cost_per_accuracy', 'best_accuracy', null] as const) {
+        expect(UpdateAutoRoutingModeRequestSchema.parse({ ...owner, mode })).toEqual({
+          ...owner,
+          mode,
+        });
+        const response = {
+          ...owner,
+          mode: mode ?? 'cost_per_accuracy',
+          configuredMode: mode,
+          defaultMode: 'cost_per_accuracy',
+        };
+        expect(AutoRoutingModeResponseSchema.parse(response)).toEqual(response);
+      }
+    }
+  );
+
+  it('rejects missing modes, unknown modes, and invalid owner identities', () => {
+    const owner = { ownerType: 'user', ownerId: 'owner-1' };
+    expect(UpdateAutoRoutingModeRequestSchema.safeParse(owner).success).toBe(false);
+    expect(
+      UpdateAutoRoutingModeRequestSchema.safeParse({ ...owner, mode: 'fastest' }).success
+    ).toBe(false);
+    expect(
+      UpdateAutoRoutingModeRequestSchema.safeParse({ ...owner, ownerType: 'platform', mode: null })
+        .success
+    ).toBe(false);
+    expect(
+      UpdateAutoRoutingModeRequestSchema.safeParse({ ...owner, ownerId: ' ', mode: null }).success
+    ).toBe(false);
+  });
+});
 
 describe('auto routing contracts', () => {
   it('validates the cross-service request and response contracts', () => {

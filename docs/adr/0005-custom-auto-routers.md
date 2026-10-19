@@ -24,11 +24,11 @@ per owner, and a customizable router that is not named as one.
 
 Split auto routing into platform routers and custom routers.
 
-- `kilo-auto/efficient` and `kilo-auto/frontier` are platform-owned. Owners cannot set a pool or a
-  mode on them. Organization model policy (`deniedModelIds`) still filters their candidates.
-- A **custom router** is owned by a user or an organization. Its owner sets a name, a slug, a
-  base dataset, a mode, a default member, and a pool of at most 20 models. The pool can contain
-  gateway models and client models.
+- `kilo-auto/efficient` and `kilo-auto/frontier` use platform-selected pools. Users and organizations
+  select their routing mode. Organization model policy still filters the platform candidates.
+- A **custom router** is owned by a user or an organization. Its owner selects the benchmark
+  difficulty, routing mode, default member, and model pool. The pool can contain gateway and client
+  models. The Efficient or Frontier base selects the benchmark dataset and routing thresholds.
 - The CLI routes client models. It calls a public `/v1/decide` route on the auto-routing worker,
   then dispatches the chosen model itself. The gateway routes custom routers for every other
   client, with gateway candidates only.
@@ -194,11 +194,10 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    and storage. Run the silent conversion before sending the advance notice.
    - Each saved pool becomes an owner-scoped `efficient` custom router.
    - The migrated row is canonical for both model IDs. Edits do not update separate copies.
-   - Preserve independently inherited organization modes during the overlap. An explicit
-     custom mode edit replaces inheritance.
-   - At cutover, inherited modes stop applying. An inherited router keeps the stored
-     `cost_per_accuracy` default unless its owner explicitly selects another mode beforehand.
-   - Keep the migrated slug and base stable; reject deletion until graduation.
+   - Copy the owner's configured mode, using the default when none is saved.
+     Custom modes are independent of platform mode settings and organization mode inheritance.
+     Platform mode settings remain stored and editable throughout the transition.
+   - Keep the migrated slug stable and reject deletion until graduation; benchmark difficulty remains editable.
    - Migrated owners and authorized organization editors can use their router without the flag.
      This does not enable unrelated router creation.
    - New legacy pool saves also convert before acknowledging success, including owners missed
@@ -215,16 +214,18 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    Refresh the reviewed campaign for new recipients without resetting delivery history.
    Give late recipients the full notice period; postpone cutover when necessary.
 6. At graduation, deploy only the cutover:
-   - Efficient stops reading owner settings and overlap aliases. Its pool becomes platform-owned.
-   - The custom model ID retains the canonical pool.
-   - Remove legacy settings routes/UI, inheritance compatibility, and temporary edit guards.
+   - Efficient stops reading owner pools and overlap aliases. Its pool becomes platform-selected.
+   - Platform modes remain selectable, retaining organization, personal, then default precedence.
+   - The custom model ID retains its own pool and independently selected mode and benchmark difficulty.
+   - Remove legacy pool settings/UI, custom-mode inheritance compatibility, and temporary pool edit guards.
+     Keep the platform mode endpoint, mode-only UI, and persisted mode storage.
    - Remove the rollout flag. Do not reconvert pools or resend the advance notice.
-7. Delete the owner settings Durable Object in a separate, later deployment after verification.
-   Its deletion permanently removes the stored legacy settings.
+7. Retire one-time pool conversion tooling after verification. Preserve the existing mode Durable
+   Object, its binding, namespace, and saved modes. Do not apply a `deleted_classes` migration.
 
-Owners with a configured mode but no saved pool are outside this migration and pool-notice cohort.
-Their Efficient override resets to the platform default at cutover. Include this separate behavior
-change in release communications; the pool blast does not notify those owners.
+Owners with a configured mode but no saved pool are outside the pool migration and notice cohort.
+Their platform mode settings remain valid and editable after cutover. They need no custom router
+to keep selecting a platform routing mode.
 
 ### Operator commands
 

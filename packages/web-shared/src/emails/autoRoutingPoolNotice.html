@@ -36,8 +36,8 @@
                 <p style="margin: 0 0 18px">
                   Until <strong>{{ cutover_at }}</strong>, your current
                   <code>kilo-auto/efficient</code> model ID continues to use your saved pool. During
-                  this notice period, the old and new model IDs share one editable pool. Manage it
-                  under Custom routers; your changes apply to both model IDs.
+                  this notice period, pool membership changes under Custom routers apply to both
+                  model IDs. Platform and custom routing modes are configured separately.
                 </p>
                 <p style="margin: 0 0 18px">
                   At that time, <code>kilo-auto/efficient</code> will switch to Kilo's
@@ -46,9 +46,15 @@
                   no need to recreate your pool.
                 </p>
                 <p style="margin: 0 0 18px">
-                  If your pool inherits a routing mode, select a mode explicitly under Custom
-                  routers before the cutover. Inherited settings stop applying then. Without an
-                  explicit selection, the custom router uses Best accuracy per dollar.
+                  If your old pool inherited a routing mode, choose the desired mode explicitly
+                  under Custom routers. Custom routers use their own mode rather than inheriting
+                  platform settings. Without a saved custom selection, the mode is Best accuracy per
+                  dollar.
+                </p>
+                <p style="margin: 0 0 18px">
+                  You can still choose the routing mode for Kilo's platform routers after this
+                  change. Platform routers use Kilo's model pool; custom routers let you choose the
+                  benchmark difficulty, routing mode, and model pool independently.
                 </p>
                 <p style="margin: 0 0 18px">
                   For organization pools, share the new organization model ID with your team and

@@ -526,7 +526,7 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
 
-    test('maps a benchmark worker without frontier owner profiles to a base router error', async () => {
+    test('maps unsupported frontier benchmark difficulty to a validation error', async () => {
       mockedRegister.mockResolvedValue({
         ok: false,
         status: 400,
@@ -539,7 +539,7 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(created.body).toMatchObject({
         error: {
           code: 'invalid_request',
-          message: expect.stringContaining('frontier base router are not available yet'),
+          message: expect.stringContaining('frontier benchmark difficulty are not available yet'),
         },
       });
       expect(mockedRegister).toHaveBeenCalledWith(expect.objectContaining({ router: 'frontier' }));
@@ -574,6 +574,63 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(listed.body.routers.map(router => router.modelId)).toEqual([
         'kilo-auto/custom/coding',
       ]);
+    });
+  });
+
+  test('persists custom mode, benchmark difficulty, and pool as independent settings', async () => {
+    await create(routerBody({ slug: 'efficient' }));
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ legacy_pool: true, legacy_mode_inherited: true })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    const customParams = params('user', 'efficient');
+
+    const modeUpdate = await updateRouter(
+      request('/user/efficient', { method: 'PATCH', body: { mode: 'best_accuracy' } }),
+      customParams
+    );
+    expect(modeUpdate.status).toBe(200);
+    const afterMode = (await modeUpdate.json()) as CustomRouterResponse;
+    expect(afterMode.router.mode).toBe('best_accuracy');
+    expect(afterMode.router.baseRouter).toBe('efficient');
+    expect(afterMode.router.entries.map(entry => entry.entry)).toEqual([gateway(SONNET)]);
+
+    const difficultyUpdate = await updateRouter(
+      request('/user/efficient', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
+      customParams
+    );
+    expect(difficultyUpdate.status).toBe(200);
+    const afterDifficulty = (await difficultyUpdate.json()) as CustomRouterResponse;
+    expect(afterDifficulty.router.mode).toBe('best_accuracy');
+    expect(afterDifficulty.router.baseRouter).toBe('frontier');
+    expect(afterDifficulty.router.entries.map(entry => entry.entry)).toEqual([gateway(SONNET)]);
+
+    const poolUpdate = await updateRouter(
+      request('/user/efficient', {
+        method: 'PATCH',
+        body: {
+          entries: [gateway(FLASH)],
+          defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+        },
+      }),
+      customParams
+    );
+    expect(poolUpdate.status).toBe(200);
+    const reloaded = await getRouter(request('/user/efficient'), customParams);
+    expect(reloaded.status).toBe(200);
+    const afterPool = (await reloaded.json()) as CustomRouterResponse;
+    expect(afterPool.router.mode).toBe('best_accuracy');
+    expect(afterPool.router.baseRouter).toBe('frontier');
+    expect(afterPool.router.entries.map(entry => entry.entry)).toEqual([gateway(FLASH)]);
+    const [row] = await db
+      .select()
+      .from(auto_routing_custom_routers)
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    expect(row).toMatchObject({
+      mode: 'best_accuracy',
+      base_router: 'frontier',
+      entries: [gateway(FLASH)],
+      legacy_pool: true,
     });
   });
 

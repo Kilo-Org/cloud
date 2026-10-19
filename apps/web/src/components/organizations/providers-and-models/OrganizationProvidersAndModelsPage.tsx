@@ -34,6 +34,7 @@ import {
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { usePreferredModels } from '@/components/shared/usePreferredModels';
 import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
+import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
   modelRetainsPrompts,
   modelTrains,
@@ -521,6 +522,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             forceMount
             className="mt-6 space-y-6 data-[state=inactive]:hidden"
           >
+            <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
             <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
         </Tabs>

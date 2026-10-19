@@ -148,6 +148,7 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
               <CustomRouterItem
                 key={router.id}
                 router={router}
+                canEdit={!readonly && router.canEdit}
                 deleting={deleteMutation.isPending && deleteMutation.variables?.id === router.id}
                 onEdit={() => setEditor({ router })}
                 onDelete={() => deleteMutation.mutateAsync(router)}
@@ -175,11 +176,13 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
 
 function CustomRouterItem({
   router,
+  canEdit,
   deleting,
   onEdit,
   onDelete,
 }: {
   router: CustomRouterSummary;
+  canEdit: boolean;
   deleting: boolean;
   onEdit: () => void;
   onDelete: () => Promise<void>;
@@ -196,11 +199,11 @@ function CustomRouterItem({
           <p className="font-medium">{router.name}</p>
           <p className="text-muted-foreground truncate font-mono text-sm">{router.modelId}</p>
           <p className="text-muted-foreground text-sm">
-            {baseLabel} base · {modeLabel}
+            {baseLabel} benchmark difficulty · {modeLabel}
             {defaultEntry ? ` · Default: ${entryLabel(defaultEntry.entry)}` : null}
           </p>
         </div>
-        {router.canEdit ? (
+        {canEdit ? (
           <div className="flex shrink-0 items-start gap-2">
             <Button type="button" variant="ghost" size="sm" disabled={deleting} onClick={onEdit}>
               <Pencil className="size-4" aria-hidden />

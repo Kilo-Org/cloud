@@ -7,7 +7,7 @@ import {
   CustomRouterReferenceSchema,
   customRouterCandidateModel,
 } from './custom-router';
-import { AutoRouterSchema } from './router';
+import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import {
   ClassifierSubtaskTypeSchema,
   ClassifierTaskTypeSchema,
@@ -210,6 +210,27 @@ export const AutoRoutingClassifierModelResponseSchema = z.object({
 export type AutoRoutingClassifierModelResponse = z.infer<
   typeof AutoRoutingClassifierModelResponseSchema
 >;
+
+export const AutoRoutingModeOwnerTypeSchema = z.enum(['user', 'org']);
+export type AutoRoutingModeOwnerType = z.infer<typeof AutoRoutingModeOwnerTypeSchema>;
+
+export const AutoRoutingModeOwnerQuerySchema = z.object({
+  ownerType: AutoRoutingModeOwnerTypeSchema,
+  ownerId: z.string().trim().min(1),
+});
+export type AutoRoutingModeOwnerQuery = z.infer<typeof AutoRoutingModeOwnerQuerySchema>;
+
+export const UpdateAutoRoutingModeRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
+  mode: AutoRoutingModeSchema.nullable(),
+});
+export type UpdateAutoRoutingModeRequest = z.infer<typeof UpdateAutoRoutingModeRequestSchema>;
+
+export const AutoRoutingModeResponseSchema = AutoRoutingModeOwnerQuerySchema.extend({
+  mode: AutoRoutingModeSchema,
+  configuredMode: AutoRoutingModeSchema.nullable(),
+  defaultMode: AutoRoutingModeSchema,
+});
+export type AutoRoutingModeResponse = z.infer<typeof AutoRoutingModeResponseSchema>;
 
 export const AutoRoutingAnalyticsPeriodSchema = z.enum(['1h', '24h', '7d', '30d']);
 export type AutoRoutingAnalyticsPeriod = z.infer<typeof AutoRoutingAnalyticsPeriodSchema>;

@@ -2,7 +2,6 @@ import {
   ClassifierOutputSchema,
   MirrorPayloadSchema,
   DEFAULT_AUTO_ROUTER,
-  DEFAULT_AUTO_ROUTING_MODE,
   taxonomyRouteKey,
   type AutoRoutingDecision,
   type AutoRoutingDecisionResponse,
@@ -54,9 +53,10 @@ import {
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
 import { getRoutingTable } from './routing-table';
+import { getAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
 import { getModelCapabilities } from './model-capabilities';
-import type { ModelCapabilitiesMap } from './model-capabilities';
+import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
 import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
 
 function stickyToIncumbent(sticky: StickyDecision | null): DecisionIncumbent | null {
@@ -370,23 +370,31 @@ function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTa
     requestedModel: payload.input.requestedModel,
     deniedModelIds: new Set(payload.routingPolicy?.deniedModelIds ?? []),
     loadRouting: async timings => {
-      const tableStartedAt = performance.now();
-      const [routingTable, shadowRoutingTable] = await Promise.all([
-        getRoutingTable(c.env, router),
-        router === 'efficient' ? getShadowRoutingTable(c.env) : null,
+      const [routingMode, [routingTable, shadowRoutingTable], capabilities] = await Promise.all([
+        getAutoRoutingMode(c.env, payload),
+        (async () => {
+          const startedAt = performance.now();
+          const tables = await Promise.all([
+            getRoutingTable(c.env, router),
+            router === 'efficient' ? getShadowRoutingTable(c.env) : null,
+          ]);
+          timings.tableMs = performance.now() - startedAt;
+          return tables;
+        })(),
+        payload.constraints === undefined
+          ? new Map<string, ModelCapabilities>()
+          : (async () => {
+              const startedAt = performance.now();
+              const result = await getModelCapabilities(c.env, {
+                router,
+                waitUntil: promise => c.executionCtx.waitUntil(promise),
+              });
+              timings.capabilitiesMs = performance.now() - startedAt;
+              return result;
+            })(),
       ]);
-      timings.tableMs = performance.now() - tableStartedAt;
-      let capabilities: ModelCapabilitiesMap = new Map();
-      if (payload.constraints !== undefined) {
-        const capabilitiesStartedAt = performance.now();
-        capabilities = await getModelCapabilities(c.env, {
-          router,
-          waitUntil: promise => c.executionCtx.waitUntil(promise),
-        });
-        timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
-      }
       return {
-        routingMode: DEFAULT_AUTO_ROUTING_MODE,
+        routingMode,
         capabilities,
         routingTable,
         shadowRoutingTable,

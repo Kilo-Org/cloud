@@ -44,7 +44,10 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Email Delivery** | Attempt to render and send one Security Agent Notification through Mailgun | Referring to provider side effect, retry, or acceptance | Notification event |
 | **Security Finding Activity Event** | Immutable record of one material user, system-policy, or source-driven action or outcome that changes or explains a Security Finding | Referring to evidence included in a Security Agent Audit Report | Page view, unchanged sync observation, queue claim, heartbeat |
 | **Security Agent Audit Report** | Owner-scoped, period-bounded audit view of Security Finding Activity Events grouped by Security Finding | Referring to the interactive audit report | Generic audit-log export, activity dump |
-| **Custom router** | An owner's named auto router that routes only within its own pool of gateway and client models, using a platform router's dataset and settings | Referring to an owner-chosen candidate set for auto routing | Efficient model pool, custom efficient, custom mode |
+| **Custom router** | An owner's named router with an owner-selected benchmark difficulty, routing mode, and pool of gateway and client models | Referring to owner-configured auto routing | Efficient model pool, custom mode |
+| **Platform router** | An auto router whose model pool is selected by the platform and whose routing mode is selected by users or organizations | Referring to Efficient or Frontier platform routing | Fixed-mode router, owner-configured platform pool |
+| **Routing mode** | The ranking objective: best accuracy per dollar or best accuracy | Referring to how a router ranks eligible models | Model pool, benchmark difficulty |
+| **Benchmark difficulty** | The selected Efficient or Frontier benchmark dataset and routing thresholds for a Custom router | Referring to the custom router's benchmark choice | Routing mode, model pool |
 | **Pool entry** | One gateway model or one client-served model in a Custom router's pool | Referring to membership inside a Custom router | Model alone, normalized effort |
 | **Benchmark profile** | Globally shared, current benchmark results for one model and thinking variant that the platform serves | Referring to readiness and measured routing evidence reused across owners | User benchmark, pool benchmark |
 | **Client profile** | Owner-scoped measurement of a Pool entry that the owner's CLI runs because the platform cannot serve it | Referring to client eval results | Benchmark profile, shared client result |
@@ -90,7 +93,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - A **Security Finding Activity Event** belongs to one Security Agent owner and one Security Finding, including after that finding is deleted.
 - A **Custom router** belongs to one personal user or organization and holds at most 20 Pool entries; it never routes outside its pool.
 - A **Benchmark profile** is current for one benchmark-engine version and shared by every owner whose Custom router names that model; a **Client profile** never affects another owner.
-- `kilo-auto/efficient` and `kilo-auto/frontier` are platform routers: owners cannot set a pool or a mode on them, and only organization model policy filters their candidates.
+- `kilo-auto/efficient` and `kilo-auto/frontier` use platform-selected pools. Personal or organization settings select their routing mode; organization model policy still filters candidates.
 - **Kilo Pass for Organizations** uses a new org-owned source of truth; personal Kilo Pass subscription rows are not authoritative for org agreements.
 - A **Kilo Pass org agreement** belongs to a parent organization and records a **Kilo Pass term version**.
 - A parent organization has at most one non-ended **Kilo Pass org agreement**.

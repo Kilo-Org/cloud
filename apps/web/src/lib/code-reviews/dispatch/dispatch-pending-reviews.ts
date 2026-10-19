@@ -67,6 +67,7 @@ import {
   type PendingCodeReviewCreatedAtWindow,
 } from './dispatch-constants';
 import { getManualCodeReviewConfig, shouldPublishCodeReviewToProvider } from '../manual-config';
+import { assertCouncilCreationAllowed } from '../core/council-entitlement';
 
 export type DispatchResult = {
   dispatched: number;
@@ -497,6 +498,29 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     logExceptInTest('[dispatchReview] Review reservation changed before preparation', {
       reviewId: review.id,
     });
+    return false;
+  }
+
+  // The plan gate covers the review lifecycle, not only creation: dispatch is
+  // one of the paths that starts a council review (alongside cron drain,
+  // stale-queued recovery, and manual retrigger). Each path confirms the
+  // owner's current enterprise entitlement through the shared guard, and a
+  // reservation that does not meet the plan ends here rather than running.
+  // No-op for non-council reviews and local development (the bypass lives
+  // inside the guard).
+  try {
+    await assertCouncilCreationAllowed({ owner, reviewType: review.review_type });
+  } catch (error) {
+    logExceptInTest('[dispatchReview] Council plan gate denied dispatch', {
+      reviewId: review.id,
+      owner,
+    });
+    await failReservedQueuedReview(
+      review.id,
+      dispatchReservationId,
+      getErrorMessage(error),
+      'billing'
+    );
     return false;
   }
 

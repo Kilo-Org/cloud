@@ -71,6 +71,7 @@ import {
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
 import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
+import { assertCouncilCreationAllowed } from '@/lib/code-reviews/core/council-entitlement';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 
 /**
@@ -686,6 +687,12 @@ export const codeReviewRouter = createTRPCRouter({
             });
           }
         }
+
+        // Council is an enterprise-only paid feature, so a council review runs
+        // only while the owner is entitled. This mirrors the creation boundary:
+        // the guard is re-checked whenever an existing review becomes runnable
+        // again. No-op for non-council reviews and local development.
+        await assertCouncilCreationAllowed({ owner, reviewType: review.review_type });
 
         const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
 

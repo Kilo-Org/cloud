@@ -41,6 +41,15 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
+// The plan gate short-circuits when local review development is on, and the shared
+// test environment sets that flag. Force it off so the gate is exercised here.
+const mockIsLocalCodeReviewDevelopmentEnabled = jest.fn<boolean, []>();
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
+  isLocalCodeReviewDevelopmentEnabled: () => mockIsLocalCodeReviewDevelopmentEnabled(),
+}));
+
+import crypto from 'crypto';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -48,6 +57,7 @@ import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
+  organization_seats_purchases,
   organizations,
   platform_integrations,
   type User,
@@ -155,6 +165,7 @@ describe('tryDispatchPendingReviews', () => {
   });
 
   beforeEach(() => {
+    mockIsLocalCodeReviewDevelopmentEnabled.mockReturnValue(false);
     mockDispatchReview.mockResolvedValue(undefined);
     mockGetReviewStatus.mockResolvedValue(null);
     mockGetAgentConfigForOwner.mockResolvedValue({
@@ -186,6 +197,7 @@ describe('tryDispatchPendingReviews', () => {
       );
     mockDispatchReview.mockReset();
     mockGetReviewStatus.mockReset();
+    mockIsLocalCodeReviewDevelopmentEnabled.mockReset();
     mockGetAgentConfigForOwner.mockReset();
     mockPrepareReviewPayload.mockReset();
     mockSendCodeReviewDisabledEmail.mockReset();
@@ -1949,5 +1961,166 @@ describe('tryDispatchPendingReviews', () => {
     });
     expect(storedReview?.status).toBe('failed');
     expect(storedAttempt?.status).toBe('failed');
+  });
+
+  describe('plan gate for council reviews', () => {
+    let gateOrgId: string;
+
+    // An enterprise-plan organization with an expired trial and no seat
+    // purchase: the plan requirement is not met, so the guard ends council
+    // reviews for this owner.
+    beforeEach(async () => {
+      const [organization] = await db
+        .insert(organizations)
+        .values({
+          name: `Dispatch Plan Gate ${Date.now()}`,
+          plan: 'enterprise',
+          require_seats: true,
+          created_at: minutesAgo(60 * 24 * 60),
+          free_trial_end_at: minutesAgo(60 * 24 * 10),
+        })
+        .returning({ id: organizations.id });
+      if (!organization) throw new Error('Expected plan gate organization');
+      gateOrgId = organization.id;
+    });
+
+    afterEach(async () => {
+      await db.delete(organizations).where(eq(organizations.id, gateOrgId));
+    });
+
+    async function insertCouncilReview(status: 'pending' | 'failed') {
+      const timestamp = minutesAgo(1);
+      const [review] = await db
+        .insert(cloud_agent_code_reviews)
+        .values({
+          owned_by_organization_id: gateOrgId,
+          platform_integration_id: organizationIntegrationId,
+          repo_full_name: REPO,
+          pr_number: 1,
+          pr_url: `https://github.com/${REPO}/pull/1`,
+          pr_title: 'Plan gate PR',
+          pr_author: 'octocat',
+          base_ref: 'main',
+          head_ref: 'feature/plan-gate',
+          head_sha: `sha-plan-gate-${status}`,
+          review_type: 'council',
+          status,
+          created_at: timestamp,
+          updated_at: timestamp,
+        })
+        .returning({ id: cloud_agent_code_reviews.id });
+      if (!review) throw new Error('Expected council review to be inserted');
+      return review.id;
+    }
+
+    async function addSeatPurchase(subscriptionStatus: 'active' | 'ended') {
+      await db.insert(organization_seats_purchases).values({
+        organization_id: gateOrgId,
+        subscription_stripe_id: `sub_${crypto.randomUUID()}`,
+        seat_count: 1,
+        amount_usd: 100,
+        starts_at: minutesAgo(60 * 24 * 30),
+        expires_at: minutesAgo(-60 * 24 * 30),
+        subscription_status: subscriptionStatus,
+      });
+    }
+
+    it('ends a council review with the billing terminal reason when the plan is not met', async () => {
+      const reviewId = await insertCouncilReview('pending');
+
+      const result = await tryDispatchPendingReviews({
+        type: 'org',
+        id: gateOrgId,
+        userId: testUser.id,
+      });
+
+      expect(result).toEqual(expect.objectContaining({ dispatched: 0, notDispatched: 1 }));
+      expect(await getStoredReview(reviewId)).toEqual(
+        expect.objectContaining({
+          status: 'failed',
+          terminalReason: 'billing',
+          dispatchReservationId: null,
+        })
+      );
+      expect(mockDispatchReview).not.toHaveBeenCalled();
+      expect(mockPrepareReviewPayload).not.toHaveBeenCalled();
+    });
+
+    it('dispatches a council review when the organization is entitled', async () => {
+      const reviewId = await insertCouncilReview('pending');
+      await addSeatPurchase('active');
+
+      const result = await tryDispatchPendingReviews({
+        type: 'org',
+        id: gateOrgId,
+        userId: testUser.id,
+      });
+
+      expect(result).toEqual(expect.objectContaining({ dispatched: 1, notDispatched: 0 }));
+      expect(mockDispatchReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewId, skipBalanceCheck: true })
+      );
+    });
+
+    it('applies the gate to a recovered stale queued council review', async () => {
+      const reviewId = await insertCouncilReview('pending');
+      const staleQueuedTimestamp = minutesAgo(6);
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({
+          status: 'queued',
+          dispatch_reservation_id: crypto.randomUUID(),
+          created_at: minutesAgo(60),
+          updated_at: staleQueuedTimestamp,
+        })
+        .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+      const result = await tryDispatchPendingReviews({
+        type: 'org',
+        id: gateOrgId,
+        userId: testUser.id,
+      });
+
+      expect(result).toEqual(expect.objectContaining({ dispatched: 0, notDispatched: 1 }));
+      expect(await getStoredReview(reviewId)).toEqual(
+        expect.objectContaining({ status: 'failed', terminalReason: 'billing' })
+      );
+      expect(mockDispatchReview).not.toHaveBeenCalled();
+    });
+
+    it('starts a non-council review of the same owner through the normal path', async () => {
+      const timestamp = minutesAgo(1);
+      const [review] = await db
+        .insert(cloud_agent_code_reviews)
+        .values({
+          owned_by_organization_id: gateOrgId,
+          platform_integration_id: organizationIntegrationId,
+          repo_full_name: REPO,
+          pr_number: 2,
+          pr_url: `https://github.com/${REPO}/pull/2`,
+          pr_title: 'Standard PR',
+          pr_author: 'octocat',
+          base_ref: 'main',
+          head_ref: 'feature/standard',
+          head_sha: 'sha-standard',
+          review_type: 'standard',
+          status: 'pending',
+          created_at: timestamp,
+          updated_at: timestamp,
+        })
+        .returning({ id: cloud_agent_code_reviews.id });
+      if (!review) throw new Error('Expected standard review to be inserted');
+
+      const result = await tryDispatchPendingReviews({
+        type: 'org',
+        id: gateOrgId,
+        userId: testUser.id,
+      });
+
+      expect(result).toEqual(expect.objectContaining({ dispatched: 1, notDispatched: 0 }));
+      expect(mockDispatchReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewId: review.id })
+      );
+    });
   });
 });

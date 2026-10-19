@@ -30,14 +30,28 @@ export const GLANCEABLE_TERMINAL_MS = 8000;
  */
 export const GLANCEABLE_STALE_MS = 1_800_000;
 
-export type GlanceableAgentsSnapshotStatus =
-  | 'waiting'
-  | 'empty'
-  | 'happy'
-  | 'stale'
-  | 'expired'
-  | 'signed_out'
-  | 'privacy';
+export const GLANCEABLE_SNAPSHOT_STATUSES = [
+  'waiting',
+  'empty',
+  'happy',
+  'stale',
+  'expired',
+  'signed_out',
+  'privacy',
+] as const;
+
+export type GlanceableAgentsSnapshotStatus = (typeof GLANCEABLE_SNAPSHOT_STATUSES)[number];
+
+/** The one kind vocabulary every surface reads, in priority order. */
+export const GLANCEABLE_STATUS_KINDS = ['needsInput', 'running', 'idle', 'scheduled'] as const;
+
+/** What a session's status means to a user: the one vocabulary every surface reads. */
+export type GlanceableStatusKind = (typeof GLANCEABLE_STATUS_KINDS)[number];
+
+/** Session statuses that mean the agent waits on the user and cannot go on alone. */
+export const GLANCEABLE_NEEDS_INPUT_STATUSES = ['question', 'permission', 'retry'] as const;
+
+export type GlanceableNeedsInputKind = (typeof GLANCEABLE_NEEDS_INPUT_STATUSES)[number];
 
 export const glanceableAgentsSnapshotSchema = z.object({
   schemaVersion: z.literal(1),
@@ -56,7 +70,7 @@ export const glanceableAgentsSnapshotSchema = z.object({
    */
   accountEpoch: z.number().int().optional(),
   organizationBound: z.boolean(),
-  status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
+  status: z.enum(GLANCEABLE_SNAPSHOT_STATUSES),
   /** Sessions actively doing something. */
   running: z.number().int().min(0),
   /** Sessions waiting on the user, including one whose CLI dropped mid-question. */
@@ -64,9 +78,10 @@ export const glanceableAgentsSnapshotSchema = z.object({
   /**
    * Sessions waiting on a permission prompt: the needs-input rows that can be
    * approved without choosing an option. Optional on the wire — an older
-   * producer omits it — and every reader treats absent as 0.
+   * producer omits it and the parse fills 0, the same convention as
+   * `scheduled` — and every reader treats absent as 0.
    */
-  needsApproval: z.number().int().min(0).optional(),
+  needsApproval: z.number().int().min(0).default(0),
   /** Sessions connected but doing nothing. */
   idle: z.number().int().min(0),
   /**
@@ -102,7 +117,7 @@ export const glanceableAgentsSnapshotSchema = z.object({
    * absent as null. Remove the optional and the default when every producer
    * sends it.
    */
-  newestResultKind: z.enum(['needsInput', 'running', 'idle', 'scheduled']).nullable().default(null),
+  newestResultKind: z.enum(GLANCEABLE_STATUS_KINDS).nullable().default(null),
   /**
    * ISO 8601 timestamp or null: when that newest change happened. Null exactly
    * when `newestResultKind` is null. Optional on input with a null default for
@@ -132,11 +147,26 @@ export type GlanceableSessionRow = {
   scheduledAt?: string;
 };
 
-/** Statuses that mean the agent waits on the user and cannot go on alone. */
-const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
+/**
+ * The needs-input kind of a session status, or null when the status is not a
+ * needs-input one. The one lookup every needs-input branch reads. Callers must
+ * not fall back to a default kind: an unknown status drops the row rather than
+ * mislabelling it as a wait.
+ */
+export function glanceableNeedsInputKind(status: string): GlanceableNeedsInputKind | null {
+  return (GLANCEABLE_NEEDS_INPUT_STATUSES as readonly string[]).includes(status)
+    ? (status as GlanceableNeedsInputKind)
+    : null;
+}
 
-/** What a session's status means to a user: the one vocabulary every surface reads. */
-export type GlanceableStatusKind = 'needsInput' | 'running' | 'idle' | 'scheduled';
+/**
+ * The snapshot statuses that end the surface: a signed-out or privacy-cleared
+ * scope. Every terminal-status decision reads this one predicate, so the data
+ * payload, presentation, refresh cadence and timeline cannot disagree.
+ */
+export function isTerminalGlanceableStatus(status: GlanceableAgentsSnapshotStatus): boolean {
+  return status === 'signed_out' || status === 'privacy';
+}
 
 /**
  * Map one session status to the kind the glanceable surfaces and the session
@@ -148,7 +178,7 @@ export type GlanceableStatusKind = 'needsInput' | 'running' | 'idle' | 'schedule
  * null only when a row has no status at all.
  */
 export function glanceableStatusKind(status: string): GlanceableStatusKind {
-  if (NEEDS_INPUT_STATUSES.has(status)) {
+  if (glanceableNeedsInputKind(status) !== null) {
     return 'needsInput';
   }
   if (status === 'idle') {
@@ -214,7 +244,7 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
   let oldest: number | null = null;
   let oldestIso: string | null = null;
   for (const session of sessions) {
-    if (!NEEDS_INPUT_STATUSES.has(session.status) || session.statusUpdatedAt === undefined) {
+    if (glanceableNeedsInputKind(session.status) === null || session.statusUpdatedAt === undefined) {
       continue;
     }
     const at = Date.parse(session.statusUpdatedAt);
@@ -337,7 +367,7 @@ export function buildGlanceableSnapshot(
   const counts = countGlanceableSessions(input.sessions);
   // Idle and scheduled counts: a connected agent doing nothing, or one that
   // will wake later, is still something the user wants on the Lock Screen.
-  const eligible = counts.running + counts.needsInput + counts.idle + counts.scheduled > 0;
+  const eligible = isEligibleGlanceableWork(counts);
   const now = input.now;
   const updatedAt = new Date(now).toISOString();
   const newest = newestGlanceableResult(input.sessions);
@@ -363,9 +393,15 @@ export function buildGlanceableSnapshot(
   };
 }
 
-/** True when any agent is connected, whether working, waiting, idle, or scheduled. */
-export function isEligibleGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return snapshot.running + snapshot.needsInput + snapshot.idle + snapshot.scheduled > 0;
+/**
+ * True when the given counts contain any connected agent, whether working,
+ * waiting, idle, or scheduled. Takes the counts shape so the snapshot builder
+ * and snapshot-level callers share one rule; a snapshot satisfies it
+ * structurally. A narrower counts object (for example followed-session
+ * counts) works too.
+ */
+export function isEligibleGlanceableWork(counts: GlanceableCounts): boolean {
+  return counts.running + counts.needsInput + counts.idle + counts.scheduled > 0;
 }
 
 /**
@@ -375,10 +411,11 @@ export function isEligibleGlanceableWork(snapshot: GlanceableAgentsSnapshot): bo
  * a card and must not be treated as idle-only, or the widget would offer
  * `New agent` and the iOS Live Activity would not raise. The client sink and
  * the APNs push-to-start share the rule, so neither can resurrect a surface
- * the other retired.
+ * the other retired. Takes the same counts shape as the eligible rule; the
+ * Home-widget refresh policy calls it instead of restating the sum.
  */
-export function isStartableGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return snapshot.running + snapshot.needsInput + snapshot.scheduled > 0;
+export function isStartableGlanceableWork(counts: GlanceableCounts): boolean {
+  return counts.running + counts.needsInput + counts.scheduled > 0;
 }
 
 /** True when every connected agent is idle: eligible work, but nothing happening. */

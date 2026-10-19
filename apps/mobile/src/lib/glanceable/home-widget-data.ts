@@ -1,5 +1,6 @@
 import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+  isTerminalGlanceableStatus,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
@@ -125,10 +126,10 @@ export function rememberHomeWidgetSnapshot(snapshot: GlanceableAgentsSnapshot): 
 }
 
 export function getHomeWidgetDataForSnapshot(snapshot: GlanceableAgentsSnapshot): HomeWidgetData {
-  if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
+  if (isTerminalGlanceableStatus(snapshot.status)) {
     return { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
   }
-  if (lastData?.snapshot.status === 'signed_out' || lastData?.snapshot.status === 'privacy') {
+  if (lastData !== null && isTerminalGlanceableStatus(lastData.snapshot.status)) {
     return { snapshot: lastData.snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
   }
   const retained = lastData?.snapshot.scopeKey === snapshot.scopeKey ? lastData : null;

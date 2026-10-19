@@ -1,5 +1,6 @@
 import {
   buildGlanceableSnapshot,
+  glanceableAgentsSnapshotSchema,
   type GlanceableAgentsSnapshot,
   type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -183,12 +184,16 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
 
   it('reads an absent field on an old snapshot as 0, never undefined', () => {
     // An older producer omits `needsApproval` from the pushed shape. The
-    // content state must still carry a number: the layout compares it with
-    // `> 0` and must not draw the control for a value it cannot read.
-    const { needsApproval: _omitted, ...oldSnapshot } = snapshotFor([PERMISSION_ROW]);
-    const contentState = buildGlanceableLiveActivityContentState(
-      oldSnapshot as GlanceableAgentsSnapshot
+    // snapshot schema fills 0 on parse (the same convention as `scheduled`),
+    // so the content state still carries a number: the layout compares it
+    // with `> 0` and must not draw the control for a value it cannot read.
+    const oldSnapshot = glanceableAgentsSnapshotSchema.parse(
+      (() => {
+        const { needsApproval: _omitted, ...rest } = snapshotFor([PERMISSION_ROW]);
+        return rest;
+      })()
     );
+    const contentState = buildGlanceableLiveActivityContentState(oldSnapshot);
     expect(contentState.needsApproval).toBe(0);
   });
 

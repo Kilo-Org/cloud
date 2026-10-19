@@ -597,6 +597,7 @@
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
     "checkConnection": "Provjeri vezu",
     "couldNotLoadPullRequest": "Nije moguće učitati zahtjev za spajanje.",
+    "reviewServiceUnavailable": "Usluga je privremeno nedostupna",
     "description": "Opis",
     "noDescriptionProvided": "Nema opisa.",
     "review": "Pregled",

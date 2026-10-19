@@ -2506,6 +2506,7 @@
     },
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",
+    "reviewServiceUnavailable": "Dịch vụ không khả dụng",
     "couldNotOpenGitHubAppSettings": "Không thể mở cài đặt ứng dụng GitHub.",
     "description": "Mô tả",
     "discussion": {

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
     "checkConnection": "కనెక్షన్‌ను తనిఖీ చేయండి",
     "couldNotLoadPullRequest": "పుల్ రిక్వెస్ట్‌ను లోడ్ చేయలేకపోయాము.",
+    "reviewServiceUnavailable": "సేవ అందుబాటులో లేదు",
     "description": "వివరణ",
     "noDescriptionProvided": "వివరణ ఇవ్వలేదు.",
     "review": "సమీక్ష",

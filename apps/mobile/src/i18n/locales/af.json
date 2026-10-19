@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
     "checkConnection": "Kontroleer verbinding",
     "couldNotLoadPullRequest": "Kon nie die trekversoek laai nie.",
+    "reviewServiceUnavailable": "Diens onbeskikbaar",
     "description": "Beskrywing",
     "noDescriptionProvided": "Geen beskrywing is verskaf nie.",
     "review": "Hersiening",

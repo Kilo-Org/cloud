@@ -619,6 +619,7 @@
     "installKiloGitHubApp": "Installa l-app ta' Kilo għal GitHub",
     "checkConnection": "Iċċekkja l-konnessjoni",
     "couldNotLoadPullRequest": "Ma setgħetx titgħabba t-talba għall-għaqda.",
+    "reviewServiceUnavailable": "Is-servizz mhux disponibbli",
     "description": "Deskrizzjoni",
     "noDescriptionProvided": "Ma ngħatat l-ebda deskrizzjoni.",
     "review": "Reviżjoni",

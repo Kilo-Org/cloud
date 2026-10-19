@@ -2531,6 +2531,7 @@
     },
     "connectionExpired": "La connessione a GitHub è scaduta.",
     "couldNotLoadPullRequest": "Impossibile caricare la pull request.",
+    "reviewServiceUnavailable": "Servizio non disponibile",
     "couldNotOpenGitHubAppSettings": "Impossibile aprire le impostazioni dell'app GitHub.",
     "description": "Descrizione",
     "discussion": {

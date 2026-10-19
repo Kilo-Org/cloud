@@ -2606,6 +2606,7 @@
     },
     "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
     "couldNotLoadPullRequest": "تعذّر تحميل طلب السحب.",
+    "reviewServiceUnavailable": "الخدمة غير متاحة حاليًا",
     "couldNotOpenGitHubAppSettings": "تعذّر فتح إعدادات تطبيق GitHub.",
     "description": "الوصف",
     "discussion": {

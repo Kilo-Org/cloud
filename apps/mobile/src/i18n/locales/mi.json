@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Tāutatia te taupānga Kilo GitHub",
     "checkConnection": "Tirohia te hononga",
     "couldNotLoadPullRequest": "Kāore i taea te uta i te tono kume.",
+    "reviewServiceUnavailable": "Kāore te ratonga i te wātea",
     "description": "Whakaahuatanga",
     "noDescriptionProvided": "Kāore he whakaahuatanga i hoatu.",
     "review": "Arotake",

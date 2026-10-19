@@ -475,6 +475,21 @@ export function PrReviewDiscussionTab({
       </>
     );
   }
+  if (view.kind === 'service-unavailable') {
+    return (
+      <>
+        <QueryError
+          variant="server"
+          title={t('prReview.reviewServiceUnavailable')}
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
+        {dialog}
+      </>
+    );
+  }
 
   // ── Loading (first page in flight) ─────────────────────────────────
   if (view.kind === 'loading') {

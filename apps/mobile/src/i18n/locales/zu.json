@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Faka i-Kilo GitHub App",
     "checkConnection": "Hlola uxhumano",
     "couldNotLoadPullRequest": "Asikwazanga ukulayisha isicelo sokuhlanganisa.",
+    "reviewServiceUnavailable": "Isevisi ayitholakali",
     "description": "Incazelo",
     "noDescriptionProvided": "Akukho ncazelo enikeziwe.",
     "review": "Ukuhlola",

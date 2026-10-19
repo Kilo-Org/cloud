@@ -2506,6 +2506,7 @@
     },
     "connectionExpired": "De GitHub-koppeling is verlopen.",
     "couldNotLoadPullRequest": "De PR kon niet worden geladen.",
+    "reviewServiceUnavailable": "Service niet beschikbaar",
     "couldNotOpenGitHubAppSettings": "De instellingen van de GitHub-app konden niet worden geopend.",
     "description": "Beschrijving",
     "discussion": {

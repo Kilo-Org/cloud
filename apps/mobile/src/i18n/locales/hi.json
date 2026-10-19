@@ -2506,6 +2506,7 @@
     },
     "connectionExpired": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
     "couldNotLoadPullRequest": "पुल रिक्वेस्ट लोड नहीं हो सकी।",
+    "reviewServiceUnavailable": "सेवा अनुपलब्ध है",
     "couldNotOpenGitHubAppSettings": "GitHub ऐप की सेटिंग नहीं खुल सकीं।",
     "description": "विवरण",
     "discussion": {

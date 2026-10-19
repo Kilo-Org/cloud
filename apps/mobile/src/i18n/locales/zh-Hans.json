@@ -2506,6 +2506,7 @@
     },
     "connectionExpired": "GitHub 连接已过期。",
     "couldNotLoadPullRequest": "无法加载拉取请求。",
+    "reviewServiceUnavailable": "评审服务不可用",
     "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置。",
     "description": "描述",
     "discussion": {

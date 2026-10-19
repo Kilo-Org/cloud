@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Apetraho ny rindranasa Kilo ho an'ny GitHub",
     "checkConnection": "Jereo ny fifandraisana",
     "couldNotLoadPullRequest": "Tsy tafiditra ny fangatahana fampiraisana.",
+    "reviewServiceUnavailable": "Tsy misy ny serivisy",
     "description": "Famaritana",
     "noDescriptionProvided": "Tsy nisy famaritana nomena.",
     "review": "Fandinihana",

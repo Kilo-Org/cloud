@@ -2531,6 +2531,7 @@
     },
     "connectionExpired": "La connexion à GitHub a expiré.",
     "couldNotLoadPullRequest": "Impossible de charger la demande de fusion.",
+    "reviewServiceUnavailable": "Service indisponible",
     "couldNotOpenGitHubAppSettings": "Impossible d'ouvrir les paramètres de l'application GitHub.",
     "description": "Présentation",
     "discussion": {

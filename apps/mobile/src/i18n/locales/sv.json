@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
     "checkConnection": "Kontrollera anslutningen",
     "couldNotLoadPullRequest": "Kunde inte läsa in PR:en.",
+    "reviewServiceUnavailable": "Tjänsten är otillgänglig",
     "description": "Beskrivning",
     "noDescriptionProvided": "Ingen beskrivning har angetts.",
     "review": "Granskning",

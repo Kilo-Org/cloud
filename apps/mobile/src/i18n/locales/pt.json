@@ -597,6 +597,7 @@
     "installKiloGitHubApp": "Instalar a aplicação do Kilo para o GitHub",
     "checkConnection": "Verificar ligação",
     "couldNotLoadPullRequest": "Não foi possível carregar o PR.",
+    "reviewServiceUnavailable": "Serviço indisponível",
     "description": "Descrição",
     "noDescriptionProvided": "Não foi fornecida nenhuma descrição.",
     "review": "Revisão",

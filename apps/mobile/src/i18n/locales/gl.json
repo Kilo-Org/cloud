@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Instalar a aplicación de Kilo para GitHub",
     "checkConnection": "Comprobar a conexión",
     "couldNotLoadPullRequest": "Non se puido cargar a solicitude de integración.",
+    "reviewServiceUnavailable": "O servizo non está dispoñible",
     "description": "Descrición",
     "noDescriptionProvided": "Non se engadiu ningunha descrición.",
     "review": "Revisión",

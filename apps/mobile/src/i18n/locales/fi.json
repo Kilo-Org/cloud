@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
     "checkConnection": "Tarkista yhteys",
     "couldNotLoadPullRequest": "Muutospyyntöä ei voitu ladata.",
+    "reviewServiceUnavailable": "Palvelu ei ole käytettävissä",
     "description": "Kuvaus",
     "noDescriptionProvided": "Kuvausta ei ole annettu.",
     "review": "Tarkistus",

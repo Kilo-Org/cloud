@@ -2506,6 +2506,7 @@
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
+    "reviewServiceUnavailable": "レビューサービスを利用できません",
     "couldNotOpenGitHubAppSettings": "GitHub Appの設定を開けませんでした。",
     "description": "説明",
     "discussion": {

@@ -2556,6 +2556,7 @@
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",
     "couldNotLoadPullRequest": "Nie udało się wczytać PR.",
+    "reviewServiceUnavailable": "Usługa niedostępna",
     "couldNotOpenGitHubAppSettings": "Nie udało się otworzyć ustawień aplikacji GitHub.",
     "description": "Opis",
     "discussion": {

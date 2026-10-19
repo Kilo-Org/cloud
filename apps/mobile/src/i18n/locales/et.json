@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Installi Kilo GitHubi rakendus",
     "checkConnection": "Kontrolli ühendust",
     "couldNotLoadPullRequest": "Tõmbetaotlust ei õnnestunud laadida.",
+    "reviewServiceUnavailable": "Teenus ei ole saadaval",
     "description": "Kirjeldus",
     "noDescriptionProvided": "Kirjeldust pole esitatud.",
     "review": "Ülevaatus",

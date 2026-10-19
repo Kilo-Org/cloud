@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",
     "checkConnection": "Ստուգել կապը",
     "couldNotLoadPullRequest": "Չհաջողվեց բեռնել միավորման հարցումը։",
+    "reviewServiceUnavailable": "Ծառայությունը հասանելի չէ",
     "description": "Նկարագրություն",
     "noDescriptionProvided": "Նկարագրություն չկա։",
     "review": "Ստուգում",

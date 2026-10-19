@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",
     "checkConnection": "Холболтыг шалгах",
     "couldNotLoadPullRequest": "Нэгтгэх хүсэлтийг ачаалж чадсангүй.",
+    "reviewServiceUnavailable": "Үйлчилгээ ашиглах боломжгүй",
     "description": "Тайлбар",
     "noDescriptionProvided": "Тайлбар оруулаагүй.",
     "review": "Шалгалт",

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",
     "checkConnection": "Duba haɗi",
     "couldNotLoadPullRequest": "Ba a iya loda buƙatar haɗawa ba.",
+    "reviewServiceUnavailable": "Sabis ba a samu ba",
     "description": "Bayani",
     "noDescriptionProvided": "Babu bayanin da aka bayar.",
     "review": "Bita",

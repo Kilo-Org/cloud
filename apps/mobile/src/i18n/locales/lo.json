@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",
     "checkConnection": "ກວດສອບການເຊື່ອມຕໍ່",
     "couldNotLoadPullRequest": "ບໍ່ສາມາດໂຫຼດຄຳຂໍລວມໂຄດໄດ້.",
+    "reviewServiceUnavailable": "ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້",
     "description": "ຄຳອະທິບາຍ",
     "noDescriptionProvided": "ບໍ່ມີຄຳອະທິບາຍ.",
     "review": "ການກວດສອບ",

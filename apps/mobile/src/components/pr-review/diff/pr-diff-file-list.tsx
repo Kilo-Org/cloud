@@ -299,6 +299,18 @@ export function PrReviewFileList({
         />
       );
     }
+    if (firstPageErrorState?.kind === 'service-unavailable') {
+      return (
+        <QueryError
+          variant="server"
+          title={t('prReview.reviewServiceUnavailable')}
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
+      );
+    }
   }
 
   if (!query.isLoading && files.length === 0) {

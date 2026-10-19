@@ -51,6 +51,12 @@ describe('classifyPrReviewQueryState', () => {
     });
   });
 
+  it('classifies BAD_GATEWAY as a service-unavailable state (review service down, retry)', () => {
+    expect(classifyPrReviewQueryState(makeTrpcError('BAD_GATEWAY'))).toEqual({
+      kind: 'service-unavailable',
+    });
+  });
+
   it('reads the code from the nested shape.data.code form too', () => {
     expect(classifyPrReviewQueryState(makeNestedTrpcError('NOT_FOUND'))).toEqual({
       kind: 'not-found',
@@ -78,7 +84,6 @@ describe('classifyPrReviewQueryState', () => {
       kind: 'retryable',
     });
     expect(classifyPrReviewQueryState(makeTrpcError('TIMEOUT'))).toEqual({ kind: 'retryable' });
-    expect(classifyPrReviewQueryState(makeTrpcError('BAD_GATEWAY'))).toEqual({ kind: 'retryable' });
   });
 });
 

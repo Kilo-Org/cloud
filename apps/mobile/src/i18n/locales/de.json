@@ -2506,6 +2506,7 @@
     },
     "connectionExpired": "Die GitHub-Verbindung ist abgelaufen.",
     "couldNotLoadPullRequest": "Der Pull-Request konnte nicht geladen werden.",
+    "reviewServiceUnavailable": "Dienst nicht verfügbar",
     "couldNotOpenGitHubAppSettings": "Die Einstellungen der GitHub-App konnten nicht geöffnet werden.",
     "description": "Beschreibung",
     "discussion": {

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
     "checkConnection": "ตรวจสอบการเชื่อมต่อ",
     "couldNotLoadPullRequest": "ไม่สามารถโหลด PR ได้",
+    "reviewServiceUnavailable": "บริการไม่พร้อมใช้งาน",
     "description": "คำอธิบาย",
     "noDescriptionProvided": "ไม่มีคำอธิบาย",
     "review": "การตรวจสอบ",

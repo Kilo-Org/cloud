@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
     "checkConnection": "ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ",
     "couldNotLoadPullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "reviewServiceUnavailable": "ସେବା ଅନୁପଲବ୍ଧ",
     "description": "ବିବରଣୀ",
     "noDescriptionProvided": "କୌଣସି ବିବରଣୀ ଦିଆଯାଇ ନାହିଁ।",
     "review": "ସମୀକ୍ଷା",

@@ -45,6 +45,17 @@ type PrReviewQueryState =
        * keep failing in the same way.
        */
       kind: 'reconnect';
+    }
+  | {
+      /**
+       * The read failed with BAD_GATEWAY: the review read path could not
+       * reach GitHub through its authorization layer (the token service
+       * is temporarily unavailable), so this is not a GitHub failure and
+       * not a connection problem on the user's side. The caller should
+       * render its own unavailable state with a retry CTA instead of the
+       * generic server-error copy.
+       */
+      kind: 'service-unavailable';
     };
 
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
@@ -60,6 +71,9 @@ export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   }
   if (code === 'UNAUTHORIZED') {
     return { kind: 'reconnect' };
+  }
+  if (code === 'BAD_GATEWAY') {
+    return { kind: 'service-unavailable' };
   }
   return { kind: 'retryable' };
 }

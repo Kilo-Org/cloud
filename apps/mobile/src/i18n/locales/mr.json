@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo GitHub अॅप इन्स्टॉल करा",
     "checkConnection": "जोडणी तपासा",
     "couldNotLoadPullRequest": "पुल रिक्वेस्ट लोड करता आली नाही.",
+    "reviewServiceUnavailable": "सेवा अनुपलब्ध आहे",
     "description": "वर्णन",
     "noDescriptionProvided": "वर्णन दिलेले नाही.",
     "review": "समीक्षा",

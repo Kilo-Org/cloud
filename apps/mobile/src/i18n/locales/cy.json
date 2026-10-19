@@ -630,6 +630,7 @@
     "installKiloGitHubApp": "Gosod ap GitHub Kilo",
     "checkConnection": "Gwirio'r cysylltiad",
     "couldNotLoadPullRequest": "Ni lwyddwyd i lwytho'r cais tynnu.",
+    "reviewServiceUnavailable": "Nid yw'r gwasanaeth ar gael",
     "description": "Disgrifiad",
     "noDescriptionProvided": "Ni ddarparwyd disgrifiad.",
     "review": "Adolygiad",

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Инсталирай приложението Kilo за GitHub",
     "checkConnection": "Провери връзката",
     "couldNotLoadPullRequest": "Не можахме да заредим заявката за обединяване.",
+    "reviewServiceUnavailable": "Услугата е временно недостъпна",
     "description": "Описание",
     "noDescriptionProvided": "Няма описание.",
     "review": "Преглед",

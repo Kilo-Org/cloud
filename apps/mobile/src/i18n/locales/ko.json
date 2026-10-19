@@ -2506,6 +2506,7 @@
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",
+    "reviewServiceUnavailable": "리뷰 서비스를 사용할 수 없습니다",
     "couldNotOpenGitHubAppSettings": "GitHub 앱 설정을 열지 못했습니다.",
     "description": "설명",
     "discussion": {

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "ئەپی Kilo بۆ GitHub دامەزرێنە",
     "checkConnection": "پشکنینی پەیوەندی",
     "couldNotLoadPullRequest": "نەتوانرا داواکاری ڕاکێشان بار بکرێت.",
+    "reviewServiceUnavailable": "خزمەتگوزاری بەردەست نییە",
     "description": "وەسف",
     "noDescriptionProvided": "هیچ وەسفێک نەدراوە.",
     "review": "پێداچوونەوە",

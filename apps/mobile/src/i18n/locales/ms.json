@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Pasang apl GitHub Kilo",
     "checkConnection": "Semak sambungan",
     "couldNotLoadPullRequest": "Tidak dapat memuatkan permintaan tarik.",
+    "reviewServiceUnavailable": "Perkhidmatan tidak tersedia",
     "description": "Penerangan",
     "noDescriptionProvided": "Tiada penerangan disediakan.",
     "review": "Semakan",

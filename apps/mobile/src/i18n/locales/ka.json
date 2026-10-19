@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo-ს GitHub აპის დაყენება",
     "checkConnection": "კავშირის შემოწმება",
     "couldNotLoadPullRequest": "შერწყმის მოთხოვნის ჩატვირთვა ვერ მოხერხდა.",
+    "reviewServiceUnavailable": "სერვისი მიუწვდომელია",
     "description": "აღწერა",
     "noDescriptionProvided": "აღწერა არ არის დამატებული.",
     "review": "შემოწმება",

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Rakib barnaamijka Kilo ee GitHub",
     "checkConnection": "Hubi xiriirka",
     "couldNotLoadPullRequest": "Codsiga isku-darka lama soo rari karin.",
+    "reviewServiceUnavailable": "Adeegyada lama heli karo",
     "description": "Sharaxaad",
     "noDescriptionProvided": "Sharaxaad lama bixin.",
     "review": "Dib-u-eegis",

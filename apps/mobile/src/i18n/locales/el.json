@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Εγκατάσταση της εφαρμογής Kilo για το GitHub",
     "checkConnection": "Έλεγχος σύνδεσης",
     "couldNotLoadPullRequest": "Δεν ήταν δυνατή η φόρτωση του αιτήματος ενσωμάτωσης.",
+    "reviewServiceUnavailable": "Η υπηρεσία δεν είναι διαθέσιμη",
     "description": "Περιγραφή",
     "noDescriptionProvided": "Δεν έχει προστεθεί περιγραφή.",
     "review": "Έλεγχος",

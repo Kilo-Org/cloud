@@ -608,6 +608,7 @@
     "installKiloGitHubApp": "Nainstalovat aplikaci Kilo pro GitHub",
     "checkConnection": "Zkontrolovat připojení",
     "couldNotLoadPullRequest": "PR se nepodařilo načíst.",
+    "reviewServiceUnavailable": "Služba není dostupná",
     "description": "Popis",
     "noDescriptionProvided": "Popis chybí.",
     "review": "Kontrola",

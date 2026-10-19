@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "A Kilo GitHub-alkalmazásának telepítése",
     "checkConnection": "Kapcsolat ellenőrzése",
     "couldNotLoadPullRequest": "Nem sikerült betölteni a módosítási kérelmet.",
+    "reviewServiceUnavailable": "A szolgáltatás nem érhető el",
     "description": "Leírás",
     "noDescriptionProvided": "Nincs megadva leírás.",
     "review": "Ellenőrzés",

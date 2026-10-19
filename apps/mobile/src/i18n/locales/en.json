@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Install the Kilo GitHub App",
     "checkConnection": "Check connection",
     "couldNotLoadPullRequest": "Could not load pull request",
+    "reviewServiceUnavailable": "Review service unavailable",
     "description": "Description",
     "noDescriptionProvided": "No description provided.",
     "review": "Review",

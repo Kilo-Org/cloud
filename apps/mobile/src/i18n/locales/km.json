@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "ដំឡើងកម្មវិធី Kilo សម្រាប់ GitHub",
     "checkConnection": "ពិនិត្យការតភ្ជាប់",
     "couldNotLoadPullRequest": "មិនអាចផ្ទុកសំណើបញ្ចូលកូដបានទេ។",
+    "reviewServiceUnavailable": "សេវាកម្មមិនអាចប្រើបានទេ",
     "description": "ការពិពណ៌នា",
     "noDescriptionProvided": "មិនមានការពិពណ៌នាទេ។",
     "review": "ការពិនិត្យ",

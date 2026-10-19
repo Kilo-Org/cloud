@@ -2506,6 +2506,7 @@
     },
     "connectionExpired": "Koneksi GitHub kedaluwarsa.",
     "couldNotLoadPullRequest": "Tidak dapat memuat PR.",
+    "reviewServiceUnavailable": "Layanan tidak tersedia",
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka pengaturan aplikasi GitHub.",
     "description": "Deskripsi",
     "discussion": {

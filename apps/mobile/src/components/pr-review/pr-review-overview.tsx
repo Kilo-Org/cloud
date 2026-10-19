@@ -193,15 +193,20 @@ export function PrReviewOverview({
         />
       );
     }
-    // retryable
+    // retryable / service-unavailable: the review read path could not serve
+    // the request. A BAD_GATEWAY (service-unavailable) names its own cause —
+    // the review service is temporarily unavailable, not GitHub — while every
+    // other failure keeps the generic server-error copy. Both offer Retry.
     return (
       <QueryError
         refreshControl={refreshControl}
         variant="server"
         title={
-          isMergeRequest
-            ? t('prReview.terms.couldNotLoadMergeRequest')
-            : t('prReview.couldNotLoadPullRequest')
+          state.kind === 'service-unavailable'
+            ? t('prReview.reviewServiceUnavailable')
+            : isMergeRequest
+              ? t('prReview.terms.couldNotLoadMergeRequest')
+              : t('prReview.couldNotLoadPullRequest')
         }
         onRetry={() => {
           void pr.refetch();

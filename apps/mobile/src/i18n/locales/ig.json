@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Tinye ngwa Kilo GitHub",
     "checkConnection": "Lelee njikọ",
     "couldNotLoadPullRequest": "Enweghị ike ibudata arịrịọ njikọta.",
+    "reviewServiceUnavailable": "Ozi ahụ adịghị",
     "description": "Nkọwa",
     "noDescriptionProvided": "Enyeghị nkọwa.",
     "review": "Nyocha",

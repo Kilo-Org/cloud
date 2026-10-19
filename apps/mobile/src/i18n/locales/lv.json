@@ -597,6 +597,7 @@
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
     "checkConnection": "Pārbaudīt savienojumu",
     "couldNotLoadPullRequest": "Neizdevās ielādēt izmaiņu pieprasījumu.",
+    "reviewServiceUnavailable": "Pakalpojums nav pieejams",
     "description": "Apraksts",
     "noDescriptionProvided": "Nav sniegts apraksts.",
     "review": "Pārskatīšana",

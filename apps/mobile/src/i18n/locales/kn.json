@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸಿ",
     "checkConnection": "ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ",
     "couldNotLoadPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "reviewServiceUnavailable": "ಸೇವೆ ಲಭ್ಯವಿಲ್ಲ",
     "description": "ವಿವರಣೆ",
     "noDescriptionProvided": "ಯಾವುದೇ ವಿವರಣೆ ನೀಡಲಾಗಿಲ್ಲ.",
     "review": "ಪರಿಶೀಲನೆ",

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Appii Kilo GitHub fe'i",
     "checkConnection": "Walitti hidhamiinsa ilaali",
     "couldNotLoadPullRequest": "Gaaffii walitti makuu fe'uu hin danda'amne.",
+    "reviewServiceUnavailable": "Tajaajila hin argamne",
     "description": "Ibsa",
     "noDescriptionProvided": "Ibsi hin kennamne.",
     "review": "Sakatta'a",

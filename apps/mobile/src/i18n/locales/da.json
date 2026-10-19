@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
     "checkConnection": "Tjek forbindelsen",
     "couldNotLoadPullRequest": "Denne pull request kunne ikke indlæses.",
+    "reviewServiceUnavailable": "Tjenesten er ikke tilgængelig",
     "description": "Beskrivelse",
     "noDescriptionProvided": "Der er ikke angivet en beskrivelse.",
     "review": "Gennemgang",

@@ -245,11 +245,17 @@ function InboxEmpty({
     );
   }
 
-  // retryable
+  // retryable / service-unavailable: a BAD_GATEWAY names its own cause (the
+  // review service is temporarily unavailable); every other failure keeps the
+  // generic could-not-load copy. Both offer Retry.
   return (
     <QueryError
       variant="server"
-      title={t('prReview.inbox.couldNotLoad')}
+      title={
+        view.kind === 'service-unavailable'
+          ? t('prReview.reviewServiceUnavailable')
+          : t('prReview.inbox.couldNotLoad')
+      }
       placement="top"
       onRetry={onRetry}
       isRetrying={isRetrying}

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Sakinisha programu ya Kilo ya GitHub",
     "checkConnection": "Angalia muunganisho",
     "couldNotLoadPullRequest": "Imeshindikana kupakia ombi la kuunganisha.",
+    "reviewServiceUnavailable": "Hudima haipatikani",
     "description": "Maelezo",
     "noDescriptionProvided": "Hakuna maelezo yaliyotolewa.",
     "review": "Ukaguzi",

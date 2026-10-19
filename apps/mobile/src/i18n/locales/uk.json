@@ -2556,6 +2556,7 @@
     },
     "connectionExpired": "Термін дії підключення до GitHub минув.",
     "couldNotLoadPullRequest": "Не вдалося завантажити запит на злиття.",
+    "reviewServiceUnavailable": "Сервіс тимчасово недоступний",
     "couldNotOpenGitHubAppSettings": "Не вдалося відкрити налаштування застосунку GitHub.",
     "description": "Опис",
     "discussion": {

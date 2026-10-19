@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
     "checkConnection": "بررسی اتصال",
     "couldNotLoadPullRequest": "بارگذاری درخواست ادغام ممکن نشد.",
+    "reviewServiceUnavailable": "سرویس در دسترس نیست",
     "description": "توضیحات",
     "noDescriptionProvided": "توضیحی ارائه نشده است.",
     "review": "بازبینی",

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
     "checkConnection": "જોડાણ તપાસો",
     "couldNotLoadPullRequest": "પુલ રિક્વેસ્ટ લોડ કરી શકાઈ નહીં.",
+    "reviewServiceUnavailable": "સેવા અનુપલબ્ધ છે",
     "description": "વર્ણન",
     "noDescriptionProvided": "કોઈ વર્ણન આપવામાં આવ્યું નથી.",
     "review": "સમીક્ષા",

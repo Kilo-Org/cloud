@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "የKilo GitHub መተግበሪያን ጫን",
     "checkConnection": "ግንኙነቱን አረጋግጥ",
     "couldNotLoadPullRequest": "የማዋሃድ ጥያቄውን መጫን አልተቻለም።",
+    "reviewServiceUnavailable": "አገልግሎቱ አይገኝም",
     "description": "መግለጫ",
     "noDescriptionProvided": "ምንም መግለጫ አልቀረበም።",
     "review": "ግምገማ",

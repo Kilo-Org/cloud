@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",
     "checkConnection": "اړیکه وګورئ",
     "couldNotLoadPullRequest": "پل ریکویسټ بار نه شو.",
+    "reviewServiceUnavailable": "خدمة نه شته",
     "description": "تشریح",
     "noDescriptionProvided": "هېڅ تشریح نه ده ورکړل شوې.",
     "review": "بیاکتنه",

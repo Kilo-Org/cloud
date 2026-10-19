@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
     "checkConnection": "Bağlantını yoxla",
     "couldNotLoadPullRequest": "Birləşdirmə sorğusunu yükləmək mümkün olmadı.",
+    "reviewServiceUnavailable": "Xidmət əlçatmazdır",
     "description": "Təsvir",
     "noDescriptionProvided": "Təsvir əlavə edilməyib.",
     "review": "Yoxlama",

@@ -586,6 +586,7 @@
     "installKiloGitHubApp": "Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ",
     "checkConnection": "ချိတ်ဆက်မှုကို စစ်ဆေးပါ",
     "couldNotLoadPullRequest": "PR ကို ရယူ၍မရပါ။",
+    "reviewServiceUnavailable": "ဝန်ဆောင်မှုကို မရနိုင်ပါ",
     "description": "ဖော်ပြချက်",
     "noDescriptionProvided": "ဖော်ပြချက် မပေးထားပါ။",
     "review": "စစ်ဆေးမှု",

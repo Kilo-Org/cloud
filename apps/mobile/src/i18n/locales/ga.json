@@ -619,6 +619,7 @@
     "installKiloGitHubApp": "Suiteáil aip GitHub Kilo",
     "checkConnection": "Seiceáil an nasc",
     "couldNotLoadPullRequest": "Níorbh fhéidir an t-iarratas tarraingthe a lódáil.",
+    "reviewServiceUnavailable": "Níl an tseirbhís ar fáil",
     "description": "Cur síos",
     "noDescriptionProvided": "Níor soláthraíodh aon chur síos.",
     "review": "Athbhreithniú",

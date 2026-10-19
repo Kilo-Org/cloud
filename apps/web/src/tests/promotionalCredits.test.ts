@@ -1,5 +1,6 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest, afterEach } from '@jest/globals';
 import {
+  GRANT_MSG_UNEXPECTED_FAILURE,
   grantCreditForCategory,
   grantCreditForCategoryConfig,
   redeemSelfServicePromoCode,
@@ -14,6 +15,10 @@ import { assertNoError } from '@kilocode/web-shared/lib/maybe-result';
 
 describe('grantCreditForCategory', () => {
   const mockUser: User = defineTestUser({});
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('should not allow a non-user-redeemable promo code on user redemption', async () => {
     const result = await redeemSelfServicePromoCode(mockUser, 'pull_request');
@@ -58,6 +63,28 @@ describe('grantCreditForCategory', () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('Successfully added');
+  });
+
+  it('returns a fixed message when the grant throws', async () => {
+    const thrown = new Error('sensitive-internal-detail');
+    jest.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
+      throw thrown;
+    });
+
+    const config: PromoCreditCategoryConfig = {
+      credit_category: 'unexpected-failure',
+      amount_usd: 10,
+    };
+
+    const result = await grantCreditForCategoryConfig(
+      { organization: null, user: mockUser },
+      { credit_category: 'unexpected-failure', counts_as_selfservice: false },
+      config
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBe(GRANT_MSG_UNEXPECTED_FAILURE);
+    expect(result.message).not.toContain('sensitive-internal-detail');
   });
 
   it('stores an explicitly provided creator and leaves omitted creators null', async () => {

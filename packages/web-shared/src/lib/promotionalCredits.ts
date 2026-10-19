@@ -53,6 +53,11 @@ type GrantCreditResult = CustomResult<
  */
 export const GRANT_MSG_ALREADY_APPLIED = 'has already been applied';
 export const GRANT_MSG_CAP_REACHED = 'reached its redemption limit';
+/**
+ * User-facing text returned when a grant fails unexpectedly.
+ */
+export const GRANT_MSG_UNEXPECTED_FAILURE =
+  'The promotional credit could not be applied. Please try again later.';
 
 async function getTotalRedemptions(dbOrTx: DbOrTx, promoCreditCategory: string): Promise<number> {
   try {
@@ -280,15 +285,15 @@ export async function grantCreditForCategoryConfig(
       credit_transaction_id: new_credit_transaction_id,
     });
   } catch (error: unknown) {
-    let errorMessage = 'Unknown error';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'object' && error !== null) {
-      errorMessage = JSON.stringify(error);
-    } else if (error !== undefined && error !== null) {
-      errorMessage = String(error);
-    }
-    return { success: false, message: errorMessage };
+    captureException(error, {
+      tags: { source: 'promotional_credits_grant' },
+      extra: {
+        credit_category: promotion.credit_category,
+        kilo_user_id: user.id,
+        organization_id: organization_id ?? null,
+      },
+    });
+    return { success: false, message: GRANT_MSG_UNEXPECTED_FAILURE };
   }
 }
 

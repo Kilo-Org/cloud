@@ -182,6 +182,9 @@ export function buildControlPlaneSandboxSelection(
     ...(metadata.workspace?.egressAllowlist === undefined
       ? {}
       : { egressAllowlist: metadata.workspace.egressAllowlist }),
+    ...(metadata.workspace?.egressAudit === undefined
+      ? {}
+      : { egressAudit: metadata.workspace.egressAudit }),
   };
   switch (provider) {
     case 'vercel': {

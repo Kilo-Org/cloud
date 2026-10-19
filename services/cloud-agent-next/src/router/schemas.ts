@@ -38,7 +38,10 @@ import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/me
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
+import { GetEgressAuditInputSchema } from '../shared/egress-audit.js';
 
+export { GetEgressAuditResponseSchema as GetEgressAuditOutput } from '../shared/egress-audit.js';
+export type { GetEgressAuditResponse } from '../shared/egress-audit.js';
 export { SandboxStatusSnapshotSchema as GetSandboxStatusOutput } from '../shared/sandbox-status.js';
 export type { SandboxStatusSnapshot as GetSandboxStatusResponse } from '../shared/sandbox-status.js';
 
@@ -1038,6 +1041,11 @@ export const UpdateSessionOutput = z.object({
 export const GetSessionInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to retrieve'),
 });
+
+export const GetEgressAuditInput = GetEgressAuditInputSchema.extend({
+  cloudAgentSessionId: sessionIdSchema,
+  limit: z.number().int().min(1).max(100).default(50),
+}).strict();
 
 export const GetSandboxStatusInput = z
   .object({

@@ -6108,6 +6108,44 @@
     ],
     "searchBlob": "cloudAgentNext.getComputeBillingStatus Get billing status and compute usage information for a cloud agent session. cloudagentnext getcomputebillingstatus cloudagentsessionid cloudAgentSessionId"
   },
+  "cloudAgentNext.getEgressAudit": {
+    "path": "cloudAgentNext.getEgressAudit",
+    "kind": "query",
+    "summary": "List recorded outbound HTTP requests for a cloud agent session, including destination hosts and allow or deny decisions. Use the cursor to page through up to 16,384 recent records per sandbox, shared across worktrees. Older records are pruned in chunks of 64.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 50,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getegressaudit",
+      "cursor",
+      "limit",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.getEgressAudit List recorded outbound HTTP requests for a cloud agent session, including destination hosts and allow or deny decisions. Use the cursor to page through up to 16,384 recent records per sandbox, shared across worktrees. Older records are pruned in chunks of 64. cloudagentnext getegressaudit cursor limit cloudagentsessionid cursor limit cloudAgentSessionId"
+  },
   "cloudAgentNext.getImageUploadUrl": {
     "path": "cloudAgentNext.getImageUploadUrl",
     "kind": "mutation",
@@ -7652,6 +7690,10 @@
                 "maxLength": 254,
                 "pattern": "^[A-Za-z0-9.-]+$"
               }
+            },
+            "egressAudit": {
+              "description": "Opt in to egress auditing in any egress mode.",
+              "type": "boolean"
             }
           }
         },
@@ -7794,9 +7836,10 @@
       "preparesession",
       "egressmode",
       "egressallowlist",
+      "egressaudit",
       "sandboxallocation"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist sandboxallocation egressMode egressAllowlist sandboxAllocation"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation egressMode egressAllowlist egressAudit sandboxAllocation"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -17506,6 +17549,69 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getComputeBillingStatus Get the compute billing status for an organization's cloud agent session. organizations cloudagentnext getcomputebillingstatus organizationid cloudagentsessionid organizationId cloudAgentSessionId"
   },
+  "organizations.cloudAgentNext.getEgressAudit": {
+    "path": "organizations.cloudAgentNext.getEgressAudit",
+    "kind": "query",
+    "summary": "List recorded outbound HTTP requests for an organization cloud agent session, including destination hosts and allow or deny decisions. Use the cursor to page through up to 16,384 recent records per sandbox, shared across worktrees. Older records are pruned in chunks of 64.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "limit": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getegressaudit",
+      "organizationid",
+      "cursor",
+      "limit",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getEgressAudit List recorded outbound HTTP requests for an organization cloud agent session, including destination hosts and allow or deny decisions. Use the cursor to page through up to 16,384 recent records per sandbox, shared across worktrees. Older records are pruned in chunks of 64. organizations cloudagentnext getegressaudit organizationid cursor limit cloudagentsessionid organizationId cursor limit cloudAgentSessionId"
+  },
   "organizations.cloudAgentNext.getImageUploadUrl": {
     "path": "organizations.cloudAgentNext.getImageUploadUrl",
     "kind": "mutation",
@@ -19252,6 +19358,10 @@
                     "maxLength": 254,
                     "pattern": "^[A-Za-z0-9.-]+$"
                   }
+                },
+                "egressAudit": {
+                  "description": "Opt in to egress auditing in any egress mode.",
+                  "type": "boolean"
                 }
               }
             },
@@ -19406,9 +19516,10 @@
       "organizationid",
       "egressmode",
       "egressallowlist",
+      "egressaudit",
       "sandboxallocation"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist sandboxallocation organizationId egressMode egressAllowlist sandboxAllocation"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation organizationId egressMode egressAllowlist egressAudit sandboxAllocation"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",

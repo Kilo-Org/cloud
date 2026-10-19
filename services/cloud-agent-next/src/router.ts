@@ -15,6 +15,7 @@ import { createSessionSendHandlers } from './router/handlers/session-send.js';
 import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
+import { createSessionEgressAuditHandlers } from './router/handlers/session-egress-audit.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
 import { listHostedSessions } from './router/handlers/hosted-session-list.js';
@@ -33,6 +34,7 @@ export const appRouter = router({
   ...createSessionSendHandlers(),
   ...createSessionWorktreeHandlers(),
   ...createSessionWorktreeChangesHandlers(),
+  ...createSessionEgressAuditHandlers(),
 });
 
 export type AppRouter = typeof appRouter;

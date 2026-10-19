@@ -102,6 +102,36 @@ describe('toNativePublicEvent', () => {
 });
 
 describe('createNativeAttachmentRegistry', () => {
+  it('delivers live pushes after completing a valid empty-log fence', () => {
+    const registry = createNativeAttachmentRegistry(vi.fn());
+    const listener = vi.fn();
+    registry.begin(cloudAgentSessionId, kiloSessionId);
+    registry.subscribe(cloudAgentSessionId, listener);
+    registry.deliver(delivery(1));
+    expect(listener).not.toHaveBeenCalled();
+    registry.complete(cloudAgentSessionId, null);
+    registry.deliver(delivery(2));
+    expect(listener.mock.calls.map(([event]) => event.properties.id)).toEqual(['msg_1', 'msg_2']);
+  });
+
+  it('keeps concurrent attachment fences and releases independent', () => {
+    const registry = createNativeAttachmentRegistry(vi.fn());
+    const first = vi.fn();
+    const second = vi.fn();
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'first');
+    registry.subscribe('first', first);
+    registry.complete('first', 3);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'second');
+    registry.subscribe('second', second);
+    registry.deliver(delivery(4));
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).not.toHaveBeenCalled();
+    registry.complete('second', 4);
+    registry.release('first');
+    registry.deliver(delivery(5));
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
   it('drops pushed events already covered by the snapshot fence', () => {
     const registry = createNativeAttachmentRegistry(() => undefined);
     const received: number[] = [];
@@ -139,7 +169,7 @@ describe('createNativeAttachmentRegistry', () => {
     registry.subscribe(cloudAgentSessionId, event => received.push(event));
     registry.complete(cloudAgentSessionId, null);
     registry.deliver(delivery(9999));
-    expect(received).toEqual([]);
+    expect(received).toEqual([expect.objectContaining({ type: 'kilo.native.resnapshot' })]);
   });
 
   it('ignores a push for a different native session on the same attachment', () => {

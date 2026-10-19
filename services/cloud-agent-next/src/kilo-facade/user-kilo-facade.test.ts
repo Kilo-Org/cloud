@@ -3797,6 +3797,131 @@ describe('hosted native routes', () => {
     };
   }
 
+  it('attaches an empty registered log and uses the later snapshot watermark', async () => {
+    const env = envStub();
+    const subscribeNativeEvents = vi.fn(async () => ({
+      registered: true,
+      fence: null,
+      kiloSessionId,
+    }));
+    const nativeSnapshot = vi.fn(async () => ({ oversized: false, fence: 9, events: [] }));
+    env.SANDBOX_SESSION.get = vi.fn().mockReturnValue({
+      subscribeNativeEvents,
+      nativeSnapshot,
+    } as never);
+    const openPublicSessionEventStream = vi.fn(() => new Response('stream'));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env,
+      userId: 'usr_1',
+      deps: hostedDeps({
+        globalEvents: { openPublicSessionEventStream, openPublicGlobalEventStream: vi.fn() },
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(openPublicSessionEventStream).toHaveBeenCalledWith(
+      kiloSessionId,
+      expect.objectContaining({ fence: 9, snapshot: [] })
+    );
+  });
+
+  it('releases only the canceled attachment when another subscriber joins the same session', async () => {
+    const env = envStub();
+    const releaseNativeEvents = vi.fn(async () => undefined);
+    const pending: Promise<unknown>[] = [];
+    env.SANDBOX_SESSION.get = vi.fn().mockReturnValue({ releaseNativeEvents });
+    const facade = new UserKiloFacade(
+      {
+        waitUntil: (promise: Promise<unknown>) => pending.push(promise),
+      } as unknown as DurableObjectState,
+      env
+    );
+    const first = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
+    const second = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
+    const firstReader = facade
+      .openPublicSessionEventStream(kiloSessionId, { attachmentId: first, fence: null })
+      .body!.getReader();
+    const secondReader = facade
+      .openPublicSessionEventStream(kiloSessionId, { attachmentId: second, fence: null })
+      .body!.getReader();
+    await firstReader.cancel();
+    await Promise.all(pending);
+    expect(releaseNativeEvents).toHaveBeenCalledExactlyOnceWith({ attachmentId: first });
+    await secondReader.cancel();
+    await Promise.all(pending);
+    expect(releaseNativeEvents).toHaveBeenLastCalledWith({ attachmentId: second });
+  });
+
+  it('registers before RPC pushes, streams more than 64 snapshot frames, suppresses covered pushes and releases on cancel', async () => {
+    const env = envStub();
+    const releaseNativeEvents = vi.fn(async () => undefined);
+    const waitUntil = vi.fn();
+    env.SANDBOX_SESSION.get = vi.fn().mockReturnValue({ releaseNativeEvents });
+    vi.mocked(env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession).mockResolvedValue({
+      cloudAgentSessionId: workspaceSession,
+    } as never);
+    const facade = new UserKiloFacade({ waitUntil } as unknown as DurableObjectState, env);
+    const push = (eventId: number) =>
+      facade.publishNativeEvent({
+        kiloUserId: 'usr_1',
+        cloudAgentSessionId: workspaceSession,
+        kiloSessionId,
+        eventId,
+        event: { type: 'pushed', properties: { eventId } },
+      });
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env,
+      userId: 'usr_1',
+      deps: hostedDeps({
+        globalEvents: facade,
+        openNativeAttachment: async () => {
+          await push(5);
+          await push(11);
+          return {
+            kind: 'fenced',
+            fence: 10,
+            snapshot: { oversized: false, fence: 10, events: [] },
+            events: Array.from({ length: 100 }, (_, id) => ({
+              type: 'snapshot',
+              properties: { id },
+            })),
+            nextPage: async () => ({
+              kind: 'fenced',
+              fence: 10,
+              snapshot: { oversized: false, fence: 10, events: [] },
+              events: [{ type: 'last-page', properties: {} }],
+            }),
+          };
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+    const reader = response.body!.getReader();
+    const frames: Array<{ type: string; properties: Record<string, unknown> }> = [];
+    for (let i = 0; i < 104; i++) {
+      const frame = await reader.read();
+      frames.push(JSON.parse(new TextDecoder().decode(frame.value).slice(6).trim()));
+    }
+    expect(frames.filter(frame => frame.type === 'snapshot')).toHaveLength(100);
+    expect(frames.slice(-3).map(frame => frame.type)).toEqual([
+      'last-page',
+      'kilo.native.fence',
+      'pushed',
+    ]);
+    expect(frames.at(-1)?.properties.eventId).toBe(11);
+    await push(12);
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain('12');
+    await reader.cancel();
+    await Promise.all(waitUntil.mock.calls.map(([promise]) => promise));
+    expect(releaseNativeEvents).toHaveBeenCalledTimes(1);
+    expect(releaseNativeEvents).toHaveBeenCalledWith({ attachmentId: expect.any(String) });
+  });
+
   it('reads a hosted session status through the Session DO without waking compute', async () => {
     const nativeLiveRead = vi.fn(async () => ({
       ok: true as const,
@@ -3901,33 +4026,43 @@ describe('hosted native routes', () => {
     expect(response.status).toBe(409);
   });
 
-  it('admits a hosted command through durable message admission, not the sandbox', async () => {
-    const admitPrompt = vi.fn(async (_params: unknown) => ({
-      success: true as const,
-      outcome: 'queued' as const,
-      compatibilityDelivery: 'queued' as const,
-      messageId: 'msg_1',
-    }));
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
-        method: 'POST',
-        body: JSON.stringify({ messageID: 'msg_1', command: 'commit', arguments: '-m done' }),
-      }),
-      env: envStub(),
-      userId: 'usr_1',
-      authToken: 'token',
-      deps: hostedDeps({ admitPrompt }),
-    });
-    expect(response.status).toBe(204);
-    expect(admitPrompt).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cloudAgentSessionId: workspaceSession,
-        request: expect.objectContaining({
-          turn: { type: 'command', id: 'msg_1', command: 'commit', arguments: '-m done' },
+  it.each([{ mode: 'code', model: 'anthropic/test' }, { model: 'anthropic/test' }])(
+    'forwards command overrides %j through durable admission',
+    async agent => {
+      const admitPrompt = vi.fn(async (_params: unknown) => ({
+        success: true as const,
+        outcome: 'queued' as const,
+        compatibilityDelivery: 'queued' as const,
+        messageId: 'msg_1',
+      }));
+      const response = await handleKiloFacadeRequest({
+        request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
+          method: 'POST',
+          body: JSON.stringify({
+            messageID: 'msg_1',
+            command: 'commit',
+            arguments: '-m done',
+            agent: 'mode' in agent ? agent.mode : undefined,
+            model: agent.model,
+          }),
         }),
-      })
-    );
-  });
+        env: envStub(),
+        userId: 'usr_1',
+        authToken: 'token',
+        deps: hostedDeps({ admitPrompt }),
+      });
+      expect(response.status).toBe(204);
+      expect(admitPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cloudAgentSessionId: workspaceSession,
+          request: expect.objectContaining({
+            agent,
+            turn: { type: 'command', id: 'msg_1', command: 'commit', arguments: '-m done' },
+          }),
+        })
+      );
+    }
+  );
 
   it('refuses a balance bypass on the native command route', async () => {
     const response = await handleKiloFacadeRequest({

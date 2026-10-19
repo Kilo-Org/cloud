@@ -116,7 +116,6 @@ import {
 } from '../../websocket/stream.js';
 import {
   isDeliverableNativeEvent,
-  NATIVE_MATERIALIZED_EVENT_TYPES,
   toNativePublicEvent,
 } from '../../kilo-facade/native-event-source.js';
 import { sandboxControlPeerNamespace } from '../peer-bindings.js';
@@ -389,13 +388,20 @@ export type NativeSnapshot = {
   oversized: boolean;
   fence: number | null;
   events: StreamEvent[];
+  continuation?: NativeSnapshotCursor;
   sessionStatus?: SessionStatus;
   questions?: unknown[];
   permissions?: unknown[];
 };
 
-/** Upper bound on one native snapshot; beyond it the caller resnapshots. */
-const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = 16 * 1024 * 1024;
+export type NativeSnapshotCursor = {
+  fence: number | null;
+  phase: 'log' | 'updates' | 'removals';
+  fromId: number;
+};
+
+/** Byte budget per RPC page; a single larger event requires resnapshot. */
+export const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = 256 * 1024;
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
@@ -539,7 +545,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * events. In-memory on purpose: a facade that outlives this DO instance
    * resnapshots from the durable log before it trusts a live tail again.
    */
-  private nativeSubscriber: { kiloSessionId: string } | null = null;
+  private nativeSubscriber: { kiloSessionId: string; attachments: Set<string> } | null = null;
   private rootStatus: RootStatus | undefined;
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
@@ -1419,32 +1425,42 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * durable event log from the client's cursor, then the materialized
    * message/part rows, so the result is complete through `fence`. It never
    * wakes compute: it reads only this DO's storage. A transcript that cannot
-   * fit the budget reports `oversized` so the caller asks for a fresh snapshot
-   * instead of treating a truncated one as complete.
+   * fit one page continues from an exclusive row cursor in the current phase.
    */
-  async nativeSnapshot(input: { fromId?: number }): Promise<NativeSnapshot> {
+  async nativeSnapshot(input: {
+    fromId?: number;
+    continuation?: NativeSnapshotCursor;
+  }): Promise<NativeSnapshot> {
     await this.initialized;
     if (this.registration === null) return { oversized: false, fence: null, events: [] };
-    const fence = this.eventQueries.getLatestEventId();
+    const fence =
+      input.continuation === undefined
+        ? this.eventQueries.getLatestEventId()
+        : input.continuation.fence;
     const events: StreamEvent[] = [];
     let bytes = 0;
     const push = (event: StreamEvent): boolean => {
-      const size = JSON.stringify(event).length;
+      const size = new TextEncoder().encode(JSON.stringify(event)).byteLength;
       if (bytes + size > CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES) return false;
       bytes += size;
       events.push(event);
       return true;
     };
-    for (const event of this.eventQueries.iterateByFilters({ fromId: input.fromId })) {
-      if (!push(formatStreamEvent(event, this.sessionId))) {
-        return { oversized: true, fence, events: [] };
-      }
-    }
-    for (const event of this.eventQueries.iterateByFilters({
-      eventTypes: [...NATIVE_MATERIALIZED_EVENT_TYPES],
-    })) {
-      if (!push(formatStreamEvent(event, this.sessionId))) {
-        return { oversized: true, fence, events: [] };
+    const phases = ['log', 'updates', 'removals'] as const;
+    const startPhase = input.continuation?.phase ?? 'log';
+    for (const phase of phases.slice(phases.indexOf(startPhase))) {
+      let fromId = phase === startPhase ? (input.continuation?.fromId ?? input.fromId ?? 0) : 0;
+      for (const event of this.eventQueries.iterateByFilters({
+        fromId,
+        toId: fence ?? 0,
+        ...(phase === 'log' ? {} : { materialized: phase }),
+      })) {
+        const formatted = formatStreamEvent(event, this.sessionId);
+        if (!push(formatted)) {
+          if (events.length === 0) return { oversized: true, fence, events: [] };
+          return { oversized: false, fence, events, continuation: { fence, phase, fromId } };
+        }
+        fromId = event.id;
       }
     }
     return {
@@ -1462,19 +1478,27 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * fence is the delivery watermark at subscribe time: the facade's snapshot is
    * complete through it, and later events arrive as pushes.
    */
-  async subscribeNativeEvents(input: { kiloSessionId: string }): Promise<{
+  async subscribeNativeEvents(input: { kiloSessionId: string; attachmentId: string }): Promise<{
+    registered: boolean;
     fence: number | null;
     kiloSessionId: string;
   }> {
     await this.initialized;
-    if (this.registration === null) return { fence: null, kiloSessionId: input.kiloSessionId };
-    this.nativeSubscriber = { kiloSessionId: input.kiloSessionId };
-    return { fence: this.eventQueries.getLatestEventId(), kiloSessionId: input.kiloSessionId };
+    if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
+      return { registered: false, fence: null, kiloSessionId: input.kiloSessionId };
+    this.nativeSubscriber ??= { kiloSessionId: input.kiloSessionId, attachments: new Set() };
+    this.nativeSubscriber.attachments.add(input.attachmentId);
+    return {
+      registered: true,
+      fence: this.eventQueries.getLatestEventId(),
+      kiloSessionId: input.kiloSessionId,
+    };
   }
 
-  async releaseNativeEvents(): Promise<void> {
+  async releaseNativeEvents(input: { attachmentId: string }): Promise<void> {
     await this.initialized;
-    this.nativeSubscriber = null;
+    this.nativeSubscriber?.attachments.delete(input.attachmentId);
+    if (this.nativeSubscriber?.attachments.size === 0) this.nativeSubscriber = null;
   }
 
   private async publishNativeEvent(stored: StoredEvent): Promise<void> {

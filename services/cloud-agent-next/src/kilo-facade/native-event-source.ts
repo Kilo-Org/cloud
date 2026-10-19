@@ -104,8 +104,10 @@ export function toNativePublicEvent(
 }
 
 export type NativeAttachmentState = {
+  cloudAgentSessionId: string;
   kiloSessionId: string;
   fence: number | null;
+  snapshotPending: boolean;
   /** Pushed events held until the snapshot through the fence is delivered. */
   pending: NativeEventDelivery[];
   listeners: Set<(event: NativePublicEvent) => void>;
@@ -113,7 +115,7 @@ export type NativeAttachmentState = {
 };
 
 export type NativeAttachmentRegistry = {
-  begin(cloudAgentSessionId: string, kiloSessionId: string): void;
+  begin(cloudAgentSessionId: string, kiloSessionId: string, attachmentId?: string): void;
   complete(cloudAgentSessionId: string, fence: number | null): void;
   deliver(delivery: NativeEventDelivery): void;
   subscribe(cloudAgentSessionId: string, listener: (event: NativePublicEvent) => void): () => void;
@@ -143,18 +145,21 @@ export function createNativeAttachmentRegistry(
   }
 
   return {
-    begin(cloudAgentSessionId, kiloSessionId) {
-      const existing = attachments.get(cloudAgentSessionId);
+    begin(cloudAgentSessionId, kiloSessionId, attachmentId = cloudAgentSessionId) {
+      const existing = attachments.get(attachmentId);
       if (existing !== undefined) {
         existing.kiloSessionId = kiloSessionId;
         existing.fence = null;
+        existing.snapshotPending = true;
         existing.pending = [];
         existing.overflowed = false;
         return;
       }
-      attachments.set(cloudAgentSessionId, {
+      attachments.set(attachmentId, {
+        cloudAgentSessionId,
         kiloSessionId,
         fence: null,
+        snapshotPending: true,
         pending: [],
         listeners: new Set(),
         overflowed: false,
@@ -164,6 +169,7 @@ export function createNativeAttachmentRegistry(
       const state = attachments.get(cloudAgentSessionId);
       if (state === undefined) return;
       state.fence = fence;
+      state.snapshotPending = false;
       if (state.overflowed) return;
       const pending = state.pending;
       state.pending = [];
@@ -173,23 +179,36 @@ export function createNativeAttachmentRegistry(
       }
     },
     deliver(delivery) {
-      const state = attachments.get(delivery.cloudAgentSessionId);
-      if (state === undefined || state.overflowed) return;
-      if (state.kiloSessionId !== delivery.kiloSessionId) return;
-      if (state.fence !== null && delivery.eventId <= state.fence) return;
-      if (state.fence === null) {
-        if (state.pending.length >= MAX_PENDING_NATIVE_EVENTS) {
-          fail(delivery.cloudAgentSessionId, state);
-          return;
+      for (const state of attachments.values()) {
+        if (state.cloudAgentSessionId !== delivery.cloudAgentSessionId || state.overflowed)
+          continue;
+        if (state.kiloSessionId !== delivery.kiloSessionId) continue;
+        if (state.fence !== null && delivery.eventId <= state.fence) continue;
+        if (state.snapshotPending) {
+          if (state.pending.length >= MAX_PENDING_NATIVE_EVENTS) {
+            fail(delivery.cloudAgentSessionId, state);
+            continue;
+          }
+          state.pending.push(delivery);
+          continue;
         }
-        state.pending.push(delivery);
-        return;
+        emit(state, delivery.event);
       }
-      emit(state, delivery.event);
     },
     subscribe(cloudAgentSessionId, listener) {
       const state = attachments.get(cloudAgentSessionId);
       if (state === undefined) return () => undefined;
+      if (state.overflowed) {
+        listener({
+          type: NATIVE_FACADE_RESNAPSHOT_EVENT,
+          properties: {
+            sessionID: state.kiloSessionId,
+            directory: publicCloudAgentDirectory(state.kiloSessionId),
+            reason: 'continuity_unproven',
+          },
+        });
+        return () => undefined;
+      }
       state.listeners.add(listener);
       return () => {
         state.listeners.delete(listener);

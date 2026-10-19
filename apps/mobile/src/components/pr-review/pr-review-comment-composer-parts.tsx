@@ -5,11 +5,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { type ReactNode, type RefObject, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  TextInput,
-  type TextInputScrollEvent,
-  View,
-} from 'react-native';
+import { TextInput, View } from 'react-native';
 
 import {
   BODY_LINE_HEIGHT,
@@ -45,6 +41,18 @@ const BOTTOM_FADE_STYLE = {
   borderRadius: BOTTOM_FADE_RADIUS,
 } as const;
 
+/** `#rrggbb` to an `rgba()` string; expo-linear-gradient ignores 8-digit hex. */
+function fadeColor(hex: string, alpha: number): string {
+  const raw = hex.replace('#', '');
+  const r = Number.parseInt(raw.slice(0, 2), 16);
+  const g = Number.parseInt(raw.slice(2, 4), 16);
+  const b = Number.parseInt(raw.slice(4, 6), 16);
+  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
+    return `rgba(0, 0, 0, ${alpha})`;
+  }
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export function CommentBodyField({
   inputRef,
   isDisabled,
@@ -63,31 +71,10 @@ export function CommentBodyField({
     ? resolveCommentBodyMaxHeight(BODY_MAX_LINES_OPEN)
     : resolveCommentBodyMaxHeight(BODY_MAX_LINES_CLOSED);
   // Content and frame heights come from the same scroll view, so their
-  // comparison is scrollability regardless of padding conventions. The fade
-  // hides once the user scrolls the last line fully into view, and reappears
-  // when they scroll back up.
+  // comparison is scrollability regardless of padding conventions.
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [frameHeight, setFrameHeight] = useState<number | null>(null);
-  const [atBottom, setAtBottom] = useState(false);
-  const overflowing = resolveCommentBodyFade({ contentHeight, frameHeight, atBottom });
-
-  // Android's TextInput onScroll payload only declares contentOffset; the
-  // runtime includes contentSize and layoutMeasurement like any ScrollView.
-  // onContentSizeChange/onLayout carry the same numbers, so the comparison
-  // stays consistent even where the extra fields are absent (tests).
-  function handleScroll(event: { nativeEvent: TextInputScrollEvent['nativeEvent'] }) {
-    const native = event.nativeEvent as TextInputScrollEvent['nativeEvent'] & {
-      contentSize?: { height: number };
-      layoutMeasurement?: { height: number };
-    };
-    if (native.contentSize === undefined || native.layoutMeasurement === undefined) {
-      return;
-    }
-    const nextAtBottom =
-      native.contentOffset.y >=
-      native.contentSize.height - native.layoutMeasurement.height - 1;
-    setAtBottom(current => (current === nextAtBottom ? current : nextAtBottom));
-  }
+  const overflowing = resolveCommentBodyFade({ contentHeight, frameHeight });
 
   return (
     <View>
@@ -99,7 +86,6 @@ export function CommentBodyField({
         placeholderTextColor={colors.mutedForeground}
         accessibilityLabel={t('prReview.composer.commentBody')}
         onChangeText={onChangeText}
-        onScroll={handleScroll}
         onContentSizeChange={event => {
           setContentHeight(event.nativeEvent.contentSize.height);
         }}
@@ -118,10 +104,10 @@ export function CommentBodyField({
         )}
         style={{ maxHeight }}
       />
-      {overflowing && !atBottom ? (
+      {overflowing ? (
         <LinearGradient
           pointerEvents="none"
-          colors={[`${colors.foreground}00`, `${colors.foreground}0f`]}
+          colors={[fadeColor(colors.foreground, 0), fadeColor(colors.foreground, 0.06)]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={[BOTTOM_FADE_STYLE, { height: BODY_LINE_HEIGHT }]}

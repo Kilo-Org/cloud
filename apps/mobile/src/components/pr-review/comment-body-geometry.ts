@@ -22,21 +22,18 @@ export type CommentBodyOverflowInput = {
   contentHeight: number | null;
   /** Frame height reported by onLayout, or null before layout. */
   frameHeight: number | null;
-  /** The scroll position shows the last line fully. */
-  atBottom: boolean;
 };
 
 /**
- * Whether the bottom fade shows. Content and frame heights come from the same
- * scroll view, so `content > frame` means the field scrolls regardless of
- * padding conventions; the fade hides once the last line is in view.
+ * Whether the bottom fade shows: the field scrolls only when its content is
+ * taller than the frame. Content and frame heights come from the same scroll
+ * view, so their comparison holds regardless of padding conventions.
  */
 export function resolveCommentBodyFade({
   contentHeight,
   frameHeight,
-  atBottom,
 }: CommentBodyOverflowInput): boolean {
-  if (contentHeight === null || frameHeight === null || atBottom) {
+  if (contentHeight === null || frameHeight === null) {
     return false;
   }
   return contentHeight > frameHeight + 0.5;

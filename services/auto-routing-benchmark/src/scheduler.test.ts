@@ -27,6 +27,7 @@ import {
   SCHEDULER_MATERIALIZED_LANES_SQL,
   SCHEDULER_MAX_ATTEMPTS,
   SCHEDULER_QUEUE_LEASE_MS,
+  SCHEDULER_SETTLED_RUNS_SQL,
   SCHEDULER_UNSETTLED_SQL,
 } from './scheduler';
 import type { SchedulerClaim, SchedulerConfig } from './scheduler';
@@ -1434,6 +1435,8 @@ describe('scheduler (production migrations and real SQLite)', () => {
 
     expect(explainPlan(sqlite, SCHEDULER_UNSETTLED_SQL)).toContain('IX_scheduler_chunks_lane');
     expect(explainPlan(sqlite, SCHEDULER_UNSETTLED_SQL)).not.toContain('SCAN scheduler_chunks');
+    expect(explainPlan(sqlite, SCHEDULER_SETTLED_RUNS_SQL)).not.toContain('SCAN scheduler_chunks');
+    expect(explainPlan(sqlite, SCHEDULER_SETTLED_RUNS_SQL)).not.toContain('SCAN run_lane_failures');
 
     const recorded: string[] = [];
     const wrapped = recordingD1(db, recorded);

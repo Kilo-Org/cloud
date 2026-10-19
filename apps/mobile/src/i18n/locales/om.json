@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Moodeelota meeshaa irratti",
       "help": "Moodeelonni meeshaa irratti bilbila kana irratti hojjetu. Gaaffiin keessanii fi deebiin meeshaa kana irra turu.",
+      "switchTitle": "Gara moodeela meeshaa irratti hojjetuutti jijjiiruu?",
+      "switchMessage": "Gara {{name}} jijjiiruun gaaffiiwwanii fi odeeffannoo haalaa marii kanaa sarvarii fagoo irratti osoo hin taane bilbila kana irratti akka qindaa'an taasisa.",
+      "switchConfirm": "Moodeela jijjiiri",
       "systemPurpose": "Moodeela sirna meeshaa kanaa keessatti ijaarame. Meeshaa irratti hojjeta.",
       "apple": "Apple Intelligence (meeshaa irratti)",
       "checking": "Argamuu isaa mirkaneessaa jira…",

@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "本机模型",
       "help": "本机模型在这部手机上运行。你的提示和回复都会保留在设备上。",
+      "switchTitle": "切换到本机模型？",
+      "switchMessage": "切换到 {{name}} 后，此对话的提示和上下文将在这部手机上处理，而不是在远程服务器上。",
+      "switchConfirm": "切换模型",
       "systemPurpose": "此设备系统内置的模型。它在设备上运行。",
       "apple": "Apple 智能（本机）",
       "checking": "正在检查可用性…",

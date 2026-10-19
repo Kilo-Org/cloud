@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Amamodeli asedivayisini",
       "help": "Amamodeli asedivayisini asebenza kule foni. Imiyalo yakho nezimpendulo kuhlala kudivayisi.",
+      "switchTitle": "Ushintshele kumodeli esedivayisini?",
+      "switchMessage": "Ukushintshela ku-{{name}} kwenza imiyalo nomongo wale ngxoxo kucutshungulwe kule foni, hhayi kuseva ekude.",
+      "switchConfirm": "Shintsha imodeli",
       "systemPurpose": "Imodeli eyakhelwe ohlelweni lwale divayisi. Isebenza kudivayisi.",
       "apple": "Apple Intelligence (edivayisini)",
       "checking": "Kuhlolwa ukutholakala…",

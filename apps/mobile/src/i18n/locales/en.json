@@ -3409,6 +3409,9 @@
     "localModels": {
       "title": "On-device models",
       "help": "On-device models run on this phone. Your prompts and replies stay on the device.",
+      "switchTitle": "Switch to an on-device model?",
+      "switchMessage": "Switching to {{name}} processes this conversation's prompts and context on this phone, not on a remote server.",
+      "switchConfirm": "Switch model",
       "systemPurpose": "The model built into this device's system. It runs on the device.",
       "apple": "Apple Intelligence (on device)",
       "checking": "Checking availability…",

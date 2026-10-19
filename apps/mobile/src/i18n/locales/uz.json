@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Qurilmadagi modellar",
       "help": "Qurilmadagi modellar shu telefonda ishlaydi. So‘rovlaringiz va javoblar qurilmada qoladi.",
+      "switchTitle": "Qurilmadagi modelga oʻtilsinmi?",
+      "switchMessage": "{{name}} modeliga oʻtish bu suhbatning soʻrovlari va konteksti masofaviy serverda emas, shu telefonda qayta ishlanishini taʼminlaydi.",
+      "switchConfirm": "Modelni almashtirish",
       "systemPurpose": "Ushbu qurilma tizimiga o‘rnatilgan model. U qurilmada ishlaydi.",
       "apple": "Apple Intelligence (qurilmada)",
       "checking": "Mavjudligi tekshirilmoqda…",

@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Seadmesisesed mudelid",
       "help": "Seadmesisesed mudelid töötavad selles telefonis. Sinu päringud ja vastused jäävad seadmesse.",
+      "switchTitle": "Kas minna üle seadmesisesele mudelile?",
+      "switchMessage": "Mudelile {{name}} üleminekul töödeldakse selle vestluse viipasid ja konteksti selles telefonis, mitte kaugserveris.",
+      "switchConfirm": "Vaheta mudelit",
       "systemPurpose": "Selle seadme süsteemi sisseehitatud mudel. See töötab seadmes.",
       "apple": "Apple Intelligence (seadmes)",
       "checking": "Saadavuse kontrollimine…",

@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Model di perangkat",
       "help": "Model di perangkat berjalan di ponsel ini. Perintah dan balasan Anda tetap ada di perangkat.",
+      "switchTitle": "Beralih ke model di perangkat?",
+      "switchMessage": "Beralih ke {{name}} akan memproses perintah dan konteks percakapan ini di ponsel ini, bukan di server jarak jauh.",
+      "switchConfirm": "Ganti model",
       "systemPurpose": "Model yang terpasang di sistem perangkat ini. Model ini berjalan di perangkat.",
       "apple": "Apple Intelligence (di perangkat)",
       "checking": "Memeriksa ketersediaan…",

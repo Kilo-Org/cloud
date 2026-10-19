@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Modellen op het apparaat",
       "help": "Modellen op het apparaat draaien op deze telefoon. Je prompts en antwoorden blijven op het apparaat.",
+      "switchTitle": "Overschakelen naar een model op het apparaat?",
+      "switchMessage": "Als je overschakelt naar {{name}}, worden de prompts en context van dit gesprek op deze telefoon verwerkt, niet op een externe server.",
+      "switchConfirm": "Van model wisselen",
       "systemPurpose": "Het model dat in het systeem van dit apparaat is ingebouwd. Het draait op het apparaat.",
       "apple": "Apple Intelligence (op het apparaat)",
       "checking": "Beschikbaarheid controleren…",

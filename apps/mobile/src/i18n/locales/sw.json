@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Modeli za kwenye kifaa",
       "help": "Modeli za kwenye kifaa hufanya kazi kwenye simu hii. Maombi na majibu yako hubaki kwenye kifaa.",
+      "switchTitle": "Ubadilishe kwenda modeli ya kwenye kifaa?",
+      "switchMessage": "Kubadilisha kwenda {{name}} hufanya maagizo na muktadha wa mazungumzo haya kuchakatwa kwenye simu hii, si kwenye seva ya mbali.",
+      "switchConfirm": "Badilisha modeli",
       "systemPurpose": "Modeli iliyojengwa ndani ya mfumo wa kifaa hiki. Hufanya kazi kwenye kifaa.",
       "apple": "Apple Intelligence (kwenye kifaa)",
       "checking": "Inakagua upatikanaji…",

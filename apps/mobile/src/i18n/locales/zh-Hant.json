@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "裝置端模型",
       "help": "裝置端模型會在這支手機上執行。你的提示和回覆都會保留在裝置上。",
+      "switchTitle": "要切換至裝置端模型嗎？",
+      "switchMessage": "切換至 {{name}} 後，此對話的提示與上下文會在這支手機上處理，而非在遠端伺服器上。",
+      "switchConfirm": "切換模型",
       "systemPurpose": "此裝置系統內建的模型。它會在裝置上執行。",
       "apple": "Apple Intelligence（裝置端）",
       "checking": "正在檢查可用性⋯",

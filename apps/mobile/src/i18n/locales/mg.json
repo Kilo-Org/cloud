@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Modely ao amin'ny fitaovana",
       "help": "Mandeha ao amin'ity finday ity ny modely ao amin'ny fitaovana. Mijanona ao amin'ny fitaovana ny fangatahanao sy ny valiny.",
+      "switchTitle": "Hifindra amin'ny modely ao amin'ny fitaovana?",
+      "switchMessage": "Ny fifindrana amin'ny {{name}} dia mahatonga ny baiko sy ny toe-javatra ao amin'ity resaka ity hokarakaraina ao amin'ity finday ity, fa tsy any amin'ny rafitra mpizara lavitra.",
+      "switchConfirm": "Miova modely",
       "systemPurpose": "Ilay modely tafiditra ao amin'ny rafitry ity fitaovana ity. Mandeha ao amin'ny fitaovana izy.",
       "apple": "Apple Intelligence (ao amin'ny fitaovana)",
       "checking": "Manamarina raha misy…",

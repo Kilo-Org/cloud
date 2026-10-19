@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Laitteessa toimivat mallit",
       "help": "Laitteessa toimivat mallit toimivat tässä puhelimessa. Kehotteesi ja vastaukset pysyvät laitteessa.",
+      "switchTitle": "Vaihdetaanko laitteessa toimivaan malliin?",
+      "switchMessage": "Kun vaihdat malliin {{name}}, tämän keskustelun kehotteet ja konteksti käsitellään tässä puhelimessa, ei etäpalvelimella.",
+      "switchConfirm": "Vaihda mallia",
       "systemPurpose": "Tämän laitteen järjestelmään sisäänrakennettu malli. Se toimii laitteessa.",
       "apple": "Apple Intelligence (laitteessa)",
       "checking": "Tarkistetaan saatavuutta…",

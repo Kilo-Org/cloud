@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Ụdị nlereanya na ngwaọrụ",
       "help": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na ekwentị a. Ajụjụ gị na nzaghachi gị na-anọ na ngwaọrụ ahụ.",
+      "switchTitle": "Ịgbanwe gaa n'ụdị nlereanya na ngwaọrụ?",
+      "switchMessage": "Ịgbanwe gaa na {{name}} ga-eme ka a hazie ntụziaka na ederede gbara mkparịta ụka a gburugburu na ekwentị a, ọ bụghị na sava dị anya.",
+      "switchConfirm": "Gbanwee ụdị nlereanya",
       "systemPurpose": "Ụdị nlereanya e wuru n'ime sistemụ ngwaọrụ a. Ọ na-arụ ọrụ na ngwaọrụ ahụ.",
       "apple": "Apple Intelligence (na ngwaọrụ)",
       "checking": "Na-elele ma ọ dị…",

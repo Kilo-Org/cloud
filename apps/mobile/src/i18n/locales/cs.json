@@ -3550,6 +3550,9 @@
     "localModels": {
       "title": "Modely v zařízení",
       "help": "Modely v zařízení běží přímo v tomto telefonu. Vaše dotazy a odpovědi zůstávají v zařízení.",
+      "switchTitle": "Přepnout na model v zařízení?",
+      "switchMessage": "Po přepnutí na {{name}} se výzvy a kontext této konverzace budou zpracovávat přímo v tomto telefonu, nikoli na vzdáleném serveru.",
+      "switchConfirm": "Přepnout model",
       "systemPurpose": "Model zabudovaný do systému tohoto zařízení. Běží v zařízení.",
       "apple": "Apple Intelligence (v zařízení)",
       "checking": "Ověřování dostupnosti…",

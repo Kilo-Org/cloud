@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "기기 내 모델",
       "help": "기기 내 모델은 이 휴대폰에서 실행됩니다. 프롬프트와 답변은 기기에만 저장됩니다.",
+      "switchTitle": "기기 내 모델로 전환할까요?",
+      "switchMessage": "{{name}}(으)로 전환하면 이 대화의 프롬프트와 컨텍스트가 원격 서버가 아닌 이 휴대폰에서 처리됩니다.",
+      "switchConfirm": "모델 전환",
       "systemPurpose": "이 기기의 시스템에 내장된 모델입니다. 기기에서 실행됩니다.",
       "apple": "Apple Intelligence(기기 내)",
       "checking": "사용 가능 여부 확인 중…",

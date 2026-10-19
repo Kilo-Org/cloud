@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Àwọn awoṣe lórí ẹ̀rọ",
       "help": "Àwọn awoṣe lórí ẹ̀rọ ń ṣiṣẹ́ lórí fóònù yìí. Àwọn ìbéèrè àti èsì rẹ máa wà lórí ẹ̀rọ náà.",
+      "switchTitle": "Yí sí awoṣe lórí ẹ̀rọ?",
+      "switchMessage": "Yíyí sí {{name}} yóò jẹ́ kí a ṣe ìṣàkóso àwọn ìtọ́nisọ́nà àti àlàyé àyíká ìjíròrò yìí lórí fóònù yìí, kì í ṣe lórí sáfà tó wà ní ọ̀nà jíjìn.",
+      "switchConfirm": "Yí awoṣe padà",
       "systemPurpose": "Awoṣe tí a kọ́ sínú ètò ẹ̀rọ yìí. Ó ń ṣiṣẹ́ lórí ẹ̀rọ náà.",
       "apple": "Apple Intelligence (lórí ẹ̀rọ)",
       "checking": "A ń ṣàyẹ̀wò bóyá ó wà…",

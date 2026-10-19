@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Eszközön futó modellek",
       "help": "Az eszközön futó modellek ezen a telefonon működnek. A kérései és a válaszok az eszközön maradnak.",
+      "switchTitle": "Eszközön futó modellre váltasz?",
+      "switchMessage": "Ha erre váltasz: {{name}}, a beszélgetés utasításait és kontextusát ezen a telefonon dolgozzuk fel, nem egy távoli szerveren.",
+      "switchConfirm": "Modell váltása",
       "systemPurpose": "Az eszköz rendszerébe épített modell. Az eszközön működik.",
       "apple": "Apple Intelligence (az eszközön)",
       "checking": "Elérhetőség ellenőrzése…",

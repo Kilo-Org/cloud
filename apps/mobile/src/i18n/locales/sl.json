@@ -3550,6 +3550,9 @@
     "localModels": {
       "title": "Modeli v napravi",
       "help": "Modeli v napravi se izvajajo v tem telefonu. Vaši pozivi in odgovori ostanejo v napravi.",
+      "switchTitle": "Preklopim na model v napravi?",
+      "switchMessage": "Po preklopu na {{name}} se pozivi in kontekst tega pogovora obdelujejo v tem telefonu, ne na oddaljenem strežniku.",
+      "switchConfirm": "Preklopi model",
       "systemPurpose": "Model, vgrajen v sistem te naprave. Izvaja se v napravi.",
       "apple": "Apple Intelligence (v napravi)",
       "checking": "Preverjanje razpoložljivosti …",

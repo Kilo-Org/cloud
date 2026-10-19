@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Líkön í tækinu",
       "help": "Líkön í tækinu keyra á þessum síma. Fyrirmæli þín og svör verða eftir í tækinu.",
+      "switchTitle": "Skipta yfir í líkan í tækinu?",
+      "switchMessage": "Ef þú skiptir yfir í {{name}} verða fyrirmæli og samhengi þessa samtals unnin á þessum síma, ekki á fjarlægum netþjóni.",
+      "switchConfirm": "Skipta um líkan",
       "systemPurpose": "Líkanið sem er innbyggt í kerfi þessa tækis. Það keyrir í tækinu.",
       "apple": "Apple Intelligence (í tækinu)",
       "checking": "Athugar framboð…",

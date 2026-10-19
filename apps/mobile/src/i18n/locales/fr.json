@@ -3509,6 +3509,9 @@
     "localModels": {
       "title": "Modèles sur l'appareil",
       "help": "Les modèles sur l'appareil s'exécutent sur ce téléphone. Vos requêtes et les réponses restent sur l'appareil.",
+      "switchTitle": "Passer à un modèle sur l'appareil ?",
+      "switchMessage": "Si vous passez à {{name}}, les invites et le contexte de cette conversation seront traités sur ce téléphone, et non sur un serveur distant.",
+      "switchConfirm": "Changer de modèle",
       "systemPurpose": "Le modèle intégré au système de cet appareil. Il s'exécute sur l'appareil.",
       "apple": "Apple Intelligence (sur l'appareil)",
       "checking": "Vérification de la disponibilité…",

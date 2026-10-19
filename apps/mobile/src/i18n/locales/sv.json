@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Modeller på enheten",
       "help": "Modeller på enheten körs på den här telefonen. Dina frågor och svar stannar på enheten.",
+      "switchTitle": "Byta till en modell på enheten?",
+      "switchMessage": "Om du byter till {{name}} behandlas den här konversationens prompter och kontext på den här telefonen, inte på en fjärrserver.",
+      "switchConfirm": "Byt modell",
       "systemPurpose": "Modellen som är inbyggd i enhetens system. Den körs på enheten.",
       "apple": "Apple Intelligence (på enheten)",
       "checking": "Kontrollerar tillgänglighet …",

@@ -3509,6 +3509,9 @@
     "localModels": {
       "title": "Models al dispositiu",
       "help": "Els models al dispositiu s'executen en aquest telèfon. Les teves peticions i respostes es queden al dispositiu.",
+      "switchTitle": "Vols canviar a un model al dispositiu?",
+      "switchMessage": "Si canvies a {{name}}, els missatges i el context d'aquesta conversa es processaran en aquest telèfon, no en un servidor remot.",
+      "switchConfirm": "Canvia de model",
       "systemPurpose": "El model integrat al sistema d'aquest dispositiu. S'executa al dispositiu.",
       "apple": "Apple Intelligence (al dispositiu)",
       "checking": "S'està comprovant la disponibilitat…",

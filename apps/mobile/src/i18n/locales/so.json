@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Moodeelada aaladda gudaheeda",
       "help": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan taleefankan. Codsiyadaada iyo jawaabaha waxay ku jiraan aaladda.",
+      "switchTitle": "Ma u wareegtaa moodeel aaladda gudaheeda ku shaqeeya?",
+      "switchMessage": "U wareegidda {{name}} waxay keenaysaa in farriimaha gelinta iyo macnaha guud ee wada sheekaysigan lagu farsameeyo taleefankan, ee aan lagu farsamayn server fog.",
+      "switchConfirm": "Beddel moodeelka",
       "systemPurpose": "Moodeelka ku dhisan nidaamka aaladdan. Wuxuu ku shaqeeyaa aaladda gudaheeda.",
       "apple": "Apple Intelligence (aaladda gudaheeda)",
       "checking": "Waxaa la hubinayaa helitaanka…",

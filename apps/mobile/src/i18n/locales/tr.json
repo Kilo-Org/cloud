@@ -3468,6 +3468,9 @@
     "localModels": {
       "title": "Cihazdaki modeller",
       "help": "Cihazdaki modeller bu telefonda çalışır. İstemleriniz ve yanıtlarınız cihazda kalır.",
+      "switchTitle": "Cihazdaki bir modele geçilsin mi?",
+      "switchMessage": "{{name}} modeline geçmek, bu konuşmanın istemlerinin ve bağlamının uzak bir sunucuda değil, bu telefonda işlenmesini sağlar.",
+      "switchConfirm": "Modeli değiştir",
       "systemPurpose": "Bu cihazın sistemine yerleşik model. Cihazda çalışır.",
       "apple": "Apple Intelligence (cihazda)",
       "checking": "Kullanılabilirlik denetleniyor…",

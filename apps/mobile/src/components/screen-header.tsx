@@ -185,13 +185,16 @@ type ScreenHeaderProps = {
  * the body below the header — and a one-line cap reserves one line, not the
  * two-line default it replaced, or the header keeps a blank line it can never
  * fill.
+ *
+ * The large branches stay in px: NativeWind's rem is 14pt, so `min-h-9` would
+ * be 31.5pt under the 36px the large title paints.
  */
 function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: number): string {
   if (size === 'large') {
     if (titleLines > 2) {
       return 'min-h-[108px]';
     }
-    return titleLines === 1 ? 'min-h-9' : 'min-h-[72px]';
+    return titleLines === 1 ? 'min-h-[36px]' : 'min-h-[72px]';
   }
   if (titleLines > 2) {
     return 'min-h-21';

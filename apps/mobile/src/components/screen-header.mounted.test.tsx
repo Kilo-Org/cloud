@@ -608,7 +608,7 @@ describe('ScreenHeader mounted', () => {
         if (cappedLines > 2) {
           reserveClass = large ? 'min-h-[108px]' : 'min-h-21';
         } else if (cappedLines === 1) {
-          reserveClass = large ? 'min-h-9' : 'min-h-7';
+          reserveClass = large ? 'min-h-[36px]' : 'min-h-7';
         }
         expect(title.parent?.props.className).toContain(reserveClass);
         expect(title.parent?.props.className).toContain('justify-center');

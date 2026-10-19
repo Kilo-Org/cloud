@@ -81,7 +81,13 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={scopeTitle} eyebrow={t('common.codeReviewer')} />
+      <ScreenHeader
+        title={scopeTitle}
+        // An organization name is user prose, not a UI label, so it keeps a
+        // second line for a natural break.
+        titleNumberOfLines={2}
+        eyebrow={t('common.codeReviewer')}
+      />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

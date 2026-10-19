@@ -1,3 +1,5 @@
+import { SANDBOX_STATUS_DETAIL_MESSAGES } from '@/routers/cloud-agent-next-schemas';
+
 export function resolveCloudAgentTerminalWsUrl(wsUrl: string, baseUrl: string): string {
   if (!wsUrl) {
     throw new Error('Terminal WebSocket URL is missing');
@@ -48,6 +50,7 @@ export function getTerminalReconnectDelayMs(
 export type TerminalConnectionDecision =
   | { kind: 'retry'; statusText: string }
   | { kind: 'final-error'; statusText: string }
+  | { kind: 'sleeping'; statusText: string }
   | { kind: 'exited'; statusText: string };
 
 function readErrorCode(error: unknown): string | undefined {
@@ -69,9 +72,31 @@ function readErrorMessage(error: unknown): string {
   return '';
 }
 
+const RETRYABLE_TERMINAL_MESSAGES = [
+  'Terminal unavailable until the workspace is prepared',
+  'Terminal is only available after the workspace is prepared',
+  'Terminal is unavailable because the session wrapper is not healthy',
+  'Terminal is unavailable',
+  'Sandbox is not available',
+  'Wrapper is not connected',
+  'Wrapper socket write failed',
+  'Wrapper request timed out',
+] as const;
+
+function isRetryableTerminalMessage(message: string): boolean {
+  return (
+    RETRYABLE_TERMINAL_MESSAGES.some(candidate => message === candidate) ||
+    message.includes('session wrapper is not running')
+  );
+}
+
 export function classifyTerminalCreateError(error: unknown): TerminalConnectionDecision {
   const code = readErrorCode(error);
   const message = readErrorMessage(error);
+
+  if (message === SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped) {
+    return { kind: 'sleeping', statusText: message };
+  }
 
   if (code === 'NOT_FOUND' || message === 'Session not found') {
     return { kind: 'final-error', statusText: 'Terminal session was not found' };
@@ -84,11 +109,16 @@ export function classifyTerminalCreateError(error: unknown): TerminalConnectionD
     };
   }
 
-  if (code === 'PRECONDITION_FAILED' || message.includes('workspace is prepared')) {
-    return { kind: 'retry', statusText: 'Waiting for workspace' };
+  if (isRetryableTerminalMessage(message)) {
+    return {
+      kind: 'retry',
+      statusText: message.includes('workspace is prepared')
+        ? 'Waiting for workspace'
+        : 'Waiting for terminal',
+    };
   }
 
-  return { kind: 'retry', statusText: 'Waiting for terminal' };
+  return { kind: 'final-error', statusText: message || 'Terminal is unavailable' };
 }
 
 export function classifyTerminalSocketClose(event: {

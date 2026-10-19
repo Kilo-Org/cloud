@@ -50,6 +50,18 @@ describe('getTerminalReconnectDelayMs', () => {
 });
 
 describe('classifyTerminalCreateError', () => {
+  it('stops retrying while the sandbox is asleep', () => {
+    expect(
+      classifyTerminalCreateError({
+        data: { code: 'PRECONDITION_FAILED' },
+        message: 'The sandbox is sleeping. Send a message to resume.',
+      })
+    ).toEqual({
+      kind: 'sleeping',
+      statusText: 'The sandbox is sleeping. Send a message to resume.',
+    });
+  });
+
   it('retries wrapper and workspace availability failures', () => {
     expect(
       classifyTerminalCreateError({
@@ -64,6 +76,15 @@ describe('classifyTerminalCreateError', () => {
         message: 'Terminal is only available after the workspace is prepared',
       })
     ).toEqual({ kind: 'retry', statusText: 'Waiting for workspace' });
+  });
+
+  it('surfaces a real terminal RPC failure instead of retrying it', () => {
+    expect(
+      classifyTerminalCreateError({
+        data: { code: 'SERVICE_UNAVAILABLE' },
+        message: 'PTY allocation failed',
+      })
+    ).toEqual({ kind: 'final-error', statusText: 'PTY allocation failed' });
   });
 
   it('stops retrying for permanent access and session errors', () => {

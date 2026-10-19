@@ -103,11 +103,14 @@ public final class ArtifactsProviderModule: Module {
       identifier: NSFileProviderDomainIdentifier(rawValue: domainIdentifier),
       displayName: domainDisplayName
     )
+    #if DEBUG
     // Dev-only: automatically enables the domain so the Files app can open the
     // location without the per-user enable step. The testing-mode entitlement
-    // gates this; the domain's mode is read once at registration, and iOS
-    // rejects any non-App-Store build that sets it without the entitlement.
+    // gates this — the plugin strips it from production builds — and iOS
+    // rejects any build that sets a testing mode without the entitlement, so
+    // the mode is compiled out of release binaries.
     domain.testingModes = [.alwaysEnabled]
+    #endif
     return domain
   }
 

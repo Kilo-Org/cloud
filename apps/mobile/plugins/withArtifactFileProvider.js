@@ -71,6 +71,23 @@ function withFileProviderSourceFiles(config) {
       for (const name of sourceFileNames()) {
         fs.copyFileSync(path.join(SOURCE_DIRECTORY, name), path.join(targetDirectory, name));
       }
+      // The committed entitlements carry the dev-only testing-mode key. Apple
+      // does not grant that capability on distribution profiles, so a
+      // production prebuild strips it from the copied file the target signs
+      // with (the Swift side gates the testing mode the same way).
+      if (isProductionBuild) {
+        const entitlementsPath = path.join(
+          targetDirectory,
+          `${TARGET_NAME}.entitlements`
+        );
+        fs.writeFileSync(
+          entitlementsPath,
+          fs
+            .readFileSync(entitlementsPath, 'utf8')
+            .replace(/<!--[\s\S]*?-->/gu, '')
+            .replace(/\s*<key>com\.apple\.developer\.fileprovider\.testing-mode<\/key>\s*<true\/>/u, '')
+        );
+      }
       return modConfig;
     },
   ]);
@@ -147,6 +164,12 @@ function withFileProviderPodsLinking(config) {
   ]);
 }
 
+// Dev-only: the testing-mode capability is not granted on distribution
+// profiles, so a production build must not request it (paired with the same
+// gate on the app's entitlements in app.config.ts and the testing mode on the
+// registered domain in ArtifactsProviderModule.swift).
+const isProductionBuild = process.env.EAS_BUILD_PROFILE === 'production';
+
 // EAS builds the extension as its own provisioning profile; the entry tells EAS
 // which target to sign and which app group it carries. Same shape as
 // expo-widgets' `withEasConfig`.
@@ -174,9 +197,14 @@ function withFileProviderEasConfig(config) {
                   bundleIdentifier: BUNDLE_IDENTIFIER,
                   entitlements: {
                     'com.apple.security.application-groups': [APP_GROUP_IDENTIFIER],
-                    // Dev-only: pairs with the domain's testingModes so the
-                    // Files app opens the location on development builds.
-                    'com.apple.developer.fileprovider.testing-mode': true,
+                    ...(isProductionBuild
+                      ? {}
+                      : {
+                          // Dev-only: pairs with the domain's testingModes so
+                          // the Files app opens the location on development
+                          // builds.
+                          'com.apple.developer.fileprovider.testing-mode': true,
+                        }),
                   },
                 },
               ],

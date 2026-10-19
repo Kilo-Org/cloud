@@ -212,10 +212,13 @@ const config: ExpoConfig = {
       'com.apple.developer.kernel.increased-memory-limit': true,
       // Dev-only: the process that registers the artifacts File Provider domain
       // and sets its automatically-enabled testing mode is the app itself, and
-      // iOS checks the calling process's entitlements. App-Store-forbidden;
-      // must be removed before any store submission (with the paired
-      // extension entitlement in plugins/withArtifactFileProvider.js).
-      'com.apple.developer.fileprovider.testing-mode': true,
+      // iOS checks the calling process's entitlements. Apple does not grant
+      // this capability on distribution profiles, so production builds must
+      // not carry it (with the paired extension entitlement in
+      // plugins/withArtifactFileProvider.js).
+      ...(isProductionBuild
+        ? {}
+        : { 'com.apple.developer.fileprovider.testing-mode': true }),
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

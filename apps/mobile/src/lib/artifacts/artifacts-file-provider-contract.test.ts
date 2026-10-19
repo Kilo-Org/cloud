@@ -138,20 +138,26 @@ describe('artifacts File Provider extension contract', () => {
     // one takes a counter suffix.
     expect(itemsBody).toContain('ArtifactFileName.sanitize(');
     expect(itemsBody).toContain('ArtifactFileName.unique(');
-    // The stage path asserts the invariant at the boundary: the component it
-    // appends to the per-fetch UUID directory is always one safe component.
+    // The stage path holds the invariant at the boundary: the component it
+    // appends to the per-fetch UUID directory is sanitized again as a
+    // last-resort fallback, so an unsafe name can never reach the path API.
     expect(extensionSource).toContain(
-      'precondition(ArtifactPath.isSafeComponent(filename), "staged name must be one path component")'
+      'let stagedName = ArtifactPath.isSafeComponent(filename)'
     );
   });
 
   it('exposes an item version and honours the requested version', () => {
     // The version is the mirror file's own size and modification date, which
-    // the wholesale rewrite changes on every rewrite.
+    // the wholesale rewrite changes on every rewrite. It is exposed as the
+    // `NSFileProviderItemVersion` the framework compares — `contentVersion`
+    // is `Data`, and a String-typed property is never read by the system.
     expect(extensionSource).toContain('let contentModificationDate: Date?');
-    expect(extensionSource).toContain('let itemVersion: String?');
+    expect(extensionSource).toContain('let version: NSFileProviderItemVersion?');
     expect(extensionSource).toContain(
-      'static func contentVersion(size: Int, modified: Date?) -> String?'
+      'static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion? {'
+    );
+    expect(extensionSource).toContain(
+      'NSFileProviderItemVersion(contentVersion: content, metadataVersion: content)'
     );
     // A non-nil request whose pinned content version differs from the
     // current one fails instead of returning bytes that do not match it.
@@ -160,21 +166,29 @@ describe('artifacts File Provider extension contract', () => {
     expect(extensionSource).toContain('NSFileProviderErrorDomain');
     expect(extensionSource).toContain('-2009');
     expect(extensionSource).not.toContain('.versionNoLongerAvailable)');
-    expect(fetchContentsBody).toContain('requestedVersion.contentVersion');
+    expect(fetchContentsBody).toContain('requestedVersion.contentVersion != current.contentVersion');
   });
 
   it('registers the domain with the dev-only testing mode', () => {
     // A fresh file-provider domain is disabled until the user enables it; the
     // dev-only testing-mode entitlement plus `testingModes = [.alwaysEnabled]`
     // skips that step so the Files app opens the location on development
-    // builds. The entitlement must never ship: it is App-Store-forbidden, so
-    // the contract pins every place it lives — the extension's entitlements,
-    // the EAS app-extension entry, and the app target (whose process performs
-    // the registration) — together with the paired code.
+    // builds. Apple does not grant the capability on distribution profiles,
+    // so the entitlement is carried in three places — the extension's
+    // entitlements, the EAS app-extension entry, and the app target (whose
+    // process performs the registration) — each gated to non-production, and
+    // the Swift mode is compiled out of release binaries. The contract test
+    // pins the pairing so neither half drifts.
     expect(entitlements).toContain('com.apple.developer.fileprovider.testing-mode');
     expect(pluginSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");
+    expect(pluginSource).toContain(
+      "process.env.EAS_BUILD_PROFILE === 'production'"
+    );
+    expect(pluginSource).toContain('com\\.apple\\.developer\\.fileprovider\\.testing-mode');
     expect(providerModuleSource).toContain('domain.testingModes = [.alwaysEnabled]');
+    expect(providerModuleSource).toContain('#if DEBUG');
     expect(appConfigSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");
+    expect(appConfigSource).toContain('...(isProductionBuild');
   });
 
   it('shows the session label the mirror sanitizes into one path component', () => {
@@ -282,6 +296,9 @@ describe('artifacts File Provider target plugin contract', () => {
     runInNewContext(pluginSource, {
       __dirname: '/mobile/plugins',
       module: pluginModule,
+      // The plugin reads the build profile at module scope; the sandbox gets a
+      // neutral `process` so the profile gate evaluates to non-production.
+      process: { env: {} },
       require: (id: string) => {
         if (id === 'fs') {
           return { readdirSync: () => ['Info.plist', 'ArtifactsFileProviderExtension.swift'] };

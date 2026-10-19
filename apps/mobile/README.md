@@ -11,6 +11,13 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
 - KiloClaw tab visibility still depends on instance ownership.
 
+## Profile setup commands
+
+The setup commands header Back arrow saves the focused edit before returning to the profile.
+If saving fails, the screen stays open with the draft intact; press Back again to retry.
+Reorder controls announce their direction and one-based command position.
+The default-profile card exposes one native switch labeled with the card title.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

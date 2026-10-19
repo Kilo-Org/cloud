@@ -6,7 +6,7 @@
  * entry point: it re-exports the s2 list operations (`addCommand`,
  * `replaceCommand`, `removeCommand`, `moveCommand`) and the server's list/row
  * bounds (`MAX_SETUP_COMMANDS`, `MAX_SETUP_COMMAND_LENGTH`), and adds the
- * per-row position label the row's controls carry.
+ * per-row position label plus the list comparison and payload helpers.
  */
 
 export {
@@ -17,6 +17,19 @@ export {
   removeCommand,
   replaceCommand,
 } from '@/lib/agent-profile-forms';
+
+/** Whether two lists hold the same commands in the same order. */
+export function sameCommands(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/**
+ * The payload `setCommands` stores. A blank row is the draft slot `add()`
+ * opens, not a command, so whitespace-only entries never reach the server.
+ */
+export function nonBlankCommands(commands: readonly string[]): string[] {
+  return commands.filter(command => command.trim().length > 0);
+}
 
 /**
  * Position label for a command row's controls, e.g. `2 / 3`. Digits only, so

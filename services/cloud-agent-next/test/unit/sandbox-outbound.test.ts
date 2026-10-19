@@ -57,11 +57,12 @@ it('coalesces tiny and empty chunks into the fixed buffer', async () => {
   expect(bufferCapacity).toBeLessThanOrEqual(CAP);
 });
 
-it('accepts a single chunk larger than the current buffer when it fits the cap', async () => {
-  const request = body([chunkOf(700, 5)]);
-  const result = await readBoundedRequestBodyBytes(request, CAP);
-  expect(result?.byteLength).toBe(700);
-  expect(result?.at(699)).toBe(5);
+it('grows the buffer for a single chunk past the initial allocation', async () => {
+  const request = body([chunkOf(512 * 1024, 5)]);
+  const result = await readBoundedRequestBodyBytes(request, 1024 * 1024);
+  expect(result?.byteLength).toBe(512 * 1024);
+  expect(result?.at(0)).toBe(5);
+  expect(result?.at(512 * 1024 - 1)).toBe(5);
 });
 
 it('applies the empty-read bound to a long run of empty chunks', async () => {

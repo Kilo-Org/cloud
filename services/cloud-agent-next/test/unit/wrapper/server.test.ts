@@ -63,7 +63,6 @@ function createMockDeps(state: WrapperState) {
     readySession: vi.fn(),
     materializePromptAttachments: vi.fn(async prompt => prompt),
     configureCommitCoAuthor: vi.fn().mockResolvedValue(undefined),
-    onSessionBound: vi.fn(),
   };
 }
 
@@ -533,7 +532,6 @@ describe('bindSessionContext', () => {
     expect(session!.wrapperRunId).toBe(completeBinding.wrapperRunId);
     expect(session!.wrapperGeneration).toBe(completeBinding.wrapperGeneration);
     expect(session!.wrapperConnectionId).toBe(completeBinding.wrapperConnectionId);
-    expect(deps.onSessionBound).toHaveBeenCalledOnce();
   });
 
   it('does not mutate state when validation fails', async () => {
@@ -543,29 +541,6 @@ describe('bindSessionContext', () => {
     await bindSessionContext(bindingWithoutRunId as SessionBinding, defaultServerConfig, deps);
 
     expect(state.hasSession).toBe(false);
-    expect(deps.onSessionBound).not.toHaveBeenCalled();
-  });
-
-  it('notifies only when an existing binding changes', async () => {
-    const state = new WrapperState();
-    const deps = createMockDeps(state);
-    await bindSessionContext(completeBinding, defaultServerConfig, deps);
-    deps.onSessionBound.mockClear();
-
-    await bindSessionContext(completeBinding, defaultServerConfig, deps);
-    expect(deps.onSessionBound).not.toHaveBeenCalled();
-
-    await bindSessionContext(
-      {
-        ...completeBinding,
-        wrapperGeneration: completeBinding.wrapperGeneration + 1,
-        wrapperConnectionId: 'conn_789',
-      },
-      defaultServerConfig,
-      deps
-    );
-
-    expect(deps.onSessionBound).toHaveBeenCalledOnce();
   });
 });
 

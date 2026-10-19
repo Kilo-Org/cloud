@@ -728,7 +728,6 @@ describe('wrapper log archive retention', () => {
       },
       config,
       deps,
-      'restart',
       'kilo_sess_next'
     );
     expect(await Promise.race([rebind.then(() => true), Bun.sleep(100).then(() => false)])).toBe(
@@ -778,9 +777,9 @@ describe('wrapper log archive retention', () => {
       ingestToken: 'refreshed-ingest-ticket',
       wrapperConnectionId: 'conn_refreshed',
     };
-    await bindSessionContext(refreshedBinding, config, deps, 'restart', 'kilo_sess_refreshed');
+    await bindSessionContext(refreshedBinding, config, deps, 'kilo_sess_refreshed');
     await state.logUploader?.uploadNow();
-    await bindSessionContext(refreshedBinding, config, deps, 'restart', 'kilo_sess_latest');
+    await bindSessionContext(refreshedBinding, config, deps, 'kilo_sess_latest');
     await state.logUploader?.uploadNow();
 
     expect(state.logUploader).toBe(uploader);
@@ -805,14 +804,7 @@ describe('wrapper log archive retention', () => {
     let attempts = 0;
     deps.readySession = async (request, archiveId) => {
       attempts++;
-      await bindSessionContext(
-        request.session,
-        config,
-        deps,
-        'close-until-runtime-ready',
-        request.kiloSessionId,
-        archiveId
-      );
+      await bindSessionContext(request.session, config, deps, request.kiloSessionId, archiveId);
       if (attempts === 1) {
         await fsp.appendFile(wrapperLogPath, 'failed bootstrap evidence\n');
         return {
@@ -865,14 +857,7 @@ describe('wrapper log archive retention', () => {
     let attempts = 0;
     deps.readySession = async (request, archiveId) => {
       attempts++;
-      await bindSessionContext(
-        request.session,
-        config,
-        deps,
-        'close-until-runtime-ready',
-        request.kiloSessionId,
-        archiveId
-      );
+      await bindSessionContext(request.session, config, deps, request.kiloSessionId, archiveId);
       bootstrapStarted.resolve();
       await releaseBootstrap.promise;
       return {
@@ -919,14 +904,7 @@ describe('wrapper log archive retention', () => {
       { preconnect: originalFetch.preconnect }
     );
     deps.readySession = async (request, archiveId) => {
-      await bindSessionContext(
-        request.session,
-        config,
-        deps,
-        'close-until-runtime-ready',
-        request.kiloSessionId,
-        archiveId
-      );
+      await bindSessionContext(request.session, config, deps, request.kiloSessionId, archiveId);
       return {
         status: 'error',
         error: { code: 'KILO_SERVER_FAILED', message: 'Kilo server failed', retryable: true },
@@ -979,7 +957,6 @@ describe('wrapper session binding', () => {
         setAborted: () => {},
         resetLifecycle: () => {},
       },
-      'close-until-runtime-ready',
       'kilo_sess_real'
     );
 
@@ -1018,8 +995,7 @@ describe('wrapper session binding', () => {
         closeConnection: async () => {},
         setAborted: () => {},
         resetLifecycle: () => {},
-      },
-      'close-until-runtime-ready'
+      }
     );
 
     if (!response) throw new Error('Expected finalizing binding rejection');
@@ -1028,152 +1004,6 @@ describe('wrapper session binding', () => {
       error: 'WRAPPER_FINALIZING',
       wrapperRunId: 'run_1',
     });
-  });
-
-  it('keeps bootstrap rebindings close-only until runtime readiness is verified', async () => {
-    const state = createTestState();
-    state.bindSession({
-      kiloSessionId: 'kilo_sess_test',
-      ingestUrl: 'ws://worker.test/ingest',
-      workerAuthToken: 'worker-token',
-      wrapperRunId: 'run_1',
-      wrapperGeneration: 1,
-      wrapperConnectionId: 'conn_1',
-      agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
-    });
-    state.setConnections({ readyState: WebSocket.OPEN } as WebSocket, new AbortController());
-
-    const closeOrder: string[] = [];
-    const response = await bindSessionContext(
-      {
-        ingestUrl: 'ws://worker.test/ingest',
-        workerAuthToken: 'worker-token',
-        wrapperRunId: 'run_2',
-        wrapperGeneration: 2,
-        wrapperConnectionId: 'conn_2',
-      },
-      {
-        port: 5000,
-        workspacePath: '/workspace/repo',
-        version: 'test',
-        sessionId: 'kilo_sess_test',
-        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
-        userId: 'user_test',
-      },
-      {
-        state,
-        kiloClient: {} as WrapperKiloClient,
-        openConnection: async () => {},
-        closeConnection: async () => {
-          closeOrder.push('ingest');
-        },
-        setAborted: () => {},
-        resetLifecycle: () => {},
-        onSessionBound: feedPolicy => {
-          closeOrder.push(feedPolicy);
-        },
-      },
-      'close-until-runtime-ready'
-    );
-
-    expect(response).toBeNull();
-    expect(closeOrder).toEqual(['close-until-runtime-ready', 'ingest']);
-  });
-
-  it('closes the bootstrap feed for an unchanged binding until runtime readiness is verified', async () => {
-    const state = createTestState();
-    const sessionBinding = {
-      kiloSessionId: 'kilo_sess_test',
-      ingestUrl: 'ws://worker.test/ingest',
-      workerAuthToken: 'worker-token',
-      wrapperRunId: 'run_1',
-      wrapperGeneration: 1,
-      wrapperConnectionId: 'conn_1',
-      agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
-    };
-    state.bindSession(sessionBinding);
-
-    const feedPolicies: string[] = [];
-    let closeConnectionCalls = 0;
-    let resetLifecycleCalls = 0;
-    const response = await bindSessionContext(
-      sessionBinding,
-      {
-        port: 5000,
-        workspacePath: '/workspace/repo',
-        version: 'test',
-        sessionId: 'kilo_sess_test',
-        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
-        userId: 'user_test',
-      },
-      {
-        state,
-        kiloClient: {} as WrapperKiloClient,
-        openConnection: async () => {},
-        closeConnection: async () => {
-          closeConnectionCalls += 1;
-        },
-        setAborted: () => {},
-        resetLifecycle: () => {
-          resetLifecycleCalls += 1;
-        },
-        onSessionBound: feedPolicy => {
-          feedPolicies.push(feedPolicy);
-        },
-      },
-      'close-until-runtime-ready'
-    );
-
-    expect(response).toBeNull();
-    expect(feedPolicies).toEqual(['close-until-runtime-ready']);
-    expect(closeConnectionCalls).toBe(0);
-    expect(resetLifecycleCalls).toBe(0);
-  });
-
-  it('keeps restart behavior for legacy direct rebindings', async () => {
-    const state = createTestState();
-    state.bindSession({
-      kiloSessionId: 'kilo_sess_test',
-      ingestUrl: 'ws://worker.test/ingest',
-      workerAuthToken: 'worker-token',
-      wrapperRunId: 'run_1',
-      wrapperGeneration: 1,
-      wrapperConnectionId: 'conn_1',
-      agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
-    });
-
-    const feedPolicies: string[] = [];
-    const response = await bindSessionContext(
-      {
-        ingestUrl: 'ws://worker.test/ingest',
-        workerAuthToken: 'worker-token',
-        wrapperRunId: 'run_2',
-        wrapperGeneration: 2,
-        wrapperConnectionId: 'conn_2',
-      },
-      {
-        port: 5000,
-        workspacePath: '/workspace/repo',
-        version: 'test',
-        sessionId: 'kilo_sess_test',
-        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
-        userId: 'user_test',
-      },
-      {
-        state,
-        kiloClient: {} as WrapperKiloClient,
-        openConnection: async () => {},
-        closeConnection: async () => {},
-        setAborted: () => {},
-        resetLifecycle: () => {},
-        onSessionBound: feedPolicy => {
-          feedPolicies.push(feedPolicy);
-        },
-      }
-    );
-
-    expect(response).toBeNull();
-    expect(feedPolicies).toEqual(['restart']);
   });
 
   it('resets lifecycle state when warm rebinding an existing connected session', async () => {

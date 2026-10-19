@@ -85,7 +85,6 @@ function createHarness(
   }> = [];
   let spawnBehavior: 'auto' | 'manual' | 'reject' = options.autoSpawn === false ? 'manual' : 'auto';
   let rejectNewVerifications = options.rejectVerifications ?? 0;
-  let readyCount = 0;
   let teardownCount = 0;
   let kiloSessionId = options.initialSessionId ?? CREATED_SESSION_ID;
 
@@ -156,10 +155,6 @@ function createHarness(
       started.push(input);
       events.push('started');
     },
-    onRuntimeReady: () => {
-      readyCount += 1;
-      events.push('ready');
-    },
     hasLifecycle: () => false,
     hasConnection: () => false,
     startupTimeoutMs: 30_000,
@@ -212,9 +207,6 @@ function createHarness(
     failNextVerification: () => {
       rejectNewVerifications = 1;
     },
-    get readyCount() {
-      return readyCount;
-    },
     get teardownCount() {
       return teardownCount;
     },
@@ -259,7 +251,6 @@ describe('KiloRuntimeLifecycle start', () => {
     expect(
       harness.logs.some(line => line.includes('reused existing runtime without session rebinding'))
     ).toBe(true);
-    expect(harness.readyCount).toBe(2);
   });
 
   it('reuses the child when the delivered credential is identical', async () => {
@@ -277,7 +268,6 @@ describe('KiloRuntimeLifecycle start', () => {
     expect(
       harness.logs.some(line => line.includes('reused existing runtime without session rebinding'))
     ).toBe(true);
-    expect(harness.readyCount).toBe(2);
   });
 
   it('rebinds the reused session without respawning', async () => {
@@ -403,7 +393,6 @@ describe('KiloRuntimeLifecycle updateEnvironment', () => {
         expectedSessionId: CREATED_SESSION_ID,
       });
       expect(harness.inheritedEnvs).toHaveLength(1);
-      const readyBefore = harness.readyCount;
       const teardownBefore = harness.teardownCount;
 
       await harness.lifecycle.updateEnvironment({ [name]: 'B' });
@@ -418,7 +407,6 @@ describe('KiloRuntimeLifecycle updateEnvironment', () => {
       expect(harness.clients[1]?.createSessionCalls).toEqual([]);
       expect(harness.getKiloSessionId()).toBe(CREATED_SESSION_ID);
       expect(harness.teardownCount).toBe(teardownBefore + 1);
-      expect(harness.readyCount).toBe(readyBefore + 1);
     }
   );
 
@@ -427,14 +415,12 @@ describe('KiloRuntimeLifecycle updateEnvironment', () => {
     await harness.lifecycle.start({
       workspacePath: WORKSPACE,
     });
-    const readyBefore = harness.readyCount;
     const teardownBefore = harness.teardownCount;
 
     await harness.lifecycle.updateEnvironment({ KILOCODE_TOKEN: 'A' });
 
     expect(harness.inheritedEnvs).toHaveLength(1);
     expect(harness.teardownCount).toBe(teardownBefore);
-    expect(harness.readyCount).toBe(readyBefore);
   });
 
   it('does not restart on a repeated worker env after the config was patched', async () => {
@@ -500,7 +486,7 @@ describe('KiloRuntimeLifecycle ordering', () => {
     expect(closeIndex).toBeGreaterThan(teardownIndex);
   });
 
-  it('publishes the runtime before logging readiness and signals ready last', async () => {
+  it('publishes the runtime before logging readiness', async () => {
     const harness = createHarness();
     await harness.lifecycle.start({
       workspacePath: WORKSPACE,
@@ -512,7 +498,7 @@ describe('KiloRuntimeLifecycle ordering', () => {
     );
     expect(startedIndex).toBeGreaterThanOrEqual(0);
     expect(readyLogIndex).toBeGreaterThan(startedIndex);
-    expect(harness.events.at(-1)).toBe('ready');
+    expect(harness.events.at(-1)).toContain('startKiloRuntime runtime ready');
   });
 
   it('logs the injected platform rather than re-deriving it', async () => {

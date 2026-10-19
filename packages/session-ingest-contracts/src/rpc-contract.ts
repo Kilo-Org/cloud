@@ -216,17 +216,6 @@ export const deleteSessionForCloudAgentSchema = z.object({
 });
 export type DeleteSessionForCloudAgentParams = z.input<typeof deleteSessionForCloudAgentSchema>;
 
-export const resolveCloudAgentRootSessionSchema = z.object({
-  kiloUserId: z.string().min(1),
-  kiloSessionId: sessionIdSchema,
-});
-export type ResolveCloudAgentRootSessionForKiloSessionParams = z.input<
-  typeof resolveCloudAgentRootSessionSchema
->;
-export type ResolveCloudAgentRootSessionForKiloSessionResult = {
-  cloudAgentSessionId: string;
-} | null;
-
 export const kiloSdkSessionInfoSchema = z.object({
   id: sessionIdSchema,
   slug: z.string(),
@@ -303,15 +292,6 @@ export const kiloSdkSessionSnapshotOutcomeSchema = z.discriminatedUnion('kind', 
 export type KiloSdkSessionSnapshotRead = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
 export type KiloSdkSessionSnapshotOutcome = KiloSdkSessionSnapshotRead;
 
-export type CloudAgentRootSessionSnapshot = {
-  kiloSessionId: string;
-  cloudAgentSessionId: string;
-  snapshot: KiloSdkSessionSnapshotRead;
-};
-export type GetCloudAgentRootSessionSnapshotParams =
-  ResolveCloudAgentRootSessionForKiloSessionParams;
-export type GetCloudAgentRootSessionSnapshotResult = CloudAgentRootSessionSnapshot | null;
-
 export const MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE = 100;
 
 /**
@@ -322,20 +302,6 @@ export const MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE = 100;
  * back to the legacy unbounded scan.
  */
 export const DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE = 50;
-
-export const listCloudAgentRootSessionsSchema = z.object({
-  kiloUserId: z.string().min(1),
-  limit: z.number().int().min(1).max(100).optional().default(100),
-  start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
-});
-export type ListCloudAgentRootSessionsParams = z.input<typeof listCloudAgentRootSessionsSchema>;
-export type CloudAgentRootSessionSummary = {
-  kiloSessionId: string;
-  cloudAgentSessionId: string;
-  title: string | null;
-  created: number;
-  updated: number;
-};
 
 export const sdkApiErrorSchema = z.object({
   name: z.literal('APIError'),
@@ -874,50 +840,15 @@ export function validateKiloSdkMessagesCursor(cursor: string): boolean {
   }
 }
 
-export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
-  .extend({
-    limit: z.number().int().nonnegative().max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE).optional(),
-    before: z.string().min(1).optional(),
-  })
-  .superRefine((params, ctx) => {
-    if (params.before !== undefined && (params.limit === undefined || params.limit === 0)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before requires a positive limit',
-      });
-      return;
-    }
-    if (params.before !== undefined && !validateKiloSdkMessagesCursor(params.before)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before is not a valid message cursor',
-      });
-    }
-  });
-export type GetCloudAgentRootSessionMessagesParams = z.input<
-  typeof getCloudAgentRootSessionMessagesSchema
->;
-export type CloudAgentRootSessionMessages = {
-  kiloSessionId: string;
-  cloudAgentSessionId: string;
-  history: KiloSdkMessageHistory | null;
-};
-export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessages | null;
-
 /**
  * Generic authorized paginated history request used by `cliSessionsV2` for any
  * Kilo session (root cloud-agent, child, or remote CLI) the user owns and
  * still has organization access to. Reuses the existing opaque cursor and
- * bounded DO reader so the new method is byte-identical to
- * `getCloudAgentRootSessionMessages` aside from the access-check boundary.
+ * bounded DO reader.
  *
  * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and must be
  * a positive integer; the schema applies `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE`
  * (50) when omitted so the request is always bounded before reaching the DO.
- * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
- * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
  * `before` requires a positive `limit`; the default guarantees this unless
  * the caller explicitly supplies a non-positive `limit`.
  */
@@ -970,17 +901,5 @@ export type SessionIngestRpcMethods = {
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
-  resolveCloudAgentRootSessionForKiloSession: (
-    params: ResolveCloudAgentRootSessionForKiloSessionParams
-  ) => Promise<ResolveCloudAgentRootSessionForKiloSessionResult>;
-  getCloudAgentRootSessionSnapshot: (
-    params: GetCloudAgentRootSessionSnapshotParams
-  ) => Promise<GetCloudAgentRootSessionSnapshotResult>;
-  listCloudAgentRootSessions: (
-    params: ListCloudAgentRootSessionsParams
-  ) => Promise<CloudAgentRootSessionSummary[]>;
-  getCloudAgentRootSessionMessages: (
-    params: GetCloudAgentRootSessionMessagesParams
-  ) => Promise<GetCloudAgentRootSessionMessagesResult>;
   getSessionMessages: (params: GetSessionMessagesParams) => Promise<GetSessionMessagesResult>;
 };

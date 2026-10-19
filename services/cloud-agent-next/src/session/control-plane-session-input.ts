@@ -58,8 +58,8 @@ export class ControlPlaneMessageInputError extends Error {
 /**
  * Builds the V2 prompt payload for a submitted turn: resolves the effective
  * agent (override over the registered defaults) and materializes attachments,
- * so every control-plane send path (queue, facade, answers) admits the same
- * fully-resolved intent.
+ * fully-resolved intent, so every control-plane send path (queue and answers)
+ * admits the same fully-resolved intent.
  */
 export async function buildControlPlaneMessagePayload(input: {
   env: Env;

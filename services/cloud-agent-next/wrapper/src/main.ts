@@ -29,8 +29,6 @@ import { createKiloRuntimeLifecycle, type KiloRuntimeLifecycle } from './kilo-ru
 import { createConnectionManager, openIngestProgressChannel } from './connection.js';
 import { createLifecycleManager } from './lifecycle.js';
 import { bindSessionContext, createServer } from './server.js';
-import { openKiloGlobalFeed } from './global-feed.js';
-import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
 import { logToFile } from './utils.js';
 import { startToolCgroup } from './tool-cgroup.js';
 import { abortKiloSessionForShutdown } from './shutdown.js';
@@ -277,8 +275,6 @@ async function main() {
     readySession: readySession,
     updateRuntimeEnvironment: (env: Record<string, string>) => runtime.updateEnvironment(env),
     materializePromptAttachments,
-    onSessionBound: (feedPolicy: SessionBoundFeedPolicy) =>
-      globalFeedManager.onSessionBound(feedPolicy),
     toolCgroupHealth: () => toolCgroup?.health() ?? null,
     // Deduped: concurrent failed requests must share one restart rather than each
     // respawning the kilo server and racing to mutate the runtime bindings.
@@ -325,23 +321,6 @@ async function main() {
     }
   }
 
-  const globalFeedManager = createGlobalFeedManager({
-    canOpen: () => Boolean(runtime.kiloClient && state.currentSession),
-    open: () => {
-      const kiloClient = runtime.kiloClient;
-      if (!kiloClient) {
-        throw new Error('Cannot open Kilo global feed: no Kilo client');
-      }
-      return openKiloGlobalFeed({ state, kiloClient });
-    },
-    onConnectionError: () => {
-      logToFile('kilo global feed failed');
-    },
-    onOpenError: () => {
-      logToFile('failed to start kilo global feed');
-    },
-  });
-
   // Runtime transitions must not interleave: readySession, updateRuntimeEnvironment
   // and restartKiloRuntime can each request one concurrently, and two bodies racing
   // through the awaits in the runtime start would overwrite each other's
@@ -372,7 +351,6 @@ async function main() {
     },
     verifyExistingKiloSession,
     onBeforeSpawnTeardown: async () => {
-      globalFeedManager.close();
       lifecycleManager?.stop();
       await connectionManager?.close();
       serverDeps.kiloClient = unavailableKiloClient;
@@ -497,7 +475,6 @@ async function main() {
       );
       lifecycleManager.start();
     },
-    onRuntimeReady: () => globalFeedManager.onRuntimeReady(),
     hasLifecycle: () => Boolean(lifecycleManager),
     hasConnection: () => Boolean(connectionManager),
     startupTimeoutMs: KILO_STARTUP_TIMEOUT_MS,
@@ -538,7 +515,6 @@ async function main() {
         request.session,
         serverConfig,
         serverDeps,
-        'close-until-runtime-ready',
         request.kiloSessionId,
         logArchiveId
       );
@@ -907,7 +883,6 @@ async function main() {
     await lifecycleManager?.drainAndClose();
     // Stop lifecycle timers after finalization has flushed.
     lifecycleManager?.stop();
-    globalFeedManager.close();
     toolCgroup?.stop();
 
     // Best-effort final log upload

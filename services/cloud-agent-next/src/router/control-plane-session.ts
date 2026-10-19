@@ -6,7 +6,7 @@ import { withDORetry } from '../utils/do-retry.js';
 /**
  * Local receipt for the migrated `CANCEL{message}` cancellation contract. The
  * outward contract is preserved deliberately: a receipt with `state`/`message`
- * that `user-kilo-facade.ts` maps to `{success}` / `{success:false,message}`.
+ * maps to `{success}` / `{success:false,message}`.
  * The `shared/control-plane-session.ts` schemas are not imported here so C3d can
  * delete them with their last consumer.
  */

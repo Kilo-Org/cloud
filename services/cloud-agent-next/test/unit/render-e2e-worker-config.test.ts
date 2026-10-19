@@ -44,7 +44,6 @@ const REMOVED_CONTAINER_CLASSES = [
 const KEPT_DO_CLASSES = [
   'CloudAgentSession',
   'StreamTicketNonceDO',
-  'UserKiloFacade',
   'SandboxControl',
   'SandboxSession',
 ];

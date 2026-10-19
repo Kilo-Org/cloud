@@ -51,7 +51,6 @@ interface __BaseEnv_Env {
 	SandboxCodeReviewContainment: DurableObjectNamespace<import("./src/index").SandboxCodeReviewContainment>;
 	CLOUD_AGENT_SESSION: DurableObjectNamespace<import("./src/index").CloudAgentSession>;
 	STREAM_TICKET_NONCE_DO: DurableObjectNamespace<import("./src/index").StreamTicketNonceDO>;
-	USER_KILO_FACADE: DurableObjectNamespace<import("./src/index").UserKiloFacade>;
 	SANDBOX_CONTROL: DurableObjectNamespace<import("./src/index").SandboxControl>;
 	SANDBOX_SESSION: DurableObjectNamespace<import("./src/index").SandboxSession>;
 	SANDBOX_CONTAINERS: DurableObjectNamespace<import("./src/index").SandboxContainers>;
@@ -68,7 +67,7 @@ interface __BaseEnv_Env {
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "Sandbox" | "CloudAgentSession" | "SandboxSmall" | "SandboxDIND" | "UserKiloFacade" | "SandboxCodeReview" | "SandboxContainment" | "SandboxSmallContainment" | "SandboxCodeReviewContainment" | "StreamTicketNonceDO" | "SandboxControl" | "SandboxSession" | "SandboxContainers";
+		durableNamespaces: "Sandbox" | "CloudAgentSession" | "SandboxSmall" | "SandboxDIND" | "SandboxCodeReview" | "SandboxContainment" | "SandboxSmallContainment" | "SandboxCodeReviewContainment" | "StreamTicketNonceDO" | "SandboxControl" | "SandboxSession" | "SandboxContainers";
 	}
 	interface DevEnv {
 		SHARED_SANDBOX_OVERRIDES: KVNamespace;
@@ -120,7 +119,6 @@ declare namespace Cloudflare {
 		SandboxCodeReviewContainment: DurableObjectNamespace<import("./src/index").SandboxCodeReviewContainment>;
 		CLOUD_AGENT_SESSION: DurableObjectNamespace<import("./src/index").CloudAgentSession>;
 		STREAM_TICKET_NONCE_DO: DurableObjectNamespace<import("./src/index").StreamTicketNonceDO>;
-		USER_KILO_FACADE: DurableObjectNamespace<import("./src/index").UserKiloFacade>;
 		SANDBOX_CONTROL: DurableObjectNamespace<import("./src/index").SandboxControl>;
 		SANDBOX_SESSION: DurableObjectNamespace<import("./src/index").SandboxSession>;
 		SANDBOX_CONTAINERS: DurableObjectNamespace<import("./src/index").SandboxContainers>;

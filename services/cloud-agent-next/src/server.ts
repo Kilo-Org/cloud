@@ -13,7 +13,6 @@ import {
   TERMINAL_TICKET_AUDIENCE,
   type WrapperAuthClaims,
 } from './auth.js';
-import { validateKiloToken } from './validate-kilo-token.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
@@ -29,17 +28,11 @@ import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
 import { requestMethodAllowsBody } from './shared/http-proxy.js';
-import { hasDuplicateQueryParameters } from './shared/http-query.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from './session-access.js';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { getPgDb } from './db/pg.js';
-import {
-  KILO_FACADE_AUTH_TOKEN_HEADER,
-  KILO_FACADE_GLOBAL_FEED_PATH,
-  KILO_FACADE_USER_ID_HEADER,
-} from './kilo-facade/user-kilo-facade.js';
 import {
   getSandboxSessionStub,
   resolveLegacySessionStub,
@@ -653,15 +646,6 @@ function ticketClaimsMismatchRequestFence(
   return false;
 }
 
-function stripPublicCredentialHeaders(headers: Headers): Headers {
-  const sanitized = new Headers(headers);
-  sanitized.delete('Authorization');
-  sanitized.delete('Cookie');
-  sanitized.delete(KILO_FACADE_USER_ID_HEADER);
-  sanitized.delete(KILO_FACADE_AUTH_TOKEN_HEADER);
-  return sanitized;
-}
-
 async function rejectLegacyWrapperTokenForRuntimeGrant(
   env: Env,
   claims: WrapperAuthClaims,
@@ -712,35 +696,6 @@ async function authorizeWrapperTicketForSession(
   if (legacyRejection) return { ok: false, response: legacyRejection };
   return { ok: true, claims: authResult.claims };
 }
-
-async function routeToUserKiloFacade(
-  c: Context<HonoContext>,
-  userId: string,
-  authToken: string
-): Promise<Response> {
-  const doId = c.env.USER_KILO_FACADE.idFromName(userId);
-  const stub = c.env.USER_KILO_FACADE.get(doId);
-  const headers = stripPublicCredentialHeaders(c.req.raw.headers);
-  headers.set(KILO_FACADE_USER_ID_HEADER, userId);
-  headers.set(KILO_FACADE_AUTH_TOKEN_HEADER, authToken);
-  const request = createSanitizedForwardRequest(c.req.raw, c.req.url, headers);
-  return stub.fetch(request);
-}
-
-async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Response> {
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, {
-    secret: nextAuthSecret,
-    connectionString: c.env.HYPERDRIVE.connectionString,
-  });
-  if (!authResult.success) {
-    return c.text(authResult.error, 401);
-  }
-  return routeToUserKiloFacade(c, authResult.userId, authResult.token);
-}
-
-app.all('/kilo', routeAuthenticatedKiloFacade);
-app.all('/kilo/*', routeAuthenticatedKiloFacade);
 
 // TODO: I think this and /terminal share a bit of code. Could be worth extracting to middleware or just a common method?
 app.get('/stream', async (c: Context<HonoContext>) => {
@@ -825,117 +780,6 @@ app.get('/stream', async (c: Context<HonoContext>) => {
 
 app.get('/terminal', async (c: Context<HonoContext>) => {
   return handleTerminalWebSocket(c.req.raw, c.env);
-});
-
-app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<HonoContext>) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.text('Expected WebSocket upgrade', 426);
-  }
-
-  const rawUserId = c.req.param('userId');
-  const cloudAgentSessionId = c.req.param('sessionId');
-  if (!rawUserId || !cloudAgentSessionId) {
-    return c.text('Missing route params', 400);
-  }
-  if (!isLegacySession(cloudAgentSessionId)) {
-    return c.text('Not found', 404);
-  }
-
-  let userId: string;
-  try {
-    userId = decodeURIComponent(rawUserId);
-  } catch {
-    return c.text('Invalid userId encoding', 400);
-  }
-
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateWrapperDispatchTicket(
-    c.req.header('Authorization') ?? null,
-    nextAuthSecret
-  );
-  if (!authResult.success) {
-    return c.text(authResult.error, 401);
-  }
-  if (authResult.claims.userId !== userId) {
-    return c.text('Token does not match session user', 403);
-  }
-
-  const url = new URL(c.req.url);
-  if (hasDuplicateQueryParameters(url.searchParams)) {
-    return c.text('Invalid global feed producer identity', 400);
-  }
-  const kiloSessionId = url.searchParams.get('kiloSessionId');
-  const wrapperRunId = url.searchParams.get('wrapperRunId');
-  const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
-  const wrapperConnectionId = url.searchParams.get('wrapperConnectionId');
-  const wrapperGeneration = wrapperGenerationParam ? Number(wrapperGenerationParam) : NaN;
-
-  if (
-    !kiloSessionId ||
-    !wrapperRunId ||
-    !Number.isInteger(wrapperGeneration) ||
-    wrapperGeneration < 0 ||
-    !wrapperConnectionId
-  ) {
-    return c.text('Invalid global feed producer identity', 400);
-  }
-
-  if (
-    ticketClaimsMismatchRequestFence(authResult.claims, {
-      cloudAgentSessionId,
-      kiloSessionId,
-      wrapperRunId,
-      wrapperGeneration,
-      wrapperConnectionId,
-    })
-  ) {
-    return c.text('Ticket does not match dispatch fence', 403);
-  }
-
-  try {
-    await requireCurrentSessionAccess({
-      env: c.env,
-      kiloUserId: userId,
-      cloudAgentSessionId,
-      expectedKiloSessionId: kiloSessionId,
-    });
-  } catch (error) {
-    return projectSessionAccessHttpError(error);
-  }
-
-  // The Kilo global feed is a legacy-plane producer route; the control wrapper
-  // publishes through the control-plane ingest instead. The guard above already
-  // failed a control session closed, so this always validates a legacy session.
-  const validation = await resolveLegacySessionStub(
-    c.env,
-    userId,
-    cloudAgentSessionId
-  ).validateKiloGlobalFeedProducer({
-    kiloSessionId,
-    wrapperRunId,
-    wrapperGeneration,
-    wrapperConnectionId,
-  });
-  if (!validation.success) {
-    return new Response(validation.message, { status: validation.status });
-  }
-
-  const facadeId = c.env.USER_KILO_FACADE.idFromName(userId);
-  const facadeStub = c.env.USER_KILO_FACADE.get(facadeId);
-  const facadeUrl = new URL(c.req.url);
-  facadeUrl.pathname = KILO_FACADE_GLOBAL_FEED_PATH;
-  facadeUrl.search = '';
-  facadeUrl.searchParams.set('userId', userId);
-  facadeUrl.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
-  facadeUrl.searchParams.set('kiloSessionId', kiloSessionId);
-  facadeUrl.searchParams.set('wrapperRunId', wrapperRunId);
-  facadeUrl.searchParams.set('wrapperGeneration', String(wrapperGeneration));
-  facadeUrl.searchParams.set('wrapperConnectionId', wrapperConnectionId);
-
-  const headers = stripPublicCredentialHeaders(c.req.raw.headers);
-  const request = createSanitizedForwardRequest(c.req.raw, facadeUrl, headers);
-  return facadeStub.fetch(request);
 });
 
 app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) => {
@@ -1253,4 +1097,3 @@ export default {
 
 export { Sandbox } from '@cloudflare/sandbox';
 export { CloudAgentSession } from './persistence/CloudAgentSession.js';
-export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

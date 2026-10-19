@@ -6,7 +6,6 @@ import type {
   GitHubRepositoryAuthorizationResult,
 } from '@kilocode/worker-utils/github-authorization';
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
-import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
 import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
@@ -543,8 +542,6 @@ export type Env = {
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
   /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
   SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
-  /** Durable Object namespace for per-user Kilo SDK facade coordination */
-  USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
   STREAM_TICKET_NONCE_DO: DurableObjectNamespace<StreamTicketNonceDO>;
   /** e2e-only callback sink; bound only by the rendered e2e configs. */

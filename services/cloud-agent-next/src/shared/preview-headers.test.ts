@@ -35,7 +35,6 @@ describe('filterPreviewRequestHeaders', () => {
         { name: 'Transfer-Encoding', value: 'chunked' },
         { name: 'X-Kilo-Preview-Port', value: '8000' },
         { name: 'X-Kilo-Preview-Allocation', value: 'ref' },
-        { name: 'X-Kilo-Facade-Auth-Token', value: 't' },
         { name: 'Forwarded', value: 'for=1.2.3.4' },
         { name: 'X-Forwarded-For', value: '1.2.3.4' },
         { name: 'CF-Ray', value: 'abc' },

@@ -108,10 +108,9 @@ export function throwAdmissionError(
 
 /**
  * The public queue-full admission failure. One owner for the code and message:
- * the tRPC paths pass it to `throwAdmissionError` (429 `PENDING_QUEUE_FULL`),
- * and the Kilo facade returns it directly. The legacy public queue-capacity
- * limit and error are kept by the execution brief's queue-capacity decision,
- * recorded in the ledger.
+ * the tRPC paths pass it to `throwAdmissionError` (429 `PENDING_QUEUE_FULL`).
+ * The legacy public queue-capacity limit and error are kept by the execution
+ * brief's queue-capacity decision, recorded in the ledger.
  */
 export function pendingQueueFullAdmissionFailure(): Extract<
   SessionMessageAdmissionResult,

@@ -18,8 +18,6 @@ const STRIPPED_PROXY_REQUEST_HEADERS = new Set([
   'sec-websocket-key',
   'sec-websocket-protocol',
   'sec-websocket-version',
-  'x-kilo-facade-user-id',
-  'x-kilo-facade-auth-token',
 ]);
 
 export function requestMethodAllowsBody(method: string): boolean {

@@ -1,5 +1,5 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { eq, and, desc, gte, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { eq, and, isNotNull, isNull, or } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
 import {
@@ -13,26 +13,13 @@ import {
   type CanDestroyCloudAgentWorktreeSandboxParams,
   type RetireCloudAgentWorktreeIfSoleMemberParams,
   deleteSessionForCloudAgentSchema,
-  getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
-  kiloSdkSessionSnapshotOutcomeSchema,
-  listCloudAgentRootSessionsSchema,
   persistedKiloSdkMessageHistorySchema,
-  resolveCloudAgentRootSessionSchema,
-  type CloudAgentRootSessionSnapshot,
-  type CloudAgentRootSessionSummary,
   type CreateSessionForCloudAgentParams,
   type CreateSessionForCloudAgentResult,
   type DeleteSessionForCloudAgentParams,
-  type GetCloudAgentRootSessionMessagesParams,
-  type GetCloudAgentRootSessionMessagesResult,
-  type GetCloudAgentRootSessionSnapshotParams,
-  type GetCloudAgentRootSessionSnapshotResult,
   type GetSessionMessagesParams,
   type GetSessionMessagesResult,
-  type ListCloudAgentRootSessionsParams,
-  type ResolveCloudAgentRootSessionForKiloSessionParams,
-  type ResolveCloudAgentRootSessionForKiloSessionResult,
   type SessionIngestRpcMethods,
 } from '@kilocode/session-ingest-contracts';
 
@@ -59,19 +46,10 @@ import {
   WORKTREE_DELETING,
 } from './services/worktree-deletion';
 
-const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
   'Cloud Agent root session identity conflict';
 
 type CliSessionsV2Row = typeof cli_sessions_v2.$inferSelect;
-
-function databaseTimestampToMilliseconds(value: string): number {
-  const timestamp = new Date(value).getTime();
-  if (!Number.isFinite(timestamp)) {
-    throw new Error('Invalid Cloud Agent root session timestamp');
-  }
-  return timestamp;
-}
 
 function organizationMembershipJoinCondition(kiloUserId: string) {
   return and(
@@ -415,64 +393,12 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     return destinationIdentityConflicts(existing, parsed) ? 'conflict' : 'matching';
   }
 
-  async resolveCloudAgentRootSessionForKiloSession(
-    params: ResolveCloudAgentRootSessionForKiloSessionParams
-  ): Promise<ResolveCloudAgentRootSessionForKiloSessionResult> {
-    const parsed = resolveCloudAgentRootSessionSchema.parse(params);
-    const mapping = await this.findOwnedRootCloudAgentMapping(parsed);
-    return mapping ? { cloudAgentSessionId: mapping.cloudAgentSessionId } : null;
-  }
-
-  async getCloudAgentRootSessionSnapshot(
-    params: GetCloudAgentRootSessionSnapshotParams
-  ): Promise<GetCloudAgentRootSessionSnapshotResult> {
-    const parsed = resolveCloudAgentRootSessionSchema.parse(params);
-    const mapping = await this.findOwnedRootCloudAgentMapping(parsed);
-    if (!mapping) {
-      return null;
-    }
-
-    return this.hydrateCloudAgentRootSessionSnapshot({
-      kiloUserId: parsed.kiloUserId,
-      kiloSessionId: parsed.kiloSessionId,
-      cloudAgentSessionId: mapping.cloudAgentSessionId,
-    });
-  }
-
-  async getCloudAgentRootSessionMessages(
-    params: GetCloudAgentRootSessionMessagesParams
-  ): Promise<GetCloudAgentRootSessionMessagesResult> {
-    const parsed = getCloudAgentRootSessionMessagesSchema.parse(params);
-    const mapping = await this.findOwnedRootCloudAgentMapping(parsed);
-    if (!mapping) {
-      return null;
-    }
-
-    const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-      () =>
-        getSessionIngestDO(this.env, {
-          kiloUserId: parsed.kiloUserId,
-          sessionId: parsed.kiloSessionId,
-        }),
-      stub => stub.readKiloSdkMessages({ limit: parsed.limit, before: parsed.before }),
-      'SessionIngestDO.readKiloSdkMessages'
-    );
-    const parsedHistory = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
-
-    return {
-      kiloSessionId: parsed.kiloSessionId,
-      cloudAgentSessionId: mapping.cloudAgentSessionId,
-      history: parsedHistory.success ? parsedHistory.data : { kind: 'invalid_data' },
-    };
-  }
-
   /**
    * Generic authorized paginated session history usable by `cliSessionsV2` for
    * any Kilo session the user owns (root cloud-agent, child, or remote CLI).
-   * Mirrors `getCloudAgentRootSessionMessages` but enforces the same
-   * `(owner, current organization membership)` boundary as the web router's
-   * `getSessionWithAccessCheck` so the DO reader is only reached for sessions
-   * the caller is allowed to read.
+   * Enforces the same `(owner, current organization membership)` boundary as
+   * the web router's `getSessionWithAccessCheck` so the DO reader is only
+   * reached for sessions the caller is allowed to read.
    *
    * Returns `null` for any access failure (missing owner row, lost org
    * membership) so the caller can surface `NOT_FOUND` without leaking which
@@ -502,104 +428,10 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     };
   }
 
-  async listCloudAgentRootSessions(
-    params: ListCloudAgentRootSessionsParams
-  ): Promise<CloudAgentRootSessionSummary[]> {
-    const parsed = listCloudAgentRootSessionsSchema.parse(params);
-    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-    const conditions = [
-      eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
-      isNull(cli_sessions_v2.parent_session_id),
-      isNotNull(cli_sessions_v2.cloud_agent_session_id),
-      personalOrAccessibleOrganizationCondition(),
-    ];
-    if (parsed.start !== undefined) {
-      conditions.push(gte(cli_sessions_v2.updated_at, new Date(parsed.start).toISOString()));
-    }
-
-    const rows = await db
-      .select({
-        kiloSessionId: cli_sessions_v2.session_id,
-        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
-        title: sql<
-          string | null
-        >`left(${cli_sessions_v2.title}, ${MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS})`,
-        createdAt: cli_sessions_v2.created_at,
-        updatedAt: cli_sessions_v2.updated_at,
-      })
-      .from(cli_sessions_v2)
-      .leftJoin(organization_memberships, organizationMembershipJoinCondition(parsed.kiloUserId))
-      .where(and(...conditions))
-      .orderBy(desc(cli_sessions_v2.updated_at), desc(cli_sessions_v2.session_id))
-      .limit(parsed.limit);
-
-    const sessions: CloudAgentRootSessionSummary[] = [];
-    for (const row of rows) {
-      if (!row.cloudAgentSessionId) continue;
-      const title: string | null = row.title;
-      sessions.push({
-        kiloSessionId: row.kiloSessionId,
-        cloudAgentSessionId: row.cloudAgentSessionId,
-        title: title?.slice(0, MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS) ?? null,
-        created: databaseTimestampToMilliseconds(row.createdAt),
-        updated: databaseTimestampToMilliseconds(row.updatedAt),
-      });
-    }
-    return sessions;
-  }
-
-  private async hydrateCloudAgentRootSessionSnapshot(params: {
-    kiloUserId: string;
-    kiloSessionId: string;
-    cloudAgentSessionId: string;
-  }): Promise<CloudAgentRootSessionSnapshot> {
-    const rawSnapshot = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-      () =>
-        getSessionIngestDO(this.env, {
-          kiloUserId: params.kiloUserId,
-          sessionId: params.kiloSessionId,
-        }),
-      stub => stub.readKiloSdkSessionSnapshot(),
-      'SessionIngestDO.readKiloSdkSessionSnapshot'
-    );
-    const snapshot = kiloSdkSessionSnapshotOutcomeSchema.safeParse(rawSnapshot);
-
-    return {
-      kiloSessionId: params.kiloSessionId,
-      cloudAgentSessionId: params.cloudAgentSessionId,
-      snapshot: snapshot.success ? snapshot.data : { kind: 'invalid_data' },
-    };
-  }
-
-  private async findOwnedRootCloudAgentMapping(params: {
-    kiloUserId: string;
-    kiloSessionId: string;
-  }): Promise<{ cloudAgentSessionId: string } | null> {
-    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-    const rows = await db
-      .select({ cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id })
-      .from(cli_sessions_v2)
-      .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, params.kiloSessionId),
-          eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-          isNull(cli_sessions_v2.parent_session_id),
-          isNotNull(cli_sessions_v2.cloud_agent_session_id),
-          personalOrAccessibleOrganizationCondition()
-        )
-      )
-      .limit(1);
-
-    const cloudAgentSessionId = rows[0]?.cloudAgentSessionId;
-    return cloudAgentSessionId ? { cloudAgentSessionId } : null;
-  }
-
   /**
    * Confirms the user owns the session and still has access to its
-   * organization. Unlike `findOwnedRootCloudAgentMapping`, this does not
-   * require a Cloud Agent mapping — it accepts any Kilo session kind so
-   * remote CLI sessions and child sessions are also readable.
+   * organization. It accepts any Kilo session kind so remote CLI sessions and
+   * child sessions are also readable.
    */
   private async findOwnedAccessibleSession(params: {
     kiloUserId: string;

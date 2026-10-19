@@ -8,12 +8,6 @@
  */
 
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import type { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
-import {
-  KILO_FACADE_AUTH_TOKEN_HEADER,
-  KILO_FACADE_GLOBAL_FEED_PATH,
-  KILO_FACADE_USER_ID_HEADER,
-} from '../src/kilo-facade/user-kilo-facade.js';
 import type {
   NotificationsBinding,
   SendCloudAgentSessionNotificationParams,
@@ -71,7 +65,6 @@ export class CloudAgentSession extends RealCloudAgentSession {
   }
 }
 
-export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
 // The test Worker binds the production `SANDBOX_CONTROL`/`SANDBOX_SESSION`
 // names to the control-plane V2 classes, matching production after the C1c flip.
 export { SandboxControlV2, SandboxSessionV2 };
@@ -80,19 +73,10 @@ export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js
 type TestEnv = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
-  USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   SANDBOX_CONTROL: Env['SANDBOX_CONTROL'];
   SANDBOX_SESSION: Env['SANDBOX_SESSION'];
   NEXTAUTH_SECRET: Env['NEXTAUTH_SECRET'];
 };
-
-function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): Promise<Response> {
-  const facade = env.USER_KILO_FACADE.get(env.USER_KILO_FACADE.idFromName(userId));
-  const headers = new Headers(request.headers);
-  headers.set(KILO_FACADE_USER_ID_HEADER, userId);
-  headers.set(KILO_FACADE_AUTH_TOKEN_HEADER, 'test-token');
-  return facade.fetch(new Request(request, { headers }));
-}
 
 function createTerminalUpgradeRequest(
   request: Request,
@@ -226,34 +210,6 @@ export default {
         return Response.json({ ok: true });
       }
       return Response.json([...recordedNotificationCalls]);
-    }
-
-    if (url.pathname.startsWith('/kilo-test/')) {
-      const userId = url.searchParams.get('userId') ?? 'test_user';
-      const facadeUrl = new URL(request.url);
-      facadeUrl.pathname = url.pathname.slice('/kilo-test'.length);
-      facadeUrl.searchParams.delete('userId');
-      return routeToUserKiloFacade(new Request(facadeUrl, request), env, userId);
-    }
-
-    if (url.pathname === '/kilo-scoped-event-test') {
-      const userId = url.searchParams.get('userId') ?? 'test_user';
-      const kiloSessionId = url.searchParams.get('kiloSessionId');
-      if (!kiloSessionId) {
-        return new Response('Missing kiloSessionId parameter', { status: 400 });
-      }
-      const facade = env.USER_KILO_FACADE.get(env.USER_KILO_FACADE.idFromName(userId));
-      return facade.openPublicSessionEventStream(kiloSessionId);
-    }
-
-    if (url.pathname === '/kilo-global-feed-test') {
-      const userId = url.searchParams.get('userId') ?? 'test_user';
-      const facadeUrl = new URL(request.url);
-      facadeUrl.pathname = KILO_FACADE_GLOBAL_FEED_PATH;
-      facadeUrl.searchParams.delete('userId');
-      facadeUrl.searchParams.set('userId', userId);
-      const facade = env.USER_KILO_FACADE.get(env.USER_KILO_FACADE.idFromName(userId));
-      return facade.fetch(new Request(facadeUrl, request));
     }
 
     return new Response('Not Found', { status: 404 });

@@ -223,7 +223,7 @@ All other container classes (`SandboxSmall`, `SandboxDIND`, `SandboxCodeReview`,
 are removed from `containers`, `durable_objects.bindings` and `migrations`, so
 those bindings do not exist on `cloud-agent-e2e-test`. The migration list keeps
 each surviving SQLite Durable Object class on its original production tag
-(`Sandbox` `v1`, `CloudAgentSession` `v2`, `UserKiloFacade` `v5`,
+(`Sandbox` `v1`, `CloudAgentSession` `v2`,
 `StreamTicketNonceDO` `v8`, `SandboxControl` `v9`, `SandboxSession` `v10`);
 entries whose classes are all removed (`v3`, `v4`, `v6`, `v7`, `v11`) are dropped, and
 no surviving tag is renumbered or reordered. The e2e Worker's Durable Object

@@ -35,7 +35,6 @@ import {
 } from '../../src/shared/wrapper-bootstrap.js';
 import { createProxyRequest } from '../../src/shared/http-proxy.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
-import type { SessionBoundFeedPolicy } from './global-feed-manager.js';
 import type { ToolCgroupHealth } from './tool-cgroup.js';
 
 export type ServerConfig = {
@@ -83,8 +82,6 @@ export type ServerDependencies = {
     workspacePath: string,
     commitCoAuthor: WrapperCommitCoAuthor | undefined
   ) => Promise<void>;
-  /** Called after a fresh or changed session binding has been stored. */
-  onSessionBound?: (feedPolicy: SessionBoundFeedPolicy) => void | Promise<void>;
   /** Snapshot of the tool-subprocess memory cgroup, null when inactive. */
   toolCgroupHealth?: () => ToolCgroupHealth | null;
   /**
@@ -247,25 +244,10 @@ function parsePtyPath(path: string): { ptyId: string; action?: 'connect' } | nul
   };
 }
 
-async function notifySessionBound(
-  deps: ServerDependencies,
-  feedPolicy: SessionBoundFeedPolicy
-): Promise<void> {
-  if (!deps.onSessionBound) return;
-  try {
-    await deps.onSessionBound(feedPolicy);
-  } catch (error) {
-    logToFile(
-      `session-bound callback failed: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
-
 export async function bindSessionContext(
   binding: SessionBinding | undefined,
   config: ServerConfig,
   deps: ServerDependencies,
-  feedPolicy: SessionBoundFeedPolicy = 'restart',
   /**
    * The kiloSessionId to bind, when the caller already knows it (e.g. from a
    * fresh session/ready request) but hasn't yet written it back to `config`.
@@ -365,7 +347,6 @@ export async function bindSessionContext(
     state.bindSession(sessionContext);
 
     logToFile(`session bound: sessionId=${kiloSessionId}`);
-    await notifySessionBound(deps, feedPolicy);
     return null;
   }
 
@@ -381,9 +362,6 @@ export async function bindSessionContext(
     agentSessionId: config.agentSessionId,
   };
   const result = state.bindSession(sessionContext);
-  if (feedPolicy === 'close-until-runtime-ready') {
-    await notifySessionBound(deps, feedPolicy);
-  }
   if (result.changed) {
     logToFile(
       `session binding refreshed: generation=${binding.wrapperGeneration ?? 'none'} connectionId=${binding.wrapperConnectionId ?? 'none'}`
@@ -392,9 +370,6 @@ export async function bindSessionContext(
       await deps.closeConnection();
     }
     deps.resetLifecycle();
-    if (feedPolicy === 'restart') {
-      await notifySessionBound(deps, feedPolicy);
-    }
   }
   return null;
 }

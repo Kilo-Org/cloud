@@ -42,7 +42,6 @@ const DROPPED_REQUEST_HEADERS = new Set([
 const DROPPED_REQUEST_HEADER_PREFIXES = [
   'proxy-',
   'sec-websocket-',
-  'x-kilo-facade-',
   'x-forwarded-',
   'cf-',
   PREVIEW_MARKER_PREFIX,

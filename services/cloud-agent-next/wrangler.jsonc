@@ -334,10 +334,6 @@
         "name": "STREAM_TICKET_NONCE_DO",
       },
       {
-        "class_name": "UserKiloFacade",
-        "name": "USER_KILO_FACADE",
-      },
-      {
         "class_name": "SandboxControl",
         "name": "SANDBOX_CONTROL",
       },
@@ -367,10 +363,6 @@
     {
       "new_sqlite_classes": ["SandboxDIND"],
       "tag": "v4",
-    },
-    {
-      "new_sqlite_classes": ["UserKiloFacade"],
-      "tag": "v5",
     },
     {
       "new_sqlite_classes": ["SandboxCodeReview"],
@@ -678,10 +670,6 @@
           {
             "class_name": "StreamTicketNonceDO",
             "name": "STREAM_TICKET_NONCE_DO",
-          },
-          {
-            "class_name": "UserKiloFacade",
-            "name": "USER_KILO_FACADE",
           },
           {
             "class_name": "SandboxControl",

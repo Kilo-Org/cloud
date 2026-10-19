@@ -58,7 +58,6 @@ export type KiloRuntimeLifecycleDependencies = {
     workspacePath: string;
     kiloSessionId: string;
   }) => void;
-  onRuntimeReady: () => void;
   hasLifecycle: () => boolean;
   hasConnection: () => boolean;
   startupTimeoutMs: number;
@@ -141,7 +140,6 @@ export function createKiloRuntimeLifecycle(
           `startKiloRuntime reused existing runtime without session rebinding sessionId=${deps.getKiloSessionId() || '(unset)'}`
         );
       }
-      deps.onRuntimeReady();
       return;
     }
 
@@ -190,7 +188,6 @@ export function createKiloRuntimeLifecycle(
     deps.log(
       `startKiloRuntime runtime ready workspacePath=${workspacePath} kiloSessionId=${kiloSessionId} platform=${deps.getPlatform() ?? '(unset)'} home=${deps.captureEnv().HOME ?? '(unset)'}`
     );
-    deps.onRuntimeReady();
   }
 
   function start(input: KiloRuntimeStartInput): Promise<void> {

@@ -88,12 +88,7 @@ import type { AttentionEvent } from '../websocket/ingest-attention-classifier.js
 import { dispatchCloudAgentAttentionPush } from '../websocket/ingest-attention-classifier.js';
 import type { StoredEvent } from '../websocket/types.js';
 import type { WrapperCommand, CloudStatusData, CommandsAvailableData } from '../shared/protocol.js';
-import {
-  isPublicCloudAgentExtensionSourceType,
-  projectPublicCloudAgentExtensionEvent,
-} from '../kilo-facade/cloud-agent-extension-events.js';
 import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-commands.js';
-import { withDORetry } from '../utils/do-retry.js';
 import type {
   AcceptedExecutionTurn,
   AdmissionFailure,
@@ -160,11 +155,6 @@ import {
   isWrapperRunFinalizing,
   nextWrapperCleanupDeadline,
 } from '../session/wrapper-runtime-state.js';
-import {
-  kiloGlobalFeedValidationSchema,
-  validateKiloGlobalFeedProducerIdentity,
-  type KiloGlobalFeedValidationResult,
-} from '../session/wrapper-global-feed-validation.js';
 import {
   createQueuedSessionMessageState,
   getSessionMessageState,
@@ -384,7 +374,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private messageSettlementOutbox?: MessageSettlementOutbox;
   private sessionMessageQueue?: SessionMessageQueue;
   private wrapperSupervisor?: WrapperSupervisor;
-  private publicExtensionPublicationTail: Promise<void> = Promise.resolve();
+
   private isTerminalStatus(
     status: ExecutionStatus
   ): status is 'completed' | 'failed' | 'interrupted' {
@@ -1366,7 +1356,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * @param event - The stored event to broadcast
    */
   broadcastEvent(event: StoredEvent): void {
-    this.publishPublicCloudAgentExtensionEvent(event);
     if (this.streamHandler) {
       this.streamHandler.broadcastEvent(event);
       return;
@@ -1383,39 +1372,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           })
           .warn('Failed to broadcast event - stream handler unavailable');
       });
-  }
-
-  private publishPublicCloudAgentExtensionEvent(event: StoredEvent): void {
-    if (!isPublicCloudAgentExtensionSourceType(event.stream_event_type)) return;
-    const publication = this.publicExtensionPublicationTail
-      .catch(() => undefined)
-      .then(async () => {
-        const metadata = await this.getMetadata();
-        const kiloSessionId = metadata?.auth.kiloSessionId;
-        if (!metadata || !kiloSessionId) return;
-        const projected = projectPublicCloudAgentExtensionEvent(event, kiloSessionId);
-        if (!projected) return;
-        const facadeId = this.env.USER_KILO_FACADE.idFromName(metadata.identity.userId);
-        await withDORetry(
-          () => this.env.USER_KILO_FACADE.get(facadeId),
-          facade =>
-            facade.publishCloudAgentExtensionEvent({
-              kiloUserId: metadata.identity.userId,
-              cloudAgentSessionId: metadata.identity.sessionId,
-              kiloSessionId,
-              organizationId: metadata.identity.orgId,
-              event: projected,
-            }),
-          'publishCloudAgentExtensionEvent'
-        );
-      })
-      .catch(error => {
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .warn('Failed to publish public Cloud Agent extension event');
-      });
-    this.publicExtensionPublicationTail = publication;
-    this.ctx.waitUntil(publication);
   }
 
   private insertAndBroadcastEvent(params: {
@@ -1923,26 +1879,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
     const metadata = await this.getStoredMetadata();
     return metadata ? sessionRuntimeLocator(metadata) : null;
-  }
-
-  async validateKiloGlobalFeedProducer(params: {
-    kiloSessionId: string;
-    wrapperRunId: string;
-    wrapperGeneration: number;
-    wrapperConnectionId: string;
-  }): Promise<KiloGlobalFeedValidationResult> {
-    const parsed = kiloGlobalFeedValidationSchema.safeParse(params);
-    if (!parsed.success) {
-      return { success: false, status: 400, message: 'Invalid global feed producer identity' };
-    }
-
-    const metadata = await this.getMetadata();
-    const runtimeState = await getWrapperRuntimeState(this.ctx.storage);
-    return validateKiloGlobalFeedProducerIdentity({
-      metadata,
-      runtimeState,
-      producer: parsed.data,
-    });
   }
 
   async getLatestAssistantMessage(): Promise<LatestAssistantMessage | null> {

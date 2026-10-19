@@ -21,10 +21,6 @@
         "name": "STREAM_TICKET_NONCE_DO",
       },
       {
-        "class_name": "UserKiloFacade",
-        "name": "USER_KILO_FACADE",
-      },
-      {
         "class_name": "SandboxControlV2",
         "name": "SANDBOX_CONTROL",
       },
@@ -42,10 +38,6 @@
     {
       "new_sqlite_classes": ["CloudAgentSession"],
       "tag": "v2",
-    },
-    {
-      "new_sqlite_classes": ["UserKiloFacade"],
-      "tag": "v5",
     },
     {
       "new_sqlite_classes": ["StreamTicketNonceDO"],

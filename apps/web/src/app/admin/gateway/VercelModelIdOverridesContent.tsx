@@ -132,8 +132,9 @@ export function VercelModelIdOverridesContent() {
             <CardTitle>Model ID Overrides</CardTitle>
             <CardDescription>
               Overrides that map a full OpenRouter model ID to a full Vercel AI Gateway model ID,
-              stored in the <code>vercel_model_id_overrides</code> table. The gateway does not read
-              these overrides yet; requests still use the built-in mapping.
+              stored in the <code>vercel_model_id_overrides</code> column of{' '}
+              <code>ai_gateway_config</code>. The gateway does not read these overrides yet;
+              requests still use the built-in mapping.
             </CardDescription>
           </div>
           <Button size="sm" onClick={openCreate}>

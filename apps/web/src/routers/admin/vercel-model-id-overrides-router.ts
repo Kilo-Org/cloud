@@ -1,54 +1,93 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { mapResolvedModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { vercel_model_id_overrides } from '@kilocode/db/schema';
-import { VercelModelIdOverrideSchema } from '@kilocode/db/schema-types';
+import { ai_gateway_config } from '@kilocode/db/schema';
+import {
+  VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT,
+  VercelModelIdOverrideSchema,
+  VercelModelIdOverridesConfigSchema,
+  type VercelModelIdOverride,
+} from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
-import { asc, eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+
+/**
+ * Locks the singleton config row (creating it if needed) so concurrent edits of
+ * different overrides cannot overwrite each other.
+ */
+async function updateOverrides(
+  update: (overrides: VercelModelIdOverride[]) => VercelModelIdOverride[]
+): Promise<void> {
+  await db.transaction(async tx => {
+    await tx.insert(ai_gateway_config).values({ id: 1 }).onConflictDoNothing();
+    const [row] = await tx
+      .select({ config: ai_gateway_config.vercel_model_id_overrides })
+      .from(ai_gateway_config)
+      .where(eq(ai_gateway_config.id, 1))
+      .for('update');
+    const overrides = update(row?.config?.overrides ?? []);
+    await tx
+      .update(ai_gateway_config)
+      .set({
+        vercel_model_id_overrides:
+          overrides.length === 0 ? null : VercelModelIdOverridesConfigSchema.parse({ overrides }),
+      })
+      .where(eq(ai_gateway_config.id, 1));
+  });
+}
 
 export const adminVercelModelIdOverridesRouter = createTRPCRouter({
   list: adminProcedure.query(async () => {
-    const rows = await db
-      .select({
-        openrouter_model_id: vercel_model_id_overrides.openrouter_model_id,
-        vercel_model_id: vercel_model_id_overrides.vercel_model_id,
-        updated_at: vercel_model_id_overrides.updated_at,
-      })
-      .from(vercel_model_id_overrides)
-      .orderBy(asc(vercel_model_id_overrides.openrouter_model_id));
+    const [row] = await db
+      .select({ config: ai_gateway_config.vercel_model_id_overrides })
+      .from(ai_gateway_config)
+      .where(eq(ai_gateway_config.id, 1))
+      .limit(1);
+    const overrides = row?.config?.overrides ?? [];
     return {
-      items: rows.map(row => ({
-        openrouter_model_id: row.openrouter_model_id,
-        vercel_model_id: row.vercel_model_id,
-        builtin_vercel_model_id: mapResolvedModelIdToVercel(row.openrouter_model_id),
-        updated_at: new Date(row.updated_at).toISOString(),
-      })),
+      items: overrides
+        .map(override => ({
+          ...override,
+          builtin_vercel_model_id: mapResolvedModelIdToVercel(override.openrouter_model_id),
+        }))
+        .sort((a, b) => a.openrouter_model_id.localeCompare(b.openrouter_model_id)),
     };
   }),
 
   upsert: adminProcedure.input(VercelModelIdOverrideSchema).mutation(async ({ input }) => {
-    await db
-      .insert(vercel_model_id_overrides)
-      .values(input)
-      .onConflictDoUpdate({
-        target: vercel_model_id_overrides.openrouter_model_id,
-        set: { vercel_model_id: input.vercel_model_id, updated_at: sql`now()` },
-      });
+    await updateOverrides(overrides => {
+      if (!overrides.some(override => override.openrouter_model_id === input.openrouter_model_id)) {
+        if (overrides.length >= VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `At most ${VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT} overrides are allowed`,
+          });
+        }
+        return [...overrides, input];
+      }
+      return overrides.map(override =>
+        override.openrouter_model_id === input.openrouter_model_id ? input : override
+      );
+    });
     return input;
   }),
 
   delete: adminProcedure
     .input(VercelModelIdOverrideSchema.pick({ openrouter_model_id: true }))
     .mutation(async ({ input }) => {
-      const result = await db
-        .delete(vercel_model_id_overrides)
-        .where(eq(vercel_model_id_overrides.openrouter_model_id, input.openrouter_model_id));
-      if ((result.rowCount ?? 0) === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: `No override exists for "${input.openrouter_model_id}"`,
-        });
-      }
+      await updateOverrides(overrides => {
+        if (
+          !overrides.some(override => override.openrouter_model_id === input.openrouter_model_id)
+        ) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `No override exists for "${input.openrouter_model_id}"`,
+          });
+        }
+        return overrides.filter(
+          override => override.openrouter_model_id !== input.openrouter_model_id
+        );
+      });
       return { success: true };
     }),
 });

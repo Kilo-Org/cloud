@@ -1,5 +1,5 @@
 {
-  "id": "ac2b2194-56a3-423b-b972-4d5efbaf255e",
+  "id": "10f0ec05-e546-4fc4-a09a-e66be47ab708",
   "prevId": "5be2d091-13ed-4f74-8757-d5c5db2ab774",
   "version": "7",
   "dialect": "postgresql",
@@ -2015,6 +2015,12 @@
         },
         "unavailable_models": {
           "name": "unavailable_models",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vercel_model_id_overrides": {
+          "name": "vercel_model_id_overrides",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -43269,45 +43275,6 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.vercel_model_id_overrides": {
-      "name": "vercel_model_id_overrides",
-      "schema": "",
-      "columns": {
-        "openrouter_model_id": {
-          "name": "openrouter_model_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "vercel_model_id": {
-          "name": "vercel_model_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

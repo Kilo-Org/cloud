@@ -308,16 +308,26 @@ describe('removeUserFromOrganization', () => {
       .set({ accepted_at: sql`NOW()` })
       .where(eq(organization_invitations.id, accepted.id));
 
+    // Create the expired invitation first so it can use the member's own
+    // address and actually exercise the expiry predicate in the cleanup,
+    // then create the live pending invitation for the same address.
     const expired = await inviteUserToOrganization(
       organization.id,
       owner.id,
-      `${member.id}-second@example.com`,
+      member.google_user_email,
       'member'
     );
     await db
       .update(organization_invitations)
       .set({ expires_at: sql`NOW() - INTERVAL '1 hour'` })
       .where(eq(organization_invitations.id, expired.id));
+
+    const pending = await inviteUserToOrganization(
+      organization.id,
+      owner.id,
+      member.google_user_email,
+      'member'
+    );
 
     const otherOrg = await inviteUserToOrganization(
       otherOrganization.id,
@@ -333,7 +343,9 @@ describe('removeUserFromOrganization', () => {
       .select({ id: organization_invitations.id })
       .from(organization_invitations)
       .where(eq(organization_invitations.email, member.google_user_email));
-    expect(remaining.map(row => row.id).sort()).toEqual([accepted.id, otherOrg.id].sort());
+    expect(remaining.map(row => row.id).sort()).toEqual(
+      [accepted.id, expired.id, otherOrg.id].sort()
+    );
 
     const remainingExpired = await db
       .select({ id: organization_invitations.id })

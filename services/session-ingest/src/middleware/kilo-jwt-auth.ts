@@ -17,6 +17,7 @@ import { resolveConnectionTicket } from '../dos/connection-ticket';
 
 export type KiloJwtAuthVariables = {
   user_id: string;
+  device_session_id?: string;
   deletionAudience?: boolean;
 };
 
@@ -47,6 +48,9 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     }
 
     c.set('user_id', consumed.userId);
+    if (consumed.deviceSessionId !== undefined) {
+      c.set('device_session_id', consumed.deviceSessionId);
+    }
     return next();
   }
 
@@ -131,6 +135,9 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   c.set('user_id', auth.userId);
+  if (auth.deviceSessionId !== undefined) {
+    c.set('device_session_id', auth.deviceSessionId);
+  }
   c.set('deletionAudience', deletionAudience);
   return next();
 });

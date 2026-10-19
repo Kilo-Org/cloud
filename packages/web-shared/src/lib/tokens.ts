@@ -101,13 +101,19 @@ export const TOKEN_EXPIRY = {
  */
 export function generateInternalServiceToken(
   userId: string,
-  options?: { expiresIn?: number; audience?: string; organizationId?: string }
+  options?: {
+    expiresIn?: number;
+    audience?: string;
+    organizationId?: string;
+    deviceSessionId?: string;
+  }
 ): string {
   return jwt.sign(
     {
       kiloUserId: userId,
       version: JWT_TOKEN_VERSION,
       ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
+      ...(options?.deviceSessionId ? { deviceSessionId: options.deviceSessionId } : {}),
     },
     NEXTAUTH_SECRET,
     {
@@ -124,6 +130,7 @@ export function generateBoundedInternalServiceToken(
     audience: BoundedInternalServiceAudience;
     expiresIn: number;
     organizationId?: string;
+    deviceSessionId?: string;
   }
 ): string {
   if (!boundedInternalServiceAudienceSet.has(options.audience)) {
@@ -143,7 +150,10 @@ export function generateBoundedInternalServiceToken(
     expiresAt: issuedAt + options.expiresIn,
     tokenPurpose: 'internal-service',
     credentialExchange: false,
-    extra: options.organizationId ? { organizationId: options.organizationId } : undefined,
+    extra: {
+      ...(options.organizationId ? { organizationId: options.organizationId } : {}),
+      ...(options.deviceSessionId ? { deviceSessionId: options.deviceSessionId } : {}),
+    },
   });
 
   if (isBoundedInternalServiceTokenIssuanceEnabled()) {
@@ -158,6 +168,7 @@ export function generateBoundedInternalServiceToken(
         ? undefined
         : options.audience,
     organizationId: options.organizationId,
+    deviceSessionId: options.deviceSessionId,
   });
 }
 

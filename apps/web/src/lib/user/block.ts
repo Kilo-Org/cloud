@@ -8,6 +8,7 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { closeDeviceSessionRealtimeConnections } from '@/lib/auth/device-session-realtime';
 
 export type BlockUserParams = {
   kiloUserId: string;
@@ -103,5 +104,10 @@ export async function blockUser(params: BlockUserParams): Promise<boolean> {
   if (executor) {
     return run(executor);
   }
-  return db.transaction(tx => run(tx));
+
+  const blocked = await db.transaction(tx => run(tx));
+  if (blocked) {
+    void closeDeviceSessionRealtimeConnections({ kiloUserId: params.kiloUserId });
+  }
+  return blocked;
 }

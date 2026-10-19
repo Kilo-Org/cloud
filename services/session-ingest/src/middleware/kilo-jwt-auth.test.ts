@@ -23,16 +23,26 @@ const userRowByUserId = vi.hoisted(
   () => new Map<string, { pepper?: string | null; blockedReason: string | null }>()
 );
 
-const dbState = vi.hoisted(() => ({ fails: false, queries: 0, downstreamCalls: 0 }));
+const dbState = vi.hoisted(() => ({
+  fails: false,
+  deviceFails: false,
+  deviceActive: true,
+  queries: 0,
+  downstreamCalls: 0,
+}));
 const getWorkerDbMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: getWorkerDbMock.mockImplementation(() => ({
-    select: () => ({
+    select: (fields?: Record<string, unknown>) => ({
       from: () => ({
         where: () => ({
           limit: async () => {
             dbState.queries++;
+            if (fields && 'id' in fields) {
+              if (dbState.deviceFails) throw new Error('connection refused');
+              return dbState.deviceActive ? [{ id: 'device-session-id' }] : [];
+            }
             if (dbState.fails) throw new Error('connection refused');
             const row = userRowByUserId.get('usr_123');
             if (!row) return [];
@@ -45,24 +55,37 @@ vi.mock('@kilocode/db/client', () => ({
 }));
 
 type TicketStore = {
-  tickets: Map<string, { userId: string; expiresAt: number; secret: string }>;
-  mint: (userId: string, expiresAt: number) => string;
+  tickets: Map<
+    string,
+    { userId: string; deviceSessionId?: string; expiresAt: number; secret: string }
+  >;
+  mint: (userId: string, expiresAt: number, deviceSessionId?: string) => string;
   namespace: {
     idFromString: (id: string) => string;
-    get: (id: string) => { consume: (secret: string) => Promise<{ userId: string } | null> };
+    get: (id: string) => {
+      consume: (secret: string) => Promise<{ userId: string; deviceSessionId?: string } | null>;
+    };
   };
 };
 
 const OBJECT_ID_PATTERN = /^[0-9a-f]{64}$/;
 
 function makeTicketStore(): TicketStore {
-  const tickets = new Map<string, { userId: string; expiresAt: number; secret: string }>();
+  const tickets = new Map<
+    string,
+    { userId: string; deviceSessionId?: string; expiresAt: number; secret: string }
+  >();
   return {
     tickets,
-    mint(userId: string, expiresAt: number): string {
+    mint(userId: string, expiresAt: number, deviceSessionId?: string): string {
       const objectId = crypto.randomUUID().replaceAll('-', '').repeat(2);
       const secret = crypto.randomUUID();
-      tickets.set(objectId, { userId, expiresAt, secret });
+      tickets.set(objectId, {
+        userId,
+        ...(deviceSessionId ? { deviceSessionId } : {}),
+        expiresAt,
+        secret,
+      });
       return `${objectId}.${secret}`;
     },
     namespace: {
@@ -77,7 +100,10 @@ function makeTicketStore(): TicketStore {
           if (!entry || entry.expiresAt <= Date.now() || entry.secret !== secret) {
             return null;
           }
-          return { userId: entry.userId };
+          return {
+            userId: entry.userId,
+            ...(entry.deviceSessionId ? { deviceSessionId: entry.deviceSessionId } : {}),
+          };
         },
       }),
     },
@@ -109,15 +135,24 @@ function makeApp() {
   app.use('/api/*', kiloJwtAuthMiddleware);
   app.get('/api/me', c => {
     dbState.downstreamCalls++;
-    return c.json({ user_id: c.get('user_id') });
+    return c.json({
+      user_id: c.get('user_id'),
+      device_session_id: c.get('device_session_id'),
+    });
   });
   app.get('/api/user/cli', c => {
     dbState.downstreamCalls++;
-    return c.json({ user_id: c.get('user_id') });
+    return c.json({
+      user_id: c.get('user_id'),
+      device_session_id: c.get('device_session_id'),
+    });
   });
   app.get('/api/user/web', c => {
     dbState.downstreamCalls++;
-    return c.json({ user_id: c.get('user_id') });
+    return c.json({
+      user_id: c.get('user_id'),
+      device_session_id: c.get('device_session_id'),
+    });
   });
   app.delete('/api/session/:sessionId', c =>
     c.json({ user_id: c.get('user_id'), deletionAudience: c.get('deletionAudience') === true })
@@ -133,6 +168,21 @@ async function signUserToken(pepper: string): Promise<string> {
     expiresInSeconds: 3600,
     env: 'production',
     extra: { tokenSource: 'kilo-chat' },
+  });
+  return token;
+}
+
+async function signDeviceUserToken(
+  pepper: string,
+  deviceSessionId = '11111111-1111-4111-8111-111111111111'
+): Promise<string> {
+  const { token } = await signKiloToken({
+    userId: 'usr_123',
+    pepper,
+    secret: TEST_JWT_SECRET,
+    expiresInSeconds: 3600,
+    env: 'production',
+    extra: { tokenSource: 'kilo-chat', deviceSessionId },
   });
   return token;
 }
@@ -241,6 +291,8 @@ describe('kiloJwtAuthMiddleware', () => {
     clearSecretCacheForTest();
     userRowByUserId.clear();
     dbState.fails = false;
+    dbState.deviceFails = false;
+    dbState.deviceActive = true;
     dbState.queries = 0;
     dbState.downstreamCalls = 0;
     getWorkerDbMock.mockClear();
@@ -291,6 +343,80 @@ describe('kiloJwtAuthMiddleware', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ user_id: 'usr_123' });
+  });
+
+  it('accepts a device token only while its device session is active', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signDeviceUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      user_id: 'usr_123',
+      device_session_id: '11111111-1111-4111-8111-111111111111',
+    });
+    expect(dbState.queries).toBe(2);
+  });
+
+  it('rejects a device token after its device session is revoked', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    dbState.deviceActive = false;
+    const token = await signDeviceUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
+    expect(dbState.downstreamCalls).toBe(0);
+  });
+
+  it('returns a retryable 503 when the device-session lookup fails', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    dbState.deviceFails = true;
+    const token = await signDeviceUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Service temporarily unavailable',
+    });
+  });
+
+  it('forwards the device session from a web ticket to the request context', async () => {
+    const ticketStore = makeTicketStore();
+    const deviceSessionId = '22222222-2222-4222-8222-222222222222';
+    const ticket = ticketStore.mint('usr_123', Date.now() + 60_000, deviceSessionId);
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      user_id: 'usr_123',
+      device_session_id: deviceSessionId,
+    });
   });
 
   it('requires a proxy attestation for a cloud-agent-next runtime bearer after pepper validation', async () => {

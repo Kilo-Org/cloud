@@ -3,12 +3,14 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 import { getCachedSecret } from './cached-secret';
+import { findActiveDeviceSession, deviceSessionIdSchema } from './device-session-auth';
 import { verifyKiloToken } from './kilo-token';
 import { verifyKiloTokenForResource, type KiloResourceAudiencePolicy } from './kilo-token-policy';
 
 export type KiloBearerAuthResult = {
   userId: string;
   botId?: string;
+  deviceSessionId?: string;
 };
 
 export type KiloSecretBinding = {
@@ -21,6 +23,12 @@ export type GetKiloUserPepper = (
   connectionString: string,
   userId: string
 ) => Promise<KiloUserPepperResult | null | undefined>;
+
+export type GetActiveDeviceSession = (
+  connectionString: string,
+  deviceSessionId: string,
+  userId: string
+) => Promise<boolean>;
 
 type KiloBearerAudienceOptions =
   | {
@@ -65,6 +73,7 @@ export async function verifyKiloBearerAgainstCurrentPepper(
     workerEnv?: string;
     connectionString: string;
     getUserPepper?: GetKiloUserPepper;
+    getActiveDeviceSession?: GetActiveDeviceSession;
     allowBlocked?: boolean;
   } & KiloBearerAudienceOptions
 ): Promise<KiloBearerAuthResult | null> {
@@ -115,9 +124,31 @@ export async function verifyKiloBearerAgainstCurrentPepper(
     return null;
   }
 
+  // A token that claims a device session is valid only while that session is
+  // active and owned by the token's user. The default lookup is always used
+  // when the claim is present; the injectable form exists for tests and still
+  // runs the same check.
+  if (payload.deviceSessionId !== undefined) {
+    if (!deviceSessionIdSchema.safeParse(payload.deviceSessionId).success) {
+      return null;
+    }
+    const getActiveDeviceSession = params.getActiveDeviceSession ?? findActiveDeviceSession;
+    const active = await getActiveDeviceSession(
+      params.connectionString,
+      payload.deviceSessionId,
+      payload.kiloUserId
+    );
+    if (!active) {
+      return null;
+    }
+  }
+
   const authResult: KiloBearerAuthResult = { userId: payload.kiloUserId };
   if (payload.botId) {
     authResult.botId = payload.botId;
+  }
+  if (payload.deviceSessionId !== undefined) {
+    authResult.deviceSessionId = payload.deviceSessionId;
   }
   return authResult;
 }

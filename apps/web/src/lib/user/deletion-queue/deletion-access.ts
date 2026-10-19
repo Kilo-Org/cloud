@@ -9,6 +9,7 @@ import {
 } from '@kilocode/db/schema';
 import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { closeDeviceSessionRealtimeConnections } from '@/lib/auth/device-session-realtime';
 
 export async function disableUserAccessForDeletion(
   tx: DrizzleTransaction,
@@ -62,4 +63,6 @@ export async function disableUserAccessForDeletion(
     );
 
   await tx.delete(native_attested_keys).where(eq(native_attested_keys.kilo_user_id, params.userId));
+
+  void closeDeviceSessionRealtimeConnections({ kiloUserId: params.userId });
 }

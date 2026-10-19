@@ -149,7 +149,6 @@ describe('kiloAuthMiddleware', () => {
         isAdmin: true,
         apiTokenPepper: 'pepper',
         orgMemberships: [{ orgId: 'org-a', role: 'owner' }],
-        deviceSessionId: 'session-wasteland-test',
       })
     );
 
@@ -197,6 +196,22 @@ describe('kiloAuthMiddleware', () => {
     const responses = await request(app, await signToken(), secret);
 
     expect(responses.map(response => response.status)).toEqual([500, 500]);
+    expect(downstreamCalls()).toBe(0);
+  });
+});
+
+describe('createKiloAuthMiddleware device sessions', () => {
+  it('rejects a claimed device session when the service has no validator', async () => {
+    const { app, downstreamCalls } = createApp();
+    const responses = await request(
+      app,
+      await signToken({
+        aud: WASTELAND_AUDIENCE,
+        deviceSessionId: '11111111-1111-4111-8111-111111111111',
+      })
+    );
+
+    expect(responses.map(response => response.status)).toEqual([401, 401]);
     expect(downstreamCalls()).toBe(0);
   });
 });

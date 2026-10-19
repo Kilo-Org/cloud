@@ -50,6 +50,7 @@ import {
   verifyKiloTokenForPolicy,
   type KiloCredentialExchangeEligibilityPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
+import { isActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
 
 import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
@@ -235,6 +236,14 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
 
+  if (
+    user &&
+    auth.claims.deviceSessionId !== undefined &&
+    !(await isActiveDeviceSession(db, auth.claims.deviceSessionId, auth.userId))
+  ) {
+    return authError(401, 'Unauthorized', auth.userId, { credentialsRejected: true });
+  }
+
   const result = await validateUserAuthorization(
     auth.userId,
     user,
@@ -321,6 +330,19 @@ async function resolveUserFromAuth(
     ) {
       return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
     }
+
+    // Device access tokens carry a session id. A revoked session must stop
+    // authorizing normal web and API routes immediately, not at JWT expiry.
+    // Use the primary connection: revocation is a primary write, and a replica
+    // read could keep accepting the token until replication catches up.
+    if (
+      user &&
+      authorizationValidationResult.deviceSessionId !== undefined &&
+      !(await isActiveDeviceSession(db, authorizationValidationResult.deviceSessionId, user.id))
+    ) {
+      return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
+    }
+
     // A token-bound organization is signed; the request header is mutable.
     // Legacy and personal tokens intentionally continue to use the header.
     const headerOrganizationId = headersList.get(ORGANIZATION_ID_HEADER);

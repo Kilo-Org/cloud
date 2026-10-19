@@ -1,6 +1,7 @@
 import { decodeJwt, type JWTPayload } from 'jose';
 import { createMiddleware } from 'hono/factory';
 import type { MiddlewareHandler } from 'hono';
+import { deviceSessionIdSchema } from './device-session-auth.js';
 import { extractBearerToken } from './extract-bearer-token.js';
 import type { KiloTokenPayload } from './kilo-token.js';
 import type { KiloResourceAudiencePolicy } from './kilo-token-policy.js';
@@ -29,10 +30,19 @@ export type KiloAuthVariables = {
 
 export type ResolveSecret = (binding: SecretBinding) => Promise<string | null>;
 
-export type KiloAuthMiddlewareOptions = {
+export type KiloAuthMiddlewareOptions<E extends KiloAuthEnv = KiloAuthEnv> = {
   resolveSecret: ResolveSecret;
   audiencePolicy: KiloResourceAudiencePolicy;
   onAuthenticated?: (payload: KiloTokenPayload) => void;
+  /**
+   * Validates a device session claim. When the option is omitted, tokens that
+   * claim a device session are refused rather than accepted unchecked.
+   */
+  isActiveDeviceSession?: (
+    env: E['Bindings'],
+    deviceSessionId: string,
+    userId: string
+  ) => Promise<boolean>;
 };
 
 export type KiloAuthEnv = {
@@ -53,7 +63,7 @@ export type KiloAuthEnv = {
  * authenticated user id.
  */
 export function createKiloAuthMiddleware<E extends KiloAuthEnv>(
-  options: KiloAuthMiddlewareOptions
+  options: KiloAuthMiddlewareOptions<E>
 ): MiddlewareHandler<E> {
   const { resolveSecret, audiencePolicy, onAuthenticated } = options;
   return createMiddleware<E>(async (c, next) => {
@@ -92,6 +102,32 @@ export function createKiloAuthMiddleware<E extends KiloAuthEnv>(
       c.set('kiloGastownAccess', payload.gastownAccess === true);
       c.set('kiloOrgMemberships', payload.orgMemberships ?? []);
       onAuthenticated?.(payload);
+
+      if (payload.deviceSessionId !== undefined) {
+        if (!deviceSessionIdSchema.safeParse(payload.deviceSessionId).success) {
+          return c.json(resError('Invalid token'), 401);
+        }
+        if (!options.isActiveDeviceSession) {
+          return c.json(resError('Invalid token'), 401);
+        }
+        let active: boolean;
+        try {
+          active = await options.isActiveDeviceSession(
+            c.env,
+            payload.deviceSessionId,
+            payload.kiloUserId
+          );
+        } catch (err) {
+          console.warn(
+            '[kilo-auth] device session lookup failed:',
+            err instanceof Error ? err.message : 'unknown error'
+          );
+          return c.json(resError('Service temporarily unavailable'), 503);
+        }
+        if (!active) {
+          return c.json(resError('Invalid token'), 401);
+        }
+      }
     } catch (err) {
       console.warn(
         '[kilo-auth] token verification failed:',

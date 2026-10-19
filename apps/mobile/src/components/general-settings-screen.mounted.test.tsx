@@ -130,6 +130,16 @@ async function mountGeneral(): Promise<Awaited<ReturnType<typeof renderWithProvi
   await flush();
   return view;
 }
+function texts(renderer: Awaited<ReturnType<typeof renderWithProviders>>) {
+  return renderer.renderer.root
+    .findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        typeof node.props.children === 'string'
+    )
+    .map(node => node.props.children);
+}
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('__DEV__', false);
@@ -146,8 +156,63 @@ afterEach(() => {
   view = undefined;
   vi.unstubAllGlobals();
 });
-
 describe('GeneralSettingsScreen', () => {
+  it('renders the settings and the condense row with their exact titles and subtitles', async () => {
+    const renderer = await mountGeneral();
+    const rendered = texts(renderer);
+
+    expect(rendered).toContain('Unlock with biometrics');
+    expect(rendered).toContain('Unlock at launch and after five minutes in the background.');
+    expect(rendered).toContain('Auto expand thinking');
+    expect(rendered).toContain("Show the agent's thinking expanded when it finishes.");
+    expect(rendered).toContain('Hide thinking details');
+    expect(rendered).toContain("Don't show the agent's thinking on the session page.");
+    expect(rendered).toContain('Keep screen on while on session page');
+    expect(rendered).toContain('Hold the screen awake while the session is working.');
+    expect(rendered).toContain('Add app attribution to PR reviews');
+    expect(rendered).toContain('Append a Reviewed via Kilo footer when you submit a review.');
+    expect(rendered).toContain('Return key sends message');
+    expect(rendered).toContain('When off, Return inserts a newline in agent composers.');
+    expect(rendered).toContain('Condense tool calls');
+    expect(rendered).toContain('Group consecutive tool calls into one row you can open.');
+  });
+
+  it('renders the condense switch off and enabled while the other five rows are unchanged', async () => {
+    const renderer = await mountGeneral();
+
+    const switches = renderer.renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    );
+    const byLabel = (label: string) => switches.find(sw => sw.props.accessibilityLabel === label);
+
+    expect(byLabel('Condense tool calls')?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
+    expect(byLabel('Unlock with biometrics')?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
+    expect(byLabel('Auto expand thinking')?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
+    expect(byLabel('Keep screen on while on session page')?.props.accessibilityState).toMatchObject(
+      {
+        checked: false,
+        disabled: false,
+      }
+    );
+    expect(byLabel('Add app attribution to PR reviews')?.props.accessibilityState).toMatchObject({
+      checked: true,
+      disabled: false,
+    });
+    expect(byLabel('Return key sends message')?.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: false,
+    });
+  });
+
   it('disables the condense switch until the preference has loaded', async () => {
     condensePreference.hasLoaded = false;
     const renderer = await mountGeneral();

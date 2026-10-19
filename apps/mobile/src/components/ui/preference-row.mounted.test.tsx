@@ -78,4 +78,28 @@ describe('PreferenceRow', () => {
 
     expect(seen).toEqual([false]);
   });
+
+  it('exposes the row as one switch carrying the title, subtitle and state', () => {
+    const root = renderRow({
+      value: true,
+      onValueChange: () => undefined,
+    });
+
+    const switches = root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Switch' &&
+        node.props.accessibilityLabel === 'Let Kilo change app settings'
+    );
+
+    expect(switches).toHaveLength(1);
+    expect(switches[0]?.props.accessibilityHint).toBe(
+      'Applies to theme, language, notifications, models and the rest of Preferences.'
+    );
+    expect(switches[0]?.props.accessibilityState).toEqual({
+      disabled: false,
+      busy: false,
+      checked: true,
+    });
+  });
 });

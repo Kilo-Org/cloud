@@ -2,11 +2,14 @@ import { EventEmitter } from 'node:events';
 import type { ServerOptions } from 'node:http';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { deciderCliPrompt } from './cli-runner';
+import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 
 type ContainerChild = EventEmitter & {
   pid: number;
   stdout: EventEmitter;
   stderr: EventEmitter;
+  stdin: { on: (event: string, listener: () => void) => void; end: (data: string) => void };
   kill: (signal: string) => void;
 };
 
@@ -41,6 +44,7 @@ function createChild() {
     pid: 12345,
     stdout: new EventEmitter(),
     stderr: new EventEmitter(),
+    stdin: { on: vi.fn(), end: vi.fn() },
     kill: vi.fn(),
   });
   mocks.children.push(child);
@@ -159,7 +163,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-it('/run disables automatic ingest while preserving API/gateway authentication', async () => {
+it('/run sends the prompt on stdin and disables automatic ingest while preserving authentication', async () => {
   await loadServer();
   const pending = request('/run', runBody);
   await flushServer();
@@ -174,9 +178,10 @@ it('/run disables automatic ingest while preserving API/gateway authentication',
     'kilo/test-model',
     '--variant',
     'high',
-    'test prompt',
   ]);
   const options = mocks.spawn.mock.calls[0][2];
+  expect(options.stdio).toEqual(['pipe', 'pipe', 'pipe']);
+  expect(mocks.children[0].stdin.end).toHaveBeenCalledWith('test prompt');
   expect(options.env.KILO_DISABLE_SESSION_INGEST).toBe('1');
   expect(options.env.KILO_API_URL).toBe('https://example.test');
   expect(options.env.KILO_ORG_ID).toBe('test-org');
@@ -184,6 +189,28 @@ it('/run disables automatic ingest while preserving API/gateway authentication',
     kilo: { type: 'api', key: 'test-benchmark-token', organizationId: 'test-org' },
   });
   mocks.children[0].emit('close', 0);
+  expect((await pending.done).status).toBe(200);
+});
+
+it.each([
+  [
+    'an ordinary case with spaces and quotes',
+    DECIDER_CASES.find(c => !c.longContext && c.userPrompt.includes('"')),
+  ],
+  ['a long-context case over 128 KiB', FRONTIER_CASES.find(c => c.longContext)],
+])('/run passes %s to the CLI byte for byte on stdin', async (_kind, benchCase) => {
+  if (!benchCase) throw new Error('dataset needs the case');
+  const prompt = deciderCliPrompt(benchCase);
+  if (benchCase.longContext) expect(Buffer.byteLength(prompt)).toBeGreaterThan(128 * 1024);
+  else expect(prompt).toMatch(/ .*"/s);
+  await loadServer();
+  const pending = request('/run', { ...runBody, prompt });
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  expect(child.stdin.end).toHaveBeenCalledExactlyOnceWith(prompt);
+  expect(mocks.spawn.mock.calls[0][1]).not.toContain(prompt);
+  child.emit('close', 0);
   expect((await pending.done).status).toBe(200);
 });
 
@@ -198,7 +225,8 @@ it('/warmup only initializes the local database once, including concurrent calle
   expect(mocks.spawn).toHaveBeenCalledOnce();
   expect(mocks.spawn.mock.calls[0][0]).toBe('kilo');
   expect(mocks.spawn.mock.calls[0][1]).toEqual(['db', 'path']);
-  const { env } = mocks.spawn.mock.calls[0][2];
+  const { env, stdio } = mocks.spawn.mock.calls[0][2];
+  expect(stdio).toEqual(['ignore', 'pipe', 'pipe']);
   expect(env.KILO_DISABLE_SESSION_INGEST).toBe('1');
   expect(env.KILO_AUTH_CONTENT).toBeUndefined();
   expect(env.KILO_API_URL).toBeUndefined();

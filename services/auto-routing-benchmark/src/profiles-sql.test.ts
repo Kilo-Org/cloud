@@ -41,6 +41,7 @@ const SCHEMA_SQL = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     owner_type TEXT NOT NULL,
     owner_id TEXT NOT NULL,
+    router TEXT NOT NULL DEFAULT 'efficient',
     model TEXT NOT NULL,
     variant TEXT NOT NULL DEFAULT '',
     engine_identity TEXT NOT NULL,
@@ -69,6 +70,7 @@ function runQuery(db: DatabaseSync, q: SqlQuery): void {
 const eventValues = {
   owner_type: 'user',
   owner_id: 'owner-a',
+  router: 'efficient' as const,
   model: 'openai/gpt-4o',
   variant: 'xhigh',
   engine_identity: 'v-test:engine',
@@ -171,6 +173,27 @@ describe('chargedEventInsertStatement (real SQLite)', () => {
       )
     );
     expect(db.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({ n: 0 });
+  });
+
+  it('charges when the active row belongs to the other base router', () => {
+    execSql(
+      db,
+      `INSERT INTO benchmark_profiles
+        (router, model, variant, engine_identity, repetitions, status, run_id, failure_reason, requested_at, updated_at, completed_at)
+       VALUES ('frontier', ?, ?, ?, ?, 'ready', 'run-1', NULL, ?, ?, NULL)`,
+      [
+        eventValues.model,
+        eventValues.variant,
+        eventValues.engine_identity,
+        eventValues.repetitions,
+        '2026-07-28T11:00:00.000Z',
+        '2026-07-28T11:00:00.000Z',
+      ]
+    );
+    runQuery(db, toSql(chargedEventInsertStatement(orm, eventValues)));
+    expect(db.prepare('SELECT router FROM profile_request_events').all()).toEqual([
+      { router: 'efficient' },
+    ]);
   });
 
   it('charges when the current row is failed (retry path)', () => {

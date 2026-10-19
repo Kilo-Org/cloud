@@ -29968,6 +29968,14 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "audience": {
+          "default": "member",
+          "type": "string",
+          "enum": [
+            "member",
+            "shared_services"
+          ]
         }
       },
       "required": [
@@ -29978,9 +29986,10 @@
       "organizations",
       "settings",
       "listavailablemodels",
-      "organizationid"
+      "organizationid",
+      "audience"
     ],
-    "searchBlob": "organizations.settings.listAvailableModels List the AI models available to an organization's members according to its model access policy. organizations settings listavailablemodels organizationid organizationId"
+    "searchBlob": "organizations.settings.listAvailableModels List the AI models available to an organization's members according to its model access policy. organizations settings listavailablemodels organizationid audience organizationId audience"
   },
   "organizations.settings.setOrganizationAutoRoute": {
     "path": "organizations.settings.setOrganizationAutoRoute",

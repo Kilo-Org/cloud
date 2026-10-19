@@ -582,6 +582,22 @@ describe('AutoRoutingDecisionSchema variant compatibility', () => {
       }).success
     ).toBe(false);
   });
+
+  it('allows null classification and table fields only on a fallback decision', () => {
+    const unclassified = {
+      ...baseBenchmark,
+      taskType: null,
+      subtaskType: null,
+      tableVersion: null,
+    };
+    expect(AutoRoutingDecisionSchema.safeParse({ ...unclassified, fallback: true }).success).toBe(
+      true
+    );
+    expect(AutoRoutingDecisionSchema.safeParse(unclassified).success).toBe(false);
+    expect(AutoRoutingDecisionSchema.safeParse({ ...unclassified, fallback: false }).success).toBe(
+      false
+    );
+  });
 });
 
 describe('owner pool settings wire contracts', () => {

@@ -164,12 +164,7 @@ describe('scheduled router queues', () => {
       expect(dailyCall).toBeLessThan(
         vi.mocked(syncPlatformRegistry).mock.invocationCallOrder[router === 'efficient' ? 0 : 1]
       );
-      expect(drainQueues).toHaveBeenCalledWith(
-        env,
-        router === 'frontier' ? 'platform' : 'both',
-        undefined,
-        router
-      );
+      expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, router);
       expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, router);
     }
     expect(sweepStaleRunsAndDrain).not.toHaveBeenCalled();

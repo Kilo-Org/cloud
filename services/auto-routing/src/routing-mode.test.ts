@@ -112,7 +112,10 @@ function createFakeStorage() {
 
   const storage = {
     entries,
-    get: async (key: string) => entries.get(key),
+    get: async (key: string | string[]) =>
+      Array.isArray(key)
+        ? new Map(key.filter(name => entries.has(name)).map(name => [name, entries.get(name)]))
+        : entries.get(key),
     put: async (keyOrEntries: string | Record<string, unknown>, value?: unknown) => {
       applyPut(entries, keyOrEntries, value);
     },
@@ -123,12 +126,15 @@ function createFakeStorage() {
       callback: (txn: {
         put: (keyOrEntries: string | Record<string, unknown>, value?: unknown) => Promise<void>;
         delete: (keyOrKeys: string | string[]) => Promise<void>;
-        get: (key: string) => Promise<unknown>;
+        get: (key: string | string[]) => Promise<unknown>;
       }) => Promise<T>
     ): Promise<T> => {
       const shadow = new Map(entries);
       const txn = {
-        get: async (key: string) => shadow.get(key),
+        get: async (key: string | string[]) =>
+          Array.isArray(key)
+            ? new Map(key.filter(name => shadow.has(name)).map(name => [name, shadow.get(name)]))
+            : shadow.get(key),
         put: async (keyOrEntries: string | Record<string, unknown>, value?: unknown) => {
           applyPut(shadow, keyOrEntries, value);
         },
@@ -621,6 +627,68 @@ describe('AutoRoutingModeConfigDO', () => {
     expect(storage.entries.get('mode')).toBe('best_accuracy');
     expect(storage.entries.get('pool')).toEqual(legacyPool);
   });
+
+  it('freezes pool snapshots while mode writes remain live throughout conversion', async () => {
+    const { modeDO, storage } = createModeDO();
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL });
+    const snapshot = await modeDO.beginConversion();
+    expect(snapshot).toMatchObject({ mode: 'best_accuracy', pool: SAMPLE_POOL, convertedAt: null });
+    await modeDO.setMode('cost_per_accuracy');
+    await expect(modeDO.getMode()).resolves.toBe('cost_per_accuracy');
+    await expect(modeDO.readStoredSettings()).resolves.toMatchObject({
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+    });
+    await expect(modeDO.setPool([{ model: 'new/model' }])).rejects.toThrow('Retry the edit');
+    await expect(modeDO.setSettings({ mode: null, pool: null })).rejects.toThrow('Retry the edit');
+    await modeDO.markConverted('2026-10-18T00:00:00.000Z', true);
+    await expect(modeDO.setSettings({ mode: null, pool: null })).rejects.toThrow('Retry the edit');
+    await modeDO.setMode(null);
+    await expect(modeDO.getMode()).resolves.toBeNull();
+    await modeDO.setMode('best_accuracy');
+    await expect(modeDO.getMode()).resolves.toBe('best_accuracy');
+    expect(storage.entries.get('pool')).toEqual(SAMPLE_POOL);
+    expect(storage.entries.has('conversionPending')).toBe(false);
+    expect((await modeDO.readStoredSettings()).convertedAt).toBe('2026-10-18T00:00:00.000Z');
+  });
+
+  it('saves first-pool mode with the snapshot and never rewinds later mode-only edits on retry', async () => {
+    const { modeDO, storage } = createModeDO();
+    await modeDO.setMode('cost_per_accuracy');
+    const requested = {
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+    } satisfies AutoRoutingOwnerSettings;
+    await expect(modeDO.beginConversion(requested)).resolves.toMatchObject(requested);
+    await expect(modeDO.getMode()).resolves.toBe('best_accuracy');
+    expect(storage.entries.has('pool')).toBe(false);
+
+    await modeDO.setMode('cost_per_accuracy');
+    await expect(modeDO.beginConversion(requested)).resolves.toMatchObject(requested);
+    await expect(modeDO.getMode()).resolves.toBe('cost_per_accuracy');
+    await modeDO.markConverted('2026-10-18T00:00:00.000Z', true);
+    await expect(modeDO.getMode()).resolves.toBe('cost_per_accuracy');
+  });
+
+  it('allows retrying pending conversion and releases nonmigrated settled owners', async () => {
+    const { modeDO } = createModeDO();
+    await modeDO.setSettings({ mode: null, pool: SAMPLE_POOL });
+    await modeDO.beginConversion();
+    await modeDO.markFailed('2026-10-18T00:00:00.000Z');
+    expect((await modeDO.beginConversion()).pool).toEqual(SAMPLE_POOL);
+    await modeDO.markConverted('2026-10-18T01:00:00.000Z', false);
+    await expect(modeDO.setMode('best_accuracy')).resolves.toBeUndefined();
+  });
+
+  it('does not lock mode-only owners or invalid pools', async () => {
+    const { modeDO, storage } = createModeDO();
+    await modeDO.setMode('best_accuracy');
+    await modeDO.beginConversion();
+    await expect(modeDO.setMode(null)).resolves.toBeUndefined();
+    storage.entries.set('pool', [{ model: 'client:fixture/model' }]);
+    await modeDO.beginConversion();
+    await expect(modeDO.setPool(SAMPLE_POOL)).resolves.toBeUndefined();
+  });
 });
 
 describe('auto routing mode config', () => {
@@ -763,6 +831,9 @@ describe('auto routing mode config', () => {
     await setAutoRoutingMode(env, { ownerType: 'org', ownerId: 'org-1' }, null);
     expect(modes.get('org:org-1')).toBeNull();
     expect(stubs.get('org:org-1')?.setMode).toHaveBeenLastCalledWith(null);
+    await expect(
+      getAutoRoutingMode(env, { userId: 'user-1', organizationId: 'org-1' })
+    ).resolves.toBe('cost_per_accuracy');
   });
 
   it('returns null when reading an owner object fails', async () => {

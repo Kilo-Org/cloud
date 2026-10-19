@@ -34,7 +34,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Play, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
-import { toEligibleModelOptions } from '@/components/auto-routing/AutoRoutingModeCard';
+import { toEligibleModelOptions } from './eligible-model-options';
 import { PoolModalityWarning } from '@/components/auto-routing/PoolModalityWarning';
 import {
   computePoolModalityCoverage,
@@ -1544,7 +1544,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     const coverage = new Map(
       models.map(model => [model.id, getReasoningVariantKeys(model.opencode?.variants)])
     );
-    return toEligibleModelOptions(models, []).map(model => ({
+    return toEligibleModelOptions(models).map(model => ({
       ...model,
       reasoningVariants: coverage.get(model.id),
     }));

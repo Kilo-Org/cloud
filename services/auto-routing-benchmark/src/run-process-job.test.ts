@@ -20,7 +20,7 @@ vi.mock('./scheduler', async importOriginal => {
   return {
     ...actual,
     beginPaidCase: vi.fn(),
-    hasPaidCase: vi.fn(),
+    getPaidCasePromptRevision: vi.fn(),
     claimScheduledChunks: vi.fn(),
     clearUnbilledCase: vi.fn(),
     cooldownProviders: vi.fn(),
@@ -69,6 +69,8 @@ vi.mock('./db', async importOriginal => {
     saveRoutingTable: vi.fn(),
     upsertCaseResult: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
+    listQueuedRemeasures: vi.fn().mockResolvedValue([]),
+    settleRemeasuresForRun: vi.fn().mockResolvedValue(undefined),
     listStaleRunningDeciderRuns: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),
@@ -131,7 +133,7 @@ import { createSystemOneClient } from './openrouter';
 import type { DeciderJudge } from './grading';
 import {
   beginPaidCase,
-  hasPaidCase,
+  getPaidCasePromptRevision,
   claimScheduledChunks,
   clearUnbilledCase,
   cooldownProviders,
@@ -281,7 +283,7 @@ beforeEach(() => {
   vi.mocked(beginPaidCase).mockResolvedValue(true);
   vi.mocked(restartPaidCase).mockResolvedValue(true);
   vi.mocked(getPaidCaseStartedAt).mockResolvedValue(null);
-  vi.mocked(hasPaidCase).mockResolvedValue(true);
+  vi.mocked(getPaidCasePromptRevision).mockResolvedValue(2);
   vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
   vi.mocked(hasUnsettledChunks).mockResolvedValue(false);
@@ -933,7 +935,22 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(savePendingDeciderOutput).toHaveBeenCalledWith(
       env.BENCH_DB,
       { run_id: runId, model, variant: '', rep: 0, case_id: benchCase.id },
-      { result: expect.objectContaining({ text: '42', exitCode: 0 }), retried: false }
+      {
+        result: expect.objectContaining({ text: '42', exitCode: 0 }),
+        retried: false,
+        promptRevision: 2,
+      }
+    );
+
+    // The paid call was opened before this transport existed, so its output stays old.
+    vi.mocked(getPaidCasePromptRevision).mockResolvedValue(1);
+    await expect(
+      acceptContainerCaseResult(env, { execution, outcome: { kind: 'completed', response } })
+    ).resolves.toBe(true);
+    expect(savePendingDeciderOutput).toHaveBeenLastCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ case_id: benchCase.id }),
+      expect.objectContaining({ promptRevision: 1 })
     );
 
     await expect(
@@ -941,11 +958,25 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     ).resolves.toBe(true);
     expect(clearUnbilledCase).toHaveBeenCalledWith(env.BENCH_DB, execution);
 
-    vi.mocked(hasPaidCase).mockResolvedValue(false);
+    vi.mocked(getPaidCasePromptRevision).mockResolvedValue(null);
     await expect(
       acceptContainerCaseResult(env, { execution, outcome: { kind: 'not_started' } })
     ).resolves.toBe(false);
     expect(clearUnbilledCase).toHaveBeenCalledTimes(1);
+  });
+
+  it('stores a recovered output under the transport that produced it', async () => {
+    const result = { ...successfulCliResult, text: '42' };
+    vi.mocked(getPendingDeciderOutput).mockResolvedValue({
+      result,
+      retried: false,
+      promptRevision: 1,
+    });
+    await processJob(env, deciderMessage());
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ case_id: benchCase.id, prompt_revision: 1 })
+    );
   });
 
   it('persists raw failed output and CLI diagnostics before saving its grade', async () => {
@@ -1025,6 +1056,7 @@ describe('processJob — canonical registry publication', () => {
         last_event_types: 'x',
         rep: 0,
         timed_out: 0,
+        prompt_revision: 2,
       }))
     );
     vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([benchCase.id]));

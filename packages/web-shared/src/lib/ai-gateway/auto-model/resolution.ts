@@ -9,7 +9,18 @@ import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import {
+  isCustomRouterModelId,
+  isVirtualAutoModelId,
+  parseCustomRouterModelId,
+  type AutoRoutingDecision,
+  type CustomRouterErrorCode,
+  type CustomRouterReference,
+} from '@kilocode/auto-routing-contracts';
+import {
+  CUSTOM_ROUTER_NOT_FOUND,
+  type CustomRouterResolution,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
 import {
   AUTO_SMALL_TARGET_MODELS,
   KILO_AUTO_FREE_MODEL,
@@ -57,6 +68,8 @@ type ResolveAutoModelParams = {
   // Decisions are lazy so only the selected router captures the request body.
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   frontierDecision?: () => Promise<AutoRoutingDecision | null>;
+  customRouterDecision?: (reference: CustomRouterReference) => Promise<CustomRouterResolution>;
+  legacyPoolRouter?: () => Promise<CustomRouterReference | null>;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -143,7 +156,9 @@ function resolveOrganizationAutoRouteTarget(
 export type ResolveAutoModelResult =
   | { kind: 'ok'; resolved: ResolvedAutoModel; routingTarget?: string }
   | { kind: 'no_free_models_available' }
-  | { kind: 'organization_auto_configuration_error'; message: string };
+  | { kind: 'organization_auto_configuration_error'; message: string }
+  | { kind: 'custom_router_error'; code: CustomRouterErrorCode; message: string }
+  | { kind: 'auto_routing_unavailable' };
 
 async function resolveOrganizationAutoModel(
   params: ResolveAutoModelParams,
@@ -215,7 +230,10 @@ async function resolveOrganizationAutoModel(
     };
   }
 
-  if (isOrganizationAutoTargetModel(validation.modelId)) {
+  if (
+    isOrganizationAutoTargetModel(validation.modelId) ||
+    isCustomRouterModelId(validation.modelId)
+  ) {
     const nestedResult = await resolveAutoModel(
       {
         ...params,
@@ -239,22 +257,30 @@ async function resolveOrganizationAutoModel(
 
 /**
  * Resolve exact catalog variants, rejecting missing variants rather than
- * serving implicit defaults. Effort-only decisions support rolling deploys.
+ * serving implicit defaults.
  */
+export async function resolveCatalogVariant(
+  model: string,
+  variant: string | null
+): Promise<ResolvedAutoModel | null> {
+  if (variant === null) return { model };
+  const variants = await getModelVariants(model, true);
+  const variantSettings: OpenCodeVariant | undefined = variants?.[variant];
+  if (!variantSettings) {
+    return null;
+  }
+  return {
+    model,
+    ...(variantSettings.reasoning ? { reasoning: { ...variantSettings.reasoning } } : {}),
+    ...(variantSettings.verbosity ? { verbosity: variantSettings.verbosity } : {}),
+  };
+}
+
 async function resolveAutoRoutingDecisionModel(
   decision: AutoRoutingDecision
 ): Promise<ResolvedAutoModel | null> {
   if (decision.variant != null) {
-    const variants = await getModelVariants(decision.model, true);
-    const variantSettings: OpenCodeVariant | undefined = variants?.[decision.variant];
-    if (!variantSettings) {
-      return null;
-    }
-    return {
-      model: decision.model,
-      ...(variantSettings.reasoning ? { reasoning: { ...variantSettings.reasoning } } : {}),
-      ...(variantSettings.verbosity ? { verbosity: variantSettings.verbosity } : {}),
-    };
+    return await resolveCatalogVariant(decision.model, decision.variant);
   }
 
   // Legacy effort-only decisions (old workers during rolling deploy).
@@ -266,6 +292,29 @@ async function resolveAutoRoutingDecisionModel(
   };
 }
 
+async function resolveCustomRouterModel(
+  params: ResolveAutoModelParams,
+  reference: CustomRouterReference | null
+): Promise<ResolveAutoModelResult> {
+  const resolution =
+    reference && params.customRouterDecision
+      ? await params.customRouterDecision(reference)
+      : CUSTOM_ROUTER_NOT_FOUND;
+  if (resolution.kind === 'unavailable') return { kind: 'auto_routing_unavailable' };
+  if (resolution.kind === 'rejected') {
+    return { kind: 'custom_router_error', code: resolution.code, message: resolution.message };
+  }
+  const resolved = await resolveAutoRoutingDecisionModel(resolution.decision);
+  if (!resolved) {
+    return {
+      kind: 'custom_router_error',
+      code: 'custom_router_unavailable',
+      message: `The selected variant of ${resolution.decision.model} is not in the model catalog`,
+    };
+  }
+  return { kind: 'ok', resolved };
+}
+
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
@@ -274,6 +323,9 @@ export async function resolveAutoModel(
   const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
   if (model === ORG_AUTO_MODEL.id) {
     return await resolveOrganizationAutoModel(params, userPromise, balancePromise);
+  }
+  if (isCustomRouterModelId(model)) {
+    return await resolveCustomRouterModel(params, parseCustomRouterModelId(model));
   }
   if (model === KILO_AUTO_FREE_MODEL.id) {
     let candidates = await getEligibleAutoFreeModels(apiKind);
@@ -325,8 +377,24 @@ export async function resolveAutoModel(
     };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
+    if (params.legacyPoolRouter) {
+      let reference: CustomRouterReference | null;
+      try {
+        reference = await params.legacyPoolRouter();
+      } catch {
+        return { kind: 'auto_routing_unavailable' };
+      }
+      if (reference) return resolveCustomRouterModel(params, reference);
+    }
     const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
-    const decision = params.efficientDecision ? await params.efficientDecision() : null;
+    let decision: AutoRoutingDecision | null = null;
+    if (params.efficientDecision) {
+      try {
+        decision = await params.efficientDecision();
+      } catch {
+        return { kind: 'auto_routing_unavailable' };
+      }
+    }
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = await resolveAutoRoutingDecisionModel(decision);
       if (resolvedFromDecision) {
@@ -362,10 +430,13 @@ export async function applyResolvedAutoModel(
   balancePromise: Promise<number>
 ): Promise<ResolveAutoModelResult> {
   const result = await resolveAutoModel(params, userPromise, balancePromise);
-  if (result.kind !== 'ok') {
-    return result;
+  if (result.kind === 'ok') {
+    applyResolvedModel(request, result.resolved);
   }
-  const resolved = result.resolved;
+  return result;
+}
+
+export function applyResolvedModel(request: GatewayRequest, resolved: ResolvedAutoModel): void {
   request.body.model = resolved.model;
   if (resolved.reasoning) {
     if (request.kind === 'messages') {
@@ -392,5 +463,4 @@ export async function applyResolvedAutoModel(
       request.body.verbosity = resolved.verbosity as OpenRouterChatCompletionRequest['verbosity'];
     }
   }
-  return result;
 }

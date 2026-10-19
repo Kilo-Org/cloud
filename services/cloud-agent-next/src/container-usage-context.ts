@@ -6,7 +6,7 @@ import {
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
-import { isContainerConcurrencyLimitError } from './container-concurrency.js';
+import { getContainerCapacityFailureReason } from './container-concurrency.js';
 import {
   getSandboxAllocationResources,
   type CloudflareContainersInstance,
@@ -388,7 +388,7 @@ export async function ensureSandboxBillingAdmissionInput(
   try {
     return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
   } catch (error) {
-    if (isContainerConcurrencyLimitError(error)) throw error;
+    if (getContainerCapacityFailureReason(error)) throw error;
     return {
       success: false,
       code: 'meter_unavailable',

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
+import { readBoundedBodyBytes } from './bounded-request-body.js';
 import { appRouter } from './router.js';
 import type { Env } from './types.js';
 import type { HonoContext } from './hono-context.js';
@@ -1002,6 +1003,20 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
 
 const ALLOWED_LOG_FILENAMES = new Set(['logs.tar.gz']);
 const MAX_LOG_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
+// Archive retention for the logs/ prefix is governed by the bucket's own
+// lifecycle policy; this cap keeps the per-session object count bounded.
+const MAX_LOG_OBJECTS_PER_SESSION = 500;
+
+// Legacy wrappers upload the literal `session`; the current wrapper uploads
+// `createLogArchiveId(wrapperRunId)` = `wr_<32 hex>--<uuid v4>`.
+const LOG_ARCHIVE_ID_PATTERN =
+  /^(?:session|wr_[0-9a-f]{32}--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+
+function logUploadContentLengthTooLarge(header: string | undefined): boolean {
+  if (header === undefined) return false;
+  const value = Number(header);
+  return !Number.isInteger(value) || value < 0 || value > MAX_LOG_UPLOAD_BYTES;
+}
 
 app.put(
   '/sessions/:userId/:sessionId/logs/:executionId/:filename',
@@ -1026,6 +1041,10 @@ app.put(
 
     if (!ALLOWED_LOG_FILENAMES.has(filename)) {
       return c.text('Invalid filename', 400);
+    }
+
+    if (!LOG_ARCHIVE_ID_PATTERN.test(executionId)) {
+      return c.text('Invalid executionId', 400);
     }
 
     const ticketAuth = await authorizeWrapperTicketForSession(c, userId, sessionId);
@@ -1061,30 +1080,48 @@ app.put(
       return projectSessionAccessHttpError(error);
     }
 
-    const contentLength = parseInt(c.req.header('Content-Length') ?? '', 10);
-    if (contentLength > MAX_LOG_UPLOAD_BYTES) {
+    if (logUploadContentLengthTooLarge(c.req.header('Content-Length'))) {
       return c.text('Request body too large', 413);
     }
 
-    // Buffer the body — R2 requires a known-length value (ArrayBuffer, string, etc.)
-    const body = await c.req.arrayBuffer();
+    // Apply the size cap while the body streams in.
+    const body = await readBoundedBodyBytes(c.req.raw, MAX_LOG_UPLOAD_BYTES);
+    if (body === null) {
+      return c.text('Request body too large', 413);
+    }
     if (body.byteLength === 0) {
       return c.text('Missing request body', 400);
-    }
-    if (body.byteLength > MAX_LOG_UPLOAD_BYTES) {
-      return c.text('Request body too large', 413);
     }
 
     const safeUserId = encodeURIComponent(userId);
     const safeSessionId = encodeURIComponent(sessionId);
     const safeExecutionId = encodeURIComponent(executionId);
+    const objectKey = `logs/${safeUserId}/${safeSessionId}/${safeExecutionId}/${filename}`;
+
+    // Keep the number of archives a session prefix holds within the cap.
+    // Re-uploading an existing archive key stays allowed at the cap, and a
+    // count-check outage fails closed.
+    let existing: { objects: Array<{ key: string }> };
+    try {
+      existing = await c.env.R2_BUCKET.list({
+        prefix: `logs/${safeUserId}/${safeSessionId}/`,
+        limit: MAX_LOG_OBJECTS_PER_SESSION + 1,
+      });
+    } catch (err) {
+      logger
+        .withFields({ error: err instanceof Error ? err.message : String(err) })
+        .error('R2 list failed for log upload');
+      return c.text('Log archive limit check failed', 500);
+    }
+    const atCap = existing.objects.length > MAX_LOG_OBJECTS_PER_SESSION;
+    if (atCap && !existing.objects.some(obj => obj.key === objectKey)) {
+      return c.text('Too many log archives for this session', 429);
+    }
 
     try {
-      await c.env.R2_BUCKET.put(
-        `logs/${safeUserId}/${safeSessionId}/${safeExecutionId}/${filename}`,
-        body,
-        { httpMetadata: { contentType: 'application/gzip' } }
-      );
+      await c.env.R2_BUCKET.put(objectKey, body, {
+        httpMetadata: { contentType: 'application/gzip' },
+      });
     } catch (err) {
       logger
         .withFields({ error: err instanceof Error ? err.message : String(err) })

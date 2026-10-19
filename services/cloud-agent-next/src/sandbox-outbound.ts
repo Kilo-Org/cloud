@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { ContainerProxy } from '@cloudflare/sandbox';
 import { z } from 'zod';
+import { readBoundedRequestBodyBytes } from './bounded-request-body.js';
 import { logger } from './logger.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 import {
@@ -196,39 +197,6 @@ function isKiloSessionBootstrapRequest(request: Request): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Reads a clone of the request body, stopping as soon as it exceeds maxBytes
- * so an unbounded (or under-declared) body is never fully buffered.
- */
-async function readBoundedRequestBodyBytes(
-  request: Request,
-  maxBytes: number
-): Promise<Uint8Array | undefined> {
-  const body: ReadableStream<Uint8Array> | null = request.clone().body;
-  if (!body) return undefined;
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) return undefined;
-      chunks.push(value);
-    }
-  } finally {
-    reader.cancel().catch(() => {});
-  }
-  const buffer = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    buffer.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return buffer;
 }
 
 async function readBoundedRequestBody(

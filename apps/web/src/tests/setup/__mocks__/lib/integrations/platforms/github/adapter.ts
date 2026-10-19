@@ -31,7 +31,7 @@ export async function getCollaboratorPermissionLevel(
   _owner: string,
   _repo: string,
   _username: string
-): Promise<'admin' | 'write' | 'read' | 'none' | null> {
+): Promise<'admin' | 'write' | 'maintain' | 'read' | 'none' | null> {
   return 'write';
 }
 

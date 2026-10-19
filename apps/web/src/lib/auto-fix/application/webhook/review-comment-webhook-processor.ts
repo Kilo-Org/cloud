@@ -26,26 +26,15 @@ import {
 } from '@/lib/integrations/platforms/github/adapter';
 import { AutoFixAgentConfigSchema } from '../../core/schemas';
 import type { Owner } from '../../core/schemas';
-import type {
-  PullRequestReviewCommentPayload,
-  GitHubAuthorAssociation,
-} from '@/lib/integrations/platforms/github/webhook-schemas';
+import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { parseFixCommand } from '@kilocode/app-shared/code-review';
 import { isLikelyKiloBotActor } from '@/lib/code-reviews/review-memory/github-feedback';
 
-/**
- * author_association values that imply write access.
- * GitHub's author_association field is unreliable — org members sometimes appear
- * as CONTRIBUTOR in webhook payloads. When the value is not in this set we fall
- * back to an API check.
- */
-const WRITE_ACCESS_ASSOCIATIONS = new Set<GitHubAuthorAssociation>([
-  'OWNER',
-  'MEMBER',
-  'COLLABORATOR',
-]);
-
-const WRITE_PERMISSION_LEVELS = new Set(['admin', 'write']);
+const WRITE_PERMISSION_LEVELS: Record<string, true> = {
+  admin: true,
+  write: true,
+  maintain: true,
+};
 
 export class ReviewCommentWebhookProcessor {
   async process(
@@ -100,42 +89,32 @@ export class ReviewCommentWebhookProcessor {
     }
 
     // 2. Check author permissions for write access
-    //    author_association from the webhook payload is checked first, but it is
-    //    unreliable (e.g. org members may appear as CONTRIBUTOR). When the fast
-    //    check fails we fall back to the collaborator permission API.
-    if (!WRITE_ACCESS_ASSOCIATIONS.has(comment.author_association)) {
-      const permission = await getCollaboratorPermissionLevel(
-        installationId,
-        repoOwner,
-        repoName,
-        comment.user.login
-      );
+    //    The permission API is the source of truth. author_association from the
+    //    webhook payload reports the commenter's association with the repository
+    //    (org member, collaborator, owner), not their effective permission, so it
+    //    is only logged for context — never used to admit.
+    const permission = await getCollaboratorPermissionLevel(
+      installationId,
+      repoOwner,
+      repoName,
+      comment.user.login,
+      integration.github_app_type ?? 'standard'
+    );
 
-      if (!permission || !WRITE_PERMISSION_LEVELS.has(permission)) {
-        logExceptInTest('[ReviewCommentWebhookProcessor] Author lacks write access', {
-          commentId: comment.id,
-          authorAssociation: comment.author_association,
-          apiPermission: permission,
-          author: comment.user.login,
-        });
-        // Add thumbs-down reaction to indicate permission denied
-        try {
-          await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, '-1');
-        } catch {
-          // Best-effort reaction
-        }
-        return;
+    if (!permission || !WRITE_PERMISSION_LEVELS[permission]) {
+      logExceptInTest('[ReviewCommentWebhookProcessor] Author lacks write access', {
+        commentId: comment.id,
+        authorAssociation: comment.author_association,
+        apiPermission: permission,
+        author: comment.user.login,
+      });
+      // Add thumbs-down reaction to indicate permission denied
+      try {
+        await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, '-1');
+      } catch {
+        // Best-effort reaction
       }
-
-      logExceptInTest(
-        '[ReviewCommentWebhookProcessor] author_association was insufficient but API confirms write access',
-        {
-          commentId: comment.id,
-          authorAssociation: comment.author_association,
-          apiPermission: permission,
-          author: comment.user.login,
-        }
-      );
+      return;
     }
 
     // 3. Build owner object

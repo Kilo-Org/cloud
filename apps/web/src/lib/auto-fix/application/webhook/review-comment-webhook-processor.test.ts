@@ -74,8 +74,8 @@ function buildPayload(body: string): PullRequestReviewCommentPayload {
       path: 'src/widget.ts',
       line: 10,
       diff_hunk: '@@',
-      // MEMBER is in WRITE_ACCESS_ASSOCIATIONS so the permission API
-      // fallback (also mocked) is skipped.
+      // The processor verifies the author with the permission API for every
+      // association value; author_association is never used to admit.
       author_association: 'MEMBER',
     },
     pull_request: {
@@ -112,6 +112,8 @@ describe('ReviewCommentWebhookProcessor admission', () => {
     jest.clearAllMocks();
     // Default: comments are authored by humans, so admission proceeds.
     mockIsLikelyKiloBotActor.mockReturnValue(false);
+    // Default: the permission API verifies the commenter as write-capable.
+    mockGetCollaboratorPermissionLevel.mockResolvedValue('write');
     processor = new ReviewCommentWebhookProcessor();
   });
 
@@ -128,6 +130,13 @@ describe('ReviewCommentWebhookProcessor admission', () => {
     await expect(processor.process(buildPayload(body), integration)).rejects.toThrow('admitted');
 
     expect(mockParseFixCommand).toHaveBeenCalledWith(body);
+    expect(mockGetCollaboratorPermissionLevel).toHaveBeenCalledWith(
+      '123',
+      'acme',
+      'widgets',
+      'maintainer',
+      'standard'
+    );
     expect(mockGetAgentConfigForOwner).toHaveBeenCalledTimes(1);
   });
 
@@ -140,6 +149,88 @@ describe('ReviewCommentWebhookProcessor admission', () => {
 
     expect(mockParseFixCommand).toHaveBeenCalledWith(body);
     expect(mockGetAgentConfigForOwner).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['OWNER', 'MEMBER', 'COLLABORATOR'] as const)(
+    'denies a %s commenter whose API-verified permission is read',
+    async association => {
+      const body = '@kilo fix this';
+      const payload = buildPayload(body);
+      payload.comment.author_association = association;
+      mockParseFixCommand.mockReturnValue(true);
+      mockGetCollaboratorPermissionLevel.mockResolvedValue('read');
+
+      await processor.process(payload, integration);
+
+      expect(mockGetCollaboratorPermissionLevel).toHaveBeenCalledTimes(1);
+      expect(mockAddReactionToPRReviewComment).toHaveBeenCalledWith(
+        '123',
+        'acme',
+        'widgets',
+        1,
+        '-1'
+      );
+      expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+      expect(mockFindExistingReviewCommentFixTicket).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['OWNER', 'MEMBER', 'COLLABORATOR'] as const)(
+    'denies a %s commenter whose API-verified permission is none',
+    async association => {
+      const body = '@kilo fix this';
+      const payload = buildPayload(body);
+      payload.comment.author_association = association;
+      mockParseFixCommand.mockReturnValue(true);
+      mockGetCollaboratorPermissionLevel.mockResolvedValue('none');
+
+      await processor.process(payload, integration);
+
+      expect(mockAddReactionToPRReviewComment).toHaveBeenCalledWith(
+        '123',
+        'acme',
+        'widgets',
+        1,
+        '-1'
+      );
+      expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+      expect(mockFindExistingReviewCommentFixTicket).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['OWNER', 'MEMBER', 'COLLABORATOR'] as const)(
+    'denies a %s commenter when the permission API fails',
+    async association => {
+      const body = '@kilo fix this';
+      const payload = buildPayload(body);
+      payload.comment.author_association = association;
+      mockParseFixCommand.mockReturnValue(true);
+      mockGetCollaboratorPermissionLevel.mockResolvedValue(null);
+
+      await processor.process(payload, integration);
+
+      expect(mockAddReactionToPRReviewComment).toHaveBeenCalledWith(
+        '123',
+        'acme',
+        'widgets',
+        1,
+        '-1'
+      );
+      expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+      expect(mockFindExistingReviewCommentFixTicket).not.toHaveBeenCalled();
+    }
+  );
+
+  it('admits a MEMBER commenter whose API-verified permission is maintain', async () => {
+    const body = '@kilo fix this';
+    mockParseFixCommand.mockReturnValue(true);
+    mockGetCollaboratorPermissionLevel.mockResolvedValue('maintain');
+    mockGetAgentConfigForOwner.mockRejectedValue(new Error('admitted'));
+
+    await expect(processor.process(buildPayload(body), integration)).rejects.toThrow('admitted');
+
+    expect(mockGetAgentConfigForOwner).toHaveBeenCalledTimes(1);
+    expect(mockAddReactionToPRReviewComment).not.toHaveBeenCalled();
   });
 
   it('rejects a non-matching body without calling getAgentConfigForOwner', async () => {

@@ -442,9 +442,15 @@ export async function addReactionToPRReviewComment(
  * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  */
-export type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
+export type CollaboratorPermission = 'admin' | 'write' | 'maintain' | 'read' | 'none';
 
-const KNOWN_PERMISSIONS = new Set<string>(['admin', 'write', 'read', 'none']);
+const KNOWN_PERMISSIONS: Record<string, true> = {
+  admin: true,
+  write: true,
+  maintain: true,
+  read: true,
+  none: true,
+};
 
 export async function getCollaboratorPermissionLevel(
   installationId: string,
@@ -463,7 +469,7 @@ export async function getCollaboratorPermissionLevel(
       username,
     });
 
-    if (KNOWN_PERMISSIONS.has(data.permission)) {
+    if (KNOWN_PERMISSIONS[data.permission]) {
       // Safe: value validated against the known set above
       return data.permission as CollaboratorPermission;
     }

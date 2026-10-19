@@ -42,7 +42,7 @@ export const GLANCEABLE_SNAPSHOT_STATUSES = [
 
 export type GlanceableAgentsSnapshotStatus = (typeof GLANCEABLE_SNAPSHOT_STATUSES)[number];
 
-/** The one kind vocabulary every surface reads, in priority order. */
+/** The one kind vocabulary every surface reads (membership only; consumers own presentation order). */
 export const GLANCEABLE_STATUS_KINDS = ['needsInput', 'running', 'idle', 'scheduled'] as const;
 
 /** What a session's status means to a user: the one vocabulary every surface reads. */

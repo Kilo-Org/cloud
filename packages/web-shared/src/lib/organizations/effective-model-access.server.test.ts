@@ -157,12 +157,14 @@ describe('effective organization model access', () => {
   });
 
   describe('custom LLMs', () => {
+    const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
     const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+    const organization = { ...context().organization, id: ORG_ID };
 
     beforeAll(async () => {
       await insertCustomLlmForTest(
         'acme/org-model',
-        customLlmDefinition({ organization_ids: [context().organization.id] })
+        customLlmDefinition({ organization_ids: [ORG_ID] })
       );
       await insertCustomLlmForTest(
         'acme/group-model',
@@ -181,7 +183,7 @@ describe('effective organization model access', () => {
     });
 
     it('exempts a custom LLM granted to the organization', async () => {
-      const policy = evaluateEffectiveModelAccessPolicy(context());
+      const policy = evaluateEffectiveModelAccessPolicy(context({ organization }));
 
       await expect(
         getEffectiveModelDecision(policy, 'acme/org-model', async () => new Set())
@@ -189,7 +191,9 @@ describe('effective organization model access', () => {
     });
 
     it('exempts a custom LLM granted to one of the member groups', async () => {
-      const policy = evaluateEffectiveModelAccessPolicy(context({ groupIds: [GROUP_ID] }));
+      const policy = evaluateEffectiveModelAccessPolicy(
+        context({ organization, groupIds: [GROUP_ID] })
+      );
 
       await expect(
         getEffectiveModelDecision(policy, 'acme/group-model', async () => new Set())
@@ -199,7 +203,7 @@ describe('effective organization model access', () => {
     it.each(['acme/other-org-model', 'acme/group-model'])(
       'applies organization policy to %s when it is not granted',
       async modelId => {
-        const policy = evaluateEffectiveModelAccessPolicy(context());
+        const policy = evaluateEffectiveModelAccessPolicy(context({ organization }));
 
         await expect(
           getEffectiveModelDecision(policy, modelId, async () => new Set())

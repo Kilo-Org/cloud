@@ -34,7 +34,7 @@ async function insertCustomLlm(credentials: CustomLlmCredentials) {
 
 function resolveProvider(
   user: User | AnonymousUserContext = { id: 'user-id' } as User,
-  organizationId: string | undefined = ORG_ID
+  organizationId: string | null = ORG_ID
 ) {
   return getProvider({
     requestedModel: PUBLIC_ID,
@@ -43,7 +43,7 @@ function resolveProvider(
       body: { model: PUBLIC_ID, messages: [{ role: 'user', content: 'hi' }] },
     },
     user,
-    organizationId,
+    organizationId: organizationId ?? undefined,
   });
 }
 
@@ -99,8 +99,8 @@ describe('getProvider custom LLM credentials', () => {
 
   it.each([
     ['another organization', { id: 'user-id' } as User, '00000000-0000-4000-8000-000000000002'],
-    ['a personal account', { id: 'user-id' } as User, undefined],
-    ['an anonymous caller', createAnonymousContext('127.0.0.1'), undefined],
+    ['a personal account', { id: 'user-id' } as User, null],
+    ['an anonymous caller', createAnonymousContext('127.0.0.1'), null],
   ])(
     'fails closed for %s instead of falling back to another upstream',
     async (_caller, user, orgId) => {

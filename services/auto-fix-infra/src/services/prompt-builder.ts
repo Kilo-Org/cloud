@@ -49,39 +49,37 @@ const neutralizeEnvelopeDelimiters = (input: string): string =>
   input.replace(/<()(\/?untrusted_[a-z_]+)/gi, '&lt;$2');
 
 /**
- * Limit text to a maximum number of characters without splitting a code point.
+ * Cap text at a maximum number of code points, adding a truncation note only
+ * when content was actually removed.
  */
-const truncateByCodePoints = (input: string, max: number): string =>
-  Array.from(input).slice(0, max).join('');
+const capByCodePoints = (input: string, max: number): string => {
+  const codePoints = Array.from(input);
+  if (codePoints.length <= max) {
+    return input;
+  }
+  return `${codePoints.slice(0, max).join('')}\n[truncated]`;
+};
 
 /**
  * Condition issue-derived text before it is embedded in the prompt as a
  * labeled data section.
  */
-const sanitizeIssueTextInput = (input: string): string => {
-  let sanitized = neutralizeEnvelopeDelimiters(sanitizeInputPatterns(input));
-
-  if (sanitized.length > MAX_ISSUE_TEXT_LENGTH) {
-    sanitized = `${truncateByCodePoints(sanitized, MAX_ISSUE_TEXT_LENGTH)}\n[truncated]`;
-  }
-
-  return sanitized;
-};
+const sanitizeIssueTextInput = (input: string): string =>
+  capByCodePoints(
+    neutralizeEnvelopeDelimiters(sanitizeInputPatterns(input)),
+    MAX_ISSUE_TEXT_LENGTH
+  );
 
 /**
  * Condition the issue body for embedding: rewrite section labels, replace
  * override phrases, and cap length while keeping fenced code content intact,
  * since that content usually holds reproduction details.
  */
-const sanitizeIssueBodyInput = (input: string): string => {
-  let sanitized = neutralizeEnvelopeDelimiters(replaceOverridePhrases(input));
-
-  if (sanitized.length > MAX_ISSUE_TEXT_LENGTH) {
-    sanitized = `${truncateByCodePoints(sanitized, MAX_ISSUE_TEXT_LENGTH)}\n[truncated]`;
-  }
-
-  return sanitized;
-};
+const sanitizeIssueBodyInput = (input: string): string =>
+  capByCodePoints(
+    neutralizeEnvelopeDelimiters(replaceOverridePhrases(input)),
+    MAX_ISSUE_TEXT_LENGTH
+  );
 
 /**
  * Replace override phrases found in external text with a fixed marker.

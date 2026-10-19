@@ -20,10 +20,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   );
   return {
     ...actual,
-    getKiloExclusiveInferenceProviderRestriction: (modelId: string) =>
+    getKiloExclusiveInferenceProviders: (modelId: string) =>
       modelId === 'test/restricted-exclusive'
         ? new Set(['stepfun'])
-        : actual.getKiloExclusiveInferenceProviderRestriction(modelId),
+        : actual.getKiloExclusiveInferenceProviders(modelId),
   };
 });
 

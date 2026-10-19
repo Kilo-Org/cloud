@@ -5,7 +5,7 @@ import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { desc, eq } from 'drizzle-orm';
-import { getKiloExclusiveInferenceProviderRestriction } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getKiloExclusiveInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -158,7 +158,7 @@ export async function getEffectiveModelDecision(
   ) {
     return { allowed: false, denialSource: 'organization_model' };
   }
-  const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
+  const exclusiveProviders = getKiloExclusiveInferenceProviders(modelId);
   const currentModelProviders =
     exclusiveProviders ??
     (policy.requireModelInCurrentSnapshot ? await providerLookup(modelId) : undefined);

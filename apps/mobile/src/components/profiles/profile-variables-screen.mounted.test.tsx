@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness pins the form, secret-masking, and delete flows for the variables screen */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

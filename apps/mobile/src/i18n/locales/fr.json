@@ -3851,5 +3851,9 @@
       "title": "Enregistrer dans une liste",
       "saved": "Enregistré dans {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Abandonner les modifications ?",
+    "discardMessage": "Vos modifications seront perdues."
   }
 }

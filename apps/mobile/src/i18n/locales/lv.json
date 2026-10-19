@@ -3851,5 +3851,9 @@
       "title": "Saglabāt sarakstā",
       "saved": "Saglabāts sarakstā {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Atmest izmaiņas?",
+    "discardMessage": "Tavas izmaiņas tiks dzēstas."
   }
 }

@@ -3806,5 +3806,9 @@
       "title": "Stoor in lys",
       "saved": "Gestoor in {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Veranderinge weggooi?",
+    "discardMessage": "Jou veranderinge sal verlore gaan."
   }
 }

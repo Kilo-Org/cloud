@@ -3896,5 +3896,9 @@
       "title": "Shrani na seznam",
       "saved": "Shranjeno na seznam {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Želiš zavreči spremembe?",
+    "discardMessage": "Tvoje spremembe se ne bodo shranile."
   }
 }

@@ -3806,5 +3806,9 @@
       "title": "Tiaki ki te rārangi",
       "saved": "Kua tiakina ki {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Whakarere ngā rerekētanga?",
+    "discardMessage": "Ka ngaro ō rerekētanga."
   }
 }

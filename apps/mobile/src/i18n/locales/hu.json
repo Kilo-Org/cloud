@@ -3806,5 +3806,9 @@
       "title": "Mentés listába",
       "saved": "Elmentve a listába: {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Módosítások elvetése?",
+    "discardMessage": "A módosításaid elvesznek."
   }
 }

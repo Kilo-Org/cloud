@@ -3806,5 +3806,9 @@
       "title": "Tehirizo ao amin'ny lisitra",
       "saved": "Voatahiry ao amin'ny {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Hariana ve ny fanovana?",
+    "discardMessage": "Ho very ny fanovanao."
   }
 }

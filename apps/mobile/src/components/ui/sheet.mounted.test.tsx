@@ -168,6 +168,16 @@ describe('Sheet', () => {
     expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
   });
 
+  it('lets a caller turn the pan-down dismissal off', async () => {
+    const { renderer } = await mount({ enablePanDownToClose: false });
+    const node = sheet(renderer);
+    if (!node) {
+      throw new Error('sheet not rendered');
+    }
+
+    expect(node.props.enablePanDownToClose).toBe(false);
+  });
+
   it('hides the drag indicator when asked', async () => {
     const { renderer } = await mount({ showHandle: false });
     const node = sheet(renderer);

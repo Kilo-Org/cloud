@@ -15,6 +15,7 @@ import {
   PERMISSION_TOOLS,
   validateAgentForm,
 } from '@/components/profiles/profile-agents-model';
+import { useSheetDiscardGuard } from '@/components/ui/sheet-discard-guard';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
@@ -88,6 +89,28 @@ export function AgentFormSheet({
     models.find(option => option.id === model.trim())?.variants ?? [];
   const variants = variantsFor(modelValue);
 
+  // Unsaved-changes check, evaluated at close time: the text fields keep their
+  // live values in refs (uncontrolled), so comparing every ref and the control
+  // states against the seeded form answers "would a discard lose anything?"
+  // without a re-render per keystroke.
+  const isDirty = () =>
+    slugRef.current !== initial.slug ||
+    nameRef.current !== initial.name ||
+    descriptionRef.current !== initial.description ||
+    promptRef.current !== initial.prompt ||
+    modelRef.current !== initial.model ||
+    stepsRef.current !== initial.steps ||
+    temperatureRef.current !== initial.temperature ||
+    topPRef.current !== initial.topP ||
+    visibility !== initial.visibility ||
+    variant !== initial.variant ||
+    disabledTools.length !== initial.disabledTools.length ||
+    disabledTools.some(tool => !initial.disabledTools.includes(tool));
+  const { requestClose, confirmDialog } = useSheetDiscardGuard({
+    isDirty,
+    onClose,
+  });
+
   const submit = () => {
     const state: AgentFormState = {
       slug: slugRef.current,
@@ -112,11 +135,11 @@ export function AgentFormSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={requestClose}>
       <SheetHeader
         title={agent === null ? t('profiles.agents.add') : agent.name}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
         disabled={isSaving}
         topInset="ios-page-sheet"
@@ -299,6 +322,7 @@ export function AgentFormSheet({
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {confirmDialog}
     </SessionPageSheet>
   );
 }

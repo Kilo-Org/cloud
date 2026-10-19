@@ -3896,5 +3896,9 @@
       "title": "Uložit do seznamu",
       "saved": "Uloženo do {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Zahodit změny?",
+    "discardMessage": "Vaše změny se ztratí."
   }
 }

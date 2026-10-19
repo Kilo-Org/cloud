@@ -3806,5 +3806,9 @@
       "title": "Londoloza ohlwini",
       "saved": "Kulondolozwe ku-{{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Uyafuna ukulahla izinguquko?",
+    "discardMessage": "Izinguquko zakho zizolahleka."
   }
 }

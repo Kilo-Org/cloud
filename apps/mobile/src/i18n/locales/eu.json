@@ -3806,5 +3806,9 @@
       "title": "Gorde zerrendan",
       "saved": "{{list}} zerrendan gordeta"
     }
+  },
+  "sheet": {
+    "discardTitle": "Baztertu aldaketak?",
+    "discardMessage": "Zure aldaketak galduko dira."
   }
 }

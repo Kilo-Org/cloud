@@ -3806,5 +3806,9 @@
       "title": "Lưu vào danh sách",
       "saved": "Đã lưu vào {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Hủy thay đổi?",
+    "discardMessage": "Các thay đổi của bạn sẽ bị mất."
   }
 }

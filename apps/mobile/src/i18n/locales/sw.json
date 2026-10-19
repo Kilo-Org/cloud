@@ -3806,5 +3806,9 @@
       "title": "Hifadhi kwenye orodha",
       "saved": "Imehifadhiwa kwenye {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Ungependa kutupa mabadiliko?",
+    "discardMessage": "Mabadiliko yako yatapotea."
   }
 }

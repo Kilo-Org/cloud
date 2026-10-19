@@ -3806,5 +3806,9 @@
       "title": "Ku kaydi liiska",
       "saved": "Waxaa lagu kaydiyay {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Ma tirtiraysaa isbedelada?",
+    "discardMessage": "Isbeddelkaadu way lumi doontaa."
   }
 }

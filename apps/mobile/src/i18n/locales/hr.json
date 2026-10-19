@@ -3851,5 +3851,9 @@
       "title": "Spremi na popis",
       "saved": "Spremljeno na popis {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Odbaciti promjene?",
+    "discardMessage": "Tvoje će se promjene izgubiti."
   }
 }

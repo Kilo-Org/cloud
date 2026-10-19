@@ -3851,5 +3851,9 @@
       "title": "Salvează în listă",
       "saved": "Salvat în {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Renunți la modificări?",
+    "discardMessage": "Modificările tale se vor pierde."
   }
 }

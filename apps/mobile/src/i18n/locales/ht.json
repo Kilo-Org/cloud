@@ -3806,5 +3806,9 @@
       "title": "Anrejistre nan lis",
       "saved": "Anrejistre nan {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Jete chanjman yo?",
+    "discardMessage": "Ou ap pèdi chanjman ou yo."
   }
 }

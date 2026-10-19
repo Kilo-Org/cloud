@@ -3806,5 +3806,9 @@
       "title": "Listeye kaydet",
       "saved": "{{list}} listesine kaydedildi"
     }
+  },
+  "sheet": {
+    "discardTitle": "Değişiklikler silinsin mi?",
+    "discardMessage": "Değişikliklerin kaybolacak."
   }
 }

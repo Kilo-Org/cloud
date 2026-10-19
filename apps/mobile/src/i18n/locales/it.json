@@ -3851,5 +3851,9 @@
       "title": "Salva nell'elenco",
       "saved": "Salvato in {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Ignorare le modifiche?",
+    "discardMessage": "Le tue modifiche andranno perse."
   }
 }

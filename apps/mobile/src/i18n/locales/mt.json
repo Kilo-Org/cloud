@@ -3941,5 +3941,9 @@
       "title": "Issejvja fil-lista",
       "saved": "Issejvjat f'{{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Twarrab it-tibdiliet?",
+    "discardMessage": "It-tibdiliet tiegħek se jintilfu."
   }
 }

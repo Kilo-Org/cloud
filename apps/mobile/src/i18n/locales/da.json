@@ -3806,5 +3806,9 @@
       "title": "Gem på liste",
       "saved": "Gemt på {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Kassér ændringer?",
+    "discardMessage": "Dine ændringer går tabt."
   }
 }

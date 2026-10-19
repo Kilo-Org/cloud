@@ -3806,5 +3806,9 @@
       "title": "Fi pamọ́ sínú àkójọ",
       "saved": "A ti fi pamọ́ sínú {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Jù àwọn àtúnṣe rẹ̀ sílẹ̀?",
+    "discardMessage": "Àwọn àtúnṣe rẹ yóò sọnù."
   }
 }

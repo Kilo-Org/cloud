@@ -3806,5 +3806,9 @@
       "title": "목록에 저장",
       "saved": "{{list}}에 저장됨"
     }
+  },
+  "sheet": {
+    "discardTitle": "변경사항을 버릴까요?",
+    "discardMessage": "변경사항이 사라집니다."
   }
 }

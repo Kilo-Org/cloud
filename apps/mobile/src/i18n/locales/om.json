@@ -3806,5 +3806,9 @@
       "title": "Tarree keessatti kuusi",
       "saved": "{{list}} keessatti kuusame"
     }
+  },
+  "sheet": {
+    "discardTitle": "Jijjiirama dhiisi?",
+    "discardMessage": "Jijjiiramni kee ni bada."
   }
 }

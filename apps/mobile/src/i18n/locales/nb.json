@@ -3806,5 +3806,9 @@
       "title": "Lagre i liste",
       "saved": "Lagret i {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Forkaste endringene?",
+    "discardMessage": "Endringene dine går tapt."
   }
 }

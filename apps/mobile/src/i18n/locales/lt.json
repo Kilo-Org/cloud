@@ -3896,5 +3896,9 @@
       "title": "Išsaugoti į sąrašą",
       "saved": "Išsaugota į {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Atmesti pakeitimus?",
+    "discardMessage": "Jūsų pakeitimai bus prarasti."
   }
 }

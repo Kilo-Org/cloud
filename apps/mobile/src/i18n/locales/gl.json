@@ -3806,5 +3806,9 @@
       "title": "Gardar na lista",
       "saved": "Gardada en {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Descartar os cambios?",
+    "discardMessage": "Perderanse os teus cambios."
   }
 }

@@ -3806,5 +3806,9 @@
       "title": "Chekwaa na ndepụta",
       "saved": "Echekwara na {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Tụfuo mgbanwe ndị a?",
+    "discardMessage": "Mgbanwe ị mere ga-efu."
   }
 }

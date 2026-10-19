@@ -3941,5 +3941,9 @@
       "title": "Sábháil le liosta",
       "saved": "Sábháilte i {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "An gcaithfear na hathruithe ar lár?",
+    "discardMessage": "Caillfear do athruithe."
   }
 }

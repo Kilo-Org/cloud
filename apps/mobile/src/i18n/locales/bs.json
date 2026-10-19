@@ -3851,5 +3851,9 @@
       "title": "Sačuvaj na listu",
       "saved": "Sačuvano na listu {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Odbaciti promjene?",
+    "discardMessage": "Tvoje promjene će biti izgubljene."
   }
 }

@@ -3806,5 +3806,9 @@
       "title": "Tallenna listalle",
       "saved": "Tallennettu listalle {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Hylätäänkö muutokset?",
+    "discardMessage": "Muutoksesi katoavat."
   }
 }

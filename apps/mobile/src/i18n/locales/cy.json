@@ -3986,5 +3986,9 @@
       "title": "Cadw i'r rhestr",
       "saved": "Wedi'i gadw i {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Gwaredu'r newidiadau?",
+    "discardMessage": "Byddwch yn colli'ch newidiadau."
   }
 }

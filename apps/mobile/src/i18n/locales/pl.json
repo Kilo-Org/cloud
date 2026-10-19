@@ -3896,5 +3896,9 @@
       "title": "Zapisz na liście",
       "saved": "Zapisano na liście {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Odrzucić zmiany?",
+    "discardMessage": "Twoje zmiany zostaną utracone."
   }
 }

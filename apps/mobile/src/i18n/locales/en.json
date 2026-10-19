@@ -3806,5 +3806,9 @@
       "title": "Save to list",
       "saved": "Saved to {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Discard changes?",
+    "discardMessage": "Your changes will be lost."
   }
 }

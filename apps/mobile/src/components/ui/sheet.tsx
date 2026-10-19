@@ -30,6 +30,15 @@ type SheetProps = {
    */
   showHandle?: boolean;
   /**
+   * Let a drag dismiss the sheet (the iOS swipe-down, Android Back, backdrop
+   * tap and swipe). A sheet whose content scrolls passes false: when the
+   * scroll view sits at its top edge, the native presentation claims an
+   * upward-scroll drag and dismisses a form the reader only meant to scroll.
+   * A `false` sheet closes through its own controls; on Android a BackHandler
+   * inside the sheet content can still own hardware Back.
+   */
+  enablePanDownToClose?: boolean;
+  /**
    * The sheet's own background. Defaults to the app's card surface. A
    * full-window surface that owns its whole window passes the colour it paints
    * so the sheet's edge never shows the card behind it.
@@ -53,6 +62,7 @@ export function Sheet({
   onDismiss,
   snapPoints,
   showHandle = true,
+  enablePanDownToClose = true,
   background,
   children,
 }: Readonly<SheetProps>) {
@@ -100,7 +110,7 @@ export function Sheet({
       // forced in-app dark theme still shows a light sheet behind themed text.
       backgroundStyle={{ backgroundColor: background ?? colors.card }}
       handleComponent={showHandle ? undefined : null}
-      enablePanDownToClose
+      enablePanDownToClose={enablePanDownToClose}
       onClose={() => {
         // A dismissal the caller already reopened past must not close the sheet
         // again through the caller's own handler. A self-dismissal (backdrop,

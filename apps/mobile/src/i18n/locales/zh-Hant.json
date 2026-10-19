@@ -3806,5 +3806,9 @@
       "title": "儲存至清單",
       "saved": "已儲存至 {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "捨棄變更？",
+    "discardMessage": "你所做的變更將不會保留。"
   }
 }

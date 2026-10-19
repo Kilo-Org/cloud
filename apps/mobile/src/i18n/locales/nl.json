@@ -3806,5 +3806,9 @@
       "title": "Opslaan in lijst",
       "saved": "Opgeslagen in {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Wijzigingen verwerpen?",
+    "discardMessage": "Je wijzigingen gaan verloren."
   }
 }

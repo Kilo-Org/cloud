@@ -3806,5 +3806,9 @@
       "title": "リストに保存",
       "saved": "{{list}}に保存しました"
     }
+  },
+  "sheet": {
+    "discardTitle": "変更を破棄しますか？",
+    "discardMessage": "行った変更は失われます。"
   }
 }

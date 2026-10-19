@@ -3806,5 +3806,9 @@
       "title": "Spara i lista",
       "saved": "Sparat i {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Kassera ändringarna?",
+    "discardMessage": "Dina ändringar går förlorade."
   }
 }

@@ -3851,5 +3851,9 @@
       "title": "Desa a la llista",
       "saved": "Desada a {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Vols descartar els canvis?",
+    "discardMessage": "Es perdran els teus canvis."
   }
 }

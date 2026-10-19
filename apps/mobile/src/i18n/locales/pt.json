@@ -3851,5 +3851,9 @@
       "title": "Guardar numa lista",
       "saved": "Guardado em {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Descartar alterações?",
+    "discardMessage": "As suas alterações serão perdidas."
   }
 }

@@ -3806,5 +3806,9 @@
       "title": "Simpan ke daftar",
       "saved": "Disimpan ke {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Buang perubahan?",
+    "discardMessage": "Perubahanmu akan hilang."
   }
 }

@@ -3896,5 +3896,9 @@
       "title": "Uložiť do zoznamu",
       "saved": "Uložené do zoznamu {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Zahodiť zmeny?",
+    "discardMessage": "Tvoje zmeny sa stratia."
   }
 }

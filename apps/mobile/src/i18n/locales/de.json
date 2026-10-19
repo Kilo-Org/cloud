@@ -3806,5 +3806,9 @@
       "title": "In Liste speichern",
       "saved": "In {{list}} gespeichert"
     }
+  },
+  "sheet": {
+    "discardTitle": "Änderungen verwerfen?",
+    "discardMessage": "Deine Änderungen gehen verloren."
   }
 }

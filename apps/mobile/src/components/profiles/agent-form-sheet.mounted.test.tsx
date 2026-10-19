@@ -11,7 +11,47 @@ const h = vi.hoisted(() => ({
   useAvailableModels: vi.fn(),
   onSave: vi.fn(),
   onClose: vi.fn(),
+  confirmRequest: null as null | {
+    title: string;
+    message: string;
+    confirmLabel: string;
+    cancelLabel?: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  },
 }));
+
+/** The confirm's two answers, as the shared dialog renders them. */
+function DialogStub({
+  request,
+}: {
+  request: { onConfirm: () => void; onCancel?: () => void } | null;
+}) {
+  if (request === null) {
+    return null;
+  }
+  const cancel = () => {
+    h.confirmRequest = null;
+  };
+  return createElement(
+    'View',
+    null,
+    createElement('Pressable', {
+      accessibilityLabel: 'Discard',
+      onPress: () => {
+        h.confirmRequest = null;
+        request.onConfirm();
+      },
+    }),
+    createElement('Pressable', {
+      accessibilityLabel: 'Keep editing',
+      onPress: () => {
+        cancel();
+        request.onCancel?.();
+      },
+    })
+  );
+}
 
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: (...args: unknown[]) => h.useAvailableModels(...args),
@@ -22,6 +62,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   Switch: 'Switch',
+  BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -30,6 +71,19 @@ vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'Se
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The confirm is a native sheet (`@/components/ui/dialog` -> DestructiveConfirmDialog);
+// its portal/native chrome cannot load in the node test renderer, so the suite
+// stubs it: the guard's request lands in `h.confirmRequest` and the dialog node
+// mirrors the real hook's behavior — onConfirm runs the request's action and
+// clears the request; cancel only clears it.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: NonNullable<typeof h.confirmRequest>) => {
+      h.confirmRequest = request;
+    },
+    dialog: createElement(DialogStub, { request: h.confirmRequest }),
+  }),
+}));
 
 function agentSource(overrides: Partial<AgentSource> = {}): AgentSource {
   return {
@@ -87,6 +141,36 @@ function pressVariant(root: ReactTestInstance, variant: string): void {
 function pressDone(root: ReactTestInstance): void {
   act(() => {
     (findOne(root, 'SheetHeader').props as { onDone: () => void }).onDone();
+  });
+}
+
+function pressCancel(root: ReactTestInstance): void {
+  act(() => {
+    (findOne(root, 'SheetHeader').props as { onCancel: () => void }).onCancel();
+  });
+}
+
+function pressVisibility(root: ReactTestInstance, label: string): void {
+  const pressable = findAll(root, 'Pressable').find(
+    node => node.props.accessibilityLabel === label
+  );
+  if (!pressable) {
+    throw new Error(`visibility option ${label} was not rendered`);
+  }
+  act(() => {
+    (pressable.props as { onPress: () => void }).onPress();
+  });
+}
+
+function pressDialogButton(root: ReactTestInstance, label: string): void {
+  const pressable = findAll(root, 'Pressable').find(
+    node => node.props.accessibilityLabel === label
+  );
+  if (!pressable) {
+    throw new Error(`dialog button ${label} was not rendered`);
+  }
+  act(() => {
+    (pressable.props as { onPress: () => void }).onPress();
   });
 }
 
@@ -207,6 +291,67 @@ describe('AgentFormSheet parity fields', () => {
         String(node.props.accessibilityLabel).includes('thinking effort')
       )
     ).toBe(false);
+
+    unmount();
+  });
+
+  it('closes a clean form through Cancel without asking', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    pressCancel(renderer.root);
+
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('asks before discarding typed edits and closes only on Discard', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Agent name', 'Renamed');
+    pressCancel(renderer.root);
+
+    // Not closed yet: the confirm stands between the edit and the loss, and it
+    // carries the shared Keep editing / Discard copy.
+    expect(h.onClose).not.toHaveBeenCalled();
+    expect(h.confirmRequest).toMatchObject({
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+    });
+
+    act(() => {
+      h.confirmRequest?.onConfirm();
+    });
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps the sheet open when the confirm is cancelled, then re-evaluates the gate', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Agent name', 'Renamed');
+    pressCancel(renderer.root);
+    expect(h.onClose).not.toHaveBeenCalled();
+
+    // Keep editing: the dialog's cancel only dismisses the confirm; the sheet
+    // and the typed value stay. The gate re-evaluates on the next close, so
+    // reverting the field makes the next Cancel close without asking again.
+    pressDialogButton(renderer.root, 'Keep editing');
+    changeText(renderer.root, 'Agent name', 'Reviewer');
+    pressCancel(renderer.root);
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('treats a visibility change as unsaved work', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    pressVisibility(renderer.root, 'All — both');
+    pressCancel(renderer.root);
+
+    expect(h.onClose).not.toHaveBeenCalled();
+    expect(h.confirmRequest).not.toBeNull();
 
     unmount();
   });

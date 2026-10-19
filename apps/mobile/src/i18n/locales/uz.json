@@ -3806,5 +3806,9 @@
       "title": "Ro‘yxatga saqlash",
       "saved": "{{list}} ro‘yxatiga saqlandi"
     }
+  },
+  "sheet": {
+    "discardTitle": "O'zgarishlar bekor qilinsinmi?",
+    "discardMessage": "O'zgarishlaringiz yo'qoladi."
   }
 }

@@ -3806,5 +3806,9 @@
       "title": "Salvesta loendisse",
       "saved": "Salvestatud loendisse {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Kas loobuda muudatustest?",
+    "discardMessage": "Sinu muudatused lähevad kaotsi."
   }
 }

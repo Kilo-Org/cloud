@@ -22,6 +22,15 @@ type SessionPageSheetProps = {
  * SheetHeader, scroll content, and safe bottom spacer inside it. Android Back
  * and Done both route through `onClose`.
  *
+ * Pan-down dismissal is off: the surface hosts scrollable forms, and when the
+ * scroll view sits at its top edge the native presentation claims an
+ * upward-scroll drag and dismisses the sheet, discarding the edits (the
+ * reported agents-form loss). There is no intended dismiss gesture on this
+ * surface to lose — it presents at the whole window with no grabber and no
+ * backdrop — so every close goes through the caller's own controls, and a form
+ * can gate those with `useSheetDiscardGuard`. Android Back reaches the same
+ * guard through its hardware-back listener.
+ *
  * It is a native sheet at the full detent, so it stacks above the session
  * screen and above another native sheet. The sheet owns the whole window, so a
  * header inside it would reserve a dead band above the title if it read the
@@ -48,6 +57,7 @@ export function SessionPageSheet({
       onDismiss={onDismiss}
       snapPoints={SHEET_SNAP_POINTS}
       showHandle={false}
+      enablePanDownToClose={false}
       background={colors.background}
     >
       <StateSurface

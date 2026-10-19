@@ -3806,5 +3806,9 @@
       "title": "Vista á lista",
       "saved": "Vistað á {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Farga breytingum?",
+    "discardMessage": "Breytingarnar þínar glatast."
   }
 }

@@ -3806,5 +3806,9 @@
       "title": "Ajiye cikin jeri",
       "saved": "An ajiye cikin {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Watsar da canje-canje?",
+    "discardMessage": "Za a rasa canje-canjenka."
   }
 }

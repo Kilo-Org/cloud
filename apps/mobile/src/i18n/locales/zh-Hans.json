@@ -3806,5 +3806,9 @@
       "title": "保存到列表",
       "saved": "已保存到 {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "丢弃更改？",
+    "discardMessage": "你所做的更改将丢失。"
   }
 }

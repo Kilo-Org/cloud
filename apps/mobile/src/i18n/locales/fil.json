@@ -3806,5 +3806,9 @@
       "title": "I-save sa listahan",
       "saved": "Na-save sa {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Itapon ang mga pagbabago?",
+    "discardMessage": "Mawawala ang iyong mga pagbabago."
   }
 }

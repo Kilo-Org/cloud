@@ -3806,5 +3806,9 @@
       "title": "Ruaj në listë",
       "saved": "U ruajt në {{list}}"
     }
+  },
+  "sheet": {
+    "discardTitle": "Të fshihen ndryshimet?",
+    "discardMessage": "Ndryshimet e tua do të humbasin."
   }
 }

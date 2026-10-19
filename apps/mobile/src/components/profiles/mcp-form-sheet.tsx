@@ -16,6 +16,7 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { useSheetDiscardGuard } from '@/components/ui/sheet-discard-guard';
 import { Text } from '@/components/ui/text';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
@@ -75,6 +76,17 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
   const [enabled, setEnabled] = useState(initial.enabled);
   const [error, setError] = useState<McpFormError | null>(null);
 
+  // Unsaved-changes check, evaluated at close time (see agent-form-sheet).
+  const isDirty = () =>
+    nameRef.current !== initial.name ||
+    commandRef.current !== initial.command ||
+    urlRef.current !== initial.url ||
+    configRef.current !== initial.configJson ||
+    timeoutRef.current !== initial.timeout ||
+    type !== initial.type ||
+    enabled !== initial.enabled;
+  const { requestClose, confirmDialog } = useSheetDiscardGuard({ isDirty, onClose });
+
   const submit = () => {
     const state = {
       name: nameRef.current,
@@ -100,11 +112,11 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
   ];
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={requestClose}>
       <SheetHeader
         title={server === null ? t('profiles.mcp.add') : server.name}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
         disabled={isSaving}
         topInset="ios-page-sheet"
@@ -217,6 +229,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {confirmDialog}
     </SessionPageSheet>
   );
 }

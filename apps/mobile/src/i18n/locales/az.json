@@ -3806,5 +3806,9 @@
       "title": "Siyahıya yadda saxla",
       "saved": "{{list}} siyahısına yadda saxlanıldı"
     }
+  },
+  "sheet": {
+    "discardTitle": "Dəyişikliklər ləğv edilsin?",
+    "discardMessage": "Dəyişiklikləriniz itiriləcək."
   }
 }

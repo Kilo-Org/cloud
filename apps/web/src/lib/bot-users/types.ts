@@ -2,7 +2,6 @@ export type BotType =
   | 'code-review'
   | 'security-scan'
   | 'auto-triage'
-  | 'auto-fix'
   | 'slack-bot'
   | 'discord-bot'
   | 'webhook-bot';
@@ -25,11 +24,6 @@ const BOT_USER_PATTERNS = {
     idPrefix: 'bot-auto-triage',
     emailSuffix: 'auto-triage-bot',
     displayName: 'Auto Triage Bot',
-  },
-  'auto-fix': {
-    idPrefix: 'bot-auto-fix',
-    emailSuffix: 'auto-fix-bot',
-    displayName: 'Auto Fix Bot',
   },
   'slack-bot': {
     idPrefix: 'bot-slack',

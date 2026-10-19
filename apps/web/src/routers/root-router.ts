@@ -29,8 +29,6 @@ import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
 import { autoTriageRouter } from '@/routers/auto-triage/auto-triage-router';
 import { personalAutoTriageRouter } from '@/routers/personal-auto-triage-router';
-import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
-import { personalAutoFixRouter } from '@/routers/personal-auto-fix-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
@@ -87,8 +85,6 @@ export const rootRouter = createTRPCRouter({
   securityAuditLog: securityAuditLogRouter,
   autoTriage: autoTriageRouter,
   personalAutoTriage: personalAutoTriageRouter,
-  autoFix: autoFixRouter,
-  personalAutoFix: personalAutoFixRouter,
   appReportedMessages: appReportedMessagesRouter,
   kiloPass: kiloPassRouter,
   credits: creditsRouter,

@@ -256,8 +256,6 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
 - `AUTO_TRIAGE_URL` - URL for the auto-triage worker. [SERVER]
 - `AUTO_TRIAGE_AUTH_TOKEN` - Auth token for the auto-triage worker. `[SECRET]`
-- `AUTO_FIX_URL` - URL for the auto-fix worker. [SERVER]
-- `AUTO_FIX_AUTH_TOKEN` - Auth token for the auto-fix worker. `[SECRET]`
 - `APP_BUILDER_URL` - URL for the App Builder worker. [SERVER]
 - `APP_BUILDER_AUTH_TOKEN` - Auth token for the App Builder worker. `[SECRET]`
 - `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]

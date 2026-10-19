@@ -233,7 +233,6 @@ export const sandboxBillingInputEnvelopeSchema = z
 const KNOWN_ORIGINS = new Set([
   'app-builder',
   'auto-triage',
-  'autofix',
   'cloud-agent',
   'cloud-agent-web',
   'code-review',

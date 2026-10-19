@@ -83,8 +83,8 @@ describe('mapModelIdToVercel', () => {
     });
   });
 
-  describe('first-party inference provider inference', () => {
-    it('rewrites the anthropic/ prefix unchanged', async () => {
+  describe('model prefix mapping', () => {
+    it('leaves the anthropic/ prefix unchanged', async () => {
       await expect(mapModelIdToVercel('anthropic/claude-sonnet-4.5')).resolves.toBe(
         'anthropic/claude-sonnet-4.5'
       );
@@ -160,8 +160,10 @@ describe('mapModelIdToVercel', () => {
       );
     });
 
-    it('maps the Vercel-served Cat Jam stealth model to its gateway id', async () => {
-      await expect(mapModelIdToVercel('stealth/cat-jam')).resolves.toBe('stealth/cat-jam');
+    it('maps the Vercel-served Reflection Beam free model to its gateway id', async () => {
+      await expect(mapModelIdToVercel('reflection/beam-free')).resolves.toBe(
+        'reflection/beam-free'
+      );
     });
   });
 });

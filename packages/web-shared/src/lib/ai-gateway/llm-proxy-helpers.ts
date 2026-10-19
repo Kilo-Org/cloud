@@ -50,10 +50,18 @@ import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  AUTO_DECISION_HEADER,
+  CUSTOM_ROUTER_ERROR_HTTP_STATUS,
+  type CustomRouterErrorCode,
+} from '@kilocode/auto-routing-contracts';
+import type { AutoDecisionRejection } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
 const fimSuffixFakeSysPrompMarkers = { begin: '[FIM_SUFFIX:', end: ']' } as const;
+
+const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
 export function invalidPathResponse() {
   return NextResponse.json(
@@ -516,6 +524,48 @@ export function organizationAutoConfigurationResponse(message: string) {
       message,
     },
     { status: 400 }
+  );
+}
+
+export function paidModelAuthRequiredResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: PAID_MODEL_AUTH_REQUIRED,
+        message: 'You need to sign in to use this model.',
+      },
+      error_type: ProxyErrorType.paid_model_auth_required,
+    },
+    { status: 401 }
+  );
+}
+
+export function customRouterErrorResponse(code: CustomRouterErrorCode, message: string) {
+  return NextResponse.json(
+    { error: { code, message }, error_type: ProxyErrorType.custom_router, message },
+    { status: CUSTOM_ROUTER_ERROR_HTTP_STATUS[code] }
+  );
+}
+
+// A custom router never falls back outside its pool, so a worker that cannot decide fails the
+// request with a retryable status instead of serving another model.
+export function autoRoutingUnavailableResponse(model: string) {
+  const error = `Auto-routing for ${model} is temporarily unavailable. Please retry.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.auto_routing_unavailable, message: error },
+    { status: 503, headers: { 'Retry-After': '1' } }
+  );
+}
+
+export function invalidAutoDecisionResponse(reason: AutoDecisionRejection) {
+  const message = `The ${AUTO_DECISION_HEADER} header is not valid for this request (${reason}). Request a new routing decision.`;
+  return NextResponse.json(
+    {
+      error: { code: ProxyErrorType.invalid_auto_decision, reason, message },
+      error_type: ProxyErrorType.invalid_auto_decision,
+      message,
+    },
+    { status: reason === 'malformed' ? 400 : 403 }
   );
 }
 

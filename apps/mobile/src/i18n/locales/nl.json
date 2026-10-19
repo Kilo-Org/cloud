@@ -1986,6 +1986,7 @@
       "title": "Sessies filteren",
       "platformCloud": "In de cloud",
       "platformExtension": "Extensie",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

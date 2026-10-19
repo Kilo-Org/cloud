@@ -18,7 +18,7 @@ import {
 import {
   gemma_4_26b_a4b_it_free_model,
   glyph_cluster_stealth_free_model,
-  cat_jam_stealth_free_model,
+  reflection_beam_free_model,
 } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -32,23 +32,40 @@ describe('rate-limited Kilo-exclusive models', () => {
   });
 });
 
-describe.each([glyph_cluster_stealth_free_model, cat_jam_stealth_free_model])(
-  '$display_name',
-  model => {
-    test('is free, stealth, and requires data collection', () => {
-      expect(isFreeModel(model.public_id)).toBe(true);
-      expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
-      expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(true);
-      expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(true);
-      expect(getInferenceProvider(model)).toEqual({
-        slug: 'stealth',
-        name: 'Stealth',
-        training: true,
-        retainsPrompts: true,
-      });
+describe('Glyph Cluster', () => {
+  test('is free, stealth, and requires data collection', () => {
+    const model = glyph_cluster_stealth_free_model;
+    expect(isFreeModel(model.public_id)).toBe(true);
+    expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
+    expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(true);
+    expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(true);
+    expect(getInferenceProvider(model)).toEqual({
+      slug: 'stealth',
+      name: 'Stealth',
+      training: true,
+      retainsPrompts: true,
     });
-  }
-);
+  });
+});
+
+describe('Reflection Beam (free)', () => {
+  test('is free, not stealth, requires data collection, and routes only to Reflection', () => {
+    const model = reflection_beam_free_model;
+    expect(isFreeModel(model.public_id)).toBe(true);
+    expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
+    expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(false);
+    expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(false);
+    expect(getInferenceProvider(model)).toEqual({
+      slug: 'reflection',
+      name: 'REFLECTION',
+      training: true,
+      retainsPrompts: true,
+    });
+    expect([...(getKiloExclusiveInferenceProviderRestriction(model.public_id) ?? [])]).toEqual([
+      'reflection',
+    ]);
+  });
+});
 
 describe('isFreeModel', () => {
   test('returns a boolean synchronously', () => {
@@ -122,6 +139,7 @@ describe('isFreeModel', () => {
       'meituan/longcat-2.0-free',
       'nex-agi/nex-n2.5-pro:free',
       'stepfun/step-5-preview-free',
+      'stealth/cat-jam',
     ])('removes %s from exclusive models', modelId => {
       expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
       expect(findKiloExclusiveModel(modelId)).toBeNull();
@@ -291,6 +309,9 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 
 describe('getKiloExclusiveInferenceProviderRestriction', () => {
   test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')
+    ).toBeUndefined();
     expect(
       getKiloExclusiveInferenceProviderRestriction('openai/gpt-5.6-sol-discounted')
     ).toBeUndefined();

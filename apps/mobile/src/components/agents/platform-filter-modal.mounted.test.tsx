@@ -141,6 +141,7 @@ describe('SessionFilterModal', () => {
     expect(checkboxes.map(row => row.findByType(Text).props.children)).toEqual([
       i18n.t('agentChat.sessionFilter.platformCloud'),
       i18n.t('agentChat.sessionFilter.platformExtension'),
+      i18n.t('agentChat.sessionFilter.platformDesktop'),
       i18n.t('agentChat.sessionFilter.platformCli'),
       i18n.t('agentChat.sessionFilter.platformSlack'),
       i18n.t('common.github'),
@@ -153,7 +154,7 @@ describe('SessionFilterModal', () => {
       checkboxes.map(
         row => (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked
       )
-    ).toEqual([true, false, false, false, false, false, false, true, false]);
+    ).toEqual([true, false, false, false, false, false, false, false, true, false]);
   });
 
   it('keeps the action row out of the scrollable option list', async () => {

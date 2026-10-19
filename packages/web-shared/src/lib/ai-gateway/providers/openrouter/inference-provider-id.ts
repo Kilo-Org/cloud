@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -58,6 +57,9 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'perplexity',
   'phala',
   'poolside',
+  // Not an OpenRouter provider: only Vercel AI Gateway serves reflection/beam-free.
+  // OpenRouter offers Beam only as a paid model through third-party providers.
+  'reflection',
   'reka',
   'relace',
   'sail-research',
@@ -266,25 +268,6 @@ export function normalizeVercelInferenceProviderIdForRouting(providerId: string 
   return providerId === VercelNonUserByokInferenceProviderIdSchema.enum.vertexAnthropic
     ? VercelUserByokInferenceProviderIdSchema.enum.vertex
     : providerId;
-}
-
-const modelPrefixToVercelInferenceProviderMapping = {
-  anthropic: VercelUserByokInferenceProviderIdSchema.enum.anthropic,
-  google: VercelUserByokInferenceProviderIdSchema.enum.google,
-  openai: VercelUserByokInferenceProviderIdSchema.enum.openai,
-  minimax: VercelUserByokInferenceProviderIdSchema.enum.minimax,
-  mistralai: VercelUserByokInferenceProviderIdSchema.enum.mistral,
-  qwen: VercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
-  'x-ai': VercelUserByokInferenceProviderIdSchema.enum.xai,
-  'z-ai': VercelUserByokInferenceProviderIdSchema.enum.zai,
-} as Record<string, VercelInferenceProviderId | undefined>;
-
-export function inferVercelFirstPartyInferenceProviderForModel(
-  model: string
-): VercelInferenceProviderId | null {
-  return isGptOssModel(model)
-    ? null
-    : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);
 }
 
 export const AwsCredentialsSchema = z.object({

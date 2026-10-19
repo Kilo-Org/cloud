@@ -1904,6 +1904,7 @@
       "title": "Filtrer les sessions",
       "platformCloud": "En ligne",
       "platformExtension": "Extension de l'éditeur",
+      "platformDesktop": "Application de bureau",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

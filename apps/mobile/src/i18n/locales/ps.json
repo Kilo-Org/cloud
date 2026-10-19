@@ -2498,6 +2498,7 @@
       "title": "د ناستو چاڼ",
       "platformCloud": "کلاوډ",
       "platformExtension": "غځونه",
+      "platformDesktop": "ډیسکټاپ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

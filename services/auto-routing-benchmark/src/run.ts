@@ -50,6 +50,9 @@ import {
   markProfilesFailedForRun,
   markProfilesReadyForRun,
   markProfilesRunningForRun,
+  copyRemeasureBaselines,
+  listQueuedRemeasures,
+  settleRemeasuresForRun,
   releaseProfileClaims,
   markRunCompleted,
   markRunFailed,
@@ -100,7 +103,7 @@ import {
   beginPaidCase,
   claimScheduledChunks,
   clearUnbilledCase,
-  hasPaidCase,
+  getPaidCasePromptRevision,
   cooldownProviders,
   deferChunk,
   failChunk,
@@ -121,6 +124,7 @@ import {
   type SchedulerConfig,
 } from './scheduler';
 import { catalogModelProviders } from './platform-models';
+import { argvAffectedCases, PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
 export type RunModelEntry = {
@@ -361,15 +365,8 @@ export async function drainQueues(
   errors?: unknown[],
   router: AutoRouter = 'efficient'
 ): Promise<StartedQueueRun[]> {
-  if (router === 'frontier' && selector === 'user') {
-    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
-  }
   const queues: BenchmarkRunPurpose[] =
-    selector === 'both'
-      ? router === 'frontier'
-        ? ['platform']
-        : ['platform', 'user']
-      : [selector satisfies BenchmarkRunPurpose];
+    selector === 'both' ? ['platform', 'user'] : [selector satisfies BenchmarkRunPurpose];
   const started: StartedQueueRun[] = [];
   for (const queue of queues) {
     try {
@@ -663,9 +660,6 @@ export async function startRun(
 ): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
   const router = kind === 'classifier' ? 'efficient' : (options.router ?? 'efficient');
   const purpose: BenchmarkRunPurpose = options.purpose ?? 'platform';
-  if (router === 'frontier' && purpose === 'user') {
-    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
-  }
   if (kind === 'decider' && (!options.entries || options.entries.length === 0)) {
     throw new BenchmarkRunConfigError('decider runs require a non-empty registry entry snapshot');
   }
@@ -838,13 +832,23 @@ export async function startRun(
     throw error;
   }
   if (kind === 'decider') {
+    // Re-measured pairs start from their previous run's results; only the cases the old
+    // prompt transport measured unreliably are left to run.
+    const skipOldCaseIds = argvAffectedCases(router).map(benchCase => benchCase.id);
     try {
+      await copyRemeasureBaselines(env.BENCH_DB, {
+        runId,
+        skipOldCaseIds,
+        promptRevision: PROMPT_TRANSPORT_REVISION,
+      });
       await reuseDeciderCaseResults(env.BENCH_DB, {
         runId,
         router,
         engineIdentity,
         repetitions,
         entries: enqueuedRunEntries,
+        skipOldCaseIds,
+        promptRevision: PROMPT_TRANSPORT_REVISION,
       });
     } catch (error) {
       const reason = `case reuse failed: ${formatError(error).error}`;
@@ -912,9 +916,6 @@ export async function drainQueue(
   queue: BenchmarkRunPurpose,
   router: AutoRouter = 'efficient'
 ): Promise<{ runId: string; entryCount: number } | null> {
-  if (router === 'frontier' && queue === 'user') {
-    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
-  }
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return null;
 
@@ -956,9 +957,13 @@ export async function drainQueue(
       pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
     }
   }
-  if (pending.length === 0) return null;
+  // Queued re-measures of ready rows are reserved ahead of the pending backlog, so an
+  // operator's repair starts on the next drain instead of waiting for the backlog.
+  const remeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
+  const queued = [...remeasures, ...pending.slice(0, Math.max(0, maxEntries - remeasures.length))];
+  if (queued.length === 0) return null;
 
-  const batch = pending.slice(0, maxEntries);
+  const batch = queued.slice(0, maxEntries);
   const entries: RunModelEntry[] = batch.map(row => ({
     model: row.model,
     variant: variantFromStorage(row.variant),
@@ -1170,7 +1175,10 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
   const parsed = ContainerCaseResultSchema.safeParse(body);
   if (!parsed.success) return false;
   const { execution, outcome } = parsed.data;
-  if (!(await hasPaidCase(env.BENCH_DB, execution))) return false;
+  // The container was spawned by whatever worker opened the paid call, which may have run
+  // the previous transport. Stamp its output with that revision, not this deploy's.
+  const promptRevision = await getPaidCasePromptRevision(env.BENCH_DB, execution);
+  if (promptRevision === null) return false;
   if (outcome.kind === 'not_started') {
     await clearUnbilledCase(env.BENCH_DB, execution);
   } else {
@@ -1183,7 +1191,11 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
         case_id: execution.caseId,
         rep: execution.rep,
       },
-      { result: parseContainerRunResponse(outcome.response, Date.now()), retried: false }
+      {
+        result: parseContainerRunResponse(outcome.response, Date.now()),
+        retried: false,
+        promptRevision,
+      }
     );
   }
   console.log(
@@ -1407,6 +1419,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             last_event_types: null,
             rep,
             timed_out: 0,
+            prompt_revision: PROMPT_TRANSPORT_REVISION,
           });
         } catch (error) {
           await upsertCaseResult(
@@ -1744,6 +1757,8 @@ async function processDeciderJob(
           last_event_types: result.lastEventTypes.join(' '),
           rep,
           timed_out: result.timedOut ? 1 : 0,
+          // A recovered output was produced by the worker that saved it.
+          prompt_revision: pending?.promptRevision ?? PROMPT_TRANSPORT_REVISION,
         });
       } catch (error) {
         if (error instanceof DeciderGraderRetryError) {
@@ -1833,6 +1848,7 @@ function failedRow(
     last_event_types: null,
     rep,
     timed_out: 0,
+    prompt_revision: PROMPT_TRANSPORT_REVISION,
   };
 }
 
@@ -1979,6 +1995,7 @@ async function finalizeRunIfComplete(
           PROFILE_LANE_DEAD_FAILURE_REASON
         );
       }
+      await settleRemeasuresForRun(env.BENCH_DB, runId, failedEntries);
       await markProfilesReadyForRun(env.BENCH_DB, runId);
     } catch (error) {
       console.warn(

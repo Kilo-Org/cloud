@@ -134,6 +134,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-models', () => {
   return { ...actual, addAutoRoutingModels: jest.fn(actual.addAutoRoutingModels) };
 });
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  listUsableCustomRouters: jest.fn(async () => []),
+}));
+
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
   const actual = jest.requireActual<typeof DirectByok>(
     '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'

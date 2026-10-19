@@ -2498,6 +2498,7 @@
       "title": "Munkamenetek szűrése",
       "platformCloud": "Felhő",
       "platformExtension": "Bővítmény",
+      "platformDesktop": "Asztali alkalmazás",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

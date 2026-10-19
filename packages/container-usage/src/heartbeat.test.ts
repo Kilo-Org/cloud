@@ -153,6 +153,113 @@ describe('installBillingHeartbeat', () => {
     expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
   });
 
+  it('treats an unreadable heartbeat verdict as a budget stop and settles the generation', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordHeartbeat = vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>(async () => ({
+        intervalId: 'instance-1:123',
+        durable: 'pg',
+        dedup: false,
+        // Violates the budget contract: a stop verdict must not report a
+        // negative balance.
+        budget: { verdict: 'stop', remainingMicrodollars: -1 },
+      }));
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg',
+        dedup: false,
+      }));
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat,
+          recordStop,
+        },
+        { service: 'cloud-agent-next', retry: { attempts: 1 } }
+      );
+      const enforceBudgetStop = vi.fn(async () => undefined);
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        { client, storage, enforceBudgetStop }
+      );
+
+      await controller.billingHeartbeatTick();
+
+      expect(enforceBudgetStop).toHaveBeenCalledWith(
+        { verdict: 'stop' },
+        expect.objectContaining({ startEpochMs: 123 })
+      );
+      expect(recordStop).toHaveBeenCalledOnce();
+      expect(await getBillingContext(storage)).toBeUndefined();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('advances past an unreadable verdict without resending the settled sequence', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const context = await getBillingContext(storage);
+      if (!context) throw new Error('Expected billing context');
+      await updateBillingContext(storage, {
+        ...context,
+        pendingHeartbeat: { seq: 1, usageSinceLast: 4, measuredAtMs: 5_000 },
+      });
+      const recordHeartbeat = vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>(async () => ({
+        intervalId: 'instance-1:123',
+        durable: 'pg',
+        dedup: false,
+        budget: { verdict: 'continue', remaining: -5 },
+      }));
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat,
+          recordStop: async () => ({
+            intervalId: 'instance-1:123',
+            durable: 'pg',
+            dedup: false,
+          }),
+        },
+        { service: 'cloud-agent-next', retry: { attempts: 3, initialDelayMs: 0 } }
+      );
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        { client, storage, deferBudgetStopFinalSettlement: true, enforceBudgetStop: vi.fn() }
+      );
+
+      await controller.billingHeartbeatTick();
+
+      // One delivery, no retry loop over the same sequence.
+      expect(recordHeartbeat).toHaveBeenCalledOnce();
+      expect(recordHeartbeat.mock.calls[0]?.[0].seq).toBe(1);
+      const advanced = await getBillingContext(storage);
+      expect(advanced?.nextSeq).toBe(2);
+      expect(advanced?.pendingHeartbeat).toBeUndefined();
+      expect(advanced?.usageMeasuredAtMs).toBe(5_000);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('keeps the default controller behavior of settling immediately after a budget stop', async () => {
     const storage = memoryStorage();
     await storedContext(storage);

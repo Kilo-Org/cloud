@@ -10,6 +10,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import {
+  heartbeatAckSchema,
   heartbeatIdempotencyKey,
   startIdempotencyKey,
   stopIdempotencyKey,
@@ -458,6 +459,249 @@ describe('container usage PostgreSQL application', () => {
       rate_cents_per_unit: '1.000000000000',
       amount_microdollars: 200_000,
     });
+  });
+
+  it('reports a zero balance in stop verdicts when a settlement overdraws a personal wallet', async () => {
+    const startEpochMs = Date.now();
+    const overdrawContext = { ...context, instanceId: `overdraw-user-${suffix}`, sku: paidSkuId };
+    const overdrawFingerprint = await usageContextFingerprint(overdrawContext);
+    const overdrawIntervalId = `cloud-agent-next:${overdrawContext.instanceId}:${startEpochMs}`;
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_000_000, microdollars_used: 0 })
+      .where(eq(kilocode_users.id, userId));
+
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...overdrawContext,
+          startEpochMs,
+          idempotencyKey: startIdempotencyKey(
+            overdrawContext.service,
+            overdrawContext.instanceId,
+            startEpochMs
+          ),
+        },
+        overdrawIntervalId,
+        overdrawFingerprint,
+        startEpochMs,
+        paidBillingConfig
+      )
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      remainingMicrodollars: 10_000_000,
+    });
+
+    const heartbeat = {
+      service: overdrawContext.service,
+      instanceId: overdrawContext.instanceId,
+      startEpochMs,
+      idempotencyKey: heartbeatIdempotencyKey(
+        overdrawContext.service,
+        overdrawContext.instanceId,
+        startEpochMs,
+        1
+      ),
+      seq: 1,
+      usageSinceLast: 12,
+      context: overdrawContext,
+    };
+    // 12 seconds at 1 cent per second is 120,000 microdollars of usage against
+    // a wallet holding 100,000; the settlement overdraws the stored balance.
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_000_000, microdollars_used: 9_900_000 })
+      .where(eq(kilocode_users.id, userId));
+    const ack = await applyHeartbeatWithDb(
+      client.db,
+      heartbeat,
+      overdrawIntervalId,
+      overdrawFingerprint,
+      startEpochMs + 12_000,
+      paidBillingConfig
+    );
+    expect(ack).toMatchObject({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      budget: { verdict: 'stop', remainingMicrodollars: 0 },
+    });
+    // The verdict must satisfy the shared heartbeat contract at a negative balance.
+    expect(
+      heartbeatAckSchema.safeParse({
+        intervalId: overdrawIntervalId,
+        durable: 'pg',
+        dedup: ack.dedup,
+        billingMode: ack.billingMode,
+        budget: ack.budget,
+      }).success
+    ).toBe(true);
+
+    const [user] = await client.db
+      .select({ used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId));
+    expect(user?.used).toBe(10_020_000);
+
+    // A resend of the settled sequence must produce the same parseable verdict.
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        heartbeat,
+        overdrawIntervalId,
+        overdrawFingerprint,
+        startEpochMs + 12_000,
+        paidBillingConfig
+      )
+    ).resolves.toMatchObject({
+      dedup: true,
+      budget: { verdict: 'stop', remainingMicrodollars: 0 },
+    });
+
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, overdrawIntervalId));
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_050_000, microdollars_used: 5_050_000 })
+      .where(eq(kilocode_users.id, userId));
+  });
+
+  it('reports a zero balance in stop verdicts when a settlement overdraws an organization wallet', async () => {
+    const startEpochMs = Date.now();
+    const overdrawContext = { ...context, instanceId: `overdraw-org-${suffix}`, sku: paidSkuId };
+    overdrawContext.subject = { type: 'org', id: organizationId };
+    overdrawContext.actor = { type: 'bot', id: `meter-bot-${suffix}` };
+    overdrawContext.onBehalfOf = { type: 'org', id: organizationId };
+    const overdrawFingerprint = await usageContextFingerprint(overdrawContext);
+    const overdrawIntervalId = `cloud-agent-next:${overdrawContext.instanceId}:${startEpochMs}`;
+    await client.db
+      .update(organizations)
+      .set({
+        total_microdollars_acquired: 5_050_000,
+        microdollars_used: 0,
+        microdollars_balance: 5_050_000,
+      })
+      .where(eq(organizations.id, organizationId));
+
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...overdrawContext,
+          startEpochMs,
+          idempotencyKey: startIdempotencyKey(
+            overdrawContext.service,
+            overdrawContext.instanceId,
+            startEpochMs
+          ),
+        },
+        overdrawIntervalId,
+        overdrawFingerprint,
+        startEpochMs,
+        paidBillingConfig
+      )
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      remainingMicrodollars: 5_050_000,
+    });
+
+    // Leave the wallet with 50,000 microdollars so the 8-second settlement
+    // overdraws it.
+    await client.db
+      .update(organizations)
+      .set({ microdollars_used: 5_000_000, microdollars_balance: 50_000 })
+      .where(eq(organizations.id, organizationId));
+
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        {
+          service: overdrawContext.service,
+          instanceId: overdrawContext.instanceId,
+          startEpochMs,
+          idempotencyKey: heartbeatIdempotencyKey(
+            overdrawContext.service,
+            overdrawContext.instanceId,
+            startEpochMs,
+            1
+          ),
+          seq: 1,
+          usageSinceLast: 8,
+          context: overdrawContext,
+        },
+        overdrawIntervalId,
+        overdrawFingerprint,
+        startEpochMs + 8_000,
+        paidBillingConfig
+      )
+    ).resolves.toMatchObject({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      budget: { verdict: 'stop', remainingMicrodollars: 0 },
+    });
+
+    const [organization] = await client.db
+      .select({
+        used: organizations.microdollars_used,
+        balance: organizations.microdollars_balance,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+    expect(organization).toEqual({ used: 5_080_000, balance: -30_000 });
+
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, overdrawIntervalId));
+    await client.db
+      .update(organizations)
+      .set({
+        total_microdollars_acquired: 5_100_000,
+        microdollars_used: 200_000,
+        microdollars_balance: 4_900_000,
+      })
+      .where(eq(organizations.id, organizationId));
+  });
+
+  it('reports a zero balance when admission rejects an overdrawn wallet', async () => {
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 4_000_000, microdollars_used: 4_500_000 })
+      .where(eq(kilocode_users.id, userId));
+    const rejectedContext = { ...context, instanceId: `overdraw-reject-${suffix}`, sku: paidSkuId };
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...rejectedContext,
+          startEpochMs: 1,
+          idempotencyKey: startIdempotencyKey(
+            rejectedContext.service,
+            rejectedContext.instanceId,
+            1
+          ),
+        },
+        `cloud-agent-next:${rejectedContext.instanceId}:1`,
+        await usageContextFingerprint(rejectedContext),
+        1_000,
+        paidBillingConfig
+      )
+    ).resolves.toMatchObject({
+      kind: 'rejected',
+      code: 'insufficient_credits',
+      remainingMicrodollars: 0,
+      minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+    });
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_050_000, microdollars_used: 5_050_000 })
+      .where(eq(kilocode_users.id, userId));
   });
 
   it('locks the open interval before the payer during paid supersede admission', async () => {

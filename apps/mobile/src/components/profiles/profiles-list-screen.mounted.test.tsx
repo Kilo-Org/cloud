@@ -226,7 +226,7 @@ describe('ProfilesListScreen', () => {
       props: { accessibilityLabel: string };
     };
     expect(star.type).toBe('Star');
-    expect(star.props.accessibilityLabel).toBe('Personal profile, Default profile');
+    expect(star.props.accessibilityLabel).toBe('Default profile');
 
     const orgRow = findAll(renderer.root, 'ConfigureRow').find(
       row => row.props.title === 'Org profile'

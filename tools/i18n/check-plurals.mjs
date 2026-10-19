@@ -113,6 +113,10 @@ export const NO_AGREEMENT = new Map([
     'progress read-out: "Loading {{loaded}} of {{total}} lines…" — "lines" counts loaded, and the row is a spinner',
   ],
   ['prReview.hunkRows.loadingContext', 'progress read-out: "Loading context…" has no count'],
+  [
+    'profiles.mcp.secretCount',
+    'bare count after a label: "Secret count: {{count}}" has no inflected word',
+  ],
 ]);
 
 /** The source files the audit scans: app code, not tests or mounted harnesses. */

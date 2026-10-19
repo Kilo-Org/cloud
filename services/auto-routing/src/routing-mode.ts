@@ -5,11 +5,21 @@ import {
   PersistedEfficientModelPoolSchema,
   type AutoRoutingMode,
   type AutoRoutingModeOwnerType,
+  type BenchmarkProfileEntryStatus,
+  type CustomRoutingTable,
   type EfficientModelPool,
+  type UpdateAutoRoutingSettingsRequest,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import * as z from 'zod';
 import { DurableObject } from 'cloudflare:workers';
+import {
+  BenchmarkProfileQuotaError,
+  fetchBenchmarkProfileStatuses,
+  fetchCustomRoutingTable,
+  registerBenchmarkProfiles,
+  syncBenchmarkSubscriptions,
+} from './benchmark-origin';
 
 type AutoRoutingModeEnv = Pick<Env, 'AUTO_ROUTING_MODE_CONFIG'>;
 
@@ -34,6 +44,20 @@ export type StoredOwnerSettings = AutoRoutingOwnerSettings & {
   convertedAt: string | null;
   failedAt: string | null;
 };
+
+export type AutoRoutingSettingsOwner = {
+  ownerType: AutoRoutingModeOwnerType;
+  ownerId: string;
+};
+
+type SubscribedAutoRoutingSettings = {
+  settings: AutoRoutingOwnerSettings;
+  statuses: BenchmarkProfileEntryStatus[];
+};
+
+type SaveAutoRoutingSettingsResult =
+  | { statuses: BenchmarkProfileEntryStatus[] }
+  | { quota: { error: string; retryAt: string } };
 
 export type AutoRoutingOwnerSettings = {
   mode: AutoRoutingMode | null;
@@ -79,6 +103,96 @@ function parseStoredOwnerSettings(stored: Map<string, unknown>): StoredOwnerSett
 }
 
 export class AutoRoutingModeConfigDO extends DurableObject<Env> {
+  private subscriptionOperation: Promise<void> = Promise.resolve();
+
+  private withSubscriptionOrdering<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.subscriptionOperation.then(operation);
+    this.subscriptionOperation = result.then(
+      () => {},
+      () => {}
+    );
+    return result;
+  }
+
+  async getSubscribedSettings(
+    owner: AutoRoutingSettingsOwner
+  ): Promise<SubscribedAutoRoutingSettings> {
+    return this.withSubscriptionOrdering(async () => {
+      const settings = await this.getSettings();
+      if (settings.pool !== null) {
+        await syncBenchmarkSubscriptions(this.env, { ...owner, entries: settings.pool });
+      }
+      const statuses =
+        settings.pool === null
+          ? []
+          : (
+              await fetchBenchmarkProfileStatuses(this.env, {
+                ...owner,
+                entries: settings.pool,
+              })
+            ).statuses;
+      return { settings, statuses };
+    });
+  }
+
+  async getCustomRoutingTable(owner: AutoRoutingSettingsOwner): Promise<CustomRoutingTable | null> {
+    return this.withSubscriptionOrdering(async () => {
+      const pool = await this.getPool();
+      if (pool === null) return null;
+      const table = await fetchCustomRoutingTable(this.env, { ...owner, entries: pool });
+      if (table !== null) return table;
+      await syncBenchmarkSubscriptions(this.env, { ...owner, entries: pool });
+      return fetchCustomRoutingTable(this.env, { ...owner, entries: pool });
+    });
+  }
+
+  async saveSettings(
+    request: UpdateAutoRoutingSettingsRequest
+  ): Promise<SaveAutoRoutingSettingsResult> {
+    return this.withSubscriptionOrdering(async () => {
+      const { ownerType, ownerId, mode, pool, retryEntries } = request;
+      const owner = { ownerType, ownerId };
+      const previous = await this.getSettings();
+      if (JSON.stringify(pool) === JSON.stringify(previous.pool) && !retryEntries?.length) {
+        const statuses =
+          pool === null
+            ? []
+            : (await fetchBenchmarkProfileStatuses(this.env, { ...owner, entries: pool })).statuses;
+        await this.setSettings({ mode, pool });
+        return { statuses };
+      }
+      if (previous.pool !== null) {
+        await syncBenchmarkSubscriptions(this.env, { ...owner, entries: previous.pool });
+      }
+      try {
+        const registered =
+          pool === null
+            ? await syncBenchmarkSubscriptions(this.env, { ...owner, entries: null })
+            : await registerBenchmarkProfiles(this.env, {
+                ...owner,
+                entries: pool,
+                ...(retryEntries !== undefined ? { retryEntries } : {}),
+              });
+        await this.setSettings({ mode, pool });
+        return { statuses: registered.statuses };
+      } catch (error) {
+        try {
+          await syncBenchmarkSubscriptions(this.env, {
+            ...owner,
+            entries: previous.pool,
+            restorePrevious: true,
+          });
+        } catch {
+          console.warn(JSON.stringify({ event: 'auto_routing_subscription_restore_failed' }));
+        }
+        if (error instanceof BenchmarkProfileQuotaError) {
+          return { quota: { error: error.message, retryAt: error.retryAt } };
+        }
+        throw error;
+      }
+    });
+  }
+
   async readStoredSettings(): Promise<StoredOwnerSettings> {
     const stored = await this.ctx.storage.get<unknown>([
       MODE_STORAGE_KEY,
@@ -278,6 +392,20 @@ export async function getConfiguredAutoRoutingSettings(
   return readAutoRoutingSettings(env, owner).catch(() => ({ mode: null, pool: null }));
 }
 
+export async function getSubscribedAutoRoutingSettings(
+  env: AutoRoutingModeEnv,
+  owner: AutoRoutingSettingsOwner
+): Promise<SubscribedAutoRoutingSettings> {
+  return modeStub(env, owner.ownerType, owner.ownerId).getSubscribedSettings(owner);
+}
+
+export async function getOwnerCustomRoutingTable(
+  env: AutoRoutingModeEnv,
+  owner: AutoRoutingSettingsOwner
+): Promise<CustomRoutingTable | null> {
+  return modeStub(env, owner.ownerType, owner.ownerId).getCustomRoutingTable(owner);
+}
+
 export function getCachedAutoRoutingSettings(
   env: AutoRoutingModeEnv,
   owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
@@ -326,7 +454,11 @@ export async function getAutoRoutingMode(
 export async function getEffectiveAutoRoutingSettings(
   env: AutoRoutingModeEnv,
   owner: { userId: string; organizationId: string | null }
-): Promise<{ mode: AutoRoutingMode; pool: EfficientModelPool | null }> {
+): Promise<{
+  mode: AutoRoutingMode;
+  pool: EfficientModelPool | null;
+  poolOwner: AutoRoutingSettingsOwner | null;
+}> {
   const userSettingsPromise = getCachedAutoRoutingSettings(env, {
     ownerType: 'user',
     ownerId: owner.userId,
@@ -343,6 +475,12 @@ export async function getEffectiveAutoRoutingSettings(
   return {
     mode: orgSettings.mode ?? userSettings.mode ?? DEFAULT_AUTO_ROUTING_MODE,
     pool: orgSettings.pool ?? userSettings.pool ?? null,
+    poolOwner:
+      orgSettings.pool !== null && owner.organizationId !== null
+        ? { ownerType: 'org', ownerId: owner.organizationId }
+        : userSettings.pool !== null
+          ? { ownerType: 'user', ownerId: owner.userId }
+          : null,
   };
 }
 
@@ -357,8 +495,7 @@ export async function setAutoRoutingMode(
 
 export async function setAutoRoutingSettings(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string },
-  settings: AutoRoutingOwnerSettings
-): Promise<void> {
-  await modeStub(env, owner.ownerType, owner.ownerId).setSettings(settings);
+  request: UpdateAutoRoutingSettingsRequest
+): Promise<SaveAutoRoutingSettingsResult> {
+  return modeStub(env, request.ownerType, request.ownerId).saveSettings(request);
 }

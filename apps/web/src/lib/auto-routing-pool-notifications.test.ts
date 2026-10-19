@@ -134,7 +134,7 @@ describe('pool notice planning', () => {
   });
 
   it('deduplicates a recipient across personal and multiple organization contacts with all router IDs', () => {
-    const targets = buildPoolNotificationTargets([
+    const { targets, unreachable } = buildPoolNotificationTargets([
       ...owners,
       { routers: [organizationRouter], emails: ['owner@example.test'] },
     ]);
@@ -146,28 +146,61 @@ describe('pool notice planning', () => {
     expect(targets.find(target => target.to === 'billing@example.test')?.routers).toEqual([
       organizationRouter,
     ]);
+    expect(unreachable).toEqual([]);
   });
 
-  it('blocks every email if any affected organization has no live billing contact', async () => {
-    const sendEmail = jest.fn<() => Promise<SendResult>>();
-    await expect(
-      runPoolNotifications({
+  it('reports an owner without a valid contact as unreachable and still sends to the others', async () => {
+    const sendEmail = jest.fn<() => Promise<SendResult>>().mockResolvedValue({ sent: true });
+    const withUnreachable = [
+      ...owners,
+      { routers: [{ ...organizationRouter, id: 'no-contact-router' }], emails: [] },
+      {
+        routers: [{ ...personalRouter, id: 'invalid-contact-router' }],
+        emails: ['private-invalid-contact'],
+      },
+    ];
+    const { targets, unreachable } = buildPoolNotificationTargets(withUnreachable);
+    expect(targets.map(target => target.to)).toEqual([
+      'billing@example.test',
+      'owner@example.test',
+    ]);
+    expect(unreachable.map(routers => routers.map(router => router.id))).toEqual([
+      ['no-contact-router'],
+      ['invalid-contact-router'],
+    ]);
+    const dryRun = await runPoolNotifications({
+      cutoverAt,
+      stateDir,
+      send: false,
+      owners: withUnreachable,
+      sendEmail,
+    });
+    expect(dryRun).toMatchObject({ recipients: 2, unreachable: 2, remaining: 2 });
+    expect(JSON.stringify(dryRun)).not.toMatch(/private-invalid-contact|contact-router/);
+    const state = await readFile(join(stateDir, 'state.json'), 'utf8');
+    expect(state).not.toMatch(/private-invalid-contact|contact-router/);
+    expect(JSON.parse(state).unreachableOwners).toEqual([
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    ]);
+    expect(
+      await runPoolNotifications({
         cutoverAt,
         stateDir,
         send: true,
-        owners: [...owners, { routers: [organizationRouter], emails: [] }],
+        owners: withUnreachable,
         sendEmail,
       })
-    ).rejects.toThrow(/no live billing contact/);
-    expect(sendEmail).not.toHaveBeenCalled();
+    ).toMatchObject({ mode: 'send', sent: 2, unreachable: 2, remaining: 0 });
+    expect(sendEmail).toHaveBeenCalledTimes(2);
   });
 
-  it('does not echo an invalid recipient in its error', () => {
-    expect(() =>
-      buildPoolNotificationTargets([
-        { routers: [personalRouter], emails: ['private-invalid-contact'] },
-      ])
-    ).toThrow('An affected contact has an invalid email; reconcile before sending.');
+  it('drops an invalid contact when the owner has another valid contact', () => {
+    const { targets, unreachable } = buildPoolNotificationTargets([
+      { routers: [personalRouter], emails: ['private-invalid-contact', 'owner@example.test'] },
+    ]);
+    expect(targets.map(target => target.to)).toEqual(['owner@example.test']);
+    expect(unreachable).toEqual([]);
   });
 });
 
@@ -678,22 +711,27 @@ describe('private resumable pool notices', () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  it('fails refresh before changing the plan if any affected owner loses its billing contacts', async () => {
+  it('rejects a send when unreachable owners differ from the saved plan until refresh', async () => {
     const sendEmail = jest.fn<() => Promise<SendResult>>().mockResolvedValue({ sent: true });
+    const changed = [...owners, { routers: [organizationRouter], emails: [] }];
     await runPoolNotifications({ cutoverAt, stateDir, send: false, owners, sendEmail });
-    const before = await readPlan();
     await expect(
-      runPoolNotifications({
+      runPoolNotifications({ cutoverAt, stateDir, send: true, owners: changed, sendEmail })
+    ).rejects.toThrow(/differ from the saved plan/);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(
+      await runPoolNotifications({
         cutoverAt,
         stateDir,
         send: false,
         refreshPlan: true,
-        owners: [...owners, { routers: [organizationRouter], emails: [] }],
+        owners: changed,
         sendEmail,
       })
-    ).rejects.toThrow(/no live billing contact/);
-    expect(await readPlan()).toEqual(before);
-    expect(sendEmail).not.toHaveBeenCalled();
+    ).toMatchObject({ unreachable: 1, remaining: 2 });
+    expect(
+      await runPoolNotifications({ cutoverAt, stateDir, send: true, owners: changed, sendEmail })
+    ).toMatchObject({ sent: 2, unreachable: 1 });
   });
 
   it('preserves sent history from an existing plan without refresh metadata fields', async () => {

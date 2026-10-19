@@ -32,7 +32,10 @@
     "staging": {
       "name": "usage-ingest-staging",
       "workers_dev": true,
-      "vars": { "USAGE_INGEST_MODE": "receipt" },
+      "vars": {
+        "USAGE_INGEST_MODE": "processing",
+        "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
+      },
       "queues": {
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging" },

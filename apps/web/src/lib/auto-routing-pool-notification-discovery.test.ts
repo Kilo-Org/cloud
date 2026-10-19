@@ -19,6 +19,10 @@ import {
   buildPoolNotificationTargets,
   runPoolNotifications,
 } from '../scripts/lib/auto-routing-pool-notifications';
+import {
+  createDeletionInProgressBlockedReason,
+  createSoftDeletedBlockedReason,
+} from '@kilocode/db/user-soft-delete';
 
 const captureMail = jest.mocked(sendViaMailgun);
 jest.mock('@kilocode/web-shared/lib/email-mailgun', () => ({
@@ -120,7 +124,7 @@ describe('migrated pool discovery and capture', () => {
     ]);
 
     const owners = await discoverPoolNotificationOwners(db);
-    const targets = buildPoolNotificationTargets(owners);
+    const { targets } = buildPoolNotificationTargets(owners);
     const discoveredIds = owners.flatMap(item => item.routers.map(router => router.id));
     expect(discoveredIds).toEqual(
       expect.arrayContaining([personal.id, orgRouter.id, secondOrgRouter.id])
@@ -212,7 +216,7 @@ describe('migrated pool discovery and capture', () => {
       const discovered = owners.find(item => item.routers.some(pool => pool.id === router.id));
       expect(discovered?.emails.sort()).toEqual(expectedEmails);
     }
-    const targets = buildPoolNotificationTargets(owners);
+    const { targets } = buildPoolNotificationTargets(owners);
     expect(targets.map(target => target.to).sort()).toEqual(expectedEmails);
     for (const target of targets) {
       expect(target.routers.map(router => router.id).sort()).toEqual(
@@ -232,26 +236,70 @@ describe('migrated pool discovery and capture', () => {
     expect(captureMail).not.toHaveBeenCalled();
   });
 
-  it('discovers missing billing recipients as a blocker before any captured email', async () => {
+  it('excludes soft-deleted personal owners and soft-deleted direct or inherited billing contacts', async () => {
+    const deletedOwner = await seedUser({ blocked_reason: createSoftDeletedBlockedReason() });
+    const deletingOwner = await seedUser({
+      blocked_reason: createDeletionInProgressBlockedReason(),
+    });
+    const liveAdmin = await seedUser();
+    const deletedAdmin = await seedUser({ blocked_reason: createSoftDeletedBlockedReason() });
+    const deletedParentOwner = await seedUser({
+      blocked_reason: createSoftDeletedBlockedReason(),
+    });
+    const deletedPersonal = await seedRouter({ userId: deletedOwner.id });
+    const deletingPersonal = await seedRouter({ userId: deletingOwner.id });
+    const parent = await seedOrganization('Fixture deleted parent contact');
+    const child = await seedOrganization('Fixture child with deleted contacts', false, parent.id);
+    const childRouter = await seedRouter({ organizationId: child.id });
+    await db.insert(organization_memberships).values([
+      { organization_id: child.id, kilo_user_id: liveAdmin.id, role: 'admin' },
+      { organization_id: child.id, kilo_user_id: deletedAdmin.id, role: 'owner' },
+      { organization_id: parent.id, kilo_user_id: deletedParentOwner.id, role: 'owner' },
+    ]);
+
+    const owners = await discoverPoolNotificationOwners(db);
+    const discoveredIds = owners.flatMap(item => item.routers.map(router => router.id));
+    expect(discoveredIds).not.toContain(deletedPersonal.id);
+    expect(discoveredIds).not.toContain(deletingPersonal.id);
+    expect(
+      owners.find(item => item.routers.some(pool => pool.id === childRouter.id))?.emails
+    ).toEqual([liveAdmin.google_user_email]);
+  });
+
+  it('reports an organization with no live billing contact as unreachable and still plans the others', async () => {
+    const owner = await seedUser();
+    const personal = await seedRouter({ userId: owner.id });
     const organization = await seedOrganization('Fixture no billing contact');
     const ordinaryMember = await seedUser();
-    await seedRouter({ organizationId: organization.id });
-    await db.insert(organization_memberships).values({
-      organization_id: organization.id,
-      kilo_user_id: ordinaryMember.id,
-      role: 'member',
-    });
+    const deletedOwner = await seedUser({ blocked_reason: createSoftDeletedBlockedReason() });
+    const orgRouter = await seedRouter({ organizationId: organization.id });
+    await db.insert(organization_memberships).values([
+      { organization_id: organization.id, kilo_user_id: ordinaryMember.id, role: 'member' },
+      { organization_id: organization.id, kilo_user_id: deletedOwner.id, role: 'owner' },
+    ]);
     const owners = await discoverPoolNotificationOwners(db);
+    const { targets, unreachable } = buildPoolNotificationTargets(owners);
+    expect(unreachable.flat().map(router => router.id)).toContain(orgRouter.id);
+    expect(targets.find(target => target.to === owner.google_user_email)?.routers).toEqual([
+      expect.objectContaining({ id: personal.id }),
+    ]);
     stateDir = await mkdtemp(join(tmpdir(), 'pool-missing-contact-'));
-    await expect(
-      runPoolNotifications({
-        cutoverAt: '2099-11-01T12:00:00Z',
-        stateDir,
-        owners,
-        send: true,
-        sendEmail: (target, cutoverAt) => sendAutoRoutingPoolNoticeEmail({ ...target, cutoverAt }),
-      })
-    ).rejects.toThrow(/no live billing contact/);
+    const options = {
+      cutoverAt: '2099-11-01T12:00:00Z',
+      stateDir,
+      owners,
+      sendEmail: (target: (typeof targets)[number], cutoverAt: string) =>
+        sendAutoRoutingPoolNoticeEmail({ ...target, cutoverAt }),
+    };
+    const dryRun = await runPoolNotifications({ ...options, send: false });
+    expect(dryRun).toMatchObject({ unreachable: unreachable.length });
+    expect(JSON.stringify(dryRun)).not.toContain(organization.id);
     expect(captureMail).not.toHaveBeenCalled();
+    expect(await runPoolNotifications({ ...options, send: true })).toMatchObject({
+      failed: 0,
+      remaining: 0,
+      unreachable: unreachable.length,
+    });
+    expect(captureMail.mock.calls.map(([mail]) => mail.to)).toContain(owner.google_user_email);
   });
 });

@@ -29,7 +29,7 @@ const nonFlexExclusiveModel: KiloExclusiveModel = {
   provider: OPENROUTER,
   flags: [],
   pricing: null,
-  inference_provider_restriction: [],
+  inference_providers: [],
 };
 
 const flexExclusiveModel: KiloExclusiveModel = {

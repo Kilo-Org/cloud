@@ -4127,379 +4127,6 @@
     ],
     "searchBlob": "appReportedMessages.createReport Report a problematic app or extension message for review, such as an unparsed or unstyled message from a CLI session. Submit the message content, mode, model, and report type to store it for investigation. appreportedmessages createreport message cli_session_id mode model report_type message cli_session_id mode model report_type"
   },
-  "autoFix.cancel": {
-    "path": "autoFix.cancel",
-    "kind": "mutation",
-    "summary": "Cancel or stop a running or pending auto-fix ticket. Use this to abort an in-progress fix before it opens a pull request.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "ticketId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "ticketId"
-      ]
-    },
-    "tags": [
-      "autofix",
-      "cancel",
-      "ticketid"
-    ],
-    "searchBlob": "autoFix.cancel Cancel or stop a running or pending auto-fix ticket. Use this to abort an in-progress fix before it opens a pull request. autofix cancel ticketid ticketId"
-  },
-  "autoFix.getConfig": {
-    "path": "autoFix.getConfig",
-    "kind": "query",
-    "summary": "Get the auto-fix configuration for an organization, including whether auto-fix is enabled and its current settings.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "autofix",
-      "getconfig",
-      "organizationid"
-    ],
-    "searchBlob": "autoFix.getConfig Get the auto-fix configuration for an organization, including whether auto-fix is enabled and its current settings. autofix getconfig organizationid organizationId"
-  },
-  "autoFix.getTicket": {
-    "path": "autoFix.getTicket",
-    "kind": "query",
-    "summary": "Fetch a single auto-fix ticket by its ID, with authorization checks for organization members or personal ownership.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "ticketId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "ticketId"
-      ]
-    },
-    "tags": [
-      "autofix",
-      "getticket",
-      "ticketid"
-    ],
-    "searchBlob": "autoFix.getTicket Fetch a single auto-fix ticket by its ID, with authorization checks for organization members or personal ownership. autofix getticket ticketid ticketId"
-  },
-  "autoFix.listTicketsForOrganization": {
-    "path": "autoFix.listTicketsForOrganization",
-    "kind": "query",
-    "summary": "List auto-fix tickets for an organization, with optional filtering by status, classification, or repository, plus pagination.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "limit": {
-          "default": 20,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100
-        },
-        "offset": {
-          "default": 0,
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "pending",
-            "running",
-            "completed",
-            "failed",
-            "cancelled"
-          ]
-        },
-        "classification": {
-          "type": "string",
-          "enum": [
-            "bug",
-            "feature",
-            "question",
-            "unclear"
-          ]
-        },
-        "repoFullName": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "autofix",
-      "listticketsfororganization",
-      "organizationid",
-      "limit",
-      "offset",
-      "status",
-      "classification",
-      "repofullname"
-    ],
-    "searchBlob": "autoFix.listTicketsForOrganization List auto-fix tickets for an organization, with optional filtering by status, classification, or repository, plus pagination. autofix listticketsfororganization organizationid limit offset status classification repofullname organizationId limit offset status classification repoFullName"
-  },
-  "autoFix.listTicketsForUser": {
-    "path": "autoFix.listTicketsForUser",
-    "kind": "query",
-    "summary": "List a user's own auto-fix tickets, with optional filtering by status, classification, or repository, plus pagination.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "limit": {
-          "default": 20,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100
-        },
-        "offset": {
-          "default": 0,
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "pending",
-            "running",
-            "completed",
-            "failed",
-            "cancelled"
-          ]
-        },
-        "classification": {
-          "type": "string",
-          "enum": [
-            "bug",
-            "feature",
-            "question",
-            "unclear"
-          ]
-        },
-        "repoFullName": {
-          "type": "string"
-        }
-      }
-    },
-    "tags": [
-      "autofix",
-      "listticketsforuser",
-      "limit",
-      "offset",
-      "status",
-      "classification",
-      "repofullname"
-    ],
-    "searchBlob": "autoFix.listTicketsForUser List a user's own auto-fix tickets, with optional filtering by status, classification, or repository, plus pagination. autofix listticketsforuser limit offset status classification repofullname limit offset status classification repoFullName"
-  },
-  "autoFix.retrigger": {
-    "path": "autoFix.retrigger",
-    "kind": "mutation",
-    "summary": "Retry or restart an auto-fix ticket that failed, is pending, or was cancelled, so the agent runs the fix again. Use this to rerun a fix ticket after a failure.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "ticketId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "ticketId"
-      ]
-    },
-    "tags": [
-      "autofix",
-      "retrigger",
-      "ticketid"
-    ],
-    "searchBlob": "autoFix.retrigger Retry or restart an auto-fix ticket that failed, is pending, or was cancelled, so the agent runs the fix again. Use this to rerun a fix ticket after a failure. autofix retrigger ticketid ticketId"
-  },
-  "autoFix.saveConfig": {
-    "path": "autoFix.saveConfig",
-    "kind": "mutation",
-    "summary": "Save or update the auto-fix agent settings for an organization, such as which repositories to fix, label filters, model, and pull request templates. Use this to change the auto-fix configuration.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "allOf": [
-        {
-          "type": "object",
-          "properties": {
-            "organizationId": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          },
-          "required": [
-            "organizationId"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "enabled_for_issues": {
-              "type": "boolean"
-            },
-            "enabled_for_review_comments": {
-              "type": "boolean"
-            },
-            "repository_selection_mode": {
-              "type": "string",
-              "enum": [
-                "all",
-                "selected"
-              ]
-            },
-            "selected_repository_ids": {
-              "type": "array",
-              "items": {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              }
-            },
-            "skip_labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "required_labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "model_slug": {
-              "type": "string"
-            },
-            "custom_instructions": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "pr_title_template": {
-              "type": "string"
-            },
-            "pr_body_template": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "pr_base_branch": {
-              "type": "string"
-            },
-            "max_pr_creation_time_minutes": {
-              "type": "integer",
-              "minimum": 5,
-              "maximum": 30
-            },
-            "max_concurrent_per_owner": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            }
-          },
-          "required": [
-            "enabled_for_issues",
-            "repository_selection_mode"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "tags": [
-      "autofix",
-      "saveconfig",
-      "organizationid",
-      "enabled_for_issues",
-      "enabled_for_review_comments",
-      "repository_selection_mode",
-      "selected_repository_ids",
-      "skip_labels",
-      "required_labels",
-      "model_slug",
-      "custom_instructions",
-      "pr_title_template",
-      "pr_body_template",
-      "pr_base_branch",
-      "max_pr_creation_time_minutes",
-      "max_concurrent_per_owner"
-    ],
-    "searchBlob": "autoFix.saveConfig Save or update the auto-fix agent settings for an organization, such as which repositories to fix, label filters, model, and pull request templates. Use this to change the auto-fix configuration. autofix saveconfig organizationid enabled_for_issues enabled_for_review_comments repository_selection_mode selected_repository_ids skip_labels required_labels model_slug custom_instructions pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes max_concurrent_per_owner organizationId enabled_for_issues enabled_for_review_comments repository_selection_mode selected_repository_ids skip_labels required_labels model_slug custom_instructions pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes max_concurrent_per_owner"
-  },
-  "autoFix.toggleAgent": {
-    "path": "autoFix.toggleAgent",
-    "kind": "mutation",
-    "summary": "Enable or disable the auto-fix agent for an organization. Use this to turn automatic issue fixing on or off.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "isEnabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "organizationId",
-        "isEnabled"
-      ]
-    },
-    "tags": [
-      "autofix",
-      "toggleagent",
-      "organizationid",
-      "isenabled"
-    ],
-    "searchBlob": "autoFix.toggleAgent Enable or disable the auto-fix agent for an organization. Use this to turn automatic issue fixing on or off. autofix toggleagent organizationid isenabled organizationId isEnabled"
-  },
   "autoTriage.getConfig": {
     "path": "autoTriage.getConfig",
     "kind": "query",
@@ -4754,11 +4381,6 @@
               "minimum": 0,
               "maximum": 1
             },
-            "auto_fix_threshold": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
             "max_concurrent_per_owner": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -4823,7 +4445,6 @@
       "skip_labels",
       "required_labels",
       "duplicate_threshold",
-      "auto_fix_threshold",
       "max_concurrent_per_owner",
       "custom_instructions",
       "model_slug",
@@ -4835,7 +4456,7 @@
       "pr_base_branch",
       "max_pr_creation_time_minutes"
     ],
-    "searchBlob": "autoTriage.saveConfig Save the auto-triage settings for an organization, including enabled state, repository selection, skip labels, and thresholds. Use to turn auto-triage on or off or change its configuration. autotriage saveconfig organizationid enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_fix_threshold max_concurrent_per_owner custom_instructions model_slug max_classification_time_minutes auto_create_pr_threshold pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes organizationId enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_fix_threshold max_concurrent_per_owner custom_instructions model_slug max_classification_time_minutes auto_create_pr_threshold pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes"
+    "searchBlob": "autoTriage.saveConfig Save the auto-triage settings for an organization, including enabled state, repository selection, skip labels, and thresholds. Use to turn auto-triage on or off or change its configuration. autotriage saveconfig organizationid enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold max_concurrent_per_owner custom_instructions model_slug max_classification_time_minutes auto_create_pr_threshold pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes organizationId enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold max_concurrent_per_owner custom_instructions model_slug max_classification_time_minutes auto_create_pr_threshold pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes"
   },
   "byok.create": {
     "path": "byok.create",
@@ -7226,6 +6847,43 @@
       "sessionid"
     ],
     "searchBlob": "cloudAgentNext.interruptSession Stop a running cloud agent session and cancel its active work. cloudagentnext interruptsession sessionid sessionId"
+  },
+  "cloudAgentNext.linkPendingUploads": {
+    "path": "cloudAgentNext.linkPendingUploads",
+    "kind": "mutation",
+    "summary": "Mark uploaded files as attached so they are kept and sent with the message.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "messageUuid": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "objectKeys": {
+          "minItems": 1,
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      },
+      "required": [
+        "messageUuid",
+        "objectKeys"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "linkpendinguploads",
+      "messageuuid",
+      "objectkeys"
+    ],
+    "searchBlob": "cloudAgentNext.linkPendingUploads Mark uploaded files as attached so they are kept and sent with the message. cloudagentnext linkpendinguploads messageuuid objectkeys messageUuid objectKeys"
   },
   "cloudAgentNext.listGitHubRepositories": {
     "path": "cloudAgentNext.listGitHubRepositories",
@@ -17888,341 +17546,6 @@
     ],
     "searchBlob": "organizations.auditLogs.list List an organization's audit log events with filters for action, actor, time range, and fuzzy text search, plus pagination. organizations auditlogs list organizationid before after action actoremail fuzzysearch starttime endtime organizationId before after action actorEmail fuzzySearch startTime endTime"
   },
-  "organizations.autoFix.cancelFix": {
-    "path": "organizations.autoFix.cancelFix",
-    "kind": "mutation",
-    "summary": "Cancel an in-progress auto-fix for a ticket. Use to stop a fix.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "ticketId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "ticketId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "autofix",
-      "cancelfix",
-      "organizationid",
-      "ticketid"
-    ],
-    "searchBlob": "organizations.autoFix.cancelFix Cancel an in-progress auto-fix for a ticket. Use to stop a fix. organizations autofix cancelfix organizationid ticketid organizationId ticketId"
-  },
-  "organizations.autoFix.getAutoFixConfig": {
-    "path": "organizations.autoFix.getAutoFixConfig",
-    "kind": "query",
-    "summary": "Get the auto-fix configuration for the organization.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "autofix",
-      "getautofixconfig",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.autoFix.getAutoFixConfig Get the auto-fix configuration for the organization. organizations autofix getautofixconfig organizationid organizationId"
-  },
-  "organizations.autoFix.listGitHubRepositories": {
-    "path": "organizations.autoFix.listGitHubRepositories",
-    "kind": "query",
-    "summary": "List GitHub repositories available to the auto-fix feature.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "autofix",
-      "listgithubrepositories",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.autoFix.listGitHubRepositories List GitHub repositories available to the auto-fix feature. organizations autofix listgithubrepositories organizationid organizationId"
-  },
-  "organizations.autoFix.listTickets": {
-    "path": "organizations.autoFix.listTickets",
-    "kind": "query",
-    "summary": "List auto-fix tickets with optional filtering by status, classification, repository, and pagination.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "limit": {
-          "type": "number"
-        },
-        "offset": {
-          "type": "number"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "pending",
-            "running",
-            "completed",
-            "failed",
-            "cancelled"
-          ]
-        },
-        "classification": {
-          "type": "string",
-          "enum": [
-            "bug",
-            "feature",
-            "question",
-            "unclear"
-          ]
-        },
-        "repoFullName": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "autofix",
-      "listtickets",
-      "organizationid",
-      "limit",
-      "offset",
-      "status",
-      "classification",
-      "repofullname"
-    ],
-    "searchBlob": "organizations.autoFix.listTickets List auto-fix tickets with optional filtering by status, classification, repository, and pagination. organizations autofix listtickets organizationid limit offset status classification repofullname organizationId limit offset status classification repoFullName"
-  },
-  "organizations.autoFix.retriggerFix": {
-    "path": "organizations.autoFix.retriggerFix",
-    "kind": "mutation",
-    "summary": "Retrigger an auto-fix for a ticket. Use to re-run a fix.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "ticketId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "ticketId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "autofix",
-      "retriggerfix",
-      "organizationid",
-      "ticketid"
-    ],
-    "searchBlob": "organizations.autoFix.retriggerFix Retrigger an auto-fix for a ticket. Use to re-run a fix. organizations autofix retriggerfix organizationid ticketid organizationId ticketId"
-  },
-  "organizations.autoFix.saveAutoFixConfig": {
-    "path": "organizations.autoFix.saveAutoFixConfig",
-    "kind": "mutation",
-    "summary": "Save the auto-fix agent configuration for an organization. Use to set up automatic issue and review-comment fixes.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "allOf": [
-        {
-          "type": "object",
-          "properties": {
-            "organizationId": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          },
-          "required": [
-            "organizationId"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "enabled_for_issues": {
-              "type": "boolean"
-            },
-            "enabled_for_review_comments": {
-              "type": "boolean"
-            },
-            "repository_selection_mode": {
-              "type": "string",
-              "enum": [
-                "all",
-                "selected"
-              ]
-            },
-            "selected_repository_ids": {
-              "type": "array",
-              "items": {
-                "type": "number"
-              }
-            },
-            "skip_labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "required_labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "model_slug": {
-              "type": "string"
-            },
-            "custom_instructions": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "pr_title_template": {
-              "type": "string"
-            },
-            "pr_body_template": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "pr_base_branch": {
-              "type": "string"
-            },
-            "max_pr_creation_time_minutes": {
-              "type": "number"
-            }
-          },
-          "required": [
-            "enabled_for_issues",
-            "repository_selection_mode"
-          ],
-          "additionalProperties": {}
-        }
-      ]
-    },
-    "tags": [
-      "organizations",
-      "autofix",
-      "saveautofixconfig",
-      "organizationid",
-      "enabled_for_issues",
-      "enabled_for_review_comments",
-      "repository_selection_mode",
-      "selected_repository_ids",
-      "skip_labels",
-      "required_labels",
-      "model_slug",
-      "custom_instructions",
-      "pr_title_template",
-      "pr_body_template",
-      "pr_base_branch",
-      "max_pr_creation_time_minutes"
-    ],
-    "searchBlob": "organizations.autoFix.saveAutoFixConfig Save the auto-fix agent configuration for an organization. Use to set up automatic issue and review-comment fixes. organizations autofix saveautofixconfig organizationid enabled_for_issues enabled_for_review_comments repository_selection_mode selected_repository_ids skip_labels required_labels model_slug custom_instructions pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes organizationId enabled_for_issues enabled_for_review_comments repository_selection_mode selected_repository_ids skip_labels required_labels model_slug custom_instructions pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes"
-  },
-  "organizations.autoFix.toggleAutoFixAgent": {
-    "path": "organizations.autoFix.toggleAutoFixAgent",
-    "kind": "mutation",
-    "summary": "Enable or disable the auto-fix agent for an organization. Use to turn automatic fixes on or off.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "allOf": [
-        {
-          "type": "object",
-          "properties": {
-            "organizationId": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          },
-          "required": [
-            "organizationId"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "isEnabled": {
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "isEnabled"
-          ],
-          "additionalProperties": {}
-        }
-      ]
-    },
-    "tags": [
-      "organizations",
-      "autofix",
-      "toggleautofixagent",
-      "organizationid",
-      "isenabled"
-    ],
-    "searchBlob": "organizations.autoFix.toggleAutoFixAgent Enable or disable the auto-fix agent for an organization. Use to turn automatic fixes on or off. organizations autofix toggleautofixagent organizationid isenabled organizationId isEnabled"
-  },
   "organizations.autoTopUp.changePaymentMethod": {
     "path": "organizations.autoTopUp.changePaymentMethod",
     "kind": "mutation",
@@ -18758,11 +18081,6 @@
           "minimum": 0,
           "maximum": 1
         },
-        "auto_fix_threshold": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
         "auto_create_pr_threshold": {
           "type": "number",
           "minimum": 0,
@@ -18826,7 +18144,6 @@
       "skip_labels",
       "required_labels",
       "duplicate_threshold",
-      "auto_fix_threshold",
       "auto_create_pr_threshold",
       "max_concurrent_per_owner",
       "custom_instructions",
@@ -18838,7 +18155,7 @@
       "max_classification_time_minutes",
       "max_pr_creation_time_minutes"
     ],
-    "searchBlob": "organizations.autoTriage.saveAutoTriageConfig Save the auto-triage agent configuration for an organization. Use to set up automatic issue triage. organizations autotriage saveautotriageconfig organizationid enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_fix_threshold auto_create_pr_threshold max_concurrent_per_owner custom_instructions model_slug pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_classification_time_minutes max_pr_creation_time_minutes organizationId enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_fix_threshold auto_create_pr_threshold max_concurrent_per_owner custom_instructions model_slug pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_classification_time_minutes max_pr_creation_time_minutes"
+    "searchBlob": "organizations.autoTriage.saveAutoTriageConfig Save the auto-triage agent configuration for an organization. Use to set up automatic issue triage. organizations autotriage saveautotriageconfig organizationid enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_create_pr_threshold max_concurrent_per_owner custom_instructions model_slug pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_classification_time_minutes max_pr_creation_time_minutes organizationId enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_create_pr_threshold max_concurrent_per_owner custom_instructions model_slug pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_classification_time_minutes max_pr_creation_time_minutes"
   },
   "organizations.autoTriage.toggleAutoTriageAgent": {
     "path": "organizations.autoTriage.toggleAutoTriageAgent",
@@ -20066,6 +19383,51 @@
       "sessionid"
     ],
     "searchBlob": "organizations.cloudAgentNext.interruptSession Stop a running cloud agent session. Use to cancel the agent's current work. organizations cloudagentnext interruptsession organizationid sessionid organizationId sessionId"
+  },
+  "organizations.cloudAgentNext.linkPendingUploads": {
+    "path": "organizations.cloudAgentNext.linkPendingUploads",
+    "kind": "mutation",
+    "summary": "Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "messageUuid": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "objectKeys": {
+          "minItems": 1,
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      },
+      "required": [
+        "organizationId",
+        "messageUuid",
+        "objectKeys"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "linkpendinguploads",
+      "organizationid",
+      "messageuuid",
+      "objectkeys"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.linkPendingUploads Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files. organizations cloudagentnext linkpendinguploads organizationid messageuuid objectkeys organizationId messageUuid objectKeys"
   },
   "organizations.cloudAgentNext.listBitbucketRepositories": {
     "path": "organizations.cloudAgentNext.listBitbucketRepositories",
@@ -31557,245 +30919,6 @@
     ],
     "searchBlob": "organizations.withMembers Get an organization with its members, SSO policy, and child organization memberships. organizations withmembers organizationid organizationId"
   },
-  "personalAutoFix.cancelFix": {
-    "path": "personalAutoFix.cancelFix",
-    "kind": "mutation",
-    "summary": "Cancel an in-progress auto-fix run for a ticket.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "ticketId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "ticketId"
-      ]
-    },
-    "tags": [
-      "personalautofix",
-      "cancelfix",
-      "ticketid"
-    ],
-    "searchBlob": "personalAutoFix.cancelFix Cancel an in-progress auto-fix run for a ticket. personalautofix cancelfix ticketid ticketId"
-  },
-  "personalAutoFix.getAutoFixConfig": {
-    "path": "personalAutoFix.getAutoFixConfig",
-    "kind": "query",
-    "summary": "Retrieves the user's personal auto-fix agent settings, including whether it is enabled, returning defaults if none exist.",
-    "inputSchema": {},
-    "tags": [
-      "personalautofix",
-      "getautofixconfig"
-    ],
-    "searchBlob": "personalAutoFix.getAutoFixConfig Retrieves the user's personal auto-fix agent settings, including whether it is enabled, returning defaults if none exist. personalautofix getautofixconfig"
-  },
-  "personalAutoFix.listGitHubRepositories": {
-    "path": "personalAutoFix.listGitHubRepositories",
-    "kind": "query",
-    "summary": "Lists the GitHub repositories associated with the current user's account.",
-    "inputSchema": {},
-    "tags": [
-      "personalautofix",
-      "listgithubrepositories"
-    ],
-    "searchBlob": "personalAutoFix.listGitHubRepositories Lists the GitHub repositories associated with the current user's account. personalautofix listgithubrepositories"
-  },
-  "personalAutoFix.listTickets": {
-    "path": "personalAutoFix.listTickets",
-    "kind": "query",
-    "summary": "Lists auto-fix tickets for the current user with optional filtering by status, classification, repository, and pagination.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "limit": {
-          "type": "number"
-        },
-        "offset": {
-          "type": "number"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "pending",
-            "running",
-            "completed",
-            "failed",
-            "cancelled"
-          ]
-        },
-        "classification": {
-          "type": "string",
-          "enum": [
-            "bug",
-            "feature",
-            "question",
-            "unclear"
-          ]
-        },
-        "repoFullName": {
-          "type": "string"
-        }
-      }
-    },
-    "tags": [
-      "personalautofix",
-      "listtickets",
-      "limit",
-      "offset",
-      "status",
-      "classification",
-      "repofullname"
-    ],
-    "searchBlob": "personalAutoFix.listTickets Lists auto-fix tickets for the current user with optional filtering by status, classification, repository, and pagination. personalautofix listtickets limit offset status classification repofullname limit offset status classification repoFullName"
-  },
-  "personalAutoFix.retriggerFix": {
-    "path": "personalAutoFix.retriggerFix",
-    "kind": "mutation",
-    "summary": "Retrigger an auto-fix run for a ticket so the agent tries to fix the issue again.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "ticketId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "ticketId"
-      ]
-    },
-    "tags": [
-      "personalautofix",
-      "retriggerfix",
-      "ticketid"
-    ],
-    "searchBlob": "personalAutoFix.retriggerFix Retrigger an auto-fix run for a ticket so the agent tries to fix the issue again. personalautofix retriggerfix ticketid ticketId"
-  },
-  "personalAutoFix.saveAutoFixConfig": {
-    "path": "personalAutoFix.saveAutoFixConfig",
-    "kind": "mutation",
-    "summary": "Save the current user's auto-fix agent settings, such as which issues or review comments trigger fixes, repository selection, labels, model, and pull request templates.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "enabled_for_issues": {
-          "type": "boolean"
-        },
-        "enabled_for_review_comments": {
-          "type": "boolean"
-        },
-        "repository_selection_mode": {
-          "type": "string",
-          "enum": [
-            "all",
-            "selected"
-          ]
-        },
-        "selected_repository_ids": {
-          "type": "array",
-          "items": {
-            "type": "number"
-          }
-        },
-        "skip_labels": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "required_labels": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "model_slug": {
-          "type": "string"
-        },
-        "custom_instructions": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "pr_title_template": {
-          "type": "string"
-        },
-        "pr_body_template": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "pr_base_branch": {
-          "type": "string"
-        },
-        "max_pr_creation_time_minutes": {
-          "type": "number"
-        }
-      },
-      "required": [
-        "enabled_for_issues",
-        "repository_selection_mode"
-      ]
-    },
-    "tags": [
-      "personalautofix",
-      "saveautofixconfig",
-      "enabled_for_issues",
-      "enabled_for_review_comments",
-      "repository_selection_mode",
-      "selected_repository_ids",
-      "skip_labels",
-      "required_labels",
-      "model_slug",
-      "custom_instructions",
-      "pr_title_template",
-      "pr_body_template",
-      "pr_base_branch",
-      "max_pr_creation_time_minutes"
-    ],
-    "searchBlob": "personalAutoFix.saveAutoFixConfig Save the current user's auto-fix agent settings, such as which issues or review comments trigger fixes, repository selection, labels, model, and pull request templates. personalautofix saveautofixconfig enabled_for_issues enabled_for_review_comments repository_selection_mode selected_repository_ids skip_labels required_labels model_slug custom_instructions pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes enabled_for_issues enabled_for_review_comments repository_selection_mode selected_repository_ids skip_labels required_labels model_slug custom_instructions pr_title_template pr_body_template pr_base_branch max_pr_creation_time_minutes"
-  },
-  "personalAutoFix.toggleAutoFixAgent": {
-    "path": "personalAutoFix.toggleAutoFixAgent",
-    "kind": "mutation",
-    "summary": "Turn the current user's auto-fix agent on or off, creating a default configuration if none exists yet.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "isEnabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "isEnabled"
-      ]
-    },
-    "tags": [
-      "personalautofix",
-      "toggleautofixagent",
-      "isenabled"
-    ],
-    "searchBlob": "personalAutoFix.toggleAutoFixAgent Turn the current user's auto-fix agent on or off, creating a default configuration if none exists yet. personalautofix toggleautofixagent isenabled isEnabled"
-  },
   "personalAutoTriage.getAutoTriageConfig": {
     "path": "personalAutoTriage.getAutoTriageConfig",
     "kind": "query",
@@ -31938,7 +31061,7 @@
   "personalAutoTriage.saveAutoTriageConfig": {
     "path": "personalAutoTriage.saveAutoTriageConfig",
     "kind": "mutation",
-    "summary": "Save the auto-triage agent settings for your own account, including which repositories to watch, label filters, and confidence thresholds for auto-fix and pull request creation.",
+    "summary": "Save the auto-triage agent settings for your own account, including which repositories to watch, label filters, and the duplicate threshold.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -31974,11 +31097,6 @@
           }
         },
         "duplicate_threshold": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "auto_fix_threshold": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
@@ -32043,7 +31161,6 @@
       "skip_labels",
       "required_labels",
       "duplicate_threshold",
-      "auto_fix_threshold",
       "auto_create_pr_threshold",
       "max_concurrent_per_owner",
       "custom_instructions",
@@ -32055,7 +31172,7 @@
       "max_classification_time_minutes",
       "max_pr_creation_time_minutes"
     ],
-    "searchBlob": "personalAutoTriage.saveAutoTriageConfig Save the auto-triage agent settings for your own account, including which repositories to watch, label filters, and confidence thresholds for auto-fix and pull request creation. personalautotriage saveautotriageconfig enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_fix_threshold auto_create_pr_threshold max_concurrent_per_owner custom_instructions model_slug pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_classification_time_minutes max_pr_creation_time_minutes enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_fix_threshold auto_create_pr_threshold max_concurrent_per_owner custom_instructions model_slug pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_classification_time_minutes max_pr_creation_time_minutes"
+    "searchBlob": "personalAutoTriage.saveAutoTriageConfig Save the auto-triage agent settings for your own account, including which repositories to watch, label filters, and the duplicate threshold. personalautotriage saveautotriageconfig enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_create_pr_threshold max_concurrent_per_owner custom_instructions model_slug pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_classification_time_minutes max_pr_creation_time_minutes enabled_for_issues repository_selection_mode selected_repository_ids skip_labels required_labels duplicate_threshold auto_create_pr_threshold max_concurrent_per_owner custom_instructions model_slug pr_branch_prefix pr_title_template pr_body_template pr_base_branch max_classification_time_minutes max_pr_creation_time_minutes"
   },
   "personalAutoTriage.toggleAutoTriageAgent": {
     "path": "personalAutoTriage.toggleAutoTriageAgent",

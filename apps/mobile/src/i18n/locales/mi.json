@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "Kāore anō kia honoa a {{platform}}. Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te hono.",
     "gitlab": {
-      "notConnectedReadOnly": "Kāore anō kia honoa a {{platform}}. Honoa kia tīmata ai te arotake i ngā tono whakakotahi."
+      "notConnectedReadOnly": "Kāore anō kia honoa a {{platform}}. Tonoa tētahi Rangatira, Kaiwhakahaere, Kaiwhakahaere utu rānei o te whakahaere kia honoa ia."
     },
     "webhookSetup": "Kāore anō kia oti te whakarite i te matau tukutuku.",
     "webhookSetupDescription": "Kāore pea ētahi pūranga e whiwhi i ngā arotake aunoa.",

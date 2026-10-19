@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} er ikke tilsluttet. Kun organisationsejere og administratorer kan oprette forbindelsen.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} er ikke tilsluttet. Opret forbindelsen for at begynde at gennemgå mergeanmodninger."
+      "notConnectedReadOnly": "{{platform}} er ikke tilsluttet. Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den."
     },
     "webhookSetup": "Opsætningen af webhooks er ikke fuldført.",
     "webhookSetupDescription": "Nogle kodelagre får muligvis ikke automatiske gennemgange.",

@@ -919,9 +919,9 @@
       "starting": "Rozpoczynanie przeglądu…",
       "title": "Ręczny przegląd"
     },
-    "notConnectedReadOnly": "Brak połączenia z {{platform}}. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
+    "notConnectedReadOnly": "Brak połączenia z {{platform}}. Tylko właściciele organizacji i administratorzy mogą je skonfigurować.",
     "gitlab": {
-      "notConnectedReadOnly": "Brak połączenia z {{platform}}. Połącz ją, aby rozpocząć przeglądanie wniosków o scalenie."
+      "notConnectedReadOnly": "Brak połączenia z {{platform}}. Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby ją połączyć."
     },
     "platformList": {
       "activity": "Aktywność",

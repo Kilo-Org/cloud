@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Endast organisationsägare och administratörer kan skapa anslutningen.",
     "gitlab": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Anslut den för att börja granska merge requests."
+      "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den."
     },
     "webhookSetup": "Konfigurationen av webbhookar är inte klar.",
     "webhookSetupDescription": "Vissa kodarkiv kanske inte granskas automatiskt.",

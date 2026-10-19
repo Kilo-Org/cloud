@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} አልተገናኘም። የማዋሃድ ጥያቄዎችን ለመገምገም ያገናኙት።"
+      "notConnectedReadOnly": "{{platform}} አልተገናኘም። የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።"
     },
     "webhookSetup": "ዌብሁክን ማዋቀር አልተጠናቀቀም።",
     "webhookSetupDescription": "አንዳንድ ማከማቻዎች በራስ-ሰር ላይገመገሙ ይችላሉ።",

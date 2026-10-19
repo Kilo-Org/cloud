@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} er ekki tengt. Aðeins eigendur fyrirtækisins og stjórnendur geta tengt það.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} er ekki tengt. Tengdu það til að hefja yfirferð á sameiningarbeiðnum."
+      "notConnectedReadOnly": "{{platform}} er ekki tengt. Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það."
     },
     "webhookSetup": "Uppsetningu vefkrækja er ekki lokið.",
     "webhookSetupDescription": "Hugsanlega verða sumar geymslur ekki yfirfarnar sjálfkrafa.",

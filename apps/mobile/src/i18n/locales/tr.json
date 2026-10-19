@@ -915,7 +915,7 @@
     },
     "notConnectedReadOnly": "{{platform}} bağlı değil. Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} bağlı değil. Birleştirme isteklerini incelemeye başlamak için bağlayın."
+      "notConnectedReadOnly": "{{platform}} bağlı değil. Bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun."
     },
     "platformList": {
       "activity": "Etkinlik",

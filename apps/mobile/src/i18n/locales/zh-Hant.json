@@ -915,7 +915,7 @@
     },
     "notConnectedReadOnly": "尚未連結 {{platform}}。只有組織擁有者和管理員可以設定連結。",
     "gitlab": {
-      "notConnectedReadOnly": "尚未連結 {{platform}}。連結之後即可開始審查合併請求。"
+      "notConnectedReadOnly": "尚未連結 {{platform}}。請要求組織的擁有者、管理員或帳單管理員進行連結。"
     },
     "platformList": {
       "activity": "活動",

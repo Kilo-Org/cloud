@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} hin walqabsiifamne. Abbootiin dhaabbataa fi bulchitootaa qofa isa walqabsiisuu danda'u.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} hin walqabsiifamne. Isa walqabsiisii yaadannoo walitti makuu sakatta'uu jalqabi."
+      "notConnectedReadOnly": "{{platform}} hin walqabsiifamne. Isa akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu."
     },
     "webhookSetup": "Qophiin weebhuukii hin xumuramne.",
     "webhookSetupDescription": "Kuusaawwan koodii tokko tokko sakatta'a ofumaan raawwatamu hin argatan ta'a.",

@@ -1488,7 +1488,7 @@
     },
     "notConnectedReadOnly": "{{platform}} nu este conectat. Doar proprietarii și administratorii organizației îl pot conecta.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} nu este conectat. Conectează-l pentru a începe revizuirea cererilor de fuziune."
+      "notConnectedReadOnly": "{{platform}} nu este conectat. Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze."
     },
     "webhookSetup": "Configurarea webhook-ului este incompletă.",
     "webhookSetupDescription": "Este posibil ca unele depozite să nu primească revizuiri automate.",

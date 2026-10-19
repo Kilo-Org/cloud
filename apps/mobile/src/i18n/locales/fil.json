@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "Hindi nakakonekta ang {{platform}}. Mga may-ari ng organisasyon at admin lang ang maaaring magkonekta nito.",
     "gitlab": {
-      "notConnectedReadOnly": "Hindi nakakonekta ang {{platform}}. Ikonekta ito para magsimulang sumuri ng mga merge request."
+      "notConnectedReadOnly": "Hindi nakakonekta ang {{platform}}. Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta ito."
     },
     "webhookSetup": "Hindi pa tapos ang setup ng webhook.",
     "webhookSetupDescription": "Maaaring hindi makatanggap ng awtomatikong pagsusuri ang ilang repository.",

@@ -1526,7 +1526,7 @@
     },
     "notConnectedReadOnly": "{{platform}} mhux konness. Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} mhux konness. Ikkonnettjah biex tibda tirrevedi r-rikjesti ta' merging."
+      "notConnectedReadOnly": "{{platform}} mhux konness. Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjah."
     },
     "webhookSetup": "Il-konfigurazzjoni tal-webhook mhix lesta.",
     "webhookSetupDescription": "Xi repożitorji jistgħu ma jirċevux reviżjonijiet awtomatiċi.",

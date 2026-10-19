@@ -918,7 +918,7 @@
     },
     "notConnectedReadOnly": "{{platform}} לא מחובר. רק בעלי הארגון ומנהלים יכולים לחבר אותו.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} לא מחובר. חבר אותו כדי להתחיל לסקור בקשות מיזוג."
+      "notConnectedReadOnly": "{{platform}} אינו מחובר. בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו."
     },
     "platformList": {
       "activity": "פעילות",

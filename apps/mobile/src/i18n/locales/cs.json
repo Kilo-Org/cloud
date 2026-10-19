@@ -1507,7 +1507,7 @@
     },
     "notConnectedReadOnly": "Služba {{platform}} není připojená. Připojit ji mohou pouze vlastníci organizace a správci.",
     "gitlab": {
-      "notConnectedReadOnly": "Služba {{platform}} není připojená. Připojte ji a začněte kontrolovat žádosti o sloučení."
+      "notConnectedReadOnly": "Služba {{platform}} není připojená. Požádejte vlastníka organizace, správce nebo správce fakturace, aby ji připojil."
     },
     "webhookSetup": "Nastavení webhooku není dokončené.",
     "webhookSetupDescription": "V některých repozitářích nemusí probíhat automatické kontroly.",

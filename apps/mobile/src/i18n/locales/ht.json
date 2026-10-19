@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} pa konekte. Se sèlman pwopriyetè òganizasyon an ak administratè yo ki ka konekte li.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} pa konekte. Konekte li pou kòmanse revize demann fizyon yo."
+      "notConnectedReadOnly": "{{platform}} pa konekte. Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou konekte l."
     },
     "webhookSetup": "Konfigirasyon webhook la pa fini.",
     "webhookSetupDescription": "Kèk depo ka pa resevwa revizyon otomatik.",

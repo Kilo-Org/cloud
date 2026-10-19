@@ -1507,7 +1507,7 @@
     },
     "notConnectedReadOnly": "Povezava s platformo {{platform}} ni vzpostavljena. Vzpostavijo jo lahko samo lastniki organizacije in skrbniki.",
     "gitlab": {
-      "notConnectedReadOnly": "Povezava s platformo {{platform}} ni vzpostavljena. Povežite jo, da lahko začnete pregledovati zahteve za spajanje."
+      "notConnectedReadOnly": "Povezava s platformo {{platform}} ni vzpostavljena. Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo poveže."
     },
     "webhookSetup": "Nastavitev spletnih povratnih klicev ni dokončana.",
     "webhookSetupDescription": "Samodejni pregledi v nekaterih skladiščih morda ne bodo delovali.",

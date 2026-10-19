@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "E jikọghị {{platform}}. Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ijikọ ya.",
     "gitlab": {
-      "notConnectedReadOnly": "E jikọghị {{platform}}. Jikọọ ya ka ị malite nyochaa arịrịọ njikọta."
+      "notConnectedReadOnly": "E jikọghị {{platform}}. Rịọ Onye nwe nzukọ, Onye nchịkwa, ma ọ bụ Onye njikwa ịgba ụgwọ ka ha jikọọ ya."
     },
     "webhookSetup": "Nhazi njikọ ngosi ezubeghị.",
     "webhookSetupDescription": "Ụfọdụ ebe nchekwa nwere ike ghara ịnata nyocha akpaaka.",

@@ -915,7 +915,7 @@
     },
     "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Nur Organisationsinhaber und Admins können die Verbindung herstellen.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Verbinde es, um mit dem Review von Merge Requests zu beginnen."
+      "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Bitte einen Inhaber, Admin oder Abrechnungsmanager, es zu verbinden."
     },
     "platformList": {
       "activity": "Aktivität",

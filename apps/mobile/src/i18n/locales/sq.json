@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} nuk është i lidhur. Vetëm pronarët e organizatës dhe administratorët mund ta lidhin.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} nuk është i lidhur. Lidheni për të nisur shqyrtimin e kërkesave për bashkim."
+      "notConnectedReadOnly": "{{platform}} nuk është i lidhur. Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta lidhë atë."
     },
     "webhookSetup": "Konfigurimi i webhook-ut është i paplotë.",
     "webhookSetupDescription": "Disa depo mund të mos marrin shqyrtime automatike.",

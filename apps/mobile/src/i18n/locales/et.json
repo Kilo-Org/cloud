@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud ja administraatorid.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} pole ühendatud. Ühenda see, et alustada liitumistaotluste ülevaatamist."
+      "notConnectedReadOnly": "{{platform}} pole ühendatud. Palu organisatsiooni omanikul, administraatoril või arveldushalduril see ühendada."
     },
     "webhookSetup": "Veebihaagi seadistamine pole lõpetatud.",
     "webhookSetupDescription": "Mõnes hoidlas ei pruugi automaatsed ülevaatused toimuda.",

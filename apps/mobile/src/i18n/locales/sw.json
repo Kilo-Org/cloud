@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} haijaunganishwa. Wamiliki na wasimamizi wa shirika pekee wanaweza kuiunganisha.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} haijaunganishwa. Iunganishe ili uanze kukagua maombi ya kuunganisha."
+      "notConnectedReadOnly": "{{platform}} haijaunganishwa. Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe."
     },
     "webhookSetup": "Usanidi wa arifa za wavuti haujakamilika.",
     "webhookSetupDescription": "Hazina zingine huenda hazipokei ukaguzi wa kiotomatiki.",

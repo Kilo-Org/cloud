@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və inzibatçılar qoşa bilər.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} qoşulmayıb. Birləşmə sorğularını yoxlamağa başlamaq üçün onu qoşun."
+      "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin."
     },
     "webhookSetup": "Vebhuk quraşdırması tamamlanmayıb.",
     "webhookSetupDescription": "Bəzi repozitoriyalarda avtomatik kod yoxlaması aparılmaya bilər.",

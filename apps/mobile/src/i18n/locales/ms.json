@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} tidak disambungkan. Hanya pemilik organisasi dan pentadbir boleh menyambungkannya.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} tidak disambungkan. Sambungkannya untuk mula menyemak permintaan gabungan."
+      "notConnectedReadOnly": "{{platform}} tidak disambungkan. Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya."
     },
     "webhookSetup": "Persediaan webhook belum lengkap.",
     "webhookSetupDescription": "Sebilangan repositori mungkin tidak menerima semakan automatik.",

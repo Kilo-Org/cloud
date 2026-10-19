@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} is nie gekoppel nie. Slegs organisasie-eienaars en administrateurs kan dit koppel.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} is nie gekoppel nie. Koppel dit om samesmeltingsversoeke te begin hersien."
+      "notConnectedReadOnly": "{{platform}} is nie gekoppel nie. Vra 'n organisasie-Eienaar, Administrateur of Faktureringsbestuurder om dit te koppel."
     },
     "webhookSetup": "Die webhaakopstelling is onvolledig.",
     "webhookSetupDescription": "Sommige bewaarplekke sal dalk nie outomatiese hersienings ontvang nie.",

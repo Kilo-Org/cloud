@@ -1507,7 +1507,7 @@
     },
     "notConnectedReadOnly": "Platforma {{platform}} nie je pripojená. Pripojiť ju môžu iba vlastníci organizácie a správcovia.",
     "gitlab": {
-      "notConnectedReadOnly": "Platforma {{platform}} nie je pripojená. Pripojte ju a začnite kontrolovať žiadosti o zlúčenie."
+      "notConnectedReadOnly": "Platforma {{platform}} nie je pripojená. Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ju pripojil."
     },
     "webhookSetup": "Nastavenie webhooku nie je dokončené.",
     "webhookSetupDescription": "V niektorých repozitároch nemusia prebiehať automatické kontroly.",

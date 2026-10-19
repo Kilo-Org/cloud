@@ -63,10 +63,6 @@ vi.mock('@/components/code-reviewer/bitbucket-overview', () => ({
 }));
 vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   buildOverviewRows: () => [],
-  connectNoticeKey: (platform: string) =>
-    platform === 'gitlab'
-      ? 'codeReviewer.gitlab.notConnectedReadOnly'
-      : 'codeReviewer.notConnectedReadOnly',
   resolveRowOnPress: () => undefined,
 }));
 vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
@@ -208,7 +204,10 @@ describe('PlatformOverviewScreen disconnected setup', () => {
 
   it.each([
     ['github', "GitHub isn't connected. Only organization owners and admins can connect it."],
-    ['gitlab', "GitLab isn't connected. Connect it to start reviewing merge requests."],
+    [
+      'gitlab',
+      "GitLab isn't connected. Ask an organization owner, admin, or billing manager to connect it.",
+    ],
   ] as const)('states who can connect %s to a read-only viewer', async (platform, copy) => {
     provider.status = 'disconnected';
     permission.canEdit = false;

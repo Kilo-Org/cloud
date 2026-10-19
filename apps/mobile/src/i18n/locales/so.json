@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} kuma xidhna. Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa ku xidhi kara.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} kuma xidhna. Ku xidh si aad u bilowdo dib-u-eegista codadka isku-darka."
+      "notConnectedReadOnly": "{{platform}} kuma xidhna. Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay ugu xidhaan."
     },
     "webhookSetup": "Dejinta ogeysiisyada shabakadda ma dhammaystirna.",
     "webhookSetupDescription": "Qaar ka mid ah kaydadka ayaa laga yaabaa inayan helin dib-u-eegis otomaatig ah.",

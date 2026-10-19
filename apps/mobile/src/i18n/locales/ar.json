@@ -927,7 +927,7 @@
     },
     "notConnectedReadOnly": "{{platform}} غير متصل. يمكن لمالكي المؤسسة والمشرفين فقط ربطه.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} غير متصل. قم بربطه لبدء مراجعة طلبات الدمج."
+      "notConnectedReadOnly": "{{platform}} غير متصل. اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه."
     },
     "platformList": {
       "activity": "النشاط",

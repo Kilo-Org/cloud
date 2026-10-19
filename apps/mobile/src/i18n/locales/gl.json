@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os administradores poden conectalo.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} non está conectado. Conéctao para comezar a revisar as solicitudes de fusión."
+      "notConnectedReadOnly": "{{platform}} non está conectado. Pídelle ao propietario, ao administrador ou ao xestor de facturación da organización que o conecte."
     },
     "webhookSetup": "A configuración do webhook está incompleta.",
     "webhookSetupDescription": "Algúns repositorios poden non recibir revisións automáticas.",

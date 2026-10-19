@@ -915,7 +915,7 @@
     },
     "notConnectedReadOnly": "{{platform}} chưa được kết nối. Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể kết nối.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} chưa được kết nối. Hãy kết nối để bắt đầu rà soát các yêu cầu hợp nhất."
+      "notConnectedReadOnly": "{{platform}} chưa được kết nối. Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối."
     },
     "platformList": {
       "activity": "Hoạt động",

@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} ayixhunyiwe. Abanikazi benhlangano nabalawuli kuphela abangayixhuma.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} ayixhunyiwe. Xhuma ukuqalise ukuhlola izicelo zokuhlanganisa."
+      "notConnectedReadOnly": "{{platform}} ayixhunyiwe. Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma."
     },
     "webhookSetup": "Ukusetha i-webhook akukaqedwa.",
     "webhookSetupDescription": "Ezinye izinqolobane zekhodi kungenzeka zingahlolwa ngokuzenzakalelayo.",

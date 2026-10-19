@@ -1488,7 +1488,7 @@
     },
     "notConnectedReadOnly": "{{platform}} nav pievienots. To var pievienot tikai organizācijas īpašnieki un administratori.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} nav pievienots. Pievienojiet to, lai sāktu izskatīt apvienošanas pieprasījumus."
+      "notConnectedReadOnly": "{{platform}} nav pievienots. Lūdziet īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot."
     },
     "webhookSetup": "Tīmekļa aizķeres iestatīšana nav pabeigta.",
     "webhookSetupDescription": "Dažos repozitorijos, iespējams, nenotiks automātiska koda pārskatīšana.",

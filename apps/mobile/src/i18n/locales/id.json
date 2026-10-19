@@ -915,7 +915,7 @@
     },
     "notConnectedReadOnly": "{{platform}} tidak terhubung. Hanya pemilik organisasi dan admin yang dapat menghubungkannya.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} tidak terhubung. Hubungkan untuk mulai meninjau merge request."
+      "notConnectedReadOnly": "{{platform}} tidak terhubung. Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya."
     },
     "platformList": {
       "activity": "Aktivitas",

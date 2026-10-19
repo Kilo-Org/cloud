@@ -1507,7 +1507,7 @@
     },
     "notConnectedReadOnly": "Platforma {{platform}} neprijungta. Ją prijungti gali tik organizacijos savininkai ir administratoriai.",
     "gitlab": {
-      "notConnectedReadOnly": "Platforma {{platform}} neprijungta. Prijunkite ją, kad galėtumėte pradėti peržiūrėti sujungimo užklausas."
+      "notConnectedReadOnly": "Platforma {{platform}} neprijungta. Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus ją prijungti."
     },
     "webhookSetup": "Įvykių pranešimų sąranka neužbaigta.",
     "webhookSetupDescription": "Kai kuriose saugyklose automatinės peržiūros gali neveikti.",

@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "Nincs kapcsolat ezzel a platformmal: {{platform}}. Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják.",
     "gitlab": {
-      "notConnectedReadOnly": "A {{platform}} nincs csatlakoztatva. Csatlakoztasd a merge requestek ellenőrzésének megkezdéséhez."
+      "notConnectedReadOnly": "A {{platform}} nincs csatlakoztatva. Kérd meg egy tulajdonost, adminisztrátort vagy számlázási felelőst, hogy csatlakoztassa."
     },
     "webhookSetup": "A webhook beállítása hiányos.",
     "webhookSetupDescription": "Előfordulhat, hogy egyes kódtárakban nem fut automatikus kódellenőrzés.",

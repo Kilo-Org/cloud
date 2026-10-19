@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} ez dago konektatuta. Erakundeko jabeek eta administratzaileek soilik konekta dezakete.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} ez dago konektatuta. Konektatu ezazu konbinazio-eskaerak berrikusten hasteko."
+      "notConnectedReadOnly": "{{platform}} ez dago konektatuta. Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari konekta dezan."
     },
     "webhookSetup": "Webhook-aren konfigurazioa osatu gabe dago.",
     "webhookSetupDescription": "Baliteke biltegi batzuek berrikuspen automatikorik ez jasotzea.",

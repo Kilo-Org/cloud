@@ -1533,7 +1533,7 @@
     },
     "notConnectedReadOnly": "{{platform}} isn't connected. Only organization owners and admins can connect it.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} isn't connected. Connect it to start reviewing merge requests."
+      "notConnectedReadOnly": "{{platform}} isn't connected. Ask an organization owner, admin, or billing manager to connect it."
     },
     "webhookSetup": "Webhook setup incomplete",
     "webhookSetupDescription": "Some repositories may not receive automatic reviews.",

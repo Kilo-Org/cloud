@@ -1488,7 +1488,7 @@
     },
     "notConnectedReadOnly": "{{platform}} nije povezan. Samo vlasnici organizacije i administratori mogu da ga povežu.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} nije povezan. Poveži ga da bi se pokrenulo pregledanje zahteva za spajanje."
+      "notConnectedReadOnly": "{{platform}} nije povezan. Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga poveže."
     },
     "webhookSetup": "Podešavanje veb-dojavnika nije završeno.",
     "webhookSetupDescription": "U nekim repozitorijumima automatski pregledi možda neće raditi.",

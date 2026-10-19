@@ -1545,7 +1545,7 @@
     },
     "notConnectedReadOnly": "Nid yw {{platform}} wedi'i gysylltu. Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu ei gysylltu.",
     "gitlab": {
-      "notConnectedReadOnly": "Nid yw {{platform}} wedi'i gysylltu. Cysylltwch ef i ddechrau adolygu ceisiadau cyfuno."
+      "notConnectedReadOnly": "Nid yw {{platform}} wedi'i gysylltu. Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei gysylltu."
     },
     "webhookSetup": "Nid yw'r bachyn gwe wedi'i sefydlu'n llawn.",
     "webhookSetupDescription": "Efallai na fydd rhai ystorfeydd yn cael adolygiadau awtomatig.",

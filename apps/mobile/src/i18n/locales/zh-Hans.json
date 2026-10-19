@@ -915,7 +915,7 @@
     },
     "notConnectedReadOnly": "尚未连接 {{platform}}。只有组织所有者和管理员可以完成连接。",
     "gitlab": {
-      "notConnectedReadOnly": "尚未连接 {{platform}}。请连接后开始审查合并请求。"
+      "notConnectedReadOnly": "尚未连接 {{platform}}。请让组织所有者、管理员或账单管理员进行连接。"
     },
     "platformList": {
       "activity": "活动",

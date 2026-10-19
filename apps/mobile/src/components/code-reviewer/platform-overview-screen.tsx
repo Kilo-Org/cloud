@@ -8,9 +8,9 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
+import { connectNoticeKey } from '@/components/code-reviewer/connect-notice-key';
 import {
   buildOverviewRows,
-  connectNoticeKey,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';

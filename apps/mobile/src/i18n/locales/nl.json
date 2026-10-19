@@ -915,7 +915,7 @@
     },
     "notConnectedReadOnly": "{{platform}} is niet gekoppeld. Alleen organisatie-eigenaren en beheerders kunnen de koppeling instellen.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} is niet gekoppeld. Koppel het om te beginnen met het beoordelen van merge requests."
+      "notConnectedReadOnly": "{{platform}} is niet gekoppeld. Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het te koppelen."
     },
     "platformList": {
       "activity": "Activiteit",

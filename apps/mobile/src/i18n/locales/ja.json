@@ -915,7 +915,7 @@
     },
     "notConnectedReadOnly": "{{platform}}が接続されていません。接続できるのは組織のオーナーと管理者のみです。",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}}が接続されていません。接続してマージリクエストのレビューを始めましょう。"
+      "notConnectedReadOnly": "{{platform}}が接続されていません。組織のオーナー、管理者、または請求管理者に接続を依頼してください。"
     },
     "platformList": {
       "activity": "アクティビティ",

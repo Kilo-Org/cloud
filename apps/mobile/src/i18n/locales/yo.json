@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè so ó pọ̀.",
     "gitlab": {
-      "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. So ó pọ̀ láti bẹ̀rẹ̀ síí ṣàtúnyẹ̀wò àwọn ìbéèrè àpapọ̀."
+      "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n so ó pọ̀."
     },
     "webhookSetup": "Ìṣètò ìfitónilétí wẹ́bù kò tíì parí.",
     "webhookSetupDescription": "Ó ṣeé ṣe kí àwọn ibi ìpamọ́ kan má gba àtúnyẹ̀wò aládàáṣiṣẹ́.",

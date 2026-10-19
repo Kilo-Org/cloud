@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalar va administratorlar uni ulashi mumkin.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} ulanmagan. Merge so'rovlarini ko'rib chiqishni boshlash uchun uni ulang."
+      "notConnectedReadOnly": "{{platform}} ulanmagan. Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang."
     },
     "webhookSetup": "Vebhukni sozlash yakunlanmagan.",
     "webhookSetupDescription": "Ba'zi repozitoriyalarda avtomatik ko'rib chiqish ishlamasligi mumkin.",

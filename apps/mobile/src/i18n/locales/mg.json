@@ -1467,9 +1467,9 @@
       "starting": "Manomboka ny fanamarinana…",
       "start": "Atombohy ny fanamarinana"
     },
-    "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+    "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka mampifandray azy.",
     "gitlab": {
-      "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Ampifandraiso izy mba hanombohana ny fanamarinana ny fangatahana fitambarana."
+      "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy."
     },
     "webhookSetup": "Tsy vita ny fametrahana ny rohy fampandrenesana.",
     "webhookSetupDescription": "Mety tsy hahazo fanamarinana mandeha ho azy ny tahirin-kaody sasany.",

@@ -1469,7 +1469,7 @@
     },
     "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Vain organisaation omistajat ja ylläpitäjät voivat yhdistää sen.",
     "gitlab": {
-      "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Yhdistä se aloittaaksesi yhdistämispyyntöjen katselmoinnin."
+      "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se."
     },
     "webhookSetup": "Webhook-kutsujen määritys on kesken.",
     "webhookSetupDescription": "Automaattiset katselmoinnit eivät ehkä toimi kaikissa tietovarastoissa.",

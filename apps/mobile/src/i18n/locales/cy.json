@@ -2440,7 +2440,6 @@
     },
     "modeOptions": {
       "code": "Codio",
-      "agentPlaceholder": "e.e. Codio",
       "plan": "Cynllun",
       "debug": "Dadfygio",
       "orchestrator": "Cydlynydd",
@@ -3840,6 +3839,7 @@
       "description": "Disgrifiad gorchymyn",
       "template": "Templed",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "e.e. Codio",
       "templatePlaceholder": "Eglurwch $ARGUMENTS",
       "subtask": "Rhedeg fel is-dasg",
       "edit": "Golygu gorchymyn slaes",

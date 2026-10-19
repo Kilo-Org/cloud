@@ -1800,7 +1800,6 @@
     },
     "modeOptions": {
       "code": "Viết mã",
-      "agentPlaceholder": "ví dụ. Mã",
       "plan": "Kế hoạch",
       "debug": "Gỡ lỗi",
       "orchestrator": "Điều phối",
@@ -3676,6 +3675,7 @@
       "description": "Mô tả lệnh",
       "template": "Bản mẫu",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ví dụ. Mã",
       "templatePlaceholder": "Giải thích $ARGUMENTS",
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
       "edit": "Chỉnh sửa lệnh gạch chéo",

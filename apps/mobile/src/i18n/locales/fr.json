@@ -1728,7 +1728,6 @@
     },
     "modeOptions": {
       "code": "Coder",
-      "agentPlaceholder": "par ex. Code",
       "plan": "Programme",
       "debug": "Déboguer",
       "orchestrator": "Orchestrateur",
@@ -3717,6 +3716,7 @@
       "description": "Description de la commande",
       "template": "Modèle",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "par ex. Code",
       "templatePlaceholder": "Expliquez $ARGUMENTS",
       "subtask": "Exécuter en tant que sous-tâche",
       "edit": "Modifier la commande barre oblique",

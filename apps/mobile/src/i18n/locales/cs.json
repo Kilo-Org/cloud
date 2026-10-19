@@ -2376,7 +2376,6 @@
     },
     "modeOptions": {
       "code": "Programovat",
-      "agentPlaceholder": "např. Code",
       "plan": "Plán",
       "debug": "Ladit",
       "orchestrator": "Orchestrátor",
@@ -3758,6 +3757,7 @@
       "description": "Popis příkazu",
       "template": "Šablona",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "např. Code",
       "templatePlaceholder": "Vysvětlete $ARGUMENTS",
       "subtask": "Spustit jako dílčí úkol",
       "edit": "Příkaz upravit lomítko",

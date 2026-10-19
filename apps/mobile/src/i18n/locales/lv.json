@@ -2344,7 +2344,6 @@
     },
     "modeOptions": {
       "code": "Programmēt",
-      "agentPlaceholder": "piem. Code",
       "plan": "Plāns",
       "debug": "Atkļūdot",
       "orchestrator": "Koordinators",
@@ -3717,6 +3716,7 @@
       "description": "Komandas apraksts",
       "template": "Veidne",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "piem. Code",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",

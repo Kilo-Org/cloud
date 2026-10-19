@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "ಕೋಡ್ ಬರೆಯಿರಿ",
-      "agentPlaceholder": "ಉದಾ. Code",
       "plan": "ಯೋಜನೆ",
       "debug": "ದೋಷ ಸರಿಪಡಿಸಿ",
       "orchestrator": "ಸಂಯೋಜಕ",
@@ -3676,6 +3675,7 @@
       "description": "ಆಜ್ಞೆಯ ವಿವರಣೆ",
       "template": "ಟೆಂಪ್ಲೇಟ್",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ಉದಾ. Code",
       "templatePlaceholder": "$ARGUMENTS ಅನ್ನು ವಿವರಿಸಿ",
       "subtask": "ಉಪಕಾರ್ಯದಂತೆ ರನ್ ಮಾಡಿ",
       "edit": "ಸ್ಲಾಶ್ ಆಜ್ಞೆಯನ್ನು ಸಂಪಾದಿಸಿ",

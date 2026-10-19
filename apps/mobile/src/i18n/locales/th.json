@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "เขียนโค้ด",
-      "agentPlaceholder": "เช่น Code",
       "plan": "แผน",
       "debug": "แก้บั๊ก",
       "orchestrator": "ผู้ประสานงาน",
@@ -3676,6 +3675,7 @@
       "description": "คำอธิบายคำสั่ง",
       "template": "แม่แบบ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "เช่น Code",
       "templatePlaceholder": "อธิบาย $ARGUMENTS",
       "subtask": "ทำงานเป็นงานย่อย",
       "edit": "แก้ไขคำสั่งสแลช",

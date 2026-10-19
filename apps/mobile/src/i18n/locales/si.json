@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "කේත ලියන්න",
-      "agentPlaceholder": "උදා. Code",
       "plan": "සැලැස්ම",
       "debug": "දෝෂ නිවැරදි කරන්න",
       "orchestrator": "සම්බන්ධීකාරක",
@@ -3676,6 +3675,7 @@
       "description": "විධාන විස්තරය",
       "template": "සැකිල්ල",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "උදා. Code",
       "templatePlaceholder": "$ARGUMENTS පැහැදිලි කරන්න",
       "subtask": "උප කාර්යයක් ලෙස ධාවනය කරන්න",
       "edit": "slash විධානය සංස්කරණය කරන්න",

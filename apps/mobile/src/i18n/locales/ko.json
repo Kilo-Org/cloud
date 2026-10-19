@@ -1800,7 +1800,6 @@
     },
     "modeOptions": {
       "code": "코딩",
-      "agentPlaceholder": "예를 들어 Code",
       "plan": "플랜",
       "debug": "디버깅",
       "orchestrator": "오케스트레이터",
@@ -3676,6 +3675,7 @@
       "description": "명령 설명",
       "template": "주형",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "예를 들어 Code",
       "templatePlaceholder": "$ARGUMENTS 설명",
       "subtask": "하위 작업으로 실행",
       "edit": "슬래시 명령 편집",

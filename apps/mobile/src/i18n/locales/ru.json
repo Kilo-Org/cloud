@@ -1832,7 +1832,6 @@
     },
     "modeOptions": {
       "code": "Код",
-      "agentPlaceholder": "например Code",
       "plan": "План",
       "debug": "Отладка",
       "orchestrator": "Оркестратор",
@@ -3758,6 +3757,7 @@
       "description": "Описание команды",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "например Code",
       "templatePlaceholder": "Объясните $ARGUMENTS",
       "subtask": "Запустить как подзадачу",
       "edit": "Команда редактирования косой черты",

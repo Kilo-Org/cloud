@@ -2412,7 +2412,6 @@
     },
     "modeOptions": {
       "code": "Scríobh cód",
-      "agentPlaceholder": "m.sh. Code",
       "plan": "Plean",
       "debug": "Dífhabhtaigh",
       "orchestrator": "Comhordaitheoir",
@@ -3799,6 +3798,7 @@
       "description": "Cur síos ar ordú",
       "template": "Teimpléad",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "m.sh. Code",
       "templatePlaceholder": "Mínigh $ARGUMENTS",
       "subtask": "Rith mar fhothasc",
       "edit": "Cuir ordú slais in eagar",

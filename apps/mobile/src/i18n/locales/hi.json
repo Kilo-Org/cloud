@@ -1778,7 +1778,6 @@
     },
     "modeOptions": {
       "code": "कोड लिखें",
-      "agentPlaceholder": "जैसे कोड",
       "plan": "योजना",
       "debug": "डीबग करें",
       "orchestrator": "समन्वयक",
@@ -3676,6 +3675,7 @@
       "description": "आदेश विवरण",
       "template": "खाका",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "जैसे कोड",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करें",
       "subtask": "उपकार्य के रूप में चलाएँ",
       "edit": "स्लैश कमांड संपादित करें",

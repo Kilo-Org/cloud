@@ -1800,7 +1800,6 @@
     },
     "modeOptions": {
       "code": "Programmeren",
-      "agentPlaceholder": "bijv. Code",
       "plan": "Planning",
       "debug": "Fouten opsporen",
       "orchestrator": "Coördinator",
@@ -3676,6 +3675,7 @@
       "description": "Beschrijving van de opdracht",
       "template": "Sjabloon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "bijv. Code",
       "templatePlaceholder": "Leg $ARGUMENTS uit",
       "subtask": "Uitvoeren als subtaak",
       "edit": "Bewerk de slash-opdracht",

@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Кодирање",
-      "agentPlaceholder": "на пр. Code",
       "plan": "План",
       "debug": "Отстранување грешки",
       "orchestrator": "Оркестратор",
@@ -3676,6 +3675,7 @@
       "description": "Опис на командата",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "на пр. Code",
       "templatePlaceholder": "Објасни $ARGUMENTS",
       "subtask": "Стартувај како подзадача",
       "edit": "Уреди команда коса црта",

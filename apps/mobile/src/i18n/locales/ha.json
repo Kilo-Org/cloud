@@ -2316,7 +2316,6 @@
     },
     "modeOptions": {
       "code": "Rubuta lambar shiri",
-      "agentPlaceholder": "misali Code",
       "plan": "Tsari",
       "debug": "Gyara kurakurai",
       "orchestrator": "Mai tsara ayyuka",
@@ -3676,6 +3675,7 @@
       "description": "Bayanin umarni",
       "template": "Samfura",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "misali Code",
       "templatePlaceholder": "Yi bayani $ARGUMENTS",
       "subtask": "Gudu azaman ƙaramin aiki",
       "edit": "Gyara umarnin slash",

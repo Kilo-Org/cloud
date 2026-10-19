@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Dee koodu",
-      "agentPlaceholder": "eg. Code",
       "plan": "Atụmatụ",
       "debug": "Dozie njehie",
       "orchestrator": "Onye nhazi",
@@ -3676,6 +3675,7 @@
       "description": "Nkọwa iwu",
       "template": "Ụdị",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "eg. Code",
       "templatePlaceholder": "Kọwaa $ARGUMENTS",
       "subtask": "Gbaa ọsọ dị ka obere ọrụ",
       "edit": "Dezie slash iwu",

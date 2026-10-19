@@ -2344,7 +2344,6 @@
     },
     "modeOptions": {
       "code": "Kodiraj",
-      "agentPlaceholder": "npr. Code",
       "plan": "Planiraj",
       "debug": "Otkloni greške",
       "orchestrator": "Orkestrator",
@@ -3717,6 +3716,7 @@
       "description": "Opis komande",
       "template": "Predložak",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "npr. Code",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Uredi naredbu kose crte",

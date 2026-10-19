@@ -1820,7 +1820,6 @@
     },
     "modeOptions": {
       "code": "כתיבת קוד",
-      "agentPlaceholder": "לְמָשָׁל Code",
       "plan": "תוכנית",
       "debug": "ניפוי שגיאות",
       "orchestrator": "תיאום משימות",
@@ -3717,6 +3716,7 @@
       "description": "תיאור הפקודה",
       "template": "תבנית",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "לְמָשָׁל Code",
       "templatePlaceholder": "הסבר $ARGUMENTS",
       "subtask": "הפעל כתת-מטלת",
       "edit": "ערוך פקודת נטוי",

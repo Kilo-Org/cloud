@@ -1832,7 +1832,6 @@
     },
     "modeOptions": {
       "code": "Programowanie",
-      "agentPlaceholder": "np. Code",
       "plan": "Planowanie",
       "debug": "Debugowanie",
       "orchestrator": "Koordynator",
@@ -3758,6 +3757,7 @@
       "description": "Opis polecenia",
       "template": "Szablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "np. Code",
       "templatePlaceholder": "Wyjaśnij $ARGUMENTS",
       "subtask": "Uruchom jako podzadanie",
       "edit": "Edytuj polecenie ukośnika",

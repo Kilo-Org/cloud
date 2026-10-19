@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "សរសេរកូដ",
-      "agentPlaceholder": "ឧ. Code",
       "plan": "ផែនការ",
       "debug": "បំបាត់កំហុស",
       "orchestrator": "អ្នកសម្របសម្រួល",
@@ -3676,6 +3675,7 @@
       "description": "ការពិពណ៌នាពាក្យបញ្ជា",
       "template": "គំរូ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ឧ. Code",
       "templatePlaceholder": "ពន្យល់ $ARGUMENTS",
       "subtask": "ដំណើរការជាកិច្ចការរង",
       "edit": "កែសម្រួលពាក្យបញ្ជា slash",

@@ -2376,7 +2376,6 @@
     },
     "modeOptions": {
       "code": "Programuoti",
-      "agentPlaceholder": "pvz. Code",
       "plan": "Planas",
       "debug": "Derinti",
       "orchestrator": "Koordinatorius",
@@ -3758,6 +3757,7 @@
       "description": "Komandos aprašymas",
       "template": "Šablonas",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "pvz. Code",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",

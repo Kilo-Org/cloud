@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Код бичих",
-      "agentPlaceholder": "жишээ нь Code",
       "plan": "Төлөвлөгөө",
       "debug": "Алдаа засах",
       "orchestrator": "Зохицуулагч",
@@ -3676,6 +3675,7 @@
       "description": "Тушаалын тайлбар",
       "template": "Загвар",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "жишээ нь Code",
       "templatePlaceholder": "$ARGUMENTS-г тайлбарла",
       "subtask": "Дэд даалгавар болгон ажиллуул",
       "edit": "Талуу зураасыг засах команд",

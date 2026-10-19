@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "కోడ్",
-      "agentPlaceholder": "ఉదా కోడ్",
       "plan": "ప్లాన్",
       "debug": "డీబగ్",
       "orchestrator": "సమన్వయకర్త",
@@ -3676,6 +3675,7 @@
       "description": "కమాండ్ వివరణ",
       "template": "మూస",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ఉదా కోడ్",
       "templatePlaceholder": "$ARGUMENTSని వివరించండి",
       "subtask": "సబ్‌టాస్క్‌గా అమలు చేయండి",
       "edit": "స్లాష్ ఆదేశాన్ని సవరించండి",

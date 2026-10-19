@@ -1785,7 +1785,6 @@
     },
     "modeOptions": {
       "code": "Programma",
-      "agentPlaceholder": "ad es. Code",
       "plan": "Piano",
       "debug": "Correggi errori",
       "orchestrator": "Orchestratore",
@@ -3717,6 +3716,7 @@
       "description": "Descrizione del comando",
       "template": "Modello",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ad es. Code",
       "templatePlaceholder": "Spiega $ARGUMENTS",
       "subtask": "Esegui come attività secondaria",
       "edit": "Comando Modifica barra",

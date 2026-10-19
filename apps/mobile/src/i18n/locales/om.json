@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Koodii barreessi",
-      "agentPlaceholder": "fkn. Code",
       "plan": "Karoora",
       "debug": "Dogoggora sirreessi",
       "orchestrator": "Qindeessaa",
@@ -3676,6 +3675,7 @@
       "description": "Ibsa ajajaa",
       "template": "Unkaa",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "fkn. Code",
       "templatePlaceholder": "$ARGUMENTS ibsi",
       "subtask": "Akka hojii xiqqaatti fiigi",
       "edit": "Ajaja slash gulaali",

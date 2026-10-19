@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Tulis kod",
-      "agentPlaceholder": "cth. Code",
       "plan": "Pelan",
       "debug": "Nyahpepijat",
       "orchestrator": "Penyelaras",
@@ -3676,6 +3675,7 @@
       "description": "Penerangan perintah",
       "template": "templat",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "cth. Code",
       "templatePlaceholder": "Terangkan $ARGUMENTS",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit arahan slash",

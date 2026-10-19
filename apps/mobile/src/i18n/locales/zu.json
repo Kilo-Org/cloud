@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Bhala ikhodi",
-      "agentPlaceholder": "isib. Code",
       "plan": "Uhlelo",
       "debug": "Lungisa amaphutha",
       "orchestrator": "Umxhumanisi",
@@ -3676,6 +3675,7 @@
       "description": "Incazelo yomyalo",
       "template": "Isifanekiso",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "isib. Code",
       "templatePlaceholder": "Chaza $ARGUMENTS",
       "subtask": "Qalisa njengomsebenzi ongaphansi",
       "edit": "Hlela umyalo we-slash",

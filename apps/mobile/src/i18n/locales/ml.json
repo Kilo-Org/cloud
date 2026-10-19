@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "കോഡ് എഴുതുക",
-      "agentPlaceholder": "ഉദാ. Code",
       "plan": "പ്ലാൻ",
       "debug": "ഡീബഗ് ചെയ്യുക",
       "orchestrator": "ഏകോപകൻ",
@@ -3676,6 +3675,7 @@
       "description": "കമാൻഡ് വിവരണം",
       "template": "ടെംപ്ലേറ്റ്",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ഉദാ. Code",
       "templatePlaceholder": "$ARGUMENTS വിശദീകരിക്കുക",
       "subtask": "ഉപടാസ്‌കായി പ്രവർത്തിപ്പിക്കുക",
       "edit": "സ്ലാഷ് കമാൻഡ് എഡിറ്റ് ചെയ്യുക",

@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Skriv kode",
-      "agentPlaceholder": "f.eks. Code",
       "plan": "Planlæg",
       "debug": "Fejlsøg",
       "orchestrator": "Koordinator",
@@ -3676,6 +3675,7 @@
       "description": "Kommandobeskrivelse",
       "template": "Skabelon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "f.eks. Code",
       "templatePlaceholder": "Forklar $ARGUMENTS",
       "subtask": "Kør som underopgave",
       "edit": "Rediger skråstreg kommando",

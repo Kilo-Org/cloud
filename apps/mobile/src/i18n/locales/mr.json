@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "कोड लिहा",
-      "agentPlaceholder": "उदा. कोड",
       "plan": "योजना",
       "debug": "त्रुटी दुरुस्त करा",
       "orchestrator": "समन्वयक",
@@ -3676,6 +3675,7 @@
       "description": "आदेश वर्णन",
       "template": "साचा",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "उदा. कोड",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करा",
       "subtask": "सबटास्क म्हणून चालवा",
       "edit": "स्लॅश कमांड संपादित करा",

@@ -1864,7 +1864,6 @@
     },
     "modeOptions": {
       "code": "البرمجة",
-      "agentPlaceholder": "على سبيل المثال Code",
       "plan": "خطة",
       "debug": "تصحيح الأخطاء",
       "orchestrator": "المنسّق",
@@ -3840,6 +3839,7 @@
       "description": "وصف الأمر",
       "template": "نموذج",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "على سبيل المثال Code",
       "templatePlaceholder": "شرح $ARGUMENTS",
       "subtask": "تشغيل كمهمة فرعية",
       "edit": "تحرير أمر الشرطة المائلة",

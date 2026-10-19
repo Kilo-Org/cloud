@@ -1800,7 +1800,6 @@
     },
     "modeOptions": {
       "code": "Programmieren",
-      "agentPlaceholder": "z.B. Code",
       "plan": "Planung",
       "debug": "Fehlersuche",
       "orchestrator": "Koordinator",
@@ -3676,6 +3675,7 @@
       "description": "Befehlsbeschreibung",
       "template": "Vorlage",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "z.B. Code",
       "templatePlaceholder": "Erklären Sie $ARGUMENTS",
       "subtask": "Als Unteraufgabe ausführen",
       "edit": "Slash-Befehl bearbeiten",

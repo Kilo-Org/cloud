@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "ኮድ መጻፍ",
-      "agentPlaceholder": "ለምሳሌ. Code",
       "plan": "ዕቅድ",
       "debug": "ስህተት ማስተካከል",
       "orchestrator": "አስተባባሪ",
@@ -3676,6 +3675,7 @@
       "description": "የትዕዛዝ መግለጫ",
       "template": "አብነት",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ለምሳሌ. Code",
       "templatePlaceholder": "$ARGUMENTS ያብራሩ",
       "subtask": "እንደ ንዑስ ተግባር ያሂዱ",
       "edit": "የጭረት ትእዛዝን ያርትዑ",

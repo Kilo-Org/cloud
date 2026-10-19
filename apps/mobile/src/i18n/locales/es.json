@@ -1816,7 +1816,6 @@
     },
     "modeOptions": {
       "code": "Programar",
-      "agentPlaceholder": "p.ej. Code",
       "plan": "Plan de trabajo",
       "debug": "Depurar",
       "orchestrator": "Orquestador",
@@ -3717,6 +3716,7 @@
       "description": "Descripción del comando",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "p.ej. Code",
       "templatePlaceholder": "Explique $ARGUMENTS",
       "subtask": "Ejecutar como subtarea",
       "edit": "Editar comando de barra diagonal",

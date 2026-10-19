@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Magsulat ng code",
-      "agentPlaceholder": "hal. Code",
       "plan": "Plano",
       "debug": "Mag-debug",
       "orchestrator": "Tagapag-ugnay",
@@ -3676,6 +3675,7 @@
       "description": "Paglalarawan ng utos",
       "template": "Padron",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "hal. Code",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",

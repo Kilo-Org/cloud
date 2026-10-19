@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "کۆدنووسین",
-      "agentPlaceholder": "بۆ نموونە. کۆد",
       "plan": "پلان",
       "debug": "هەڵەدۆزی",
       "orchestrator": "ڕێکخەر",
@@ -3676,6 +3675,7 @@
       "description": "وەسفکردنی فەرمان",
       "template": "قاڵب",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "بۆ نموونە. کۆد",
       "templatePlaceholder": "$ARGUMENTS ڕوون بکەرەوە",
       "subtask": "وەکو ئەرکی لاوەکی کارپێبکە",
       "edit": "فەرمانی دەستکاریکردنی slash",

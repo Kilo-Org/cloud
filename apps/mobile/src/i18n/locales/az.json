@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Kod yaz",
-      "agentPlaceholder": "məs. Code",
       "plan": "Planlaşdırma",
       "debug": "Xətaları düzəlt",
       "orchestrator": "Əlaqələndirici",
@@ -3676,6 +3675,7 @@
       "description": "Komandanın təsviri",
       "template": "Şablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "məs. Code",
       "templatePlaceholder": "$ARGUMENTS-i izah edin",
       "subtask": "Alt tapşırıq kimi işləyin",
       "edit": "Slash əmrini redaktə edin",

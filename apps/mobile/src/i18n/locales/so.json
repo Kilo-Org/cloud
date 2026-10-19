@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Qor koodh",
-      "agentPlaceholder": "tusaale. Code",
       "plan": "Qorshe",
       "debug": "Sax ciladaha",
       "orchestrator": "Isku-duwe",
@@ -3676,6 +3675,7 @@
       "description": "Tilmaanta amarka",
       "template": "Tusaale",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "tusaale. Code",
       "templatePlaceholder": "Sharax $ARGUMENTS",
       "subtask": "U orda sidii shaqo-hoosaad",
       "edit": "Tafatir amarka slash",

@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Koodaa",
-      "agentPlaceholder": "esim. Koodi",
       "plan": "Suunnittele",
       "debug": "Korjaa virheitä",
       "orchestrator": "Orkestroija",
@@ -3676,6 +3675,7 @@
       "description": "Komennon kuvaus",
       "template": "Malli",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "esim. Koodi",
       "templatePlaceholder": "Selitä $ARGUMENTS",
       "subtask": "Suorita alitehtävänä",
       "edit": "Muokkaa vinoviivakomentoa",

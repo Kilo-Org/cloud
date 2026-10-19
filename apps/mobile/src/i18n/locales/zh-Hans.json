@@ -1800,7 +1800,6 @@
     },
     "modeOptions": {
       "code": "编程",
-      "agentPlaceholder": "例如Code",
       "plan": "计划",
       "debug": "调试",
       "orchestrator": "任务编排",
@@ -3676,6 +3675,7 @@
       "description": "命令说明",
       "template": "模板",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "例如Code",
       "templatePlaceholder": "解释$ARGUMENTS",
       "subtask": "作为子任务运行",
       "edit": "编辑斜杠命令",

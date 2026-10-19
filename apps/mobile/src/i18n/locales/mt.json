@@ -2408,7 +2408,6 @@
     },
     "modeOptions": {
       "code": "Ikteb kodiċi",
-      "agentPlaceholder": "eż. Code",
       "plan": "Pjan",
       "debug": "Sib l-iżbalji",
       "orchestrator": "Koordinatur",
@@ -3799,6 +3798,7 @@
       "description": "Deskrizzjoni tal-kmand",
       "template": "Mudell",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "eż. Code",
       "templatePlaceholder": "Spjega $ARGUMENTS",
       "subtask": "Mexxi bħala subtask",
       "edit": "Editja kmand slash",

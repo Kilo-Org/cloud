@@ -2348,7 +2348,6 @@
     },
     "modeOptions": {
       "code": "Programiraj",
-      "agentPlaceholder": "npr. Kod",
       "plan": "Planiranje",
       "debug": "Otkloni pogreške",
       "orchestrator": "Orkestrator",
@@ -3717,6 +3716,7 @@
       "description": "Opis naredbe",
       "template": "Predložak",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "npr. Kod",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",

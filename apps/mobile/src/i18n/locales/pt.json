@@ -2344,7 +2344,6 @@
     },
     "modeOptions": {
       "code": "Programar",
-      "agentPlaceholder": "ex.: Código",
       "plan": "Plano",
       "debug": "Depurar",
       "orchestrator": "Orquestrador",
@@ -3717,6 +3716,7 @@
       "description": "Descrição do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ex.: Código",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Editar comando de barra",

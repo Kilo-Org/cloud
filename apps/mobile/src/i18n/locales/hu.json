@@ -2316,7 +2316,6 @@
     },
     "modeOptions": {
       "code": "Kódolás",
-      "agentPlaceholder": "például Code",
       "plan": "Terv",
       "debug": "Hibakeresés",
       "orchestrator": "Koordinátor",
@@ -3676,6 +3675,7 @@
       "description": "A parancs leírása",
       "template": "Sablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "például Code",
       "templatePlaceholder": "Magyarázza el $ARGUMENTS",
       "subtask": "Futtassa részfeladatként",
       "edit": "Szerkessze a perjel parancsot",

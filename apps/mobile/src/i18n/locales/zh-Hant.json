@@ -1800,7 +1800,6 @@
     },
     "modeOptions": {
       "code": "寫程式",
-      "agentPlaceholder": "例如 Code",
       "plan": "計畫",
       "debug": "偵錯",
       "orchestrator": "任務協調",
@@ -3676,6 +3675,7 @@
       "description": "命令說明",
       "template": "範本",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "例如 Code",
       "templatePlaceholder": "解釋$ARGUMENTS",
       "subtask": "作為子任務運行",
       "edit": "編輯斜槓命令",

@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "কোড",
-      "agentPlaceholder": "যেমন Code",
       "plan": "প্ল্যান",
       "debug": "ডিবাগ",
       "orchestrator": "সমন্বয়কারী",
@@ -3676,6 +3675,7 @@
       "description": "কমান্ডের বিবরণ",
       "template": "টেমপ্লেট",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "যেমন Code",
       "templatePlaceholder": "$ARGUMENTS ব্যাখ্যা করুন",
       "subtask": "সাবটাস্ক হিসাবে চালান",
       "edit": "স্ল্যাশ কমান্ড সম্পাদনা করুন",

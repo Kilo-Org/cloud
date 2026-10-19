@@ -2376,7 +2376,6 @@
     },
     "modeOptions": {
       "code": "Programiraj",
-      "agentPlaceholder": "npr. Programiraj",
       "plan": "Načrt",
       "debug": "Razhrošči",
       "orchestrator": "Orkestrator",
@@ -3758,6 +3757,7 @@
       "description": "Opis ukaza",
       "template": "Predloga",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "npr. Programiraj",
       "templatePlaceholder": "Pojasnite $ARGUMENTS",
       "subtask": "Zaženi kot podopravilo",
       "edit": "Uredi ukaz za poševnico",

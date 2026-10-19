@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "کوڈ لکھیں",
-      "agentPlaceholder": "جیسے Code",
       "plan": "منصوبہ",
       "debug": "خرابیاں دور کریں",
       "orchestrator": "کاموں کا منتظم",
@@ -3676,6 +3675,7 @@
       "description": "کمانڈ کی تفصیل",
       "template": "سانچہ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "جیسے Code",
       "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
       "subtask": "ذیلی کام کے طور پر چلائیں۔",
       "edit": "سلیش کمانڈ میں ترمیم کریں۔",

@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "நிரல் எழுதுதல்",
-      "agentPlaceholder": "எ.கா. Code",
       "plan": "திட்டம்",
       "debug": "பிழை திருத்தம்",
       "orchestrator": "ஒருங்கிணைப்பாளர்",
@@ -3676,6 +3675,7 @@
       "description": "கட்டளை விளக்கம்",
       "template": "டெம்ப்ளேட்",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "எ.கா. Code",
       "templatePlaceholder": "$ARGUMENTSஐ விளக்கவும்",
       "subtask": "துணைப் பணியாக இயக்கவும்",
       "edit": "ஸ்லாஷ் கட்டளையைத் திருத்தவும்",

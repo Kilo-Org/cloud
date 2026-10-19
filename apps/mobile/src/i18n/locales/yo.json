@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Kọ kóòdù",
-      "agentPlaceholder": "àpẹẹrẹ Kóòdù",
       "plan": "Ètò",
       "debug": "Ṣàtúnṣe àṣìṣe",
       "orchestrator": "Olùṣètò iṣẹ́",
@@ -3676,6 +3675,7 @@
       "description": "Apejuwe aṣẹ",
       "template": "Àdàkọ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "àpẹẹrẹ Kóòdù",
       "templatePlaceholder": "Ṣe alaye $ARGUMENTS",
       "subtask": "Ṣiṣe bi iṣẹ-ṣiṣe",
       "edit": "Ṣatunkọ pipaṣẹ idinku",

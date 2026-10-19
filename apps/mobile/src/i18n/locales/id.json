@@ -1804,7 +1804,6 @@
     },
     "modeOptions": {
       "code": "Tulis kode",
-      "agentPlaceholder": "misalnya Code",
       "plan": "Rencana",
       "debug": "Perbaiki masalah",
       "orchestrator": "Orkestrator",
@@ -3676,6 +3675,7 @@
       "description": "Deskripsi perintah",
       "template": "Templat",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "misalnya Code",
       "templatePlaceholder": "Jelaskan $ARGUMENTS",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit perintah garis miring",

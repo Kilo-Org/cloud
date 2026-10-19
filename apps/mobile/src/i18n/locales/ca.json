@@ -2344,7 +2344,6 @@
     },
     "modeOptions": {
       "code": "Programa",
-      "agentPlaceholder": "p. ex. Code",
       "plan": "Pla",
       "debug": "Depura",
       "orchestrator": "Orquestrador",
@@ -3717,6 +3716,7 @@
       "description": "Descripció de l'ordre",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "p. ex. Code",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar com a subtasca",
       "edit": "Edita l'ordre de barra inclinada",

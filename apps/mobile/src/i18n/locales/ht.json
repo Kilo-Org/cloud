@@ -2316,7 +2316,6 @@
     },
     "modeOptions": {
       "code": "Ekri kòd",
-      "agentPlaceholder": "pa egzanp Code",
       "plan": "Planifikasyon",
       "debug": "Korije erè",
       "orchestrator": "Kowòdonatè",
@@ -3676,6 +3675,7 @@
       "description": "Kòmandman deskripsyon",
       "template": "Modèl",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "pa egzanp Code",
       "templatePlaceholder": "Eksplike $ARGUMENTS",
       "subtask": "Kouri kòm subtach",
       "edit": "Edit lòd koupe",

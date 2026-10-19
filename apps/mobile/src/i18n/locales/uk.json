@@ -1832,7 +1832,6 @@
     },
     "modeOptions": {
       "code": "Програмування",
-      "agentPlaceholder": "напр. Code",
       "plan": "План",
       "debug": "Налагодження",
       "orchestrator": "Оркестратор",
@@ -3758,6 +3757,7 @@
       "description": "Опис команди",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "напр. Code",
       "templatePlaceholder": "Поясніть $ARGUMENTS",
       "subtask": "Запуск як підзавдання",
       "edit": "Редагувати команду косої риски",

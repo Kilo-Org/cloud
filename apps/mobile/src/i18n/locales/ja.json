@@ -1800,7 +1800,6 @@
     },
     "modeOptions": {
       "code": "コード",
-      "agentPlaceholder": "例えばCode",
       "plan": "プラン",
       "debug": "デバッグ",
       "orchestrator": "オーケストレーター",
@@ -3676,6 +3675,7 @@
       "description": "コマンドの説明",
       "template": "テンプレート",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "例えばCode",
       "templatePlaceholder": "$ARGUMENTS の説明",
       "subtask": "サブタスクとして実行",
       "edit": "スラッシュコマンドの編集",

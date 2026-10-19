@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "कोड",
-      "agentPlaceholder": "जस्तै Code",
       "plan": "योजना",
       "debug": "डिबग",
       "orchestrator": "समन्वयकर्ता",
@@ -3676,6 +3675,7 @@
       "description": "आदेश विवरण",
       "template": "टेम्प्लेट",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "जस्तै Code",
       "templatePlaceholder": "$ARGUMENTS व्याख्या गर्नुहोस्",
       "subtask": "सबटास्कको रूपमा चलाउनुहोस्",
       "edit": "स्ल्याश आदेश सम्पादन गर्नुहोस्",

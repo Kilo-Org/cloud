@@ -2316,7 +2316,6 @@
     },
     "modeOptions": {
       "code": "કોડ લખો",
-      "agentPlaceholder": "દા.ત. Code",
       "plan": "યોજના",
       "debug": "ડીબગ કરો",
       "orchestrator": "સંકલનકર્તા",
@@ -3676,6 +3675,7 @@
       "description": "આદેશનું વર્ણન",
       "template": "ઢાંચો",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "દા.ત. Code",
       "templatePlaceholder": "$ARGUMENTS સમજાવો",
       "subtask": "સબટાસ્ક તરીકે ચલાવો",
       "edit": "સ્લેશ આદેશ સંપાદિત કરો",

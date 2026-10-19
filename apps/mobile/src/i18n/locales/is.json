@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Forrita",
-      "agentPlaceholder": "t.d. Code",
       "plan": "Áætlun",
       "debug": "Villuleita",
       "orchestrator": "Samræmingarstjóri",
@@ -3676,6 +3675,7 @@
       "description": "Skipunarlýsing",
       "template": "Sniðmát",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "t.d. Code",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",

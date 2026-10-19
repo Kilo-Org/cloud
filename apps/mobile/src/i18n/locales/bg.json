@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Програмиране",
-      "agentPlaceholder": "напр. Code",
       "plan": "План",
       "debug": "Отстраняване на грешки",
       "orchestrator": "Координатор",
@@ -3676,6 +3675,7 @@
       "description": "Описание на командата",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "напр. Code",
       "templatePlaceholder": "Обяснете $ARGUMENTS",
       "subtask": "Изпълнение като подзадача",
       "edit": "Команда за редактиране на наклонена черта",

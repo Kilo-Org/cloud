@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "ਕੋਡ ਲਿਖੋ",
-      "agentPlaceholder": "ਜਿਵੇਂ ਕਿ Code",
       "plan": "ਯੋਜਨਾ",
       "debug": "ਡੀਬੱਗ ਕਰੋ",
       "orchestrator": "ਤਾਲਮੇਲਕਾਰ",
@@ -3676,6 +3675,7 @@
       "description": "ਕਮਾਂਡ ਦਾ ਵੇਰਵਾ",
       "template": "ਟੈਂਪਲੇਟ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "ਜਿਵੇਂ ਕਿ Code",
       "templatePlaceholder": "$ARGUMENTS ਦੀ ਵਿਆਖਿਆ ਕਰੋ",
       "subtask": "ਸਬਟਾਸਕ ਵਜੋਂ ਚਲਾਓ",
       "edit": "ਸਲੈਸ਼ ਕਮਾਂਡ ਨੂੰ ਸੋਧੋ",

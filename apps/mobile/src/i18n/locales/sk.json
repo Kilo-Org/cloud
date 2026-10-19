@@ -2376,7 +2376,6 @@
     },
     "modeOptions": {
       "code": "Programovať",
-      "agentPlaceholder": "napr. Code",
       "plan": "Plán",
       "debug": "Ladiť",
       "orchestrator": "Orchestrátor",
@@ -3758,6 +3757,7 @@
       "description": "Popis príkazu",
       "template": "Šablóna",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "napr. Code",
       "templatePlaceholder": "Vysvetlite $ARGUMENTS",
       "subtask": "Spustiť ako podúlohu",
       "edit": "Príkaz na úpravu lomky",

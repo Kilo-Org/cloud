@@ -2323,7 +2323,6 @@
     },
     "modeOptions": {
       "code": "Code",
-      "agentPlaceholder": "e.g. Code",
       "plan": "Plan",
       "debug": "Debug",
       "orchestrator": "Orchestrator",
@@ -3676,6 +3675,7 @@
       "description": "Command description",
       "template": "Template",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "e.g. Code",
       "templatePlaceholder": "Explain $ARGUMENTS",
       "subtask": "Run as subtask",
       "edit": "Edit slash command",

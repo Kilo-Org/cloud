@@ -2312,7 +2312,6 @@
     },
     "modeOptions": {
       "code": "Κώδικας",
-      "agentPlaceholder": "π.χ. Code",
       "plan": "Πλάνο",
       "debug": "Αποσφαλμάτωση",
       "orchestrator": "Συντονιστής",
@@ -3676,6 +3675,7 @@
       "description": "Περιγραφή εντολής",
       "template": "Περίγραμμα",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "π.χ. Code",
       "templatePlaceholder": "Εξηγήστε τα $ARGUMENTS",
       "subtask": "Εκτέλεση ως δευτερεύουσα εργασία",
       "edit": "Επεξεργασία εντολής κάθετο",

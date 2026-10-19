@@ -2376,7 +2376,6 @@
     },
     "modeOptions": {
       "code": "Праграмаванне",
-      "agentPlaceholder": "напр. Code",
       "plan": "План",
       "debug": "Адладка",
       "orchestrator": "Каардынатар",
@@ -3758,6 +3757,7 @@
       "description": "Апісанне каманды",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "напр. Code",
       "templatePlaceholder": "Растлумачце $ARGUMENTS",
       "subtask": "Запуск як падзадача",
       "edit": "Рэдагаваць каманду касой рысы",

@@ -2344,7 +2344,6 @@
     },
     "modeOptions": {
       "code": "Programare",
-      "agentPlaceholder": "de ex. Code",
       "plan": "Planul",
       "debug": "Depanare",
       "orchestrator": "Coordonator",
@@ -3717,6 +3716,7 @@
       "description": "Descrierea comenzii",
       "template": "Șablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "de ex. Code",
       "templatePlaceholder": "Explicați $ARGUMENTS",
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",

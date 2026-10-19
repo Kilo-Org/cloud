@@ -24,7 +24,7 @@ export function clearCustomRouterCache(): void {
   cache.clear();
 }
 
-function toDefinition(row: AutoRoutingCustomRouter): CustomRouterDefinition {
+export function toCustomRouterDefinition(row: AutoRoutingCustomRouter): CustomRouterDefinition {
   const owner: CustomRouterOwner = row.owned_by_organization_id
     ? { type: 'org', id: row.owned_by_organization_id }
     : { type: 'user', id: row.owned_by_user_id ?? '' };
@@ -53,7 +53,7 @@ async function queryRouter(
 ): Promise<CustomRouterDefinition | null> {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 2_000 });
   const [row] = await db.select().from(auto_routing_custom_routers).where(where).limit(1);
-  return row ? toDefinition(row) : null;
+  return row ? toCustomRouterDefinition(row) : null;
 }
 
 function cached(
@@ -81,7 +81,7 @@ export function findCustomRouter(
   owner: CustomRouterOwner,
   slug: string
 ): Promise<CustomRouterDefinition | null> {
-  return cached(`${owner.type}:${owner.id}:${slug}`, () =>
+  const load = () =>
     queryRouter(
       env,
       and(
@@ -90,8 +90,8 @@ export function findCustomRouter(
           : eq(auto_routing_custom_routers.owned_by_user_id, owner.id),
         eq(auto_routing_custom_routers.slug, slug)
       )
-    )
-  );
+    );
+  return cached(`${owner.type}:${owner.id}:${slug}`, load);
 }
 
 export function findCustomRouterById(

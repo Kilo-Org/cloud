@@ -2498,6 +2498,7 @@
       "title": "Նիստերի զտում",
       "platformCloud": "Ամպային",
       "platformExtension": "Ընդլայնում",
+      "platformDesktop": "Աշխատասեղան",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

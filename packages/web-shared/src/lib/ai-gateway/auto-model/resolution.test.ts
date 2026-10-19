@@ -653,6 +653,32 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
 });
 
 describe('resolveAutoModel — Organization Auto branch', () => {
+  it('uses the platform decision when Organization Auto targets Balanced after cutover', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => sampleDecision,
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: { routes: {}, fallback_model: KILO_AUTO_BALANCED_MODEL.id },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: sampleDecision.model },
+      routingTarget: KILO_AUTO_BALANCED_MODEL.id,
+    });
+  });
+
   it('uses exact built-in alias routes before canonical fallback routes', async () => {
     const result = await resolveAutoModel(
       {

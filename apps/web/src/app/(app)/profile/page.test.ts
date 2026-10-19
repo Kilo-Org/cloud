@@ -4,6 +4,7 @@ const mockGetUserForCredentialIssuance = jest.fn();
 const mockGenerateApiToken = jest.fn();
 const mockGetCustomerInfo = jest.fn();
 const mockSupportCard = jest.fn(() => null);
+const mockCustomRoutersCard = jest.fn(() => null);
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
@@ -48,14 +49,11 @@ jest.mock('@/components/dev/CreateKilocodeOrgButton', () => ({
   CreateKilocodeOrgButton: () => null,
 }));
 jest.mock('@/components/profile/UserProfileCard', () => ({ UserProfileCard: () => null }));
+jest.mock('@/components/auto-routing/CustomRoutersCard', () => ({
+  CustomRoutersCard: mockCustomRoutersCard,
+}));
 jest.mock('@/components/auto-routing/AutoRoutingModeCard', () => ({
   AutoRoutingModeCard: () => null,
-}));
-jest.mock('@/components/auto-routing/CustomRoutersCard', () => ({
-  CustomRoutersCard: () => null,
-}));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
-  isCustomRoutersEnabled: jest.fn(() => false),
 }));
 jest.mock('@/components/profile/DeleteAccountDialog', () => ({ DeleteAccountDialog: () => null }));
 jest.mock('@/lib/user', () => ({ getOAuthDisplayNames: jest.fn(() => new Map()) }));
@@ -100,9 +98,11 @@ describe('ProfilePage', () => {
         searchParams: Promise.resolve({ source }),
       });
       const cards: unknown[] = [];
+      let customRoutersCards = 0;
       function collectCards(node: React.ReactNode) {
         if (!React.isValidElement<{ children?: React.ReactNode }>(node)) return;
         if (node.type === mockSupportCard) cards.push(node.props);
+        if (node.type === mockCustomRoutersCard) customRoutersCards += 1;
         React.Children.forEach(node.props.children, collectCards);
       }
       collectCards(page);
@@ -116,6 +116,7 @@ describe('ProfilePage', () => {
           isProminent: !!source,
         },
       ]);
+      expect(customRoutersCards).toBe(1);
     }
   );
 });

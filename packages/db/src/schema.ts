@@ -12285,6 +12285,8 @@ export const auto_routing_custom_routers = pgTable(
     mode: text().$type<(typeof CustomRouterMode)[keyof typeof CustomRouterMode]>().notNull(),
     entries: jsonb().$type<AutoRoutingCustomRouterEntry[]>().notNull(),
     default_entry_key: text().notNull(),
+    legacy_pool: boolean().default(false).notNull(),
+    legacy_mode_inherited: boolean().default(false).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

@@ -78,6 +78,50 @@ describe('session tracking identifiers', () => {
         : trackedRequest.body.prompt_cache_key;
     expect(trackedSession).toBeUndefined();
   });
+
+  const promptCacheKeyRequests = (promptCacheKey: string): GatewayRequest[] => [
+    {
+      kind: 'chat_completions',
+      body: { model: 'test-model', messages: [], prompt_cache_key: promptCacheKey },
+    },
+    {
+      kind: 'responses',
+      body: { model: 'test-model', input: 'Hello', prompt_cache_key: promptCacheKey },
+    },
+  ];
+
+  it.each(promptCacheKeyRequests('k'.repeat(64)))(
+    'keeps a client $kind prompt cache key within the length limit',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, null);
+
+      expect(request.body).toHaveProperty('prompt_cache_key', 'k'.repeat(64));
+    }
+  );
+
+  it.each(promptCacheKeyRequests('k'.repeat(65)))(
+    'hashes a client $kind prompt cache key over the length limit',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, null);
+
+      expect(request.body).toHaveProperty(
+        'prompt_cache_key',
+        generateProviderSpecificSessionHash(userId, 'k'.repeat(65), OPENROUTER)
+      );
+    }
+  );
+
+  it.each(promptCacheKeyRequests('k'.repeat(65)))(
+    'prefers the task session hash over a long client $kind prompt cache key',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, sessionId);
+
+      expect(request.body).toHaveProperty(
+        'prompt_cache_key',
+        generateProviderSpecificSessionHash(userId, sessionId, OPENROUTER)
+      );
+    }
+  );
 });
 
 describe('downstream safety identifiers', () => {

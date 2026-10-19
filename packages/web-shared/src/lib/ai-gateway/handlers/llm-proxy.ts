@@ -486,8 +486,8 @@ export async function handleLlmProxyRequest(
       }
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy, owner),
-        () => collectDataCollectionRequiredAutoRoutingModelIds(owner)
+        collectDeniedAutoRoutingModelIds,
+        collectDataCollectionRequiredAutoRoutingModelIds
       );
       const result = await fetchEfficientAutoDecision({
         ...decisionRequest(owner),
@@ -528,7 +528,10 @@ export async function handleLlmProxyRequest(
         },
       });
     };
-    const efficientDecision = isAutoEfficientId ? () => decisionForRouter('efficient') : undefined;
+    const efficientDecision =
+      isAutoEfficientId || requestedModelLowerCased === ORG_AUTO_MODEL.id
+        ? () => decisionForRouter('efficient')
+        : undefined;
     const frontierDecision =
       requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id ||
       requestedModelLowerCased === ORG_AUTO_MODEL.id

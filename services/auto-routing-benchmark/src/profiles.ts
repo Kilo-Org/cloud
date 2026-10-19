@@ -19,11 +19,9 @@ import { benchmarkProfiles, profileRequestEvents } from './db-schema';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
 
-/** Rolling 24h owner admission limit (charged new/retry only). */
-export const PROFILE_ADMISSION_LIMIT = 10;
+/** Rolling 24h owner admission limit per base router (charged new/retry only). */
+export const PROFILE_ADMISSION_LIMIT = 20;
 export const PROFILE_ADMISSION_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-export const MISSING_PROFILE_FAILURE_REASON = 'Benchmark profile missing; retry to request it.';
 
 export type ProfileOwnerType = 'user' | 'org';
 
@@ -38,9 +36,9 @@ export type CurrentProfileContext = {
 /**
  * Shared currency predicate: a profile row is current only when it was measured
  * (or is being measured) under the live decider engine identity and the saved
- * deciderRepetitions, for the same exact Pool entry (model + variant). Used by
- * status lookup and (later) custom table assembly — never treat a stale row as
- * ready.
+ * deciderRepetitions, for the same exact Pool entry (model + variant). Platform and
+ * owner-pool tables require it; custom routers serve an older ready row flagged
+ * stale instead (ADR 0005).
  */
 export function isCurrentBenchmarkProfile(
   row: Pick<ProfileRow, 'model' | 'variant' | 'engine_identity' | 'repetitions'> & {
@@ -170,8 +168,9 @@ function entryKeyFromRow(row: Pick<ProfileRow, 'model' | 'variant'>): string {
   return benchmarkPairKey({ model: row.model, variant: variantFromStorage(row.variant) });
 }
 
-async function loadRowsForPairs(
+export async function loadProfileRowsForPairs(
   db: D1Database,
+  router: AutoRouter,
   pairs: readonly BenchmarkPair[]
 ): Promise<ProfileRow[]> {
   const models = [...new Set(pairs.map(pair => pair.model))];
@@ -180,9 +179,7 @@ async function loadRowsForPairs(
   const rows = await orm
     .select()
     .from(benchmarkProfiles)
-    .where(
-      and(eq(benchmarkProfiles.router, 'efficient'), inArray(benchmarkProfiles.model, models))
-    );
+    .where(and(eq(benchmarkProfiles.router, router), inArray(benchmarkProfiles.model, models)));
   const wanted = new Set(pairs.map(benchmarkPairKey));
   return rows.filter(row => wanted.has(entryKeyFromRow(row)));
 }
@@ -208,14 +205,6 @@ function statusFromRow(entry: BenchmarkPair, row: ProfileRow): BenchmarkProfileE
 
 function pendingStatus(entry: BenchmarkPair): BenchmarkProfileEntryStatus {
   return { entry, status: 'pending', failureReason: null };
-}
-
-function missingStatus(entry: BenchmarkPair): BenchmarkProfileEntryStatus {
-  return {
-    entry,
-    status: 'failed',
-    failureReason: MISSING_PROFILE_FAILURE_REASON,
-  };
 }
 
 export function buildPendingUpsertValues(
@@ -266,7 +255,7 @@ export function claimUserRequestedStatement(
     .set({ user_requested: true, updated_at: nowIso })
     .where(
       and(
-        eq(benchmarkProfiles.router, 'efficient'),
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
         eq(benchmarkProfiles.user_requested, false),
@@ -333,6 +322,7 @@ export function pendingStatusInsertStatement(
 export type ChargedEventInsertValues = {
   owner_type: string;
   owner_id: string;
+  router: AutoRouter;
   model: string;
   variant: string;
   engine_identity: string;
@@ -351,8 +341,8 @@ export type ChargedEventInsertValues = {
  *   SELECT 1 FROM benchmark_profiles WHERE pk AND status IN (...))
  *
  * Drizzle's insert().select always emits the full table column list including
- * autoincrement `id`, so the SELECT must provide 8 expressions (NULL AS id)
- * or SQLite/D1 rejects with "7 values for 8 columns".
+ * autoincrement `id`, so the SELECT must provide 9 expressions (NULL AS id)
+ * or SQLite/D1 rejects with "8 values for 9 columns".
  */
 export function chargedEventInsertStatement(
   orm: ReturnType<typeof drizzle>,
@@ -367,6 +357,7 @@ export function chargedEventInsertStatement(
         NULL AS id,
         ${values.owner_type} AS owner_type,
         ${values.owner_id} AS owner_id,
+        ${values.router} AS router,
         ${values.model} AS model,
         ${values.variant} AS variant,
         ${values.engine_identity} AS engine_identity,
@@ -375,7 +366,7 @@ export function chargedEventInsertStatement(
       WHERE NOT EXISTS (
         SELECT 1 FROM ${benchmarkProfiles}
         WHERE ${benchmarkProfiles.model} = ${values.model}
-          AND ${benchmarkProfiles.router} = 'efficient'
+          AND ${benchmarkProfiles.router} = ${values.router}
           AND ${benchmarkProfiles.variant} = ${values.variant}
           AND ${benchmarkProfiles.engine_identity} = ${values.engine_identity}
           AND ${benchmarkProfiles.repetitions} = ${values.repetitions}
@@ -389,6 +380,7 @@ export function chargedEventInsertStatement(
         values: {
           owner_type: values.owner_type,
           owner_id: values.owner_id,
+          router: values.router,
           model: values.model,
           variant: values.variant,
           engine_identity: values.engine_identity,
@@ -421,13 +413,9 @@ export async function registerProfiles(
   config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>,
   input: RegisterProfilesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
-  if (config.router === 'frontier') {
-    throw new ProfileValidationError(
-      'Custom model pools are only supported by the efficient router'
-    );
-  }
   assertUniquePairs(input.pairs);
   const current = currentProfileContextFromConfig(config);
+  const router = current.router ?? 'efficient';
   const now = input.now ?? new Date();
   const nowIso = now.toISOString();
   const windowStartIso = new Date(now.getTime() - PROFILE_ADMISSION_WINDOW_MS).toISOString();
@@ -440,7 +428,7 @@ export async function registerProfiles(
     if (retryKeys.has(key)) throw new ProfileValidationError(`Duplicate retry pair: ${key}`);
     retryKeys.add(key);
   }
-  const existingRows = await loadRowsForPairs(db, input.pairs);
+  const existingRows = await loadProfileRowsForPairs(db, router, input.pairs);
   const byEntry = groupRowsByEntry(existingRows);
 
   type PlanItem = {
@@ -476,6 +464,7 @@ export async function registerProfiles(
       and(
         eq(profileRequestEvents.owner_type, input.ownerType),
         eq(profileRequestEvents.owner_id, input.ownerId),
+        eq(profileRequestEvents.router, router),
         gte(profileRequestEvents.admitted_at, windowStartIso)
       )
     )
@@ -501,6 +490,7 @@ export async function registerProfiles(
         chargedEventInsertStatement(orm, {
           owner_type: input.ownerType,
           owner_id: input.ownerId,
+          router,
           model: item.entry.model,
           variant: variantToStorage(item.entry.variant),
           engine_identity: current.engineIdentity,
@@ -532,8 +522,9 @@ export async function registerProfiles(
   // guard-blocked concurrent admit reports the true current status.
   const postRows =
     admissions.length > 0
-      ? await loadRowsForPairs(
+      ? await loadProfileRowsForPairs(
           db,
+          router,
           admissions.map(a => a.entry)
         )
       : [];
@@ -555,79 +546,6 @@ export async function registerProfiles(
           ? boundFailureReason(classification.failureReason)
           : null,
     };
-  });
-
-  return { statuses };
-}
-
-export type LookupProfileStatusesInput = {
-  pairs: readonly BenchmarkPair[];
-  /** Injectable clock for tests. */
-  now?: Date;
-};
-
-/**
- * Status lookup for up to MAX_POOL_ENTRIES exact pairs.
- * - current row → its status
- * - stale only → free pending insert (no request event; on-conflict do nothing)
- *   + report the actual post-batch current status
- * - missing → failed with missing message; never admits from a read path
- */
-export async function lookupProfileStatuses(
-  db: D1Database,
-  config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>,
-  input: LookupProfileStatusesInput
-): Promise<BenchmarkProfileStatusesResponse> {
-  if (config.router === 'frontier') {
-    throw new ProfileValidationError(
-      'Custom model pools are only supported by the efficient router'
-    );
-  }
-  assertUniquePairs(input.pairs);
-  const current = currentProfileContextFromConfig(config);
-  const nowIso = (input.now ?? new Date()).toISOString();
-
-  const existingRows = await loadRowsForPairs(db, input.pairs);
-  const byEntry = groupRowsByEntry(existingRows);
-
-  const staleToAdmit: BenchmarkPair[] = [];
-  /** Parallel to input.entries: pre-resolved status, or null when stale-admit pending. */
-  const preStatuses: Array<BenchmarkProfileEntryStatus | null> = [];
-
-  for (const entry of input.pairs) {
-    const rows = byEntry.get(benchmarkPairKey(entry)) ?? [];
-    const currentRow = rows.find(row => isCurrentBenchmarkProfile(row, current, entry));
-    if (currentRow) {
-      preStatuses.push(statusFromRow(entry, currentRow));
-      continue;
-    }
-    if (rows.length > 0) {
-      staleToAdmit.push(entry);
-      preStatuses.push(null);
-      continue;
-    }
-    preStatuses.push(missingStatus(entry));
-  }
-
-  if (staleToAdmit.length > 0) {
-    const orm = drizzle(db);
-    const stmts = staleToAdmit.map(entry =>
-      pendingStatusInsertStatement(orm, buildPendingUpsertValues(entry, current, nowIso))
-    );
-    await orm.batch(stmts as unknown as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
-  }
-
-  const postRows = staleToAdmit.length > 0 ? await loadRowsForPairs(db, staleToAdmit) : [];
-  const postByEntry = groupRowsByEntry(postRows);
-
-  const statuses: BenchmarkProfileEntryStatus[] = input.pairs.map((entry, i) => {
-    const pre = preStatuses[i];
-    if (pre) return pre;
-    const currentRow = (postByEntry.get(benchmarkPairKey(entry)) ?? []).find(row =>
-      isCurrentBenchmarkProfile(row, current, entry)
-    );
-    if (currentRow) return statusFromRow(entry, currentRow);
-    return pendingStatus(entry);
   });
 
   return { statuses };

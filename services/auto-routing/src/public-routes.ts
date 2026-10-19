@@ -97,11 +97,12 @@ export const publicDecideHandler = publicHandler(async c => {
   const reference = parseCustomRouterModelId(request.model);
   if (!reference) throw new CustomRouterError('invalid_request', 'Not a custom router model ID');
   const owner = customRouterOwner(reference, caller);
-  const [router, balanceUsd] = await Promise.all([
+  const [stored, balanceUsd] = await Promise.all([
     owner ? findCustomRouter(c.env, owner, reference.slug) : null,
     loadPayerBalanceUsd(caller),
   ]);
-  if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
+  if (!stored) throw new CustomRouterError('router_not_found', 'Custom router not found');
+  const router = stored;
   requirePaidUsageBalance(balanceUsd);
   // The organization model policy filters gateway entries for any router used in that
   // organization's context, including a member's personal router.

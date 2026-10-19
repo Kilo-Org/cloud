@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR 0005: Custom Auto Routers and Client-Served Models](./0005-custom-auto-routers.md).
+Each saved owner pool became a custom router with slug `efficient`; efficient no longer reads
+owner settings.
 
 ## Context
 

@@ -2564,6 +2564,7 @@
       "title": "Filtr relací",
       "platformCloud": "V cloudu",
       "platformExtension": "Rozšíření",
+      "platformDesktop": "Desktopová aplikace",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

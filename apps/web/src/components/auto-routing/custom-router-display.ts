@@ -51,12 +51,10 @@ async function errorMessage(response: Response): Promise<string> {
   return parsed.success ? parsed.data.error.message : `Request failed (HTTP ${response.status})`;
 }
 
-/** Null when custom routers are not enabled for this owner: the API answers 404. */
 export async function fetchCustomRouters(
   organizationId: string | undefined
-): Promise<CustomRouterListResponse | null> {
+): Promise<CustomRouterListResponse> {
   const response = await fetch(customRoutersEndpoint(organizationId));
-  if (response.status === 404) return null;
   if (!response.ok) throw new Error(await errorMessage(response));
   return CustomRouterListResponseSchema.parse(await response.json());
 }

@@ -134,11 +134,27 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         entries: draft.entries,
         defaultEntryKey: draft.defaultEntryKey,
       };
+      const patch = router
+        ? {
+            name: fields.name,
+            ...(draft.baseRouter !== router.baseRouter ? { baseRouter: draft.baseRouter } : {}),
+            ...(draft.mode !== router.mode ? { mode: draft.mode } : {}),
+            ...(draft.entries.length !== router.entries.length ||
+            draft.entries.some(
+              (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
+            )
+              ? { entries: draft.entries }
+              : {}),
+            ...(draft.defaultEntryKey !== router.defaultEntryKey
+              ? { defaultEntryKey: draft.defaultEntryKey }
+              : {}),
+          }
+        : fields;
       const response = router
         ? await fetch(customRouterItemEndpoint(router.scope, router.slug, organizationId), {
             method: 'PATCH',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(fields),
+            body: JSON.stringify(patch),
           })
         : await fetch(customRoutersEndpoint(organizationId), {
             method: 'POST',
@@ -246,7 +262,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor={fieldId('base')}>Base router</Label>
+              <Label htmlFor={fieldId('base')}>Benchmark difficulty</Label>
               <Select
                 value={draft.baseRouter}
                 disabled={pending}
@@ -254,7 +270,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                   setDraft(current => ({ ...current, baseRouter: AutoRouterSchema.parse(value) }))
                 }
               >
-                <SelectTrigger id={fieldId('base')}>
+                <SelectTrigger id={fieldId('base')} aria-describedby={fieldId('base-help')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -265,8 +281,9 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-xs">
-                Sets the benchmark dataset and routing thresholds.
+              <p id={fieldId('base-help')} className="text-muted-foreground text-xs">
+                Uses the Efficient or Frontier benchmark dataset and routing thresholds. Does not
+                change this router&apos;s mode or model pool.
               </p>
             </div>
             <div className="space-y-2">
@@ -289,6 +306,9 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-muted-foreground text-xs">
+                Only applies to this custom router, independently of the platform routing mode.
+              </p>
             </div>
           </div>
 

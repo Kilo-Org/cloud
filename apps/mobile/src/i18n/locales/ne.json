@@ -2498,6 +2498,7 @@
       "title": "सत्र फिल्टर",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्सटेन्सन",
+      "platformDesktop": "डेस्कटप",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

@@ -32,7 +32,6 @@ import {
 import {
   customRouterOwnerCondition,
   findCustomRouter,
-  isCustomRoutersEnabled,
   listCustomRouters,
   toCustomRouterDefinition,
   type CustomRouterOwner,
@@ -44,7 +43,7 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { NextResponse, type NextRequest } from 'next/server';
 import * as z from 'zod';
 import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-pool-validation';
@@ -103,7 +102,6 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
       'Authentication required'
     );
   }
-  if (!(await isCustomRoutersEnabled(auth.user.id))) throw routerNotFound();
 
   const queryOrganizationId = request.nextUrl.searchParams.get('organizationId');
   const authOrganizationId = auth.organizationId ?? null;
@@ -114,7 +112,9 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
     );
   }
   const organizationId = authOrganizationId ?? queryOrganizationId;
-  if (!organizationId) return { user: auth.user, organization: null };
+  if (!organizationId) {
+    return { user: auth.user, organization: null };
+  }
   if (!z.uuid().safeParse(organizationId).success) {
     throw new CustomRouterApiError('invalid_request', 'Invalid organization ID');
   }
@@ -336,7 +336,7 @@ async function requestPlatformBenchmarks(params: {
     ) {
       throw new CustomRouterApiError(
         'invalid_request',
-        `baseRouter: Benchmarks for the ${params.baseRouter} base router are not available yet. Choose another base router.`
+        `baseRouter: Benchmarks for the ${params.baseRouter} benchmark difficulty are not available yet. Choose another benchmark difficulty.`
       );
     }
     if (result.status === 400) {
@@ -349,7 +349,7 @@ async function requestPlatformBenchmarks(params: {
   }
 }
 
-async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
+export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
   const key = `auto-routing-custom-routers:${owner.type}:${owner.id}`;
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 }
@@ -402,7 +402,10 @@ export async function listCustomRoutersResponse(
   const summaries = await Promise.all(
     routers.map(router => toSummary(router, router.ownerType === 'user' || orgCanEdit))
   );
-  return NextResponse.json({ routers: summaries });
+  return NextResponse.json({
+    routers: summaries,
+    canCreate: !context.organization || orgCanEdit,
+  });
 }
 
 export async function getCustomRouterResponse(
@@ -429,7 +432,7 @@ function assertCanCreate(existing: { slug: string }[], slug: string): void {
   }
 }
 
-async function ownerRouterSlugs(
+export async function ownerRouterSlugs(
   executor: DrizzleTransaction | typeof db,
   owner: CustomRouterOwner
 ): Promise<{ slug: string }[]> {
@@ -513,7 +516,8 @@ export async function updateCustomRouterResponse(
   request: NextRequest
 ): Promise<NextResponse> {
   const { scope, slug } = parseRouterParams(params);
-  const parsed = UpdateCustomRouterRequestSchema.safeParse(await readJsonBody(request));
+  const rawInput = await readJsonBody(request);
+  const parsed = UpdateCustomRouterRequestSchema.safeParse(rawInput);
   if (!parsed.success) throw invalidRequest(parsed.error);
   const input = parsed.data;
   const owner = await resolveEditableOwner(context, scope);
@@ -548,11 +552,13 @@ export async function deleteCustomRouterResponse(
 ): Promise<NextResponse> {
   const { scope, slug } = parseRouterParams(params);
   const owner = await resolveEditableOwner(context, scope);
-  const deleted = await db
-    .delete(auto_routing_custom_routers)
-    .where(and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, slug)))
-    .returning({ id: auto_routing_custom_routers.id });
-  if (deleted.length === 0) throw routerNotFound();
+  await db.transaction(async tx => {
+    await lockOwner(tx, owner);
+    const current = await findRouter(tx, owner, slug);
+    await tx
+      .delete(auto_routing_custom_routers)
+      .where(eq(auto_routing_custom_routers.id, current.id));
+  });
   return new NextResponse(null, { status: 204 });
 }
 

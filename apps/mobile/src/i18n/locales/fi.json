@@ -2498,6 +2498,7 @@
       "title": "Suodata istuntoja",
       "platformCloud": "Pilvi",
       "platformExtension": "Laajennus",
+      "platformDesktop": "Työpöytä",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

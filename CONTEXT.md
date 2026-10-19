@@ -44,9 +44,13 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Email Delivery** | Attempt to render and send one Security Agent Notification through Mailgun | Referring to provider side effect, retry, or acceptance | Notification event |
 | **Security Finding Activity Event** | Immutable record of one material user, system-policy, or source-driven action or outcome that changes or explains a Security Finding | Referring to evidence included in a Security Agent Audit Report | Page view, unchanged sync observation, queue claim, heartbeat |
 | **Security Agent Audit Report** | Owner-scoped, period-bounded audit view of Security Finding Activity Events grouped by Security Finding | Referring to the interactive audit report | Generic audit-log export, activity dump |
-| **Efficient model pool** | The exact model and thinking-variant pairs that `kilo-auto/efficient` may consider for an owner | Referring to either the platform default or an owner-configured pool | Custom mode, custom efficient model |
-| **Pool entry** | One concrete model paired with its canonical thinking-variant key, or the model's default only when it exposes no variants | Referring to benchmark and routing identity inside an Efficient model pool | Model alone, normalized effort |
-| **Benchmark profile** | Globally shared, current benchmark results for one Pool entry | Referring to readiness and measured routing evidence reused across owners | User benchmark, pool benchmark |
+| **Custom router** | An owner's named router with an owner-selected benchmark difficulty, routing mode, and pool of gateway and client models | Referring to owner-configured auto routing | Efficient model pool, custom mode |
+| **Platform router** | An auto router whose model pool is selected by the platform and whose routing mode is selected by users or organizations | Referring to Efficient or Frontier platform routing | Fixed-mode router, owner-configured platform pool |
+| **Routing mode** | The ranking objective: best accuracy per dollar or best accuracy | Referring to how a router ranks eligible models | Model pool, benchmark difficulty |
+| **Benchmark difficulty** | The selected Efficient or Frontier benchmark dataset and routing thresholds for a Custom router | Referring to the custom router's benchmark choice | Routing mode, model pool |
+| **Pool entry** | One gateway model or one client-served model in a Custom router's pool | Referring to membership inside a Custom router | Model alone, normalized effort |
+| **Benchmark profile** | Globally shared, current benchmark results for one model and thinking variant that the platform serves | Referring to readiness and measured routing evidence reused across owners | User benchmark, pool benchmark |
+| **Client profile** | Owner-scoped measurement of a Pool entry that the owner's CLI runs because the platform cannot serve it | Referring to client eval results | Benchmark profile, shared client result |
 | **Kilo Pass for Organizations** | Organization-owned Kilo Pass product that buys pass capacity for parent-org paid seats and allocates pooled credit capacity into parent or direct child containers | Referring to org Kilo Pass agreements, purchases, allocations, and admin workflows | Personal Kilo Pass, user Kilo Pass subscription |
 | **Kilo Pass org agreement** | Durable org-owned source of truth for one organization's Kilo Pass terms, version, purchase channel, and lifecycle | Preserving self-serve and manual org Kilo Pass terms | Personal subscription row, seat purchase row |
 | **Kilo Pass term version** | Immutable versioned commercial and credit-grant rules attached to a Kilo Pass org agreement; standard and dedicated custom versions are allowed | Referring to legacy upfront-bonus terms, default bonus-after-base terms, or future bonus changes | Promo flag, mutable agreement fields, plan metadata |
@@ -87,9 +91,9 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - An **Email Delivery** realizes a durable **Security Agent Notification** and may be retried without creating new event identity.
 - A **Security Remediation** belongs to one **Security Finding** and can have one or more **Security Remediation Attempts**.
 - A **Security Finding Activity Event** belongs to one Security Agent owner and one Security Finding, including after that finding is deleted.
-- An **Efficient model pool** belongs to one personal user or organization; an organization pool overrides members' personal pools, while no configured pool inherits the next available setting and then the platform default.
-- A **Pool entry** has at most one current **Benchmark profile** for a benchmark-engine version, shared by every owner that selects that entry.
-- `kilo-auto/efficient` considers only ready, request-compatible Pool entries from the effective Efficient model pool; its balanced failure fallback remains outside pool membership.
+- A **Custom router** belongs to one personal user or organization and holds at most 20 Pool entries; it never routes outside its pool.
+- A **Benchmark profile** is current for one benchmark-engine version and shared by every owner whose Custom router names that model; a **Client profile** never affects another owner.
+- `kilo-auto/efficient` and `kilo-auto/frontier` use platform-selected pools. Personal or organization settings select their routing mode; organization model policy still filters candidates.
 - **Kilo Pass for Organizations** uses a new org-owned source of truth; personal Kilo Pass subscription rows are not authoritative for org agreements.
 - A **Kilo Pass org agreement** belongs to a parent organization and records a **Kilo Pass term version**.
 - A parent organization has at most one non-ended **Kilo Pass org agreement**.
@@ -235,7 +239,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - Keep normal bonus unlock transactional with canonical spend recording and issuance-level idempotency. Do not rely on asynchronous or scheduled evaluation as primary unlock path.
 - Treat bonus eligibility as period-bounded by agreement-relative **Kilo Pass issuance window**. Do not carry a locked bonus threshold into later windows or count later spend toward multiple issuance bonuses.
 - Apply bonus-credit expiry at next agreement-relative issuance boundary, matching personal Kilo Pass period behavior. Do not apply same period expiry to base credits.
-- Use **Efficient model pool** for the candidate set and **Pool entry** for an exact model and canonical thinking variant. Do not introduce a second efficient mode or model ID.
+- Use **Custom router** for an owner-chosen candidate set and **Pool entry** for one of its models. Do not give platform routers a per-owner pool or mode.
 - Treat **Benchmark profiles** as global evidence, never owner-specific benchmark results.
 
 ## Ambiguities
@@ -262,7 +266,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 - **Security Agent Email Delivery** may revalidate and deliver an existing notification but must not create notification eligibility or copy mutable finding data into Worker request.
 - **Shared Security Notification Policy** defines common parsing and pure eligibility behavior; it does not perform persistence or recipient lookup.
 - Cross-context dispatch sends only stable notification ID from **Security Sync** to authenticated **Security Agent Email Delivery** boundary.
-- **Auto Routing** owns effective pool resolution and per-request selection. The benchmark worker owns Benchmark profile measurement and publication; web owns catalog validation, permissions, and settings UI.
+- **Auto Routing** owns per-request selection for platform routers and Custom routers. The benchmark worker owns Benchmark profile and Client profile measurement and publication; web owns Custom router definitions, catalog validation, permissions, and the router editor.
 - **Kilo Pass for Organizations** owns org agreements, term versions, purchased pass capacity, allocation plans, issuance snapshots, and pooled bonus-after-base behavior. Personal Kilo Pass owns existing user subscriptions and user-global threshold behavior.
 - Org seat purchases may determine eligible seat counts for Kilo Pass for Organizations, but seat purchase rows are not the Kilo Pass agreement source of truth.
 

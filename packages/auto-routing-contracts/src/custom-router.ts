@@ -521,6 +521,7 @@ export type CustomRouterSummary = z.infer<typeof CustomRouterSummarySchema>;
 
 export const CustomRouterListResponseSchema = z.object({
   routers: z.array(CustomRouterSummarySchema),
+  canCreate: z.boolean().optional(),
 });
 export type CustomRouterListResponse = z.infer<typeof CustomRouterListResponseSchema>;
 

@@ -68,7 +68,7 @@ export function getFallbackReasoningOptions(model: string): ReasoningOption[] | 
   if (model === 'stealth/glyph-cluster') {
     return effortOptions('low', 'medium', 'high', 'xhigh');
   }
-  if (model === 'stealth/cat-jam') {
+  if (model.startsWith('reflection/beam')) {
     return effortOptions('low', 'medium', 'high', 'xhigh', 'max');
   }
   return undefined;

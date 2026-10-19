@@ -310,7 +310,7 @@ describe('verifyNativeAppleIdToken', () => {
   it('keeps the transition off when the toggle is off', async () => {
     process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
     const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    Object.assign(process.env, { NODE_ENV: 'production' });
     try {
       mockVerifyAppleJwtWithJwks.mockResolvedValue(
         applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
@@ -319,14 +319,14 @@ describe('verifyNativeAppleIdToken', () => {
 
       await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
     } finally {
-      process.env.NODE_ENV = previousNodeEnv;
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
     }
   });
 
   it('honors the toggle in production mode', async () => {
     process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
     const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    Object.assign(process.env, { NODE_ENV: 'production' });
     try {
       mockVerifyAppleJwtWithJwks.mockResolvedValue(
         applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
@@ -337,7 +337,7 @@ describe('verifyNativeAppleIdToken', () => {
       expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
       expect(mockIsReleaseToggleEnabled).toHaveBeenCalled();
     } finally {
-      process.env.NODE_ENV = previousNodeEnv;
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
     }
   });
 
@@ -355,7 +355,7 @@ describe('verifyNativeAppleIdToken', () => {
     process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
     mockIsReleaseToggleEnabled.mockRejectedValue(new Error('posthog down'));
     const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    Object.assign(process.env, { NODE_ENV: 'production' });
     try {
       mockVerifyAppleJwtWithJwks.mockResolvedValue(
         applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
@@ -364,7 +364,66 @@ describe('verifyNativeAppleIdToken', () => {
       await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
       expect(mockCaptureMessage).not.toHaveBeenCalled();
     } finally {
-      process.env.NODE_ENV = previousNodeEnv;
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+    }
+  });
+
+  it('opens the transition in development with the explicit local opt-in', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousVercelEnv = process.env.VERCEL_ENV;
+    delete process.env.VERCEL_ENV;
+    Object.assign(process.env, { NODE_ENV: 'development' });
+    process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL = 'true';
+    try {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+
+      const result = await verifyNativeAppleIdToken('a-token');
+      expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
+      expect(mockIsReleaseToggleEnabled).not.toHaveBeenCalled();
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+      Object.assign(process.env, { VERCEL_ENV: previousVercelEnv });
+      delete process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL;
+    }
+  });
+
+  it('keeps the transition closed under Vercel even with the local opt-in', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousVercelEnv = process.env.VERCEL_ENV;
+    Object.assign(process.env, { NODE_ENV: 'development', VERCEL_ENV: 'production' });
+    process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL = 'true';
+    try {
+      mockIsReleaseToggleEnabled.mockResolvedValue(false);
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+      Object.assign(process.env, { VERCEL_ENV: previousVercelEnv });
+      delete process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL;
+    }
+  });
+
+  it('keeps the transition closed in development without the local opt-in', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    const previousNodeEnv = process.env.NODE_ENV;
+    Object.assign(process.env, { NODE_ENV: 'development' });
+    delete process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL;
+    try {
+      mockIsReleaseToggleEnabled.mockResolvedValue(false);
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
     }
   });
 });

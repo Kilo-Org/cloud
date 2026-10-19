@@ -121,6 +121,21 @@ export async function shouldRouteToVercel(
   return true;
 }
 
+function getConversationId(request: GatewayRequest): string | undefined {
+  const id = request.kind === 'messages' ? request.body.session_id : request.body.prompt_cache_key;
+  return typeof id === 'string' && id.length > 0 ? id : undefined;
+}
+
+// An explicit session ID makes Vercel pin the exact credential that served the
+// session, keeping its prompt cache warm after a fallback.
+// https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
+function getSessionAffinityOptions(
+  request: GatewayRequest
+): Pick<NonNullable<VercelProviderConfig['gateway']>, 'sessionId' | 'sessionAffinity'> {
+  const sessionId = getConversationId(request);
+  return sessionId ? { sessionId, sessionAffinity: true } : { sessionAffinity: true };
+}
+
 function convertProviderSort(
   sort: OpenRouterProviderConfig['sort']
 ): GatewayProviderOptions['sort'] {
@@ -172,6 +187,7 @@ export function convertProviderOptions(
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
       serviceTier: serviceTier === 'flex' || serviceTier === 'priority' ? serviceTier : undefined,
+      ...getSessionAffinityOptions(requestToMutate),
     },
   };
 }
@@ -285,6 +301,7 @@ export async function applyVercelSettings(
         sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
         models: requestToMutate.body.models,
+        ...getSessionAffinityOptions(requestToMutate),
       },
     };
   } else {

@@ -1,9 +1,8 @@
 /**
  * Internal API Endpoint: Auto Triage Status Updates
  *
- * Called by:
- * - Triage Orchestrator (for 'analyzing' status and sessionId updates)
- * - Cloud Agent callback (for 'actioned' or 'failed' status)
+ * Called by the Triage Orchestrator with the status and the fields it
+ * collected while working the ticket.
  *
  * The ticketId is passed in the URL path.
  *
@@ -17,25 +16,9 @@ import { NextResponse } from 'next/server';
 import { updateTriageTicketStatus, getTriageTicketById } from '@/lib/auto-triage/db/triage-tickets';
 import { tryDispatchPendingTickets } from '@/lib/auto-triage/dispatch/dispatch-pending-tickets';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
+import { TriageStatusUpdateRequestSchema } from '@/lib/auto-triage/core/schemas';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import type { TriageStatus, TriageClassification, TriageAction } from '@/lib/auto-triage/db/types';
-
-interface StatusUpdatePayload {
-  sessionId?: string;
-  status: TriageStatus;
-  classification?: TriageClassification;
-  confidence?: number;
-  intentSummary?: string;
-  relatedFiles?: string[];
-  isDuplicate?: boolean;
-  duplicateOfTicketId?: string;
-  similarityScore?: number;
-  qdrantPointId?: string;
-  actionTaken?: TriageAction;
-  actionMetadata?: Record<string, unknown>;
-  errorMessage?: string;
-}
 
 export async function POST(
   req: NextRequest,
@@ -47,26 +30,61 @@ export async function POST(
     if (unauthorized) return unauthorized;
 
     const { ticketId } = await params;
-    const payload: StatusUpdatePayload = await req.json();
-    const { sessionId, status, errorMessage, ...updates } = payload;
 
-    // Validate payload
-    if (!status) {
-      return NextResponse.json({ error: 'Missing required field: status' }, { status: 400 });
+    let payload: unknown;
+    try {
+      payload = await req.json();
+    } catch {
+      return NextResponse.json(
+        {
+          error: 'Invalid payload',
+          issues: [{ code: 'invalid_json', message: 'Request body must be valid JSON' }],
+        },
+        { status: 400 }
+      );
     }
 
+    const parsed = TriageStatusUpdateRequestSchema.safeParse(
+      payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+        ? { ...payload, ticketId }
+        : payload
+    );
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid payload', issues: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const {
+      ticketId: validatedTicketId,
+      status,
+      sessionId,
+      classification,
+      confidence,
+      intentSummary,
+      relatedFiles,
+      isDuplicate,
+      duplicateOfTicketId,
+      similarityScore,
+      actionTaken,
+      actionMetadata,
+      errorMessage,
+    } = parsed.data;
+
     logExceptInTest('[triage-status] Received status update', {
-      ticketId,
+      ticketId: validatedTicketId,
       sessionId,
       status,
       hasError: !!errorMessage,
     });
 
     // Get current ticket to check if update is needed
-    const ticket = await getTriageTicketById(ticketId);
+    const ticket = await getTriageTicketById(validatedTicketId);
 
     if (!ticket) {
-      logExceptInTest('[triage-status] Ticket not found', { ticketId });
+      logExceptInTest('[triage-status] Ticket not found', { ticketId: validatedTicketId });
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
@@ -94,16 +112,22 @@ export async function POST(
     // - pending -> actioned/failed (edge case: immediate failure)
 
     // Update ticket status in database
-    await updateTriageTicketStatus(ticketId, status, {
+    await updateTriageTicketStatus(validatedTicketId, status, {
       sessionId,
+      classification,
+      confidence,
+      intentSummary,
+      relatedFiles,
+      isDuplicate,
+      duplicateOfTicketId,
+      similarityScore,
+      actionTaken,
+      actionMetadata,
       errorMessage,
-      startedAt: status === 'analyzing' ? new Date() : undefined,
-      completedAt: status === 'actioned' || status === 'failed' ? new Date() : undefined,
-      ...updates,
     });
 
     logExceptInTest('[triage-status] Updated ticket status', {
-      ticketId,
+      ticketId: validatedTicketId,
       sessionId,
       status,
     });

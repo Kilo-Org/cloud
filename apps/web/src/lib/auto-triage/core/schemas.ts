@@ -370,6 +370,14 @@ export const TriageStatusUpdateSchema = z.object({
 });
 
 /**
+ * Status update accepted by the internal status route.
+ *
+ * Rejects unknown keys so only the fields the route allowlists reach the
+ * ticket writer; timestamps are derived from the status, never supplied.
+ */
+export const TriageStatusUpdateRequestSchema = TriageStatusUpdateSchema.strict();
+
+/**
  * Dispatch triage request to worker
  */
 export const DispatchTriageRequestSchema = z.object({

@@ -2,7 +2,7 @@ import { getExtensionUrl } from './getExtensionUrl';
 import { EDITOR_OPTIONS, DEFAULT_EDITOR } from '@/lib/editorOptions';
 
 describe('getExtensionUrl', () => {
-  const noCookies = { get: (_name: string) => undefined };
+  const noCookies = { get: (_: string) => undefined };
 
   it.each(EDITOR_OPTIONS.map(editor => [editor.source, editor]))(
     'resolves source %s to that editor entry',
@@ -30,7 +30,7 @@ describe('getExtensionUrl', () => {
   });
 
   it('falls back to the default editor when the cookie holds an unknown source value', () => {
-    const cookies = { get: (name: string) => ({ value: 'not-an-editor' }) };
+    const cookies = { get: (_: string) => ({ value: 'not-an-editor' }) };
     const result = getExtensionUrl({}, cookies);
 
     expect(result.editor).toBe(DEFAULT_EDITOR);
@@ -38,7 +38,7 @@ describe('getExtensionUrl', () => {
   });
 
   it('uses the cookie value when the query has no source', () => {
-    const cookies = { get: (name: string) => ({ value: 'cursor' }) };
+    const cookies = { get: (_: string) => ({ value: 'cursor' }) };
     const result = getExtensionUrl({}, cookies);
 
     expect(result.editor).toBe(EDITOR_OPTIONS.find(editor => editor.source === 'cursor'));

@@ -474,6 +474,18 @@ describe('Home live presentation', () => {
       expect(text().includes('Connection lost')).toBe(mode === 'exhausted');
       expect(text().includes('Reconnecting…')).toBe(mode === 'reconnecting' || mode === 'unknown');
       expect(text()).not.toContain('Internet connection restored');
+      if (mode === 'exhausted') {
+        // Device defect (Android portrait, pt-BR): the notice beside `Retry`
+        // and the header action ellipsized "Connection lost" to "Connection
+        // …". The message must keep no `numberOfLines` cap, so it wraps to a
+        // second line instead of clipping.
+        const message = nodes('Text').find(node => node.children.includes('Connection lost'));
+        expect(message).toBeDefined();
+        expect(message?.props.numberOfLines).toBeUndefined();
+        expect(String(message?.props.className).split(' ')).toEqual(
+          expect.arrayContaining(['min-w-0', 'shrink'])
+        );
+      }
     }
   );
 

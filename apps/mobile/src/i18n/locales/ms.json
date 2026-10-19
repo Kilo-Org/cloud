@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Semakan ini tidak dapat dihantar dalam keadaan sekarang. PR mungkin telah berubah, atau anda cuba menyemak permintaan tarik anda sendiri.",
       "reviewNotSubmittedTerm": "Semakan ini tidak dapat dihantar seperti sedia ada. {{term}} mungkin telah berubah, atau anda tidak boleh menyemak {{term}} anda sendiri.",
       "couldNotPostComment": "Tidak dapat menyiarkan komen.",
-      "couldNotSubmitReview": "Tidak dapat menghantar semakan. Semak sambungan anda dan cuba lagi."
+      "couldNotSubmitReview": "Tidak dapat menghantar semakan. Semak sambungan anda dan cuba lagi.",
+      "rateLimited": "Terlalu banyak permintaan. Sila cuba lagi kemudian."
     },
     "operation": {
       "couldNotReply": "Tidak dapat membalas.",

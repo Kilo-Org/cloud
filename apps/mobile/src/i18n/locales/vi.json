@@ -2930,7 +2930,8 @@
       "reviewNotSubmitted": "Không thể gửi bản đánh giá này ở trạng thái hiện tại. Có thể PR đã thay đổi hoặc đây là PR của bạn nên bạn không thể tự đánh giá.",
       "reviewNotSubmittedTerm": "Không thể gửi đánh giá này ở trạng thái hiện tại. {{term}} có thể đã thay đổi, hoặc bạn không thể đánh giá {{term}} của chính mình.",
       "couldNotPostComment": "Không thể đăng bình luận.",
-      "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại."
+      "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại.",
+      "rateLimited": "Quá nhiều yêu cầu. Vui lòng thử lại sau."
     },
     "operation": {
       "couldNotReply": "Không thể trả lời.",

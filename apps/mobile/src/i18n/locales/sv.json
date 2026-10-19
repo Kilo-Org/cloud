@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Den här granskningen kan inte skickas i sitt nuvarande skick. PR:en kan ha ändrats, eller så gäller den din egen PR som du inte får granska.",
       "reviewNotSubmittedTerm": "Den här granskningen kan inte skickas i sitt nuvarande skick. {{term}} kan ha ändrats, eller så kan du inte granska din egen {{term}}.",
       "couldNotPostComment": "Kunde inte publicera kommentaren.",
-      "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen."
+      "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen.",
+      "rateLimited": "För många förfrågningar. Försök igen senare."
     },
     "operation": {
       "couldNotReply": "Det gick inte att skicka svaret.",

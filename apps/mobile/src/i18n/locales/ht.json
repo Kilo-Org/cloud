@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Pa ka soumèt revizyon sa a jan li ye a. Petèt PR a chanje, oswa ou pa ka revize pwòp demann fizyon ou a.",
       "reviewNotSubmittedTerm": "Yo pa ka voye revizyon sa a jan l ye a. Petèt {{term}} lan chanje, oswa ou pa ka revize pwòp {{term}} ou.",
       "couldNotPostComment": "Pa t ka pibliye kòmantè a.",
-      "couldNotSubmitReview": "Pa t ka soumèt revizyon an. Tcheke koneksyon ou epi eseye ankò."
+      "couldNotSubmitReview": "Pa t ka soumèt revizyon an. Tcheke koneksyon ou epi eseye ankò.",
+      "rateLimited": "Twòp demann. Tanpri eseye ankò pita."
     },
     "operation": {
       "couldNotReply": "Nou pa t kapab voye repons lan.",

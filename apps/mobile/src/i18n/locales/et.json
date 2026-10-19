@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Seda ülevaatust ei saa praegusel kujul esitada. PR võib olla muutunud või proovid üle vaadata enda tõmbetaotlust, mis pole lubatud.",
       "reviewNotSubmittedTerm": "Seda ülevaatust ei saa praegusel kujul esitada. {{term}} võib olla muutunud või ei tohi omaenda {{term}} üle vaadata.",
       "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
-      "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti."
+      "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
+      "rateLimited": "Liiga palju päringuid. Proovi hiljem uuesti."
     },
     "operation": {
       "couldNotReply": "Vastamine ebaõnnestus.",

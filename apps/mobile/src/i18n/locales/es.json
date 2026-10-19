@@ -2970,7 +2970,8 @@
       "reviewNotSubmitted": "Esta revisión no se puede enviar en su estado actual. Puede que la PR haya cambiado o que no tengas permiso para revisar tu propia PR.",
       "reviewNotSubmittedTerm": "Esta revisión no se puede enviar en su estado actual. Puede que {{term}} haya cambiado o que no tengas permiso para revisar tu propio {{term}}.",
       "couldNotPostComment": "No se pudo publicar el comentario.",
-      "couldNotSubmitReview": "No se pudo enviar la revisión. Comprueba tu conexión e inténtalo de nuevo."
+      "couldNotSubmitReview": "No se pudo enviar la revisión. Comprueba tu conexión e inténtalo de nuevo.",
+      "rateLimited": "Demasiadas solicitudes. Inténtalo de nuevo más tarde."
     },
     "operation": {
       "couldNotReply": "No se pudo responder.",

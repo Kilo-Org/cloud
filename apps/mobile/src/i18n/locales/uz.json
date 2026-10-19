@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Ko'rib chiqish natijasini hozirgi holatida yuborib bo'lmaydi. PR o'zgargan bo'lishi mumkin yoki siz o'zingiz ochgan PRni ko'rib chiqishga urinyapsiz.",
       "reviewNotSubmittedTerm": "Ushbu ko'rib chiqish hozirgi holatida yuborilmaydi. {{term}} o'zgargan bo'lishi mumkin yoki o'zingiz yaratgan {{term}}ni ko'rib chiqa olmaysiz.",
       "couldNotPostComment": "Izoh joylashtirib bo'lmadi.",
-      "couldNotSubmitReview": "Ko'rib chiqish natijasini yuborib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring."
+      "couldNotSubmitReview": "Ko'rib chiqish natijasini yuborib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+      "rateLimited": "Juda ko'p so'rovlar yuborildi. Iltimos, keyinroq qayta urinib ko'ring."
     },
     "operation": {
       "couldNotReply": "Javob yuborib bo‘lmadi.",

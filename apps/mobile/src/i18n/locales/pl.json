@@ -3010,7 +3010,8 @@
       "reviewNotSubmitted": "Nie można wysłać tego przeglądu w obecnej postaci. PR mógł się zmienić albo jest to twój własny PR, którego nie możesz przeglądać w ten sposób.",
       "reviewNotSubmittedTerm": "Nie można wysłać tego przeglądu w obecnej postaci. {{term}} mógł się zmienić albo nie możesz przeglądać własnego {{term}}.",
       "couldNotPostComment": "Nie udało się opublikować komentarza.",
-      "couldNotSubmitReview": "Nie udało się wysłać przeglądu. Sprawdź połączenie i spróbuj ponownie."
+      "couldNotSubmitReview": "Nie udało się wysłać przeglądu. Sprawdź połączenie i spróbuj ponownie.",
+      "rateLimited": "Zbyt wiele żądań. Spróbuj ponownie później."
     },
     "operation": {
       "couldNotReply": "Nie udało się odpowiedzieć.",

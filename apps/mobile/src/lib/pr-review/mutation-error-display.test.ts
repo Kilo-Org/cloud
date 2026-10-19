@@ -209,6 +209,38 @@ describe('mutationErrorDisplay', () => {
     });
   });
 
+  it('maps a typed rate limit to the localized wait copy on every surface', () => {
+    // The server's "try again in about N minutes" line is English-only; the
+    // inline box shows the localized wait copy instead, on every surface.
+    const rateLimited = makeError('TOO_MANY_REQUESTS', 'GitHub rate limit reached. Try again.');
+    expect(mutationErrorDisplayFromError('composer', rateLimited)).toEqual({
+      kind: 'retryable',
+      message: 'Too many requests. Please try again later.',
+    });
+    expect(mutationErrorDisplayFromError('edit-comment', rateLimited)).toEqual({
+      kind: 'retryable',
+      message: 'Too many requests. Please try again later.',
+    });
+    // The submit surface keeps its own retryable copy.
+    expect(mutationErrorDisplayFromError('submit', rateLimited)).toEqual({
+      kind: 'retryable',
+      message: 'Could not submit review. Check your connection and try again.',
+    });
+  });
+
+  it('shows the localized edit-comment copy for a typed gateway failure', () => {
+    // BAD_GATEWAY carries raw provider text; the edit sheet shows the
+    // localized copy instead.
+    const gateway = makeError(
+      'BAD_GATEWAY',
+      'The connected provider could not be reached. Try again.'
+    );
+    expect(mutationErrorDisplayFromError('edit-comment', gateway)).toEqual({
+      kind: 'retryable',
+      message: "Couldn't save your comment. Check your connection and try again.",
+    });
+  });
+
   it('mutationErrorDisplayFromError classifies then selects', () => {
     const serverMessage = 'Repository was archived so is read-only.';
     expect(

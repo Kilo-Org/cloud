@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Lokhu kubuyekeza akukwazi ukuthunyelwa njengoba kunjalo. Kungenzeka i-PR ishintshile, noma awukwazi ukubuyekeza isicelo sakho sokuhlanganisa.",
       "reviewNotSubmittedTerm": "Lokhu kubuyekeza akukwazi ukuthunyelwa kanjalo. Kungenzeka {{term}} kushintshe, noma awukwazi ukubuyekeza {{term}} wakho siqu.",
       "couldNotPostComment": "Asikwazanga ukuthumela amazwana.",
-      "couldNotSubmitReview": "Asikwazanga ukuthumela ukubuyekeza. Hlola ukuxhumana kwakho bese uzama futhi."
+      "couldNotSubmitReview": "Asikwazanga ukuthumela ukubuyekeza. Hlola ukuxhumana kwakho bese uzama futhi.",
+      "rateLimited": "Izicelo eziningi kakhulu. Sicela uzame futhi kamuva."
     },
     "operation": {
       "couldNotReply": "Asikwazanga ukuphendula.",

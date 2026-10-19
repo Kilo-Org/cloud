@@ -785,7 +785,8 @@
       "reviewNotSubmitted": "Aquesta revisió no es pot enviar tal com està. Pot ser que la PR hagi canviat o que estiguis intentant revisar la teva pròpia sol·licitud d'integració.",
       "reviewNotSubmittedTerm": "Aquesta revisió no es pot enviar tal com està. Pot ser que la {{term}} hagi canviat o que no puguis revisar la teva pròpia {{term}}.",
       "couldNotPostComment": "No s'ha pogut publicar el comentari.",
-      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar."
+      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar.",
+      "rateLimited": "S'han rebut massa sol·licituds. Torna-ho a provar més tard."
     },
     "operation": {
       "couldNotReply": "No s'ha pogut respondre.",

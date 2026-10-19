@@ -785,7 +785,8 @@
       "reviewNotSubmitted": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, PR ir mainījies vai arī tu mēģini vērtēt savu izmaiņu pieprasījumu.",
       "reviewNotSubmittedTerm": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, {{term}} ir mainījies, vai arī tu nevar vērtēt savu {{term}}.",
       "couldNotPostComment": "Neizdevās publicēt komentāru.",
-      "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz."
+      "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "rateLimited": "Pārāk daudz pieprasījumu. Lūdzu, mēģini vēlāk vēlreiz."
     },
     "operation": {
       "couldNotReply": "Neizdevās atbildēt.",

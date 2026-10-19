@@ -801,7 +801,8 @@
       "reviewNotSubmitted": "Dabartinės peržiūros pateikti negalima. PR galėjo pasikeisti arba bandai peržiūrėti savo paties pakeitimų užklausą.",
       "reviewNotSubmittedTerm": "Šios peržiūros pateikti negalima. {{term}} galėjo pasikeisti arba negali peržiūrėti savo {{term}}.",
       "couldNotPostComment": "Nepavyko paskelbti komentaro.",
-      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą."
+      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą.",
+      "rateLimited": "Gauta per daug užklausų. Bandykite vėliau dar kartą."
     },
     "operation": {
       "couldNotReply": "Nepavyko atsakyti.",

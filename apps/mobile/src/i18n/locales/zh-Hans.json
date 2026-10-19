@@ -2930,7 +2930,8 @@
       "reviewNotSubmitted": "当前无法提交此审查。可能是 PR 已有更新，或你正在审查自己创建的拉取请求。",
       "reviewNotSubmittedTerm": "此审查无法按现状提交。{{term}}可能已变更，或者你不能审查自己的{{term}}。",
       "couldNotPostComment": "无法发布评论。",
-      "couldNotSubmitReview": "无法提交审查。请检查网络连接后重试。"
+      "couldNotSubmitReview": "无法提交审查。请检查网络连接后重试。",
+      "rateLimited": "请求过多。请稍后重试。"
     },
     "operation": {
       "couldNotReply": "无法回复。",

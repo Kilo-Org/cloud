@@ -2930,7 +2930,8 @@
       "reviewNotSubmitted": "Deze beoordeling kan in de huidige vorm niet worden verzonden. Mogelijk is de PR gewijzigd of probeer je je eigen PR te beoordelen.",
       "reviewNotSubmittedTerm": "Deze beoordeling kan niet in de huidige vorm worden verzonden. Mogelijk is de {{term}} gewijzigd, of kun je je eigen {{term}} niet beoordelen.",
       "couldNotPostComment": "De opmerking kon niet worden geplaatst.",
-      "couldNotSubmitReview": "De beoordeling kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw."
+      "couldNotSubmitReview": "De beoordeling kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw.",
+      "rateLimited": "Te veel verzoeken. Probeer het later opnieuw."
     },
     "operation": {
       "couldNotReply": "Het antwoord kon niet worden verzonden.",

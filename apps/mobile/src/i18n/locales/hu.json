@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a PR megváltozott, vagy a saját módosítási kérelmedet próbálod ellenőrizni, ami nem engedélyezett.",
       "reviewNotSubmittedTerm": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a {{term}} megváltozott, vagy nem ellenőrizheted a saját {{term}}.",
       "couldNotPostComment": "Nem sikerült közzétenni a hozzászólást.",
-      "couldNotSubmitReview": "Nem sikerült elküldeni a kódellenőrzést. Ellenőrizd az internetkapcsolatot, és próbáld újra."
+      "couldNotSubmitReview": "Nem sikerült elküldeni a kódellenőrzést. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+      "rateLimited": "Túl sok kérés. Próbáld újra később."
     },
     "operation": {
       "couldNotReply": "Nem sikerült válaszolni.",

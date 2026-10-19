@@ -2930,7 +2930,8 @@
       "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが更新されていないか、自分が作成したプルリクエストではないか確認してください。",
       "reviewNotSubmittedTerm": "このレビューはそのまま送信できません。{{term}}が変更されたか、自分の{{term}}はレビューできません。",
       "couldNotPostComment": "コメントを投稿できませんでした。",
-      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
+      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。",
+      "rateLimited": "リクエストが多すぎます。しばらくしてからもう一度お試しください。"
     },
     "operation": {
       "couldNotReply": "返信できませんでした。",

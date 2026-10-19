@@ -801,7 +801,8 @@
       "reviewNotSubmitted": "Túto kontrolu kódu nemožno odoslať v tejto podobe. PR sa mohol zmeniť alebo ide o tvoju vlastnú žiadosť o zlúčenie, ktorú nemôžeš posúdiť.",
       "reviewNotSubmittedTerm": "Túto kontrolu kódu nemožno odoslať v tejto podobe. {{term}} sa mohol zmeniť alebo nemôžeš posúdiť svoj vlastný {{term}}.",
       "couldNotPostComment": "Komentár sa nepodarilo odoslať.",
-      "couldNotSubmitReview": "Kontrolu kódu sa nepodarilo odoslať. Skontroluj pripojenie a skús to znova."
+      "couldNotSubmitReview": "Kontrolu kódu sa nepodarilo odoslať. Skontroluj pripojenie a skús to znova.",
+      "rateLimited": "Priveľa požiadaviek. Skús to znova neskôr."
     },
     "operation": {
       "couldNotReply": "Nepodarilo sa odpovedať.",

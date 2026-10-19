@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Ky rishikim nuk mund të dërgohet në gjendjen aktuale. PR-ja mund të ketë ndryshuar ose nuk lejohet të rishikosh kërkesën tënde për bashkim.",
       "reviewNotSubmittedTerm": "Ky rishikim nuk mund të dërgohet siç është. Mbase {{term}} ka ndryshuar, ose nuk mund të rishikosh {{term}} tënde.",
       "couldNotPostComment": "Nuk u arrit të postohej komenti.",
-      "couldNotSubmitReview": "Nuk u dërgua rishikimi. Kontrollo lidhjen dhe provo përsëri."
+      "couldNotSubmitReview": "Nuk u dërgua rishikimi. Kontrollo lidhjen dhe provo përsëri.",
+      "rateLimited": "Shumë kërkesa. Provo përsëri më vonë."
     },
     "operation": {
       "couldNotReply": "Përgjigjja nuk u dërgua.",

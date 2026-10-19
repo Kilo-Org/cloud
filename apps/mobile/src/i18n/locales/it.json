@@ -2970,7 +2970,8 @@
       "reviewNotSubmitted": "Impossibile inviare questa revisione così com'è. La PR potrebbe essere stata modificata oppure potresti esserne l'autore: non puoi revisionare le tue pull request.",
       "reviewNotSubmittedTerm": "Impossibile inviare questa revisione così com'è. {{term}} potrebbe essere cambiato, oppure non puoi revisionare il tuo {{term}}.",
       "couldNotPostComment": "Impossibile pubblicare il commento.",
-      "couldNotSubmitReview": "Impossibile inviare la revisione. Controlla la connessione e riprova."
+      "couldNotSubmitReview": "Impossibile inviare la revisione. Controlla la connessione e riprova.",
+      "rateLimited": "Troppe richieste. Riprova più tardi."
     },
     "operation": {
       "couldNotReply": "Non è stato possibile inviare la risposta.",

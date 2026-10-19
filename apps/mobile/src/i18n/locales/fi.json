@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Tätä katselmointia ei voi lähettää sellaisenaan. PR on voinut muuttua tai kyseessä on oma muutospyyntösi, jota et voi katselmoida.",
       "reviewNotSubmittedTerm": "Tätä katselmointia ei voi lähettää sellaisenaan. {{term}} on voinut muuttua, tai kyseessä on oma {{term}}, jota et voi katselmoida.",
       "couldNotPostComment": "Kommenttia ei voitu julkaista.",
-      "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen."
+      "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen.",
+      "rateLimited": "Liian monta pyyntöä. Yritä myöhemmin uudelleen."
     },
     "operation": {
       "couldNotReply": "Vastaaminen epäonnistui.",

@@ -2930,7 +2930,8 @@
       "reviewNotSubmitted": "Dieses Review kann in seiner aktuellen Form nicht gesendet werden. Möglicherweise hat sich der PR geändert oder du versuchst, deinen eigenen Pull-Request zu prüfen.",
       "reviewNotSubmittedTerm": "Dieses Review kann in seiner aktuellen Form nicht gesendet werden. Möglicherweise hat sich der {{term}} geändert, oder du kannst deinen eigenen {{term}} nicht prüfen.",
       "couldNotPostComment": "Der Kommentar konnte nicht veröffentlicht werden.",
-      "couldNotSubmitReview": "Das Review konnte nicht gesendet werden. Prüfe deine Verbindung und versuche es erneut."
+      "couldNotSubmitReview": "Das Review konnte nicht gesendet werden. Prüfe deine Verbindung und versuche es erneut.",
+      "rateLimited": "Zu viele Anfragen. Bitte versuche es später erneut."
     },
     "operation": {
       "couldNotReply": "Die Antwort konnte nicht gesendet werden.",

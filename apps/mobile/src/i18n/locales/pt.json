@@ -785,7 +785,8 @@
       "reviewNotSubmitted": "Não é possível enviar esta revisão no estado atual. O PR pode ter mudado ou podes estar a tentar rever o teu próprio PR.",
       "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou não podes rever o teu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
-      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente."
+      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente.",
+      "rateLimited": "Demasiados pedidos. Tente novamente mais tarde."
     },
     "operation": {
       "couldNotReply": "Não foi possível responder.",

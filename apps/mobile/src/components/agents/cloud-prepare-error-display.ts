@@ -9,17 +9,27 @@
 import { i18n } from '@/i18n';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
+/** The server's denial message for an organization the caller cannot use. */
+const ORGANIZATION_ACCESS_MESSAGE = 'You do not have access to this organization';
+
+/** The worker's unavailable-model rejection, mapped to the model picker copy. */
+const MODEL_UNAVAILABLE_MESSAGE = 'Selected model is not available for this cloud agent session';
+
 /**
- * The localized failure copy for a rejected cloud prepare. Known tRPC codes
- * name what the user can do next; every other rejection — an unclassified
- * server detail, an unknown transport failure — gets the generic service line.
+ * The localized failure copy for a rejected cloud prepare. Only failures the
+ * message names precisely get actionable copy; every other rejection — an
+ * unclassified server detail, an unknown transport failure — gets the generic
+ * service line, because the tRPC code alone does not identify the failure.
  */
 export function cloudPrepareFailureMessage(error: unknown): string {
-  const code = readTrpcErrorField(error, 'code');
-  if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN') {
+  const message = readTrpcErrorField(error, 'message');
+  if (message === ORGANIZATION_ACCESS_MESSAGE) {
     return i18n.t('agentChat.newSession.checkOrganizationAccess');
   }
-  if (code === 'PAYMENT_REQUIRED') {
+  if (message === MODEL_UNAVAILABLE_MESSAGE) {
+    return i18n.t('agentChat.session.modelUnavailable');
+  }
+  if (readTrpcErrorField(error, 'code') === 'PAYMENT_REQUIRED') {
     return i18n.t('agentChat.session.notEnoughCredits');
   }
   return i18n.t('queryError.serverDescription');

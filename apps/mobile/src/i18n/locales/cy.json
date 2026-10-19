@@ -833,7 +833,8 @@
       "reviewNotSubmitted": "Ni ellir cyflwyno'r adolygiad hwn fel y mae. Efallai fod y PR wedi newid, neu mai'ch cais tynnu eich hun ydyw, ac ni allwch ei adolygu.",
       "reviewNotSubmittedTerm": "Ni ellir cyflwyno'r adolygiad hwn fel y mae. Efallai bod y {{term}} wedi newid, neu ni allwch adolygu eich {{term}} eich hun.",
       "couldNotPostComment": "Ni lwyddwyd i bostio'r sylw.",
-      "couldNotSubmitReview": "Ni lwyddwyd i gyflwyno'r adolygiad. Gwiriwch eich cysylltiad a rhowch gynnig eto."
+      "couldNotSubmitReview": "Ni lwyddwyd i gyflwyno'r adolygiad. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "rateLimited": "Gormod o geisiadau. Ceisiwch eto nes ymlaen."
     },
     "operation": {
       "couldNotReply": "Doedd dim modd ateb.",

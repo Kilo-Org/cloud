@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Denne gennemgang kan ikke sendes, som den er. PR'en kan være ændret, eller fejlen skyldes, at du ikke kan gennemgå din egen pull request.",
       "reviewNotSubmittedTerm": "Denne gennemgang kan ikke sendes, som den er. {{term}} kan være ændret, eller også kan du ikke gennemgå din egen {{term}}.",
       "couldNotPostComment": "Kunne ikke sende kommentaren.",
-      "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen."
+      "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen.",
+      "rateLimited": "For mange anmodninger. Prøv igen senere."
     },
     "operation": {
       "couldNotReply": "Svaret kunne ikke sendes.",

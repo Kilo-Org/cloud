@@ -2930,7 +2930,8 @@
       "reviewNotSubmitted": "Bu inceleme bu hâliyle gönderilemiyor. PR değişmiş olabilir veya kendi çekme isteğini incelemeye çalışıyor olabilirsin.",
       "reviewNotSubmittedTerm": "Bu inceleme olduğu gibi gönderilemez. {{term}} değişmiş olabilir veya kendi {{term}}ni gözden geçiremezsin.",
       "couldNotPostComment": "Yorum gönderilemedi.",
-      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene."
+      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene.",
+      "rateLimited": "Çok fazla istek gönderildi. Lütfen daha sonra tekrar dene."
     },
     "operation": {
       "couldNotReply": "Yanıt verilemedi.",

@@ -2930,7 +2930,8 @@
       "reviewNotSubmitted": "이 리뷰는 현재 상태로 제출할 수 없습니다. PR이 변경되었거나 본인이 작성한 풀 리퀘스트여서 리뷰할 수 없는 경우일 수 있습니다.",
       "reviewNotSubmittedTerm": "이 리뷰는 그대로 제출할 수 없습니다. {{term}}이(가) 변경되었거나, 자신의 {{term}}은(는) 검토할 수 없습니다.",
       "couldNotPostComment": "댓글을 게시하지 못했습니다.",
-      "couldNotSubmitReview": "리뷰를 제출하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요."
+      "couldNotSubmitReview": "리뷰를 제출하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "rateLimited": "요청이 너무 많습니다. 나중에 다시 시도하세요."
     },
     "operation": {
       "couldNotReply": "답글을 달 수 없습니다.",

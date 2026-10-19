@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Tsy azo alefa amin'izao endriny izao ity fandinihana ity. Mety niova ny PR, na tsy azonao atao ny mandinika ny fangatahana fampiraisana nataonao.",
       "reviewNotSubmittedTerm": "Tsy azo alefa toy izao ny fandinihana. Mety io {{term}} io, na tsy afaka mamandrika ny {{term}}-anao manokana ianao.",
       "couldNotPostComment": "Tsy navoaka ny hevitra.",
-      "couldNotSubmitReview": "Tsy nalefa ny fandinihana. Jereo ny fifandraisanao ary andramo indray."
+      "couldNotSubmitReview": "Tsy nalefa ny fandinihana. Jereo ny fifandraisanao ary andramo indray.",
+      "rateLimited": "Be loatra ny fangatahana. Andramo indray azafady rehefa afara kelikely."
     },
     "operation": {
       "couldNotReply": "Tsy tafalefa ny valiny.",

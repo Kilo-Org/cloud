@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. PR-beiðnin gæti hafa breyst eða þú ert að yfirfara eigin sameiningarbeiðni, sem er ekki leyfilegt.",
       "reviewNotSubmittedTerm": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. {{term}} gæti hafa breyst, eða þú mátt ekki yfirfara þína eigin {{term}}.",
       "couldNotPostComment": "Ekki tókst að birta athugasemd.",
-      "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur."
+      "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur.",
+      "rateLimited": "Of margar beiðnir. Reyndu aftur seinna."
     },
     "operation": {
       "couldNotReply": "Tókst ekki að svara.",

@@ -2970,7 +2970,8 @@
       "reviewNotSubmitted": "Não é possível enviar esta revisão no estado atual. O PR pode ter mudado ou você pode estar tentando revisar seu próprio pull request.",
       "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou você não pode revisar o seu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
-      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifique sua conexão e tente novamente."
+      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifique sua conexão e tente novamente.",
+      "rateLimited": "Muitas solicitações. Tente novamente mais tarde."
     },
     "operation": {
       "couldNotReply": "Não foi possível responder.",

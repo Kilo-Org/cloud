@@ -801,7 +801,8 @@
       "reviewNotSubmitted": "Tuto revizi nelze v aktuálním stavu odeslat. PR se možná změnil nebo se pokoušíš o revizi vlastního PR, což není povolené.",
       "reviewNotSubmittedTerm": "Tuto revizi nelze v aktuálním stavu odeslat. {{term}} se možná změnil nebo nemůžeš revidovat vlastní {{term}}.",
       "couldNotPostComment": "Komentář se nepodařilo odeslat.",
-      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu."
+      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu.",
+      "rateLimited": "Příliš mnoho požadavků. Zkuste to prosím později znovu."
     },
     "operation": {
       "couldNotReply": "Odpověď se nepodařilo odeslat.",

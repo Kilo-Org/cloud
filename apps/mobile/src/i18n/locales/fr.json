@@ -2970,7 +2970,8 @@
       "reviewNotSubmitted": "Impossible d'envoyer cette revue en l'état. La PR a peut-être changé ou vous tentez d'examiner votre propre demande de fusion, ce qui n'est pas autorisé.",
       "reviewNotSubmittedTerm": "Impossible d'envoyer cette revue en l'état. Il se peut que {{term}} ait changé, ou que vous ne puissiez pas examiner votre propre {{term}}.",
       "couldNotPostComment": "Impossible de publier le commentaire.",
-      "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez."
+      "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez.",
+      "rateLimited": "Trop de requêtes. Réessayez plus tard."
     },
     "operation": {
       "couldNotReply": "Impossible de répondre.",

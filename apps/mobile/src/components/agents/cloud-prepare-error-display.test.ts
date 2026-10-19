@@ -11,23 +11,45 @@ function makeError(code: string, message: string): Error {
 }
 
 describe('cloudPrepareFailureMessage', () => {
-  it('maps an organization access denial to the organization access copy', () => {
+  it('maps the organization access denial message to the organization access copy', () => {
     const denial = makeError('UNAUTHORIZED', 'You do not have access to this organization');
     expect(cloudPrepareFailureMessage(denial)).toBe(
       'Check your access to this organization, then try again.'
     );
   });
 
-  it('maps FORBIDDEN to the organization access copy', () => {
-    expect(cloudPrepareFailureMessage(makeError('FORBIDDEN', 'nope'))).toBe(
+  it('maps the shaped server error form too', () => {
+    const denial = {
+      shape: {
+        data: { code: 'UNAUTHORIZED', message: 'You do not have access to this organization' },
+      },
+    };
+    expect(cloudPrepareFailureMessage(denial)).toBe(
       'Check your access to this organization, then try again.'
     );
   });
 
-  it('reads the shaped server error form too', () => {
-    const denial = { shape: { data: { code: 'UNAUTHORIZED', message: 'denied' } } };
-    expect(cloudPrepareFailureMessage(denial)).toBe(
-      'Check your access to this organization, then try again.'
+  it('does not key the organization copy on the code alone', () => {
+    // UNAUTHORIZED/FORBIDDEN also carry unrelated failures (trial expiry,
+    // model-catalog access, re-authentication), so only the precise denial
+    // message maps to the organization copy.
+    const trial = makeError('FORBIDDEN', 'Organization trial has expired.');
+    const reauth = makeError('UNAUTHORIZED', 'Invalid token');
+    expect(cloudPrepareFailureMessage(trial)).toBe(
+      'Something went wrong on our end. Please try again.'
+    );
+    expect(cloudPrepareFailureMessage(reauth)).toBe(
+      'Something went wrong on our end. Please try again.'
+    );
+  });
+
+  it('maps the unavailable-model rejection to the model picker copy', () => {
+    const model = makeError(
+      'BAD_REQUEST',
+      'Selected model is not available for this cloud agent session'
+    );
+    expect(cloudPrepareFailureMessage(model)).toBe(
+      "This model isn't available for Cloud Agent. Choose another model and try again."
     );
   });
 

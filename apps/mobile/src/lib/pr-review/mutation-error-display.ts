@@ -109,8 +109,14 @@ export function mutationErrorDisplay(
   if (surface === 'submit') {
     return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
   }
-  // The raw provider / transport text never reaches the inline box: a
-  // retryable failure shows the surface's localized copy.
+  // The server's raw text never reaches the inline box, whatever the
+  // retryable carrier was. A rate limit gets the localized wait copy (the
+  // server's "try again in about N minutes" is English-only); every other
+  // retryable failure (transport drop, conflict, gateway) gets the surface's
+  // localized line.
+  if (readTrpcErrorField(rawError, 'code') === 'TOO_MANY_REQUESTS') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.rateLimited') };
+  }
   const message =
     surface === 'edit-comment'
       ? i18n.t('prReview.discussion.commentEditFailed')

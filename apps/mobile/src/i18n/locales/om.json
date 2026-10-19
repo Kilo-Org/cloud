@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Gamaaggamni kun akkuma jirutti dhiheeffamuu hin danda'u. PR jijjiirameera ta'a, ykn gaaffii walitti makuu mataa keetii gamaaggamuu hin dandeessu.",
       "reviewNotSubmittedTerm": "Gamaaggamaan kun akkasumaan hin galmaa'u. {{term}} jijjiirame ta'uu danda'a, yookiin {{term}} ofii kee gamaaggamuu hin dandeessu.",
       "couldNotPostComment": "Yaada maxxansuu hin dandeenye.",
-      "couldNotSubmitReview": "Gamaaggama dhiheessuun hin danda'amne. Walqunnamtii kee ilaaliitii irra deebi'ii yaali."
+      "couldNotSubmitReview": "Gamaaggama dhiheessuun hin danda'amne. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
+      "rateLimited": "Hawwisni baay'ee hedduudha. Yeroo booda irratti deebi'ii yaali."
     },
     "operation": {
       "couldNotReply": "Deebii kennuun hin danda'amne.",

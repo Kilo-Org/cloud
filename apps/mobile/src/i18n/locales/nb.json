@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Denne kodegjennomgangen kan ikke sendes inn slik den er nå. PR-en kan være endret, eller du prøver å gå gjennom din egen PR.",
       "reviewNotSubmittedTerm": "Denne kodegjennomgangen kan ikke sendes inn slik den er nå. {{term}} kan være endret, eller du kan ikke gå gjennom din egen {{term}}.",
       "couldNotPostComment": "Kunne ikke publisere kommentaren.",
-      "couldNotSubmitReview": "Kunne ikke sende inn kodegjennomgangen. Sjekk tilkoblingen og prøv igjen."
+      "couldNotSubmitReview": "Kunne ikke sende inn kodegjennomgangen. Sjekk tilkoblingen og prøv igjen.",
+      "rateLimited": "For mange forespørsler. Prøv igjen senere."
     },
     "operation": {
       "couldNotReply": "Kunne ikke sende svaret.",

@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Dib-u-eegistan lama gudbin karo sida ay tahay. Waxaa laga yaabaa in PR-ka la beddelay ama inaadan dib u eegi karin codsigaaga isku-darka.",
       "reviewNotSubmittedTerm": "Dib-u-eegistan laguma diri karo sida uu yahay. {{term}} waa la yaabaa inuu isbeddelay, ama ma dib-u-eegi kartid {{term}} kaa ah.",
       "couldNotPostComment": "Faallada lama daabici karin.",
-      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day."
+      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "rateLimited": "Codsiyo aad u badan. Fadlan mar kale isku day."
     },
     "operation": {
       "couldNotReply": "Lama jawaabi karin.",

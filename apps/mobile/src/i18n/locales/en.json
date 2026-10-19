@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
       "reviewNotSubmittedTerm": "This review can't be submitted as is. The {{term}} may have changed, or you can't review your own {{term}}.",
       "couldNotPostComment": "Could not post comment.",
-      "couldNotSubmitReview": "Could not submit review. Check your connection and try again."
+      "couldNotSubmitReview": "Could not submit review. Check your connection and try again.",
+      "rateLimited": "Too many requests. Please try again later."
     },
     "operation": {
       "couldNotReply": "Could not reply.",

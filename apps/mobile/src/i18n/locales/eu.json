@@ -769,7 +769,8 @@
       "reviewNotSubmitted": "Berrikuspen hau ezin da dagoen bezala bidali. Baliteke PRa aldatu izana edo zure bateratze-eskaera berrikusten aritzea, eta hori ez dago baimenduta.",
       "reviewNotSubmittedTerm": "Berrikuspen hau ezin da oraingo egoeran bidali. Baliteke {{term}} aldatu izana, edo ezin duzu zure {{term}} propioa berrikusi.",
       "couldNotPostComment": "Ezin izan da iruzkina argitaratu.",
-      "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro."
+      "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro.",
+      "rateLimited": "Eskari gehiegi. Saiatu geroago berriro."
     },
     "operation": {
       "couldNotReply": "Ezin izan da erantzun.",

@@ -2345,6 +2345,36 @@ export const GatewayModelListConfigSchema = z.object({
 
 export type GatewayModelListConfig = z.infer<typeof GatewayModelListConfigSchema>;
 
+export const VercelModelIdOverrideSchema = z.object({
+  openrouter_model_id: GatewayModelIdSchema,
+  vercel_model_id: GatewayModelIdSchema,
+});
+
+export type VercelModelIdOverride = z.infer<typeof VercelModelIdOverrideSchema>;
+
+export const VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT = 200;
+
+export const VercelModelIdOverridesConfigSchema = z.object({
+  overrides: z
+    .array(VercelModelIdOverrideSchema)
+    .max(VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT)
+    .superRefine((overrides, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { openrouter_model_id }] of overrides.entries()) {
+        if (seen.has(openrouter_model_id)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate OpenRouter model "${openrouter_model_id}"`,
+            path: [index, 'openrouter_model_id'],
+          });
+        }
+        seen.add(openrouter_model_id);
+      }
+    }),
+});
+
+export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({

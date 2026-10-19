@@ -291,29 +291,49 @@ const byokUpstreamErrorSchema = z.object({
   message: z.string().optional().catch(undefined),
 });
 
-async function byokErrorMessage(
-  response: Response,
-  userByokProviderIds: UserByokProviderId[]
-): Promise<string | undefined> {
-  if (response.status === 403 && userByokProviderIds.includes('opencode-go')) {
-    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
-  }
-  const specificMessage = byokErrorMessages[response.status];
-  if (specificMessage) return specificMessage;
-  if (response.status < 400 || response.status >= 500) return undefined;
-
+async function readByokProviderMessage(response: Response): Promise<string | undefined> {
   const body: unknown = await response
     .clone()
     .json()
     .catch(() => null);
   const parsed = byokUpstreamErrorSchema.safeParse(body);
-  const providerMessage = parsed.success ? (parsed.data.error?.message ?? parsed.data.message) : '';
-  const message = providerMessage
-    ?.replace(/\p{Cc}/gu, ' ')
-    .trim()
-    .slice(0, 300);
-  return message
-    ? `[BYOK] ${message}`
+  if (!parsed.success) return undefined;
+  const providerMessage = parsed.data.error?.message ?? parsed.data.message;
+  return (
+    providerMessage
+      ?.replace(/\p{Cc}/gu, ' ')
+      .trim()
+      .slice(0, 300) || undefined
+  );
+}
+
+function specificByokErrorMessage(
+  status: number,
+  userByokProviderIds: UserByokProviderId[]
+): string | undefined {
+  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
+    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
+  }
+  return byokErrorMessages[status];
+}
+
+async function byokErrorMessage(
+  response: Response,
+  userByokProviderIds: UserByokProviderId[]
+): Promise<string | undefined> {
+  const specificMessage = specificByokErrorMessage(response.status, userByokProviderIds);
+  if (!specificMessage && (response.status < 400 || response.status >= 500)) return undefined;
+
+  // The provider's own explanation (for example an expired rather than revoked
+  // key) is often more actionable than our status-based summary.
+  const providerMessage = await readByokProviderMessage(response);
+  if (specificMessage) {
+    return providerMessage
+      ? `${specificMessage} Provider message: ${providerMessage}`
+      : specificMessage;
+  }
+  return providerMessage
+    ? `[BYOK] ${providerMessage}`
     : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
 }
 
@@ -401,9 +421,11 @@ export async function makeErrorReadable({
   const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
   if (vertexByokResponse) return vertexByokResponse;
 
-  const hasSpecificByokMessage =
-    userByokProviderIds !== null && byokErrorMessages[response.status] !== undefined;
-  if (!hasSpecificByokMessage) {
+  const specificByokMessage =
+    userByokProviderIds === null
+      ? undefined
+      : specificByokErrorMessage(response.status, userByokProviderIds);
+  if (specificByokMessage === undefined) {
     const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
     if (providerErrorResponse) return providerErrorResponse;
 
@@ -414,8 +436,10 @@ export async function makeErrorReadable({
   if (userByokProviderIds !== null) {
     const byokMessage = await byokErrorMessage(response, userByokProviderIds);
     if (byokMessage) {
-      if (hasSpecificByokMessage) {
-        warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      if (specificByokMessage !== undefined) {
+        // Log only the fixed text so this line stays stable to search on;
+        // captureProxyError already logs the upstream body.
+        warnExceptInTest(`Responding with ${response.status} ${specificByokMessage}`);
       }
       return NextResponse.json(
         {

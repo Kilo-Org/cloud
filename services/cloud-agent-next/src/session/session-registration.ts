@@ -305,7 +305,11 @@ type SessionCreationLedgerHooks = {
   /** The DO RPC threw; the commit outcome is unknown. */
   onTransportFailure: () => Promise<void>;
   /** The DO confirmed registration (and initial admission when one exists). */
-  onSuccess: (result: { cloudAgentSessionId: string; kiloSessionId: string }) => Promise<void>;
+  onSuccess: (result: {
+    cloudAgentSessionId: string;
+    kiloSessionId: string;
+    admission?: { messageId: string; compatibilityDelivery: 'sent' | 'queued' };
+  }) => Promise<void>;
 };
 
 /** Result returned to the prepare handler for ledger-guarded creates. */
@@ -1658,22 +1662,25 @@ function savedAllocationArgs(
 }
 
 /**
- * Settings are read only while the row has recorded no progress. After that, the
- * choice the row pinned (or none) applies, so a retry never follows a settings
- * change.
+ * Settings are read only for a row this call just admitted, or one that has
+ * recorded no progress yet. After that, the choice the row pinned (or none)
+ * applies, so a retry never follows a settings change.
  */
 async function withLedgerSavedAllocation(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   row: OperationLedgerRow,
-  options: SessionLedgerCreateOptions
+  options: SessionLedgerCreateOptions,
+  freshAdmission: boolean
 ): Promise<SessionRegistrationInput> {
   const pinned = row.canonical_result?.[SESSION_CREATE_SAVED_ALLOCATION_KEY];
   if (typeof pinned === 'string' && isSelectableSandboxAllocation(pinned as SandboxAllocation)) {
     return { ...input, savedSandboxAllocation: pinned as SandboxAllocation };
   }
-  if (row.canonical_result !== null) return { ...input, savedSandboxAllocation: null };
-  return withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+  // Admission always writes a canonical result, so its presence no longer means
+  // progress was recorded; only a fresh admission may still read owner settings.
+  if (freshAdmission) return withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+  return { ...input, savedSandboxAllocation: null };
 }
 
 /**
@@ -1862,7 +1869,7 @@ async function assertCreateIntentUnchanged(
   input: SessionRegistrationInput,
   row: OperationLedgerRow,
   ctx: SessionRegistrationContext,
-  options?: { billingOrigin?: string }
+  options?: { billingOrigin?: string; freshAdmission?: boolean }
 ): Promise<void> {
   if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
@@ -1881,7 +1888,10 @@ async function assertCreateIntentUnchanged(
       : undefined;
   if (
     !recorded.success ||
-    !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement) ||
+    // A row this call just admitted has nothing to compare against: the owner's
+    // saved choice is resolved after admission and is not part of the fingerprint.
+    (!options?.freshAdmission &&
+      !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement)) ||
     ((selectable !== undefined || input.runtime?.egressMode === 'allowlist') &&
       (typeof stored !== 'string' || stored.length === 0))
   ) {
@@ -1968,6 +1978,10 @@ export async function createSessionWithLedger(
     sessionPlaneForCreate(input, ctx, options) === 'control';
   const initialEffectiveInput = effectiveSessionRegistrationInput(input, initialWorktreeEnabled, 2);
   const savedSandboxAllocation = input.savedSandboxAllocation;
+  // The client's requested choice is part of the immutable intent, so pin it with
+  // the fingerprint: a freshly admitted row must satisfy the same replay check
+  // that a recorded row does.
+  const requestedSandboxAllocationChoice = input.runtime?.sandboxAllocation;
   const admission = await admitOperation(db, {
     userId: ctx.userId,
     orgId: input.options?.kilocodeOrganizationId,
@@ -1981,6 +1995,9 @@ export async function createSessionWithLedger(
         await sessionCreateIntentFingerprint(initialEffectiveInput),
       [SESSION_CREATE_WORKTREE_ENABLED_KEY]: initialWorktreeEnabled,
       [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+      ...(requestedSandboxAllocationChoice !== undefined
+        ? { sandboxAllocation: requestedSandboxAllocationChoice }
+        : {}),
       ...(savedSandboxAllocation !== undefined
         ? { [SESSION_CREATE_SAVED_ALLOCATION_KEY]: savedSandboxAllocation }
         : {}),
@@ -1992,13 +2009,22 @@ export async function createSessionWithLedger(
     organizationId: input.options?.kilocodeOrganizationId,
     resourceKey: null,
   });
-  const resolvedInput = await withLedgerSavedAllocation(input, ctx, admission.row, options);
+  const resolvedInput = await withLedgerSavedAllocation(
+    input,
+    ctx,
+    admission.row,
+    options,
+    admission.admission === 'admitted'
+  );
   const effectiveInput = effectiveSessionRegistrationInput(
     resolvedInput,
     worktreeEnabledForCreate(resolvedInput, ctx, admission.row),
     finalizationVersionForCreate(admission.row)
   );
-  await assertCreateIntentUnchanged(effectiveInput, admission.row, ctx, options);
+  await assertCreateIntentUnchanged(effectiveInput, admission.row, ctx, {
+    ...options,
+    freshAdmission: admission.admission === 'admitted',
+  });
 
   switch (admission.admission) {
     case 'admitted':
@@ -2115,6 +2141,12 @@ async function buildLedgerHooks(
         canonicalResult: {
           cloudAgentSessionId: result.cloudAgentSessionId,
           kiloSessionId: result.kiloSessionId,
+          ...(result.admission
+            ? {
+                initialMessageId: result.admission.messageId,
+                delivery: result.admission.compatibilityDelivery,
+              }
+            : {}),
         },
         outboxEvent: sessionCreateSettledOutboxEvent({
           distinctId,

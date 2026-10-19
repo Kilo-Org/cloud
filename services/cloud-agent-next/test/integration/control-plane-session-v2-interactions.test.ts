@@ -435,6 +435,37 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     }
   });
 
+  it('fences answers and clears pending interactions when the hosted session stops', async () => {
+    const { sessionId, stub } = await registerOnlySession();
+    await stub.send(promptPayload(messageId(), 'start'));
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+    await expect(stub.getPendingInteractions()).resolves.toEqual({
+      questions: [{ id: 'q_1' }],
+      permissions: [],
+    });
+    const before = await stub.getSession();
+    const beforeCount = before.type === 'found' ? before.messages.length : -1;
+
+    await expect(stub.stopHostedSession()).resolves.toMatchObject({
+      type: 'found',
+      lifecycle: { state: 'stopped' },
+    });
+
+    await expect(
+      stub.answer({
+        sessionId,
+        reply: { action: 'answer', questionId: 'q_1', answers: [['yes']] },
+      })
+    ).resolves.toBe('not_connected');
+    await expect(stub.getPendingInteractions()).resolves.toEqual({
+      questions: [],
+      permissions: [],
+    });
+    const after = await stub.getSession();
+    const afterCount = after.type === 'found' ? after.messages.length : -1;
+    expect(afterCount).toBe(beforeCount);
+  });
+
   it('refuses a settled answer whose id is unknown, repeated or already answered', async () => {
     // No sandbox route goes ready, so an admitted answer stays queued and the
     // turn stays settled for every attempt below.

@@ -1322,6 +1322,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const open = openMessages(this.messages).map(message => message.messageId);
       this.worktreeChanges.markInterrupted();
       await this.settleMessages(open, 'cancelled', 'interrupted');
+      // A question or permission from the stopped turn must not survive the
+      // fence: answering it would admit a new turn and wake compute again.
+      await this.clearPendingInteractions();
       const peer = this.sandboxPeer();
       if (peer !== null) {
         const detached = await withDORetry(
@@ -1402,6 +1405,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.registration === null) return 'not_connected';
     const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
     return this.enqueue(async () => {
+      // Answering a pending interaction or a settled turn admits work, so a
+      // session that is stopping or stopped must refuse it like `send` does.
+      if (this.hostedLifecycle.state !== 'active') return 'not_connected';
       // A live turn takes the answer directly (spec §5). The route is named by
       // this DO, never by the caller, so a wrong id cannot reach a sibling.
       if (this.messages.some(message => message.state === 'accepted')) {
@@ -1456,6 +1462,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.pendingInteractions = next;
       await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
     }
+  }
+
+  private async clearPendingInteractions(): Promise<void> {
+    if (this.pendingInteractions === undefined) return;
+    this.pendingInteractions = undefined;
+    await this.ctx.storage.delete(PENDING_INTERACTIONS_KEY);
   }
 
   async onRoute(update: ControlPlaneRouteUpdate): Promise<void> {

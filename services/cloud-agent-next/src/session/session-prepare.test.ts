@@ -372,7 +372,10 @@ function runCreate(
   return createSessionWithLedger(request, ctx, CREATE_OPTIONS);
 }
 
-type SettleOptions = { outboxEvent?: { properties?: unknown } };
+type SettleOptions = {
+  outboxEvent?: { properties?: unknown };
+  canonicalResult?: Record<string, unknown>;
+};
 
 /** Returns the options argument of the n-th `settleOperation` call, if any. */
 function settleOptions(index: number): SettleOptions | undefined {
@@ -1720,6 +1723,83 @@ describe('explicit sandbox session creation', () => {
     });
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
     expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBeUndefined();
+  });
+
+  it('admits a fresh create whose request pins a selectable allocation', async () => {
+    const request = requestForPreset('cloudflare-single');
+    const doStub = makeDoStub();
+    admitOperationMock.mockImplementationOnce(
+      async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+        admission: 'admitted' as const,
+        row: makeLedgerRow({
+          organization_id: orgId,
+          canonical_result: admitted.initialCanonicalResult,
+        }),
+      })
+    );
+
+    await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    expect(admitOperationMock.mock.calls[0]?.[1]).toMatchObject({
+      initialCanonicalResult: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+    });
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
+  });
+
+  it('resolves the saved allocation for a fresh prepare create', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const doStub = makeDoStub();
+    admitOperationMock.mockImplementationOnce(
+      async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+        admission: 'admitted' as const,
+        row: makeLedgerRow({
+          organization_id: orgId,
+          canonical_result: admitted.initialCanonicalResult,
+        }),
+      })
+    );
+
+    await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledOnce();
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe('cloudflare-shared');
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ROW_ID,
+      expect.objectContaining({ [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-shared' })
+    );
+  });
+
+  it('settles the delivered initial message so a replay reports the same delivery', async () => {
+    const request = requestForPreset('cloudflare-single');
+    const doStub = makeDoStub({
+      createSessionWithInitialAdmission: vi.fn().mockResolvedValue({
+        success: true,
+        outcome: 'queued',
+        messageId: INITIAL_MESSAGE_ID,
+        compatibilityDelivery: 'sent',
+      } satisfies SessionMessageAdmissionResult),
+    });
+
+    await createSessionWithLedger(request, selectedContext(doStub), {
+      ...CREATE_OPTIONS,
+      includeInitialMessage: true,
+    });
+
+    expect(settleOptions(0)?.canonicalResult).toMatchObject({
+      initialMessageId: INITIAL_MESSAGE_ID,
+      delivery: 'sent',
+    });
   });
 
   it('ignores saved settings for a code review and uses a neutral sandbox key', async () => {

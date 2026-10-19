@@ -216,6 +216,24 @@ describe('tabLabelWidth', () => {
   it('counts CJK/Kana/Hangul glyphs as one em wide', () => {
     expect(tabLabelWidth('設定')).toBeCloseTo(2 * (11 + 0.2), 5);
   });
+
+  it('counts joined-script glyphs at the fallback-font advance, not the mono advance', () => {
+    // Arabic renders in the system fallback font (`Text` drops the mono family
+    // for RTL-script copy), whose glyphs are far narrower than JetBrains
+    // Mono's 0.6em. Measuring them at the mono advance over-estimated the
+    // width until the width rule dropped every Arabic label at phone widths.
+    expect(tabLabelWidth('الرئيسية')).toBeCloseTo(8 * (0.55 * 11 + 0.2), 5);
+    expect(tabLabelWidth('الملف الشخصي')).toBeCloseTo(11 * (0.55 * 11 + 0.2) + (0.6 * 11 + 0.2), 5);
+  });
+
+  it('measures a mixed-script label per glyph', () => {
+    // "Home" (4 mono glyphs) + a space + "الرئيسية" (8 joined glyphs): the
+    // space between the scripts stays on the one line at the mono advance.
+    expect(tabLabelWidth('Home الرئيسية')).toBeCloseTo(
+      5 * (0.6 * 11 + 0.2) + 8 * (0.55 * 11 + 0.2),
+      5
+    );
+  });
 });
 
 describe('tabLabelFits', () => {
@@ -278,6 +296,28 @@ describe('shouldShowTabLabel', () => {
   it('keeps the width rule from overriding the font-scale rule', () => {
     expect(shouldShowTabLabel(2, 160 / 5, ['Home'])).toBe(false);
   });
+
+  it('keeps the Arabic labels at a normal phone width', () => {
+    // The Arabic catalog labels on a 393dp phone with the optional fifth tab
+    // hidden: 393/4 = 98.25dp per tab, 88.25dp of label box. Under the old
+    // mono-advance measure الملف الشخصي was estimated at 81.6dp, so a five-tab
+    // bar (68.6dp box) dropped the whole row — the labels and the focused-tab
+    // emphasis with them — while the same bar kept its Japanese labels. The
+    // joined-script advance measures the widest Arabic label at 75.55dp, so
+    // the four-tab bar keeps every label.
+    const arabicLabels = ['الرئيسية', 'الوكلاء', 'الدردشة', 'الملف الشخصي'];
+    expect(shouldShowTabLabel(1, 393 / 4, arabicLabels)).toBe(true);
+    // The widest label genuinely cannot fit a five-tab box (68.6dp < 75.55dp),
+    // so the width rule still does its job in Arabic.
+    expect(shouldShowTabLabel(1, 393 / 5, ['الرئيسية', 'الوكلاء', 'الدردشة', 'الملف الشخصي'])).toBe(
+      false
+    );
+  });
+
+  it('drops an Arabic label row that genuinely cannot fit its tab', () => {
+    // 160dp / 3 tabs leaves a 43.3dp box; الوكلاء needs ~43.75dp.
+    expect(shouldShowTabLabel(1, 160 / 3, ['الرئيسية', 'الوكلاء', 'الدردشة'])).toBe(false);
+  });
 });
 
 describe('tab label shrink floor', () => {
@@ -294,6 +334,7 @@ describe('tab label shrink floor', () => {
     ['Home', 'Agents', 'Profile'],
     ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'],
     ['Home', 'Agents', 'Bogga shakhsiga'],
+    ['الرئيسية', 'الوكلاء', 'الدردشة', 'الملف الشخصي'],
   ];
   // The label box is the tab item minus its 10dp horizontal padding.
   const TAB_ITEM_PADDING = 10;
@@ -323,8 +364,11 @@ describe('tab label shrink floor', () => {
 
   it('drops the label row before a label could need a shrink below the floor', () => {
     const floorBoundLabels = ['Profile', 'Kilo Claw', 'Bogga shakhsiga', '設定'];
+    // The long Arabic profile label: at a narrow tab it also only fits by
+    // shrinking below the floor, so the row must drop rather than clip.
+    const floorBoundJoinedLabels = ['الملف الشخصي'];
     let checkedWidths = 0;
-    for (const label of floorBoundLabels) {
+    for (const label of [...floorBoundLabels, ...floorBoundJoinedLabels]) {
       for (const tabWidth of TAB_WIDTHS) {
         const box = tabWidth - TAB_ITEM_PADDING;
         // The label would only fit by shrinking below the floor, so the bar

@@ -99,34 +99,6 @@ export class KiloClient {
     }
   }
 
-  async importSession(shareUrl: string): Promise<Session> {
-    const urlMatch = shareUrl.match(/https?:\/\/kilosessions\.ai\/share\/([a-zA-Z0-9_-]+)/);
-    if (!urlMatch) {
-      throw new KiloClientError(
-        'Invalid share URL format. Expected: https://kilosessions.ai/share/<slug>'
-      );
-    }
-
-    logger.withFields({ shareUrl }).info('Importing kilo session from URL');
-
-    const result = await this.execSession.exec(`kilo import "${shareUrl}"`, {
-      timeout: this.timeoutSeconds * 1000,
-    });
-
-    if (result.exitCode !== 0) {
-      throw new KiloClientError(`Failed to import session: ${result.stderr || result.stdout}`);
-    }
-
-    const match = result.stdout.match(/Imported session:\s*(\S+)/);
-    if (!match || !match[1]) {
-      throw new KiloClientError(`Failed to parse session ID from import output: ${result.stdout}`);
-    }
-
-    const sessionId = match[1];
-    logger.withFields({ kiloSessionId: sessionId, shareUrl }).info('Imported kilo session');
-    return this.resumeSession(sessionId);
-  }
-
   async promptAsync(parts: PromptPart[], options?: PromptOptions): Promise<void>;
   async promptAsync(text: string, options?: PromptOptions): Promise<void>;
   async promptAsync(partsOrText: PromptPart[] | string, options?: PromptOptions): Promise<void> {

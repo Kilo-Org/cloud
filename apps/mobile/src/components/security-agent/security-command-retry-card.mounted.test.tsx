@@ -55,7 +55,7 @@ describe('SecurityCommandRetryCard', () => {
     const root = renderCard({
       lastError: 'Network error',
       retryable: true,
-      onDiscard: vi.fn((): void => {}),
+      onDiscard: vi.fn((): void => undefined),
     });
 
     expect(renderedTexts(root.root)).toContain('Network error');
@@ -67,7 +67,7 @@ describe('SecurityCommandRetryCard', () => {
     const root = renderCard({
       lastError: 'Network error',
       retryable: true,
-      onRetry: vi.fn((): void => {}),
+      onRetry: vi.fn((): void => undefined),
     });
 
     expect(renderedTexts(root.root)).toContain('Retry');

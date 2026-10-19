@@ -1017,6 +1017,34 @@ describe('IdleAuth email validation layout', () => {
     expect(nativeAuth.requestEmailCode).toHaveBeenCalledWith('');
     expect(renderer.root.findByType('FormField')).toBeTruthy();
   });
+
+  // The hook stores a catalog key, so flipping the i18n instance under a
+  // mounted field must re-read the message in the new language — the reported
+  // defect was exactly an inline error that stayed Portuguese after the picker
+  // switched the app to English. The German string is read after the flip:
+  // the de catalog loads lazily, so a `lng: 'de'` lookup before changeLanguage
+  // falls back to English.
+  it('re-translates the inline validation error after changeLanguage', async () => {
+    nativeAuth.emailErrorKey = 'authErrors.invalidRequest';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    expect(renderer.root.findByType('FormField').props.error).toBe(
+      'Check your email address and try again.'
+    );
+
+    await act(async () => {
+      await i18n.changeLanguage('de');
+    });
+    try {
+      expect(renderer.root.findByType('FormField').props.error).toBe(
+        'Prüfe deine E-Mail-Adresse und versuche es erneut.'
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+    expect(renderer.root.findByType('FormField').props.error).toBe(
+      'Check your email address and try again.'
+    );
+  });
 });
 
 describe('IdleAuth layout repairs', () => {

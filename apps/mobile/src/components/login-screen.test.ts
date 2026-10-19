@@ -504,6 +504,35 @@ describe('login-screen timeout error dismissal', () => {
 
     renderer.unmount();
   });
+
+  // The descriptor stores a catalog key, so flipping the i18n instance under a
+  // mounted screen must re-read the banner in the new language — the defect
+  // this PR fixes was exactly a banner that stayed in the previous language.
+  // The German string is read after the flip: the de catalog loads lazily, so
+  // a `lng: 'de'` lookup before changeLanguage falls back to English.
+  it('re-renders the stored error banner in the new language after changeLanguage', async () => {
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await i18n.changeLanguage('de');
+    });
+    try {
+      const germanTimeout = i18n.t('authErrors.signInTimedOut');
+      expect(germanTimeout).not.toBe('Sign-in timed out. Please try again.');
+      expect(
+        findByType(renderer.root, 'Text').some(node => node.props.children === germanTimeout)
+      ).toBe(true);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+    // The flip back proves the banner re-reads on every language change, not
+    // just on a one-way switch.
+    const englishTimeout = i18n.t('authErrors.signInTimedOut');
+    expect(
+      findByType(renderer.root, 'Text').some(node => node.props.children === englishTimeout)
+    ).toBe(true);
+    renderer.unmount();
+  });
 });
 
 describe('login-screen idle skeleton', () => {

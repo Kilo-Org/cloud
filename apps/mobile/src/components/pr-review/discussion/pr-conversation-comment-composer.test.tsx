@@ -377,4 +377,27 @@ describe('PrConversationCommentComposer', () => {
     const field = requireByType(element, 'CommentBodyField');
     expect((field.props as { defaultValue?: string }).defaultValue).toBe('saved comment');
   });
+
+  it('shows the acceptance-required copy after the gate resolves dismissed', async () => {
+    // The error mirror runs the gate; the dismissed outcome must surface the
+    // acceptance requirement, not the age-posture copy the dialog shows.
+    const termsRequired = new Error('terms_required');
+    Object.assign(termsRequired, { data: { code: 'PRECONDITION_FAILED' } });
+    addCommentMocks.error = termsRequired;
+    termsGateMock.mockResolvedValue({ kind: 'dismissed' });
+    mountComposer();
+    await flushMicrotasks();
+    const element = mountComposer();
+
+    const props = inlineProps(element);
+    expect(props.inlineError).toBe('You must accept the Terms of Service to post.');
+    expect(props.inlineError).not.toBe('You must be 13 or older to post.');
+    expect(props.inlineErrorKind).toBe(null);
+  });
 });
+
+/** The stubbed inline-error element's props, read once with a typed alias. */
+function inlineProps(element: React.ReactElement): InlineErrorProps {
+  const inline = requireByType(element, 'ComposerInlineError');
+  return inline.props as InlineErrorProps;
+}

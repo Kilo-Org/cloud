@@ -51,10 +51,7 @@ const conditionExternalText = (
     OVERRIDE_PHRASE_PATTERN,
     '[instruction override attempt removed]'
   );
-  return capByCodePoints(
-    withoutOverrides.replace(ENVELOPE_TAG_PATTERN, '&lt;$1$2&gt;'),
-    maxLength
-  );
+  return capByCodePoints(withoutOverrides.replace(ENVELOPE_TAG_PATTERN, '&lt;$1$2&gt;'), maxLength);
 };
 
 /**

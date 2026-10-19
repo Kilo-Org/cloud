@@ -15,10 +15,7 @@ type IssueOverrides = {
   issueBody?: string | null;
 };
 
-const buildPrompt = (
-  overrides: IssueOverrides = {},
-  customInstructions: string | null = null
-) =>
+const buildPrompt = (overrides: IssueOverrides = {}, customInstructions: string | null = null) =>
   buildClassificationPrompt(
     { ...baseIssueInfo, ...overrides },
     { custom_instructions: customInstructions },
@@ -31,9 +28,7 @@ describe('buildClassificationPrompt issue data sections', () => {
   it('places the issue title and body inside their data sections', () => {
     const prompt = buildPrompt();
 
-    expect(prompt.indexOf('<issue_title>')).toBeLessThan(
-      prompt.indexOf('Broken build on startup')
-    );
+    expect(prompt.indexOf('<issue_title>')).toBeLessThan(prompt.indexOf('Broken build on startup'));
     expect(prompt.indexOf('Broken build on startup')).toBeLessThan(
       prompt.indexOf('</issue_title>')
     );

@@ -15,7 +15,7 @@ describe('formatProfileCountItems', () => {
         { kind: 'mcp', count: 1 },
       ])
     ).toEqual(['3 vars', '1 MCP']);
-    expect(formatProfileCountItems(t, [{ kind: 'commands', count: 1 }])).toEqual(['1 cmds']);
+    expect(formatProfileCountItems(t, [{ kind: 'commands', count: 1 }])).toEqual(['1 cmd']);
   });
 
   it('resolves nothing for an empty list', () => {

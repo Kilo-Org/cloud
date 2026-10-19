@@ -51,6 +51,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => connectivityState.value,
+  useCommittedConnectivityStatus: () => connectivityState.value,
 }));
 
 vi.mock('@/lib/organization-context', () => ({

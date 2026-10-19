@@ -27,7 +27,7 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
@@ -103,6 +103,8 @@ export function ProfilesListScreen() {
     isRefetching,
     refetch,
   } = useAgentProfileList(organizationId ?? undefined);
+  // Reactive: a connectivity commit re-renders the error variant selection.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   const sections = buildProfileSections({ orgProfiles, personalProfiles, isOrgContext });
   // Wait for the stored organization before choosing the list context, so a
@@ -139,7 +141,7 @@ export function ProfilesListScreen() {
             server one; `unknown` connectivity keeps the server variant. */}
         {isError && (
           <QueryError
-            variant={getCommittedConnectivityStatus() === 'offline' ? 'offline' : 'server'}
+            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
             placement="top"
             title={t('profiles.loadFailed')}
             onRetry={() => void refetch()}

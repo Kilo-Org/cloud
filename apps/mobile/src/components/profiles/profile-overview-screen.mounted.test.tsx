@@ -45,6 +45,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => h.connectivity,
+  useCommittedConnectivityStatus: () => h.connectivity,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back, push: h.push }) }));

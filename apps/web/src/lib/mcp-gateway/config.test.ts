@@ -91,6 +91,41 @@ describe('getGatewayAppConfig', () => {
     }
   });
 
+  test('rejects keysets whose publicJwk carries members outside the public allowlist', () => {
+    const originalGatewayEnv = Object.fromEntries(
+      gatewayEnvKeys.map(key => [key, process.env[key]])
+    );
+    try {
+      process.env.MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON = JSON.stringify({
+        issuer: 'https://app.kilo.ai',
+        activeKeyId: 'jwt-active',
+        keys: [
+          {
+            keyId: 'jwt-active',
+            publicJwk: { kty: 'RSA', n: 'modulus', e: 'AQAB', d: 'private-exponent' },
+            privateKeyPem: 'private-key',
+          },
+        ],
+      });
+      process.env.MCP_GATEWAY_CREDENTIAL_KEYSET_JSON = JSON.stringify({
+        active: { keyId: 'credential-active', publicKeyPem: 'public-key' },
+        decrypt: [{ keyId: 'credential-active', privateKeyPem: 'private-key' }],
+      });
+      process.env.MCP_GATEWAY_RATE_LIMIT_SECRET = 'test-rate-limit-secret';
+
+      expect(() => getGatewayAppConfig()).toThrow(/Unrecognized key/i);
+    } finally {
+      for (const key of gatewayEnvKeys) {
+        const value = originalGatewayEnv[key];
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
+
   test('accepts legacy JWT keysets without publicKeyPem', () => {
     const originalGatewayEnv = Object.fromEntries(
       gatewayEnvKeys.map(key => [key, process.env[key]])

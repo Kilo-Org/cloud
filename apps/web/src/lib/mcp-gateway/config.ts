@@ -6,31 +6,23 @@ import { z } from 'zod';
 
 type GatewayPublicJwk = Pick<
   JsonWebKey,
-  | 'alg'
-  | 'crv'
-  | 'd'
-  | 'dp'
-  | 'dq'
-  | 'e'
-  | 'ext'
-  | 'k'
-  | 'key_ops'
-  | 'kty'
-  | 'n'
-  | 'oth'
-  | 'p'
-  | 'q'
-  | 'qi'
-  | 'use'
-  | 'x'
-  | 'y'
+  'alg' | 'crv' | 'e' | 'ext' | 'key_ops' | 'kty' | 'n' | 'use' | 'x' | 'y'
 >;
 
 const PublicJwkSchema = z
   .object({
     kty: z.string().min(1),
+    use: z.string().min(1).optional(),
+    alg: z.string().min(1).optional(),
+    key_ops: z.array(z.string()).optional(),
+    n: z.string().optional(),
+    e: z.string().optional(),
+    crv: z.string().optional(),
+    x: z.string().optional(),
+    y: z.string().optional(),
+    ext: z.boolean().optional(),
   })
-  .passthrough();
+  .strict();
 
 const JWTKeySchema = z.object({
   keyId: z.string().min(1),

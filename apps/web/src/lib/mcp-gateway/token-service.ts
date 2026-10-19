@@ -32,9 +32,30 @@ import type { GatewayOAuthGrantService } from './oauth-grant-service';
 import { hashToken, pkceChallenge, randomToken } from './crypto';
 import { createAuditService } from './audit-service';
 
+const PublishedJwkMembers = [
+  'kty',
+  'use',
+  'alg',
+  'key_ops',
+  'n',
+  'e',
+  'crv',
+  'x',
+  'y',
+  'ext',
+] as const;
+
 function publicJwks(config: GatewayAppConfig): { keys: Array<JsonWebKey & { kid: string }> } {
   return {
-    keys: config.jwtKeyset.keys.map(key => ({ ...key.publicJwk, kid: key.keyId })),
+    keys: config.jwtKeyset.keys.map(key => {
+      const jwk: JsonWebKey & { kid: string } = { kid: key.keyId };
+      for (const member of PublishedJwkMembers) {
+        if (member in key.publicJwk) {
+          jwk[member] = key.publicJwk[member];
+        }
+      }
+      return jwk;
+    }),
   };
 }
 

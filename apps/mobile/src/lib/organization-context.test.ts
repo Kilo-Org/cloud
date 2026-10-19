@@ -194,12 +194,11 @@ describe('OrganizationProvider.setOrganizationId', () => {
 describe('OrganizationProvider lost-membership recovery', () => {
   /** Stores the recovered fixture selection; every other key reads absent. */
   const storeSelection = (): void => {
-    hoisted.getItemAsync.mockImplementation(
-      async key =>
-        await (key === ORGANIZATION_STORAGE_KEY
-          ? Promise.resolve('org-lost')
-          : Promise.resolve(null))
-    );
+    hoisted.getItemAsync.mockImplementation(async key => {
+      const stored = key === ORGANIZATION_STORAGE_KEY ? 'org-lost' : null;
+      await Promise.resolve();
+      return stored;
+    });
   };
 
   beforeEach(() => {

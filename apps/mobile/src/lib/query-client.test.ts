@@ -237,14 +237,18 @@ describe('organizations.list refresh on permission loss', () => {
     expect(queryClient.getQueryState(LIST_KEY)?.isInvalidated).toBe(true);
 
     const pending = Promise.withResolvers<{ organizationId: string }[]>();
+    let gated = false;
     listFn.mockImplementation(async () => {
       // The initial mount fires one refetch (the invalidation marked the query
       // stale); gate it so the resolution order is observable. Any further
       // call answers immediately.
-      if (listFn.mock.results.length > 1) {
+      if (gated) {
+        await Promise.resolve();
         return [];
       }
-      return pending.promise;
+      gated = true;
+      const settled = await pending.promise;
+      return settled;
     });
     const listObserver = new QueryObserver(queryClient, {
       queryKey: LIST_KEY,

@@ -313,4 +313,5 @@ allowBuilds:
   spawn-sync: false
   tree-sitter-bash: false
   geckodriver: true
+  dtrace-provider: false
   '@scarf/scarf': false

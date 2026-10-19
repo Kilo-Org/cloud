@@ -1,6 +1,6 @@
 import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { PlatformIntegration } from '@kilocode/db/schema';
+import type { PlatformIntegration, SlackOAuthCredential } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -217,7 +217,17 @@ export async function getSlackBotToken(integration: PlatformIntegration): Promis
     return null;
   }
 
-  const credential = await getSlackCredentialByIntegrationId(integration.id);
+  let credential: SlackOAuthCredential | null;
+  try {
+    credential = await getSlackCredentialByIntegrationId(integration.id);
+  } catch (error) {
+    captureException(error, {
+      level: 'error',
+      tags: { component: 'slack-service', op: 'read-slack-credential' },
+      extra: { integrationId: integration.id },
+    });
+    return null;
+  }
   if (!credential) return null;
 
   try {
@@ -280,29 +290,34 @@ export async function upsertSlackInstallation({
 
   if (existing) {
     try {
-      const [updated] = await db
-        .update(platform_integrations)
-        .set({
-          platform_installation_id: teamId,
-          platform_account_id: teamId,
-          platform_account_login: teamName,
-          scopes: SLACK_SCOPES,
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata,
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(platform_integrations.id, existing.id))
-        .returning();
+      return await db.transaction(async tx => {
+        const [updated] = await tx
+          .update(platform_integrations)
+          .set({
+            platform_installation_id: teamId,
+            platform_account_id: teamId,
+            platform_account_login: teamName,
+            scopes: SLACK_SCOPES,
+            integration_status: INTEGRATION_STATUS.ACTIVE,
+            metadata,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(platform_integrations.id, existing.id))
+          .returning();
 
-      await writeSlackCredential({
-        integrationId: updated.id,
-        slackTeamId: teamId,
-        owner,
-        botToken: installation.botToken,
-        botUserId: installation.botUserId ?? null,
+        // Both writes commit together: the integration row and its credential row
+        // form one unit, and each is incomplete without the other.
+        await writeSlackCredential({
+          integrationId: updated.id,
+          slackTeamId: teamId,
+          owner,
+          botToken: installation.botToken,
+          botUserId: installation.botUserId ?? null,
+          tx,
+        });
+
+        return updated;
       });
-
-      return updated;
     } catch (error) {
       if (isSlackWorkspaceUniqueViolation(error)) {
         throw new SlackWorkspaceAlreadyConnectedError(teamName);
@@ -312,32 +327,35 @@ export async function upsertSlackInstallation({
   }
 
   try {
-    const [created] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        platform: PLATFORM.SLACK,
-        integration_type: 'oauth',
-        platform_installation_id: teamId,
-        platform_account_id: teamId,
-        platform_account_login: teamName,
-        scopes: SLACK_SCOPES,
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata,
-        installed_at: new Date().toISOString(),
-      })
-      .returning();
+    return await db.transaction(async tx => {
+      const [created] = await tx
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          platform: PLATFORM.SLACK,
+          integration_type: 'oauth',
+          platform_installation_id: teamId,
+          platform_account_id: teamId,
+          platform_account_login: teamName,
+          scopes: SLACK_SCOPES,
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata,
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
 
-    await writeSlackCredential({
-      integrationId: created.id,
-      slackTeamId: teamId,
-      owner,
-      botToken: installation.botToken,
-      botUserId: installation.botUserId ?? null,
+      await writeSlackCredential({
+        integrationId: created.id,
+        slackTeamId: teamId,
+        owner,
+        botToken: installation.botToken,
+        botUserId: installation.botUserId ?? null,
+        tx,
+      });
+
+      return created;
     });
-
-    return created;
   } catch (error) {
     if (isSlackWorkspaceUniqueViolation(error)) {
       throw new SlackWorkspaceAlreadyConnectedError(teamName);

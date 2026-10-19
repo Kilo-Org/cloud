@@ -33,7 +33,11 @@ import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle
 import { platform_integrations, slack_oauth_credentials } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { SlackCredentialOwner } from '@kilocode/worker-utils/slack-credential';
-import { createSlackCredentialIfAbsent } from '@/lib/integrations/platforms/slack/credential-store';
+import {
+  createSlackCredentialIfAbsent,
+  decryptSlackBotToken,
+  getSlackCredentialByIntegrationId,
+} from '@/lib/integrations/platforms/slack/credential-store';
 import { requireSlackCredentialKeyset } from '@/lib/integrations/platforms/slack/credential-keyset';
 
 type SkipReason =
@@ -72,7 +76,7 @@ function parseArgs(): { execute: boolean; scrub: boolean; batchSize: number } {
 function readPlaintextToken(metadata: unknown): string | null {
   if (metadata === null || typeof metadata !== 'object') return null;
   if (!('access_token' in metadata)) return null;
-  const value = (metadata as { access_token?: unknown }).access_token;
+  const value = metadata.access_token;
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
@@ -116,6 +120,10 @@ async function main(): Promise<void> {
   let migrated = 0;
   let eligible = 0;
   let scrubbed = 0;
+  // Integrations whose credential row this run can vouch for: either the row was
+  // written by this run, or it decrypts to the metadata token (checked below).
+  // Only these are eligible for the scrub pass.
+  const scrubCandidateIds = new Set<string>();
 
   for (let offset = 0; offset < integrations.length; offset += batchSize) {
     const batch = integrations.slice(offset, offset + batchSize);
@@ -137,6 +145,19 @@ async function main(): Promise<void> {
     for (const integration of batch) {
       if (alreadyMigrated.has(integration.id)) {
         skipped.already_migrated += 1;
+        // The metadata token and the stored credential must agree before the
+        // metadata copy is removed. The comparison below admits the row for
+        // scrubbing only on an exact match; any other result keeps it unchanged.
+        if (execute && scrub) {
+          const fresh = await storedCredentialMatches(integration.id, integration);
+          if (fresh === true) {
+            scrubCandidateIds.add(integration.id);
+          } else if (fresh === false) {
+            skipped.scrub_no_credential += 1;
+          } else {
+            skipped.scrub_failed += 1;
+          }
+        }
         continue;
       }
 
@@ -176,6 +197,7 @@ async function main(): Promise<void> {
           skipped.already_migrated += 1;
         } else {
           migrated += 1;
+          scrubCandidateIds.add(integration.id);
         }
       } catch (error) {
         skipped.write_failed += 1;
@@ -187,37 +209,25 @@ async function main(): Promise<void> {
     }
   }
 
-  // Scrub pass: once every plaintext token has an encrypted copy, remove the
-  // plaintext from metadata. Rows without a credential row are left untouched —
-  // deleting their only token copy would make the integration unrecoverable — and
-  // are reported so they can be fixed and the script re-run (it is idempotent).
+  // Scrub pass: remove the metadata token for every eligible integration.
+  // - A row is eligible only when its stored credential is current: the credential
+  //   was written by this run's copy pass, or an existing credential decrypts to
+  //   exactly the metadata token. Every other row is reported and left unchanged so
+  //   the script can be repeated after it is resolved.
+  // The metadata update removes only the token key (`jsonb -`), so concurrent writes
+  // to other metadata fields between the snapshot above and this update survive.
   if (execute && scrub) {
     for (const integration of integrations) {
+      if (!scrubCandidateIds.has(integration.id)) continue;
       const metadata = integration.metadata;
       if (metadata === null || typeof metadata !== 'object') continue;
       if (!('access_token' in metadata)) continue;
 
-      const [credential] = await db
-        .select({ id: slack_oauth_credentials.id })
-        .from(slack_oauth_credentials)
-        .where(eq(slack_oauth_credentials.platform_integration_id, integration.id))
-        .limit(1);
-
-      if (!credential) {
-        skipped.scrub_no_credential += 1;
-        console.warn(
-          `Kept plaintext token for integration ${integration.id}: no encrypted credential row`
-        );
-        continue;
-      }
-
       try {
-        const rest: Record<string, unknown> = { ...metadata };
-        delete rest.access_token;
         await db
           .update(platform_integrations)
           .set({
-            metadata: rest,
+            metadata: sql`${platform_integrations.metadata} - 'access_token'`,
             updated_at: new Date().toISOString(),
           })
           .where(eq(platform_integrations.id, integration.id));
@@ -271,8 +281,39 @@ function readOwner(integration: {
 function readBotUserId(metadata: unknown): string | null {
   if (metadata === null || typeof metadata !== 'object') return null;
   if (!('bot_user_id' in metadata)) return null;
-  const value = (metadata as { bot_user_id?: unknown }).bot_user_id;
+  const value = metadata.bot_user_id;
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Whether the integration's stored credential is exactly its current metadata token.
+ *
+ * Returns true on an exact match, false when the credential row is absent, revoked,
+ * or the integration has no exclusive owner, and null when the row could not be
+ * read. The caller reports the distinction so each outcome gets the right follow-up.
+ * Never logs or prints token material.
+ */
+async function storedCredentialMatches(
+  integrationId: string,
+  integration: {
+    owned_by_organization_id: string | null;
+    owned_by_user_id: string | null;
+    metadata: unknown;
+  }
+): Promise<boolean | null> {
+  const botToken = readPlaintextToken(integration.metadata);
+  if (!botToken) return false;
+  const owner = readOwner(integration);
+  if (!owner) return false;
+
+  const credential = await getSlackCredentialByIntegrationId(integrationId);
+  if (!credential) return false;
+
+  try {
+    return decryptSlackBotToken(credential, owner) === botToken;
+  } catch {
+    return null;
+  }
 }
 
 void main()

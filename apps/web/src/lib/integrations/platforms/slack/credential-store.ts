@@ -7,7 +7,7 @@ import {
   buildSlackCredentialLockKey,
   type SlackCredentialOwner,
 } from '@kilocode/worker-utils/slack-credential';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptSlackCredentialSecret,
   encryptSlackCredentialSecret,
@@ -43,6 +43,12 @@ export type WriteSlackCredentialInput = {
   accessTokenExpiresAt?: string | null;
   /** Present only once Slack token rotation is enabled. */
   refreshToken?: string | null;
+  /**
+   * Existing transaction to join instead of opening one. Callers that write the
+   * `platform_integrations` row in the same operation (the Slack install path) pass
+   * their transaction so the integration row and its credential commit together.
+   */
+  tx?: DrizzleTransaction;
 };
 
 export type SlackCredentialWriteOutcome =
@@ -89,7 +95,7 @@ async function upsertSlackCredential(
   input: WriteSlackCredentialInput,
   { onlyIfAbsent }: { onlyIfAbsent: boolean }
 ): Promise<SlackCredentialWriteOutcome> {
-  return db.transaction(async tx => {
+  const run = async (tx: DrizzleTransaction): Promise<SlackCredentialWriteOutcome> => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${buildSlackCredentialLockKey(input.integrationId)}, 0))`
     );
@@ -157,7 +163,9 @@ async function upsertSlackCredential(
       .values({ id: credentialId, platform_integration_id: input.integrationId, ...values })
       .returning();
     return { status: 'written', credential: created };
-  });
+  };
+
+  return input.tx ? run(input.tx) : db.transaction(run);
 }
 
 export async function getSlackCredentialByIntegrationId(

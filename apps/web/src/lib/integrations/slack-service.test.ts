@@ -9,6 +9,7 @@ const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 const mockAuthRevoke = jest.fn();
 const mockAuthTest = jest.fn();
+const mockTransaction = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
@@ -28,6 +29,10 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     insert: jest.fn(() => ({
       values: mockInsertValues,
     })),
+    // Accessed lazily: jest.mock factories hoist above the const declarations.
+    get transaction() {
+      return mockTransaction;
+    },
   },
 }));
 
@@ -58,6 +63,7 @@ jest.mock('@sentry/nextjs', () => ({
 import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import { SlackCredentialDecryptionError } from '@/lib/integrations/platforms/slack/credential-encryption';
 import {
   deleteInstallationByTeamId,
   getMissingSlackScopes,
@@ -266,13 +272,17 @@ describe('slack-service testConnection', () => {
 
   it('returns failure when the credential cannot be decrypted', async () => {
     mockLimit.mockResolvedValue([buildSlackIntegration({ metadata: {} })]);
-    mockDecryptSlackBotToken.mockReturnValue(null);
+    mockDecryptSlackBotToken.mockImplementation(() => {
+      throw new SlackCredentialDecryptionError('access');
+    });
 
     await expect(testConnection(owner)).resolves.toEqual({
       success: false,
       error: 'No access token found',
     });
     expect(mockAuthTest).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain('xoxb-token');
   });
 
   it('returns the Slack error when auth.test rejects the token', async () => {
@@ -326,6 +336,15 @@ describe('upsertSlackInstallation', () => {
     mockDecryptSlackBotToken.mockReset();
     mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
     mockCaptureException.mockReset();
+    // The upsert wraps both writes in one transaction and awaits its callback.
+    mockTransaction.mockReset();
+    mockTransaction.mockImplementation(
+      async (fn: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        fn({
+          update: () => ({ set: mockUpdateSet }),
+          insert: () => ({ values: mockInsertValues }),
+        })
+    );
   });
 
   it('preserves the selected model and scrubs any stale metadata token when refreshing an existing installation', async () => {
@@ -436,6 +455,7 @@ describe('upsertSlackInstallation', () => {
       owner,
       botToken: 'xoxb-new-token',
       botUserId: 'U_NEW_BOT',
+      tx: expect.objectContaining({ insert: expect.any(Function) }),
     });
   });
 

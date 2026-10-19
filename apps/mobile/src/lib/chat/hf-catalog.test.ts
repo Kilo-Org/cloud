@@ -169,6 +169,9 @@ describe('a Hugging Face model detail', () => {
     expect(readModelDetail(info({ cardData: { license: ['gpl-3.0'] } }), []).license).toBe(
       'GPL 3.0'
     );
+    expect(readModelDetail(info({ cardData: { license: 'cc-by-nc-sa-4.0' } }), []).license).toBe(
+      'CC BY-NC-SA 4.0'
+    );
     expect(readModelDetail(info({ cardData: { license: 'some-obscure-1.0' } }), []).license).toBe(
       'some-obscure-1.0'
     );

@@ -16,7 +16,10 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputController } from '@/lib/voice-input/native-voice-input';
-import { useVoiceInputLanguage } from '@/lib/voice-input/voice-input-language-preference';
+import {
+  useVoiceInputLanguage,
+  useVoiceInputLanguageLoaded,
+} from '@/lib/voice-input/voice-input-language-preference';
 import {
   isVoiceInputLanguageInstalledOnDevice,
   resolveVoiceInputSessionLanguageTag,
@@ -39,6 +42,12 @@ export function VoiceTranscriptionControl() {
   const supportsOnDevice = voiceInputController.supportsOnDevice();
   const [consent, setConsent] = useState<VoiceNetworkConsent>('unset');
   const storedLanguageTag = useVoiceInputLanguage();
+  // The stored tag is the SecureStore default (`null`) until the module-scope
+  // read settles, which can take seconds on a slow keychain read; deriving the
+  // session tag from the app language in that window would claim a mode for a
+  // choice that may exist (voice-input-settings-screen.tsx gates this exact
+  // read the same way). Keep the row on the loading placeholder until it lands.
+  const languageLoaded = useVoiceInputLanguageLoaded();
   const { t, i18n } = useTranslation();
 
   // The mic refines the service-level on-device check with the offline model
@@ -55,7 +64,7 @@ export function VoiceTranscriptionControl() {
   const appLanguage = i18n.language;
 
   useEffect(() => {
-    if (gatewayTranscriptionEnabled || !supportsOnDevice) {
+    if (gatewayTranscriptionEnabled || !supportsOnDevice || !languageLoaded) {
       return undefined;
     }
     let active = true;
@@ -75,7 +84,13 @@ export function VoiceTranscriptionControl() {
     return () => {
       active = false;
     };
-  }, [gatewayTranscriptionEnabled, supportsOnDevice, storedLanguageTag, appLanguage]);
+  }, [
+    gatewayTranscriptionEnabled,
+    supportsOnDevice,
+    languageLoaded,
+    storedLanguageTag,
+    appLanguage,
+  ]);
 
   useEffect(() => {
     if (!userId) {

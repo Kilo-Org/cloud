@@ -87,6 +87,7 @@ const voiceLanguageGateMock = vi.hoisted(() => ({
     >(),
   isVoiceInputLanguageInstalledOnDevice: vi.fn<() => Promise<boolean>>(),
   useVoiceInputLanguage: vi.fn(() => null as string | null),
+  languageLoaded: true,
 }));
 
 vi.mock('@/lib/voice-input/voice-input-language', () => ({
@@ -97,6 +98,7 @@ vi.mock('@/lib/voice-input/voice-input-language', () => ({
 
 vi.mock('@/lib/voice-input/voice-input-language-preference', () => ({
   useVoiceInputLanguage: voiceLanguageGateMock.useVoiceInputLanguage,
+  useVoiceInputLanguageLoaded: () => voiceLanguageGateMock.languageLoaded,
 }));
 
 const voiceNetworkConsentMock = vi.hoisted(() => ({
@@ -324,6 +326,7 @@ describe('Voice transcription section', () => {
     voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag.mockResolvedValue('en-US');
     voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(true);
     voiceLanguageGateMock.useVoiceInputLanguage.mockReturnValue(null);
+    voiceLanguageGateMock.languageLoaded = true;
     gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled = false;
     gatewayTranscriptionPreferenceMock.hasLoaded = true;
     useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
@@ -451,6 +454,29 @@ describe('Voice transcription section', () => {
     expect(texts).not.toContain('On device');
     expect(texts).not.toContain('Via the Kilo gateway');
     expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows the loading placeholder while the stored voice-language read resolves', async () => {
+    // The SecureStore read can take seconds on a slow keychain; deriving from
+    // the app-language default in that window would claim a mode for a stored
+    // choice that may exist (vr2 review, 2026-10-19). The gate waits for it.
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.languageLoaded = false;
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(texts).not.toContain('Online, not allowed');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    // Once the read lands, the row derives from the stored tag.
+    voiceLanguageGateMock.languageLoaded = true;
+    await TestRenderer.act(async () => {
+      renderer.update(createElement(VoiceTranscriptionControl));
+      await flush();
+    });
+    expect(findTextStrings(renderer.root)).not.toContain('Loading…');
   });
 
   it('shows Online, allowed with the switch on when consent is granted', async () => {

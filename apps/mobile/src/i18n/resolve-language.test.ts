@@ -29,9 +29,7 @@ describe('resolveLanguageTag', () => {
   it('resolves Portuguese tags to pt-BR unless they name Portugal', () => {
     // iOS reports a pt-BR device as the bare tag `pt` with the region in
     // `regionCode`, not in `languageTag`.
-    expect(
-      resolveLanguageTag([{ languageTag: 'pt', regionCode: 'BR' } as const])
-    ).toBe('pt-BR');
+    expect(resolveLanguageTag([{ languageTag: 'pt', regionCode: 'BR' } as const])).toBe('pt-BR');
     expect(resolveLanguageTag([{ languageTag: 'pt-PT' }])).toBe('pt');
     expect(resolveLanguageTag([{ languageTag: 'pt', regionCode: 'PT' } as const])).toBe('pt');
     expect(resolveLanguageTag([{ languageTag: 'pt' }])).toBe('pt-BR');

@@ -277,6 +277,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       membershipIds: memberships?.map(membership => membership.organizationId),
       membershipsSettled: membershipsFetched,
       membershipsFailed,
+      // The selected organization's own org-scoped read is the only proof it is
+      // unusable: the org list can be a stale, earlier-successful page.
+      selectedOrganizationAccessDenied:
+        sessions.storedErrorCode === 'UNAUTHORIZED' || sessions.storedErrorCode === 'FORBIDDEN',
     });
     const base = getNewAgentSessionPath(selectedOrganizationId);
     commit(appendShareParams(base, shareId));
@@ -287,6 +291,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     membershipsFailed,
     membershipsFetched,
     organizationId,
+    sessions.storedErrorCode,
     shareId,
   ]);
 

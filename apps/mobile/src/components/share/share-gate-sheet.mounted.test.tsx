@@ -114,19 +114,23 @@ const organizationsListMock = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => organizationsListMock.current,
 }));
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({
+const sessionsMock = vi.hoisted(() => ({
+  current: {
     storedSessions: [],
-    activeSessionIds: new Set(),
+    activeSessionIds: new Set<string>(),
     activeSessions: [],
     storedIsError: false,
     storedIsSuccess: true,
     storedIsPaused: false,
+    storedErrorCode: undefined as string | undefined,
     activeIsError: false,
     activeIsPaused: false,
     isLoading: false,
     refetch: vi.fn(),
-  }),
+  },
+}));
+vi.mock('@/lib/hooks/use-agent-sessions', () => ({
+  useAgentSessions: () => sessionsMock.current,
 }));
 vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
   useRemoteInstanceSpawn: () => ({ spawn: spawnMock }),
@@ -452,6 +456,10 @@ describe('ShareGateSheet new-session organization', () => {
       isFetched: true,
       isError: false,
     };
+    sessionsMock.current = {
+      ...sessionsMock.current,
+      storedErrorCode: undefined,
+    };
     __resetSharePayloadStoreForTests();
     __resetPendingShareNavigationForTests();
   });
@@ -476,7 +484,7 @@ describe('ShareGateSheet new-session organization', () => {
       renderer.unmount();
     });
     if (pending === null) {
-      throw new Error('the gate did not commit a destination');
+      throw new TypeError('the gate did not commit a destination');
     }
     return pending.href;
   }
@@ -490,13 +498,14 @@ describe('ShareGateSheet new-session organization', () => {
     expect(href).toContain(`shareId=${shareId}`);
   });
 
-  it('commits into the account default when the selection is no longer a membership', async () => {
+  it('commits into the account default when the selected organization denies access', async () => {
     organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
     organizationsListMock.current = {
       data: [{ organizationId: 'org-first' }, { organizationId: 'org-second' }],
       isFetched: true,
       isError: false,
     };
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
     const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
 
     const href = await commitNewSession(shareId);
@@ -505,9 +514,10 @@ describe('ShareGateSheet new-session organization', () => {
     expect(href).not.toContain('org-lost');
   });
 
-  it('commits personal when the account holds no organization', async () => {
+  it('commits personal when the account holds no other organization', async () => {
     organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
     organizationsListMock.current = { data: [], isFetched: true, isError: false };
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'FORBIDDEN' };
     const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
 
     const href = await commitNewSession(shareId);
@@ -516,13 +526,25 @@ describe('ShareGateSheet new-session organization', () => {
     expect(href).not.toContain('organizationId=');
   });
 
-  it('keeps the selection while the membership list is unsettled', async () => {
+  it('keeps the selection on a membership list miss without an access denial', async () => {
     organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
-    organizationsListMock.current = { data: undefined, isFetched: false, isError: false };
+    organizationsListMock.current = { data: [], isFetched: true, isError: false };
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'INTERNAL_SERVER_ERROR' };
     const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
 
     const href = await commitNewSession(shareId);
 
     expect(href).toContain('organizationId=org-selected');
+  });
+
+  it('keeps the selection while the membership list is unsettled', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    organizationsListMock.current = { data: undefined, isFetched: false, isError: false };
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
   });
 });

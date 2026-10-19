@@ -92,8 +92,6 @@ type KiloSdkMessageInfoEnumeration = {
   omittedItemCount: number;
 };
 
-type KiloSdkOversizedItemPolicy = 'skip' | 'fail';
-
 type KiloSdkHistoryCandidateRead =
   | { kind: 'value'; value: Record<string, unknown> }
   | { kind: 'missing' }
@@ -136,23 +134,16 @@ export async function readKiloSdkSessionSnapshot(
 export async function readKiloSdkMessages(
   db: DrizzleSqliteDODatabase,
   r2: R2Bucket,
-  params: { limit?: number; before?: string }
+  params: { limit: number; before?: string }
 ): Promise<KiloSdkMessagesRead> {
   const budget = createKiloSdkHistoryReadBudget();
   const before =
     params.before === undefined ? undefined : decodeKiloSdkMessagesCursor(params.before);
-  const requestedLimit = params.limit ?? 0;
-  const limit =
-    requestedLimit > 0
-      ? Math.min(requestedLimit, MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      : requestedLimit;
-  if (limit <= 0 && before !== undefined) {
+  if (!Number.isInteger(params.limit) || params.limit <= 0) {
     return { kind: 'invalid_data' };
   }
-  const enumerated =
-    limit > 0
-      ? await enumerateBoundedKiloSdkMessageInfos(db, r2, budget, limit, before)
-      : await enumerateUnboundedKiloSdkMessageInfos(db, r2, budget);
+  const limit = Math.min(params.limit, MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE);
+  const enumerated = await enumerateBoundedKiloSdkMessageInfos(db, r2, budget, limit, before);
   if (isKiloSdkHistoryReadFailure(enumerated)) {
     return enumerated;
   }
@@ -198,13 +189,7 @@ export async function readKiloSdkMessages(
       storedMessagesNewestFirst.push({ info: message.info, parts: [] });
       continue;
     }
-    const hydratedParts = await hydrateKiloSdkMessageParts(
-      db,
-      r2,
-      budget,
-      message.identity,
-      limit > 0 ? 'skip' : 'fail'
-    );
+    const hydratedParts = await hydrateKiloSdkMessageParts(db, r2, budget, message.identity);
     if (isKiloSdkHistoryReadFailure(hydratedParts)) {
       return hydratedParts;
     }
@@ -254,17 +239,13 @@ function isKiloSdkHistoryReadFailure(
 }
 
 function resolveKiloSdkHistoryCandidateOutcome(
-  materialized: KiloSdkHistoryCandidateRead,
-  oversizedItemPolicy: KiloSdkOversizedItemPolicy,
-  phase: KiloSdkHistoryReadPhase
+  materialized: KiloSdkHistoryCandidateRead
 ): KiloSdkHistoryCandidateOutcome {
   if (materialized.kind === 'missing') {
     return { kind: 'skip' };
   }
   if (materialized.kind === 'intrinsically_too_large') {
-    return oversizedItemPolicy === 'skip'
-      ? { kind: 'skip' }
-      : { kind: 'too_large', maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES, phase };
+    return { kind: 'skip' };
   }
   return materialized;
 }
@@ -377,7 +358,7 @@ async function enumerateBoundedKiloSdkMessageInfos(
           lastConsumedMessageStorageIdentity
         );
       } else {
-        const outcome = resolveKiloSdkHistoryCandidateOutcome(materialized, 'skip', 'message_scan');
+        const outcome = resolveKiloSdkHistoryCandidateOutcome(materialized);
         if (outcome.kind === 'skip') {
           if (materialized.kind === 'intrinsically_too_large') {
             const omittedRows = countOmittedKiloSdkMessageRows(db, row.item_id);
@@ -416,53 +397,6 @@ async function enumerateBoundedKiloSdkMessageInfos(
     omittedItemCount,
     lastConsumedMessageStorageIdentity
   );
-}
-
-async function enumerateUnboundedKiloSdkMessageInfos(
-  db: DrizzleSqliteDODatabase,
-  r2: R2Bucket,
-  budget: KiloSdkHistoryReadBudget
-): Promise<KiloSdkMessageInfoEnumeration | KiloSdkHistoryReadFailure> {
-  const messages: MaterializedKiloSdkMessage[] = [];
-  let lastMessageRowId = 0;
-  for (;;) {
-    const messageRowIds = db
-      .select({ id: ingestItems.id, item_id: ingestItems.item_id })
-      .from(ingestItems)
-      .where(and(eq(ingestItems.item_type, 'message'), gt(ingestItems.id, lastMessageRowId)))
-      .orderBy(ingestItems.id)
-      .limit(KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE)
-      .all();
-    if (messageRowIds.length === 0) break;
-    for (const messageRowId of messageRowIds) {
-      const storageIdentity = parsePersistedKiloSdkMessageStorageIdentity(messageRowId.item_id);
-      if (!storageIdentity) {
-        return { kind: 'invalid_data' };
-      }
-      const materialized = await readKiloSdkHistoryCandidate(
-        messageRowId.id,
-        rowId => readItemReference(db, rowId),
-        r2,
-        budget,
-        'message_scan'
-      );
-      const outcome = resolveKiloSdkHistoryCandidateOutcome(materialized, 'fail', 'message_scan');
-      if (outcome.kind !== 'skip' && outcome.kind !== 'value') {
-        return outcome;
-      }
-      if (outcome.kind === 'value') {
-        const identity = readMessageIdentity(outcome.value);
-        if (!identity || identity.id !== storageIdentity.messageId) {
-          return { kind: 'invalid_data' };
-        }
-        messages.push({ info: outcome.value, identity });
-      }
-      lastMessageRowId = messageRowId.id;
-    }
-    if (messageRowIds.length < KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE) break;
-  }
-  messages.sort(compareKiloSdkMessageInfo).reverse();
-  return { pageNewestFirst: messages, nextCursor: null, omittedItemCount: 0 };
 }
 
 type KiloSdkMessagePartRowCount = { kind: 'count'; count: number } | KiloSdkInvalidData;
@@ -562,8 +496,7 @@ async function hydrateKiloSdkMessageParts(
   db: DrizzleSqliteDODatabase,
   r2: R2Bucket,
   budget: KiloSdkHistoryReadBudget,
-  identity: KiloSdkMessagesLegacyCursor,
-  oversizedItemPolicy: KiloSdkOversizedItemPolicy
+  identity: KiloSdkMessagesLegacyCursor
 ): Promise<
   | {
       parts: Array<Record<string, unknown>>;
@@ -608,7 +541,6 @@ async function hydrateKiloSdkMessageParts(
         'page_parts'
       );
       if (materialized.kind === 'too_large') {
-        if (oversizedItemPolicy === 'fail') return materialized;
         const remainingParts = countKiloSdkMessagePartRows(db, identity, partRowId.id);
         if (remainingParts.kind === 'invalid_data') {
           return remainingParts;
@@ -619,11 +551,7 @@ async function hydrateKiloSdkMessageParts(
           aggregateBudgetExhausted: true,
         };
       }
-      const outcome = resolveKiloSdkHistoryCandidateOutcome(
-        materialized,
-        oversizedItemPolicy,
-        'page_parts'
-      );
+      const outcome = resolveKiloSdkHistoryCandidateOutcome(materialized);
       if (outcome.kind === 'skip') {
         omittedItemCount += 1;
       } else if (outcome.kind !== 'value') {
@@ -896,18 +824,7 @@ function readPartIdentity(
   return parsed.success ? parsed.data : null;
 }
 
-function compareKiloSdkMessageInfo(
-  left: MaterializedKiloSdkMessage,
-  right: MaterializedKiloSdkMessage
-): number {
-  return left.identity.time - right.identity.time || compareId(left.identity.id, right.identity.id);
-}
-
-function compareId(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
 function compareKiloSdkPart(left: Record<string, unknown>, right: Record<string, unknown>): number {
   if (typeof left.id !== 'string' || typeof right.id !== 'string') return 0;
-  return compareId(left.id, right.id);
+  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
 }

@@ -2174,13 +2174,8 @@ describe('SessionIngestRPC.getCloudAgentRootSessionMessages', () => {
     });
   });
 
-  it('returns full materialized history for native limit zero requests', async () => {
-    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
-    const readKiloSdkMessages = vi.fn(async () => ({
-      messages: [sdkStoredMessageFixture],
-      nextCursor: null,
-    }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+  it('validates the page size before mapping lookup', async () => {
+    const { db } = makeDbFakes([]);
     const rpc = makeRpc(db);
 
     await expect(
@@ -2189,19 +2184,14 @@ describe('SessionIngestRPC.getCloudAgentRootSessionMessages', () => {
         kiloSessionId: sdkSessionInfoFixture.id,
         limit: 0,
       })
-    ).resolves.toEqual({
-      kiloSessionId: sdkSessionInfoFixture.id,
-      cloudAgentSessionId: 'agent_owned_root',
-      history: { messages: [sdkStoredMessageFixture], nextCursor: null, omittedItemCount: 0 },
-    });
-    expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 0, before: undefined });
+    ).rejects.toThrow();
+    expect(db.select).not.toHaveBeenCalled();
   });
 
-  it('normalizes legacy history pages without omission metadata to zero', async () => {
+  it('carries the shared default page size when the legacy request omits a limit', async () => {
     const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
-    vi.mocked(getSessionIngestDO).mockReturnValue({
-      readKiloSdkMessages: vi.fn(async () => ({ messages: [], nextCursor: null })),
-    } as never);
+    const readKiloSdkMessages = vi.fn(async () => ({ messages: [], nextCursor: null }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
     const rpc = makeRpc(db);
 
     await expect(
@@ -2211,6 +2201,10 @@ describe('SessionIngestRPC.getCloudAgentRootSessionMessages', () => {
       })
     ).resolves.toMatchObject({
       history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledWith({
+      limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+      before: undefined,
     });
   });
 
@@ -2632,7 +2626,7 @@ describe('SessionIngestRPC.getCloudAgentRootSessionMessages', () => {
     });
   });
 
-  it('rejects before without a positive limit and invalid paging input before mapping lookup', async () => {
+  it('rejects invalid paging input before mapping lookup', async () => {
     const { db } = makeDbFakes([]);
     const rpc = makeRpc(db);
 
@@ -2640,14 +2634,13 @@ describe('SessionIngestRPC.getCloudAgentRootSessionMessages', () => {
       rpc.getCloudAgentRootSessionMessages({
         kiloUserId: 'usr_owner',
         kiloSessionId: sdkSessionInfoFixture.id,
-        before: 'not-valid',
+        limit: 0,
       })
     ).rejects.toThrow();
     await expect(
       rpc.getCloudAgentRootSessionMessages({
         kiloUserId: 'usr_owner',
         kiloSessionId: sdkSessionInfoFixture.id,
-        limit: 0,
         before: 'not-valid',
       })
     ).rejects.toThrow();

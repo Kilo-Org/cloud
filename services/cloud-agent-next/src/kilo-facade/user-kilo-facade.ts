@@ -2,6 +2,7 @@ import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
 import {
   cloudAgentWorktreeIdSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { DurableObject } from 'cloudflare:workers';
@@ -639,20 +640,22 @@ function parseSessionMessagesQuery(
   }
   const params: Pick<GetCloudAgentRootSessionMessagesParams, 'limit' | 'before'> = {};
   const limitParam = url.searchParams.get('limit');
-  if (limitParam !== null) {
+  if (limitParam === null) {
+    params.limit = DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE;
+  } else {
     const limit = Number(limitParam);
-    if (!Number.isInteger(limit) || limit < 0 || limit > MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE) {
       return facadeError(
         400,
         'KILO_QUERY_INVALID',
-        `Session messages limit must be an integer from 0 to ${MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE}`
+        `Session messages limit must be an integer from 1 to ${MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE}`
       );
     }
     params.limit = limit;
   }
   const before = url.searchParams.get('before');
   if (before !== null) {
-    if (before.length === 0 || params.limit === undefined || params.limit === 0) {
+    if (before.length === 0) {
       return facadeError(
         400,
         'KILO_QUERY_INVALID',

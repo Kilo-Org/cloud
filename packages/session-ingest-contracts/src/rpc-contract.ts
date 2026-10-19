@@ -876,19 +876,17 @@ export function validateKiloSdkMessagesCursor(cursor: string): boolean {
 
 export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
   .extend({
-    limit: z.number().int().nonnegative().max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE).optional(),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
     before: z.string().min(1).optional(),
   })
   .superRefine((params, ctx) => {
-    if (params.before !== undefined && (params.limit === undefined || params.limit === 0)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before requires a positive limit',
-      });
-      return;
-    }
-    if (params.before !== undefined && !validateKiloSdkMessagesCursor(params.before)) {
+    if (params.before === undefined) return;
+    if (!validateKiloSdkMessagesCursor(params.before)) {
       ctx.addIssue({
         code: 'custom',
         path: ['before'],
@@ -915,11 +913,9 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  *
  * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and must be
  * a positive integer; the schema applies `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE`
- * (50) when omitted so the request is always bounded before reaching the DO.
- * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
- * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
- * `before` requires a positive `limit`; the default guarantees this unless
- * the caller explicitly supplies a non-positive `limit`.
+ * (50) when omitted so every request carries a page size before reaching the
+ * DO. `before` references a page boundary produced by an earlier read; the
+ * default limit keeps that reference within a single page of history.
  */
 export const getSessionMessagesSchema = z
   .object({

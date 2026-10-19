@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   decodeKiloSdkMessagesCursor,
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   MAX_SESSION_DIFF_READ_BYTES,
 } from '@kilocode/session-ingest-contracts';
@@ -447,11 +448,11 @@ describe('SessionIngestDO integration', () => {
   });
 
   describe('SDK message transcript reads', () => {
-    it('returns the complete stored SDK message transcript when no page limit is set', async () => {
+    it('carries the shared default page size through to the persisted read', async () => {
       const sessionId = 'ses_sdk_messages_00000000001';
       const stub = getStub(kiloUserId, sessionId);
       const firstInfo = {
-        id: 'msg_user_01',
+        id: 'msg_100_user_0001',
         sessionID: sessionId,
         role: 'user',
         time: { created: 100 },
@@ -459,7 +460,7 @@ describe('SessionIngestDO integration', () => {
         model: { providerID: 'provider', modelID: 'model' },
       };
       const secondInfo = {
-        id: 'msg_assistant_02',
+        id: 'msg_200_asst_0001',
         sessionID: sessionId,
         role: 'assistant',
         time: { created: 200, completed: 250 },
@@ -486,7 +487,6 @@ describe('SessionIngestDO integration', () => {
         type: 'text',
         text: 'hello back',
       };
-
       await stub.ingest(
         [
           { type: 'message', data: firstInfo },
@@ -499,14 +499,16 @@ describe('SessionIngestDO integration', () => {
         1
       );
 
-      expect(await stub.readKiloSdkMessages({})).toEqual({
-        messages: [
-          { info: firstInfo, parts: [firstPart] },
-          { info: secondInfo, parts: [secondPart] },
-        ],
-        nextCursor: null,
-        omittedItemCount: 0,
-      });
+      expect(await stub.readKiloSdkMessages({ limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE })).toEqual(
+        {
+          messages: [
+            { info: firstInfo, parts: [firstPart] },
+            { info: secondInfo, parts: [secondPart] },
+          ],
+          nextCursor: null,
+          omittedItemCount: 0,
+        }
+      );
     });
 
     it('returns invalid_data instead of throwing for malformed persisted transcript identity data', async () => {
@@ -643,7 +645,9 @@ describe('SessionIngestDO integration', () => {
       await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
         kind: 'invalid_data',
       });
-      await expect(stub.readKiloSdkMessages({})).resolves.toEqual({ kind: 'invalid_data' });
+      await expect(
+        stub.readKiloSdkMessages({ limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE })
+      ).resolves.toEqual({ kind: 'invalid_data' });
     });
 
     it('returns a retryable failure instead of an empty missing R2-backed message', async () => {
@@ -663,10 +667,12 @@ describe('SessionIngestDO integration', () => {
         { 'message/msg_missing': `items/${sessionId}/message/missing` }
       );
 
-      expect(await stub.readKiloSdkMessages({})).toEqual({
-        kind: 'retryable_failure',
-        phase: 'message_scan',
-      });
+      expect(await stub.readKiloSdkMessages({ limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE })).toEqual(
+        {
+          kind: 'retryable_failure',
+          phase: 'message_scan',
+        }
+      );
     });
 
     it('returns a retryable failure instead of an empty missing R2-backed selected part', async () => {
@@ -885,8 +891,8 @@ describe('SessionIngestDO integration', () => {
       });
     });
 
-    it('preserves unbounded cold-read materialization behavior', async () => {
-      const sessionId = 'ses_sdk_page_unbounded_000000001';
+    it('validates the page size before reading persisted history', async () => {
+      const sessionId = 'ses_sdk_page_pagesize_00000001';
       const stub = getStub(kiloUserId, sessionId);
       const messages = [
         { id: 'msg_later', created: 200 },
@@ -906,13 +912,14 @@ describe('SessionIngestDO integration', () => {
         1
       );
 
-      const omittedLimit = await stub.readKiloSdkMessages({});
-      expect(omittedLimit.messages.map(entry => entry.info.id)).toEqual([
-        'msg_earlier',
-        'msg_later',
-      ]);
-      const zeroLimit = await stub.readKiloSdkMessages({ limit: 0 });
-      expect(zeroLimit.messages.map(entry => entry.info.id)).toEqual(['msg_earlier', 'msg_later']);
+      await expect(stub.readKiloSdkMessages({ limit: 0 })).resolves.toEqual({
+        kind: 'invalid_data',
+      });
+      // The method parameter is a number, so cast to exercise the runtime
+      // validation with a missing value.
+      await expect(
+        stub.readKiloSdkMessages({ limit: undefined as unknown as number })
+      ).resolves.toEqual({ kind: 'invalid_data' });
     });
 
     it('hydrates selected R2-backed messages while skipping older R2 bodies', async () => {
@@ -1036,10 +1043,11 @@ describe('SessionIngestDO integration', () => {
         nextCursor: null,
         omittedItemCount: 0,
       });
-      await expect(stub.readKiloSdkMessages({})).resolves.toEqual({
-        kind: 'too_large',
-        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
-        phase: 'message_scan',
+      await expect(
+        stub.readKiloSdkMessages({ limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE })
+      ).resolves.toMatchObject({
+        messages: [{ info: { id: 'msg_100_old' } }, { info: { id: 'msg_200_readable' } }],
+        omittedItemCount: 3,
       });
     });
 
@@ -1551,7 +1559,9 @@ describe('SessionIngestDO integration', () => {
         omittedItemCount: 0,
       };
       await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual(expected);
-      await expect(stub.readKiloSdkMessages({})).resolves.toEqual(expected);
+      await expect(
+        stub.readKiloSdkMessages({ limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE })
+      ).resolves.toEqual(expected);
     });
 
     it('returns invalid_data for a selected historical NUL-bearing part body identity', async () => {
@@ -1637,9 +1647,7 @@ describe('SessionIngestDO integration', () => {
         omittedItemCount: 1,
       });
       await expect(stub.readKiloSdkMessages({ limit: 0 })).resolves.toEqual({
-        kind: 'too_large',
-        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
-        phase: 'page_parts',
+        kind: 'invalid_data',
       });
     });
 
@@ -1725,9 +1733,7 @@ describe('SessionIngestDO integration', () => {
       expect(page.omittedItemCount).toBe(1);
       expect(page.nextCursor).toBeNull();
       await expect(stub.readKiloSdkMessages({ limit: 0 })).resolves.toEqual({
-        kind: 'too_large',
-        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
-        phase: 'page_parts',
+        kind: 'invalid_data',
       });
     });
 

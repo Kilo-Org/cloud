@@ -1,5 +1,6 @@
 import {
   encodeKiloSdkMessagesCursor,
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
 } from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
@@ -1651,6 +1652,56 @@ describe('handleKiloFacadeRequest', () => {
       request: new Request(
         `http://worker.test/kilo/session/${kiloSessionId}/message?limit=${MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE + 1}`
       ),
+      env,
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_cold',
+        })),
+        resolveLiveWrapper,
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
+    expect(resolveLiveWrapper).not.toHaveBeenCalled();
+    expect(env.SESSION_INGEST.getCloudAgentRootSessionMessages).not.toHaveBeenCalled();
+  });
+
+  it('carries the shared default page size when the message read omits a limit', async () => {
+    const env = envStub();
+    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
+      kiloSessionId,
+      cloudAgentSessionId: 'agent_cold',
+      history: { messages: sdkMessageHistory(), nextCursor: null, omittedItemCount: 0 },
+    });
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
+      env,
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_cold',
+        })),
+        resolveLiveWrapper: vi.fn(async () => null),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(env.SESSION_INGEST.getCloudAgentRootSessionMessages).toHaveBeenCalledWith({
+      kiloUserId: 'usr_1',
+      kiloSessionId,
+      limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+    });
+  });
+
+  it('requires an explicit page size within the accepted range', async () => {
+    const env = envStub();
+    const resolveLiveWrapper = vi.fn();
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message?limit=0`),
       env,
       userId: 'usr_1',
       deps: {

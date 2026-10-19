@@ -1056,7 +1056,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     return readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
   }
 
-  async readKiloSdkMessages(params: { limit?: number; before?: string }) {
+  async readKiloSdkMessages(params: { limit: number; before?: string }) {
     return readKiloSdkMessages(this.db, this.env.SESSION_INGEST_R2, params);
   }
 

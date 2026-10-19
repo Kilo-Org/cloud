@@ -36,22 +36,27 @@ function modeStub(env: AutoRoutingModeEnv, ownerType: AutoRoutingModeOwnerType, 
   return namespace.get(namespace.idFromName(modeKey(ownerType, ownerId)));
 }
 
+export function readConfiguredAutoRoutingMode(
+  env: AutoRoutingModeEnv,
+  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+): Promise<AutoRoutingMode | null> {
+  return modeStub(env, owner.ownerType, owner.ownerId).getMode();
+}
+
 export async function getConfiguredAutoRoutingMode(
   env: AutoRoutingModeEnv,
   owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
 ): Promise<AutoRoutingMode | null> {
-  return modeStub(env, owner.ownerType, owner.ownerId)
-    .getMode()
-    .catch((error: unknown) => {
-      console.warn(
-        JSON.stringify({
-          event: 'auto_routing_config_read_failed',
-          key: modeKey(owner.ownerType, owner.ownerId),
-          ...formatError(error),
-        })
-      );
-      return null;
-    });
+  return readConfiguredAutoRoutingMode(env, owner).catch((error: unknown) => {
+    console.warn(
+      JSON.stringify({
+        event: 'auto_routing_config_read_failed',
+        key: modeKey(owner.ownerType, owner.ownerId),
+        ...formatError(error),
+      })
+    );
+    return null;
+  });
 }
 
 export async function getAutoRoutingMode(

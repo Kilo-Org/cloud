@@ -2921,6 +2921,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Pirms sākam",
+    "summaryTitle": "Datu kopīgošanas preferences",
     "introDescription": "Kilo nosūta tavus ziņojumus AI pakalpojumu sniedzējiem, lai sagatavotu atbildes. Tālāk ir norādīts, kādi dati tiek kopīgoti un ar ko.",
     "required": "Nepieciešams Kilo lietošanai",
     "promptsTitle": "Tavas uzvednes un sarunas",
@@ -2929,7 +2930,6 @@
     "accountDescription": "Tavs Kilo konta ID un pieprasījumu metadati, ko izmanto autentifikācijai un lietojuma mērīšanai.",
     "diagnosticsTitle": "Lietotnes diagnostika",
     "diagnosticsDescription": "Avāriju un kļūdu ziņojumi, no kuriem ir izņemts lietotnes saturs un kuri palīdz nodrošināt lietotnes stabilitāti.",
-    "optional": "Pēc izvēles",
     "helpImprove": "Palīdzēt uzlabot Kilo",
     "helpImproveDescription": "Kopīgo anonīmus datus par lietotnes lietošanu un instalēšanas avotu. To vari jebkurā laikā mainīt iestatījumos.",
     "seeFullDetails": "Skatīt visu informāciju",

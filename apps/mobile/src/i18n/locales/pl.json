@@ -2417,6 +2417,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Zanim zaczniemy",
+    "summaryTitle": "Preferencje udostępniania danych",
     "introDescription": "Kilo wysyła twoje wiadomości do dostawców AI, aby generować odpowiedzi. Poniżej znajdziesz informacje o tym, jakie dane udostępniamy i komu.",
     "required": "Wymagane do korzystania z Kilo",
     "promptsTitle": "Twoje polecenia i rozmowy",
@@ -2425,7 +2426,6 @@
     "accountDescription": "Identyfikator twojego konta Kilo i metadane żądań, używane do uwierzytelniania i pomiaru zużycia.",
     "diagnosticsTitle": "Diagnostyka aplikacji",
     "diagnosticsDescription": "Raporty o awariach i błędach, bez treści z aplikacji, które pomagają zapewnić jej stabilne działanie.",
-    "optional": "Opcjonalne",
     "helpImprove": "Pomóż ulepszyć Kilo",
     "helpImproveDescription": "Udostępniaj anonimowe dane o korzystaniu z aplikacji i źródle jej instalacji. Możesz to zmienić w każdej chwili w ustawieniach.",
     "seeFullDetails": "Zobacz szczegóły",

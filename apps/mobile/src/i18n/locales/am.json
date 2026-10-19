@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "ከመጀመራችን በፊት",
+    "summaryTitle": "የውሂብ ማጋራት ምርጫዎች",
     "introDescription": "Kilo ምላሾችን ለማመንጨት መልእክቶችዎን ለAI አቅራቢዎች ይልካል። የሚጋራው ውሂብ እና የሚቀበሉት ወገኖች ከታች ተዘርዝረዋል።",
     "required": "Kiloን ለመጠቀም አስፈላጊ",
     "promptsTitle": "ጥያቄዎችዎ እና ውይይቶችዎ",
@@ -2889,7 +2890,6 @@
     "accountDescription": "የKilo መለያዎ መለያ ቁጥር እና የጥያቄዎች ተጨማሪ መረጃ ማንነትዎን ለማረጋገጥና አጠቃቀምን ለመለካት ያገለግላሉ።",
     "diagnosticsTitle": "የመተግበሪያ ምርመራዎች",
     "diagnosticsDescription": "የመተግበሪያው ይዘት የተወገደላቸው የብልሽትና የስህተት ሪፖርቶች መተግበሪያው በተረጋጋ ሁኔታ እንዲሠራ ያገለግላሉ።",
-    "optional": "አማራጭ",
     "helpImprove": "Kiloን ለማሻሻል ይርዱ",
     "helpImproveDescription": "ማንነትዎን የማይገልጽ የአጠቃቀም ትንታኔ ውሂብ እና መተግበሪያውን ያገኙበትን ምንጭ ያጋሩ። ይህን በማንኛውም ጊዜ በቅንብሮች ውስጥ መቀየር ይችላሉ።",
     "seeFullDetails": "ሙሉ ዝርዝሮችን ይመልከቱ",

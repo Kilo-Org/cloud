@@ -2369,6 +2369,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "开始之前",
+    "summaryTitle": "数据共享偏好设置",
     "introDescription": "Kilo 会将你的消息发送给 AI 提供商，以生成回复。下方列出了共享的数据及其接收方。",
     "required": "使用 Kilo 的必要授权",
     "promptsTitle": "你的提示词和对话",
@@ -2377,7 +2378,6 @@
     "accountDescription": "你的 Kilo 账户 ID 和请求元数据，用于验证身份并统计用量。",
     "diagnosticsTitle": "应用诊断",
     "diagnosticsDescription": "移除应用内容后的崩溃和错误报告，用于保障应用稳定运行。",
-    "optional": "可选",
     "helpImprove": "帮助改进 Kilo",
     "helpImproveDescription": "共享匿名的产品分析数据和安装来源。你可以随时在设置中更改此选项。",
     "seeFullDetails": "查看完整详情",

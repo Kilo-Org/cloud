@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Før vi begynner",
+    "summaryTitle": "Innstillinger for datadeling",
     "introDescription": "Kilo sender meldingene dine til AI-leverandører for å generere svar. Her ser du hvilke data vi deler, og hvem vi deler dem med.",
     "required": "Nødvendig for å bruke Kilo",
     "promptsTitle": "Instruksjonene og samtalene dine",
@@ -2889,7 +2890,6 @@
     "accountDescription": "ID-en til Kilo-kontoen din og metadata om forespørsler brukes til å bekrefte identiteten din og måle forbruket.",
     "diagnosticsTitle": "Appdiagnostikk",
     "diagnosticsDescription": "Krasj- og feilrapporter brukes til å holde appen stabil. Innhold fra appen er fjernet fra rapportene.",
-    "optional": "Valgfritt",
     "helpImprove": "Hjelp til å forbedre Kilo",
     "helpImproveDescription": "Del anonyme bruksdata og informasjon om installasjonskilden. Du kan endre dette når som helst i innstillingene.",
     "seeFullDetails": "Se alle detaljer",

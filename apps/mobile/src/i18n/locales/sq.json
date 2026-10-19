@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Përpara se të fillojmë",
+    "summaryTitle": "Preferencat e ndarjes së të dhënave",
     "introDescription": "Kilo dërgon mesazhet e tua te ofruesit e AI për të gjeneruar përgjigje. Ja cilat të dhëna ndahen dhe me kë.",
     "required": "E nevojshme për të përdorur Kilo",
     "promptsTitle": "Kërkesat dhe bisedat e tua",
@@ -2889,7 +2890,6 @@
     "accountDescription": "ID-ja e llogarisë tënde Kilo dhe metadatat e kërkesave përdoren për të verifikuar identitetin tënd dhe për të matur përdorimin.",
     "diagnosticsTitle": "Diagnostika e aplikacionit",
     "diagnosticsDescription": "Raportet e ndërprerjeve të papritura dhe të gabimeve, pa përmbajtjen e aplikacionit, përdoren për ta mbajtur aplikacionin të qëndrueshëm.",
-    "optional": "Opsionale",
     "helpImprove": "Ndihmo në përmirësimin e Kilo",
     "helpImproveDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit. Mund ta ndryshosh këtë në çdo kohë te cilësimet.",
     "seeFullDetails": "Shiko detajet e plota",

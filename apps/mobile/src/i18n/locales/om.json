@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Osoo hin jalqabin",
+    "summaryTitle": "Filannoo qooda odeeffannoo",
     "introDescription": "Kilo deebii uumuuf ergaawwan kee dhiyeessitoota AI tiif erga. Odeeffannoo qoodamu fi eenyuuf akka qoodamu asitti ilaali.",
     "required": "Kilo fayyadamuuf kan barbaachisu",
     "promptsTitle": "Gaaffiiwwanii fi mariiwwan kee",
@@ -2889,7 +2890,6 @@
     "accountDescription": "Eenymmeessaa herrega Kilo kee fi odeeffannoo dabalataa gaaffii, eenyummaa kee mirkaneessuu fi fayyadama safaruuf gargaaran.",
     "diagnosticsTitle": "Qorannoo appilikeeshinii",
     "diagnosticsDescription": "Gabaasota appilikeeshiniin tasa cufamuu fi dogoggoraa, qabiyyeen appilikeeshinii keessaa haqame, appilikeeshiniin tasgabbaa'ee akka hojjetuuf gargaaran.",
-    "optional": "Dirqamaa miti",
     "helpImprove": "Kilo fooyyessuuf gargaari",
     "helpImproveDescription": "Xiinxala fayyadama oomishaa eenyummaa kee hin mul'isnee fi madda fe'iinsaa qoodi. Kana yeroo kamiyyuu Qindaa'inoota keessatti jijjiiruu dandeessa.",
     "seeFullDetails": "Odeeffannoo guutuu ilaali",

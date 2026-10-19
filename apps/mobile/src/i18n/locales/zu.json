@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Ngaphambi kokuba siqale",
+    "summaryTitle": "Izintandokazi zokwabelana ngedatha",
     "introDescription": "I-Kilo ithumela imilayezo yakho kubahlinzeki be-AI ukuze bakhiqize izimpendulo. Nansi idatha esabelana ngayo nalabo esabelana nabo.",
     "required": "Kuyadingeka ukuze usebenzise i-Kilo",
     "promptsTitle": "Izicelo zakho nezingxoxo",
@@ -2889,7 +2890,6 @@
     "accountDescription": "I-ID ye-akhawunti yakho ye-Kilo nemininingwane yezicelo, okusetshenziselwa ukuqinisekisa ubuwena nokulinganisa ukusetshenziswa.",
     "diagnosticsTitle": "Ukuhlolwa kohlelo lokusebenza",
     "diagnosticsDescription": "Imibiko yokuphahlazeka namaphutha, okususiwe kuyo okuqukethwe kohlelo lokusebenza, esetshenziselwa ukugcina uhlelo lokusebenza luzinzile.",
-    "optional": "Ongazikhethela kona",
     "helpImprove": "Siza ukuthuthukisa i-Kilo",
     "helpImproveDescription": "Yabelana ngedatha yokusetshenziswa komkhiqizo engakuvezi ukuthi ungubani kanye nomthombo owufake kuwo. Ungakushintsha lokhu noma nini ezilungiselelweni.",
     "seeFullDetails": "Bona yonke imininingwane",

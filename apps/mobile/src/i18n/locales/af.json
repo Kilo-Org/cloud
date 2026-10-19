@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Voordat ons begin",
+    "summaryTitle": "Voorkeure vir datadeling",
     "introDescription": "Kilo stuur jou boodskappe na AI-verskaffers om antwoorde te genereer. Hier sien jy wat ons deel en met wie.",
     "required": "Vereis om Kilo te gebruik",
     "promptsTitle": "Jou opdragte en gesprekke",
@@ -2889,7 +2890,6 @@
     "accountDescription": "Jou Kilo-rekening-ID en versoekmetadata, wat gebruik word om jou identiteit te verifieer en jou gebruik te meet.",
     "diagnosticsTitle": "Toepdiagnostiek",
     "diagnosticsDescription": "Verslae oor ineenstortings en foute, waaruit die toepinhoud verwyder is, om die toep stabiel te hou.",
-    "optional": "Opsioneel",
     "helpImprove": "Help om Kilo te verbeter",
     "helpImproveDescription": "Deel anonieme gebruiksontledings en jou installasiebron. Jy kan dit enige tyd in Instellings verander.",
     "seeFullDetails": "Bekyk volledige besonderhede",

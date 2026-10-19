@@ -2321,6 +2321,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Avant de commencer",
+    "summaryTitle": "Préférences de partage des données",
     "introDescription": "Kilo envoie vos messages à des fournisseurs d'IA pour générer des réponses. Voici ce qui est partagé et avec qui.",
     "required": "Requis pour utiliser Kilo",
     "promptsTitle": "Vos consignes et conversations",
@@ -2329,7 +2330,6 @@
     "accountDescription": "Votre identifiant de compte Kilo et les métadonnées des requêtes, utilisés pour vous authentifier et mesurer l'utilisation.",
     "diagnosticsTitle": "Diagnostics de l'application",
     "diagnosticsDescription": "Rapports de plantage et d'erreur, sans le contenu de l'application, utilisés pour assurer sa stabilité.",
-    "optional": "Facultatif",
     "helpImprove": "Aider à améliorer Kilo",
     "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment dans les réglages.",
     "seeFullDetails": "Voir tous les détails",

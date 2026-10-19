@@ -2369,6 +2369,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "시작하기 전에",
+    "summaryTitle": "데이터 공유 환경설정",
     "introDescription": "Kilo는 응답을 생성하기 위해 메시지를 AI 제공업체에 보냅니다. 공유하는 데이터와 공유 대상을 확인하세요.",
     "required": "Kilo 사용에 필요한 필수 항목",
     "promptsTitle": "프롬프트와 대화",
@@ -2377,7 +2378,6 @@
     "accountDescription": "인증 및 사용량 측정에 사용되는 Kilo 계정 ID와 요청 메타데이터입니다.",
     "diagnosticsTitle": "앱 진단",
     "diagnosticsDescription": "앱 안정성을 유지하기 위한 비정상 종료 및 오류 보고서입니다. 앱 콘텐츠는 제외됩니다.",
-    "optional": "선택 사항",
     "helpImprove": "Kilo 개선 돕기",
     "helpImproveDescription": "익명 사용 분석 데이터와 설치 경로를 공유합니다. 설정에서 언제든지 변경할 수 있습니다.",
     "seeFullDetails": "자세히 보기",

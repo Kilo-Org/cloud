@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Sebelum kita bermula",
+    "summaryTitle": "Keutamaan perkongsian data",
     "introDescription": "Kilo menghantar mesej anda kepada penyedia AI untuk menjana respons. Berikut ialah data yang dikongsi dan pihak yang menerimanya.",
     "required": "Diperlukan untuk menggunakan Kilo",
     "promptsTitle": "Gesaan dan perbualan anda",
@@ -2889,7 +2890,6 @@
     "accountDescription": "ID akaun Kilo dan metadata permintaan anda digunakan untuk mengesahkan identiti anda dan mengukur penggunaan.",
     "diagnosticsTitle": "Diagnostik apl",
     "diagnosticsDescription": "Laporan ranap dan ralat tanpa kandungan apl digunakan untuk mengekalkan kestabilan apl.",
-    "optional": "Pilihan",
     "helpImprove": "Bantu menambah baik Kilo",
     "helpImproveDescription": "Kongsi analitik produk tanpa nama dan sumber pemasangan. Anda boleh mengubahnya pada bila-bila masa dalam Tetapan.",
     "seeFullDetails": "Lihat butiran penuh",

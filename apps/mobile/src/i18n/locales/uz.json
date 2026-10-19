@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Boshlashdan oldin",
+    "summaryTitle": "Ma'lumotlarni ulashish sozlamalari",
     "introDescription": "Kilo javob yaratish uchun xabarlaringizni AI provayderlariga yuboradi. Quyida qaysi ma'lumotlar kimga yuborilishi ko'rsatilgan.",
     "required": "Kilo ilovasidan foydalanish uchun majburiy",
     "promptsTitle": "So'rovlaringiz va suhbatlaringiz",
@@ -2889,7 +2890,6 @@
     "accountDescription": "Kilo hisobingizning ID raqami va so'rov metama'lumotlari shaxsingizni tasdiqlash va foydalanishni hisoblash uchun ishlatiladi.",
     "diagnosticsTitle": "Ilova diagnostikasi",
     "diagnosticsDescription": "Ilova mazmuni olib tashlangan nosozlik va xato hisobotlari ilovaning barqaror ishlashi uchun qo'llanadi.",
-    "optional": "Ixtiyoriy",
     "helpImprove": "Kiloni yaxshilashga yordam bering",
     "helpImproveDescription": "Ilovadan foydalanish haqidagi anonim ma'lumotlar va o'rnatish manbasini ulashing. Buni istalgan vaqtda sozlamalarda o'zgartirishingiz mumkin.",
     "seeFullDetails": "To'liq tafsilotlarni ko'rish",

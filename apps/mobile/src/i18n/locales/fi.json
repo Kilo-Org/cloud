@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Ennen kuin aloitamme",
+    "summaryTitle": "Tietojen jakamisen asetukset",
     "introDescription": "Kilo lähettää viestisi AI-palveluntarjoajille vastausten tuottamista varten. Alla näet, mitä tietoja jaetaan ja kenelle.",
     "required": "Kilon käytön edellytykset",
     "promptsTitle": "Kehotteesi ja keskustelusi",
@@ -2889,7 +2890,6 @@
     "accountDescription": "Kilo-tilisi tunnusta ja pyyntöjen metatietoja käytetään tunnistamiseesi ja käytön mittaamiseen.",
     "diagnosticsTitle": "Sovelluksen diagnostiikka",
     "diagnosticsDescription": "Kaatumis- ja virheraportteja käytetään sovelluksen vakauden ylläpitämiseen. Sovelluksen sisältö poistetaan raporteista.",
-    "optional": "Valinnainen",
     "helpImprove": "Auta parantamaan Kiloa",
     "helpImproveDescription": "Jaa anonyymejä tietoja sovelluksen käytöstä ja asennuksen lähteestä. Voit muuttaa asetusta milloin tahansa asetuksissa.",
     "seeFullDetails": "Näytä täydet tiedot",

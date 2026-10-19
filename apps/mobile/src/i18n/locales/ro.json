@@ -2921,6 +2921,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Înainte să începem",
+    "summaryTitle": "Preferințe de partajare a datelor",
     "introDescription": "Kilo trimite mesajele tale furnizorilor de AI pentru a genera răspunsuri. Iată ce date partajăm și cu cine.",
     "required": "Necesar pentru utilizarea Kilo",
     "promptsTitle": "Instrucțiunile și conversațiile tale",
@@ -2929,7 +2930,6 @@
     "accountDescription": "ID-ul contului tău Kilo și metadatele cererilor, folosite pentru a te autentifica și a măsura utilizarea.",
     "diagnosticsTitle": "Date de diagnostic ale aplicației",
     "diagnosticsDescription": "Rapoarte despre închideri neașteptate și erori, din care eliminăm conținutul aplicației, folosite pentru a menține stabilitatea aplicației.",
-    "optional": "Opțional",
     "helpImprove": "Ajută la îmbunătățirea Kilo",
     "helpImproveDescription": "Partajează date anonime despre utilizarea aplicației și sursa instalării. Poți modifica oricând această opțiune în setări.",
     "seeFullDetails": "Vezi toate detaliile",

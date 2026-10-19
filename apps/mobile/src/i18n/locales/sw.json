@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Kabla ya kuanza",
+    "summaryTitle": "Mapendeleo ya kushiriki data",
     "introDescription": "Kilo hutuma ujumbe wako kwa watoa huduma wa AI ili kutengeneza majibu. Hapa kuna maelezo ya data inayoshirikiwa na wanaoipokea.",
     "required": "Inahitajika ili utumie Kilo",
     "promptsTitle": "Maagizo na mazungumzo yako",
@@ -2889,7 +2890,6 @@
     "accountDescription": "Kitambulisho cha akaunti yako ya Kilo na maelezo ya ziada ya maombi hutumika kuthibitisha utambulisho wako na kupima matumizi.",
     "diagnosticsTitle": "Uchunguzi wa programu",
     "diagnosticsDescription": "Ripoti za programu kuacha kufanya kazi na za hitilafu hutumika kuhakikisha programu inafanya kazi vizuri. Maudhui ya programu huondolewa kwenye ripoti hizo.",
-    "optional": "Hiari",
     "helpImprove": "Saidia kuboresha Kilo",
     "helpImproveDescription": "Shiriki takwimu za matumizi zisizokutambulisha na chanzo cha usakinishaji. Unaweza kubadilisha hili wakati wowote kwenye mipangilio.",
     "seeFullDetails": "Tazama maelezo kamili",

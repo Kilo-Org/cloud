@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "I mua i te tīmatanga",
+    "summaryTitle": "Ngā tautuhinga tuari raraunga",
     "introDescription": "Ka tukuna e Kilo ō karere ki ngā kaiwhakarato AI hei whakaputa whakautu. Anei ngā raraunga ka tuaritia me ngā kaiwhiwhi.",
     "required": "E hiahiatia ana hei whakamahi i a Kilo",
     "promptsTitle": "Ō tohutohu me ō kōrerorero",
@@ -2889,7 +2890,6 @@
     "accountDescription": "Te ID o tō pūkete Kilo me ngā raraungameta o ngā tono, hei manatoko i a koe, hei ine hoki i te whakamahinga.",
     "diagnosticsTitle": "Ngā tātaritanga hapa o te taupānga",
     "diagnosticsDescription": "Ngā pūrongo tukinga me ngā hapa, kua tangohia ngā ihirangi o te taupānga, hei whakapūmau i te taupānga.",
-    "optional": "He kōwhiringa",
     "helpImprove": "Āwhina ki te whakapai ake i a Kilo",
     "helpImproveDescription": "Tuaritia ngā tātaritanga whakamahinga kāore he ingoa, me te pūtake tāuta. Ka taea e koe te huri i tēnei i ngā tautuhinga ahakoa te wā.",
     "seeFullDetails": "Tirohia ngā taipitopito katoa",

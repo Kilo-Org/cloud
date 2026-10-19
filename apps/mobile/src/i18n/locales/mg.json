@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Alohan'ny hanombohana",
+    "summaryTitle": "Safidy momba ny fizaràna angona",
     "introDescription": "Mandefa ny hafatrao any amin'ny mpamatsy AI ny Kilo mba hamoronana valiny. Ireto ny angona zaraina sy ny mpandray azy.",
     "required": "Ilaina amin'ny fampiasana Kilo",
     "promptsTitle": "Ny toromarikanao sy ny resakao",
@@ -2889,7 +2890,6 @@
     "accountDescription": "Ny famantarana ny kaontinao Kilo sy ny angona mamaritra ny fangatahana, ampiasaina hanamarinana anao sy handrefesana ny fampiasana.",
     "diagnosticsTitle": "Fitiliana ny rindranasa",
     "diagnosticsDescription": "Tatitry ny fijanonana tampoka sy ny hadisoana, izay nesorina ny votoatin'ny rindranasa, mba hiantohana ny fiasan'ny rindranasa.",
-    "optional": "Tsy voatery",
     "helpImprove": "Ampio hanatsara ny Kilo",
     "helpImproveDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana. Azonao ovaina ao amin'ny Fikirana izany amin'ny fotoana rehetra.",
     "seeFullDetails": "Jereo ny antsipiriany feno",

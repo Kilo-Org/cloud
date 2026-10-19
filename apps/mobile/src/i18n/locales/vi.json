@@ -2369,6 +2369,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Trước khi bắt đầu",
+    "summaryTitle": "Tùy chọn chia sẻ dữ liệu",
     "introDescription": "Kilo gửi tin nhắn của bạn đến các nhà cung cấp AI để tạo phản hồi. Dưới đây là thông tin về dữ liệu được chia sẻ và bên nhận dữ liệu.",
     "required": "Bắt buộc để sử dụng Kilo",
     "promptsTitle": "Yêu cầu và cuộc trò chuyện của bạn",
@@ -2377,7 +2378,6 @@
     "accountDescription": "ID tài khoản Kilo và siêu dữ liệu của yêu cầu, dùng để xác thực và tính mức sử dụng của bạn.",
     "diagnosticsTitle": "Chẩn đoán ứng dụng",
     "diagnosticsDescription": "Báo cáo sự cố và lỗi, đã loại bỏ nội dung ứng dụng, dùng để giữ ứng dụng ổn định.",
-    "optional": "Tùy chọn",
     "helpImprove": "Giúp cải thiện Kilo",
     "helpImproveDescription": "Chia sẻ dữ liệu phân tích sản phẩm ẩn danh và nguồn cài đặt ứng dụng. Bạn có thể thay đổi lựa chọn này bất cứ lúc nào trong Cài đặt.",
     "seeFullDetails": "Xem đầy đủ thông tin",

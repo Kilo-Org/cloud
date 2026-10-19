@@ -3001,6 +3001,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Qabel ma nibdew",
+    "summaryTitle": "Preferenzi tal-qsim tad-dejta",
     "introDescription": "Kilo jibgħat il-messaġġi tiegħek lill-fornituri tal-AI biex jiġġeneraw tweġibiet. Hawn tara x'naqsmu u ma' min.",
     "required": "Meħtieġ biex tuża Kilo",
     "promptsTitle": "L-istruzzjonijiet u l-konversazzjonijiet tiegħek",
@@ -3009,7 +3010,6 @@
     "accountDescription": "L-ID tal-kont tiegħek ta' Kilo u l-metadata tat-talbiet, użati biex tiġi vverifikata l-identità tiegħek u jitkejjel l-użu.",
     "diagnosticsTitle": "Dijanjostika tal-applikazzjoni",
     "diagnosticsDescription": "Rapporti ta' waqfien mhux mistenni u żbalji, mingħajr il-kontenut tal-applikazzjoni, użati biex l-applikazzjoni tibqa' stabbli.",
-    "optional": "Mhux obbligatorju",
     "helpImprove": "Għin biex jitjieb Kilo",
     "helpImproveDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni. Tista' tbiddel din l-għażla meta trid fis-settings.",
     "seeFullDetails": "Ara d-dettalji sħaħ",

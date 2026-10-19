@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Tupu anyị amalite",
+    "summaryTitle": "Mmasị ikesi data",
     "introDescription": "Kilo na-ezigara ndị na-enye ọrụ AI ozi gị ka ha mepụta nzaghachi. Ihe ndị a na-egosi data a na-ekekọrịta na ndị na-anata ya.",
     "required": "Ihe achọrọ iji Kilo",
     "promptsTitle": "Ihe ị na-ede na mkparịta ụka gị",
@@ -2889,7 +2890,6 @@
     "accountDescription": "A na-eji ID akaụntụ Kilo gị na nkọwa data arịrịọ iji nyochaa njirimara gị ma tụọ ojiji.",
     "diagnosticsTitle": "Nchọpụta nsogbu ngwa",
     "diagnosticsDescription": "A na-eji akụkọ mmebi na njehie eme ka ngwa rụọ ọrụ nke ọma, mgbe e wepụchara ọdịnaya ngwa na ha.",
-    "optional": "Ọ bụghị iwu",
     "helpImprove": "Nyere aka melite Kilo",
     "helpImproveDescription": "Kekọrịta data nyocha ojiji ngwa na-enweghị njirimara gị, yana ebe ị si nweta ngwa ahụ. Ị nwere ike ịgbanwe nke a oge ọ bụla na Ntọala.",
     "seeFullDetails": "Hụ nkọwa zuru ezu",

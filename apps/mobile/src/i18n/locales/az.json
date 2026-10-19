@@ -2881,6 +2881,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Başlamazdan əvvəl",
+    "summaryTitle": "Məlumat paylaşımı seçimləri",
     "introDescription": "Kilo cavab yaratmaq üçün mesajlarını AI təminatçılarına göndərir. Aşağıda hansı məlumatların kimlərlə paylaşıldığını görə bilərsən.",
     "required": "Kilo-dan istifadə üçün tələb olunanlar",
     "promptsTitle": "Sorğuların və söhbətlərin",
@@ -2889,7 +2890,6 @@
     "accountDescription": "Kilo hesabının identifikatoru və sorğunun metaməlumatları kimliyini təsdiqləmək və istifadəni ölçmək üçün işlədilir.",
     "diagnosticsTitle": "Tətbiq diaqnostikası",
     "diagnosticsDescription": "Tətbiqin sabit işləməsi üçün istifadə olunan çökmə və xəta hesabatları. Tətbiqin məzmunu bu hesabatlardan silinir.",
-    "optional": "İstəyə bağlı",
     "helpImprove": "Kilo-nu yaxşılaşdırmağa kömək et",
     "helpImproveDescription": "Məhsulun istifadəsi haqqında anonim məlumatları və quraşdırma mənbəyini paylaş. Bunu istənilən vaxt parametrlərdə dəyişə bilərsən.",
     "seeFullDetails": "Bütün təfərrüatlara bax",

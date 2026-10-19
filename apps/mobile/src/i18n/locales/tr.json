@@ -2369,6 +2369,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Başlamadan önce",
+    "summaryTitle": "Veri paylaşımı tercihleri",
     "introDescription": "Kilo, yanıt üretmek için mesajlarını yapay zekâ sağlayıcılarına gönderir. Hangi verilerin kiminle paylaşıldığını aşağıda görebilirsin.",
     "required": "Kilo'yu kullanmak için gerekli",
     "promptsTitle": "İstemlerin ve konuşmaların",
@@ -2377,7 +2378,6 @@
     "accountDescription": "Kimliğini doğrulamak ve kullanımı ölçmek için kullanılan Kilo hesap kimliğin ve istek meta verileri.",
     "diagnosticsTitle": "Uygulama tanılama verileri",
     "diagnosticsDescription": "Uygulamanın kararlı çalışması için kullanılan, uygulama içeriğinden arındırılmış çökme ve hata raporları.",
-    "optional": "İsteğe bağlı",
     "helpImprove": "Kilo'yu iyileştirmeye yardımcı ol",
     "helpImproveDescription": "Anonim ürün analizi verilerini ve uygulamayı yüklediğin kaynağı paylaş. Bu tercihi ayarlardan istediğin zaman değiştirebilirsin.",
     "seeFullDetails": "Tüm ayrıntıları gör",

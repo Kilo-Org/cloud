@@ -401,19 +401,24 @@ describe('verifyPlayIntegrity access token cache', () => {
     expect(tokenCalls).toHaveLength(1);
   });
 
-  test('both Google calls carry an abort timeout signal', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
-    });
-    const hash = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
-    mockFetch.mockResolvedValueOnce(validVerdict(hash));
+  test('both Google calls carry the 10s abort timeout signal', async () => {
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+    try {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+      });
+      const hash = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+      mockFetch.mockResolvedValueOnce(validVerdict(hash));
 
-    await verifyPlayIntegrity('integrity-1', 'challenge-1');
+      await verifyPlayIntegrity('integrity-1', 'challenge-1');
 
-    for (const call of mockFetch.mock.calls) {
-      const init = call[1] as { signal?: AbortSignal };
-      expect(init.signal).toBeInstanceOf(AbortSignal);
+      expect(timeoutSpy).toHaveBeenCalledTimes(2);
+      for (const call of timeoutSpy.mock.calls) {
+        expect(call[0]).toBe(10_000);
+      }
+    } finally {
+      timeoutSpy.mockRestore();
     }
   });
 

@@ -532,6 +532,39 @@ describe('admission condition aggregation', () => {
     }
   });
 
+  test('final window flushes on later traffic even without a new counted condition', () => {
+    setMode('enforce');
+    jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000);
+    try {
+      checkNativeAdmission({ provider: 'google', idToken: 'a' });
+      // Window elapses; the next request has an admission field, so nothing
+      // new is counted, but the pending window must still flush.
+      jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000 + 60_001);
+      checkNativeAdmission({
+        provider: 'google',
+        idToken: 'b',
+        admission: {
+          platform: 'android',
+          kind: 'assertion',
+          challenge: 'ch1',
+          payload: 'base64data',
+          keyId: 'key1',
+        },
+      });
+
+      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
+      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
+      expect(line).toMatchObject({
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_legacy_count',
+        count: 1,
+        windowStart: new Date(3_000_000).toISOString(),
+      });
+    } finally {
+      jestGlobal.restoreAllMocks();
+    }
+  });
+
   test('per-request captureMessage stays silent for expected conditions', () => {
     setMode('enforce');
     checkNativeAdmission({ provider: 'google', idToken: 'a' });

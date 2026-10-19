@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import {
   addCommand,
+  commandPosition,
   commandRowA11yLabel,
   MAX_SETUP_COMMAND_LENGTH,
   MAX_SETUP_COMMANDS,
@@ -153,9 +154,16 @@ export function ProfileCommandsScreen({
   const controlClass = (disabled: boolean) =>
     cn('h-11 w-11 items-center justify-center active:opacity-70', disabled && 'opacity-40');
 
+  const commandTotal = nonBlankCommands(commands).length;
   const renderCommandRow = (command: string, index: number) => {
     const isFirst = index === 0;
     const isLast = index === commands.length - 1;
+    const position = commandPosition(commands, index);
+    const upLabel =
+      position === null ? t('profiles.moveUp') : t('profiles.moveCommandUp', { position });
+    const downLabel =
+      position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
+    const rowHint = position === null ? undefined : commandRowA11yLabel(position - 1, commandTotal);
     return (
       <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
         <FormField
@@ -167,7 +175,7 @@ export function ProfileCommandsScreen({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
-          accessibilityHint={commandRowA11yLabel(index, commands.length)}
+          accessibilityHint={rowHint}
           onChangeText={value => {
             setCommands(current => replaceCommand(current, index, value));
           }}
@@ -183,8 +191,8 @@ export function ProfileCommandsScreen({
             className={controlClass(isFirst)}
             disabled={isFirst}
             accessibilityRole="button"
-            accessibilityLabel={t('profiles.moveCommandUp', { position: index + 1 })}
-            accessibilityHint={commandRowA11yLabel(index, commands.length)}
+            accessibilityLabel={upLabel}
+            accessibilityHint={rowHint}
             onPress={() => {
               move(index, -1);
             }}
@@ -195,8 +203,8 @@ export function ProfileCommandsScreen({
             className={controlClass(isLast)}
             disabled={isLast}
             accessibilityRole="button"
-            accessibilityLabel={t('profiles.moveCommandDown', { position: index + 1 })}
-            accessibilityHint={commandRowA11yLabel(index, commands.length)}
+            accessibilityLabel={downLabel}
+            accessibilityHint={rowHint}
             onPress={() => {
               move(index, 1);
             }}

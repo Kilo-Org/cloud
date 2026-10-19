@@ -38,3 +38,16 @@ export function nonBlankCommands(commands: readonly string[]): string[] {
 export function commandRowA11yLabel(index: number, total: number): string {
   return `${index + 1} / ${total}`;
 }
+
+/**
+ * One-based position among the commands alone, or `null` for a blank draft
+ * row. Blank rows are not commands, so they must not claim a command number
+ * that the saved list does not hold.
+ */
+export function commandPosition(commands: readonly string[], index: number): number | null {
+  const row = commands[index];
+  if (row === undefined || row.trim().length === 0) {
+    return null;
+  }
+  return commands.slice(0, index + 1).filter(command => command.trim().length > 0).length;
+}

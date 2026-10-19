@@ -4,6 +4,7 @@ import '@/i18n';
 import {
   changeRowText,
   commitRow,
+  findAll,
   findFields,
   mountScreen,
   pressBack,
@@ -248,6 +249,23 @@ describe('ProfileCommandsScreen Back', () => {
     await waitFor(() => h.back.mock.calls.length > 0);
     expect(h.mutations.setCommands.mutateAsync).not.toHaveBeenCalled();
     expect(h.back).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('does not number a blank draft row as a command', async () => {
+    h.query.data = testProfile(['a']);
+    h.query.isPending = false;
+    const { renderer, unmount } = await mountScreen();
+    pressButton(renderer.root);
+    const labels = findAll(renderer.root, 'Pressable')
+      .map(node => node.props.accessibilityLabel)
+      .filter((label): label is string => typeof label === 'string');
+    expect(labels.filter(label => label.startsWith('Move command '))).toEqual([
+      'Move command 1 up',
+      'Move command 1 down',
+    ]);
+    expect(labels).toContain('Move up');
+    expect(labels).toContain('Move down');
     unmount();
   });
 });

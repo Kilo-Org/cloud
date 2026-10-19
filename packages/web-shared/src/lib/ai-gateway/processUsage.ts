@@ -11,6 +11,8 @@ import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
 import {
   describeDatabaseError,
   isUsageRowConflict,
+  observeUsageRecordCompletion,
+  type UsageRecordObservationContext,
   stackFramesUnderHeader,
 } from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
@@ -422,7 +424,8 @@ async function saveUsageRelatedData(
     metadataFields,
     prior_microdollar_usage,
     posthog_distinct_id,
-    bouncer_usage_event
+    bouncer_usage_event,
+    { entrypoint: 'gateway', writer_caller: 'unknown' }
   );
 }
 
@@ -435,28 +438,42 @@ export async function saveUsageRelatedDataLocally(
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
   posthog_distinct_id: string | null,
-  bouncer_usage_event: BouncerUsageEventEnqueue | null = null
-): Promise<UsageRecordWriteOutcome | null> {
-  // `isFirst` must be evaluated before the insert — afterwards this record is
-  // itself prior usage — but the event it drives is only emitted once the insert
-  // has committed. A redelivery that arrives while the first delivery's
-  // transaction is still open cannot see the uncommitted row either, so it also
-  // computes `isFirst`; emitting here would double-count `first_usage`.
-  const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
-  const inserted = await insertUsageRecord(coreUsageFields, metadataFields, bouncer_usage_event);
-  if (!inserted) return null;
-  if (posthog_distinct_id && !inserted.wasRedelivery) {
-    if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
-    await sendFirstMicrodollarUsageEventIfNeeded(
-      inserted.newMicrodollarsUsed === null
-        ? null
-        : { newMicrodollarsUsed: inserted.newMicrodollarsUsed },
-      coreUsageFields,
-      posthog_distinct_id,
-      isFirst
-    );
+  bouncer_usage_event: BouncerUsageEventEnqueue | null = null,
+  observationContext: UsageRecordObservationContext = {
+    entrypoint: 'unknown',
+    writer_caller: 'unknown',
   }
-  return inserted;
+): Promise<UsageRecordWriteOutcome | null> {
+  return observeUsageRecordCompletion(
+    coreUsageFields,
+    async () => {
+      // `isFirst` must be evaluated before the insert — afterwards this record is
+      // itself prior usage — but the event it drives is only emitted once the insert
+      // has committed. A redelivery that arrives while the first delivery's
+      // transaction is still open cannot see the uncommitted row either, so it also
+      // computes `isFirst`; emitting here would double-count `first_usage`.
+      const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
+      const inserted = await insertUsageRecord(
+        coreUsageFields,
+        metadataFields,
+        bouncer_usage_event
+      );
+      if (!inserted) return null;
+      if (posthog_distinct_id && !inserted.wasRedelivery) {
+        if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
+        await sendFirstMicrodollarUsageEventIfNeeded(
+          inserted.newMicrodollarsUsed === null
+            ? null
+            : { newMicrodollarsUsed: inserted.newMicrodollarsUsed },
+          coreUsageFields,
+          posthog_distinct_id,
+          isFirst
+        );
+      }
+      return inserted;
+    },
+    observationContext
+  );
 }
 
 async function isFirstUsage(

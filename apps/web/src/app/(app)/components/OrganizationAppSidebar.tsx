@@ -21,7 +21,6 @@ import {
   Shield,
   Plus,
   ListChecks,
-  Wrench,
   Webhook,
   Settings,
   MessageSquare,
@@ -232,7 +231,6 @@ export default function OrganizationAppSidebar({
             icon: ListChecks,
             url: `/organizations/${organizationId}/auto-triage`,
           },
-          { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
         ]
       : []),
     ...(isDeployEnabled || isDevelopment

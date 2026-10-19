@@ -256,12 +256,10 @@ export function MessageBubble({
 
   // User message
   if (isUserMessage(message.info)) {
-    // Check if this is a compaction trigger message
     const compactionPart = message.parts.find(isCompactionPart);
     const hasOnlyCompactionParts =
       message.parts.length > 0 && message.parts.every(isCompactionPart);
 
-    // Render compaction separator for compaction-only messages
     if (hasOnlyCompactionParts && compactionPart) {
       return (
         <CompactionSeparator

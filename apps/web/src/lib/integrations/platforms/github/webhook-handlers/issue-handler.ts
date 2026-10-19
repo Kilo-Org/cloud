@@ -2,10 +2,8 @@ import { NextResponse } from 'next/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { WebhookIssuePayloadSchema } from '@/lib/auto-triage/core/schemas';
-import { IssueLabeledPayloadSchema } from '@/lib/auto-fix/core/schemas';
 import { IssueWebhookProcessor } from '@/lib/auto-triage/application/webhook/issue-webhook-processor';
 import { ConfigValidator } from '@/lib/auto-triage/application/webhook/config-validator';
-import { LabelWebhookProcessor } from '@/lib/auto-fix/application/webhook/label-webhook-processor';
 
 type IssuePayload = {
   action: 'opened' | 'reopened' | 'edited';
@@ -40,29 +38,10 @@ export async function handleIssueAutoTriage(
   return processor.process(payload, integration);
 }
 
-export async function handleIssueLabeled(payload: unknown, integration: PlatformIntegration) {
-  const parseResult = IssueLabeledPayloadSchema.safeParse(payload);
-
-  if (!parseResult.success) {
-    logExceptInTest('Invalid issue labeled webhook payload:', parseResult.error);
-    return NextResponse.json(
-      { error: 'Invalid webhook payload', details: parseResult.error.issues },
-      { status: 400 }
-    );
-  }
-
-  const processor = new LabelWebhookProcessor();
-  return processor.process(parseResult.data, integration);
-}
-
 export async function handleIssue(payload: unknown, integration: PlatformIntegration) {
   const action = (payload as { action?: string }).action;
 
-  if (action === 'labeled') {
-    return handleIssueLabeled(payload, integration);
-  }
-
-  if (action === 'unlabeled') {
+  if (action === 'labeled' || action === 'unlabeled') {
     return NextResponse.json({ message: 'Event received' }, { status: 200 });
   }
 

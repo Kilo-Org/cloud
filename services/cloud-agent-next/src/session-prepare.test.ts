@@ -539,26 +539,24 @@ describe('sandbox selection Worker API', () => {
     }
   );
 
-  it.each(['auto-triage', 'autofix'])(
-    'authorizes Dedicated Standard for an enrolled organization %s trigger',
-    async createdOnPlatform => {
-      const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({ doStub });
-      ctx.env.SANDBOX_SELECTION_IDS = orgId;
-      generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
-      await appRouter.createCaller(ctx).prepareSession({
-        ...prepareInput,
-        sandboxAllocation: 'isolated-standard',
-        createdOnPlatform,
-      });
-      expect(doStub.registerSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          identity: expect.objectContaining({ orgId, createdOnPlatform }),
-          workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
-        })
-      );
-    }
-  );
+  it('authorizes Dedicated Standard for an enrolled organization auto-triage trigger', async () => {
+    const createdOnPlatform = 'auto-triage';
+    const doStub = createMockDOStub();
+    const ctx = createInternalApiContext({ doStub });
+    ctx.env.SANDBOX_SELECTION_IDS = orgId;
+    generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+    await appRouter.createCaller(ctx).prepareSession({
+      ...prepareInput,
+      sandboxAllocation: 'isolated-standard',
+      createdOnPlatform,
+    });
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ orgId, createdOnPlatform }),
+        workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+      })
+    );
+  });
 
   it('authorizes Dedicated Standard in public start without an internal API key', async () => {
     const doStub = createMockDOStub();
@@ -625,7 +623,6 @@ describe('effective session profile policy', () => {
     { origin: 'Slack', expected: 'explicit-profile-only' },
     { origin: 'code-review', expected: 'explicit-profile-only' },
     { origin: 'security-agent', expected: 'explicit-profile-only' },
-    { origin: 'autofix', expected: 'explicit-profile-only' },
     { origin: 'auto-triage', expected: 'explicit-profile-only' },
   ])('selects $expected for origin $origin', ({ origin, expected }) => {
     expect(profileResolutionPolicyForSessionCreateOrigin(origin)).toEqual({

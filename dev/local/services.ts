@@ -53,7 +53,6 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['cloud-agent'],
     sectionBreakBefore: true,
   },
-  { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   {
     id: 'security-agent',
     label: 'Security Agent',
@@ -229,12 +228,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'auto-triage',
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/auto-triage-infra',
-  },
-  // auto-fix
-  'cloudflare-auto-fix-infra': {
-    group: 'auto-fix',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-fix-infra',
   },
   // security-agent
   'cloudflare-security-sync': {

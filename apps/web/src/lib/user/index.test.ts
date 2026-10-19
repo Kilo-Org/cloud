@@ -58,6 +58,7 @@ import {
   bot_requests,
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
+  admin_action_audit_logs,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
@@ -290,6 +291,7 @@ describe('User', () => {
     await db.delete(organization_recommendation_dismissals);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(admin_action_audit_logs);
     await db.delete(model_eval_ingestions);
     await db.delete(kiloclaw_scheduled_action_targets);
     await db.delete(kiloclaw_scheduled_action_stages);
@@ -4654,6 +4656,70 @@ describe('User', () => {
       expect(logs).toHaveLength(1);
       expect(logs[0].target_user_id).toBe('deleted-user');
       expect(logs[0].actor_email).toBe(adminUser.google_user_email); // admin not anonymized
+    });
+
+    it('should anonymize admin action audit logs where user is actor', async () => {
+      const adminUser = await insertTestUser();
+
+      await db.insert(admin_action_audit_logs).values({
+        action: 'user.api_key.reset',
+        actor_id: adminUser.id,
+        actor_email: adminUser.google_user_email,
+        actor_name: adminUser.google_user_name,
+        target_type: 'user',
+        target_id: 'some-other-user',
+        message: 'API key reset',
+      });
+
+      await softDeleteUser(adminUser.id);
+
+      const logs = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+      expect(logs).toHaveLength(1);
+      expect(logs[0].actor_email).toBeNull();
+      expect(logs[0].actor_name).toBeNull();
+      expect(logs[0].target_id).toBe('some-other-user');
+    });
+
+    it('should anonymize admin action audit logs where user is the target', async () => {
+      const targetUser = await insertTestUser();
+      const adminUser = await insertTestUser();
+
+      await db.insert(admin_action_audit_logs).values([
+        {
+          action: 'user.api_key.reset',
+          actor_id: adminUser.id,
+          actor_email: adminUser.google_user_email,
+          actor_name: adminUser.google_user_name,
+          target_type: 'user',
+          target_id: targetUser.id,
+          message: 'API key reset',
+        },
+        {
+          action: 'organization.create',
+          actor_id: adminUser.id,
+          actor_email: adminUser.google_user_email,
+          actor_name: adminUser.google_user_name,
+          target_type: 'organization',
+          target_id: targetUser.id,
+          message: 'Organization created',
+        },
+      ]);
+
+      await softDeleteUser(targetUser.id);
+
+      const logs = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+      expect(logs).toHaveLength(2);
+      const userTargeted = logs.find(log => log.target_type === 'user');
+      const orgTargeted = logs.find(log => log.target_type === 'organization');
+      expect(userTargeted?.target_id).toBe('deleted-user');
+      expect(userTargeted?.actor_email).toBe(adminUser.google_user_email);
+      expect(orgTargeted?.target_id).toBe(targetUser.id);
     });
 
     it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {

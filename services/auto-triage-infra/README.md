@@ -4,7 +4,7 @@ Cloudflare Worker that orchestrates the auto-triage process for GitHub issues us
 
 ## Architecture
 
-This worker follows the same pattern as the auto-fix worker:
+This worker follows the same pattern as other Cloudflare automation workers:
 
 - **HTTP API**: Receives triage requests from Next.js backend via [`index.ts`](src/index.ts:1)
 - **Durable Objects**: [`TriageOrchestrator`](src/triage-orchestrator.ts:24) manages the lifecycle of each triage ticket
@@ -56,7 +56,7 @@ auto-triage worker
 
 - **Duplicate Detection**: Calls Next.js API to check for similar issues using vector similarity search
 - **Issue Classification**: Uses cloud-agent-next with AI models to classify issues as bug/feature/question/unclear via prepare + initiate + callback
-- **Label Application**: Applies AI-selected labels plus action-tracking labels (kilo-triaged, kilo-auto-fix) via the Next.js API
+- **Label Application**: Applies AI-selected labels plus the `kilo-triaged` action-tracking label via the Next.js API
 - **Status Updates**: Real-time callbacks to Next.js API for status tracking
 - **Modular Services**: Clean separation of concerns with dedicated service classes
 
@@ -166,8 +166,7 @@ stuck-ticket alarm.
 6. **Callback route** validates the per-ticket secret, resolves the DO, and invokes
    `completeClassification()` which parses the assistant output and acts on it:
    - **Question/Unclear** → update status (TODO: post comment)
-   - **Bug/Feature (high confidence)** → apply `kilo-auto-fix` label so auto-fix picks it up
-   - **Bug/Feature (low confidence)** → request clarification
+   - **Bug/Feature** → apply `kilo-triaged` and mark the ticket actioned
 
 ### Classification Process
 
@@ -183,10 +182,7 @@ stuck-ticket alarm.
 
 ### PR Creation Process
 
-PR creation is not handled in this worker. When a classification is
-high-confidence, the worker applies the `kilo-auto-fix` label to the
-issue; the separate `auto-fix-infra` worker subscribes to that label
-and creates PRs independently.
+PR creation is not handled in this worker.
 
 ### Timeouts
 
@@ -366,7 +362,7 @@ The [`TriageOrchestrator`](src/triage-orchestrator.ts:24) Durable Object manages
    - **Duplicate** ([`closeDuplicate()`](src/triage-orchestrator.ts:210)): Updates status with duplicate info
    - **Question** ([`answerQuestion()`](src/triage-orchestrator.ts:227)): Posts answer comment (TODO)
    - **Unclear** ([`requestClarification()`](src/triage-orchestrator.ts:244)): Requests more info (TODO)
-   - **Bug/Feature** (high confidence): Applies `kilo-auto-fix` label for the auto-fix worker to pick up
+   - **Bug/Feature**: Applies `kilo-triaged` and marks the ticket actioned
 
 ### Service Classes
 
@@ -450,7 +446,7 @@ The worker uses a comprehensive type system defined in [`types.ts`](src/types.ts
 
 - **[`SessionInput`](src/types.ts:30)**: Configuration for triage session
   - GitHub issue details (repo, number, title, body)
-  - Thresholds for duplicate detection and auto-fix label application
+  - Thresholds for duplicate detection
   - Model selection and custom instructions
 
 - **[`ClassificationResult`](src/types.ts:106)**: AI classification output

@@ -155,7 +155,6 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
             cloudAgentSessionId: fetchedSession.cloud_agent_session_id as CloudAgentSessionId,
           };
         }
-        // 1. Check if the session is in the active sessions list (remote CLI)
         try {
           const active = await trpcClient.activeSessions.list.query();
           if (active.sessions.some(s => s.id === kiloSessionId)) {
@@ -165,7 +164,6 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           // Active sessions unavailable — fall through to other checks
         }
 
-        // 2. Check if the session has a cloud agent session ID
         try {
           const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
           if (session.cloud_agent_session_id) {
@@ -179,7 +177,6 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           // Session not found — fall through to read-only
         }
 
-        // 3. Fallback: read-only historical session
         return { type: 'read-only', kiloSessionId };
       },
 

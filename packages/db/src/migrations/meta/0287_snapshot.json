@@ -1,5 +1,5 @@
 {
-  "id": "63e012e1-9366-4097-bf2b-c8306995de86",
+  "id": "10f0ec05-e546-4fc4-a09a-e66be47ab708",
   "prevId": "5be2d091-13ed-4f74-8757-d5c5db2ab774",
   "version": "7",
   "dialect": "postgresql",
@@ -2015,6 +2015,12 @@
         },
         "unavailable_models": {
           "name": "unavailable_models",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vercel_model_id_overrides": {
+          "name": "vercel_model_id_overrides",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -11755,44 +11761,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "consumed_microdollars": {
-          "name": "consumed_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "retired_microdollars": {
-          "name": "retired_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "paid_credit_policy": {
-          "name": "paid_credit_policy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "credit_source": {
-          "name": "credit_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_transaction_id": {
-          "name": "source_transaction_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refund_principal_microdollars": {
-          "name": "refund_principal_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
         "is_free": {
           "name": "is_free",
           "type": "boolean",
@@ -11980,21 +11948,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_credit_transactions_source_transaction_id": {
-          "name": "IDX_credit_transactions_source_transaction_id",
-          "columns": [
-            {
-              "expression": "source_transaction_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -23545,22 +23498,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_kilocode_users_next_credit_expiration_at": {
-          "name": "IDX_kilocode_users_next_credit_expiration_at",
-          "columns": [
-            {
-              "expression": "next_credit_expiration_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"kilocode_users\".\"next_credit_expiration_at\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_kilocode_users_blocked_at": {
           "name": "IDX_kilocode_users_blocked_at",
           "columns": [
@@ -30405,22 +30342,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organizations_next_credit_expiration_at": {
-          "name": "IDX_organizations_next_credit_expiration_at",
-          "columns": [
-            {
-              "expression": "next_credit_expiration_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"organizations\".\"next_credit_expiration_at\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

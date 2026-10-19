@@ -236,6 +236,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
       organizationId,
       kiloUserId: user.id,
       modelId: requestBody.model,
+      fromDb: readDb,
     });
     if (
       !decision.allowed ||

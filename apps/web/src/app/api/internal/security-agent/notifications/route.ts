@@ -1,4 +1,4 @@
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
@@ -11,7 +11,7 @@ import {
 } from '@kilocode/db/schema';
 import type { SecurityFindingNotificationKind } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { send as sendEmail, type TemplateName } from '@kilocode/web-shared/lib/email';
 import {
   dispatchSecurityFindingPush,
@@ -52,11 +52,6 @@ const notificationKindToTemplate = {
   sla_warning: 'securityFindingSlaWarning',
   sla_breach: 'securityFindingSlaBreach',
 } as const satisfies Record<SecurityFindingNotificationKind, TemplateName>;
-
-function secretMatches(provided: string | null, expected: string): boolean {
-  if (!provided) return false;
-  return timingSafeEqual(provided, expected);
-}
 
 function formatDeadline(iso: string | null): string {
   if (!iso) return '';
@@ -191,10 +186,8 @@ function isNotificationStillEligible(
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('X-Internal-Secret');
-  if (!INTERNAL_API_SECRET || !secretMatches(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(req);
+  if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);
   const parsedBody = BodySchema.safeParse(rawBody);

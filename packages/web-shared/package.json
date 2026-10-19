@@ -20,6 +20,7 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/event-service": "workspace:*",
+    "@kilocode/mcp-gateway": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/organization-entitlement": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",

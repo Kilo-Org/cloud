@@ -170,7 +170,7 @@ export default function RequestLoggingOptInsContent() {
             broader opt-in wins.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -201,11 +201,15 @@ export default function RequestLoggingOptInsContent() {
               {optIns?.map(entry => (
                 <TableRow key={entry.id}>
                   <TableCell className="capitalize">{entry.target_type}</TableCell>
-                  <TableCell className="font-mono text-xs break-all">{entry.target_id}</TableCell>
+                  <TableCell className="min-w-[calc(36ch+1.5rem)] font-mono text-xs break-all">
+                    {entry.target_id}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {entry.errors_only ? 'Errors only' : 'All requests'}
                   </TableCell>
-                  <TableCell className="max-w-md whitespace-pre-wrap">{entry.reason}</TableCell>
+                  <TableCell className="max-w-md min-w-48 break-words whitespace-pre-wrap">
+                    {entry.reason}
+                  </TableCell>
                   <TableCell>{entry.added_by_email}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {new Date(entry.added_at).toLocaleString()}

@@ -15,13 +15,12 @@
  * Protected by internal API secret
  */
 
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getFixTicketById, updateFixTicketStatus } from '@/lib/auto-fix/db/fix-tickets';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { createPullRequest } from '@/lib/auto-fix/github/create-pull-request';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';
 
@@ -40,10 +39,8 @@ interface CreatePRPayload {
 export async function POST(req: NextRequest) {
   try {
     // Validate internal API secret
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const unauthorized = authorizeInternalApiRequest(req);
+    if (unauthorized) return unauthorized;
 
     const payload: CreatePRPayload = await req.json();
     const { ticketId, sessionId, branchName: providedBranchName, githubToken, config } = payload;

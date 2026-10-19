@@ -115,7 +115,14 @@ describe('adminAutoFreeConfigRouter', () => {
 
     const rows = await db.select().from(ai_gateway_config);
     expect(rows).toEqual([
-      { id: 1, config: {}, auto_free: config, preferred_models: null, unavailable_models: null },
+      {
+        id: 1,
+        config: {},
+        auto_free: config,
+        preferred_models: null,
+        unavailable_models: null,
+        vercel_model_id_overrides: null,
+      },
     ]);
   });
 

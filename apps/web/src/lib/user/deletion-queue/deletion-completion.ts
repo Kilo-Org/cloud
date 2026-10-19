@@ -4,7 +4,7 @@ import {
   UserDeletionAuditEventType,
   UserDeletionRequestStatus,
   UserDeletionStepStatus,
-  type UserDeletionStepKey,
+  UserDeletionStepKey,
 } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -89,7 +89,9 @@ export async function tryCompleteRequest(requestId: string): Promise<boolean> {
       .where(eq(user_deletion_steps.request_id, requestId))
       .for('update');
 
-    const required = steps.map(step => step.step_key);
+    const required = steps
+      .map(step => step.step_key)
+      .filter(stepKey => stepKey !== UserDeletionStepKey.CsaSupportDb);
     if (!catalogTasksReady(request.catalog_version, steps, required)) {
       return false;
     }

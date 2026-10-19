@@ -94,6 +94,7 @@ describe('legacy pool overlap', () => {
     await expect(resolveLegacyPoolRouting(env, caller)).resolves.toMatchObject({
       router: null,
       pool: [{ model: 'org/old' }],
+      poolOwner: { ownerType: 'org', ownerId: caller.organizationId },
       mode: 'cost_per_accuracy',
     });
   });

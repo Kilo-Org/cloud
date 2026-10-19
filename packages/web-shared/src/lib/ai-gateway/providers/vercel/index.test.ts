@@ -437,6 +437,39 @@ describe('applyVercelSettings BYOK pinning', () => {
     expect(request.body.provider).toBeUndefined();
   });
 
+  it('sets zeroDataRetention and disallowPromptTraining in the BYOK gateway options', async () => {
+    const request = byokRequest([]);
+    request.body.provider = { zdr: true, data_collection: 'deny' };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      zeroDataRetention: true,
+      disallowPromptTraining: true,
+      only: ['anthropic', 'bedrock'],
+      byok: {
+        anthropic: [{ apiKey: 'sk-anthropic' }],
+        bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
+      },
+    });
+    expect(request.body.provider).toBeUndefined();
+  });
+
+  it('leaves zeroDataRetention and disallowPromptTraining unset when the provider settings omit them', async () => {
+    const request = byokRequest([]);
+    request.body.provider = { data_collection: 'allow' };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.zeroDataRetention).toBeUndefined();
+    expect(request.body.providerOptions?.gateway?.disallowPromptTraining).toBeUndefined();
+  });
+
   it('drops a BYOK provider the caller ignored when another serving provider remains', async () => {
     const request = byokRequest(['anthropic']);
 

@@ -2344,6 +2344,7 @@
     },
     "modeOptions": {
       "code": "Programa",
+      "agentPlaceholder": "p. ex. Code",
       "plan": "Pla",
       "debug": "Depura",
       "orchestrator": "Orquestrador",

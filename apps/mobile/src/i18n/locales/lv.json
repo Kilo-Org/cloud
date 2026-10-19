@@ -2344,6 +2344,7 @@
     },
     "modeOptions": {
       "code": "Programmēt",
+      "agentPlaceholder": "piem. Code",
       "plan": "Plāns",
       "debug": "Atkļūdot",
       "orchestrator": "Koordinators",

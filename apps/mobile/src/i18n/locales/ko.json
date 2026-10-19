@@ -1800,6 +1800,7 @@
     },
     "modeOptions": {
       "code": "코딩",
+      "agentPlaceholder": "예를 들어 Code",
       "plan": "플랜",
       "debug": "디버깅",
       "orchestrator": "오케스트레이터",

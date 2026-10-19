@@ -1728,6 +1728,7 @@
     },
     "modeOptions": {
       "code": "Coder",
+      "agentPlaceholder": "par ex. Code",
       "plan": "Programme",
       "debug": "Déboguer",
       "orchestrator": "Orchestrateur",

@@ -1800,6 +1800,7 @@
     },
     "modeOptions": {
       "code": "コード",
+      "agentPlaceholder": "例えばCode",
       "plan": "プラン",
       "debug": "デバッグ",
       "orchestrator": "オーケストレーター",

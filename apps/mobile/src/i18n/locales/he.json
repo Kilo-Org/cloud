@@ -1820,6 +1820,7 @@
     },
     "modeOptions": {
       "code": "כתיבת קוד",
+      "agentPlaceholder": "לְמָשָׁל Code",
       "plan": "תוכנית",
       "debug": "ניפוי שגיאות",
       "orchestrator": "תיאום משימות",

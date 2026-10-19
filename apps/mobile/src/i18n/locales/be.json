@@ -2376,6 +2376,7 @@
     },
     "modeOptions": {
       "code": "Праграмаванне",
+      "agentPlaceholder": "напр. Code",
       "plan": "План",
       "debug": "Адладка",
       "orchestrator": "Каардынатар",

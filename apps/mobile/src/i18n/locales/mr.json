@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "कोड लिहा",
+      "agentPlaceholder": "उदा. कोड",
       "plan": "योजना",
       "debug": "त्रुटी दुरुस्त करा",
       "orchestrator": "समन्वयक",

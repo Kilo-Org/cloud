@@ -2348,6 +2348,7 @@
     },
     "modeOptions": {
       "code": "Programiraj",
+      "agentPlaceholder": "npr. Kod",
       "plan": "Planiranje",
       "debug": "Otkloni pogreške",
       "orchestrator": "Orkestrator",

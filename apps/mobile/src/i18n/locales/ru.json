@@ -1832,6 +1832,7 @@
     },
     "modeOptions": {
       "code": "Код",
+      "agentPlaceholder": "например Code",
       "plan": "План",
       "debug": "Отладка",
       "orchestrator": "Оркестратор",

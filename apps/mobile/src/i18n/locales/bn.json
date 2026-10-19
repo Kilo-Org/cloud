@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "কোড",
+      "agentPlaceholder": "যেমন Code",
       "plan": "প্ল্যান",
       "debug": "ডিবাগ",
       "orchestrator": "সমন্বয়কারী",

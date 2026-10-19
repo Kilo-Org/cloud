@@ -1800,6 +1800,7 @@
     },
     "modeOptions": {
       "code": "寫程式",
+      "agentPlaceholder": "例如 Code",
       "plan": "計畫",
       "debug": "偵錯",
       "orchestrator": "任務協調",

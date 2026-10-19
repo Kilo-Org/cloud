@@ -1832,6 +1832,7 @@
     },
     "modeOptions": {
       "code": "Програмування",
+      "agentPlaceholder": "напр. Code",
       "plan": "План",
       "debug": "Налагодження",
       "orchestrator": "Оркестратор",

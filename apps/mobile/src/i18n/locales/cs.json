@@ -2376,6 +2376,7 @@
     },
     "modeOptions": {
       "code": "Programovat",
+      "agentPlaceholder": "např. Code",
       "plan": "Plán",
       "debug": "Ladit",
       "orchestrator": "Orchestrátor",

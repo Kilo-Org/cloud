@@ -2316,6 +2316,7 @@
     },
     "modeOptions": {
       "code": "Programar",
+      "agentPlaceholder": "p.ex. Code",
       "plan": "Planificación",
       "debug": "Depurar",
       "orchestrator": "Orquestador",

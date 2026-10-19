@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "ကုဒ်ရေးခြင်း",
+      "agentPlaceholder": "ဥပမာ Code",
       "plan": "အစီအစဉ်",
       "debug": "အမှားရှာပြင်ခြင်း",
       "orchestrator": "လုပ်ငန်းညှိနှိုင်းသူ",

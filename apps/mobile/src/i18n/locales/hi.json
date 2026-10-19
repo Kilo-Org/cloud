@@ -1778,6 +1778,7 @@
     },
     "modeOptions": {
       "code": "कोड लिखें",
+      "agentPlaceholder": "जैसे कोड",
       "plan": "योजना",
       "debug": "डीबग करें",
       "orchestrator": "समन्वयक",

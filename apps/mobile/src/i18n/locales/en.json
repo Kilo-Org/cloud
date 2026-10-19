@@ -2323,6 +2323,7 @@
     },
     "modeOptions": {
       "code": "Code",
+      "agentPlaceholder": "e.g. Code",
       "plan": "Plan",
       "debug": "Debug",
       "orchestrator": "Orchestrator",

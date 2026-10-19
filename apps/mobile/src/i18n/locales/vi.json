@@ -1800,6 +1800,7 @@
     },
     "modeOptions": {
       "code": "Viết mã",
+      "agentPlaceholder": "ví dụ. Mã",
       "plan": "Kế hoạch",
       "debug": "Gỡ lỗi",
       "orchestrator": "Điều phối",

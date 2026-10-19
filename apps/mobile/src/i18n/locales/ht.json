@@ -2316,6 +2316,7 @@
     },
     "modeOptions": {
       "code": "Ekri kòd",
+      "agentPlaceholder": "pa egzanp Code",
       "plan": "Planifikasyon",
       "debug": "Korije erè",
       "orchestrator": "Kowòdonatè",

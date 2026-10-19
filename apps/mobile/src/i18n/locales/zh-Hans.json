@@ -1800,6 +1800,7 @@
     },
     "modeOptions": {
       "code": "编程",
+      "agentPlaceholder": "例如Code",
       "plan": "计划",
       "debug": "调试",
       "orchestrator": "任务编排",

@@ -2316,6 +2316,7 @@
     },
     "modeOptions": {
       "code": "કોડ લખો",
+      "agentPlaceholder": "દા.ત. Code",
       "plan": "યોજના",
       "debug": "ડીબગ કરો",
       "orchestrator": "સંકલનકર્તા",

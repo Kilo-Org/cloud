@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "കോഡ് എഴുതുക",
+      "agentPlaceholder": "ഉദാ. Code",
       "plan": "പ്ലാൻ",
       "debug": "ഡീബഗ് ചെയ്യുക",
       "orchestrator": "ഏകോപകൻ",

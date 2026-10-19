@@ -1800,6 +1800,7 @@
     },
     "modeOptions": {
       "code": "Kod yaz",
+      "agentPlaceholder": "örneğin Code",
       "plan": "Çalışma planı",
       "debug": "Hata ayıkla",
       "orchestrator": "Orkestratör",

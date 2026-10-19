@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "کۆدنووسین",
+      "agentPlaceholder": "بۆ نموونە. کۆد",
       "plan": "پلان",
       "debug": "هەڵەدۆزی",
       "orchestrator": "ڕێکخەر",

@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "Kod yozish",
+      "agentPlaceholder": "masalan. Code",
       "plan": "Reja",
       "debug": "Xatolarni tuzatish",
       "orchestrator": "Muvofiqlashtiruvchi",

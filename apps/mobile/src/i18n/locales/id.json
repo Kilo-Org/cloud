@@ -1804,6 +1804,7 @@
     },
     "modeOptions": {
       "code": "Tulis kode",
+      "agentPlaceholder": "misalnya Code",
       "plan": "Rencana",
       "debug": "Perbaiki masalah",
       "orchestrator": "Orkestrator",

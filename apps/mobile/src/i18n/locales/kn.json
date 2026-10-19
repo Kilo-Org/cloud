@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "ಕೋಡ್ ಬರೆಯಿರಿ",
+      "agentPlaceholder": "ಉದಾ. Code",
       "plan": "ಯೋಜನೆ",
       "debug": "ದೋಷ ಸರಿಪಡಿಸಿ",
       "orchestrator": "ಸಂಯೋಜಕ",

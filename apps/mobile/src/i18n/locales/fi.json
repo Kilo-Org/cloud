@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "Koodaa",
+      "agentPlaceholder": "esim. Koodi",
       "plan": "Suunnittele",
       "debug": "Korjaa virheitä",
       "orchestrator": "Orkestroija",

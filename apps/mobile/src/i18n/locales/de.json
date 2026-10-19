@@ -1800,6 +1800,7 @@
     },
     "modeOptions": {
       "code": "Programmieren",
+      "agentPlaceholder": "z.B. Code",
       "plan": "Planung",
       "debug": "Fehlersuche",
       "orchestrator": "Koordinator",

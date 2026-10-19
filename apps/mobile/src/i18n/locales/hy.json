@@ -2316,6 +2316,7 @@
     },
     "modeOptions": {
       "code": "Կոդ գրել",
+      "agentPlaceholder": "օր. Code",
       "plan": "Պլան",
       "debug": "Վրիպազերծել",
       "orchestrator": "Համակարգող",

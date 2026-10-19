@@ -1785,6 +1785,7 @@
     },
     "modeOptions": {
       "code": "Programma",
+      "agentPlaceholder": "ad es. Code",
       "plan": "Piano",
       "debug": "Correggi errori",
       "orchestrator": "Orchestratore",

@@ -1785,6 +1785,7 @@
     },
     "modeOptions": {
       "code": "Programar",
+      "agentPlaceholder": "por exemplo Code",
       "plan": "Plano",
       "debug": "Depurar",
       "orchestrator": "Orquestrador",

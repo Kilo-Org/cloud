@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "కోడ్",
+      "agentPlaceholder": "ఉదా కోడ్",
       "plan": "ప్లాన్",
       "debug": "డీబగ్",
       "orchestrator": "సమన్వయకర్త",

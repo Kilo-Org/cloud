@@ -1832,6 +1832,7 @@
     },
     "modeOptions": {
       "code": "Programowanie",
+      "agentPlaceholder": "np. Code",
       "plan": "Planowanie",
       "debug": "Debugowanie",
       "orchestrator": "Koordynator",

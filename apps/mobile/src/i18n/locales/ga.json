@@ -2412,6 +2412,7 @@
     },
     "modeOptions": {
       "code": "Scríobh cód",
+      "agentPlaceholder": "m.sh. Code",
       "plan": "Plean",
       "debug": "Dífhabhtaigh",
       "orchestrator": "Comhordaitheoir",

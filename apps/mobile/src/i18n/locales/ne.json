@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "कोड",
+      "agentPlaceholder": "जस्तै Code",
       "plan": "योजना",
       "debug": "डिबग",
       "orchestrator": "समन्वयकर्ता",

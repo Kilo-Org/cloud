@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "Кодирање",
+      "agentPlaceholder": "на пр. Code",
       "plan": "План",
       "debug": "Отстранување грешки",
       "orchestrator": "Оркестратор",

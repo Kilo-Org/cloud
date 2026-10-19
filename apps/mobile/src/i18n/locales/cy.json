@@ -2440,6 +2440,7 @@
     },
     "modeOptions": {
       "code": "Codio",
+      "agentPlaceholder": "e.e. Codio",
       "plan": "Cynllun",
       "debug": "Dadfygio",
       "orchestrator": "Cydlynydd",

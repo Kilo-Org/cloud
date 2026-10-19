@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "Програмиране",
+      "agentPlaceholder": "напр. Code",
       "plan": "План",
       "debug": "Отстраняване на грешки",
       "orchestrator": "Координатор",

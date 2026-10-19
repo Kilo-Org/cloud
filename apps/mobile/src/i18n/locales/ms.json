@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "Tulis kod",
+      "agentPlaceholder": "cth. Code",
       "plan": "Pelan",
       "debug": "Nyahpepijat",
       "orchestrator": "Penyelaras",

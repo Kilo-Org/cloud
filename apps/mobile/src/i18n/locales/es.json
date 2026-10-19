@@ -1816,6 +1816,7 @@
     },
     "modeOptions": {
       "code": "Programar",
+      "agentPlaceholder": "p.ej. Code",
       "plan": "Plan de trabajo",
       "debug": "Depurar",
       "orchestrator": "Orquestador",

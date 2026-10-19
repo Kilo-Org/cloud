@@ -2344,6 +2344,7 @@
     },
     "modeOptions": {
       "code": "Programare",
+      "agentPlaceholder": "de ex. Code",
       "plan": "Planul",
       "debug": "Depanare",
       "orchestrator": "Coordonator",

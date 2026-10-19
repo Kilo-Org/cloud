@@ -2408,6 +2408,7 @@
     },
     "modeOptions": {
       "code": "Ikteb kodiċi",
+      "agentPlaceholder": "eż. Code",
       "plan": "Pjan",
       "debug": "Sib l-iżbalji",
       "orchestrator": "Koordinatur",

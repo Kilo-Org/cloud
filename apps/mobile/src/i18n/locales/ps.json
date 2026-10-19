@@ -2312,6 +2312,7 @@
     },
     "modeOptions": {
       "code": "کوډ ولیکئ",
+      "agentPlaceholder": "د مثال په توګه Code",
       "plan": "پلان",
       "debug": "تېروتنې سمې کړئ",
       "orchestrator": "همغږي کوونکی",

@@ -2316,6 +2316,7 @@
     },
     "modeOptions": {
       "code": "Rubuta lambar shiri",
+      "agentPlaceholder": "misali Code",
       "plan": "Tsari",
       "debug": "Gyara kurakurai",
       "orchestrator": "Mai tsara ayyuka",

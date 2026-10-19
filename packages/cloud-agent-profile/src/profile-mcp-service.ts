@@ -147,9 +147,10 @@ function encryptRecord(
  * so keys left as the masked placeholder round-trip unchanged.
  *
  * The round-trip is bound to an unchanged destination: when a masked value is
- * submitted for a different remote URL or local command, the stored envelope
- * no longer corresponds to where the caller is sending it, so the update is
- * rejected and the caller must submit the plaintext values again.
+ * submitted for a different remote URL, a different local command, or a
+ * different transport type, the stored envelope no longer corresponds to
+ * where the caller is sending it, so the update is rejected and the caller
+ * must submit the plaintext values again.
  */
 function buildStoredConfig(
   publicKeyBase64: string,
@@ -157,11 +158,11 @@ function buildStoredConfig(
   existing?: StoredMcpConfig
 ): StoredMcpConfig {
   if (input.type === 'local') {
-    const existingEnv = existing && 'command' in existing ? existing.environment : undefined;
+    const existingLocal = existing && 'command' in existing ? existing : undefined;
     if (
       existing &&
-      'command' in existing &&
-      JSON.stringify(existing.command) !== JSON.stringify(input.config.command) &&
+      (existingLocal === undefined ||
+        JSON.stringify(existingLocal.command) !== JSON.stringify(input.config.command)) &&
       hasMaskedValue(input.config.environment)
     ) {
       throw new TRPCError({
@@ -172,14 +173,17 @@ function buildStoredConfig(
     }
     return {
       command: input.config.command,
-      environment: encryptRecord(publicKeyBase64, input.config.environment, existingEnv),
+      environment: encryptRecord(
+        publicKeyBase64,
+        input.config.environment,
+        existingLocal?.environment
+      ),
     };
   }
-  const existingHeaders = existing && 'url' in existing ? existing.headers : undefined;
+  const existingRemote = existing && 'url' in existing ? existing : undefined;
   if (
     existing &&
-    'url' in existing &&
-    existing.url !== input.config.url &&
+    (existingRemote === undefined || existingRemote.url !== input.config.url) &&
     hasMaskedValue(input.config.headers)
   ) {
     throw new TRPCError({
@@ -190,7 +194,7 @@ function buildStoredConfig(
   }
   return {
     url: input.config.url,
-    headers: encryptRecord(publicKeyBase64, input.config.headers, existingHeaders),
+    headers: encryptRecord(publicKeyBase64, input.config.headers, existingRemote?.headers),
   };
 }
 

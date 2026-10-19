@@ -880,6 +880,81 @@ describe('Agent Profiles Router', () => {
             })
           ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
         });
+
+        test('local command changes and transport changes require fresh MCP values', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const profileId = await createOrgProfile();
+
+          const { id: mcpServerId } = await ownerCaller.agentProfiles.createMcp({
+            organizationId: organizationA.id,
+            profileId,
+            server: {
+              name: 'local-server',
+              type: 'local',
+              enabled: true,
+              config: {
+                type: 'local',
+                command: ['node', 'server.js', '--config', 'my config.json'],
+                environment: { API_KEY: 'original-value' },
+              } as never,
+            },
+          });
+
+          // An unchanged command array keeps the stored value, including an
+          // argument that contains a space.
+          await ownerCaller.agentProfiles.updateMcp({
+            organizationId: organizationA.id,
+            profileId,
+            mcpServerId,
+            server: {
+              name: 'local-server',
+              type: 'local',
+              enabled: false,
+              config: {
+                type: 'local',
+                command: ['node', 'server.js', '--config', 'my config.json'],
+                environment: { API_KEY: MASKED_SECRET_VALUE },
+              } as never,
+            },
+          });
+
+          await expect(
+            ownerCaller.agentProfiles.updateMcp({
+              organizationId: organizationA.id,
+              profileId,
+              mcpServerId,
+              server: {
+                name: 'local-server',
+                type: 'local',
+                enabled: true,
+                config: {
+                  type: 'local',
+                  command: ['node', 'other.js'],
+                  environment: { API_KEY: MASKED_SECRET_VALUE },
+                } as never,
+              },
+            })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+          // Switching transport is a destination change too.
+          await expect(
+            ownerCaller.agentProfiles.updateMcp({
+              organizationId: organizationA.id,
+              profileId,
+              mcpServerId,
+              server: {
+                name: 'local-server',
+                type: 'remote',
+                enabled: true,
+                config: {
+                  type: 'remote',
+                  url: 'https://gateway.example.com/mcp',
+                  headers: { Authorization: MASKED_SECRET_VALUE },
+                } as never,
+              },
+            })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        });
       });
     });
   });

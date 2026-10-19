@@ -292,6 +292,15 @@ function McpForm(props: McpFormProps) {
   /** Only populated when the user attempts to save with invalid JSON; cleared on edit. */
   const [jsonError, setJsonError] = useState<string | null>(null);
 
+  // The form shows the command as one string, so joining and re-splitting it
+  // can change an argument that contains whitespace. Keep the stored array and
+  // only rebuild it once the text differs from the one the form was seeded
+  // with, so an untouched command stays byte-identical for the destination
+  // check on the server.
+  const originalCommand =
+    mode === 'edit' && 'command' in props.initial.config ? props.initial.config.command : undefined;
+  const originalCommandText = originalCommand?.join(' ');
+
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
@@ -310,10 +319,13 @@ function McpForm(props: McpFormProps) {
     setSaving(true);
     try {
       if (form.type === 'local') {
-        const parts = form.commandText
-          .split(/\s+/)
-          .map(p => p.trim())
-          .filter(Boolean);
+        const parts =
+          originalCommand !== undefined && form.commandText.trim() === originalCommandText?.trim()
+            ? originalCommand
+            : form.commandText
+                .split(/\s+/)
+                .map(p => p.trim())
+                .filter(Boolean);
         if (parts.length === 0) {
           toast.error('Command is required');
           return;

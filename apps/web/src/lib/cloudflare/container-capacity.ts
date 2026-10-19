@@ -25,10 +25,10 @@ export function containerCapacityForService(service: string): ContainerCapacity 
     case 'cloud-agent-next-sandbox-small':
     case 'cloud-agent-next-sandbox-dind':
     case 'cloud-agent-next-sandbox-small-containment':
-      return { vcpu: 2, memoryBytes: 6_144 * MEBIBYTE_BYTES, diskBytes: 10_000 * MEGABYTE_BYTES };
+      return { vcpu: 2, memoryBytes: 6_144 * MEBIBYTE_BYTES, diskBytes: 20_000 * MEGABYTE_BYTES };
     case 'cloud-agent-next-sandbox-code-review':
     case 'cloud-agent-next-sandbox-code-review-containment':
-      return { vcpu: 1, memoryBytes: 4_096 * MEBIBYTE_BYTES, diskBytes: 8_000 * MEGABYTE_BYTES };
+      return { vcpu: 1, memoryBytes: 4_096 * MEBIBYTE_BYTES, diskBytes: 20_000 * MEGABYTE_BYTES };
     case 'cloud-agent-next-sandbox-containers-standard3':
       return { vcpu: 2, memoryBytes: 8_192 * MEBIBYTE_BYTES, diskBytes: 16_000 * MEGABYTE_BYTES };
     case 'cloud-agent-next-sandbox-containers-standard4':

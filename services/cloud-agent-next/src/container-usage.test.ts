@@ -928,7 +928,7 @@ describe('MeteredSandbox', () => {
           durable_object_id: 'do-id',
           vcpu: '2',
           memory_mib: '6144',
-          disk_mb: '10000',
+          disk_mb: '20000',
         },
       })
     );
@@ -976,7 +976,7 @@ describe('MeteredSandbox', () => {
           durable_object_id: 'do-id',
           vcpu: '2',
           memory_mib: '6144',
-          disk_mb: '10000',
+          disk_mb: '20000',
           origin: 'cloud-agent',
         },
       })

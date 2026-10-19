@@ -181,6 +181,8 @@
   // SandboxSmall and SandboxCodeReview receive no traffic: every non-contained sandbox runs
   // in Sandbox. SandboxDIND remains for stop/delete of persisted devcontainer sessions.
   // Remove retired applications/bindings only after verifying drain and external bindings.
+  // Every production container class requests the platform maximum 20 GB disk, so large
+  // repository checkouts are not bounded by the class's vCPU/memory tier.
   "containers": [
     {
       "class_name": "Sandbox",
@@ -202,7 +204,7 @@
       "instance_type": {
         "vcpu": 2,
         "memory_mib": 6144,
-        "disk_mb": 10000,
+        "disk_mb": 20000,
       },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
@@ -216,7 +218,7 @@
       "instance_type": {
         "vcpu": 2,
         "memory_mib": 6144,
-        "disk_mb": 10000,
+        "disk_mb": 20000,
       },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
@@ -230,7 +232,7 @@
       "instance_type": {
         "vcpu": 1,
         "memory_mib": 4096,
-        "disk_mb": 8000,
+        "disk_mb": 20000,
       },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
@@ -258,7 +260,7 @@
       "instance_type": {
         "vcpu": 2,
         "memory_mib": 6144,
-        "disk_mb": 10000,
+        "disk_mb": 20000,
       },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
@@ -272,7 +274,7 @@
       "instance_type": {
         "vcpu": 1,
         "memory_mib": 4096,
-        "disk_mb": 8000,
+        "disk_mb": 20000,
       },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",

@@ -26,6 +26,8 @@ interface Seen {
 interface Tools {
   readonly list: readonly unknown[];
   call: (arguments_: Readonly<Record<string, unknown>>) => unknown;
+  /** What `resources/read` is answered with, when the suite asks for one. */
+  read?: (uri: string) => unknown;
 }
 
 /** One message off the wire. Only the fields this server answers are named. */
@@ -35,6 +37,7 @@ interface Wire {
   params?: {
     name?: string;
     arguments?: Readonly<Record<string, unknown>>;
+    uri?: unknown;
   };
 }
 
@@ -64,18 +67,35 @@ const reply = (id: unknown, result: unknown): Answered => [200, { jsonrpc: '2.0'
 
 /** What a `tools/call` is answered with before its own tool: a server that is
     down, or one that refuses the credential. */
-const refusedCall = (fixture: Fixture): Answered | undefined => {
-  if (fixture.mode === 'refuse-call') {
+const refusedCall = (mode: Fixture['mode']): Answered | undefined => {
+  if (mode === 'refuse-call') {
     return [500, { error: 'the call failed' }];
   }
-  if (fixture.mode === 'refuse-call-auth') {
+  if (mode === 'refuse-call-auth') {
     return [401, { error: 'unauthorized' }];
   }
   return undefined;
 };
 
-/** What the protocol says for each message this server exercises. */
-const answer = (message: Wire, fixture: Fixture): Answered => {
+/** What `resources/read` is answered with, under the same rules as a call. */
+const answeredResource = (message: Wire, { tools }: Fixture): Answered => {
+  const uri = message.params?.['uri'];
+  const answered = typeof uri === 'string' ? tools.read?.(uri) : undefined;
+  if (answered === undefined) {
+    return [
+      200,
+      {
+        jsonrpc: '2.0',
+        id: message.id,
+        error: { code: -32_602, message: `no such resource: ${String(uri)}` },
+      },
+    ];
+  }
+  return reply(message.id, answered);
+};
+
+/** The handshake, and the tool surface the caller asked for. */
+const answeredTool = (message: Wire, fixture: Fixture): Answered | undefined => {
   if (message.method === 'initialize') {
     return reply(message.id, {
       protocolVersion: '2025-06-18',
@@ -90,17 +110,29 @@ const answer = (message: Wire, fixture: Fixture): Answered => {
     return reply(message.id, { tools: fixture.tools.list });
   }
   if (message.method === 'tools/call') {
-    const refused = refusedCall(fixture);
-    return refused ?? reply(message.id, fixture.tools.call(message.params?.arguments ?? {}));
+    return (
+      refusedCall(fixture.mode) ??
+      reply(message.id, fixture.tools.call(message.params?.arguments ?? {}))
+    );
   }
-  return [
-    200,
-    {
-      jsonrpc: '2.0',
-      id: message.id,
-      error: { code: -32_601, message: `no such method: ${String(message.method)}` },
-    },
-  ];
+  return undefined;
+};
+
+/** What the protocol says for each message this server exercises. */
+const answer = (message: Wire, fixture: Fixture): Answered => {
+  if (message.method === 'resources/read') {
+    return answeredResource(message, fixture);
+  }
+  return (
+    answeredTool(message, fixture) ?? [
+      200,
+      {
+        jsonrpc: '2.0',
+        id: message.id,
+        error: { code: -32_601, message: `no such method: ${String(message.method)}` },
+      },
+    ]
+  );
 };
 
 const bodyOf = async (request: IncomingMessage): Promise<Wire> => {
@@ -219,11 +251,33 @@ const readingFile: Tools = {
 
 const noTools: Tools = { list: [], call: () => ({}) };
 
+/** The app one server shows for a tool with a view, answered whole. */
+const chartApp: Tools = {
+  list: [
+    {
+      name: 'draw-chart',
+      description: 'Draws a chart.',
+      inputSchema: schema,
+      _meta: { ui: { resourceUri: 'ui://work/chart.html' } },
+    },
+  ],
+  call: () => ({ content: [{ type: 'text', text: 'chart drawn' }] }),
+  read: uri =>
+    uri === 'ui://work/chart.html'
+      ? {
+          contents: [
+            { uri, mimeType: 'text/html;profile=mcp-app', text: '<h1>chart</h1>' },
+          ],
+        }
+      : undefined,
+};
+
 export type { Answered, Fixture, Seen, Tools, Wire };
 export {
   answer,
   bodyOf,
   callOf,
+  chartApp,
   deps,
   noTools,
   only,

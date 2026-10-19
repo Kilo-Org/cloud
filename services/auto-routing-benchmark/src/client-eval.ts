@@ -213,9 +213,30 @@ export async function gradeClientEvalResult(
   const stored = await getClientCase(db, caseKey);
   if (stored?.ran) {
     if (stored.pendingGraderUsage !== null) {
-      const usage = UsageRecordRequestSchema.parse(JSON.parse(stored.pendingGraderUsage));
-      if (!(await recordGraderUsage(deps, usage))) throw graderUsageNotRecorded();
-      await clearPendingGraderUsage(db, { ...caseKey, revision: stored.revision });
+      const storedKey = { ...caseKey, revision: stored.revision };
+      let pending: unknown;
+      try {
+        pending = JSON.parse(stored.pendingGraderUsage);
+      } catch {
+        pending = null;
+      }
+      const usage = UsageRecordRequestSchema.safeParse(pending);
+      if (!usage.success) {
+        // An unreadable record cannot be billed; drop the result so a retry grades it again.
+        console.error(
+          JSON.stringify({
+            event: 'client_eval_pending_usage_invalid',
+            profileId: profile.id,
+            caseId: request.caseId,
+            rep: request.rep,
+          })
+        );
+        await deleteClientCaseUpload(db, storedKey);
+        await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
+        throw graderUsageNotRecorded();
+      }
+      if (!(await recordGraderUsage(deps, usage.data))) throw graderUsageNotRecorded();
+      await clearPendingGraderUsage(db, storedKey);
     }
     await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
     return { score: stored.score };

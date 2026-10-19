@@ -463,6 +463,22 @@ describe('client eval (real SQLite)', () => {
       sqlite.prepare('SELECT pending_grader_usage AS pending FROM client_case_results').get()
     ).toEqual({ pending: null });
   });
+
+  it('drops a result whose pending grader usage is unreadable so a retry grades it again', async () => {
+    const judged = { caseId: judgedCase.id };
+    await gradeClientEvalResult(db, CONFIG, upload(judged), deps);
+    sqlite.exec(`UPDATE client_case_results SET pending_grader_usage = '{not json'`);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(gradeClientEvalResult(db, CONFIG, upload(judged), deps)).rejects.toMatchObject({
+      code: 'internal_error',
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_results').get()).toEqual({ n: 0 });
+    expect(await gradeClientEvalResult(db, CONFIG, upload(judged), deps)).toEqual({ score: 0.75 });
+    expect(judge).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
 });
 
 describe('clientEvalCase', () => {

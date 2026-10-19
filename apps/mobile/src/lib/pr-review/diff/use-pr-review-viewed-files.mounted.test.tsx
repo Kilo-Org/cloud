@@ -34,9 +34,16 @@ const storeMocks = vi.hoisted(() => ({
 // hook exists for. The real `viewed-files` module loads fine in this node
 // environment once its SecureStore chain is stubbed.
 vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn(async () => null),
-  setItemAsync: vi.fn(async () => undefined),
-  deleteItemAsync: vi.fn(async () => undefined),
+  getItemAsync: vi.fn(async () => {
+    await Promise.resolve();
+    return null;
+  }),
+  setItemAsync: vi.fn(async () => {
+    await Promise.resolve();
+  }),
+  deleteItemAsync: vi.fn(async () => {
+    await Promise.resolve();
+  }),
 }));
 
 vi.mock('@/lib/storage-keys', () => ({

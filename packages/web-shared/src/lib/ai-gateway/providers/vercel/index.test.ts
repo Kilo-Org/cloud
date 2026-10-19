@@ -460,17 +460,24 @@ describe('applyVercelSettings BYOK pinning', () => {
       { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
     ]);
     const managedOptions = convertProviderOptions(managed, null).gateway;
+    if (!managedOptions) {
+      throw new Error('convertProviderOptions did not produce managed gateway options');
+    }
 
-    const { byok: byokCredentials, ...byokOptions } = byok.body.providerOptions?.gateway ?? {};
+    const gatewayOptions = byok.body.providerOptions?.gateway;
+    if (!gatewayOptions) {
+      throw new Error('applyVercelSettings did not produce BYOK gateway options');
+    }
+    const byokCredentials = gatewayOptions.byok;
     expect(byokCredentials).toEqual({ anthropic: [{ apiKey: 'sk-anthropic' }] });
     for (const [key, value] of Object.entries(managedOptions)) {
       if (key === 'only' || key === 'order' || key === 'sessionId') {
         continue;
       }
-      expect(byokOptions[key as keyof typeof byokOptions]).toEqual(value);
+      expect(gatewayOptions[key as keyof typeof gatewayOptions]).toEqual(value);
     }
-    expect(byokOptions.zeroDataRetention).toBe(true);
-    expect(byokOptions.disallowPromptTraining).toBe(true);
+    expect(gatewayOptions.zeroDataRetention).toBe(true);
+    expect(gatewayOptions.disallowPromptTraining).toBe(true);
   });
 
   it('sets zeroDataRetention and disallowPromptTraining in the BYOK gateway options', async () => {

@@ -59,11 +59,7 @@ describe('<RepoToggleRow>', () => {
 
   it('renders the lock icon for a private repo', () => {
     const root = renderRow(
-      <RepoToggleRow
-        repo={{ id: 1, fullName: LONG_NAME, private: true }}
-        selected
-        onPress={noop}
-      />
+      <RepoToggleRow repo={{ id: 1, fullName: LONG_NAME, private: true }} selected onPress={noop} />
     );
     expect(root.findAllByType(LOCK)).toHaveLength(1);
   });

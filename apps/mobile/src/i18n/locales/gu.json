@@ -3550,7 +3550,7 @@
       "commands_one": "{{count}} આદેશ",
       "commands_other": "{{count}} આદેશો",
       "skills_one": "{{count}} કૌશલ્ય",
-      "skills_other": "{{count}} કૌશલ્ય",
+      "skills_other": "{{count}} કૌશલ્યો",
       "vars_one": "{{count}} ચલ",
       "vars_other": "{{count}} ચલો"
     },

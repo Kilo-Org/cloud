@@ -3480,8 +3480,8 @@
       "serverToolCount_one": "{{count}} أداة",
       "serverToolCount_two": "{{count}} أداتان",
       "serverToolCount_few": "{{count}} أدوات",
-      "serverToolCount_many": "{{count}} أداة",
-      "serverToolCount_other": "{{count}} أدوات"
+      "serverToolCount_many": "{{count}} أداةً",
+      "serverToolCount_other": "{{count}} أداة"
     },
     "mcpOAuth": {
       "authMethod": "المصادقة",
@@ -3719,20 +3719,20 @@
       "commands_one": "{{count}} أمر",
       "commands_two": "{{count}} أمران",
       "commands_few": "{{count}} أوامر",
-      "commands_many": "{{count}} أمر",
-      "commands_other": "{{count}} أوامر",
+      "commands_many": "{{count}} أمرًا",
+      "commands_other": "{{count}} أمر",
       "skills_zero": "{{count}} مهارات",
       "skills_one": "{{count}} مهارة",
       "skills_two": "{{count}} مهارتان",
       "skills_few": "{{count}} مهارات",
-      "skills_many": "{{count}} مهارة",
-      "skills_other": "{{count}} مهارات",
+      "skills_many": "{{count}} مهارةً",
+      "skills_other": "{{count}} مهارة",
       "vars_zero": "{{count}} متغيرات",
       "vars_one": "{{count}} متغير",
       "vars_two": "{{count}} متغيران",
       "vars_few": "{{count}} متغيرات",
-      "vars_many": "{{count}} متغير",
-      "vars_other": "{{count}} متغيرات"
+      "vars_many": "{{count}} متغيرًا",
+      "vars_other": "{{count}} متغير"
     },
     "nameLabel": "اسم الملف الشخصي",
     "namePlaceholder": "على سبيل المثال تصحيح أخطاء الواجهة الخلفية",

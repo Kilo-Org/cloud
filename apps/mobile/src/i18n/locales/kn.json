@@ -3552,7 +3552,7 @@
       "skills_one": "{{count}} ಕೌಶಲ್ಯ",
       "skills_other": "{{count}} ಕೌಶಲ್ಯಗಳು",
       "vars_one": "{{count}} ಅಸ್ಥಿರ",
-      "vars_other": "{{count}} ಅಸ್ಥಿರ"
+      "vars_other": "{{count}} ಅಸ್ಥಿರಗಳು"
     },
     "nameLabel": "ಪ್ರೊಫೈಲ್ ಹೆಸರು",
     "namePlaceholder": "ಉದಾ. ಬ್ಯಾಕೆಂಡ್ ಡೀಬಗ್ ಮಾಡುವಿಕೆ",

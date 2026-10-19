@@ -55,10 +55,10 @@ export type LegacySandboxClassName = Exclude<
 export const SANDBOX_CAPACITIES: Record<LegacySandboxClassName, SandboxCapacity> = {
   Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
   SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-  SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 20_000 },
+  SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
   SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 20_000 },
-  SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 20_000 },
-  SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 20_000 },
+  SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
   SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 20_000 },
 };
 

@@ -185,7 +185,10 @@ export async function runGlanceableApprove(
   if (options.target !== undefined) {
     // A session card names its own session and request; the recorded ask is
     // the aggregate card's and stays as it is.
-    const result = await answerPendingPermission({ ...options.target, permissionId: null }, options);
+    const result = await answerPendingPermission(
+      { ...options.target, permissionId: null },
+      options
+    );
     if (result.kind === 'approved' || result.kind === 'gone') {
       ackSessionAttention(options.target.kiloSessionId);
     }

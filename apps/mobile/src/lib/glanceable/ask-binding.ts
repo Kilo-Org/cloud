@@ -23,7 +23,7 @@ import { getWaitingAsk, recordWaitingAsk, type WaitingAsk } from './waiting-ask'
 /** Wait before a failed bind may be read again, keyed by the ask identity. */
 export const ASK_BIND_RETRY_MS = 30_000;
 
-export type AskBindingInput = { kiloSessionId: string; organizationId: string | null };
+type AskBindingInput = { kiloSessionId: string; organizationId: string | null };
 
 type ReadPermissionId = (input: AskBindingInput) => Promise<string | null>;
 
@@ -38,9 +38,11 @@ type ReadPermissionId = (input: AskBindingInput) => Promise<string | null>;
  */
 async function readPermissionId(input: AskBindingInput): Promise<string | null> {
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  const { resolveCloudAgentSessionId } = require('./cloud-agent-session') as typeof CloudAgentSession;
+  const { resolveCloudAgentSessionId } =
+    require('./cloud-agent-session') as typeof CloudAgentSession;
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  const { resolvePendingPermissionId } = require('./pending-permission') as typeof PendingPermission;
+  const { resolvePendingPermissionId } =
+    require('./pending-permission') as typeof PendingPermission;
   const cloudAgentSessionId = await resolveCloudAgentSessionId(input.kiloSessionId);
   return resolvePendingPermissionId({
     cloudAgentSessionId,
@@ -122,10 +124,7 @@ function kickBind(ask: WaitingAsk): void {
   if (inFlight.has(identity)) {
     return;
   }
-  if (
-    lastFailed?.identity === identity &&
-    clock() - lastFailed.at < ASK_BIND_RETRY_MS
-  ) {
+  if (lastFailed?.identity === identity && clock() - lastFailed.at < ASK_BIND_RETRY_MS) {
     return;
   }
   const settled = (async () => {

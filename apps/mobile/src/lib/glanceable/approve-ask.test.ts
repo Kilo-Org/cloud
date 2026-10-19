@@ -61,11 +61,8 @@ const createGlanceablePublisher = vi.fn();
 vi.mock('./create-publisher', () => ({ createGlanceablePublisher }));
 
 const { trpcClient } = await import('@/lib/trpc');
-const {
-  answerSessionPermission,
-  refreshGlanceableSnapshot,
-  runGlanceableApprove,
-} = await import('@/lib/glanceable/approve-ask');
+const { answerSessionPermission, refreshGlanceableSnapshot, runGlanceableApprove } =
+  await import('@/lib/glanceable/approve-ask');
 const { NotApprovableError } = await import('@/lib/glanceable/cloud-agent-session');
 // The pending-permission read is its own module; this suite owns its cases too.
 const { PendingPermissionTimeoutError, resolvePendingPermissionId } =

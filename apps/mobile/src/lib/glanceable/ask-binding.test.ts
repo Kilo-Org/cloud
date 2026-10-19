@@ -26,9 +26,8 @@ const {
   subscribeAskBound,
   whenAskBindingSettled,
 } = await import('./ask-binding');
-const { _resetWaitingAskForTests, _setSecureStoreForTests, getWaitingAsk } = await import(
-  './waiting-ask'
-);
+const { _resetWaitingAskForTests, _setSecureStoreForTests, getWaitingAsk } =
+  await import('./waiting-ask');
 
 const NOW = 1_750_000_000_000;
 const STORED_AT = '2026-01-01T00:00:00.000Z';
@@ -182,12 +181,18 @@ describe('recordSelectedAsk', () => {
     recordSelectedAsk(askFor());
     recordSelectedAsk(askFor({ kiloSessionId: 'ses_2', statusUpdatedAt: null }));
     await whenAskBindingSettled();
-    expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 'ses_2', boundPermissionId: 'perm_next' });
+    expect(getWaitingAsk()).toMatchObject({
+      kiloSessionId: 'ses_2',
+      boundPermissionId: 'perm_next',
+    });
 
     first.resolve('perm_stale');
     await _whenAskBindsSettledForTests();
 
-    expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 'ses_2', boundPermissionId: 'perm_next' });
+    expect(getWaitingAsk()).toMatchObject({
+      kiloSessionId: 'ses_2',
+      boundPermissionId: 'perm_next',
+    });
   });
 
   it('never resurrects a cleared ask when its read lands', async () => {

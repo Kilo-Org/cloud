@@ -1580,7 +1580,8 @@
       "bugs": "Chyby",
       "style": "Štýl",
       "testing": "Testovanie",
-      "documentation": "Dokumentácia"
+      "documentation": "Dokumentácia",
+      "unknown": "Iné ({{area}})"
     },
     "gateThreshold": {
       "warning": "Upozornenie"

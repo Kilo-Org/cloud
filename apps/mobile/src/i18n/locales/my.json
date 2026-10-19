@@ -1542,7 +1542,8 @@
       "bugs": "ကုဒ်အမှားများ",
       "style": "ကုဒ်ရေးဟန်",
       "testing": "စမ်းသပ်ခြင်း",
-      "documentation": "လမ်းညွှန်စာတမ်းများ"
+      "documentation": "လမ်းညွှန်စာတမ်းများ",
+      "unknown": "အခြား ({{area}})"
     },
     "gateThreshold": {
       "warning": "သတိပေးချက်"

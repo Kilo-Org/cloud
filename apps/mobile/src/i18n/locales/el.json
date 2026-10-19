@@ -1542,7 +1542,8 @@
       "bugs": "Σφάλματα",
       "style": "Στυλ",
       "testing": "Δοκιμές",
-      "documentation": "Τεκμηρίωση"
+      "documentation": "Τεκμηρίωση",
+      "unknown": "Άλλο ({{area}})"
     },
     "gateThreshold": {
       "warning": "Προειδοποίηση"

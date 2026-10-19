@@ -1542,7 +1542,8 @@
       "bugs": "Njehie",
       "style": "Ụdị ide koodu",
       "testing": "Nnwale",
-      "documentation": "Akwụkwọ nkọwa"
+      "documentation": "Akwụkwọ nkọwa",
+      "unknown": "Ọzọ ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ịdọ aka ná ntị"

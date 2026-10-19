@@ -1542,7 +1542,8 @@
       "bugs": "பிழைகள்",
       "style": "பாணி",
       "testing": "சோதனை",
-      "documentation": "ஆவணங்கள்"
+      "documentation": "ஆவணங்கள்",
+      "unknown": "மற்றது ({{area}})"
     },
     "gateThreshold": {
       "warning": "எச்சரிக்கை"

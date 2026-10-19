@@ -1580,7 +1580,8 @@
       "bugs": "Klaidos",
       "style": "Stilius",
       "testing": "Testavimas",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Kita ({{area}})"
     },
     "gateThreshold": {
       "warning": "Įspėjimas"

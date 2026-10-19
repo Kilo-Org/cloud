@@ -1542,7 +1542,8 @@
       "bugs": "Àwọn àṣìṣe",
       "style": "Àṣà kíkọ kóòdù",
       "testing": "Ìdánwò",
-      "documentation": "Ìwé àkọsílẹ̀"
+      "documentation": "Ìwé àkọsílẹ̀",
+      "unknown": "Miiran ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ìkìlọ̀"

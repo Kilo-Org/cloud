@@ -1542,7 +1542,8 @@
       "bugs": "هەڵەکان",
       "style": "شێوازی کۆدنووسین",
       "testing": "تاقیکردنەوە",
-      "documentation": "بەڵگەنامەکان"
+      "documentation": "بەڵگەنامەکان",
+      "unknown": "دیکە ({{area}})"
     },
     "gateThreshold": {
       "warning": "هۆشداری"

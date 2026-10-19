@@ -1542,7 +1542,8 @@
       "bugs": "Hitilafu",
       "style": "Mtindo",
       "testing": "Upimaji",
-      "documentation": "Nyaraka"
+      "documentation": "Nyaraka",
+      "unknown": "Nyingine ({{area}})"
     },
     "gateThreshold": {
       "warning": "Onyo"

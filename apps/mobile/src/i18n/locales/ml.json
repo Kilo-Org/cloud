@@ -1542,7 +1542,8 @@
       "bugs": "ബഗുകൾ",
       "style": "ശൈലി",
       "testing": "ടെസ്റ്റിംഗ്",
-      "documentation": "ഡോക്യുമെന്റേഷൻ"
+      "documentation": "ഡോക്യുമെന്റേഷൻ",
+      "unknown": "ഇതര ({{area}})"
     },
     "gateThreshold": {
       "warning": "മുന്നറിയിപ്പ്"

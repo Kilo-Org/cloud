@@ -1580,7 +1580,8 @@
       "bugs": "Hrošči",
       "style": "Slog",
       "testing": "Testiranje",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Drugo ({{area}})"
     },
     "gateThreshold": {
       "warning": "Opozorilo"

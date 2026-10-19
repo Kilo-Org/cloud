@@ -1030,7 +1030,8 @@
       "bugs": "버그",
       "style": "스타일",
       "testing": "테스트",
-      "documentation": "문서화"
+      "documentation": "문서화",
+      "unknown": "기타 ({{area}})"
     },
     "gateThreshold": {
       "warning": "경고"

@@ -1599,7 +1599,8 @@
       "bugs": "Żbalji fil-kodiċi",
       "style": "Stil",
       "testing": "Ittestjar",
-      "documentation": "Dokumentazzjoni"
+      "documentation": "Dokumentazzjoni",
+      "unknown": "Ieħor ({{area}})"
     },
     "gateThreshold": {
       "warning": "Twissija"

@@ -1599,7 +1599,8 @@
       "bugs": "Fabhtanna",
       "style": "Stíl",
       "testing": "Tástáil",
-      "documentation": "Doiciméadú"
+      "documentation": "Doiciméadú",
+      "unknown": "Eile ({{area}})"
     },
     "gateThreshold": {
       "warning": "Rabhadh"

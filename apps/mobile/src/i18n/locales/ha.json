@@ -1542,7 +1542,8 @@
       "bugs": "Kurakurai",
       "style": "Salo",
       "testing": "Gwaji",
-      "documentation": "Bayanan jagora"
+      "documentation": "Bayanan jagora",
+      "unknown": "Sauran ({{area}})"
     },
     "gateThreshold": {
       "warning": "Gargaɗi"

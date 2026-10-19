@@ -1030,7 +1030,8 @@
       "bugs": "Hatalar",
       "style": "Stil",
       "testing": "Test",
-      "documentation": "Belgeler"
+      "documentation": "Belgeler",
+      "unknown": "Diğer ({{area}})"
     },
     "gateThreshold": {
       "warning": "Uyarı"

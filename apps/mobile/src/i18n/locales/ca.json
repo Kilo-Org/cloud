@@ -1561,7 +1561,8 @@
       "bugs": "Errors",
       "style": "Estil",
       "testing": "Proves",
-      "documentation": "Documentació"
+      "documentation": "Documentació",
+      "unknown": "Altres ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avís"

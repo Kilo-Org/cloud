@@ -1542,7 +1542,8 @@
       "bugs": "Gallar",
       "style": "Stíll",
       "testing": "Prófanir",
-      "documentation": "Skjölun"
+      "documentation": "Skjölun",
+      "unknown": "Annað ({{area}})"
     },
     "gateThreshold": {
       "warning": "Viðvörun"

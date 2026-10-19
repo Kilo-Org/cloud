@@ -1542,7 +1542,8 @@
       "bugs": "Қателер",
       "style": "Стиль",
       "testing": "Тестілеу",
-      "documentation": "Құжаттама"
+      "documentation": "Құжаттама",
+      "unknown": "Басқа ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ескерту"

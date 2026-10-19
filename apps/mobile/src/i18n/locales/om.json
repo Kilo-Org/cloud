@@ -1542,7 +1542,8 @@
       "bugs": "Dogoggoroota koodii",
       "style": "Akkaataa barreessuu",
       "testing": "Qorannoo",
-      "documentation": "Sanadoota"
+      "documentation": "Sanadoota",
+      "unknown": "Biroo ({{area}})"
     },
     "gateThreshold": {
       "warning": "Akeekkachiisa"

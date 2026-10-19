@@ -1561,7 +1561,8 @@
       "bugs": "Kļūdas",
       "style": "Stils",
       "testing": "Testēšana",
-      "documentation": "Dokumentācija"
+      "documentation": "Dokumentācija",
+      "unknown": "Cits ({{area}})"
     },
     "gateThreshold": {
       "warning": "Brīdinājums"

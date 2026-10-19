@@ -1542,7 +1542,8 @@
       "bugs": "خرابیاں",
       "style": "انداز",
       "testing": "جانچ",
-      "documentation": "دستاویزات"
+      "documentation": "دستاویزات",
+      "unknown": "دیگر ({{area}})"
     },
     "gateThreshold": {
       "warning": "انتباہ"

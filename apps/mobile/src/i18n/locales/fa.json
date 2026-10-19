@@ -1542,7 +1542,8 @@
       "bugs": "باگ‌ها",
       "style": "سبک کدنویسی",
       "testing": "تست",
-      "documentation": "مستندات"
+      "documentation": "مستندات",
+      "unknown": "غیره ({{area}})"
     },
     "gateThreshold": {
       "warning": "هشدار"

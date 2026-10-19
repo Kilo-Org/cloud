@@ -1542,7 +1542,8 @@
       "bugs": "बग",
       "style": "शैली",
       "testing": "चाचणी",
-      "documentation": "दस्तऐवजीकरण"
+      "documentation": "दस्तऐवजीकरण",
+      "unknown": "इतर ({{area}})"
     },
     "gateThreshold": {
       "warning": "चेतावणी"

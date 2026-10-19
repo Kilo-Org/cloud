@@ -1542,7 +1542,8 @@
       "bugs": "ሳንካዎች",
       "style": "የአጻጻፍ ዘይቤ",
       "testing": "ፍተሻ",
-      "documentation": "ሰነዶች"
+      "documentation": "ሰነዶች",
+      "unknown": "ሌላ ({{area}})"
     },
     "gateThreshold": {
       "warning": "ማስጠንቀቂያ"

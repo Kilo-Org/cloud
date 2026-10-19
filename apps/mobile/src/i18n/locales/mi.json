@@ -1542,7 +1542,8 @@
       "bugs": "Ngā hapa",
       "style": "Te āhua",
       "testing": "Whakamātautau",
-      "documentation": "Tuhinga"
+      "documentation": "Tuhinga",
+      "unknown": "Ētahi ({{area}})"
     },
     "gateThreshold": {
       "warning": "Whakatūpato"

@@ -1030,7 +1030,8 @@
       "bugs": "Programmeerfouten",
       "style": "Stijl",
       "testing": "Testen",
-      "documentation": "Documentatie"
+      "documentation": "Documentatie",
+      "unknown": "Overig ({{area}})"
     },
     "gateThreshold": {
       "warning": "Waarschuwing"

@@ -1542,7 +1542,8 @@
       "bugs": "දෝෂ",
       "style": "කේත ශෛලිය",
       "testing": "පරීක්ෂාව",
-      "documentation": "ලේඛන"
+      "documentation": "ලේඛන",
+      "unknown": "වෙනත් ({{area}})"
     },
     "gateThreshold": {
       "warning": "අනතුරු ඇඟවීම"

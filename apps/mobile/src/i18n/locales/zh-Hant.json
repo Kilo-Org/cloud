@@ -1030,7 +1030,8 @@
       "bugs": "程式錯誤",
       "style": "程式碼風格",
       "testing": "測試",
-      "documentation": "文件"
+      "documentation": "文件",
+      "unknown": "其他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"

@@ -1542,7 +1542,8 @@
       "bugs": "బగ్‌లు",
       "style": "శైలి",
       "testing": "పరీక్షలు",
-      "documentation": "డాక్యుమెంటేషన్"
+      "documentation": "డాక్యుమెంటేషన్",
+      "unknown": "ఇతర ({{area}})"
     },
     "gateThreshold": {
       "warning": "హెచ్చరిక"

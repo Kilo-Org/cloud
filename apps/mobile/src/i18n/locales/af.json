@@ -1542,7 +1542,8 @@
       "bugs": "Foute",
       "style": "Styl",
       "testing": "Toetsing",
-      "documentation": "Dokumentasie"
+      "documentation": "Dokumentasie",
+      "unknown": "Ander ({{area}})"
     },
     "gateThreshold": {
       "warning": "Waarskuwing"

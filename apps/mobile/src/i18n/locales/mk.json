@@ -1542,7 +1542,8 @@
       "bugs": "Грешки",
       "style": "Стил",
       "testing": "Тестирање",
-      "documentation": "Документација"
+      "documentation": "Документација",
+      "unknown": "Друго ({{area}})"
     },
     "gateThreshold": {
       "warning": "Предупредување"

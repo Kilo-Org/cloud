@@ -1542,7 +1542,8 @@
       "bugs": "ບັກ",
       "style": "ຮູບແບບການຂຽນໂຄ້ດ",
       "testing": "ການທົດສອບ",
-      "documentation": "ເອກະສານ"
+      "documentation": "ເອກະສານ",
+      "unknown": "ອື່ນໆ ({{area}})"
     },
     "gateThreshold": {
       "warning": "ຄຳເຕືອນ"

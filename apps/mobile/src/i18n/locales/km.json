@@ -1542,7 +1542,8 @@
       "bugs": "កំហុស",
       "style": "រចនាប័ទ្មកូដ",
       "testing": "ការធ្វើតេស្ត",
-      "documentation": "ឯកសារ"
+      "documentation": "ឯកសារ",
+      "unknown": "ផ្សេងទៀត ({{area}})"
     },
     "gateThreshold": {
       "warning": "ការព្រមាន"

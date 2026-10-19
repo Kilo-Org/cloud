@@ -1542,7 +1542,8 @@
       "bugs": "Cilladaha",
       "style": "Qaabka",
       "testing": "Tijaabinta",
-      "documentation": "Dukumentiyada"
+      "documentation": "Dukumentiyada",
+      "unknown": "Kale ({{area}})"
     },
     "gateThreshold": {
       "warning": "Digniin"

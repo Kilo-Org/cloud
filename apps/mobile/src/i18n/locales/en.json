@@ -1542,7 +1542,8 @@
       "bugs": "Bugs",
       "style": "Style",
       "testing": "Testing",
-      "documentation": "Documentation"
+      "documentation": "Documentation",
+      "unknown": "Other ({{area}})"
     },
     "gateThreshold": {
       "warning": "Warning"

@@ -1542,7 +1542,8 @@
       "bugs": "ਬੱਗ",
       "style": "ਸ਼ੈਲੀ",
       "testing": "ਟੈਸਟਿੰਗ",
-      "documentation": "ਦਸਤਾਵੇਜ਼"
+      "documentation": "ਦਸਤਾਵੇਜ਼",
+      "unknown": "ਹੋਰ ({{area}})"
     },
     "gateThreshold": {
       "warning": "ਚੇਤਾਵਨੀ"

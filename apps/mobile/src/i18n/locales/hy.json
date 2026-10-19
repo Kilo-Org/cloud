@@ -1542,7 +1542,8 @@
       "bugs": "Սխալներ",
       "style": "Ոճ",
       "testing": "Թեստավորում",
-      "documentation": "Փաստաթղթավորում"
+      "documentation": "Փաստաթղթավորում",
+      "unknown": "Այլ ({{area}})"
     },
     "gateThreshold": {
       "warning": "Նախազգուշացում"

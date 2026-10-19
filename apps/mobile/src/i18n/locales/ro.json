@@ -1561,7 +1561,8 @@
       "bugs": "Erori",
       "style": "Stil",
       "testing": "Testare",
-      "documentation": "Documentație"
+      "documentation": "Documentație",
+      "unknown": "Altele ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avertisment"

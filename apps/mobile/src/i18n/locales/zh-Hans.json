@@ -1030,7 +1030,8 @@
       "bugs": "缺陷",
       "style": "风格",
       "testing": "测试",
-      "documentation": "文档"
+      "documentation": "文档",
+      "unknown": "其他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"

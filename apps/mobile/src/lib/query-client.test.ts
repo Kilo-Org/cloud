@@ -204,17 +204,17 @@ describe('permission-denied query removal', () => {
   });
 });
 
-describe('organizations.list refresh on permission loss', () => {
-  const LIST_KEY: readonly unknown[] = [['organizations', 'list'], { type: 'query' }];
-  const makeOrgKey = (id: string): readonly unknown[] => [
-    ['organizations', 'withMembers'],
-    { type: 'query', input: { organizationId: id } },
-  ];
-  const forbidden = () =>
-    Object.assign(new Error('forbidden'), {
-      data: { code: 'FORBIDDEN', httpStatus: 403 },
-    });
+const LIST_KEY: readonly unknown[] = [['organizations', 'list'], { type: 'query' }];
+const makeOrgKey = (id: string): readonly unknown[] => [
+  ['organizations', 'withMembers'],
+  { type: 'query', input: { organizationId: id } },
+];
+const forbidden = () =>
+  Object.assign(new Error('forbidden'), {
+    data: { code: 'FORBIDDEN', httpStatus: 403 },
+  });
 
+describe('organizations.list refresh on permission loss', () => {
   it('refetches the shared list once an org-scoped FORBIDDEN lands', async () => {
     const queryClient = createKiloAppQueryClient();
     const listFn = vi.fn<() => Promise<{ organizationId: string }[]>>();
@@ -231,13 +231,21 @@ describe('organizations.list refresh on permission loss', () => {
     const unsubscribe = observer.subscribe(() => undefined);
     await observer.refetch().catch(() => undefined);
     unsubscribe();
-    // The org-scoped FORBIDDEN lands while the list query has no observer:
-    // scheduling its refresh is still observable once one mounts, so the
-    // resolver gates the refetch this observer then triggers.
+
+    // The denial scheduled the shared list's refresh: the fresh payload is now
+    // marked stale, so the next observer mount refetches it.
+    expect(queryClient.getQueryState(LIST_KEY)?.isInvalidated).toBe(true);
+
     const pending = Promise.withResolvers<{ organizationId: string }[]>();
-    listFn.mockImplementation(() =>
-      listFn.mock.calls.length === 1 ? pending.promise : Promise.resolve([])
-    );
+    listFn.mockImplementation(async () => {
+      // The initial mount fires one refetch (the invalidation marked the query
+      // stale); gate it so the resolution order is observable. Any further
+      // call answers immediately.
+      if (listFn.mock.results.length > 1) {
+        return [];
+      }
+      return pending.promise;
+    });
     const listObserver = new QueryObserver(queryClient, {
       queryKey: LIST_KEY,
       queryFn: listFn,
@@ -246,8 +254,8 @@ describe('organizations.list refresh on permission loss', () => {
     });
     const unsubList = listObserver.subscribe(() => undefined);
     await flushQueryUpdates();
-    // The triggered refetch arrived at the gated queryFn.
-    expect(listFn).toHaveBeenCalled();
+    // The mount's refetch arrived at the gated queryFn.
+    expect(listFn).toHaveBeenCalledTimes(1);
     pending.resolve([{ organizationId: 'org-2' }]);
     await flushQueryUpdates();
     expect(listObserver.getCurrentResult().data).toEqual([{ organizationId: 'org-2' }]);

@@ -1,3 +1,7 @@
+/* eslint-disable max-lines -- the selection lifecycle (restore, default
+   resolution, lost-membership recovery, and the storage contract) shares one
+   state machine; splitting it would scatter the generation fencing that keeps
+   the publisher correct */
 import * as SecureStore from '@/lib/auth/secure-store';
 import {
   createContext,
@@ -16,7 +20,7 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
-import type { OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { i18n } from '@/i18n';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';

@@ -1,13 +1,12 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
+import { type QueryClient } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { act } from '@/test/renderer';
-import { waitFor } from '@/test/render-with-providers';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OrganizationProvider, useOrganization } from './organization-context';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
-import { renderWithProviders } from '@/test/render-with-providers';
-import type { QueryClient } from '@tanstack/react-query';
 // The recovery toast resolves catalog copy; the suite needs the real i18n
 // singleton so the asserted strings are the English catalog's, not key names.
 import '@/i18n';
@@ -193,6 +192,16 @@ describe('OrganizationProvider.setOrganizationId', () => {
 });
 
 describe('OrganizationProvider lost-membership recovery', () => {
+  /** Stores the recovered fixture selection; every other key reads absent. */
+  const storeSelection = (): void => {
+    hoisted.getItemAsync.mockImplementation(
+      async key =>
+        await (key === ORGANIZATION_STORAGE_KEY
+          ? Promise.resolve('org-lost')
+          : Promise.resolve(null))
+    );
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.useAuth.mockReturnValue({ token: 't' });
@@ -214,9 +223,7 @@ describe('OrganizationProvider lost-membership recovery', () => {
 
   it('switches to the first remaining membership and announces the target when the active org drops out of the list', async () => {
     // The stored selection names an organization the list still holds.
-    hoisted.getItemAsync.mockImplementation(async key =>
-      key === ORGANIZATION_STORAGE_KEY ? 'org-lost' : null
-    );
+    storeSelection();
     hoisted.list.mockResolvedValue([
       { organizationId: 'org-lost', organizationName: 'Doomed org', role: 'member' },
       { organizationId: 'org-kept', organizationName: 'Kept org', role: 'member' },
@@ -245,9 +252,7 @@ describe('OrganizationProvider lost-membership recovery', () => {
   });
 
   it('falls back to Personal, writes the marker, and names Personal when no membership remains', async () => {
-    hoisted.getItemAsync.mockImplementation(async key =>
-      key === ORGANIZATION_STORAGE_KEY ? 'org-lost' : null
-    );
+    storeSelection();
     hoisted.list.mockResolvedValue([
       { organizationId: 'org-lost', organizationName: 'Doomed org', role: 'member' },
     ]);
@@ -270,9 +275,7 @@ describe('OrganizationProvider lost-membership recovery', () => {
   });
 
   it('keeps the selection while the list is loading, failing, or still names the org', async () => {
-    hoisted.getItemAsync.mockImplementation(async key =>
-      key === ORGANIZATION_STORAGE_KEY ? 'org-lost' : null
-    );
+    storeSelection();
     const pending = Promise.withResolvers<{ organizationId: string }[]>();
     hoisted.list.mockReturnValue(pending.promise);
     const { getCtx, queryClient, unmount } = await mountProvider();
@@ -281,6 +284,7 @@ describe('OrganizationProvider lost-membership recovery', () => {
     // A failed list decides nothing: the selection stays, no toast.
     await act(async () => {
       pending.reject(new Error('offline'));
+      await Promise.resolve();
     });
     expect(getCtx().organizationId).toBe('org-lost');
     expect(hoisted.toastWarning).not.toHaveBeenCalled();
@@ -297,9 +301,7 @@ describe('OrganizationProvider lost-membership recovery', () => {
   });
 
   it('does not re-switch when the user picks another context during recovery', async () => {
-    hoisted.getItemAsync.mockImplementation(async key =>
-      key === ORGANIZATION_STORAGE_KEY ? 'org-lost' : null
-    );
+    storeSelection();
     hoisted.list.mockResolvedValue([
       { organizationId: 'org-lost', organizationName: 'Doomed org', role: 'member' },
       { organizationId: 'org-kept', organizationName: 'Kept org', role: 'member' },

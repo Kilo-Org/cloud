@@ -224,9 +224,10 @@ function removePermissionDeniedQueries(
  * A permission denial on an org-scoped query can mean the membership itself is
  * gone (the host removed the member) while the cached `organizations.list`
  * still names the org — the provider's reconciliation then has nothing to act
- * on. Mark the shared list stale so it refetches; when the fresh list drops
- * the org, `OrganizationProvider` switches to the remaining context. A list
- * still holding the org (role-scoped denial, org intact) changes nothing.
+ * on. Invalidate the shared list so it refetches despite its freshness window;
+ * when the fresh list drops the org, `OrganizationProvider` switches to the
+ * remaining context. A list still holding the org (role-scoped denial, org
+ * intact) changes nothing: the fresh snapshot matches the selection's own.
  */
 function refreshOrganizationsListOnPermissionLoss(
   queryClient: QueryClient,
@@ -240,12 +241,7 @@ function refreshOrganizationsListOnPermissionLoss(
   if (organizationId === undefined || organizationId === null) {
     return;
   }
-  const listKey: QueryKey = [['organizations', 'list']];
-  const list = queryClient.getQueryCache().find({ queryKey: listKey });
-  if (!list || list.state.fetchStatus !== 'idle') {
-    return;
-  }
-  void queryClient.refetchQueries({ queryKey: listKey, stale: true });
+  void queryClient.invalidateQueries({ queryKey: [['organizations', 'list']] });
 }
 
 /**

@@ -81,6 +81,7 @@ import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
+  flushDraft,
   NEW_SESSION_DRAFT_KEY,
   resolvePrefillOverDraft,
   saveDraft,
@@ -193,53 +194,66 @@ export function NewSessionScreenBody() {
 
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
-  // The Organization section above Run on. Switching the account switches the
-  // whole new-session screen with it: the create is attributed to the active
-  // account, and the org-scoped picks (repositories, models, profiles) belong
-  // to the previous one, so the body remounts through a stack-safe replace
-  // carrying the new ?organizationId. The durable text draft survives — the
-  // prompt is the session's own state, not an org pick. A clone entry is
-  // locked: the source session belongs to its own org (no section rendered).
-  // The entry's own params (share prefill, clone/fork ids, run-on preselect)
-  // stay in the URL so the remount keeps the same entry.
-  const { t: orgT } = useTranslation();
-  const stackSafeRouter = useStackSafeReplace();
-  const handleOrganizationSwitch = useCallback(
-    (nextOrganizationId: string | null) => {
-      // See ModelSelector: the sheet never re-anchors after the keyboard
-      // hides, so the keyboard must be down before this push.
-      Keyboard.dismiss();
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(searchParams)) {
-        // The typed `useLocalSearchParams` shape above makes every entry a
-        // string; empty params are dropped so the route keeps no bare key.
-        if (key !== 'organizationId' && value !== '') {
-          params.set(key, value);
-        }
-      }
-      if (nextOrganizationId) {
-        params.set('organizationId', nextOrganizationId);
-      }
-      const query = params.size > 0 ? `?${params.toString()}` : '';
-      stackSafeRouter.replace(`/(app)/agent-chat/new${query}` as Href);
-    },
-    [stackSafeRouter, searchParams]
-  );
-  const organizationSection = isCloneEntry ? undefined : (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {orgT('common.organization')}
-      </Text>
-      <ContextControl onSelectionChange={handleOrganizationSwitch} />
-    </View>
-  );
-
   // Durable new-session draft. The form mounts immediately — typing must never
   // wait on the `user.getMe` query — and the stored draft settles behind it.
   // The prompt input is uncontrolled, so a stored draft that arrives after
   // mount reaches it only through the remount keyed on `promptSeed` below, and
   // that remount happens only while the user has typed nothing.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+
+  // The Organization section above Run on. Switching the account switches the
+  // whole new-session screen with it: the create is attributed to the active
+  // account, and the org-scoped picks (repositories, models, profiles) belong
+  // to the previous one, so the body remounts through a stack-safe replace
+  // carrying the new ?organizationId. The durable text draft survives — the
+  // pending debounced write flushes before the replace, so the remount's
+  // draft load reads the newest text (the replace's push lands before the old
+  // screen's unmount flush would run). A clone entry is locked to its source
+  // session's org: a read-only row (an explicit scope never inherits global).
+  // The entry's own params (share prefill, clone/fork ids, run-on preselect)
+  // stay in the URL so the remount keeps the same entry.
+  const stackSafeRouter = useStackSafeReplace();
+  const handleOrganizationSwitch = useCallback(
+    (nextOrganizationId: string | null) => {
+      // See ModelSelector: the sheet never re-anchors after the keyboard
+      // hides, so the keyboard must be down before this push.
+      Keyboard.dismiss();
+      void (async () => {
+        if (userId && !isCloneEntry) {
+          await flushDraft(userId, NEW_SESSION_DRAFT_KEY);
+        }
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(searchParams)) {
+          // The typed `useLocalSearchParams` shape above makes every entry a
+          // string; empty params are dropped so the route keeps no bare key.
+          if (key !== 'organizationId' && value !== '') {
+            params.set(key, value);
+          }
+        }
+        if (nextOrganizationId) {
+          params.set('organizationId', nextOrganizationId);
+        }
+        const query = params.size > 0 ? `?${params.toString()}` : '';
+        stackSafeRouter.replace(`/(app)/agent-chat/new${query}` as Href);
+      })();
+    },
+    [stackSafeRouter, searchParams, userId, isCloneEntry]
+  );
+  const organizationSection = (
+    <View className="mt-5">
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('common.organization')}
+      </Text>
+      {isCloneEntry ? (
+        <ContextControl
+          scope={{ organizationId: organizationId ?? null, isResolved: true }}
+        />
+      ) : (
+        <ContextControl onSelectionChange={handleOrganizationSwitch} />
+      )}
+    </View>
+  );
+
   // Clone entry never touches the shared new-session draft: pass an undefined
   // identity so `useFencedDraftLoad` performs no fetch (its entity key is
   // typed non-optional, unlike `useDraftFlushOnBackground` below). The

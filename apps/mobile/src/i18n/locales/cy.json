@@ -631,7 +631,7 @@
     "checkConnection": "Gwirio'r cysylltiad",
     "couldNotLoadPullRequest": "Ni lwyddwyd i lwytho'r cais tynnu.",
     "reviewServiceUnavailable": "Nid yw'r gwasanaeth ar gael",
-    "reviewServiceUnavailableDescription": "Mae'r gwasanaeth yn dros dro ar gael. Rhowch gynnig arall arni cyn bo hir.",
+    "reviewServiceUnavailableDescription": "Nid yw'r gwasanaeth ar gael dros dro. Rhowch gynnig arall arni cyn bo hir.",
     "description": "Disgrifiad",
     "noDescriptionProvided": "Ni ddarparwyd disgrifiad.",
     "review": "Adolygiad",

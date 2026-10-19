@@ -143,9 +143,7 @@ export function TabScreenScrollView({
       scheduleReveal();
     }
     return () => {
-      if (active) {
-        clearTimeout(revealTimerRef.current);
-      }
+      clearTimeout(revealTimerRef.current);
     };
   }, [keyboardOcclusion, scheduleReveal]);
   const handleFrameLayout = (event: LayoutChangeEvent) => {

@@ -57,16 +57,19 @@ export function DetailScreenScrollView({ children, style, ...props }: ScrollView
       scheduleReveal();
     }
     return () => {
-      if (active) {
-        clearTimeout(revealTimerRef.current);
-      }
+      clearTimeout(revealTimerRef.current);
     };
   }, [keyboardOcclusion, reservesImeNatively, scheduleReveal]);
   const handleFrameLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     const last = lastFrameRef.current;
     lastFrameRef.current = { width, height };
-    if (reservesImeNatively && last != null && (last.width !== width || last.height !== height)) {
+    if (
+      reservesImeNatively &&
+      keyboardOcclusion > 0 &&
+      last != null &&
+      (last.width !== width || last.height !== height)
+    ) {
       // The layout event fires before the scroll view has re-laid out its
       // content at the new frame, so revealing synchronously scrolls against
       // stale geometry. The reveal timer defers past it.

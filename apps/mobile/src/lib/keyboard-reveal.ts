@@ -35,7 +35,7 @@ export function scrollFocusedInputAboveKeyboard(scrollable: {
     const keyboardTop = scrollable.windowHeight - scrollable.occlusionRef.current;
     const overlap = y + height - keyboardTop;
     if (overlap > 0) {
-      scrollView.scrollToEnd({ animated: true });
+      scrollView.scrollTo({ y: scrollable.offsetRef.current + overlap, animated: true });
     }
   };
   focused.measureInWindow(onMeasured);

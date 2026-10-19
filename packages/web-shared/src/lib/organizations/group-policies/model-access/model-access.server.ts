@@ -108,9 +108,7 @@ export function evaluateEffectiveModelAccessPolicy(
       modelAllowList: [
         ...new Set(
           selectedPolicies.flatMap(policy =>
-            policy.data.mode === 'selected'
-              ? policy.data.model_allow_list.map(normalizeModelId)
-              : []
+            policy.data.mode === 'selected' ? policy.data.model_allow_list : []
           )
         ),
       ],
@@ -190,7 +188,12 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.mode === 'organization_baseline') {
     return await decisionWithinOrganizationBaseline();
   }
-  if (policy.memberGrant.modelAllowList.includes(normalizedModelId)) {
+  // A grant names an exact catalog id: a variant-suffixed entry authorizes
+  // only that variant, while a base-id entry covers the model's variants.
+  if (
+    policy.memberGrant.modelAllowList.includes(modelId) ||
+    policy.memberGrant.modelAllowList.includes(normalizedModelId)
+  ) {
     return { allowed: true };
   }
   if (policy.memberGrant.providerAllowList.length > 0) {
@@ -317,7 +320,7 @@ export function normalizeModelAccessPolicy(
     data: {
       mode: 'selected',
       model_allow_list: [
-        ...new Set(policy.data.model_allow_list.map(value => normalizeModelId(value.trim()))),
+        ...new Set(policy.data.model_allow_list.map(value => value.trim())),
       ].sort(),
       provider_allow_list: [
         ...new Set(

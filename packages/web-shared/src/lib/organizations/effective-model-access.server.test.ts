@@ -267,6 +267,74 @@ describe('effective organization model access', () => {
     expect(decision).toMatchObject({ allowed: false, denialSource: 'organization_model' });
   });
 
+  it('judges a selected variant grant on the exact requested id', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['openai/gpt-4o:free'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+        ],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/gpt-4o:free', async () => new Set(['openai']))
+    ).resolves.toEqual({ allowed: true });
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/gpt-4o', async () => new Set(['openai']))
+    ).resolves.toEqual({ allowed: false, denialSource: 'no_grant' });
+  });
+
+  it('covers model variants with a base-id selected grant', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['openai/gpt-4o'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+        ],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/gpt-4o:free', async () => new Set(['openai']))
+    ).resolves.toEqual({ allowed: true });
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/gpt-4o', async () => new Set(['openai']))
+    ).resolves.toEqual({ allowed: true });
+  });
+
+  it('keeps deny-list variants of an organization denied model denied', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['openai'], model_deny_list: ['openai/o3'] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/o3:free', async () => new Set(['openai']))
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+  });
+
   it('allows provider grants beyond the organization baseline', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({

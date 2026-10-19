@@ -55,7 +55,7 @@ describe('organization group policies', () => {
         type: 'model_access',
         data: {
           mode: 'selected',
-          model_allow_list: ['openai/gpt-4o:free', 'openai/gpt-4o'],
+          model_allow_list: [' openai/gpt-4o:free ', 'openai/gpt-4o:free', 'openai/gpt-4o'],
           provider_allow_list: ['OpenAI/model', 'openai'],
         },
       })
@@ -63,7 +63,7 @@ describe('organization group policies', () => {
       type: 'model_access',
       data: {
         mode: 'selected',
-        model_allow_list: ['openai/gpt-4o'],
+        model_allow_list: ['openai/gpt-4o', 'openai/gpt-4o:free'],
         provider_allow_list: ['openai'],
       },
     });

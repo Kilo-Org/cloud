@@ -120,16 +120,14 @@ describe('collectDeniedAutoRoutingModelIds', () => {
 
     beforeEach(() => {
       jest.mocked(getCachedRoutingTable).mockReset();
-      jest
-        .mocked(getCachedRoutingTable)
-        .mockImplementation(
-          async router =>
-            (router === 'frontier'
-              ? { routes: { 'implementation/code_generation': [{ model: 'openai/gpt-5' }] } }
-              : {
-                  routes: { 'implementation/code_generation': [{ model: 'anthropic/claude' }] },
-                }) as never
-        );
+      jest.mocked(getCachedRoutingTable).mockImplementation(
+        async router =>
+          (router === 'frontier'
+            ? { routes: { 'implementation/code_generation': [{ model: 'openai/gpt-5' }] } }
+            : {
+                routes: { 'implementation/code_generation': [{ model: 'anthropic/claude' }] },
+              }) as never
+      );
       jest.mocked(getAutoRoutingSettings).mockReset();
       jest.mocked(getAutoRoutingSettings).mockResolvedValue({
         status: 200,

@@ -587,8 +587,9 @@ describe('ScreenHeader mounted', () => {
       const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       // The cap is clamped to the three lines the reserved box covers, so a
-      // title can never paint a line the reserve does not hold.
-      const cappedLines = Math.min(props.titleNumberOfLines ?? 2, 3);
+      // title can never paint a line the reserve does not hold. The default
+      // is one line: CJK titles ellipsize instead of orphaning characters.
+      const cappedLines = Math.min(props.titleNumberOfLines ?? 1, 3);
       expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);

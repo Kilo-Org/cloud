@@ -85,7 +85,16 @@ type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
   titleContent?: React.ReactNode;
-  /** Line cap for the title, at most {@link MAX_TITLE_LINES}. */
+  /**
+   * Line cap for the title, at most {@link MAX_TITLE_LINES}. The default is
+   * one line: a header title that does not fit ellipsizes at its tail instead
+   * of wrapping. Android breaks CJK strings between any two characters, so a
+   * two-line cap orphans the string's last characters (ja-JP
+   * セキュリティエージェント rendered as 「…ジェン」 / 「ト」) — a tail
+   * ellipsis is the only natural boundary a CJK title has. Callers whose
+   * titles are real prose opt back into wrapping with an explicit cap
+   * (session headers: `SESSION_HEADER_TITLE_LINES`, todos: 2).
+   */
   titleNumberOfLines?: number;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
@@ -185,7 +194,7 @@ function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: n
 export function ScreenHeader({
   title,
   titleContent,
-  titleNumberOfLines = 2,
+  titleNumberOfLines = 1,
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,

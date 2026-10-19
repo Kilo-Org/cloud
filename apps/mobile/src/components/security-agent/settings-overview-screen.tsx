@@ -230,7 +230,13 @@ export function SettingsOverviewScreen({
   // above the card (explorer security-agent-settings, 2026-09-20).
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dashboard.settings')} headerRight={auditAction} />
+      <ScreenHeader
+        title={t('securityAgent.dashboard.settings')}
+        // One size-11 (44dp) audit icon; declaring it keeps the one-line
+        // title's readable minimum when the row is narrow.
+        headerRightWidth={44}
+        headerRight={auditAction}
+      />
       <TabScreenScrollView className="flex-1">
         <View className="gap-6 px-6 py-4">
           <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">

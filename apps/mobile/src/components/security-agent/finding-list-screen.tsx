@@ -156,6 +156,9 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('common.findings')}
+        // One size-11 (44dp) filter icon; declaring it keeps the one-line
+        // title's readable minimum when the row is narrow.
+        headerRightWidth={44}
         headerRight={
           <Pressable
             onPress={() => {

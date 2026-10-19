@@ -2975,6 +2975,7 @@
       "backToProfile": "પ્રોફાઇલ પર પાછા જાઓ",
       "loadErrorMessage": "તમારું ઇન્ટરનેટ જોડાણ તપાસીને ફરી પ્રયાસ કરો.",
       "loadErrorTitle": "તમારી સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
+      "membershipLostNotice": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ હવે નથી. {{target}} પર સ્વિચ કર્યું.",
       "organizationUnavailable": "સંસ્થા ઉપલબ્ધ નથી.",
       "selectDescription": "આગળ વધવા માટે તમારી પ્રોફાઇલમાંથી સંસ્થા પસંદ કરો.",
       "selectOrganization": "સંસ્થા પસંદ કરો",

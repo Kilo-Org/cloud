@@ -3095,6 +3095,7 @@
       "backToProfile": "Ar ais go dtí an phróifíl",
       "loadErrorMessage": "Seiceáil do nasc agus bain triail eile as.",
       "loadErrorTitle": "Níorbh fhéidir d'eagraíochtaí a lódáil.",
+      "membershipLostNotice": "Níl rochtain agat ar an eagraíocht seo a thuilleadh. Athraithe go {{target}}.",
       "organizationUnavailable": "Níl an eagraíocht ar fáil.",
       "selectDescription": "Roghnaigh eagraíocht ó do phróifíl le leanúint ar aghaidh.",
       "selectOrganization": "Roghnaigh eagraíocht",

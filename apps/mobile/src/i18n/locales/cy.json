@@ -3135,6 +3135,7 @@
       "backToProfile": "Yn ôl i'r proffil",
       "loadErrorMessage": "Gwiria dy gysylltiad a rho gynnig arall arni.",
       "loadErrorTitle": "Methu llwytho'ch sefydliadau.",
+      "membershipLostNotice": "Nid oes gennych fynediad i'r sefydliad hwn mwyach. Wedi newid i {{target}}.",
       "organizationUnavailable": "Nid yw'r sefydliad ar gael.",
       "selectDescription": "Dewiswch sefydliad o'ch proffil i barhau.",
       "selectOrganization": "Dewis sefydliad",

@@ -2975,6 +2975,7 @@
       "backToProfile": "Профильге оралу",
       "loadErrorMessage": "Интернетке қосылғаныңызды тексеріп, қайталап көріңіз.",
       "loadErrorTitle": "Ұйымдарыңызды жүктеу мүмкін болмады.",
+      "membershipLostNotice": "Бұл ұйымға енді кіру рұқсатыңыз жоқ. {{target}}-ға ауыстырылды.",
       "organizationUnavailable": "Ұйым қолжетімсіз.",
       "selectDescription": "Жалғастыру үшін профильден ұйымды таңдаңыз.",
       "selectOrganization": "Ұйымды таңдау",

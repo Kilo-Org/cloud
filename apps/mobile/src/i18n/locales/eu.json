@@ -2975,6 +2975,7 @@
       "backToProfile": "Itzuli profilera",
       "loadErrorMessage": "Egiaztatu konexioa eta saiatu berriro.",
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
+      "membershipLostNotice": "Ez duzu jada erakunde honetarako sarbiderik. Aldatu da {{target}}-ra.",
       "organizationUnavailable": "Erakundea ez dago erabilgarri.",
       "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
       "selectOrganization": "Hautatu erakunde bat",

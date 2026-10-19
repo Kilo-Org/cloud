@@ -2975,6 +2975,7 @@
       "backToProfile": "Tillbaka till profilen",
       "loadErrorMessage": "Kontrollera anslutningen och försök igen.",
       "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
+      "membershipLostNotice": "Du har inte längre åtkomst till den här organisationen. Växlade till {{target}}.",
       "organizationUnavailable": "Organisationen är inte tillgänglig.",
       "selectDescription": "Välj en organisation i din profil för att fortsätta.",
       "selectOrganization": "Välj en organisation",

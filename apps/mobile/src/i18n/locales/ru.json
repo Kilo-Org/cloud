@@ -3047,6 +3047,7 @@
       "backToProfile": "К профилю",
       "loadErrorMessage": "Проверьте подключение и попробуйте снова.",
       "loadErrorTitle": "Не удалось загрузить список ваших организаций.",
+      "membershipLostNotice": "У вас больше нет доступа к этой организации. Переключено на {{target}}.",
       "organizationUnavailable": "Организация недоступна.",
       "selectDescription": "Выберите организацию в профиле, чтобы продолжить.",
       "selectOrganization": "Выберите организацию",

@@ -3047,6 +3047,7 @@
       "backToProfile": "Wróć do profilu",
       "loadErrorMessage": "Sprawdź połączenie i spróbuj ponownie.",
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
+      "membershipLostNotice": "Nie masz już dostępu do tej organizacji. Przełączono na {{target}}.",
       "organizationUnavailable": "Organizacja jest niedostępna.",
       "selectDescription": "Wybierz organizację w swoim profilu, aby kontynuować.",
       "selectOrganization": "Wybierz organizację",

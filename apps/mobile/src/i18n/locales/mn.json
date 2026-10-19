@@ -2975,6 +2975,7 @@
       "backToProfile": "Профайл руу буцах",
       "loadErrorMessage": "Холболтоо шалгаад дахин оролдоно уу.",
       "loadErrorTitle": "Таны байгууллагуудыг ачаалж чадсангүй.",
+      "membershipLostNotice": "Та энэ байгууллагад хандах эрхгүй боллоо. {{target}} руу шилжлээ.",
       "organizationUnavailable": "Байгууллагад хандах боломжгүй.",
       "selectDescription": "Үргэлжлүүлэхийн тулд профайлаасаа байгууллага сонгоно уу.",
       "selectOrganization": "Байгууллага сонгох",

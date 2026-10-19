@@ -2975,6 +2975,7 @@
       "backToProfile": "Kthehu te profili",
       "loadErrorMessage": "Kontrollo lidhjen dhe provo përsëri.",
       "loadErrorTitle": "Nuk u ngarkuan organizatat e tua.",
+      "membershipLostNotice": "Nuk ke më qasje në këtë organizatë. U kalua te {{target}}.",
       "organizationUnavailable": "Organizata nuk është e disponueshme.",
       "selectDescription": "Zgjidh një organizatë nga profili yt për të vazhduar.",
       "selectOrganization": "Zgjidh një organizatë",

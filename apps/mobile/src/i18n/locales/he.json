@@ -3007,6 +3007,7 @@
       "backToProfile": "חזרה לפרופיל",
       "loadErrorMessage": "כדאי לבדוק את החיבור לאינטרנט ולנסות שוב.",
       "loadErrorTitle": "לא ניתן היה לטעון את הארגונים שלך.",
+      "membershipLostNotice": "אין לך גישה לארגון זה עוד. הוחלף ל-{{target}}.",
       "organizationUnavailable": "הארגון אינו זמין.",
       "selectDescription": "בחר ארגון מהפרופיל שלך כדי להמשיך.",
       "selectOrganization": "בחירת ארגון",

@@ -2967,6 +2967,7 @@
       "backToProfile": "Quay lại hồ sơ",
       "loadErrorMessage": "Kiểm tra kết nối và thử lại.",
       "loadErrorTitle": "Không thể tải danh sách tổ chức của bạn.",
+      "membershipLostNotice": "Bạn không còn quyền truy cập vào tổ chức này. Đã chuyển sang {{target}}.",
       "organizationUnavailable": "Không thể truy cập tổ chức.",
       "selectDescription": "Chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
       "selectOrganization": "Chọn một tổ chức",

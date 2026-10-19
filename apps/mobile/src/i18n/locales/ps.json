@@ -2975,6 +2975,7 @@
       "backToProfile": "بېرته پروفایل ته ورشئ",
       "loadErrorMessage": "خپله انټرنېټي اړیکه وګورئ او بیا هڅه وکړئ.",
       "loadErrorTitle": "ستاسو سازمانونه بار نه شول.",
+      "membershipLostNotice": "تاسو دې سازمان ته نور لاسرسی نه لرئ. په {{target}} بدل شو.",
       "organizationUnavailable": "سازمان د لاسرسي وړ نه دی.",
       "selectDescription": "د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
       "selectOrganization": "یو سازمان غوره کړئ",

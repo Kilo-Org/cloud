@@ -2975,6 +2975,7 @@
       "backToProfile": "Tagasi profiilile",
       "loadErrorMessage": "Kontrolli ühendust ja proovi uuesti.",
       "loadErrorTitle": "Sinu organisatsioone ei õnnestunud laadida.",
+      "membershipLostNotice": "Sul puudub enam juurdepääs sellele organisatsioonile. Vahetatud {{target}}-le.",
       "organizationUnavailable": "Organisatsioon pole saadaval.",
       "selectDescription": "Jätkamiseks vali oma profiililt organisatsioon.",
       "selectOrganization": "Vali organisatsioon",

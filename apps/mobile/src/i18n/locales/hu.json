@@ -2975,6 +2975,7 @@
       "backToProfile": "Vissza a profilhoz",
       "loadErrorMessage": "Ellenőrizd az internetkapcsolatot, és próbáld újra.",
       "loadErrorTitle": "Nem sikerült betölteni a szervezeteidet.",
+      "membershipLostNotice": "Már nincs hozzáférésed ehhez a szervezethez. Átváltva a következőre: {{target}}.",
       "organizationUnavailable": "A szervezet nem érhető el.",
       "selectDescription": "A folytatáshoz válassz szervezetet a profilodból.",
       "selectOrganization": "Szervezet kiválasztása",

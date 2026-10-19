@@ -3007,6 +3007,7 @@
       "backToProfile": "Volver al perfil",
       "loadErrorMessage": "Comprueba tu conexión e inténtalo de nuevo.",
       "loadErrorTitle": "No se pudieron cargar tus organizaciones.",
+      "membershipLostNotice": "Ya no tienes acceso a esta organización. Cambiado a {{target}}.",
       "organizationUnavailable": "La organización no está disponible.",
       "selectDescription": "Elige una organización de tu perfil para continuar.",
       "selectOrganization": "Seleccionar una organización",

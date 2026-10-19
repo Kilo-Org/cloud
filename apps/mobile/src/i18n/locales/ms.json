@@ -2975,6 +2975,7 @@
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Semak sambungan anda dan cuba lagi.",
       "loadErrorTitle": "Tidak dapat memuatkan organisasi anda.",
+      "membershipLostNotice": "Anda tidak lagi mempunyai akses kepada organisasi ini. Ditukar kepada {{target}}.",
       "organizationUnavailable": "Organisasi tidak tersedia.",
       "selectDescription": "Pilih organisasi daripada profil anda untuk meneruskan.",
       "selectOrganization": "Pilih organisasi",

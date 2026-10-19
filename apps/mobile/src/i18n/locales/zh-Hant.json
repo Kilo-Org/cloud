@@ -2967,6 +2967,7 @@
       "backToProfile": "返回個人資料",
       "loadErrorMessage": "請檢查網路連線後再試一次。",
       "loadErrorTitle": "無法載入你的組織清單。",
+      "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
       "organizationUnavailable": "無法存取組織。",
       "selectDescription": "請到個人資料頁面選取組織，即可繼續。",
       "selectOrganization": "選取組織",

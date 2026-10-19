@@ -3015,6 +3015,7 @@
       "backToProfile": "Torna al perfil",
       "loadErrorMessage": "Comprova la connexió i torna-ho a provar.",
       "loadErrorTitle": "No s'han pogut carregar les teves organitzacions.",
+      "membershipLostNotice": "Ja no tens accés a aquesta organització. Canviat a {{target}}.",
       "organizationUnavailable": "L'organització no està disponible.",
       "selectDescription": "Tria una organització des del teu perfil per continuar.",
       "selectOrganization": "Selecciona una organització",

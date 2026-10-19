@@ -2975,6 +2975,7 @@
       "backToProfile": "პროფილზე დაბრუნება",
       "loadErrorMessage": "შეამოწმე კავშირი და ხელახლა სცადე.",
       "loadErrorTitle": "თქვენი ორგანიზაციების ჩატვირთვა ვერ მოხერხდა.",
+      "membershipLostNotice": "თქვენ აღარ გაქვთ წვდომა ამ ორგანიზაციაზე. გადავერთეთ {{target}}-ზე.",
       "organizationUnavailable": "ორგანიზაცია მიუწვდომელია.",
       "selectDescription": "გასაგრძელებლად აირჩიეთ ორგანიზაცია თქვენი პროფილიდან.",
       "selectOrganization": "აირჩიეთ ორგანიზაცია",

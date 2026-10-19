@@ -2975,6 +2975,7 @@
       "backToProfile": "Miverena amin'ny mombamomba anao",
       "loadErrorMessage": "Jereo ny fifandraisanao ary andramo indray.",
       "loadErrorTitle": "Tsy voaray ny fikambananao.",
+      "membershipLostNotice": "Tsy manana alalana hiditra amin'ity fikambanana ity intsony ianao. Nafindra tany amin'ny {{target}}.",
       "organizationUnavailable": "Tsy azo idirana ny fikambanana.",
       "selectDescription": "Misafidiana fikambanana ao amin'ny mombamomba anao mba hanohizana.",
       "selectOrganization": "Misafidiana fikambanana",

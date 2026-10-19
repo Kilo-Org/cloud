@@ -2967,6 +2967,7 @@
       "backToProfile": "प्रोफ़ाइल पर वापस जाएँ",
       "loadErrorMessage": "अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
       "loadErrorTitle": "आपके संगठन लोड नहीं हो सके।",
+      "membershipLostNotice": "आपको इस संगठन का ऐक्सेस अब नहीं है। {{target}} पर स्विच किया गया।",
       "organizationUnavailable": "संगठन उपलब्ध नहीं है।",
       "selectDescription": "जारी रखने के लिए अपनी प्रोफ़ाइल से एक संगठन चुनें।",
       "selectOrganization": "एक संगठन चुनें",

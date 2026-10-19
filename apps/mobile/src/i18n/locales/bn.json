@@ -2975,6 +2975,7 @@
       "backToProfile": "প্রোফাইলে ফিরে যান",
       "loadErrorMessage": "আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
       "loadErrorTitle": "আপনার সংস্থাগুলো লোড করা যায়নি।",
+      "membershipLostNotice": "এই সংস্থায় আপনার আর অ্যাক্সেস নেই। স্যুইচ করা হয়েছে {{target}}-এ।",
       "organizationUnavailable": "সংস্থাটি পাওয়া যাচ্ছে না।",
       "selectDescription": "চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি সংস্থা বেছে নিন।",
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",

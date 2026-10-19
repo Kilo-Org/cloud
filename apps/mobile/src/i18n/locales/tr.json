@@ -2967,6 +2967,7 @@
       "backToProfile": "Profile geri dön",
       "loadErrorMessage": "Bağlantını kontrol edip tekrar dene.",
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
+      "membershipLostNotice": "Bu kuruluşa artık erişimin yok. {{target}}'e geçildi.",
       "organizationUnavailable": "Kuruluş kullanılamıyor.",
       "selectDescription": "Devam etmek için profilinden bir kuruluş seç.",
       "selectOrganization": "Bir kuruluş seç",

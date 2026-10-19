@@ -2975,6 +2975,7 @@
       "backToProfile": "กลับไปยังโปรไฟล์",
       "loadErrorMessage": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
       "loadErrorTitle": "โหลดองค์กรของคุณไม่สำเร็จ",
+      "membershipLostNotice": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้อีกต่อไป เปลี่ยนเป็น {{target}} แล้ว",
       "organizationUnavailable": "องค์กรไม่พร้อมใช้งาน",
       "selectDescription": "เลือกองค์กรจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
       "selectOrganization": "เลือกองค์กร",

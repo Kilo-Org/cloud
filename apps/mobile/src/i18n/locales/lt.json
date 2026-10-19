@@ -3055,6 +3055,7 @@
       "backToProfile": "Grįžti į profilį",
       "loadErrorMessage": "Patikrink ryšį ir bandyk dar kartą.",
       "loadErrorTitle": "Nepavyko įkelti jūsų organizacijų.",
+      "membershipLostNotice": "Jūs nebeturite prieigos prie šios organizacijos. Perjungta į {{target}}.",
       "organizationUnavailable": "Organizacija nepasiekiama.",
       "selectDescription": "Norėdami tęsti, savo profilyje pasirinkite organizaciją.",
       "selectOrganization": "Pasirinkite organizaciją",

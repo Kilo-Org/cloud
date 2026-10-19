@@ -3015,6 +3015,7 @@
       "backToProfile": "Atpakaļ uz profilu",
       "loadErrorMessage": "Pārbaudi savienojumu un mēģini vēlreiz.",
       "loadErrorTitle": "Neizdevās ielādēt tavas organizācijas.",
+      "membershipLostNotice": "Tev vairs nav piekļuves šai organizācijai. Pārslēgts uz {{target}}.",
       "organizationUnavailable": "Organizācija nav pieejama.",
       "selectDescription": "Lai turpinātu, izvēlies organizāciju savā profilā.",
       "selectOrganization": "Organizācijas izvēle",

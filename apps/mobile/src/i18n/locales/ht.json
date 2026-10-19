@@ -2975,6 +2975,7 @@
       "backToProfile": "Tounen nan pwofil la",
       "loadErrorMessage": "Tcheke koneksyon ou epi eseye ankò.",
       "loadErrorTitle": "Nou pa t ka chaje òganizasyon ou yo.",
+      "membershipLostNotice": "Ou pa gen aksè nan òganizasyon sa a ankò. Chanje pou {{target}}.",
       "organizationUnavailable": "Òganizasyon an pa disponib.",
       "selectDescription": "Chwazi yon òganizasyon nan pwofil ou pou kontinye.",
       "selectOrganization": "Chwazi yon òganizasyon",

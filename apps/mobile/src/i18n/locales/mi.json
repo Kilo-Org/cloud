@@ -2975,6 +2975,7 @@
       "backToProfile": "Hoki ki te kōtaha",
       "loadErrorMessage": "Tirohia tō hononga, ā, whakamātau anō.",
       "loadErrorTitle": "Kāore i taea te uta i ō rōpū.",
+      "membershipLostNotice": "Kāore ō whakaaetanga uru ki tēnei rōpū anō. I whakawhiti ki {{target}}.",
       "organizationUnavailable": "Kāore e wātea ana te rōpū.",
       "selectDescription": "Kōwhiria tētahi rōpū mai i tō kōtaha kia haere tonu.",
       "selectOrganization": "Kōwhiria tētahi rōpū",

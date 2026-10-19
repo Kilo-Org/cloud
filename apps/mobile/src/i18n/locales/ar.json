@@ -3127,6 +3127,7 @@
       "backToProfile": "العودة إلى الملف الشخصي",
       "loadErrorMessage": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
       "loadErrorTitle": "تعذّر تحميل مؤسساتك.",
+      "membershipLostNotice": "لم يعد لديك حق الوصول إلى هذه المؤسسة. تم التبديل إلى {{target}}.",
       "organizationUnavailable": "المؤسسة غير متاحة.",
       "selectDescription": "اختر مؤسسة من ملفك الشخصي للمتابعة.",
       "selectOrganization": "اختيار مؤسسة",

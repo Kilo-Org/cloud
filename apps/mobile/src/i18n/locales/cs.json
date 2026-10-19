@@ -3055,6 +3055,7 @@
       "backToProfile": "Zpět na profil",
       "loadErrorMessage": "Zkontroluj připojení a zkus to znovu.",
       "loadErrorTitle": "Vaše organizace se nepodařilo načíst.",
+      "membershipLostNotice": "Už nemáte přístup do této organizace. Přepnuto na {{target}}.",
       "organizationUnavailable": "Organizace není k dispozici.",
       "selectDescription": "Vyberte ve svém profilu organizaci a pokračujte.",
       "selectOrganization": "Vyberte organizaci",

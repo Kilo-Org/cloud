@@ -2975,6 +2975,7 @@
       "backToProfile": "Ku noqo bogga shakhsiga",
       "loadErrorMessage": "Hubi xiriirkaaga internetka oo mar kale isku day.",
       "loadErrorTitle": "Ururradaada lama soo shubi karin.",
+      "membershipLostNotice": "Mar dambe ma lihid oggolaansho aad ku gasho ururkan. Waxaa lagu beddelay {{target}}.",
       "organizationUnavailable": "Ururka lama heli karo.",
       "selectDescription": "Boggaaga shakhsiga ka dooro urur si aad u sii socoto.",
       "selectOrganization": "Dooro urur",

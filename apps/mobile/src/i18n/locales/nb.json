@@ -2975,6 +2975,7 @@
       "backToProfile": "Tilbake til profil",
       "loadErrorMessage": "Sjekk tilkoblingen og prøv igjen.",
       "loadErrorTitle": "Kunne ikke laste inn organisasjonene dine.",
+      "membershipLostNotice": "Du har ikke lenger tilgang til denne organisasjonen. Byttet til {{target}}.",
       "organizationUnavailable": "Organisasjonen er ikke tilgjengelig.",
       "selectDescription": "Velg en organisasjon fra profilen din for å fortsette.",
       "selectOrganization": "Velg en organisasjon",

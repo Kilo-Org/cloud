@@ -3095,6 +3095,7 @@
       "backToProfile": "Lura għall-profil",
       "loadErrorMessage": "Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
       "loadErrorTitle": "Ma setgħux jitgħabbew l-organizzazzjonijiet tiegħek.",
+      "membershipLostNotice": "M'għandekx iktar aċċess għal din l-organizzazzjoni. Inbidel għal {{target}}.",
       "organizationUnavailable": "L-organizzazzjoni mhix disponibbli.",
       "selectDescription": "Agħżel organizzazzjoni mill-profil tiegħek biex tkompli.",
       "selectOrganization": "Agħżel organizzazzjoni",

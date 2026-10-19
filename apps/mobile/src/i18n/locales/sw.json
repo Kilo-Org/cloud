@@ -2975,6 +2975,7 @@
       "backToProfile": "Rudi kwenye wasifu",
       "loadErrorMessage": "Angalia muunganisho wako wa intaneti na ujaribu tena.",
       "loadErrorTitle": "Imeshindikana kupakia mashirika yako.",
+      "membershipLostNotice": "Huna tena ruhusa ya kufikia shirika hili. Imebadilishwa kwenda {{target}}.",
       "organizationUnavailable": "Shirika halipatikani.",
       "selectDescription": "Chagua shirika kutoka kwenye wasifu wako ili uendelee.",
       "selectOrganization": "Chagua shirika",

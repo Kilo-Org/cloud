@@ -3015,6 +3015,7 @@
       "backToProfile": "Voltar ao perfil",
       "loadErrorMessage": "Verifica a tua ligação e tenta novamente.",
       "loadErrorTitle": "Não foi possível carregar as suas organizações.",
+      "membershipLostNotice": "Já não tem acesso a esta organização. Mudou para {{target}}.",
       "organizationUnavailable": "A organização não está disponível.",
       "selectDescription": "Escolha uma organização no seu perfil para continuar.",
       "selectOrganization": "Selecionar uma organização",

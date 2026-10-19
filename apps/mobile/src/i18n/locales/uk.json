@@ -3047,6 +3047,7 @@
       "backToProfile": "Назад до профілю",
       "loadErrorMessage": "Перевір з’єднання та спробуй ще раз.",
       "loadErrorTitle": "Не вдалося завантажити ваші організації.",
+      "membershipLostNotice": "У вас більше немає доступу до цієї організації. Перемкнуто на {{target}}.",
       "organizationUnavailable": "Організація недоступна.",
       "selectDescription": "Виберіть організацію у своєму профілі, щоб продовжити.",
       "selectOrganization": "Виберіть організацію",

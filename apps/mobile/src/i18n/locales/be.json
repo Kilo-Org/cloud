@@ -3055,6 +3055,7 @@
       "backToProfile": "Назад да профілю",
       "loadErrorMessage": "Правер злучэнне і паспрабуй яшчэ раз.",
       "loadErrorTitle": "Не ўдалося загрузіць вашы арганізацыі.",
+      "membershipLostNotice": "У вас больш няма доступу да гэтай арганізацыі. Пераключана на {{target}}.",
       "organizationUnavailable": "Арганізацыя недаступная.",
       "selectDescription": "Каб працягнуць, выберыце арганізацыю ў сваім профілі.",
       "selectOrganization": "Выберыце арганізацыю",

@@ -2975,6 +2975,7 @@
       "backToProfile": "Profilga qaytish",
       "loadErrorMessage": "Internetga ulanishni tekshiring va qayta urinib ko‘ring.",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
+      "membershipLostNotice": "Sizda ushbu tashkilotga kirish huquqi endi yo'q. {{target}} ga o'tkazildi.",
       "organizationUnavailable": "Tashkilot mavjud emas.",
       "selectDescription": "Davom etish uchun profilingizdan tashkilotni tanlang.",
       "selectOrganization": "Tashkilotni tanlang",

@@ -2967,6 +2967,7 @@
       "backToProfile": "プロフィールに戻る",
       "loadErrorMessage": "接続を確認して、もう一度お試しください。",
       "loadErrorTitle": "組織を読み込めませんでした。",
+      "membershipLostNotice": "この組織にアクセスできなくなりました。{{target}}に切り替えました。",
       "organizationUnavailable": "組織を利用できません。",
       "selectDescription": "続行するには、プロフィールから組織を選択してください。",
       "selectOrganization": "組織を選択",

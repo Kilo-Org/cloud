@@ -3015,6 +3015,7 @@
       "backToProfile": "Natrag na profil",
       "loadErrorMessage": "Provjeri vezu i pokušaj ponovno.",
       "loadErrorTitle": "Nije moguće učitati tvoje organizacije.",
+      "membershipLostNotice": "Više nemaš pristup ovoj organizaciji. Prebačeno na {{target}}.",
       "organizationUnavailable": "Organizacija nije dostupna.",
       "selectDescription": "Za nastavak odaberi organizaciju na svom profilu.",
       "selectOrganization": "Odaberi organizaciju",

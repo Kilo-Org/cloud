@@ -2975,6 +2975,7 @@
       "backToProfile": "Til baka í prófíl",
       "loadErrorMessage": "Athugaðu tenginguna og reyndu aftur.",
       "loadErrorTitle": "Ekki tókst að hlaða félögunum þínum.",
+      "membershipLostNotice": "Þú hefur ekki lengur aðgang að þessu félagi. Skipt yfir í {{target}}.",
       "organizationUnavailable": "Félagið er ekki tiltækt.",
       "selectDescription": "Veldu félag úr prófílnum þínum til að halda áfram.",
       "selectOrganization": "Val á félagi",

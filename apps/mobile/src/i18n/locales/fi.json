@@ -2975,6 +2975,7 @@
       "backToProfile": "Takaisin profiiliin",
       "loadErrorMessage": "Tarkista yhteys ja yritä uudelleen.",
       "loadErrorTitle": "Organisaatioitasi ei voitu ladata.",
+      "membershipLostNotice": "Sinulla ei ole enää pääsyä tähän organisaatioon. Vaihdettu {{target}}.",
       "organizationUnavailable": "Organisaatio ei ole käytettävissä.",
       "selectDescription": "Jatka valitsemalla organisaatio profiilistasi.",
       "selectOrganization": "Valitse organisaatio",

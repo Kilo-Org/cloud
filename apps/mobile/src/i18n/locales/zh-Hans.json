@@ -2967,6 +2967,7 @@
       "backToProfile": "返回个人资料",
       "loadErrorMessage": "请检查网络连接后重试。",
       "loadErrorTitle": "无法加载你的组织列表。",
+      "membershipLostNotice": "你已无法访问此组织。已切换至 {{target}}。",
       "organizationUnavailable": "此组织不可用。",
       "selectDescription": "请前往个人资料页面，选择一个组织后继续。",
       "selectOrganization": "选择组织",

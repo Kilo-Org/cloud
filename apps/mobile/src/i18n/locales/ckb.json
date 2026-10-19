@@ -2975,6 +2975,7 @@
       "backToProfile": "گەڕانەوە بۆ پڕۆفایل",
       "loadErrorMessage": "پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
       "loadErrorTitle": "نەتوانرا ڕێکخراوەکانت بار بکرێن.",
+      "membershipLostNotice": "چیتر مۆڵەتی دەستگەیشتن بەم ڕێکخراوەت نییە. گۆڕدرا بۆ {{target}}.",
       "organizationUnavailable": "ڕێکخراوەکە بەردەست نییە.",
       "selectDescription": "لە پڕۆفایلەکەتەوە ڕێکخراوێک هەڵبژێرە بۆ بەردەوامبوون.",
       "selectOrganization": "هەڵبژاردنی ڕێکخراوێک",

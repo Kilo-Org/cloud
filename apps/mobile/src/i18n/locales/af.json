@@ -2975,6 +2975,7 @@
       "backToProfile": "Terug na profiel",
       "loadErrorMessage": "Kontroleer jou verbinding en probeer weer.",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
+      "membershipLostNotice": "Jy het nie meer toegang tot hierdie organisasie nie. Oorgeskakel na {{target}}.",
       "organizationUnavailable": "Die organisasie is nie beskikbaar nie.",
       "selectDescription": "Kies 'n organisasie uit jou profiel om voort te gaan.",
       "selectOrganization": "Kies 'n organisasie",

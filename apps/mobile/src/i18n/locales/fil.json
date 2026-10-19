@@ -2975,6 +2975,7 @@
       "backToProfile": "Bumalik sa profile",
       "loadErrorMessage": "Suriin ang koneksyon mo at subukan muli.",
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
+      "membershipLostNotice": "Wala ka nang access sa organisasyong ito. Lumipat sa {{target}}.",
       "organizationUnavailable": "Hindi ma-access ang organisasyon.",
       "selectDescription": "Pumili ng organisasyon mula sa iyong profile para magpatuloy.",
       "selectOrganization": "Pumili ng organisasyon",

@@ -2967,6 +2967,7 @@
       "backToProfile": "Terug naar profiel",
       "loadErrorMessage": "Controleer je verbinding en probeer het opnieuw.",
       "loadErrorTitle": "Je organisaties konden niet worden geladen.",
+      "membershipLostNotice": "Je hebt geen toegang meer tot deze organisatie. Overgeschakeld naar {{target}}.",
       "organizationUnavailable": "De organisatie is niet beschikbaar.",
       "selectDescription": "Kies een organisatie uit je profiel om door te gaan.",
       "selectOrganization": "Een organisatie selecteren",

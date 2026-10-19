@@ -2975,6 +2975,7 @@
       "backToProfile": "Profilə qayıt",
       "loadErrorMessage": "Bağlantını yoxla və yenidən cəhd et.",
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
+      "membershipLostNotice": "Bu təşkilata artıq giriş icazən yoxdur. Keçid edildi: {{target}}.",
       "organizationUnavailable": "Təşkilat əlçatan deyil.",
       "selectDescription": "Davam etmək üçün profilindən təşkilat seç.",
       "selectOrganization": "Təşkilat seç",

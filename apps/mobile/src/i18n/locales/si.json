@@ -2975,6 +2975,7 @@
       "backToProfile": "පැතිකඩට ආපසු යන්න",
       "loadErrorMessage": "ඔබේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "loadErrorTitle": "ඔබේ සංවිධාන පූරණය කළ නොහැකි විය.",
+      "membershipLostNotice": "ඔබට මෙම සංවිධානයට තවදුරටත් ප්‍රවේශ වීමට අවසර නොමැත. {{target}} වෙත මාරු විය.",
       "organizationUnavailable": "සංවිධානය ලබා ගත නොහැක.",
       "selectDescription": "ඉදිරියට යාමට ඔබේ පැතිකඩෙන් සංවිධානයක් තෝරන්න.",
       "selectOrganization": "සංවිධානයක් තෝරන්න",

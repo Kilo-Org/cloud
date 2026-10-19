@@ -3015,6 +3015,7 @@
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
+      "membershipLostNotice": "Nu mai ai acces la această organizație. S-a comutat la {{target}}.",
       "organizationUnavailable": "Organizația nu este disponibilă.",
       "selectDescription": "Alege o organizație din profilul tău pentru a continua.",
       "selectOrganization": "Selectează o organizație",

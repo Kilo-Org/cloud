@@ -2975,6 +2975,7 @@
       "backToProfile": "بازگشت به پروفایل",
       "loadErrorMessage": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.",
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
+      "membershipLostNotice": "شما دیگر به این سازمان دسترسی ندارید. به {{target}} تغییر یافت.",
       "organizationUnavailable": "سازمان در دسترس نیست.",
       "selectDescription": "برای ادامه، در پروفایل خود یک سازمان انتخاب کنید.",
       "selectOrganization": "انتخاب سازمان",

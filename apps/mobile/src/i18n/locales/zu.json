@@ -2975,6 +2975,7 @@
       "backToProfile": "Buyela kuphrofayili",
       "loadErrorMessage": "Hlola uxhumano lwakho bese uzama futhi.",
       "loadErrorTitle": "Asikwazanga ukulayisha izinhlangano zakho.",
+      "membershipLostNotice": "Awusenayo imvume yokufinyelela kule nhlangano. Ushintshelwe ku-{{target}}.",
       "organizationUnavailable": "Inhlangano ayitholakali.",
       "selectDescription": "Khetha inhlangano kuphrofayili yakho ukuze uqhubeke.",
       "selectOrganization": "Khetha inhlangano",

@@ -2975,6 +2975,7 @@
       "backToProfile": "Обратно към профила",
       "loadErrorMessage": "Провери връзката си и опитай отново.",
       "loadErrorTitle": "Не успяхме да заредим организациите ти.",
+      "membershipLostNotice": "Вече нямаш достъп до тази организация. Превключено към {{target}}.",
       "organizationUnavailable": "Организацията е недостъпна.",
       "selectDescription": "Избери организация от профила си, за да продължиш.",
       "selectOrganization": "Избор на организация",

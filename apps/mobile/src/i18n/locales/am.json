@@ -2975,6 +2975,7 @@
       "backToProfile": "ወደ መገለጫ ይመለሱ",
       "loadErrorMessage": "ግንኙነትህን አረጋግጠህ እንደገና ሞክር።",
       "loadErrorTitle": "ድርጅቶችዎን መጫን አልተቻለም።",
+      "membershipLostNotice": "ይህን ድርጅት ከእንግዲህ የመድረስ ፈቃድ የለዎትም። ወደ {{target}} ተቀይሯል።",
       "organizationUnavailable": "ድርጅቱ አይገኝም።",
       "selectDescription": "ለመቀጠል ከመገለጫዎ ድርጅት ይምረጡ።",
       "selectOrganization": "ድርጅት ይምረጡ",

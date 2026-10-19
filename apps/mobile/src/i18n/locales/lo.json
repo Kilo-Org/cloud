@@ -2975,6 +2975,7 @@
       "backToProfile": "ກັບໄປທີ່ໂປຣໄຟລ໌",
       "loadErrorMessage": "ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງໃໝ່.",
       "loadErrorTitle": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນຂອງທ່ານໄດ້.",
+      "membershipLostNotice": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້ອີກແລ້ວ. ປ່ຽນໄປ {{target}} ແລ້ວ.",
       "organizationUnavailable": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້.",
       "selectDescription": "ເລືອກອົງກອນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
       "selectOrganization": "ເລືອກອົງກອນ",

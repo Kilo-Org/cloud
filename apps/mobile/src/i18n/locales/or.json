@@ -2975,6 +2975,7 @@
       "backToProfile": "ପ୍ରୋଫାଇଲକୁ ଫେରନ୍ତୁ",
       "loadErrorMessage": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "loadErrorTitle": "ଆପଣଙ୍କ ସଂଗଠନଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "membershipLostNotice": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ଆଉ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ। {{target}} କୁ ସ୍ୱିଚ୍ ହୋଇଛି।",
       "organizationUnavailable": "ସଂଗଠନ ଉପଲବ୍ଧ ନାହିଁ।",
       "selectDescription": "ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
       "selectOrganization": "ଏକ ସଂଗଠନ ବାଛନ୍ତୁ",

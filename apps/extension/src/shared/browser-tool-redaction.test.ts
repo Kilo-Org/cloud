@@ -40,11 +40,11 @@ describe('header redaction', () => {
   });
 
   it('does not mutate the input record', () => {
-    const input = { authorization: 'Bearer secret' };
+    const input = { authorization: 'Bearer fixture-auth' };
 
     redactSensitiveHeaders(input);
 
-    expect(input.authorization).toBe('Bearer secret');
+    expect(input.authorization).toBe('Bearer fixture-auth');
   });
 
   it('passes undefined through so the renderer keeps its none marker', () => {
@@ -167,7 +167,7 @@ describe('body redaction', () => {
     );
   });
 
-  it('reports no change for an empty multipart field value', () => {
+  it('replaces an empty multipart field value region', () => {
     const body = [
       '--BOUNDARY',
       'Content-Disposition: form-data; name="password"',
@@ -177,7 +177,16 @@ describe('body redaction', () => {
       '',
     ].join('\r\n');
 
-    expect(redactSensitiveBody(body)).toBeUndefined();
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="password"',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
   });
 
   it('replaces a multi-line multipart value region up to the delimiter', () => {
@@ -186,6 +195,30 @@ describe('body redaction', () => {
       'Content-Disposition: form-data; name="password"',
       '',
       'hunter2',
+      'more-of-the-value',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="password"',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
+  it('replaces a multipart value region spanning blank lines', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="password"',
+      '',
+      'hunter2',
+      '',
       'more-of-the-value',
       '--BOUNDARY--',
       '',

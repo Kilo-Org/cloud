@@ -222,11 +222,7 @@ const redactMultipartBody = (text: string): string | undefined => {
 
       let endIndex = valueIndex;
 
-      while (
-        endIndex < lines.length &&
-        lines[endIndex] !== '' &&
-        !isDelimiter(lines[endIndex] ?? '')
-      ) {
+      while (endIndex < lines.length && !isDelimiter(lines[endIndex] ?? '')) {
         endIndex += 1;
       }
 

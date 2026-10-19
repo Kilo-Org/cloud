@@ -322,12 +322,7 @@ describe('removeUserFromOrganization', () => {
       .set({ expires_at: sql`NOW() - INTERVAL '1 hour'` })
       .where(eq(organization_invitations.id, expired.id));
 
-    await inviteUserToOrganization(
-      organization.id,
-      owner.id,
-      member.google_user_email,
-      'member'
-    );
+    await inviteUserToOrganization(organization.id, owner.id, member.google_user_email, 'member');
 
     const otherOrg = await inviteUserToOrganization(
       otherOrganization.id,

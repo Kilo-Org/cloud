@@ -1,5 +1,4 @@
 import 'server-only';
-import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import { createHash } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
@@ -53,7 +52,6 @@ import {
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   recordKiloAdminElevation,
@@ -2386,66 +2384,4 @@ export const cliSessionsV2Router = createTRPCRouter({
       });
     }
   }),
-
-  /**
-   * Share a v2 CLI session from a webhook trigger request.
-   * Creates a read-only public snapshot via the session-ingest worker.
-   *
-   * For org triggers, any org member can share; for personal triggers, only the owner.
-   */
-  shareForWebhookTrigger: baseProcedure
-    .input(
-      z.object({
-        kilo_session_id: z.string().startsWith('ses_'),
-        trigger_id: z.string().min(1),
-        organization_id: z.string().uuid().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      await verifyWebhookTriggerAccess(ctx, input.trigger_id, input.organization_id);
-
-      // For org triggers, verify the session belongs to the same org.
-      // For personal triggers, verify the session belongs to the requesting user.
-      const ownerCondition = input.organization_id
-        ? eq(cli_sessions_v2.organization_id, input.organization_id)
-        : eq(cli_sessions_v2.kilo_user_id, ctx.user.id);
-
-      const [session] = await db
-        .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
-        .from(cli_sessions_v2)
-        .where(and(eq(cli_sessions_v2.session_id, input.kilo_session_id), ownerCondition))
-        .limit(1);
-
-      if (!session) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Session not found',
-        });
-      }
-
-      try {
-        const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
-        if (input.organization_id) {
-          // A public snapshot exposes the transcript; record shares made by a
-          // Kilo admin who is not a member. The share token is never logged.
-          await recordElevatedOrganizationAdminAction(ctx, {
-            organizationId: input.organization_id,
-            requiredRoles: ['owner', 'admin', 'billing_manager', 'member'],
-            action: 'organization.webhook_session.share',
-            message: 'Created public share of a webhook-trigger session',
-            metadata: {
-              sessionId: input.kilo_session_id,
-              triggerId: input.trigger_id,
-              sessionOwnerKiloUserId: session.kilo_user_id,
-            },
-          });
-        }
-        return { share_token: result.share_token, session_id: input.kilo_session_id };
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Session not found') {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
-        }
-        throw error;
-      }
-    }),
 });

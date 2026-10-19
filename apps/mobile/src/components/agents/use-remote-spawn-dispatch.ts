@@ -50,10 +50,10 @@ export const REMOTE_SPAWN_START_DEADLINE_MS = 30_000;
  * `onStart()` dispatch:
  *
  *   - `ready`         -> `router.replace` via `getSpawnedAgentSessionPath`
- *   - `retryable`     -> toast + refetch the instance list + reset the
- *                        selection to `null` if the selected
- *                        `connectionId` dropped off
- *   - `nonRetryable`  -> toast, no navigation, no refetch
+ *   - `retryable`     -> inline retryable failure + refetch the instance
+ *                        list + reset the selection to `null` if the
+ *                        selected `connectionId` dropped off
+ *   - `nonRetryable`  -> inline terminal failure, no navigation, no refetch
  *
  * The outcome -> action mapping is in
  * `@/lib/remote-submit-outcome` (pure, unit-tested). This hook is
@@ -215,15 +215,18 @@ export function useRemoteSpawnDispatch({
         } catch {
           // Refetch failed; continue with the last-known list.
         }
+        // A retry committed while this tail was awaiting owns the state now:
+        // this stale attempt's failure must not disarm its draft marker.
+        if (attemptRef.current !== attempt) {
+          return;
+        }
         const live = resolveLiveInstance(runOnInstance, freshList);
         if (live === null) {
           // No live row matches the selection (neither the connectionId nor
           // the name + projectName pair). Surface the retryable copy and let
           // the next Start tap re-resolve against a refreshed list.
           settle();
-          if (attemptRef.current === attempt) {
-            setRemoteSpawnFailure({ retryable: true, message: remoteSpawnRetryableToast() });
-          }
+          setRemoteSpawnFailure({ retryable: true, message: remoteSpawnRetryableToast() });
           onSpawnFailedRef.current?.();
           return;
         }
@@ -239,9 +242,7 @@ export function useRemoteSpawnDispatch({
         });
         if (!liveAdmission.allowed) {
           settle();
-          if (attemptRef.current === attempt) {
-            setRemoteSpawnFailure({ retryable: false, message: liveAdmission.toast });
-          }
+          setRemoteSpawnFailure({ retryable: false, message: liveAdmission.toast });
           onSpawnFailedRef.current?.();
           return;
         }
@@ -298,6 +299,9 @@ export function useRemoteSpawnDispatch({
         // button and re-arm the caller's abandon guard so a later back/swipe
         // still confirms.
         settle();
+        if (attemptRef.current !== attempt) {
+          return;
+        }
         onSpawnFailedRef.current?.();
         if (outcome.status === 'nonRetryable') {
           // A typed non-retryable rejection ends the intent.
@@ -315,16 +319,14 @@ export function useRemoteSpawnDispatch({
         // outcome.status === 'retryable': a clone/import retry keeps the form
         // and re-enables Start; the selection is never reset to Cloud Agent.
         if (outcome.status === 'retryable' && fields.cloneFromKiloSessionId) {
-          if (attemptRef.current === attempt) {
-            setRemoteSpawnFailure({
-              retryable: true,
-              message: i18n.t('agentChat.session.cloneFailedRetry'),
-            });
-          }
+          setRemoteSpawnFailure({
+            retryable: true,
+            message: i18n.t('agentChat.session.cloneFailedRetry'),
+          });
           return;
         }
         const failure = resolveRemoteSpawnFailure({ outcome });
-        if (failure !== null && attemptRef.current === attempt) {
+        if (failure !== null) {
           setRemoteSpawnFailure(failure);
         }
         if (outcome.status !== 'retryable') {

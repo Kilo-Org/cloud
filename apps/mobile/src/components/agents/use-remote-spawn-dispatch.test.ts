@@ -1107,4 +1107,44 @@ describe('useRemoteSpawnDispatch stall watchdog', () => {
       message: remoteSpawnRetryableToast(),
     });
   });
+
+  it('a stalled attempt late tail cannot disarm a retry watchdog or busy window', async () => {
+    const stalled = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => stalled.promise);
+    const { onStart } = runHook({ organizationId: 'org-xyz' });
+
+    onStart();
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS);
+    expect(rerenderLastHook().isSpawningRemote).toBe(false);
+
+    // Retry while the first attempt is still hanging: the new attempt arms
+    // its own watchdog.
+    const retried = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => retried.promise);
+    onStart();
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+
+    // The first attempt finally fails. Its tail must not reset the busy
+    // window or publish its failure over the retry's in-flight state.
+    stalled.resolve({
+      status: 'retryable',
+      reason: 'transport failure',
+      cause: new Error('socket gone'),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+    expect(rerenderLastHook().remoteSpawnFailure).toBeNull();
+
+    // The retried attempt still holds its watchdog: past the budget it
+    // releases the button (no indefinite busy).
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS);
+    const fresh = rerenderLastHook();
+    expect(fresh.isSpawningRemote).toBe(false);
+    expect(fresh.remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
+  });
 });

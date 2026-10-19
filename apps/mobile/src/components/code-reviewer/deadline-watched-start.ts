@@ -43,6 +43,11 @@ export function useDeadlineWatchedStart(
   const [stalled, setStalled] = useState(false);
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Identity of the newest armed attempt. A delayed attempt's settle runs
+  // against this token: only the newest attempt may clear the watchdog and
+  // publish its result, so a retry is never disarmed or overwritten by a
+  // previous attempt's late outcome.
+  const attemptRef = useRef(0);
   const clearWatchdog = useCallback(() => {
     if (watchdogRef.current !== null) {
       clearTimeout(watchdogRef.current);
@@ -51,22 +56,28 @@ export function useDeadlineWatchedStart(
   }, []);
   useEffect(() => clearWatchdog, [clearWatchdog]);
 
-  const settle = useCallback(
-    (message: string | null) => {
-      clearWatchdog();
-      setStalled(false);
-      setFailureMessage(message);
-    },
-    [clearWatchdog]
-  );
-
   const begin = useCallback(() => {
     // A fresh attempt replaces the previous failure with either the outcome
-    // or the new failure state; the watchdog re-arms for it.
+    // or the new failure state; the watchdog re-arms for it. The settle
+    // passed to `run` is bound to this attempt, so a stale attempt's late
+    // settle cannot touch the newer one.
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
     setStalled(false);
     setFailureMessage(null);
     clearWatchdog();
+    const settle = (message: string | null) => {
+      if (attemptRef.current !== attempt) {
+        return;
+      }
+      clearWatchdog();
+      setStalled(false);
+      setFailureMessage(message);
+    };
     if (!run(settle)) {
+      // The gate refused before anything was pending: no watchdog, and this
+      // attempt's settle must never fire.
+      attemptRef.current += 1;
       return;
     }
     watchdogRef.current = setTimeout(() => {
@@ -76,7 +87,7 @@ export function useDeadlineWatchedStart(
       // late success still lands.
       setStalled(true);
     }, deadlineMs);
-  }, [clearWatchdog, deadlineMs, run, settle]);
+  }, [clearWatchdog, deadlineMs, run]);
 
   return {
     begin,

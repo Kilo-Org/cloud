@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { type Href } from 'expo-router';
 
 import {
@@ -108,6 +108,11 @@ export function useRemoteSpawnDispatch({
     onSpawnFailedRef.current?.();
   });
   const { arm: armWatchdog, disarm: clearWatchdog } = spawnWatchdog;
+  // Identity of the newest committed spawn attempt. A delayed tail's settle
+  // and failure writes run against this token: only the newest attempt may
+  // disarm the watchdog, reset the busy window, or publish a failure, so a
+  // retry is never clobbered by a previous attempt's late outcome.
+  const attemptRef = useRef(0);
   // P1-A-08b: one `operationKey` per spawn intent, so a retryable failure keeps
   // the key and the relay dedupes the retry.
   const { getKey, rotateKey } = useHoistedOperationKey();
@@ -172,6 +177,8 @@ export function useRemoteSpawnDispatch({
     // A fresh attempt replaces the previous failure with either the session
     // or the new failure state; the watchdog re-arms for it.
     setRemoteSpawnFailure(null);
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
     clearWatchdog();
     armWatchdog();
     const createInput = buildCreateRemoteSessionInput({
@@ -184,13 +191,14 @@ export function useRemoteSpawnDispatch({
     });
     void (async () => {
       setIsResolvingInstance(true);
-      // `settled` guards the watchdog race: after the deadline has flipped
-      // the form to the inline failure, a late tail must not re-assert busy
-      // state or overwrite the failure with a second report of the same
-      // attempt.
+      // `settled` guards double reporting within one attempt, and the attempt
+      // token guards across attempts: after the deadline has flipped the form
+      // to the inline failure, the user can Retry while this tail is still
+      // running, so a late settle must not disarm the newer attempt's
+      // watchdog, reset its busy window, or overwrite its failure.
       let settled = false;
       const settle = () => {
-        if (settled) {
+        if (settled || attemptRef.current !== attempt) {
           return;
         }
         settled = true;
@@ -213,7 +221,9 @@ export function useRemoteSpawnDispatch({
           // the name + projectName pair). Surface the retryable copy and let
           // the next Start tap re-resolve against a refreshed list.
           settle();
-          setRemoteSpawnFailure({ retryable: true, message: remoteSpawnRetryableToast() });
+          if (attemptRef.current === attempt) {
+            setRemoteSpawnFailure({ retryable: true, message: remoteSpawnRetryableToast() });
+          }
           onSpawnFailedRef.current?.();
           return;
         }
@@ -229,7 +239,9 @@ export function useRemoteSpawnDispatch({
         });
         if (!liveAdmission.allowed) {
           settle();
-          setRemoteSpawnFailure({ retryable: false, message: liveAdmission.toast });
+          if (attemptRef.current === attempt) {
+            setRemoteSpawnFailure({ retryable: false, message: liveAdmission.toast });
+          }
           onSpawnFailedRef.current?.();
           return;
         }
@@ -303,14 +315,16 @@ export function useRemoteSpawnDispatch({
         // outcome.status === 'retryable': a clone/import retry keeps the form
         // and re-enables Start; the selection is never reset to Cloud Agent.
         if (outcome.status === 'retryable' && fields.cloneFromKiloSessionId) {
-          setRemoteSpawnFailure({
-            retryable: true,
-            message: i18n.t('agentChat.session.cloneFailedRetry'),
-          });
+          if (attemptRef.current === attempt) {
+            setRemoteSpawnFailure({
+              retryable: true,
+              message: i18n.t('agentChat.session.cloneFailedRetry'),
+            });
+          }
           return;
         }
         const failure = resolveRemoteSpawnFailure({ outcome });
-        if (failure !== null) {
+        if (failure !== null && attemptRef.current === attempt) {
           setRemoteSpawnFailure(failure);
         }
         if (outcome.status !== 'retryable') {

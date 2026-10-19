@@ -496,7 +496,11 @@ export function NewSessionScreenBody() {
   // draft-clearing marker. The bypass is reset when the spawn settles without
   // navigating (a failed spawn), so an abandon after a failure still confirms,
   // and the failure also disarms the draft-clearing marker so the draft
-  // survives leaving to Home.
+  // survives leaving to Home. The ready callback re-arms the marker for the
+  // same attempt: a success that lands late (after the deadline flipped the
+  // form to the inline failure and the user pressed Retry) has consumed the
+  // prompt, so the unmount must still clear the draft instead of flushing it
+  // back into the composer for the next visit.
   const handleSpawnAdmitted = useCallback(() => {
     markRemoteSpawnAttempted();
     skipDiscardGuardRef.current = true;
@@ -519,6 +523,10 @@ export function NewSessionScreenBody() {
   const armCloneNavigateBypass = useCallback(() => {
     cloneNavigateBypassRef.current = true;
   }, []);
+  const handleSpawnReady = useCallback(() => {
+    markRemoteSpawnAttempted();
+    armCloneNavigateBypass();
+  }, [markRemoteSpawnAttempted, armCloneNavigateBypass]);
 
   // A to-do start can target a remote instance instead of Cloud Agent; the
   // spawned session links to the to-do the same way the cloud path links it.
@@ -640,7 +648,7 @@ export function NewSessionScreenBody() {
     cloneUpToMessageId: cloneUpToMessageId || null,
     forkPrefillText: forkPrefillText || null,
     onCloneImportFailure: handleCloneImportFailure,
-    onSpawnReady: armCloneNavigateBypass,
+    onSpawnReady: handleSpawnReady,
     onSpawnSucceeded: handleSpawnSucceeded,
   });
   const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);

@@ -36,7 +36,6 @@ function resolveProvider() {
     },
     user: { id: 'user-id' } as User,
     organizationId: ORG_ID,
-    taskId: undefined,
   });
 }
 

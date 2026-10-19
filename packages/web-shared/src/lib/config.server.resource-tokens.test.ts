@@ -15,6 +15,7 @@ const families = {
   'delegated-resource': 'DELEGATED_RESOURCE_TOKENS_ENABLED',
   'workflow-gateway': 'WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED',
   benchmark: 'BENCHMARK_RESOURCE_TOKENS_ENABLED',
+  'internal-bot': 'INTERNAL_BOT_RESOURCE_TOKENS_ENABLED',
 } satisfies Record<ResourceTokenFamily, string>;
 const entries = Object.entries(families) as [ResourceTokenFamily, string][];
 const master = 'SHARED_RESOURCE_TOKENS_ENABLED';

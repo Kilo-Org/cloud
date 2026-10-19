@@ -98,6 +98,11 @@ const userManagementItems: MenuItem[] = [
     icon: () => <Clock />,
   },
   {
+    title: () => 'Internal Bot Users',
+    url: '/admin/internal-bot-users',
+    icon: () => <Bot />,
+  },
+  {
     title: () => 'Bulk Block',
     url: '/admin/bulk-block',
     icon: () => <Ban />,

@@ -21,6 +21,7 @@ import {
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type * as DirectByok from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnkryptBenchmarks } from '@kilocode/web-shared/lib/model-stats/enkrypt';
@@ -133,6 +134,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-models', () => {
   );
   return { ...actual, addAutoRoutingModels: jest.fn(actual.addAutoRoutingModels) };
 });
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  listUsableCustomRouters: jest.fn(async () => []),
+}));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
   const actual = jest.requireActual<typeof DirectByok>(
@@ -434,9 +439,8 @@ describe('GET /api/v1/models', () => {
     expect(model).not.toHaveProperty('terminalBench');
   });
 
-  test('enriches public Kilo-exclusive models but not virtual catalog entries', async () => {
-    const exclusiveModel = kiloExclusiveModels.find(model => model.status === 'public');
-    if (!exclusiveModel) throw new Error('Expected a public Kilo-exclusive model fixture');
+  test('enriches listed Kilo-exclusive models but not virtual catalog entries', async () => {
+    const exclusiveModel = qwen36_plus_stealth_model;
     const exclusiveBenchmark = { ...enkryptBenchmark, model_name: exclusiveModel.display_name };
     jest
       .mocked(mockRows)
@@ -913,10 +917,12 @@ describe('final Enkrypt serialization boundaries', () => {
           expect(JSON.stringify(result)).not.toContain(field);
         }
         if (branch === 'organization') {
-          expect(getAvailableModelsForOrganization).toHaveBeenCalledWith('test-org-id', {
-            type: 'member',
-            kiloUserId: 'test-user-id',
-          });
+          const [organizationId, subject, audience, fromDb] =
+            jest.mocked(getAvailableModelsForOrganization).mock.lastCall ?? [];
+          expect(organizationId).toBe('test-org-id');
+          expect(subject).toEqual({ type: 'member', kiloUserId: 'test-user-id' });
+          expect(audience).toBe('member');
+          expect(fromDb).toBe(readDb);
           expect(result.data.map(model => model.id)).toEqual(['some-other-model']);
           expect(getDirectByokModelsForUser).not.toHaveBeenCalled();
         }

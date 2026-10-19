@@ -1089,6 +1089,8 @@ describe('database schema', () => {
         'failed',
         'cancelled',
       ],
+      CustomRouterBaseRouter: ['efficient', 'frontier'],
+      CustomRouterMode: ['cost_per_accuracy', 'best_accuracy'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};

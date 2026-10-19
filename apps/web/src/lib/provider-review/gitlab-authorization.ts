@@ -11,7 +11,13 @@ import 'server-only';
 
 import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import { gitlabInstanceOrigin } from '@kilocode/app-shared/provider-review';
+import {
+  gitlabInstanceOrigin,
+  isNetworkFailure,
+  ProviderApiStatusError,
+  ProviderReviewError,
+  type ProviderReviewErrorKind,
+} from '@kilocode/app-shared/provider-review';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
@@ -32,38 +38,24 @@ export type GitLabReviewOwner =
   | { type: 'user'; userId: string }
   | { type: 'organization'; organizationId: string; userId: string };
 
-export type GitLabReviewErrorKind =
-  | 'not_found'
-  | 'forbidden'
-  | 'reconnect'
-  | 'stale_head'
-  | 'bad_request'
-  | 'retryable';
+export type GitLabReviewErrorKind = ProviderReviewErrorKind;
 
 /**
  * A classified provider failure. `retryable` is true only for 5xx/network
  * outcomes. The message is fixed copy and never embeds a token or an
  * instance URL, so every output of this layer is safe to show or log.
  */
-export class GitLabReviewError extends Error {
-  readonly kind: GitLabReviewErrorKind;
-  readonly retryable: boolean;
-
-  constructor(kind: GitLabReviewErrorKind, message: string) {
-    super(message);
+export class GitLabReviewError extends ProviderReviewError {
+  constructor(kind: ProviderReviewErrorKind, message: string) {
+    super(kind, message);
     this.name = 'GitLabReviewError';
-    this.kind = kind;
-    this.retryable = kind === 'retryable';
   }
 }
 
 /** An HTTP failure raised by this layer's own GitLab JSON requests. */
-export class GitLabApiStatusError extends Error {
-  constructor(
-    readonly status: number,
-    message: string
-  ) {
-    super(message);
+export class GitLabApiStatusError extends ProviderApiStatusError {
+  constructor(status: number, message: string) {
+    super(status, message);
     this.name = 'GitLabApiStatusError';
   }
 }
@@ -108,15 +100,6 @@ export function classifyGitLabStatus(status: number): GitLabReviewError {
     return new GitLabReviewError('retryable', 'GitLab is temporarily unavailable. Try again.');
   }
   return new GitLabReviewError('retryable', 'GitLab returned an unexpected error.');
-}
-
-function isNetworkFailure(error: Error): boolean {
-  return (
-    error.name === 'TypeError' ||
-    error.name === 'TimeoutError' ||
-    error.name === 'AbortError' ||
-    error.message.toLowerCase().includes('fetch failed')
-  );
 }
 
 function classifyTrpcError(code: TRPCError['code']): GitLabReviewError {

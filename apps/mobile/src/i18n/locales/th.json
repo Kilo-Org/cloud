@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} ใช้ไม่ได้แล้ว เลือกคลังโค้ดด้านล่าง",
       "prefillModelUnavailable": "{{model}} ใช้ไม่ได้แล้ว กำลังใช้โมเดลเริ่มต้นของคุณแทน",
       "couldNotReadPendingSessions": "ไม่สามารถอ่านเซสชันที่รอดำเนินการได้ ลองอีกครั้ง",
+      "couldNotStartSessionNow": "ขณะนี้ไม่สามารถเริ่มเซสชันได้ โปรดลองอีกครั้งในภายหลัง",
       "failedToCreate": "ไม่สามารถสร้างเซสชันได้",
       "couldNotRefreshRepositories": "ไม่สามารถรีเฟรชรายการคลังโค้ดได้ กรุณาลองอีกครั้ง",
       "discardDraftTitle": "ทิ้งฉบับร่างหรือไม่?",

@@ -2264,6 +2264,7 @@
       "prefillRepoUnavailable": "Saugykla „{{repo}}“ nebepasiekiama. Pasirinkite kitą saugyklą žemiau.",
       "prefillModelUnavailable": "Modelis „{{model}}“ nebepasiekiamas. Naudojamas numatytasis modelis.",
       "couldNotReadPendingSessions": "Nepavyko nuskaityti laukiančių sesijų. Bandykite dar kartą.",
+      "couldNotStartSessionNow": "Šiuo metu nepavyko paleisti sesijos. Pabandykite dar kartą vėliau.",
       "failedToCreate": "Nepavyko sukurti sesijos.",
       "couldNotRefreshRepositories": "Nepavyko atnaujinti saugyklų. Bandykite dar kartą.",
       "discardDraftTitle": "Atmesti juodraštį?",

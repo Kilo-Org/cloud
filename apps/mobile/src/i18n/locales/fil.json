@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "Hindi na magamit ang {{repo}}. Pumili ng imbakan ng code sa ibaba.",
       "prefillModelUnavailable": "Hindi na magamit ang {{model}}. Ginagamit ang iyong paunang itinakdang modelo.",
       "couldNotReadPendingSessions": "Hindi mabasa ang mga nakabinbing sesyon. Subukang muli.",
+      "couldNotStartSessionNow": "Hindi magsimula ng sesyon sa ngayon. Subukang muli mamaya.",
       "failedToCreate": "Hindi makagawa ng sesyon.",
       "couldNotRefreshRepositories": "Hindi ma-refresh ang mga imbakan ng code. Subukang muli.",
       "discardDraftTitle": "Burahin ang burador?",

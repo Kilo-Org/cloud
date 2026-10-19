@@ -2264,6 +2264,7 @@
       "prefillRepoUnavailable": "{{repo}} již není k dispozici. Níže vyberte repozitář.",
       "prefillModelUnavailable": "{{model}} již není k dispozici. Používá se váš výchozí model.",
       "couldNotReadPendingSessions": "Čekající relace se nepodařilo načíst. Zkuste to znovu.",
+      "couldNotStartSessionNow": "Relaci se nyní nepodařilo spustit. Zkuste to prosím později znovu.",
       "failedToCreate": "Relaci se nepodařilo vytvořit.",
       "couldNotRefreshRepositories": "Seznam repozitářů se nepodařilo obnovit. Zkuste to znovu.",
       "discardDraftTitle": "Zahodit koncept?",

@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} kana booda hin argamu. Gadiitti kuusaa koodii filadhu.",
       "prefillModelUnavailable": "{{model}} kana booda hin argamu. Moodela durtii kee fayyadamaa jirra.",
       "couldNotReadPendingSessions": "Turtiiwwan eegumsarra jiran dubbisuu hin danda'amne. Deebi'ii yaali.",
+      "couldNotStartSessionNow": "Amma turtee hafuu hin danda'amne. Maaloo booda deebi'ii yaali.",
       "failedToCreate": "Turtii uumuu hin danda'amne.",
       "couldNotRefreshRepositories": "Kuusaawwan koodii haaromsuu hin danda'amne. Deebi'ii yaali.",
       "discardDraftTitle": "Wixinee haqxaa?",

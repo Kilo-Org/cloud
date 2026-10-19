@@ -2236,6 +2236,7 @@
       "prefillRepoUnavailable": "{{repo}} ja no està disponible. Tria un repositori a continuació.",
       "prefillModelUnavailable": "{{model}} ja no està disponible. S'està utilitzant el teu model predeterminat.",
       "couldNotReadPendingSessions": "No s'han pogut llegir les sessions pendents. Torna-ho a provar.",
+      "couldNotStartSessionNow": "Ara no s'ha pogut iniciar la sessió. Torna-ho a provar més tard.",
       "failedToCreate": "No s'ha pogut crear la sessió.",
       "couldNotRefreshRepositories": "No s'han pogut actualitzar els repositoris. Torna-ho a provar.",
       "discardDraftTitle": "Vols descartar l'esborrany?",

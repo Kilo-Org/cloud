@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} ໃຊ້ບໍ່ໄດ້ແລ້ວ. ເລືອກຄັງໂຄດຂ້າງລຸ່ມ.",
       "prefillModelUnavailable": "{{model}} ໃຊ້ບໍ່ໄດ້ແລ້ວ. ກຳລັງໃຊ້ໂມເດວມາດຕະຖານຂອງເຈົ້າແທນ.",
       "couldNotReadPendingSessions": "ບໍ່ສາມາດອ່ານເຊດຊັນທີ່ລໍຖ້າຢູ່ໄດ້. ລອງໃໝ່.",
+      "couldNotStartSessionNow": "ຕອນນີ້ບໍ່ສາມາດເລີ່ມເຊດຊັນໄດ້. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",
       "failedToCreate": "ບໍ່ສາມາດສ້າງເຊດຊັນໄດ້.",
       "couldNotRefreshRepositories": "ບໍ່ສາມາດໂຫຼດລາຍການຄັງໂຄດໃໝ່ໄດ້. ກະລຸນາລອງໃໝ່.",
       "discardDraftTitle": "ລຶບຂໍ້ຄວາມຮ່າງບໍ?",

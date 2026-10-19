@@ -1744,6 +1744,7 @@
       "prefillRepoUnavailable": "لم يعد {{repo}} متاحًا. اختر مستودعًا أدناه.",
       "prefillModelUnavailable": "لم يعد {{model}} متاحًا. نستخدم نموذجك الافتراضي.",
       "couldNotReadPendingSessions": "تعذّرت قراءة الجلسات المعلقة. حاول مرة أخرى.",
+      "couldNotStartSessionNow": "تعذّر بدء الجلسة حاليًا. حاول مرة أخرى لاحقًا.",
       "failedToCreate": "تعذّر إنشاء الجلسة.",
       "couldNotRefreshRepositories": "تعذّر تحديث المستودعات. حاول مرة أخرى.",
       "discardDraftTitle": "حذف المسودة؟",

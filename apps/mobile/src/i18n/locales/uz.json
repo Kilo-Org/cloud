@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} endi mavjud emas. Quyida repozitoriya tanlang.",
       "prefillModelUnavailable": "{{model}} endi mavjud emas. Standart modelingiz ishlatilmoqda.",
       "couldNotReadPendingSessions": "Kutilayotgan sessiyalarni o'qib bo'lmadi. Qayta urinib ko'ring.",
+      "couldNotStartSessionNow": "Sessiyani hozir boshlab bo'lmadi. Iltimos, keyinroq qayta urinib ko'ring.",
       "failedToCreate": "Sessiyani yaratib bo'lmadi.",
       "couldNotRefreshRepositories": "Repozitoriyalarni yangilab bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "discardDraftTitle": "Qoralama bekor qilinsinmi?",

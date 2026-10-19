@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} artıq əlçatan deyil. Aşağıdan repozitoriya seç.",
       "prefillModelUnavailable": "{{model}} artıq əlçatan deyil. Standart modelindən istifadə olunur.",
       "couldNotReadPendingSessions": "Gözləyən sessiyaları oxumaq mümkün olmadı. Yenidən cəhd et.",
+      "couldNotStartSessionNow": "Sessiyanı indi başlatmaq mümkün olmadı. Zəhmət olmasa, sonra yenidən cəhd et.",
       "failedToCreate": "Sessiya yaratmaq mümkün olmadı.",
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",

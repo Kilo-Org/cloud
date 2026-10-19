@@ -1720,6 +1720,7 @@
       "prefillRepoUnavailable": "{{repo}} nie jest już dostępne. Wybierz repozytorium poniżej.",
       "prefillModelUnavailable": "Model {{model}} nie jest już dostępny. Używany jest twój domyślny model.",
       "couldNotReadPendingSessions": "Nie udało się odczytać oczekujących sesji. Spróbuj ponownie.",
+      "couldNotStartSessionNow": "Nie udało się teraz uruchomić sesji. Spróbuj ponownie później.",
       "failedToCreate": "Nie udało się utworzyć sesji.",
       "couldNotRefreshRepositories": "Nie udało się odświeżyć repozytoriów. Spróbuj ponownie.",
       "discardDraftTitle": "Odrzucić szkic?",

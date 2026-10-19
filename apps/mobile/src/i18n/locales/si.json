@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} තවදුරටත් ලබාගත නොහැක. පහත ගබඩාවක් තෝරන්න.",
       "prefillModelUnavailable": "{{model}} තවදුරටත් ලබා ගත නොහැක. ඔබේ පෙරනිමි මාදිලිය භාවිත වේ.",
       "couldNotReadPendingSessions": "පොරොත්තුවේ ඇති සැසි කියවිය නොහැකි විය. නැවත උත්සාහ කරන්න.",
+      "couldNotStartSessionNow": "දැනට සැසිය ආරම්භ කළ නොහැකි විය. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
       "failedToCreate": "සැසියක් සෑදිය නොහැකි විය.",
       "couldNotRefreshRepositories": "ගබඩා නැවුම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "discardDraftTitle": "කටු සටහන ඉවතලන්නද?",

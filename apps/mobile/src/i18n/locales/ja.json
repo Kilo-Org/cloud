@@ -1696,6 +1696,7 @@
       "prefillRepoUnavailable": "{{repo}}は利用できなくなりました。以下でリポジトリを選択してください。",
       "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。",
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
+      "couldNotStartSessionNow": "現在セッションを開始できませんでした。後でもう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした。",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
       "discardDraftTitle": "下書きを破棄しますか？",

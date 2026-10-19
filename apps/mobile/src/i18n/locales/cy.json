@@ -2320,6 +2320,7 @@
       "prefillRepoUnavailable": "Nid yw {{repo}} ar gael mwyach. Dewiswch ystorfa isod.",
       "prefillModelUnavailable": "Nid yw {{model}} ar gael mwyach. Mae eich model diofyn yn cael ei ddefnyddio.",
       "couldNotReadPendingSessions": "Methu darllen y sesiynau sy'n aros. Ceisiwch eto.",
+      "couldNotStartSessionNow": "Methu dechrau'r sesiwn ar hyn o bryd. Ceisiwch eto rywdro.",
       "failedToCreate": "Methu creu'r sesiwn.",
       "couldNotRefreshRepositories": "Methu adnewyddu'r ystorfeydd. Ceisiwch eto.",
       "discardDraftTitle": "Dileu'r drafft?",

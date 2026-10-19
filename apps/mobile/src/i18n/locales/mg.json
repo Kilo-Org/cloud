@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "Tsy azo ampiasaina intsony ny {{repo}}. Misafidiana tahirin-kaody etsy ambany.",
       "prefillModelUnavailable": "Tsy azo ampiasaina intsony ny {{model}}. Ny modely voafidinao mialoha no ampiasaina.",
       "couldNotReadPendingSessions": "Tsy voavaky ny fotoam-piasana miandry. Andramo indray.",
+      "couldNotStartSessionNow": "Tsy nahomby ny fanombohana ny fotoam-piasana ankehitriny. Andramo indray any aoriana.",
       "failedToCreate": "Tsy nahomby ny famoronana fotoam-piasana.",
       "couldNotRefreshRepositories": "Tsy nahomby ny fanavaozana ny lisitry ny tahirin-kaody. Andramo indray azafady.",
       "discardDraftTitle": "Hariana ve ny volavola?",

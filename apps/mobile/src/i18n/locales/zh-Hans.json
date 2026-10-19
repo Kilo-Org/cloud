@@ -1696,6 +1696,7 @@
       "prefillRepoUnavailable": "{{repo}} 已不可用。请在下方选择仓库。",
       "prefillModelUnavailable": "{{model}} 已不可用。当前使用你的默认模型。",
       "couldNotReadPendingSessions": "无法读取待处理的会话。请重试。",
+      "couldNotStartSessionNow": "目前无法启动会话。请稍后重试。",
       "failedToCreate": "创建会话失败。",
       "couldNotRefreshRepositories": "无法刷新仓库。请重试。",
       "discardDraftTitle": "丢弃草稿？",

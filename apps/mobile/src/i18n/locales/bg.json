@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} вече не е налично. Избери хранилище по-долу.",
       "prefillModelUnavailable": "{{model}} вече не е наличен. Използва се твоят модел по подразбиране.",
       "couldNotReadPendingSessions": "Не успяхме да прочетем чакащите сесии. Опитай отново.",
+      "couldNotStartSessionNow": "Не успяхме да стартираме сесията в момента. Опитай отново по-късно.",
       "failedToCreate": "Не успяхме да създадем сесия.",
       "couldNotRefreshRepositories": "Не успяхме да опресним хранилищата. Опитай отново.",
       "discardDraftTitle": "Да се изтрие ли черновата?",

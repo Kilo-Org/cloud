@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} pole enam saadaval. Vali allpool hoidla.",
       "prefillModelUnavailable": "{{model}} pole enam saadaval. Kasutatakse sinu vaikemudelit.",
       "couldNotReadPendingSessions": "Ootel seansside lugemine ebaõnnestus. Proovi uuesti.",
+      "couldNotStartSessionNow": "Seanssi ei õnnestunud praegu käivitada. Proovi hiljem uuesti.",
       "failedToCreate": "Seansi loomine ebaõnnestus.",
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",

@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} енді қолжетімсіз. Төменде репозиторий таңдаңыз.",
       "prefillModelUnavailable": "{{model}} енді қолжетімсіз. Әдепкі моделіңіз қолданылуда.",
       "couldNotReadPendingSessions": "Кезектегі сессияларды оқу мүмкін болмады. Қайталап көріңіз.",
+      "couldNotStartSessionNow": "Сессияны қазір бастау мүмкін болмады. Кейінірек қайталап көріңіз.",
       "failedToCreate": "Сессияны жасау мүмкін болмады.",
       "couldNotRefreshRepositories": "Репозиторийлерді жаңарту мүмкін болмады. Қайталап көріңіз.",
       "discardDraftTitle": "Нобайды жою керек пе?",

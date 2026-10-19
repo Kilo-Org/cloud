@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} jada ez dago erabilgarri. Aukeratu biltegi bat behean.",
       "prefillModelUnavailable": "{{model}} jada ez dago erabilgarri. Zure modelo lehenetsia erabiltzen ari da.",
       "couldNotReadPendingSessions": "Ezin izan dira zain dauden saioak irakurri. Saiatu berriro.",
+      "couldNotStartSessionNow": "Ezin izan da saioa orain abiarazi. Saiatu berriro geroago.",
       "failedToCreate": "Ezin izan da saioa sortu.",
       "couldNotRefreshRepositories": "Ezin izan da biltegien zerrenda freskatu. Saiatu berriro.",
       "discardDraftTitle": "Baztertu zirriborroa?",

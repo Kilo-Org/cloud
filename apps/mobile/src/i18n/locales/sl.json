@@ -2264,6 +2264,7 @@
       "prefillRepoUnavailable": "Skladišče {{repo}} ni več na voljo. Spodaj izberi drugo skladišče.",
       "prefillModelUnavailable": "{{model}} ni več na voljo. Uporabljen je tvoj privzeti model.",
       "couldNotReadPendingSessions": "Čakajočih sej ni bilo mogoče prebrati. Poskusi znova.",
+      "couldNotStartSessionNow": "Seje trenutno ni bilo mogoče zagnati. Poskusi znova pozneje.",
       "failedToCreate": "Seje ni bilo mogoče ustvariti.",
       "couldNotRefreshRepositories": "Skladišč ni bilo mogoče osvežiti. Poskusi znova.",
       "discardDraftTitle": "Želiš zavreči osnutek?",

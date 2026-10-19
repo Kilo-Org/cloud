@@ -22,6 +22,7 @@ import {
   resolveRepoFingerprint,
   setRepositoryField,
 } from '@/components/agents/prepare-session-repository';
+import { prepareFailureMessage } from '@/components/agents/prepare-failure-copy';
 import { i18n } from '@/i18n';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { trpcClient } from '@/lib/trpc';
@@ -218,10 +219,7 @@ export async function prepareAgentSession(
     return { ok: true, sessionId: result.kiloSessionId };
   } catch (error) {
     const retryable = isCloudPrepareRetryableError(error);
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : i18n.t('agentChat.newSession.failedToCreate');
+    const message = prepareFailureMessage(error, retryable);
     // A typed terminal rejection ends the intent; a retryable one keeps the key.
     if (!retryable) {
       deps.rotateKey();

@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} აღარ არის ხელმისაწვდომი. ქვემოთ აირჩიეთ სხვა რეპოზიტორია.",
       "prefillModelUnavailable": "{{model}} აღარ არის ხელმისაწვდომი. გამოიყენება თქვენი ნაგულისხმევი მოდელი.",
       "couldNotReadPendingSessions": "მომლოდინე სესიების წაკითხვა ვერ მოხერხდა. სცადეთ ხელახლა.",
+      "couldNotStartSessionNow": "ამ დროს სესიის დაწყება ვერ მოხერხდა. სცადეთ მოგვიანებით ხელახლა.",
       "failedToCreate": "სესიის შექმნა ვერ მოხერხდა.",
       "couldNotRefreshRepositories": "რეპოზიტორიების განახლება ვერ მოხერხდა. სცადეთ ხელახლა.",
       "discardDraftTitle": "წაიშალოს მონახაზი?",

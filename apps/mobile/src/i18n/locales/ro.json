@@ -2236,6 +2236,7 @@
       "prefillRepoUnavailable": "{{repo}} nu mai este disponibil. Alege un depozit mai jos.",
       "prefillModelUnavailable": "{{model}} nu mai este disponibil. Se folosește modelul tău implicit.",
       "couldNotReadPendingSessions": "Nu s-au putut citi sesiunile în așteptare. Încearcă din nou.",
+      "couldNotStartSessionNow": "Nu s-a putut porni sesiunea în acest moment. Încearcă din nou mai târziu.",
       "failedToCreate": "Nu s-a putut crea sesiunea.",
       "couldNotRefreshRepositories": "Nu s-au putut reîmprospăta depozitele. Încearcă din nou.",
       "discardDraftTitle": "Renunți la ciornă?",

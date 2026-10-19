@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} tidak lagi tersedia. Pilih repositori di bawah.",
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Model lalai anda digunakan.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu. Cuba semula.",
+      "couldNotStartSessionNow": "Tidak dapat memulakan sesi pada masa ini. Sila cuba semula kemudian.",
       "failedToCreate": "Gagal mencipta sesi.",
       "couldNotRefreshRepositories": "Tidak dapat memuatkan semula repositori. Sila cuba semula.",
       "discardDraftTitle": "Buang draf?",

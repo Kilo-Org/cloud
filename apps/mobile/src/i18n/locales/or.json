@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ନିମ୍ନରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
       "prefillModelUnavailable": "{{model}} ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆପଣଙ୍କ ଡିଫଲ୍ଟ ମଡେଲ୍ ବ୍ୟବହାର କରାଯାଉଛି।",
       "couldNotReadPendingSessions": "ଅପେକ୍ଷାରେ ଥିବା ସେସନ୍ ପଢ଼ି ହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "couldNotStartSessionNow": "ଏବେ ସେସନ୍ ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "failedToCreate": "ସେସନ୍ ତିଆରି ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotRefreshRepositories": "ରିପୋଜିଟୋରୀ ତାଲିକା ରିଫ୍ରେସ୍ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "discardDraftTitle": "ଡ୍ରାଫ୍ଟ ହଟାଇବେ?",

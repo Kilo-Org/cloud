@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} ከእንግዲህ አይገኝም። ከታች ማከማቻ ይምረጡ።",
       "prefillModelUnavailable": "{{model}} ከእንግዲህ አይገኝም። ነባሪ ሞዴልዎ ጥቅም ላይ እየዋለ ነው።",
       "couldNotReadPendingSessions": "የሚጠባበቁ ክፍለ ጊዜዎችን ማንበብ አልተቻለም። እንደገና ይሞክሩ።",
+      "couldNotStartSessionNow": "ክፍለ ጊዜውን አሁን ማስጀመር አልተቻለም። እባክዎ ቆይተው እንደገና ይሞክሩ።",
       "failedToCreate": "ክፍለ ጊዜ መፍጠር አልተሳካም።",
       "couldNotRefreshRepositories": "ማከማቻዎችን ማደስ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "discardDraftTitle": "ረቂቁን ማስወገድ ይፈልጋሉ?",

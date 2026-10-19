@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "Ez a tároló már nem érhető el: {{repo}}. Válassz másik tárolót az alábbiak közül.",
       "prefillModelUnavailable": "Ez a modell már nem érhető el: {{model}}. Helyette az alapértelmezett modelledet használjuk.",
       "couldNotReadPendingSessions": "Nem sikerült beolvasni a függőben lévő munkameneteket. Próbáld újra.",
+      "couldNotStartSessionNow": "Nem sikerült elindítani a munkamenetet most. Próbáld újra később.",
       "failedToCreate": "Nem sikerült létrehozni a munkamenetet.",
       "couldNotRefreshRepositories": "Nem sikerült frissíteni a tárolókat. Próbáld újra.",
       "discardDraftTitle": "Piszkozat elvetése?",

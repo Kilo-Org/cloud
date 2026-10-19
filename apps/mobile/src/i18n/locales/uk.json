@@ -1720,6 +1720,7 @@
       "prefillRepoUnavailable": "Репозиторій {{repo}} більше недоступний. Виберіть інший нижче.",
       "prefillModelUnavailable": "Модель {{model}} більше недоступна. Використовується ваша типова модель.",
       "couldNotReadPendingSessions": "Не вдалося прочитати дані сеансів у черзі. Спробуйте ще раз.",
+      "couldNotStartSessionNow": "Не вдалося запустити сеанс прямо зараз. Спробуйте пізніше ще раз.",
       "failedToCreate": "Не вдалося створити сеанс.",
       "couldNotRefreshRepositories": "Не вдалося оновити список репозиторіїв. Спробуйте ще раз.",
       "discardDraftTitle": "Видалити чернетку?",

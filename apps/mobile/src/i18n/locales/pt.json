@@ -2236,6 +2236,7 @@
       "prefillRepoUnavailable": "{{repo}} já não está disponível. Escolha um repositório abaixo.",
       "prefillModelUnavailable": "{{model}} já não está disponível. Está a ser usado o seu modelo predefinido.",
       "couldNotReadPendingSessions": "Não foi possível ler as sessões pendentes. Tente novamente.",
+      "couldNotStartSessionNow": "Não foi possível iniciar a sessão neste momento. Tente novamente mais tarde.",
       "failedToCreate": "Não foi possível criar a sessão.",
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Eliminar rascunho?",

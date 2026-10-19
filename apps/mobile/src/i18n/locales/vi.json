@@ -1696,6 +1696,7 @@
       "prefillRepoUnavailable": "{{repo}} không còn dùng được. Hãy chọn kho mã khác bên dưới.",
       "prefillModelUnavailable": "{{model}} không còn dùng được. Hiện đang dùng mô hình mặc định của bạn.",
       "couldNotReadPendingSessions": "Không thể đọc danh sách phiên đang chờ. Vui lòng thử lại.",
+      "couldNotStartSessionNow": "Không thể bắt đầu phiên ngay bây giờ. Vui lòng thử lại sau.",
       "failedToCreate": "Không thể tạo phiên.",
       "couldNotRefreshRepositories": "Không thể làm mới danh sách kho mã. Vui lòng thử lại.",
       "discardDraftTitle": "Hủy bản nháp?",

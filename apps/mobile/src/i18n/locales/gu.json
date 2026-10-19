@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} હવે ઉપલબ્ધ નથી. નીચે રિપોઝિટરી પસંદ કરો.",
       "prefillModelUnavailable": "{{model}} હવે ઉપલબ્ધ નથી. તમારા ડિફોલ્ટ મોડલનો ઉપયોગ થઈ રહ્યો છે.",
       "couldNotReadPendingSessions": "બાકી રહેલાં સત્રો વાંચી શકાયાં નહીં. ફરી પ્રયાસ કરો.",
+      "couldNotStartSessionNow": "સત્ર શરૂ કરી શકાયું નહીં. કૃપા કરીને પછી ફરી પ્રયાસ કરો.",
       "failedToCreate": "સત્ર બનાવી શકાયું નહીં.",
       "couldNotRefreshRepositories": "રિપોઝિટરીઓ રિફ્રેશ કરી શકાઈ નહીં. ફરી પ્રયાસ કરો.",
       "discardDraftTitle": "ડ્રાફ્ટ કાઢી નાખવો?",

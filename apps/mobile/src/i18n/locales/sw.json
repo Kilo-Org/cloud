@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} haipatikani tena. Chagua hazina hapa chini.",
       "prefillModelUnavailable": "{{model}} haipatikani tena. Modeli yako chaguomsingi inatumika.",
       "couldNotReadPendingSessions": "Imeshindikana kusoma vikao vinavyosubiri. Jaribu tena.",
+      "couldNotStartSessionNow": "Imeshindikana kuanzisha kikao kwa sasa. Tafadhali jaribu tena baadaye.",
       "failedToCreate": "Imeshindikana kuunda kikao.",
       "couldNotRefreshRepositories": "Imeshindikana kupakia upya hazina. Tafadhali jaribu tena.",
       "discardDraftTitle": "Ungependa kufuta rasimu?",

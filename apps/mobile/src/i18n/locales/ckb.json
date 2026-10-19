@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} چیتر بەردەست نییە. لە خوارەوە کۆگایەک هەڵبژێرە.",
       "prefillModelUnavailable": "{{model}} چیتر بەردەست نییە. مۆدێلی بنەڕەتیت بەکار دەهێنرێت.",
       "couldNotReadPendingSessions": "نەتوانرا سێشنە چاوەڕوانەکان بخوێنرێنەوە. دووبارە هەوڵ بدەرەوە.",
+      "couldNotStartSessionNow": "لە ئێستادا نەتوانرا سێشنەکە دەستپێبکرێت. تکایە دواتر دووبارە هەوڵ بدەرەوە.",
       "failedToCreate": "نەتوانرا سێشنێک دروست بکرێت.",
       "couldNotRefreshRepositories": "نەتوانرا کۆگاکان نوێ بکرێنەوە. تکایە دووبارە هەوڵ بدەرەوە.",
       "discardDraftTitle": "سڕینەوەی ڕەشنووس؟",

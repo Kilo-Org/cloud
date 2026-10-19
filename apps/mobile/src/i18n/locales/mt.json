@@ -2292,6 +2292,7 @@
       "prefillRepoUnavailable": "{{repo}} m'għadux disponibbli. Agħżel repożitorju hawn taħt.",
       "prefillModelUnavailable": "{{model}} m'għadux disponibbli. Qed jintuża l-mudell prestabbilit tiegħek.",
       "couldNotReadPendingSessions": "Ma setgħux jinqraw is-sessjonijiet pendenti. Erġa' pprova.",
+      "couldNotStartSessionNow": "Ma setgħetx tinbeda s-sessjoni bħalissa. Erġa' pprova aktar tard.",
       "failedToCreate": "Ma setgħetx tinħoloq is-sessjoni.",
       "couldNotRefreshRepositories": "Ma setgħux jiġu aġġornati r-repożitorji. Erġa' pprova.",
       "discardDraftTitle": "Twarrab l-abbozz?",

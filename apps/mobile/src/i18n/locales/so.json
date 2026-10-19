@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} mar dambe lama heli karo. Hoos ka dooro kayd.",
       "prefillModelUnavailable": "{{model}} mar dambe lama heli karo. Waxaa la isticmaalayaa moodeelkaaga caadiga ah.",
       "couldNotReadPendingSessions": "Kalfadhiyada sugaya lama akhrin karin. Mar kale isku day.",
+      "couldNotStartSessionNow": "Kalfadhiga hadda lama bilaabi karin. Fadlan mar kale isku day ka dib.",
       "failedToCreate": "Kalfadhiga lama abuuri karin.",
       "couldNotRefreshRepositories": "Kaydadka lama cusboonaysiin karin. Fadlan mar kale isku day.",
       "discardDraftTitle": "Ma tirtiraysaa qabyada?",

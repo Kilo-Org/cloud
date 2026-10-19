@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} er ikke længere tilgængeligt. Vælg et kodelager nedenfor.",
       "prefillModelUnavailable": "{{model}} er ikke længere tilgængelig. Din standardmodel bruges i stedet.",
       "couldNotReadPendingSessions": "Kunne ikke læse de ventende sessioner. Prøv igen.",
+      "couldNotStartSessionNow": "Kunne ikke starte sessionen lige nu. Prøv igen senere.",
       "failedToCreate": "Kunne ikke oprette en session.",
       "couldNotRefreshRepositories": "Kunne ikke opdatere listen over kodelagre. Prøv igen.",
       "discardDraftTitle": "Kassér kladde?",

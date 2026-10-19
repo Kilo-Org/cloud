@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} اب دستیاب نہیں۔ نیچے ریپوزٹری منتخب کریں۔",
       "prefillModelUnavailable": "{{model}} اب دستیاب نہیں ہے۔ آپ کا پہلے سے طے شدہ ماڈل استعمال ہو رہا ہے۔",
       "couldNotReadPendingSessions": "زیر التواء سیشنز نہیں پڑھے جا سکے۔ دوبارہ کوشش کریں۔",
+      "couldNotStartSessionNow": "ابھی سیشن شروع نہیں ہو سکا۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
       "failedToCreate": "سیشن نہیں بن سکا۔",
       "couldNotRefreshRepositories": "ریپوزٹریوں کی فہرست تازہ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
       "discardDraftTitle": "مسودہ حذف کریں؟",

@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} अब उपलब्ध छैन। तल एउटा रिपोजिटरी छान्नुहोस्।",
       "prefillModelUnavailable": "{{model}} अब उपलब्ध छैन। तपाईंको पूर्वनिर्धारित मोडेल प्रयोग हुँदैछ।",
       "couldNotReadPendingSessions": "पर्खाइमा रहेका सत्रहरू पढ्न सकिएन। फेरि प्रयास गर्नुहोस्।",
+      "couldNotStartSessionNow": "अहिले सत्र सुरु गर्न सकिएन। कृपया पछि फेरि प्रयास गर्नुहोस्।",
       "failedToCreate": "सत्र बनाउन सकिएन।",
       "couldNotRefreshRepositories": "रिपोजिटरीहरूको सूची ताजा गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "discardDraftTitle": "मस्यौदा मेट्ने?",

@@ -13,6 +13,7 @@ import {
 import { useNewSessionCreator } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
+import { i18n } from '@/i18n';
 
 const prepareSessionMutate = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
@@ -677,6 +678,8 @@ describe('useNewSessionCreator onCreated', () => {
   });
 
   it('never fires onCreated when prepareSession rejects, and preserves the draft', async () => {
+    // A codeless transport rejection is not a user-actionable refusal, so the
+    // toast carries the localized generic copy, never the raw error text.
     prepareSessionMutate.mockRejectedValueOnce(new Error('boom'));
     const onCreated = vi.fn(() => undefined);
     const resultRef = mountCreator(createInput({ organizationId: 'org-1', onCreated }));
@@ -689,7 +692,8 @@ describe('useNewSessionCreator onCreated', () => {
 
     expect(onCreated).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith('boom');
+    expect(toastError).toHaveBeenCalledWith(i18n.t('agentChat.newSession.couldNotStartSessionNow'));
+    expect(toastError).not.toHaveBeenCalledWith('boom');
   });
 
   it('does not prepare (and never fires onCreated) when the draft is empty', async () => {

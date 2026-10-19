@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "«{{repo}}» պահոցն այլևս հասանելի չէ։ Ստորև ընտրեք այլ պահոց։",
       "prefillModelUnavailable": "«{{model}}» մոդելն այլևս հասանելի չէ։ Օգտագործվում է ձեր լռելյայն մոդելը։",
       "couldNotReadPendingSessions": "Չհաջողվեց կարդալ սպասող նիստերը։ Կրկին փորձեք։",
+      "couldNotStartSessionNow": "Այս պահին չհաջողվեց սկսել նիստը։ Փորձեք կրկին ավելի ուշ։",
       "failedToCreate": "Չհաջողվեց ստեղծել նիստը։",
       "couldNotRefreshRepositories": "Չհաջողվեց թարմացնել պահոցները։ Կրկին փորձեք։",
       "discardDraftTitle": "Ջնջե՞լ սևագիրը",

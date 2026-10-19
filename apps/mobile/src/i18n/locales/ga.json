@@ -2292,6 +2292,7 @@
       "prefillRepoUnavailable": "Níl {{repo}} ar fáil a thuilleadh. Roghnaigh stór thíos.",
       "prefillModelUnavailable": "Níl {{model}} ar fáil a thuilleadh. Tá do shamhail réamhshocraithe in úsáid.",
       "couldNotReadPendingSessions": "Níorbh fhéidir na seisiúin atá ar feitheamh a léamh. Bain triail as arís.",
+      "couldNotStartSessionNow": "Níorbh fhéidir an seisiún a thosú faoi láthair. Bain triail as arís níos déanaí.",
       "failedToCreate": "Níorbh fhéidir an seisiún a chruthú.",
       "couldNotRefreshRepositories": "Níorbh fhéidir stórtha a athnuachan. Bain triail as arís le do thoil.",
       "discardDraftTitle": "An gcaithfear an dréacht ar lár?",

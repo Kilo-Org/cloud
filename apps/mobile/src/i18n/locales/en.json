@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} is no longer available. Using your default model.",
       "couldNotReadPendingSessions": "Could not read pending sessions. Try again.",
       "failedToCreate": "Failed to create session",
+      "couldNotStartSessionNow": "Couldn't start the session right now. Please try again later.",
       "couldNotRefreshRepositories": "Could not refresh repositories. Please try again.",
       "discardDraftTitle": "Discard draft?",
       "discardDraftMessage": "Your prompt will be lost.",

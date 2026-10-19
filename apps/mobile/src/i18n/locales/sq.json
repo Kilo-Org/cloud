@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "Depoja {{repo}} nuk është më e disponueshme. Zgjidh një depo më poshtë.",
       "prefillModelUnavailable": "{{model}} nuk është më i disponueshëm. Po përdoret modeli yt i parazgjedhur.",
       "couldNotReadPendingSessions": "Nuk u lexuan seancat në pritje. Provo përsëri.",
+      "couldNotStartSessionNow": "Nuk u nis seanca për momentin. Provo përsëri më vonë.",
       "failedToCreate": "Nuk u krijua seanca.",
       "couldNotRefreshRepositories": "Nuk u rifreskuan depot. Provo përsëri.",
       "discardDraftTitle": "Të fshihet drafti?",

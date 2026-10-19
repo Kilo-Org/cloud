@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} är inte längre tillgängligt. Välj ett kodarkiv nedan.",
       "prefillModelUnavailable": "{{model}} är inte längre tillgänglig. Din standardmodell används i stället.",
       "couldNotReadPendingSessions": "Det gick inte att läsa in väntande sessioner. Försök igen.",
+      "couldNotStartSessionNow": "Det gick inte att starta sessionen just nu. Försök igen senare.",
       "failedToCreate": "Det gick inte att skapa sessionen.",
       "couldNotRefreshRepositories": "Det gick inte att uppdatera kodarkiven. Försök igen.",
       "discardDraftTitle": "Ta bort utkastet?",

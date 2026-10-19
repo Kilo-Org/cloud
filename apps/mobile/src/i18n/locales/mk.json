@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} веќе не е достапен. Избери репозиториум подолу.",
       "prefillModelUnavailable": "{{model}} веќе не е достапен. Се користи твојот стандарден модел.",
       "couldNotReadPendingSessions": "Не успеа вчитувањето на сесиите што чекаат. Обиди се повторно.",
+      "couldNotStartSessionNow": "Моментално не успеа стартувањето на сесијата. Обиди се повторно подоцна.",
       "failedToCreate": "Не успеа создавањето на сесијата.",
       "couldNotRefreshRepositories": "Не успеа освежувањето на репозиториумите. Обиди се повторно.",
       "discardDraftTitle": "Да се отфрли нацртот?",

@@ -2236,6 +2236,7 @@
       "prefillRepoUnavailable": "Repozitorij {{repo}} više nije dostupan. Odaberi repozitorij u nastavku.",
       "prefillModelUnavailable": "Model {{model}} više nije dostupan. Koristi se tvoj zadani model.",
       "couldNotReadPendingSessions": "Nije moguće učitati sesije na čekanju. Pokušaj ponovno.",
+      "couldNotStartSessionNow": "Trenutno nije moguće pokrenuti sesiju. Pokušaj ponovno kasnije.",
       "failedToCreate": "Stvaranje sesije nije uspjelo.",
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovno.",
       "discardDraftTitle": "Odbaciti nacrt?",

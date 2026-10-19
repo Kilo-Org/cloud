@@ -1696,6 +1696,7 @@
       "prefillRepoUnavailable": "{{repo}} अब उपलब्ध नहीं है। नीचे एक रिपॉज़िटरी चुनें।",
       "prefillModelUnavailable": "{{model}} अब उपलब्ध नहीं है। आपके डिफ़ॉल्ट मॉडल का उपयोग हो रहा है।",
       "couldNotReadPendingSessions": "लंबित सत्र पढ़े नहीं जा सके। फिर से कोशिश करें।",
+      "couldNotStartSessionNow": "अभी सत्र शुरू नहीं हो सका। कृपया बाद में फिर से कोशिश करें।",
       "failedToCreate": "सत्र नहीं बन सका।",
       "couldNotRefreshRepositories": "रिपॉज़िटरी रीफ़्रेश नहीं हो सकीं। कृपया फिर से कोशिश करें।",
       "discardDraftTitle": "ड्राफ़्ट हटाएँ?",

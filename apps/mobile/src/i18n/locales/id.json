@@ -1696,6 +1696,7 @@
       "prefillRepoUnavailable": "{{repo}} tidak lagi tersedia. Pilih repositori di bawah.",
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Model bawaanmu digunakan sebagai pengganti.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu diproses. Coba lagi.",
+      "couldNotStartSessionNow": "Tidak dapat memulai sesi saat ini. Coba lagi nanti.",
       "failedToCreate": "Gagal membuat sesi.",
       "couldNotRefreshRepositories": "Tidak dapat memuat ulang repositori. Coba lagi.",
       "discardDraftTitle": "Buang draf?",

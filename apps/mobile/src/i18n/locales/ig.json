@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} adịkwaghị. Họrọ ebe nchekwa koodu n'okpuru.",
       "prefillModelUnavailable": "{{model}} adịkwaghị. A na-eji ihe nlereanya ndabara gị.",
       "couldNotReadPendingSessions": "Enweghị ike ịgụ nnọkọ ndị na-echere. Nwaa ọzọ.",
+      "couldNotStartSessionNow": "Enweghị ike ịmalite nnọkọ a ugbu a. Biko nwaa ọzọ mgbe e mesịrị.",
       "failedToCreate": "Enweghị ike ịmepụta nnọkọ.",
       "couldNotRefreshRepositories": "Enweghị ike ibudata ebe nchekwa koodu ọzọ. Biko nwaa ọzọ.",
       "discardDraftTitle": "Tụfuo ozi a na-ede?",

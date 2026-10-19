@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "An daina samun {{repo}}. Zaɓi ma'ajiya a ƙasa.",
       "prefillModelUnavailable": "An daina samun {{model}}. Ana amfani da samfurinka na asali.",
       "couldNotReadPendingSessions": "An kasa karanta zamannin da ke jira. Sake gwadawa.",
+      "couldNotStartSessionNow": "Ba za a iya fara zamar a yanzu ba. Da fatan za a sake gwadawa daga baya.",
       "failedToCreate": "An kasa ƙirƙirar zama.",
       "couldNotRefreshRepositories": "An kasa sabunta ma'ajiyoyi. Sake gwadawa.",
       "discardDraftTitle": "Watsar da daftari?",

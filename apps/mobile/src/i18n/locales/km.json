@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} លែងអាចប្រើបានទៀតហើយ។ សូមជ្រើសរើសឃ្លាំងកូដខាងក្រោម។",
       "prefillModelUnavailable": "{{model}} លែងអាចប្រើបានទៀតហើយ។ កំពុងប្រើម៉ូដែលលំនាំដើមរបស់អ្នក។",
       "couldNotReadPendingSessions": "មិនអាចអានវគ្គដែលកំពុងរង់ចាំបានទេ។ ព្យាយាមម្តងទៀត។",
+      "couldNotStartSessionNow": "មិនអាចចាប់ផ្ដើមវគ្គនៅពេលនេះបានទេ។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
       "failedToCreate": "មិនអាចបង្កើតវគ្គបានទេ។",
       "couldNotRefreshRepositories": "មិនអាចផ្ទុកបញ្ជីឃ្លាំងកូដឡើងវិញបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "discardDraftTitle": "បោះបង់សេចក្តីព្រាង?",

@@ -1696,6 +1696,7 @@
       "prefillRepoUnavailable": "{{repo}} is niet meer beschikbaar. Kies hieronder een repository.",
       "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt.",
       "couldNotReadPendingSessions": "De wachtende sessies konden niet worden uitgelezen. Probeer het opnieuw.",
+      "couldNotStartSessionNow": "De sessie kon op dit moment niet worden gestart. Probeer het later opnieuw.",
       "failedToCreate": "De sessie kon niet worden aangemaakt.",
       "couldNotRefreshRepositories": "De repositories konden niet worden vernieuwd. Probeer het opnieuw.",
       "discardDraftTitle": "Concept verwijderen?",

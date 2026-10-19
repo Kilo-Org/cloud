@@ -2264,6 +2264,7 @@
       "prefillRepoUnavailable": "Рэпазіторый {{repo}} больш недаступны. Выберыце іншы ніжэй.",
       "prefillModelUnavailable": "Мадэль {{model}} больш недаступная. Выкарыстоўваецца ваша прадвызначаная мадэль.",
       "couldNotReadPendingSessions": "Не ўдалося прачытаць даныя сеансаў у чаканні. Паспрабуйце яшчэ раз.",
+      "couldNotStartSessionNow": "Не ўдалося пачаць сеанс зараз. Паспрабуйце пазней.",
       "failedToCreate": "Не ўдалося стварыць сеанс.",
       "couldNotRefreshRepositories": "Не ўдалося абнавіць рэпазіторыі. Паспрабуйце яшчэ раз.",
       "discardDraftTitle": "Выдаліць чарнавік?",

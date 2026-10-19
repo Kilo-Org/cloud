@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} is nie meer beskikbaar nie. Kies 'n bewaarplek hieronder.",
       "prefillModelUnavailable": "{{model}} is nie meer beskikbaar nie. Jou standaardmodel word gebruik.",
       "couldNotReadPendingSessions": "Die hangende sessies kon nie gelees word nie. Probeer weer.",
+      "couldNotStartSessionNow": "Die sessie kon nie nou begin word nie. Probeer asseblief later weer.",
       "failedToCreate": "Die sessie kon nie geskep word nie.",
       "couldNotRefreshRepositories": "Die bewaarplekke kon nie verfris word nie. Probeer asseblief weer.",
       "discardDraftTitle": "Konsep weggooi?",

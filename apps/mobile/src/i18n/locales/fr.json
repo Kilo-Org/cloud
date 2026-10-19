@@ -1609,6 +1609,7 @@
       "prefillRepoUnavailable": "{{repo}} n'est plus disponible. Choisissez un dépôt ci-dessous.",
       "prefillModelUnavailable": "{{model}} n'est plus disponible. Votre modèle par défaut est utilisé.",
       "couldNotReadPendingSessions": "Impossible de lire les sessions en attente. Réessayez.",
+      "couldNotStartSessionNow": "Impossible de démarrer la session pour le moment. Réessayez plus tard.",
       "failedToCreate": "Impossible de créer la session.",
       "couldNotRefreshRepositories": "Impossible d'actualiser les dépôts. Réessayez.",
       "discardDraftTitle": "Supprimer le brouillon ?",

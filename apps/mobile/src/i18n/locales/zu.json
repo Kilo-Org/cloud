@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} ayisatholakali. Khetha inqolobane yekhodi ngezansi.",
       "prefillModelUnavailable": "{{model}} ayisatholakali. Kusetshenziswa imodeli yakho ezenzakalelayo.",
       "couldNotReadPendingSessions": "Asikwazanga ukufunda iziseshini ezilindile. Zama futhi.",
+      "couldNotStartSessionNow": "Iseshini ayikwazanga kuqala okwamanje. Sicela uzame futhi kamva.",
       "failedToCreate": "Asikwazanga ukudala iseshini.",
       "couldNotRefreshRepositories": "Asikwazanga ukuvuselela izinqolobane zekhodi. Sicela uzame futhi.",
       "discardDraftTitle": "Uyafuna ukulahla okusalungiswa?",

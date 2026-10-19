@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} er ikke lenger tilgjengelig. Velg et kodelager nedenfor.",
       "prefillModelUnavailable": "{{model}} er ikke lenger tilgjengelig. Standardmodellen din brukes i stedet.",
       "couldNotReadPendingSessions": "Kunne ikke lese ventende økter. Prøv igjen.",
+      "couldNotStartSessionNow": "Kunne ikke starte økten akkurat nå. Prøv igjen senere.",
       "failedToCreate": "Kunne ikke opprette en økt.",
       "couldNotRefreshRepositories": "Kunne ikke oppdatere kodelagrene. Prøv igjen.",
       "discardDraftTitle": "Forkaste utkast?",

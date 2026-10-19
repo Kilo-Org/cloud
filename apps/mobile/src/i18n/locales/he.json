@@ -1708,6 +1708,7 @@
       "prefillRepoUnavailable": "{{repo}} אינו זמין עוד. בחר מאגר למטה.",
       "prefillModelUnavailable": "{{model}} כבר אינו זמין. במקומו ייעשה שימוש במודל ברירת המחדל שלך.",
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא את הסשנים הממתינים. נסה שוב.",
+      "couldNotStartSessionNow": "לא ניתן להתחיל את הסשן כרגע. נסה שוב מאוחר יותר.",
       "failedToCreate": "לא ניתן היה ליצור סשן.",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
       "discardDraftTitle": "למחוק את הטיוטה?",

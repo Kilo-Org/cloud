@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} نور د لاسرسي وړ نه دی. لاندې یو زېرمتون غوره کړئ.",
       "prefillModelUnavailable": "{{model}} نور د لاسرسي وړ نه دی. ستاسو تلواله ماډل کارول کېږي.",
       "couldNotReadPendingSessions": "په تمه ناستې ونه لوستل شوې. بیا هڅه وکړئ.",
+      "couldNotStartSessionNow": "ناسته اوس پیل نه شوه. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
       "failedToCreate": "ناسته جوړه نه شوه.",
       "couldNotRefreshRepositories": "زېرمتونونه تازه نه شول. بیا هڅه وکړئ.",
       "discardDraftTitle": "مسوده ړنګه کړم؟",

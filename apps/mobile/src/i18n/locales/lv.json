@@ -2236,6 +2236,7 @@
       "prefillRepoUnavailable": "{{repo}} vairs nav pieejams. Izvēlies repozitoriju zemāk.",
       "prefillModelUnavailable": "{{model}} vairs nav pieejams. Tiek izmantots tavs noklusējuma modelis.",
       "couldNotReadPendingSessions": "Neizdevās nolasīt gaidošās sesijas. Mēģini vēlreiz.",
+      "couldNotStartSessionNow": "Pašlaik neizdevās uzsākt sesiju. Mēģini vēlreiz vēlāk.",
       "failedToCreate": "Neizdevās izveidot sesiju.",
       "couldNotRefreshRepositories": "Neizdevās atsvaidzināt repozitorijus. Lūdzu, mēģini vēlreiz.",
       "discardDraftTitle": "Atmest melnrakstu?",

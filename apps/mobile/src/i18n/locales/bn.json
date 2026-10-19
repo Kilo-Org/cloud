@@ -2208,6 +2208,7 @@
       "prefillRepoUnavailable": "{{repo}} আর ব্যবহার করা যাচ্ছে না। নিচে একটি রিপোজিটরি বেছে নিন।",
       "prefillModelUnavailable": "{{model}} আর ব্যবহার করা যাচ্ছে না। আপনার ডিফল্ট মডেল ব্যবহার করা হচ্ছে।",
       "couldNotReadPendingSessions": "অপেক্ষমাণ সেশনের তথ্য পড়া যায়নি। আবার চেষ্টা করুন।",
+      "couldNotStartSessionNow": "এখন সেশন শুরু করা যায়নি। অনুগ্রহ করে পরে আবার চেষ্টা করুন।",
       "failedToCreate": "সেশন তৈরি করা যায়নি।",
       "couldNotRefreshRepositories": "রিপোজিটরি রিফ্রেশ করা যায়নি। আবার চেষ্টা করুন।",
       "discardDraftTitle": "খসড়া বাতিল করবেন?",

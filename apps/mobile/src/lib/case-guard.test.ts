@@ -46,6 +46,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/chat/backend-store.ts': 'HTTP header-name comparison',
   'lib/chat/backend-url.ts': 'hostname comparison',
   'lib/chat/gguf-catalog.ts': 'file-extension comparison',
+  'lib/chat/hf-catalog.ts': 'SPDX id lookup key',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',

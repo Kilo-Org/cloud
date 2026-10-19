@@ -166,7 +166,7 @@ const resolveUrl = (id: string, revision: string, path: string) =>
 export type HfRepoInfo = z.infer<typeof hfRepoInfo>;
 
 /** SPDX ids a card may state, mapped to the license's own display name. */
-const LICENSE_NAMES: Readonly<Record<string, string>> = {
+const LICENSE_NAMES = {
   'agpl-3.0': 'AGPL 3.0',
   'apache-2.0': 'Apache 2.0',
   'bsd-2-clause': 'BSD 2-Clause',
@@ -187,12 +187,14 @@ const LICENSE_NAMES: Readonly<Record<string, string>> = {
   'mpl-2.0': 'MPL 2.0',
   'qwen-research': 'Qwen Research',
   unlicense: 'Unlicense',
-};
+} satisfies Readonly<Record<string, string>>;
+
+const LICENSE_BY_ID: Readonly<Record<string, string>> = LICENSE_NAMES;
 
 function licenseOf(card: HfRepoInfo['cardData']): string | undefined {
   const license = Array.isArray(card?.license) ? card.license[0] : card?.license;
   const named = license === 'other' ? (card?.license_name ?? license) : license;
-  return named === undefined ? undefined : (LICENSE_NAMES[named.toLowerCase()] ?? named);
+  return named === undefined ? undefined : (LICENSE_BY_ID[named.toLowerCase()] ?? named);
 }
 
 function quantOf(path: string): string | undefined {

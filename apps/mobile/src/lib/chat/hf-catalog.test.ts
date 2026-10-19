@@ -156,24 +156,22 @@ describe('a Hugging Face model detail', () => {
   });
 
   it('shows one license name on the summary and every quantization card', () => {
-    const detail = readModelDetail(
-      info({ cardData: { license: 'apache-2.0' } }),
-      [file('Tiny-Chat-Q4_K_M.gguf', 500, '1'), file('Tiny-Chat-Q8_0.gguf', 900, '2')]
-    );
+    const detail = readModelDetail(info({ cardData: { license: 'apache-2.0' } }), [
+      file('Tiny-Chat-Q4_K_M.gguf', 500, '1'),
+      file('Tiny-Chat-Q8_0.gguf', 900, '2'),
+    ]);
     expect(detail.license).toBe('Apache 2.0');
     expect(detail.quants.map(quant => quant.model.license)).toEqual(['Apache 2.0', 'Apache 2.0']);
   });
 
   it('normalizes common SPDX ids and passes unknown ones through', () => {
-    expect(
-      readModelDetail(info({ cardData: { license: 'mit' } }), []).license
-    ).toBe('MIT');
-    expect(
-      readModelDetail(info({ cardData: { license: ['gpl-3.0'] } }), []).license
-    ).toBe('GPL 3.0');
-    expect(
-      readModelDetail(info({ cardData: { license: 'some-obscure-1.0' } }), []).license
-    ).toBe('some-obscure-1.0');
+    expect(readModelDetail(info({ cardData: { license: 'mit' } }), []).license).toBe('MIT');
+    expect(readModelDetail(info({ cardData: { license: ['gpl-3.0'] } }), []).license).toBe(
+      'GPL 3.0'
+    );
+    expect(readModelDetail(info({ cardData: { license: 'some-obscure-1.0' } }), []).license).toBe(
+      'some-obscure-1.0'
+    );
   });
 
   it('rejects a repository without a pinned revision', () => {

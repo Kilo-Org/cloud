@@ -134,10 +134,10 @@ describe('file-navigator-bridge', () => {
     requestScrollToFile({ ...PR_A, path: 'gh.ts' });
     requestScrollToFile({ ...PR_A, ref: GITLAB_REF_A, path: 'gl.ts' });
 
+    expect(listenerGh).toHaveBeenCalledTimes(1);
+    expect(listenerGl).toHaveBeenCalledTimes(1);
     expect(listenerGh).toHaveBeenCalledWith({ ...PR_A, path: 'gh.ts' });
     expect(listenerGl).toHaveBeenCalledWith({ ...PR_A, ref: GITLAB_REF_A, path: 'gl.ts' });
-    expect(listenerGh).toHaveBeenCalledWith(expect.objectContaining({ path: 'gh.ts' }));
-    expect(listenerGl).toHaveBeenCalledWith(expect.objectContaining({ path: 'gl.ts' }));
 
     unsubGh();
     unsubGl();

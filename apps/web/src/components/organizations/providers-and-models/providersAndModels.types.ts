@@ -5,6 +5,7 @@ export type ModelRow = {
   preferredIndex: number | undefined;
   sourceIndex: number;
   unavailableReason?: string;
+  inheritedFrom?: string;
 };
 
 export type PolicyPillVariant = 'trains' | 'retainsPrompts';

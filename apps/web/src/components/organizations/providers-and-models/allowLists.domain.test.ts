@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  buildVariantModelProvidersIndex,
   canonicalizeDenyList,
   canonicalizeProviderAllowList,
   computeAllowedModelIds,
@@ -45,6 +46,18 @@ describe('allowLists.domain', () => {
       'anthropic',
       'openai',
     ]);
+  });
+
+  test('indexes providers per served model id', () => {
+    const index = buildVariantModelProvidersIndex([
+      { slug: 'deepinfra', models: [{ slug: 'x/y', endpoint: { variant: 'standard' } }] },
+      { slug: 'nvidia', models: [{ slug: 'x/y', endpoint: { variant: 'free' } }] },
+      { slug: 'coreweave', models: [{ slug: 'x/y', endpoint: null }] },
+    ]);
+
+    expect([...(index.get('x/y') ?? [])]).toEqual(['deepinfra']);
+    expect([...(index.get('x/y:free') ?? [])]).toEqual(['nvidia']);
+    expect(index.has('coreweave')).toBe(false);
   });
 
   test('legacy provider deny list can be inverted into an allow list snapshot', () => {

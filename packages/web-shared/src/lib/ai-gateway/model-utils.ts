@@ -3,8 +3,6 @@
  * Keep this file free of server-only dependencies.
  */
 
-import type { OpenRouterModel } from '@kilocode/db/schema-types';
-
 /**
  * Public-id namespace prefixes for Kilo-owned models. These are reserved and
  * must not be claimed by custom upstreams.
@@ -32,7 +30,10 @@ export function normalizeModelId(modelId: string): string {
  * unsuffixed; the provider's endpoint carries the variant (`standard`, `free`),
  * which the gateway exposes as `<slug>:<variant>` for anything but `standard`.
  */
-export function getSnapshotModelVariantId(model: OpenRouterModel): string {
+export function getSnapshotModelVariantId(model: {
+  slug: string;
+  endpoint?: { variant?: string | null } | null;
+}): string {
   const variant = model.endpoint?.variant;
   return variant && variant !== 'standard' ? `${model.slug}:${variant}` : model.slug;
 }

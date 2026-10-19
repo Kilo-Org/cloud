@@ -333,7 +333,7 @@ describe('sub-organization model policy summary', () => {
 
     expect(withGroup.children[0]?.groupPolicies.groups[0]?.modelAccessPolicy).toEqual({
       mode: 'selected',
-      selectedModelCount: 1,
+      selectedModelCount: 2,
       selectedProviderCount: 1,
     });
     expect(withGroup.children[0]?.divergence).toEqual(baseline.children[0]?.divergence);

@@ -1,4 +1,7 @@
-import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  getSnapshotModelVariantId,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 export type OpenRouterModelSlugSnapshot = {
   slug: string;
@@ -9,6 +12,14 @@ export type OpenRouterProviderModelsSnapshot = Array<{
   models: Array<{
     slug: string;
     endpoint?: unknown;
+  }>;
+}>;
+
+export type OpenRouterProviderVariantModelsSnapshot = ReadonlyArray<{
+  slug: string;
+  models: ReadonlyArray<{
+    slug: string;
+    endpoint?: { variant?: string | null } | null;
   }>;
 }>;
 
@@ -58,6 +69,25 @@ export function buildModelProvidersIndex(
         existing.add(provider.slug);
       } else {
         index.set(normalizedModelId, new Set([provider.slug]));
+      }
+    }
+  }
+  return index;
+}
+
+export function buildVariantModelProvidersIndex(
+  openRouterProviders: OpenRouterProviderVariantModelsSnapshot
+): Map<string, Set<string>> {
+  const index = new Map<string, Set<string>>();
+  for (const provider of openRouterProviders) {
+    for (const model of provider.models) {
+      if (!model.endpoint) continue;
+      const modelId = getSnapshotModelVariantId(model);
+      const existing = index.get(modelId);
+      if (existing) {
+        existing.add(provider.slug);
+      } else {
+        index.set(modelId, new Set([provider.slug]));
       }
     }
   }

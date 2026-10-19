@@ -73,7 +73,8 @@ export function ModelsTab({
 
             <div className="max-h-[560px] overflow-y-auto">
               {filteredModelRows.map(row => {
-                const checked = allowedModelIds.has(row.modelId);
+                const inherited = row.inheritedFrom !== undefined;
+                const checked = allowedModelIds.has(row.modelId) || inherited;
                 const providerCount = row.providerSlugs.length;
                 const providerLabel = providerCount === 1 ? 'provider' : 'providers';
                 const enabledProviderCount = row.providerSlugs.filter(slug =>
@@ -88,7 +89,7 @@ export function ModelsTab({
                   >
                     <Checkbox
                       checked={checked}
-                      disabled={!canEdit || (unavailable && !checked)}
+                      disabled={!canEdit || inherited || (unavailable && !checked)}
                       onCheckedChange={nextChecked => {
                         onToggleModelAllowed(row.modelId, Boolean(nextChecked));
                       }}
@@ -97,6 +98,11 @@ export function ModelsTab({
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{row.modelName}</div>
                       <div className="text-muted-foreground mt-0.5 text-xs">{row.modelId}</div>
+                      {row.inheritedFrom && (
+                        <div className="text-muted-foreground mt-1 text-xs">
+                          Included by the {row.inheritedFrom} grant
+                        </div>
+                      )}
                       {row.unavailableReason && (
                         <div className="type-label text-status-warning mt-1">
                           {row.unavailableReason}

@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { ModelsTab } from '@/components/organizations/providers-and-models/ModelsTab';
 import { ProvidersTab } from '@/components/organizations/providers-and-models/ProvidersTab';
 import {
-  buildModelProvidersIndex,
+  buildVariantModelProvidersIndex,
   sortUniqueStrings,
 } from '@/components/organizations/providers-and-models/allowLists.domain';
 import type {
@@ -26,10 +26,27 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  getSnapshotModelVariantId,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useTRPC } from '@/lib/trpc/utils';
 
 type Mode = OrganizationGroupModelAccessPolicy['data']['mode'];
+
+function inheritedGrantFor(selectedModelIds: ReadonlySet<string>, modelId: string) {
+  const baseModelId = normalizeModelId(modelId);
+  if (baseModelId === modelId) return undefined;
+  return selectedModelIds.has(baseModelId) && !selectedModelIds.has(modelId)
+    ? baseModelId
+    : undefined;
+}
+
+function isModelGranted(selectedModelIds: ReadonlySet<string>, modelId: string) {
+  return (
+    selectedModelIds.has(modelId) || inheritedGrantFor(selectedModelIds, modelId) !== undefined
+  );
+}
 
 export function ModelAccessPolicyEditor({
   organizationId,
@@ -51,13 +68,15 @@ export function ModelAccessPolicyEditor({
     editorDataQuery.data?.policyType === 'model_access' ? editorDataQuery.data : undefined;
   const providers = useMemo(() => editorData?.catalog.providers ?? [], [editorData]);
   const models = useMemo(() => {
-    const modelsBySlug = new Map<string, (typeof providers)[number]['models'][number]>();
+    const modelsById = new Map<string, (typeof providers)[number]['models'][number]>();
     providers.forEach(provider =>
       provider.models.forEach(model => {
-        if (model.endpoint && !modelsBySlug.has(model.slug)) modelsBySlug.set(model.slug, model);
+        if (!model.endpoint) return;
+        const modelId = getSnapshotModelVariantId(model);
+        if (!modelsById.has(modelId)) modelsById.set(modelId, model);
       })
     );
-    return [...modelsBySlug.values()];
+    return [...modelsById.values()];
   }, [providers]);
   const [mode, setMode] = useState<Mode>(policy.data.mode);
   const [modelIds, setModelIds] = useState<string[]>(
@@ -76,11 +95,11 @@ export function ModelAccessPolicyEditor({
 
   const selectedModels = useMemo(() => new Set(modelIds), [modelIds]);
   const selectedProviders = useMemo(() => new Set(providerSlugs), [providerSlugs]);
-  const providerIndex = useMemo(() => buildModelProvidersIndex(providers), [providers]);
+  const providerIndex = useMemo(() => buildVariantModelProvidersIndex(providers), [providers]);
 
   const modelRows = useMemo((): ModelRow[] => {
     return models.map((model, sourceIndex) => {
-      const modelId = normalizeModelId(model.slug);
+      const modelId = getSnapshotModelVariantId(model);
       const routes = [...(providerIndex.get(modelId) ?? [])];
       return {
         modelId,
@@ -88,14 +107,15 @@ export function ModelAccessPolicyEditor({
         providerSlugs: routes,
         preferredIndex: undefined,
         sourceIndex,
+        inheritedFrom: inheritedGrantFor(selectedModels, modelId),
       };
     });
-  }, [models, providerIndex]);
+  }, [models, providerIndex, selectedModels]);
 
   const filteredModels = useMemo(() => {
     const search = modelSearch.trim().toLowerCase();
     return modelRows.filter(row => {
-      if (selectedModelsOnly && !selectedModels.has(row.modelId)) return false;
+      if (selectedModelsOnly && !isModelGranted(selectedModels, row.modelId)) return false;
       return (
         !search ||
         row.modelName.toLowerCase().includes(search) ||
@@ -165,8 +185,10 @@ export function ModelAccessPolicyEditor({
       const models = providers.find(item => item.slug === provider.providerSlug)?.models ?? [];
       counts.set(
         provider.providerSlug,
-        models.filter(model => model.endpoint && selectedModels.has(normalizeModelId(model.slug)))
-          .length
+        models.filter(
+          model =>
+            model.endpoint && isModelGranted(selectedModels, getSnapshotModelVariantId(model))
+        ).length
       );
     });
     return counts;

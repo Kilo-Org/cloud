@@ -319,6 +319,65 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: true });
   });
 
+  it('combines selected grants from several groups', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['openai/gpt-4o:free'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['openai/gpt-4o'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+        ],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/gpt-4o:free', async () => new Set(['openai']))
+    ).resolves.toEqual({ allowed: true });
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/gpt-4o', async () => new Set(['openai']))
+    ).resolves.toEqual({ allowed: true });
+  });
+
+  it('applies each selected entry to its own id', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['openai/gpt-4o:free'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+        ],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/gpt-4o:exacto', async () => new Set(['openai']))
+    ).resolves.toEqual({ allowed: false, denialSource: 'no_grant' });
+  });
+
   it('keeps deny-list variants of an organization denied model denied', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({

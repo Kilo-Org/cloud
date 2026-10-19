@@ -167,7 +167,7 @@ function summarizePolicy(policies: OrganizationGroupPolicies) {
   }
   return {
     mode: 'selected' as const,
-    selectedModelCount: new Set(policy.data.model_allow_list.map(normalizeModelId)).size,
+    selectedModelCount: new Set(policy.data.model_allow_list).size,
     selectedProviderCount: new Set(policy.data.provider_allow_list).size,
   };
 }

@@ -14,7 +14,9 @@
  * measures every other catalog: for each family and each language it looks for
  * the categories that language's own plural rules require, and prints one line
  * per language with the number of families the language is missing. That is
- * the report the translation pass works from.
+ * the report the translation pass works from, so the app's `check:plurals`
+ * passes `--source-only`; the locale categories are gated in CI by
+ * `check:i18n` (`check-catalogs.mjs`).
  *
  * A counted message whose copy owns no word whose form the count changes — a
  * participle, a bare number in parentheses, a label — needs no family, because

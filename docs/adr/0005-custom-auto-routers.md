@@ -97,7 +97,7 @@ The benchmark worker stays the only writer of measurements and routing tables.
   the write with the owner's PostgreSQL advisory lock. Updates validate and admit the merged,
   locked definition; deletes and client-entry edits use the same lock. All registration batches
   share a ten-second HTTP deadline, including response-body reads. A batch that fails in transit
-  before the deadline is retried once.
+  or gets a worker 5xx before the deadline is retried once.
   PostgreSQL and worker D1 do not share a transaction: an ambiguous HTTP failure, a later batch
   rejection, or a database commit failure can leave already-admitted profiles and quota charges.
   There is no refund API. Re-registering current pending, running, or ready profiles is

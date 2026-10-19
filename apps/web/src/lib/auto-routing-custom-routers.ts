@@ -333,12 +333,16 @@ async function requestPlatformBenchmarks(params: {
       ownerId: params.owner.id,
       entries: models.slice(start, start + BENCHMARK_REGISTER_BATCH_SIZE),
     };
+    const register = () => registerOwnerBenchmarkProfiles(registration, signal);
     // Registration is idempotent for pending, running, and ready profiles, so one retry is safe.
-    const result = await registerOwnerBenchmarkProfiles(registration, signal)
-      .catch(error => {
-        if (signal.aborted) throw error;
-        return registerOwnerBenchmarkProfiles(registration, signal);
-      })
+    const result = await register()
+      .then(
+        first => (!first.ok && first.status >= 500 && !signal.aborted ? register() : first),
+        error => {
+          if (signal.aborted) throw error;
+          return register();
+        }
+      )
       .catch(error => {
         captureException(error, {
           tags: { source: 'auto_routing_custom_router_admission' },

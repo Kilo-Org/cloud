@@ -340,8 +340,22 @@ describe('/api/auto-routing/custom-routers', () => {
       expect((await create(routerBody())).status).toBe(201);
     });
 
-    test('retries one transient registration failure before saving', async () => {
-      mockedRegister.mockRejectedValueOnce(new TypeError('fetch failed'));
+    test.each([
+      [
+        'a rejected request',
+        () => mockedRegister.mockRejectedValueOnce(new TypeError('fetch failed')),
+      ],
+      [
+        'a worker 503',
+        () =>
+          mockedRegister.mockResolvedValueOnce({
+            ok: false,
+            status: 503,
+            error: { error: 'Service unavailable' },
+          }),
+      ],
+    ])('retries %s once before saving', async (_failure, failOnce) => {
+      failOnce();
 
       const created = await create(routerBody());
 
@@ -414,6 +428,7 @@ describe('/api/auto-routing/custom-routers', () => {
 
       expect(created.status).toBe(500);
       expect(created.body).toMatchObject({ error: { code: 'internal_error' } });
+      expect(mockedRegister).toHaveBeenCalledTimes(2);
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
 

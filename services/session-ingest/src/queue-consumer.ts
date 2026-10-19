@@ -71,11 +71,34 @@ async function processMessage(
       await applyMetadataChanges(env, msg.kiloUserId, msg.sessionId, mergedChanges, ctx);
     }
   } catch (err) {
-    // An earlier chunk may have committed to the DO before a later chunk (or the
-    // JSON parse) failed. The DO reports a metadata change only when its stored
-    // value differs, so on retry those already-persisted values won't be
-    // re-emitted — Postgres would never catch up. Flush what we have now so the
-    // two stores stay in sync. Best-effort: never mask the original error.
+    if (err instanceof StagingParseError) {
+      // Items that parsed before the malformed tail may still be buffered in
+      // the chunker; flush them first so the metadata flush and attention
+      // dispatch below observe their changes, then remove the staging object
+      // and complete the message.
+      await chunker.flushChunkToSessionDO();
+      await flushPartialMetadataChanges(env, msg, mergedChanges, ctx);
+      scheduleAttentionSignalDispatch(
+        env,
+        msg,
+        sessionRow,
+        mergedChanges,
+        mergedAttentionSignals,
+        ctx
+      );
+      console.error('Removing staging object after an incomplete parse', {
+        r2Key: msg.r2Key,
+        sessionId: msg.sessionId,
+        error: err.message,
+      });
+      await env.SESSION_INGEST_R2.delete(msg.r2Key);
+      return;
+    }
+    // An earlier chunk may have committed to the DO before a later chunk
+    // failed. The DO reports a metadata change only when its stored value
+    // differs, so on retry those already-persisted values won't be re-emitted —
+    // Postgres would never catch up. Flush what we have now so the two stores
+    // stay in sync. Best-effort: never mask the original error.
     await flushPartialMetadataChanges(env, msg, mergedChanges, ctx);
     // Same reasoning for attention signals: a committed status transition won't
     // re-emit on retry, so dispatch what was collected before the failure.
@@ -87,19 +110,6 @@ async function processMessage(
       mergedAttentionSignals,
       ctx
     );
-    if (err instanceof StagingParseError) {
-      // Items that parsed before the malformed tail may still be buffered in
-      // the chunker; flush them so the valid prefix is persisted, then remove
-      // the staging object and complete the message.
-      await chunker.flushChunkToSessionDO();
-      console.error('Removing staging object after an incomplete parse', {
-        r2Key: msg.r2Key,
-        sessionId: msg.sessionId,
-        error: err.message,
-      });
-      await env.SESSION_INGEST_R2.delete(msg.r2Key);
-      return;
-    }
     throw err;
   }
 

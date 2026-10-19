@@ -54,7 +54,7 @@ function makeRequest(body: unknown, options: RequestOptions = {}): NextRequest {
     nextUrl: url,
     headers: {
       get: (name: string) => {
-        if (name === 'X-Internal-Secret')
+        if (name.toLowerCase() === 'x-internal-secret')
           return options.secret === undefined ? SECRET : options.secret;
         return null;
       },

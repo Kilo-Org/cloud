@@ -75,12 +75,12 @@ app.post('/attributions/track', async c => {
   }
 
   // Read the body with a bounded reader against the fixed byte budget.
+  let bodyText: string | undefined;
   try {
     const declaredLength = Number(c.req.header('Content-Length') ?? Number.NaN);
     if (Number.isFinite(declaredLength) && declaredLength > MAX_TRACK_BODY_BYTES) {
       return c.json(resError('Request body too large'), 413);
     }
-    let bodyText: string | undefined;
     if (c.req.raw.body !== null) {
       const bounded = await readBoundedStream(
         c.req.raw.body as ReadableStream<Uint8Array>,
@@ -91,17 +91,6 @@ app.post('/attributions/track', async c => {
       }
       bodyText = new TextDecoder().decode(bounded.bytes);
     }
-
-    // Parse and validate request body
-    let payload: AttributionsTrackRequestBody;
-    try {
-      const body: unknown = bodyText === undefined ? {} : JSON.parse(bodyText);
-      payload = AttributionsTrackRequestBody.parse(body);
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      return c.json(resError('Invalid request payload:\n' + errMsg), 400);
-    }
-    return await trackAttribution(c, payload, user_id, organization_id);
   } catch (error) {
     // An upload that ends before completion surfaces here as a read error;
     // return a plain 400 instead of surfacing an internal failure.
@@ -111,6 +100,18 @@ app.post('/attributions/track', async c => {
     });
     return c.json(resError('Invalid request payload'), 400);
   }
+
+  // Parse and validate request body
+  let payload: AttributionsTrackRequestBody;
+  try {
+    const body: unknown = bodyText === undefined ? {} : JSON.parse(bodyText);
+    payload = AttributionsTrackRequestBody.parse(body);
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    return c.json(resError('Invalid request payload:\n' + errMsg), 400);
+  }
+
+  return trackAttribution(c, payload, user_id, organization_id);
 });
 
 async function trackAttribution(

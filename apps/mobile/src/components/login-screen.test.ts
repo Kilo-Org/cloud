@@ -580,6 +580,25 @@ describe('login-screen idle skeleton', () => {
 
     expect(persistLoginDrafts).toHaveBeenCalledTimes(1);
   });
+
+  it('skips unmount persistence once the mount completed a sign-in', async () => {
+    deviceAuth.status = 'approved';
+    deviceAuth.token = 'tok';
+
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    renderer.unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistLoginDrafts).not.toHaveBeenCalled();
+  });
 });
 
 describe('login-screen approved wait surface', () => {

@@ -324,6 +324,67 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
   });
 
+  it('drops a refusal that settles after the user edited the code', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+
+    const renderer = await mountIdleAuth();
+
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('late@example.com');
+    });
+
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+
+    // The refusal resolves only after the user has edited the code.
+    const verifyGate = Promise.withResolvers<unknown>();
+    mockPostAuth.mockReturnValue(verifyGate.promise as never);
+
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('000000');
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The user edits the code while the attempt is in flight.
+    act(() => {
+      (otpForm.props.onCodeChange as () => void)();
+    });
+
+    await act(async () => {
+      verifyGate.resolve({
+        ok: false,
+        errorCode: 'INVALID_CODE',
+        ssoOrganizationId: undefined,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('renders a wrong-code refusal inline on the code step and clears it on edit', async () => {
     mockPostAuth.mockResolvedValue({
       ok: true,

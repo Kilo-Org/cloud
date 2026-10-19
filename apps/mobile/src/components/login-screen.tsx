@@ -2,7 +2,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { I18nManager, Pressable, ScrollView, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
@@ -59,12 +59,21 @@ export function LoginScreen() {
     ssoRecovery: SsoRecoveryDraft | null;
   } | null>(null);
 
+  // Set once this mount completes a sign-in: the unmount persistence then
+  // stays off, because the signed-in session owns the screen and a typed
+  // email from the abandoned attempt must not survive into the next login.
+  const signedInRef = useRef(false);
+
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
       setPersistError(undefined);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
         clearLoginDrafts();
+        // Signed in: the session took over, so the unmount persistence must
+        // not write a typed email from this attempt into SecureStore after
+        // the drafts were cleared above.
+        signedInRef.current = true;
       } catch {
         setPersistError(t('login.couldNotCompleteSignIn'));
       }
@@ -94,7 +103,11 @@ export function LoginScreen() {
       // the next mount restores what the user had typed — a device rotation
       // that recreates the activity must not blank the email field. A failed
       // write leaves the field empty on the next mount; the restore path
-      // already tolerates missing drafts.
+      // already tolerates missing drafts. After a completed sign-in the
+      // drafts were cleared on purpose, so persistence stays off.
+      if (signedInRef.current) {
+        return;
+      }
       void (async () => {
         try {
           await persistLoginDrafts();

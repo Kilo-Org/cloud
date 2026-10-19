@@ -32,6 +32,7 @@ export function useRepoBindings(organizationId?: string) {
   const query = useQuery({
     ...options,
     placeholderData: keepPreviousDataForQueryKey(options.queryKey),
+    networkMode: 'always',
   });
 
   return {
@@ -55,7 +56,11 @@ export function useRepoBindingMutations(organizationId?: string) {
   const queryClient = useQueryClient();
   const bindingsFilter = trpc.agentProfiles.listRepoBindings.pathFilter();
 
+  // `networkMode: 'always'` keeps a bind or unbind settling while the online
+  // manager is offline (NetInfo can misreport while the backend is reachable):
+  // the request either succeeds or fails fast, so `isPending` can never stick.
   const callbacks = {
+    networkMode: 'always' as const,
     onSuccess: () => {
       void queryClient.invalidateQueries(bindingsFilter);
     },

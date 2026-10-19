@@ -28,6 +28,9 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   },
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  getCustomLlmsById: async () => new Map([['acme/custom', {}]]),
+}));
 
 const TTL = 5 * 60 * 1000;
 const benchmark = {
@@ -124,6 +127,7 @@ describe('model stats snapshot cache', () => {
     expect(mockReplicaSelect).not.toHaveBeenCalled();
     const snapshot = await cache.getModelStatsSnapshot();
     expect(await enkrypt.getEnkryptBenchmarks()).toBe(snapshot);
+    expect(snapshot.customLlmIds).toEqual(new Set(['acme/custom']));
   });
 
   it('selects only each row verification alongside nested stats in one ordered left join', async () => {

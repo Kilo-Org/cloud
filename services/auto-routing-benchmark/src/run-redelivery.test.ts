@@ -72,8 +72,8 @@ describe('a paid case whose queue invocation is canceled (production migrations 
       .prepare(`
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at, min_accuracy, switch_cost_factor,
-        max_concurrency, repetitions, engine_identity, benchmark_user_id
-      ) VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, 'redelivery-test', 'benchmark-user')
+        max_concurrency, repetitions, engine_identity, benchmark_user_id, benchmark_org_id
+      ) VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, 'redelivery-test', 'bot-internal-benchmark', 'benchmark-org')
     `)
       .run(RUN_ID, new Date(NOW).toISOString());
     const models = ['lane/model', 'other/model'];

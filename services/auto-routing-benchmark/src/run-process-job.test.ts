@@ -357,7 +357,7 @@ describe('processJob — scheduler-owned execution', () => {
     });
   });
 
-  it('refuses a run without an org snapshot before minting a token', async () => {
+  it('does not mint a token for a run without an org snapshot', async () => {
     const snapshot = await getRunWithModels(env.BENCH_DB, runId);
     if (!snapshot) throw new Error('Run snapshot missing');
     vi.mocked(getRunWithModels).mockResolvedValue({
@@ -366,9 +366,7 @@ describe('processJob — scheduler-owned execution', () => {
     });
     mockClaim();
 
-    await expect(processJob(env, deciderMessage())).rejects.toThrow(
-      /has no benchmarkUserId or benchmarkOrgId/
-    );
+    await processJob(env, deciderMessage());
     expect(
       vi.mocked(fetch).mock.calls.some(([u]) => (u as string).includes('/api/internal/bot-token'))
     ).toBe(false);

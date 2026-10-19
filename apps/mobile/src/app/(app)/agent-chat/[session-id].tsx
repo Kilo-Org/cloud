@@ -59,13 +59,14 @@ export default function SessionDetailScreen() {
     via?: string;
     /**
      * C3b: set to `'1'` by the new-agent screen's `kilo remote` happy
-     * path. When present, a transient `NOT_FOUND` from
-     * `cliSessionsV2.get` (the parent ingest row has not been written
-     * yet) is retried up to 8 times at 1s each before falling through
-     * to the permanent not-found screen. When absent — the regression
-     * case — behavior is byte-identical to pre-C3b: `retry: false`
-     * everywhere, so a stale or deleted session in history still
-     * shows the same permanent state it always did.
+     * path. A transient `NOT_FOUND` from `cliSessionsV2.get` (the
+     * ingest row has not been written yet) is retried up to 8 times at
+     * 1s each before falling through to the permanent not-found screen —
+     * whether or not this param is present. The param only marks the
+     * spawn flow itself; every other open gets the same window through
+     * the young-route retry, except an open that began on the restored
+     * identity, whose denial must stay immediate (the retry callback
+     * below owns that skip).
      */
     spawned?: string;
     /** `'1'` when the spawn cloned a session onto a remote CLI; its first page waits for the sync. */
@@ -144,8 +145,6 @@ export default function SessionDetailScreen() {
   // account's rows. Sign-in clears the prior hint before storing new credentials;
   // a fresh sign-in is not a restore, so the route must stay pending
   // (`identityPending`) until `user.getMe` answers.
-  // Declared before the metadata query so the retry callback can scope its
-  // NOT_FOUND skip to the hint that is actually in play.
   const restoredUserId = useRestoredAccountId(owner.authEpoch, owner.restored);
   const sessionQuery = useQuery(
     {

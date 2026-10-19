@@ -1,4 +1,5 @@
 import {
+  type CloudAgentRootSessionSummary,
   encodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
 } from '@kilocode/session-ingest-contracts';
@@ -279,7 +280,7 @@ function sdkMessageHistory(): KiloSdkStoredMessage[] {
   ];
 }
 
-function sdkMessageHistoryWithOwnerVisibleStructuredPaths(): KiloSdkStoredMessage[] {
+function sdkMessageHistoryWithPrivateStructuredPaths(): KiloSdkStoredMessage[] {
   const history = sdkMessageHistory();
   const assistant = history[1];
   if (!assistant || assistant.info.role !== 'assistant') {
@@ -294,7 +295,16 @@ function sdkMessageHistoryWithOwnerVisibleStructuredPaths(): KiloSdkStoredMessag
     parts: [
       ...assistant.parts.map(part =>
         part.id === tool.id
-          ? { ...tool, state: { ...tool.state, input: { path: '/workspace/repo' } } }
+          ? {
+              ...tool,
+              state: {
+                ...tool.state,
+                input: {
+                  path: '/workspace/repo',
+                  content: 'Keep /workspace/repo and file:///workspace/private as user text',
+                },
+              },
+            }
           : part
       ),
       {
@@ -324,21 +334,29 @@ function sdkMessageHistoryWithOwnerVisibleStructuredPaths(): KiloSdkStoredMessag
   return history;
 }
 
-function expectOwnerVisibleStructuredMessagePaths(body: KiloSdkStoredMessage[]): void {
+function expectPublicStructuredMessagePaths(body: KiloSdkStoredMessage[]): void {
+  const directory = publicCloudAgentDirectory(kiloSessionId);
   expect(body[1]?.parts).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         id: 'prt_tool_1',
-        state: expect.objectContaining({ input: { path: '/workspace/repo' } }),
+        state: expect.objectContaining({
+          input: {
+            path: directory,
+            content: 'Keep /workspace/repo and file:///workspace/private as user text',
+          },
+          output: 'unchanged model-authored /workspace/private text',
+        }),
       }),
       expect.objectContaining({
         id: 'prt_metadata_private',
         text: 'file: src/foo.ts was updated',
-        metadata: { path: '/workspace/private/unreviewed.ts' },
+        metadata: { path: `${directory}/unreviewed.ts` },
       }),
       expect.objectContaining({
         id: 'prt_resource_private',
-        source: expect.objectContaining({ uri: 'file:///workspace/private/resource.txt' }),
+        url: 'data:text/plain,safe',
+        source: expect.objectContaining({ type: 'resource', uri: '' }),
       }),
     ])
   );
@@ -401,7 +419,7 @@ function projectedSdkMessageHistory(): KiloSdkStoredMessage[] {
       parts: [
         {
           ...filePart,
-          source: { ...filePart.source, path: directory },
+          source: { ...filePart.source, path: `${directory}/source.ts` },
         },
         {
           ...toolPart,
@@ -412,7 +430,7 @@ function projectedSdkMessageHistory(): KiloSdkStoredMessage[] {
                 ...attachment,
                 source: {
                   ...attachment.source,
-                  path: directory,
+                  path: `${directory}/symbol.ts`,
                 },
               },
             ],
@@ -562,6 +580,7 @@ describe('handleKiloFacadeRequest', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     expect(openPublicGlobalEventStream).toHaveBeenCalledOnce();
+    expect(openPublicGlobalEventStream).toHaveBeenCalledWith('usr_1');
   });
 
   it('requires a directory selector for a scoped event subscription', async () => {
@@ -1801,9 +1820,9 @@ describe('handleKiloFacadeRequest', () => {
     expect(new URL(forwardedRequest.url).search).toBe('?limit=1');
   });
 
-  it('preserves owner-visible structured paths and file text in live messages', async () => {
+  it('projects private structured paths and preserves file text in live messages', async () => {
     const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json(sdkMessageHistoryWithOwnerVisibleStructuredPaths())
+      Response.json(sdkMessageHistoryWithPrivateStructuredPaths())
     );
 
     const response = await handleKiloFacadeRequest({
@@ -1819,7 +1838,7 @@ describe('handleKiloFacadeRequest', () => {
     });
 
     expect(response.status).toBe(200);
-    expectOwnerVisibleStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
+    expectPublicStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
   });
 
   it('bounds and validates successful live message JSON before public projection', async () => {
@@ -1897,9 +1916,9 @@ describe('handleKiloFacadeRequest', () => {
     });
   });
 
-  it('preserves owner-visible structured paths and file text in cold messages', async () => {
+  it('projects private structured paths and preserves file text in cold messages', async () => {
     const env = envStub();
-    const history = sdkMessageHistoryWithOwnerVisibleStructuredPaths();
+    const history = sdkMessageHistoryWithPrivateStructuredPaths();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
       kiloSessionId,
       cloudAgentSessionId: 'agent_cold',
@@ -1918,7 +1937,7 @@ describe('handleKiloFacadeRequest', () => {
     });
 
     expect(response.status).toBe(200);
-    expectOwnerVisibleStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
+    expectPublicStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
   });
 
   it('preserves non-enumerating not-found behavior for a cold transcript miss', async () => {
@@ -3781,6 +3800,523 @@ describe('global event helpers', () => {
         payload: { id: 'evt_message', type: 'message.updated', properties: {} },
       })
     ).toBe(false);
+  });
+});
+
+describe('hosted global native events', () => {
+  function rootSummary(
+    id = kiloSessionId,
+    cloudAgentSessionId = firstWorkspaceSessionId
+  ): CloudAgentRootSessionSummary {
+    return {
+      kiloSessionId: id,
+      cloudAgentSessionId,
+      title: 'Owned root',
+      created: 100,
+      updated: 200,
+    };
+  }
+
+  function globalFixture(roots = [rootSummary()]) {
+    const env = envStub();
+    const listCloudAgentRootSessions = vi.mocked(env.SESSION_INGEST.listCloudAgentRootSessions);
+    listCloudAgentRootSessions.mockResolvedValue(roots);
+    const resolveRoot = vi.mocked(env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession);
+    resolveRoot.mockImplementation(async ({ kiloUserId, kiloSessionId: requestedId }) => {
+      if (kiloUserId !== groupedOwnerId) return null;
+      const root = roots.find(item => item.kiloSessionId === requestedId);
+      return root ? { cloudAgentSessionId: root.cloudAgentSessionId } : null;
+    });
+    const subscribeNativeEvents = vi.fn(
+      async ({
+        kiloSessionId: requestedId,
+      }: {
+        kiloSessionId: string;
+        attachmentId: string;
+      }): Promise<{ registered: boolean; fence: number | null; kiloSessionId: string }> => ({
+        registered: true,
+        fence: 10,
+        kiloSessionId: requestedId,
+      })
+    );
+    const releaseNativeEvents = vi.fn(async (_input: { attachmentId: string }) => undefined);
+    const nativeSnapshot = vi.fn();
+    const nativeLiveRead = vi.fn();
+    const kiloRequest = vi.fn();
+    const send = vi.fn();
+    const sandboxIdFromName = vi.fn().mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.idFromName = sandboxIdFromName;
+    const legacyGet = vi.fn();
+    env.CLOUD_AGENT_SESSION.get = legacyGet;
+    env.SANDBOX_SESSION.get = vi.fn().mockReturnValue({
+      subscribeNativeEvents,
+      releaseNativeEvents,
+      nativeSnapshot,
+      nativeLiveRead,
+      kiloRequest,
+      send,
+    });
+    const waitUntil = vi.fn<(promise: Promise<unknown>) => void>();
+    const facade = new UserKiloFacade({ waitUntil } as unknown as DurableObjectState, env);
+    const push = (eventId: number, root = roots[0], materialized = false) => {
+      if (!root) throw new Error('Expected native root fixture');
+      return facade.publishNativeEvent({
+        kiloUserId: groupedOwnerId,
+        cloudAgentSessionId: root.cloudAgentSessionId,
+        kiloSessionId: root.kiloSessionId,
+        eventId,
+        materialized,
+        event: { type: 'message.updated', properties: { sessionID: root.kiloSessionId, eventId } },
+      });
+    };
+    return {
+      env,
+      facade,
+      listCloudAgentRootSessions,
+      resolveRoot,
+      subscribeNativeEvents,
+      releaseNativeEvents,
+      nativeSnapshot,
+      nativeLiveRead,
+      kiloRequest,
+      send,
+      sandboxIdFromName,
+      legacyGet,
+      waitUntil,
+      push,
+    };
+  }
+
+  function globalReader(facade: UserKiloFacade) {
+    const response = facade.openPublicGlobalEventStream(groupedOwnerId);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/event-stream');
+    if (!response.body) throw new Error('Expected authenticated global event response body');
+    return response.body.getReader();
+  }
+
+  async function expectGlobalConnected(reader: ReadableStreamDefaultReader<Uint8Array>) {
+    await expect(readSseFrame(reader)).resolves.toEqual({
+      directory: '/cloud-agent',
+      payload: { id: expect.stringMatching(/^evt_/), type: 'server.connected', properties: {} },
+    });
+  }
+
+  it('subscribes only listed owned control roots at limit 100 without reading or waking compute', async () => {
+    const fixture = globalFixture([
+      rootSummary(),
+      rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId),
+      rootSummary('ses_legacy', 'agent_legacy'),
+    ]);
+    const scopedStream = vi.spyOn(fixture.facade, 'openPublicSessionEventStream');
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledExactlyOnceWith({
+        kiloUserId: groupedOwnerId,
+        limit: 100,
+      });
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledTimes(2);
+      expect(
+        fixture.subscribeNativeEvents.mock.calls.map(([input]) => input.kiloSessionId)
+      ).toEqual([kiloSessionId, siblingKiloSessionId]);
+      expect(fixture.sandboxIdFromName).toHaveBeenNthCalledWith(
+        1,
+        `${groupedOwnerId}:${firstWorkspaceSessionId}`
+      );
+      expect(fixture.sandboxIdFromName).toHaveBeenNthCalledWith(
+        2,
+        `${groupedOwnerId}:${siblingWorkspaceSessionId}`
+      );
+      expect(fixture.resolveRoot).not.toHaveBeenCalled();
+      expect(fixture.env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).not.toHaveBeenCalled();
+      expect(fixture.env.SESSION_INGEST.getCloudAgentRootSessionMessages).not.toHaveBeenCalled();
+      expect(fixture.legacyGet).not.toHaveBeenCalled();
+      expect(fixture.nativeSnapshot).not.toHaveBeenCalled();
+      expect(fixture.nativeLiveRead).not.toHaveBeenCalled();
+      expect(fixture.kiloRequest).not.toHaveBeenCalled();
+      expect(fixture.send).not.toHaveBeenCalled();
+      expect(scopedStream).not.toHaveBeenCalled();
+    } finally {
+      await reader.cancel();
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+    }
+    expect(fixture.releaseNativeEvents).toHaveBeenCalledTimes(2);
+    expect(fixture.releaseNativeEvents.mock.calls.map(([input]) => input.attachmentId)).toEqual(
+      fixture.subscribeNativeEvents.mock.calls.map(([input]) => input.attachmentId)
+    );
+  });
+
+  it('completes the subscription fence before global connected and drains only uncovered pushes', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    const subscription = Promise.withResolvers<{
+      registered: boolean;
+      fence: number | null;
+      kiloSessionId: string;
+    }>();
+    fixture.subscribeNativeEvents.mockReturnValueOnce(subscription.promise);
+    const reader = globalReader(fixture.facade);
+    const firstFrame = vi.fn();
+    const pendingFrame = readSseFrame(reader).then(firstFrame);
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledOnce();
+      await fixture.push(5);
+      await fixture.push(11);
+      await fixture.push(2, undefined, true);
+      expect(firstFrame).not.toHaveBeenCalled();
+      subscription.resolve({ registered: true, fence: 10, kiloSessionId });
+      await pendingFrame;
+      expect(firstFrame).toHaveBeenCalledExactlyOnceWith({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { type: 'message.updated', properties: { sessionID: kiloSessionId, eventId: 11 } },
+      });
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { type: 'message.updated', properties: { sessionID: kiloSessionId, eventId: 2 } },
+      });
+      await expectGlobalConnected(reader);
+      await fixture.push(10);
+      await fixture.push(12);
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { type: 'message.updated', properties: { sessionID: kiloSessionId, eventId: 12 } },
+      });
+    } finally {
+      await reader.cancel();
+      await pendingFrame;
+      vi.useRealTimers();
+    }
+  });
+
+  it('fans peer pushes to a global-only stream while rejecting foreign or mismatched roots', async () => {
+    const fixture = globalFixture([
+      rootSummary(),
+      rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId),
+    ]);
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      const denied = {
+        kiloUserId: groupedOwnerId,
+        cloudAgentSessionId: firstWorkspaceSessionId,
+        kiloSessionId,
+        eventId: 11,
+        event: { type: 'denied', properties: {} },
+      };
+      await fixture.facade.publishNativeEvent({ ...denied, kiloUserId: 'foreign-user' });
+      await fixture.facade.publishNativeEvent({
+        ...denied,
+        cloudAgentSessionId: siblingWorkspaceSessionId,
+      });
+      await fixture.facade.publishNativeEvent({ ...denied, kiloSessionId: 'ses_unlisted' });
+      await fixture.push(11);
+      await fixture.push(12, rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId));
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { type: 'message.updated', properties: { sessionID: kiloSessionId, eventId: 11 } },
+      });
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        directory: publicCloudAgentDirectory(siblingKiloSessionId),
+        payload: {
+          type: 'message.updated',
+          properties: { sessionID: siblingKiloSessionId, eventId: 12 },
+        },
+      });
+      expect(fixture.resolveRoot).toHaveBeenCalledWith({
+        kiloUserId: 'foreign-user',
+        kiloSessionId,
+      });
+    } finally {
+      await reader.cancel();
+    }
+  });
+
+  it('refreshes a known root that registers later without snapshot reads or duplicate consumers', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    fixture.subscribeNativeEvents
+      .mockResolvedValueOnce({ registered: false, fence: null, kiloSessionId })
+      .mockResolvedValue({ registered: true, fence: null, kiloSessionId });
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(fixture.releaseNativeEvents).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledTimes(2);
+      await fixture.push(1);
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { type: 'message.updated', properties: { sessionID: kiloSessionId, eventId: 1 } },
+      });
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledTimes(4);
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledTimes(2);
+      expect(fixture.nativeSnapshot).not.toHaveBeenCalled();
+      expect(fixture.kiloRequest).not.toHaveBeenCalled();
+      expect(fixture.send).not.toHaveBeenCalled();
+    } finally {
+      await reader.cancel();
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      vi.useRealTimers();
+    }
+    const attachmentIds = fixture.subscribeNativeEvents.mock.calls.map(
+      ([input]) => input.attachmentId
+    );
+    expect(new Set(attachmentIds).size).toBe(2);
+    expect(fixture.releaseNativeEvents.mock.calls.map(([input]) => input.attachmentId)).toEqual(
+      attachmentIds
+    );
+  });
+
+  it('discovers roots added after global connection on the next heartbeat', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    fixture.listCloudAgentRootSessions.mockResolvedValueOnce([]);
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      expect(fixture.subscribeNativeEvents).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledOnce();
+      await fixture.push(11);
+      await expect(readSseFrame(reader)).resolves.toMatchObject({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { type: 'message.updated', properties: { eventId: 11 } },
+      });
+      expect(fixture.listCloudAgentRootSessions.mock.calls).toEqual([
+        [{ kiloUserId: groupedOwnerId, limit: 100 }],
+        [{ kiloUserId: groupedOwnerId, limit: 100 }],
+      ]);
+    } finally {
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps an empty registered root subscribed when its native runtime starts later', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    fixture.subscribeNativeEvents.mockResolvedValue({
+      registered: true,
+      fence: null,
+      kiloSessionId,
+    });
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledOnce();
+      await fixture.push(1);
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { type: 'message.updated', properties: { sessionID: kiloSessionId, eventId: 1 } },
+      });
+      expect(fixture.nativeSnapshot).not.toHaveBeenCalled();
+      expect(fixture.nativeLiveRead).not.toHaveBeenCalled();
+      expect(fixture.kiloRequest).not.toHaveBeenCalled();
+      expect(fixture.send).not.toHaveBeenCalled();
+    } finally {
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('releases a root removed from the owned list and stops its global delivery', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      const attachment = fixture.subscribeNativeEvents.mock.calls[0]?.[0];
+      expect(attachment).toBeDefined();
+      fixture.listCloudAgentRootSessions.mockResolvedValue([]);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(fixture.releaseNativeEvents).toHaveBeenCalledExactlyOnceWith({
+        attachmentId: attachment?.attachmentId,
+      });
+      await fixture.push(11);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledOnce();
+    } finally {
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+    expect(fixture.releaseNativeEvents).toHaveBeenCalledOnce();
+  });
+
+  it('keeps global and scoped consumers distinct when either subscriber cancels', async () => {
+    const fixture = globalFixture();
+    const first = globalReader(fixture.facade);
+    const second = globalReader(fixture.facade);
+    const scopedId = fixture.facade.prepareNativeAttachment(
+      firstWorkspaceSessionId,
+      kiloSessionId,
+      groupedOwnerId
+    );
+    const scopedBody = fixture.facade.openPublicSessionEventStream(kiloSessionId, {
+      attachmentId: scopedId,
+      fence: 10,
+    }).body;
+    if (!scopedBody) throw new Error('Expected scoped native event response body');
+    const scoped = scopedBody.getReader();
+    try {
+      await expectGlobalConnected(first);
+      await expectGlobalConnected(second);
+      await readSseFrame(scoped);
+      await expect(readSseFrame(scoped)).resolves.toMatchObject({ type: 'kilo.native.fence' });
+      const [firstInput, secondInput] = fixture.subscribeNativeEvents.mock.calls.map(
+        ([input]) => input
+      );
+      expect(firstInput).toBeDefined();
+      expect(secondInput).toBeDefined();
+      expect(new Set([firstInput?.attachmentId, secondInput?.attachmentId, scopedId]).size).toBe(3);
+      await first.cancel();
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(fixture.releaseNativeEvents).toHaveBeenCalledExactlyOnceWith({
+        attachmentId: firstInput?.attachmentId,
+      });
+      await fixture.push(11);
+      await expect(readSseFrame(second)).resolves.toMatchObject({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { properties: { eventId: 11 } },
+      });
+      await expect(readSseFrame(scoped)).resolves.toEqual({
+        type: 'message.updated',
+        properties: { sessionID: kiloSessionId, eventId: 11 },
+      });
+      await scoped.cancel();
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(fixture.releaseNativeEvents).toHaveBeenLastCalledWith({ attachmentId: scopedId });
+      await fixture.push(12);
+      await expect(readSseFrame(second)).resolves.toMatchObject({
+        payload: { properties: { eventId: 12 } },
+      });
+      await second.cancel();
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(fixture.releaseNativeEvents).toHaveBeenLastCalledWith({
+        attachmentId: secondInput?.attachmentId,
+      });
+      expect(fixture.releaseNativeEvents).toHaveBeenCalledTimes(3);
+    } finally {
+      await first.cancel();
+      await second.cancel();
+      await scoped.cancel();
+    }
+  });
+
+  it('releases a late DO registration after cancellation during a pending subscribe', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    const subscription = Promise.withResolvers<void>();
+    const consumers = new Set<string>();
+    fixture.subscribeNativeEvents.mockImplementation(async input => {
+      await subscription.promise;
+      consumers.add(input.attachmentId);
+      return { registered: true, fence: 10, kiloSessionId: input.kiloSessionId };
+    });
+    fixture.releaseNativeEvents.mockImplementation(async input => {
+      consumers.delete(input.attachmentId);
+    });
+    const reader = globalReader(fixture.facade);
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      const attachment = fixture.subscribeNativeEvents.mock.calls[0]?.[0];
+      expect(attachment).toBeDefined();
+      await reader.cancel();
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(fixture.releaseNativeEvents).toHaveBeenCalledExactlyOnceWith({
+        attachmentId: attachment?.attachmentId,
+      });
+      subscription.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(consumers.size).toBe(0);
+      expect(fixture.releaseNativeEvents).toHaveBeenCalledTimes(2);
+      expect(fixture.releaseNativeEvents).toHaveBeenLastCalledWith({
+        attachmentId: attachment?.attachmentId,
+      });
+      await fixture.push(11);
+      await expect(reader.read()).resolves.toEqual({ done: true, value: undefined });
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      subscription.resolve();
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('coalesces heartbeat refreshes while subscribe is pending and avoids duplicate attachments', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    const subscription = Promise.withResolvers<{
+      registered: boolean;
+      fence: number | null;
+      kiloSessionId: string;
+    }>();
+    fixture.subscribeNativeEvents.mockReturnValueOnce(subscription.promise);
+    const reader = globalReader(fixture.facade);
+    try {
+      await vi.advanceTimersByTimeAsync(30_000);
+      for (let heartbeat = 0; heartbeat < 3; heartbeat++) {
+        expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      }
+      expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledOnce();
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledOnce();
+      subscription.resolve({ registered: true, fence: 10, kiloSessionId });
+      await expectGlobalConnected(reader);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledTimes(3);
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledOnce();
+    } finally {
+      subscription.resolve({ registered: true, fence: 10, kiloSessionId });
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('attaches the maximum root-list page without pagination or individual session reads', async () => {
+    const roots = Array.from({ length: 100 }, (_, index) =>
+      rootSummary(
+        `ses_${String(index).padStart(26, '0')}`,
+        `workspace_aaaaaaaa-aaaa-4aaa-8aaa-${String(index).padStart(12, '0')}`
+      )
+    );
+    const fixture = globalFixture(roots);
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledExactlyOnceWith({
+        kiloUserId: groupedOwnerId,
+        limit: 100,
+      });
+      expect(fixture.subscribeNativeEvents).toHaveBeenCalledTimes(100);
+      expect(
+        new Set(fixture.subscribeNativeEvents.mock.calls.map(([input]) => input.attachmentId)).size
+      ).toBe(100);
+      expect(fixture.resolveRoot).not.toHaveBeenCalled();
+      expect(fixture.env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).not.toHaveBeenCalled();
+      expect(fixture.env.SESSION_INGEST.getCloudAgentRootSessionMessages).not.toHaveBeenCalled();
+      expect(fixture.nativeSnapshot).not.toHaveBeenCalled();
+    } finally {
+      await reader.cancel();
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+    }
+    expect(fixture.releaseNativeEvents).toHaveBeenCalledTimes(100);
   });
 });
 

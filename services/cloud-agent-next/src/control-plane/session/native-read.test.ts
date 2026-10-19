@@ -33,6 +33,7 @@ type NativeRequestUnit = {
   sessionId: string;
   registration: unknown;
   route: unknown;
+  metadata?: { repository: { upstreamBranch?: string } };
   sandboxPeer: () => unknown;
   sandboxPeerFor?: (sandboxId: string) => unknown;
   kiloRequest: (operation: { name: string }) => Promise<ControlPlaneControlResult>;
@@ -90,6 +91,18 @@ describe('SandboxSessionV2.kiloRequest', () => {
       error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
     });
     expect(kiloRequest).not.toHaveBeenCalled();
+  });
+
+  it('derives the diff base from stored repository metadata rather than the caller', async () => {
+    const kiloRequest = vi.fn(async () => ({ ok: true, result: [] }));
+    const session = unit({ peer: { kiloRequest } });
+    session.metadata = { repository: { upstreamBranch: 'main' } };
+    await session.kiloRequest({ name: 'session.diff', baseRef: 'refs/heads/untrusted' } as never);
+    expect(kiloRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: { name: 'session.diff', baseRef: 'refs/remotes/origin/main' },
+      })
+    );
   });
 
   it('returns not_found without a registration', async () => {

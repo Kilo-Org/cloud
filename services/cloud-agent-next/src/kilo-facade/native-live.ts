@@ -1,4 +1,3 @@
-import { projectPrivateWorktreePaths } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 import type {
   ControlPlaneControlResult,
@@ -9,7 +8,10 @@ import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { publicCloudAgentDirectory } from './public-sdk-projection.js';
+import {
+  projectPublicStructuredPaths,
+  publicCloudAgentDirectory,
+} from './public-sdk-projection.js';
 
 /**
  * The native read subset the VS Code and JetBrains clients exercise on a live
@@ -37,13 +39,15 @@ const todoSchema = z
 
 const diffFileSchema = z
   .object({
-    file: z.string().max(4096),
+    file: z.string().max(4096).optional(),
     additions: z.number().int().nonnegative().optional(),
     deletions: z.number().int().nonnegative().optional(),
     status: z.string().max(64).optional(),
     patch: z.string().optional(),
+    before: z.string().optional(),
+    after: z.string().optional(),
   })
-  .passthrough();
+  .strip();
 
 const nativeQuestionSchema = z.object({ id: z.string().min(1) }).passthrough();
 const nativePermissionSchema = z.object({ id: z.string().min(1) }).passthrough();
@@ -106,17 +110,11 @@ function absentAsEmpty(value: unknown): unknown {
   return value === null || value === undefined ? [] : value;
 }
 
-function reworktreeStructured<T extends object>(value: T, kiloSessionId: string): T {
-  const directory = publicCloudAgentDirectory(kiloSessionId);
-  return projectPrivateWorktreePaths(value, [{ directory }], directory);
-}
-
 function sessionPublicShape(value: unknown, kiloSessionId: string): NativeReadOutcome {
   const parsed = nativeSessionSchema.safeParse(value);
   if (!parsed.success || parsed.data.id !== kiloSessionId) return invalidNativeResult();
-  const { path: _path, ...rest } = parsed.data;
   return bounded({
-    ...reworktreeStructured(withoutPrivatePaths(rest) as Record<string, unknown>, kiloSessionId),
+    ...projectPublicStructuredPaths(parsed.data, kiloSessionId),
     directory: publicCloudAgentDirectory(kiloSessionId),
   });
 }
@@ -131,7 +129,7 @@ function messagesPublicShape(
   if (!window.every(message => nativeMessageSchema.safeParse(message).success)) {
     return invalidNativeResult();
   }
-  return bounded(reworktreeStructured(structuredClone(window) as object[], kiloSessionId));
+  return bounded(projectPublicStructuredPaths(window, kiloSessionId));
 }
 
 function parseNativeResult(
@@ -170,24 +168,17 @@ function parseNativeResult(
     case 'session.diff': {
       const parsed = z.array(diffFileSchema).safeParse(absentAsEmpty(value));
       if (!parsed.success) return invalidNativeResult();
-      const files = parsed.data.map(file => ({
-        file: file.file,
-        ...(file.additions === undefined ? {} : { additions: file.additions }),
-        ...(file.deletions === undefined ? {} : { deletions: file.deletions }),
-        ...(file.status === undefined ? {} : { status: file.status }),
-        ...(file.patch === undefined ? {} : { patch: file.patch }),
-      }));
-      return bounded(files);
+      return bounded(projectPublicStructuredPaths(parsed.data, kiloSessionId));
     }
     case 'question.list': {
       const parsed = z.array(nativeQuestionSchema).safeParse(absentAsEmpty(value));
       if (!parsed.success) return invalidNativeResult();
-      return bounded(withoutPrivatePaths(parsed.data));
+      return bounded(projectPublicStructuredPaths(parsed.data, kiloSessionId));
     }
     case 'permission.list': {
       const parsed = z.array(nativePermissionSchema).safeParse(absentAsEmpty(value));
       if (!parsed.success) return invalidNativeResult();
-      return bounded(withoutPrivatePaths(parsed.data));
+      return bounded(projectPublicStructuredPaths(parsed.data, kiloSessionId));
     }
   }
 }

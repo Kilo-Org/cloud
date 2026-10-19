@@ -150,7 +150,7 @@ type PublicSubscriber = {
 };
 
 export type KiloFacadeGlobalEvents = {
-  openPublicGlobalEventStream(): Response;
+  openPublicGlobalEventStream(userId?: string): Response;
   openPublicSessionEventStream(
     kiloSessionId: string,
     native?: {
@@ -1380,7 +1380,7 @@ async function eventStreamResponse(params: {
     if (!globalEvents) {
       return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Kilo facade stream is unavailable');
     }
-    return globalEvents.openPublicGlobalEventStream();
+    return globalEvents.openPublicGlobalEventStream(userId);
   }
 
   if (kiloPath !== '/event') {
@@ -2109,8 +2109,20 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     { waiting?: () => void; attachmentId: string }
   >();
   private readonly nativeUnsubscribes = new Map<string, () => void>();
+  private readonly globalNativeAttachments = new Map<string, Map<string, string>>();
+  private readonly globalNativeRefreshes = new Map<string, Promise<void>>();
   private readonly nativeAttachments = createNativeAttachmentRegistry(
     (attachmentId, kiloSessionId) => {
+      for (const [subscriberId, attachments] of this.globalNativeAttachments) {
+        if (![...attachments.values()].includes(attachmentId)) continue;
+        this.sendToSubscriber(subscriberId, {
+          directory: publicCloudAgentDirectory(kiloSessionId),
+          payload: {
+            type: NATIVE_FACADE_RESNAPSHOT_EVENT,
+            properties: { sessionID: kiloSessionId, reason: 'continuity_unproven' },
+          },
+        });
+      }
       for (const [subscriberId, writer] of this.nativeWriters) {
         if (writer.attachmentId !== attachmentId) continue;
         this.sendToSubscriber(subscriberId, {
@@ -2167,8 +2179,8 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     });
   }
 
-  openPublicGlobalEventStream(): Response {
-    return this.openPublicEventStream({ kind: 'global' });
+  openPublicGlobalEventStream(userId?: string): Response {
+    return this.openPublicEventStream({ kind: 'global' }, undefined, userId);
   }
 
   openPublicSessionEventStream(
@@ -2246,7 +2258,8 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       snapshot?: NativePublicEvent[];
       attachmentId?: string;
       nextPage?: () => Promise<NativeAttachOutcome>;
-    }
+    },
+    globalUserId?: string
   ): Response {
     const subscriberId = crypto.randomUUID();
     const publicConnectionEvent = () =>
@@ -2264,12 +2277,21 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
             controller,
             scope,
             heartbeat: setInterval(() => {
+              if (globalUserId !== undefined) {
+                void this.refreshGlobalNativeAttachments(subscriberId, globalUserId);
+              }
               if (this.nativeWriters.get(subscriberId)?.waiting !== undefined) return;
               this.sendCommentToSubscriber(subscriberId, 'heartbeat');
             }, HEARTBEAT_INTERVAL_MS),
           };
           this.subscribers.set(subscriberId, subscriber);
-          this.sendToSubscriber(subscriberId, publicConnectionEvent());
+          if (globalUserId === undefined) {
+            this.sendToSubscriber(subscriberId, publicConnectionEvent());
+          } else {
+            void this.refreshGlobalNativeAttachments(subscriberId, globalUserId).then(() => {
+              this.sendToSubscriber(subscriberId, publicConnectionEvent());
+            });
+          }
           if (native !== undefined && scope.kind === 'session') {
             void this.openNativeSessionAttachment(subscriberId, scope.kiloSessionId, native);
           }
@@ -2547,6 +2569,107 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     clearInterval(subscriber.heartbeat);
     this.subscribers.delete(subscriberId);
     this.clearNativeSubscriber(subscriberId);
+    const attachments = this.globalNativeAttachments.get(subscriberId);
+    this.globalNativeAttachments.delete(subscriberId);
+    for (const attachmentId of attachments?.values() ?? []) {
+      this.nativeUnsubscribes.get(attachmentId)?.();
+      this.nativeUnsubscribes.delete(attachmentId);
+      this.releaseNativeAttachment(attachmentId);
+    }
+  }
+
+  private refreshGlobalNativeAttachments(subscriberId: string, userId: string): Promise<void> {
+    const pending = this.globalNativeRefreshes.get(subscriberId);
+    if (pending !== undefined) return pending;
+    const refresh = this.subscribeGlobalNativeAttachments(subscriberId, userId)
+      .catch(error => {
+        logger
+          .withFields({ error: String(error) })
+          .error('Failed to subscribe global native events');
+        this.sendToSubscriber(subscriberId, {
+          directory: PUBLIC_VIRTUAL_SERVER_DIRECTORY,
+          payload: {
+            type: NATIVE_FACADE_RESNAPSHOT_EVENT,
+            properties: { reason: 'subscription_unavailable' },
+          },
+        });
+      })
+      .finally(() => this.globalNativeRefreshes.delete(subscriberId));
+    this.globalNativeRefreshes.set(subscriberId, refresh);
+    return refresh;
+  }
+
+  private async subscribeGlobalNativeAttachments(
+    subscriberId: string,
+    userId: string
+  ): Promise<void> {
+    if (!this.subscribers.has(subscriberId)) return;
+    const sessionIngest = this.env.SESSION_INGEST;
+    if (!sessionIngest) return;
+    const roots = await sessionIngest.listCloudAgentRootSessions({
+      kiloUserId: userId,
+      limit: 100,
+    });
+    if (!this.subscribers.has(subscriberId)) return;
+    let attachments = this.globalNativeAttachments.get(subscriberId);
+    if (attachments === undefined) {
+      attachments = new Map();
+      this.globalNativeAttachments.set(subscriberId, attachments);
+    }
+    const authorized = new Set(roots.map(root => root.kiloSessionId));
+    for (const [kiloSessionId, attachmentId] of attachments) {
+      if (authorized.has(kiloSessionId)) continue;
+      attachments.delete(kiloSessionId);
+      this.nativeUnsubscribes.get(attachmentId)?.();
+      this.nativeUnsubscribes.delete(attachmentId);
+      this.releaseNativeAttachment(attachmentId);
+    }
+    for (const root of roots) {
+      if (!isControlSession(root.cloudAgentSessionId) || attachments.has(root.kiloSessionId))
+        continue;
+      if (!this.subscribers.has(subscriberId)) return;
+      const attachmentId = this.prepareNativeAttachment(
+        root.cloudAgentSessionId,
+        root.kiloSessionId,
+        userId
+      );
+      attachments.set(root.kiloSessionId, attachmentId);
+      this.nativeUnsubscribes.set(
+        attachmentId,
+        this.nativeAttachments.subscribe(attachmentId, event => {
+          this.sendToSubscriber(subscriberId, {
+            directory: publicCloudAgentDirectory(root.kiloSessionId),
+            payload: event,
+          });
+        })
+      );
+      try {
+        const subscription = await withDORetry(
+          () => getSandboxSessionStub(this.env, userId, root.cloudAgentSessionId),
+          stub => stub.subscribeNativeEvents({ kiloSessionId: root.kiloSessionId, attachmentId }),
+          'subscribeNativeEvents'
+        );
+        if (subscription.registered && this.subscribers.has(subscriberId)) {
+          this.nativeAttachments.complete(attachmentId, subscription.fence);
+          continue;
+        }
+      } catch (error) {
+        logger.withFields({ error: String(error) }).error('Failed to attach global native session');
+      }
+      attachments.delete(root.kiloSessionId);
+      this.nativeUnsubscribes.get(attachmentId)?.();
+      this.nativeUnsubscribes.delete(attachmentId);
+      this.releaseNativeAttachment(attachmentId);
+      if (!this.subscribers.has(subscriberId)) {
+        this.ctx.waitUntil(
+          withDORetry(
+            () => getSandboxSessionStub(this.env, userId, root.cloudAgentSessionId),
+            stub => stub.releaseNativeEvents({ attachmentId }),
+            'releaseNativeEvents'
+          )
+        );
+      }
+    }
   }
 
   private clearNativeSubscriber(subscriberId: string): void {

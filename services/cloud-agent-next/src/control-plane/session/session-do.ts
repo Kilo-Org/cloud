@@ -1351,23 +1351,26 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.registration === null) return 'not_connected';
     const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
     return this.enqueue(async () => {
+      const target = pendingInteractionTarget(parsed.reply);
+      if (!this.hasPendingInteraction(target.collection, target.id)) return 'not_connected';
       // A live turn takes the answer directly (spec §5). The route is named by
       // this DO, never by the caller, so a wrong id cannot reach a sibling.
       if (this.messages.some(message => message.state === 'accepted')) {
         const peer = this.sandboxPeer();
         if (peer === null) return 'not_connected';
+        let result: ControlPlaneDispatchResult;
         try {
-          return await peer.answer({ sessionId: this.sessionId, reply: parsed.reply });
+          result = await peer.answer({ sessionId: this.sessionId, reply: parsed.reply });
         } catch {
           return 'not_connected';
         }
+        if (result === 'sent') await this.resolvePendingInteraction(parsed.reply);
+        return result;
       }
       // The asking turn already settled: the answer becomes a new message that
       // continues the chat (spec §5), admitted through the send path. Only a
       // question/permission this session still waits on may do so, so a retry,
       // an unknown id or an already-answered one cannot admit another turn.
-      const target = pendingInteractionTarget(parsed.reply);
-      if (!this.hasPendingInteraction(target.collection, target.id)) return 'not_connected';
       const intent = answerMessageIntent(
         this.messages,
         parsed.reply,
@@ -1411,13 +1414,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
       };
     }
+    const upstreamBranch = this.metadata?.repository?.upstreamBranch;
     return peer.kiloRequest({
       session: {
         sessionId: this.sessionId,
         kiloSessionId: this.registration.spec.kiloSessionId,
         directory: this.registration.spec.directory,
       },
-      operation: parsed,
+      operation:
+        parsed.name === 'session.diff'
+          ? {
+              name: 'session.diff',
+              ...(upstreamBranch === undefined
+                ? {}
+                : { baseRef: `refs/remotes/origin/${upstreamBranch}` }),
+            }
+          : parsed,
     });
   }
 

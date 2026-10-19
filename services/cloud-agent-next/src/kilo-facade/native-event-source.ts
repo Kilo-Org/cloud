@@ -1,5 +1,8 @@
 import type { StreamEvent } from '../websocket/types.js';
-import { publicCloudAgentDirectory } from './public-sdk-projection.js';
+import {
+  projectPublicStructuredPaths,
+  publicCloudAgentDirectory,
+} from './public-sdk-projection.js';
 
 /**
  * Native event delivery for a hosted `workspace_*` session (spec §10).
@@ -37,6 +40,7 @@ export const NATIVE_MATERIALIZED_EVENT_TYPES = [
   'message.part.updated',
   'message.removed',
   'message.part.removed',
+  'autocommit_completed',
 ] as const;
 
 /** Native Kilo event payload in the public directory namespace. */
@@ -58,7 +62,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** `message.updated` / `message.part.updated` / removals only. */
 export function isMaterializedNativeEvent(event: StreamEvent): boolean {
   if (event.streamEventType !== 'kilocode' || !isRecord(event.data)) return false;
   return (NATIVE_MATERIALIZED_EVENT_TYPES as readonly string[]).includes(
@@ -89,7 +92,11 @@ export function toNativePublicEvent(
     if (properties.sessionID !== undefined && properties.sessionID !== kiloSessionId) return null;
     return {
       type: event.data.event,
-      properties: { ...properties, sessionID: kiloSessionId, directory },
+      properties: {
+        ...projectPublicStructuredPaths(properties, kiloSessionId),
+        sessionID: kiloSessionId,
+        directory,
+      },
     };
   }
   if (typeof event.data.type !== 'string') return null;
@@ -97,7 +104,7 @@ export function toNativePublicEvent(
   return {
     type: event.data.type,
     properties: {
-      ...payload,
+      ...projectPublicStructuredPaths(payload, kiloSessionId),
       sessionID: kiloSessionId,
       directory,
     },

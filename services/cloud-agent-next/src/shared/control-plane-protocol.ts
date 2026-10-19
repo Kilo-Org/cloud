@@ -1117,7 +1117,12 @@ export const controlPlaneNativeOperationSchema = z.discriminatedUnion('name', [
     .strict(),
   z.object({ name: z.literal('session.status') }).strict(),
   z.object({ name: z.literal('session.todo') }).strict(),
-  z.object({ name: z.literal('session.diff') }).strict(),
+  z
+    .object({
+      name: z.literal('session.diff'),
+      baseRef: sessionGitSummaryPayloadSchema.shape.baseRef,
+    })
+    .strict(),
   z.object({ name: z.literal('question.list') }).strict(),
   z.object({ name: z.literal('permission.list') }).strict(),
 ]);

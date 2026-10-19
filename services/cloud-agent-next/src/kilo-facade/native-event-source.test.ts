@@ -3,6 +3,7 @@ import type { StreamEvent } from '../websocket/types.js';
 import {
   createNativeAttachmentRegistry,
   isDeliverableNativeEvent,
+  isMaterializedNativeEvent,
   MAX_PENDING_NATIVE_EVENTS,
   toNativePublicEvent,
   type NativeEventDelivery,
@@ -78,6 +79,119 @@ describe('toNativePublicEvent', () => {
     });
   });
 
+  it.each(['event', 'type'])('projects captured assistant path metadata in a %s envelope', key => {
+    const info = {
+      id: 'msg_captured',
+      sessionID: kiloSessionId,
+      role: 'assistant',
+      path: { cwd: '/workspace/app', root: '/workspace/app' },
+      time: { created: 100, completed: 101 },
+      tokens: { input: 10, output: 1 },
+    };
+    expect(
+      toNativePublicEvent(
+        streamEvent(8, { [key]: 'message.updated', properties: { info } }),
+        kiloSessionId
+      )
+    ).toEqual({
+      type: 'message.updated',
+      properties: {
+        info: {
+          ...info,
+          path: {
+            cwd: publicCloudAgentDirectory(kiloSessionId),
+            root: publicCloudAgentDirectory(kiloSessionId),
+          },
+        },
+        sessionID: kiloSessionId,
+        directory: publicCloudAgentDirectory(kiloSessionId),
+      },
+    });
+    expect(info.path).toEqual({ cwd: '/workspace/app', root: '/workspace/app' });
+  });
+
+  it.each(['session.created', 'session.updated'])(
+    'projects captured %s nested directory without dropping SDK fields',
+    type => {
+      const info = {
+        id: kiloSessionId,
+        directory: '/workspace/app',
+        title: 'Keep /workspace/app in my title',
+        path: { cwd: '/workspace/app' },
+      };
+      expect(
+        toNativePublicEvent(streamEvent(9, { event: type, properties: { info } }), kiloSessionId)
+      ).toMatchObject({
+        properties: {
+          info: {
+            ...info,
+            directory: publicCloudAgentDirectory(kiloSessionId),
+            path: { cwd: publicCloudAgentDirectory(kiloSessionId) },
+          },
+        },
+      });
+    }
+  );
+
+  it('projects pending permission metadata in the scoped SSE feed without rewriting added contents', () => {
+    const patch =
+      'Index: /workspace/app/native-permission.txt\n--- /workspace/app/native-permission.txt\n+++ /workspace/app/native-permission.txt\n@@ -0,0 +1 @@\n+Keep /workspace/app/native-permission.txt';
+    expect(
+      toNativePublicEvent(
+        streamEvent(10, {
+          event: 'permission.asked',
+          properties: {
+            id: 'per_captured',
+            sessionID: kiloSessionId,
+            permission: 'edit',
+            patterns: ['native-permission.txt'],
+            metadata: {
+              filepath: '/workspace/app/native-permission.txt',
+              diff: patch,
+              filediff: {
+                file: '/workspace/app/native-permission.txt',
+                patch,
+                additions: 1,
+                deletions: 0,
+              },
+            },
+          },
+        }),
+        kiloSessionId
+      )
+    ).toMatchObject({
+      properties: {
+        id: 'per_captured',
+        permission: 'edit',
+        patterns: ['native-permission.txt'],
+        metadata: {
+          filepath: publicCloudAgentDirectory(kiloSessionId),
+          diff: `Index: ${publicCloudAgentDirectory(kiloSessionId)}\n--- ${publicCloudAgentDirectory(kiloSessionId)}\n+++ ${publicCloudAgentDirectory(kiloSessionId)}\n@@ -0,0 +1 @@\n+Keep /workspace/app/native-permission.txt`,
+          filediff: { file: publicCloudAgentDirectory(kiloSessionId), additions: 1, deletions: 0 },
+        },
+      },
+    });
+  });
+
+  it('classifies stored kilocode autocommit updates as materialized and deliverable', () => {
+    const event = streamEvent(2, {
+      event: 'autocommit_completed',
+      properties: { messageId: 'msg_commit', success: true },
+    });
+    expect(isDeliverableNativeEvent(event)).toBe(true);
+    expect(isMaterializedNativeEvent(event)).toBe(true);
+    expect(toNativePublicEvent(event, kiloSessionId)).toMatchObject({
+      type: 'autocommit_completed',
+      properties: { messageId: 'msg_commit', success: true },
+    });
+    expect(isMaterializedNativeEvent(streamEvent(3, { type: 'autocommit_completed' }))).toBe(true);
+    expect(isMaterializedNativeEvent(streamEvent(4, { event: 'session.updated' }))).toBe(false);
+    expect(isDeliverableNativeEvent(streamEvent(0, event.data))).toBe(false);
+    expect(
+      isDeliverableNativeEvent(streamEvent(2, { messageId: 'msg_commit' }, 'autocommit_completed'))
+    ).toBe(false);
+  });
+
   it('drops an event that names another session', () => {
     expect(
       toNativePublicEvent(
@@ -102,6 +216,31 @@ describe('toNativePublicEvent', () => {
 });
 
 describe('createNativeAttachmentRegistry', () => {
+  it('replays an autocommit rewrite below the completed fence after its stable-ID snapshot', () => {
+    const registry = createNativeAttachmentRegistry(vi.fn());
+    const listener = vi.fn();
+    registry.begin(cloudAgentSessionId, kiloSessionId);
+    registry.subscribe(cloudAgentSessionId, listener);
+    const event = streamEvent(2, {
+      event: 'autocommit_completed',
+      properties: { messageId: 'msg_commit', success: true, pushed: true },
+    });
+    const native = toNativePublicEvent(event, kiloSessionId);
+    if (native === null) throw new Error('expected autocommit event');
+    registry.deliver({
+      ...delivery(2),
+      event: native,
+      materialized: isMaterializedNativeEvent(event),
+    });
+    registry.complete(cloudAgentSessionId, 12);
+    expect(listener).toHaveBeenCalledExactlyOnceWith(native);
+    registry.deliver({
+      ...delivery(2),
+      event: native,
+      materialized: isMaterializedNativeEvent(event),
+    });
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
   it('replays materialized rewrites below the page cursor and fence in observation order', () => {
     const registry = createNativeAttachmentRegistry(vi.fn());
     const listener = vi.fn();

@@ -108,6 +108,133 @@ describe('readNativeLiveOperation', () => {
     });
   });
 
+  it('projects captured pending permission paths and diff headers while preserving its SDK shape and text', async () => {
+    const patch =
+      'Index: /workspace/app/native-permission.txt\n===================================================================\n--- /workspace/app/native-permission.txt\n+++ /workspace/app/native-permission.txt\n@@ -0,0 +1,2 @@\n+permission-e2e\n+Keep /workspace/app/native-permission.txt\n\\ No newline at end of file\n';
+    const permission = {
+      id: 'per_captured',
+      sessionID: kiloSessionId,
+      permission: 'edit',
+      patterns: ['native-permission.txt'],
+      metadata: {
+        filepath: '/workspace/app/native-permission.txt',
+        diff: patch,
+        filediff: {
+          file: '/workspace/app/native-permission.txt',
+          patch,
+          additions: 2,
+          deletions: 0,
+        },
+        description: 'User mentioned /workspace/app/native-permission.txt',
+      },
+      always: ['*'],
+      tool: { messageID: 'msg_captured', callID: 'call_write' },
+    };
+    const publicDirectory = publicCloudAgentDirectory(kiloSessionId);
+    const projectedPatch = `Index: ${publicDirectory}\n===================================================================\n--- ${publicDirectory}\n+++ ${publicDirectory}\n@@ -0,0 +1,2 @@\n+permission-e2e\n+Keep /workspace/app/native-permission.txt\n\\ No newline at end of file\n`;
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'permission.list' }, async () => ({ ok: true, result: [permission] }))
+    );
+    expect(outcome).toEqual({
+      kind: 'ok',
+      body: [
+        {
+          ...permission,
+          metadata: {
+            ...permission.metadata,
+            filepath: publicDirectory,
+            diff: projectedPatch,
+            filediff: {
+              ...permission.metadata.filediff,
+              file: publicDirectory,
+              patch: projectedPatch,
+            },
+          },
+        },
+      ],
+    });
+    expect(permission.metadata.filepath).toBe('/workspace/app/native-permission.txt');
+  });
+
+  it('uses the actual assistant private worktree root for live structured paths, not the virtual directory', async () => {
+    const privateDirectory =
+      '/workspace/private/worktrees/worktree_12345678-1234-4234-8234-123456789abc';
+    const publicDirectory = publicCloudAgentDirectory(kiloSessionId);
+    const text = `Keep ${privateDirectory}/file.txt as user text`;
+    const messages = [
+      {
+        info: {
+          id: 'msg_paths',
+          role: 'assistant',
+          path: { cwd: privateDirectory, root: privateDirectory },
+        },
+        parts: [
+          { type: 'text', text },
+          {
+            type: 'tool',
+            state: {
+              input: { filePath: `${privateDirectory}/file.txt` },
+              metadata: {
+                filepath: `${privateDirectory}/file.txt`,
+                filediff: { file: `${privateDirectory}/file.txt` },
+              },
+              output: text,
+            },
+          },
+        ],
+      },
+    ];
+    expect(
+      await readNativeLiveOperation(
+        readParams({ name: 'session.messages' }, async () => ({ ok: true, result: messages }))
+      )
+    ).toEqual({
+      kind: 'ok',
+      body: [
+        {
+          info: { ...messages[0].info, path: { cwd: publicDirectory, root: publicDirectory } },
+          parts: [
+            { type: 'text', text },
+            {
+              type: 'tool',
+              state: {
+                input: { filePath: `${publicDirectory}/file.txt` },
+                metadata: {
+                  filepath: `${publicDirectory}/file.txt`,
+                  filediff: { file: `${publicDirectory}/file.txt` },
+                },
+                output: text,
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('preserves pending question contents while normalizing structured paths', async () => {
+    const question = {
+      id: 'que_paths',
+      sessionID: kiloSessionId,
+      directory: '/workspace/app',
+      questions: [
+        {
+          question: 'Is /workspace/app correct?',
+          header: 'Path',
+          options: [{ label: '/workspace/app', description: 'Keep text' }],
+        },
+      ],
+    };
+    expect(
+      await readNativeLiveOperation(
+        readParams({ name: 'question.list' }, async () => ({ ok: true, result: [question] }))
+      )
+    ).toEqual({
+      kind: 'ok',
+      body: [{ ...question, directory: publicCloudAgentDirectory(kiloSessionId) }],
+    });
+  });
+
   it('bounds a message window to the requested limit', async () => {
     const messages = Array.from({ length: 5 }, (_, index) => ({
       info: { id: `msg_${index}` },
@@ -188,16 +315,63 @@ describe('native todo and diff shapes', () => {
     expect(outcome).toMatchObject({ kind: 'failed', code: 'KILO_UPSTREAM_RESPONSE_INVALID' });
   });
 
-  it('keeps diff file entries and drops private path fields', async () => {
+  it('keeps SDK diff contents and drops fields outside its schema', async () => {
     const outcome = await readNativeLiveOperation(
       readParams({ name: 'session.diff' }, async () => ({
         ok: true,
-        result: [{ file: 'src/app.ts', additions: 2, deletions: 1, before: '/tmp/a.ts' }],
+        result: [
+          {
+            file: 'src/app.ts',
+            additions: 2,
+            deletions: 1,
+            before: '/tmp/a.ts',
+            after: '/workspace/app/a.ts',
+            privateDirectory: '/tmp/checkout',
+          },
+        ],
       }))
     );
     expect(outcome).toEqual({
       kind: 'ok',
-      body: [{ file: 'src/app.ts', additions: 2, deletions: 1 }],
+      body: [
+        {
+          file: 'src/app.ts',
+          additions: 2,
+          deletions: 1,
+          before: '/tmp/a.ts',
+          after: '/workspace/app/a.ts',
+        },
+      ],
+    });
+  });
+
+  it('retains optional SDK file fields and projects diff headers from absolute paths', async () => {
+    const publicDirectory = publicCloudAgentDirectory(kiloSessionId);
+    expect(
+      await readNativeLiveOperation(
+        readParams({ name: 'session.diff' }, async () => ({
+          ok: true,
+          result: [
+            {
+              additions: 1,
+              deletions: 0,
+              status: 'added',
+              patch:
+                '--- /dev/null\n+++ /workspace/app/a.ts\n@@ -0,0 +1 @@\n+/workspace/app/content',
+            },
+          ],
+        }))
+      )
+    ).toEqual({
+      kind: 'ok',
+      body: [
+        {
+          additions: 1,
+          deletions: 0,
+          status: 'added',
+          patch: `--- /dev/null\n+++ ${publicDirectory}\n@@ -0,0 +1 @@\n+/workspace/app/content`,
+        },
+      ],
     });
   });
 });

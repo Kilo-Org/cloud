@@ -8,6 +8,15 @@ import {
   CONTROL_PLANE_KILO_RESULT_MAX_BYTES,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import type { SnapshotFileDiff } from '@kilocode/sdk/v2';
+import {
+  worktreeSnapshotCaptureSchema,
+  type SessionGitSummaryPayload,
+  type WorktreeSnapshotCapture,
+} from '../../../src/shared/worktree-changes-wire.js';
+import { collectWorktreeSnapshot } from '../control/worktree-changes.js';
+import { WorktreeFileCaptureError } from '../control/worktree-file-capture.js';
+import { runDirectoryOperation } from '../control/worktree-operations.js';
 
 /**
  * Handles the Sandbox DO's allowlisted native read requests inside the
@@ -27,6 +36,11 @@ export type ControlPlaneKiloRequestsDeps = {
   preparedRoute: (sessionId: string) => { runtimeKey: string; directory: string } | null;
   /** The live native client for one runtime key, or null when it is gone. */
   clientFor: (runtimeKey: string) => WrapperKiloClient | null;
+  captureSnapshot?: (
+    directory: string,
+    payload: SessionGitSummaryPayload,
+    signal: AbortSignal
+  ) => Promise<WorktreeSnapshotCapture>;
   log?: (message: string) => void;
   timeoutMs?: number;
 };
@@ -46,6 +60,10 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
   handle(frame: ControlPlaneKiloRequestFrame): Promise<void>;
 } {
   const timeoutMs = deps.timeoutMs ?? KILO_REQUEST_TIMEOUT_MS;
+  const captureSnapshot =
+    deps.captureSnapshot ??
+    ((directory, payload, signal) =>
+      collectWorktreeSnapshot(directory, payload, undefined, signal));
 
   function fail(
     requestId: string,
@@ -68,12 +86,41 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
         return client.getSessionDetails(kiloSessionId, directory, signal);
       case 'session.messages':
         return client.getRecentSessionMessages(kiloSessionId, directory, signal);
-      case 'session.status':
-        return client.getSessionStatuses(directory, signal);
+      case 'session.status': {
+        const statuses = await client.getSessionStatuses(directory, signal);
+        const status = statuses[kiloSessionId];
+        return status === undefined ? {} : { [kiloSessionId]: status };
+      }
       case 'session.todo':
         return client.getSessionTodos(kiloSessionId, directory, signal);
-      case 'session.diff':
-        return client.getSessionDiff(kiloSessionId, directory, signal);
+      case 'session.diff': {
+        const nativeDiff = await client.getSessionDiff(kiloSessionId, directory, signal);
+        if (!Array.isArray(nativeDiff))
+          throw new Error('Native session diff returned an invalid array');
+        if (nativeDiff.length > 0) return nativeDiff;
+        // Cloud runtimes disable Kilo snapshots; reuse the bounded worktree patches instead.
+        return runDirectoryOperation(directory, async () => {
+          const snapshot = worktreeSnapshotCaptureSchema.parse(
+            await captureSnapshot(directory, { revision: 1, baseRef: operation.baseRef }, signal)
+          );
+          if (snapshot.summary.truncated) throw new WorktreeFileCaptureError('too_large');
+          const records = new Map(snapshot.files.map(file => [file.path, file]));
+          return snapshot.summary.files.map((file): SnapshotFileDiff => {
+            const record = records.get(file.path);
+            if (!record) throw new Error('Worktree diff is incomplete');
+            if (record.diff.status === 'omitted' && record.diff.reason !== 'binary') {
+              throw new WorktreeFileCaptureError(record.diff.reason);
+            }
+            return {
+              file: file.path,
+              additions: file.additions,
+              deletions: file.deletions,
+              status: file.status,
+              patch: record.diff.status === 'available' ? record.diff.patch : '',
+            };
+          });
+        });
+      }
       case 'question.list': {
         const questions = await client.getQuestions(directory, signal);
         return questions.filter(question => question.sessionID === kiloSessionId);
@@ -114,6 +161,19 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
     } catch (error) {
       if (signal.aborted) {
         deps.emit(fail(requestId, 'timeout', 'Native request timed out', true));
+        return;
+      }
+      if (
+        error instanceof WorktreeFileCaptureError &&
+        ['too_large', 'line_limit', 'budget_exhausted'].includes(error.reason)
+      ) {
+        deps.emit(
+          fail(requestId, 'too_large', 'Native response exceeds the public response budget', false)
+        );
+        return;
+      }
+      if (messageOf(error) === 'worktree_deleting') {
+        deps.emit(fail(requestId, 'not_ready', 'Session directory is not attached', false));
         return;
       }
       deps.log?.(`native request ${operation.name} failed: ${messageOf(error)}`);

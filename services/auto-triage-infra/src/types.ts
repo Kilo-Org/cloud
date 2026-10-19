@@ -106,7 +106,12 @@ export const similarTicketSchema = z.object({
   ticketId: z.string().min(1),
   issueNumber: z.number().int().positive(),
   issueTitle: z.string().min(1),
-  similarity: z.number().min(0).max(1),
+  // Milvus cosine scores pass through unclamped; float rounding can push a
+  // perfect match marginally above 1, so accept a small epsilon.
+  similarity: z
+    .number()
+    .min(0)
+    .max(1 + 1e-6),
   repoFullName: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/),
 });
 
@@ -115,7 +120,11 @@ export type SimilarTicket = z.infer<typeof similarTicketSchema>;
 export const duplicateResultSchema = z.object({
   isDuplicate: z.boolean(),
   duplicateOfTicketId: z.string().min(1).nullable(),
-  similarityScore: z.number().min(0).max(1).nullable(),
+  similarityScore: z
+    .number()
+    .min(0)
+    .max(1 + 1e-6)
+    .nullable(),
   reasoning: z.string().optional(),
   similarTickets: z.array(similarTicketSchema),
 });

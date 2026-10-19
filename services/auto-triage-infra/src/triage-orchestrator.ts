@@ -49,8 +49,13 @@ const QUOTED_TITLE_MAX_LENGTH = 280;
  * starts or ends with a backtick, per CommonMark.
  */
 export function formatQuotedIssueTitle(title: string): string {
+  // Titles are single-line in practice; fold whitespace so the quoted line
+  // stays one blockquote paragraph inside the code span.
+  const folded = title.replace(/\s+/g, ' ').trim();
   const truncated =
-    title.length > QUOTED_TITLE_MAX_LENGTH ? `${title.slice(0, QUOTED_TITLE_MAX_LENGTH)}…` : title;
+    folded.length > QUOTED_TITLE_MAX_LENGTH
+      ? `${folded.slice(0, QUOTED_TITLE_MAX_LENGTH)}…`
+      : folded;
   const longestRun = [...truncated.matchAll(/`+/g)].reduce(
     (max, run) => Math.max(max, run[0].length),
     0

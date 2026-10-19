@@ -337,11 +337,24 @@ describe('formatQuotedIssueTitle', () => {
   it('truncates long titles and appends an ellipsis', () => {
     expect(formatQuotedIssueTitle('y'.repeat(300))).toBe(`\`${'y'.repeat(280)}…\``);
   });
+
+  it('folds line breaks so the title stays one quoted paragraph', () => {
+    expect(formatQuotedIssueTitle('line one\n\ncc @org/team\nline two')).toBe(
+      '`line one cc @org/team line two`'
+    );
+    expect(formatQuotedIssueTitle('a\r\nb\tc')).toBe('`a b c`');
+  });
 });
 
 describe('duplicateResultSchema', () => {
   it('accepts a well-formed response', () => {
     expect(duplicateResultSchema.parse(validDuplicateResult())).toEqual(validDuplicateResult());
+  });
+
+  it('accepts a similarity marginally above 1 from float rounding', () => {
+    const result = { ...validDuplicateResult(), similarityScore: 1 + 5e-7 };
+    result.similarTickets = [{ ...result.similarTickets[0], similarity: 1 + 5e-7 }];
+    expect(duplicateResultSchema.safeParse(result).success).toBe(true);
   });
 
   it.each([

@@ -8,18 +8,118 @@ jest.mock('@/lib/device-auth/device-auth-viewer-token');
 jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
 
-import { denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+import {
+  denyDeviceAuthRequest,
+  getDeviceAuthRequest,
+  isDeviceAuthRequestExpired,
+} from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { checkRateLimit } from '@vercel/firewall';
-import { DELETE } from './route';
+import { GET, DELETE } from './route';
 
+const mockGet = jest.mocked(getDeviceAuthRequest);
 const mockDeny = jest.mocked(denyDeviceAuthRequest);
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockVerifyToken = jest.mocked(verifyDeviceAuthViewerToken);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 
 const fakeUser = { id: 'user-1' } as never;
+
+const SAMPLE_CODE = 'test-code';
+const SAMPLE_URL = 'https://example.com';
+
+describe('GET /api/device-auth/codes/[code] (status only)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // The route reads expiry through the helper; mirror the real rule here.
+    jest
+      .mocked(isDeviceAuthRequestExpired)
+      .mockImplementation(
+        request => new Date(request.expires_at) < new Date() || request.status === 'expired'
+      );
+  });
+
+  test('reports 202 pending for an unapproved request', async () => {
+    mockGet.mockResolvedValue({
+      status: 'pending',
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    } as never);
+
+    const response = await GET(new NextRequest(SAMPLE_URL), {
+      params: Promise.resolve({ code: SAMPLE_CODE }),
+    });
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ status: 'pending' });
+  });
+
+  test('reports 202 pending for an approved request', async () => {
+    mockGet.mockResolvedValue({
+      status: 'approved',
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    } as never);
+
+    const response = await GET(new NextRequest(SAMPLE_URL), {
+      params: Promise.resolve({ code: SAMPLE_CODE }),
+    });
+    expect(response.status).toBe(202);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body['status']).toBe('pending');
+    expect(body).toEqual({ status: 'pending' });
+  });
+
+  test('reports 403 denied', async () => {
+    mockGet.mockResolvedValue({
+      status: 'denied',
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    } as never);
+
+    const response = await GET(new NextRequest(SAMPLE_URL), {
+      params: Promise.resolve({ code: SAMPLE_CODE }),
+    });
+    expect(response.status).toBe(403);
+  });
+
+  test('reports 410 expired', async () => {
+    mockGet.mockResolvedValue({
+      status: 'expired',
+      expires_at: new Date(Date.now() - 1000).toISOString(),
+    } as never);
+
+    const response = await GET(new NextRequest(SAMPLE_URL), {
+      params: Promise.resolve({ code: SAMPLE_CODE }),
+    });
+    expect(response.status).toBe(410);
+  });
+
+  test('reports 410 expired for a consumed request', async () => {
+    mockGet.mockResolvedValue({
+      status: 'consumed',
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    } as never);
+
+    const response = await GET(new NextRequest(SAMPLE_URL), {
+      params: Promise.resolve({ code: SAMPLE_CODE }),
+    });
+    expect(response.status).toBe(410);
+  });
+
+  test('reports 410 expired for a code with no row', async () => {
+    mockGet.mockResolvedValue(undefined as never);
+
+    const response = await GET(new NextRequest(SAMPLE_URL), {
+      params: Promise.resolve({ code: SAMPLE_CODE }),
+    });
+    expect(response.status).toBe(410);
+  });
+
+  test('reports 400 for a missing code', async () => {
+    const response = await GET(new NextRequest(SAMPLE_URL), {
+      params: Promise.resolve({ code: '' }),
+    });
+    expect(response.status).toBe(400);
+  });
+});
 
 describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => {
   beforeEach(() => {
@@ -51,7 +151,7 @@ describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => 
     mockVerifyToken.mockReturnValue(null);
 
     const response = await DELETE(createRequest('ABCD-EFGH'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: SAMPLE_CODE }),
     });
     expect(response.status).toBe(403);
     expect(response.statusText).toBeDefined(); // invalid or expired

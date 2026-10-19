@@ -16,9 +16,10 @@ export type OrgOption = { id: string; name: string };
 
 /**
  * The admin's authenticator as the opt-in row renders it: the stored secret
- * (shown only by the enrolment subsection, before a code ever verifies) and
- * whether a code has already verified against it. The verified state is the
- * checkbox's tick and nothing else.
+ * (which reaches a response body only through the enrolment subsection, and
+ * only in a response that explicitly reveals it) and whether a code has
+ * already verified against it. The verified state is the checkbox's tick and
+ * nothing else.
  */
 export type AuthenticatorView = { secret: string; verified: boolean };
 
@@ -35,6 +36,8 @@ export const PERSONAL_ORG_ID = 'personal';
 
 /**
  * The consent HTML: sign-in link + status polling until the flow resolves.
+ * The poll sends the flow cookie (`credentials:'same-origin'`) because
+ * /authorize/status answers only the browser that started the flow.
  *
  * The sign-in link opens in a NEW TAB on purpose: the pairing-status poll runs
  * in this tab, so sending the user to apps/web in the same tab killed the poll
@@ -63,7 +66,7 @@ export function consentPage(input: {
     `<script>(function(){var u=${JSON.stringify(input.statusUrl)};var el=document.getElementById('status');` +
     `var restart=document.getElementById('restart');` +
     `function fail(msg){el.textContent=msg;restart.hidden=false;}` +
-    `async function poll(){try{var r=await fetch(u,{credentials:'omit'});var j=await r.json();` +
+    `async function poll(){try{var r=await fetch(u,{credentials:'same-origin'});var j=await r.json();` +
     `if(j.status==='needs_org'){location.replace(j.picker_url);return;}` +
     `if(j.status==='denied'){fail('Kilo sign-in was denied. Start sign-in again to retry, or close this tab.');return;}` +
     `if(j.status==='expired'){fail('The Kilo sign-in request expired. Start sign-in again to try once more.');return;}` +
@@ -91,18 +94,23 @@ const PICKER_STYLE =
   '#otp-section label{display:block;margin:10px 0 4px;font-size:13px;color:var(--muted)}' +
   '#otp-section input{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);' +
   'background:var(--background);color:var(--foreground);font-size:14px;letter-spacing:.12em;' +
-  'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}';
+  'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}' +
+  'button.secondary{margin-top:10px;padding:8px 14px;border-radius:8px;border:1px solid var(--border);' +
+  'background:var(--input);color:var(--foreground);font-size:13px;font-weight:600;cursor:pointer}' +
+  'button.secondary:hover{border-color:var(--border-strong);background:var(--hover)}';
 
 /**
- * The enrolment subsection for an admin with no verified authenticator yet: the
- * one-time secret, its `otpauth://` URI and the code field. Hidden by default —
- * the inline script reveals it with the checkbox and disables the code field
- * while hidden, so a disabled input is never submitted. An already enrolled
- * admin gets no subsection at all: the ticked checkbox is the whole surface.
+ * The enrolment subsection for an admin with no verified authenticator yet:
+ * the one-time secret, its `otpauth://` URI and the code field. Rendered only
+ * in a response that explicitly reveals it (the enroll POST or a refused
+ * opt-in submit) — never in the plain picker GET. The inline script disables
+ * the code field while hidden, so a disabled input is never submitted. An
+ * already enrolled admin gets no subsection at all: the ticked checkbox is the
+ * whole surface.
  */
-function authenticatorSectionHtml(input: { secret: string; revealed: boolean }): string {
+function authenticatorSectionHtml(input: { secret: string }): string {
   return (
-    `<div id="otp-section"${input.revealed ? '' : ' hidden'}>` +
+    `<div id="otp-section">` +
     `<h2>Add an authenticator</h2>` +
     `<p>Add this secret to your authenticator app, or enter the otpauth URI below:</p>` +
     `<p><code>${escapeHtml(input.secret)}</code></p>` +
@@ -119,10 +127,10 @@ function authenticatorSectionHtml(input: { secret: string; revealed: boolean }):
 }
 
 /**
- * Flip the subsection with the checkbox. Binding only to `change` (no initial
- * sync) keeps a re-render that already revealed the subsection — after a
- * refused enrol submit — visible even though the box is never pre-checked
- * before verification. Nothing else is re-checked or resubmitted.
+ * Flip the subsection with the checkbox. Binding only to `change` keeps a
+ * re-render that arrived already revealed — after a refused enrol submit —
+ * visible even though the box is never pre-checked before verification.
+ * Nothing else is re-checked or resubmitted.
  */
 const OTP_SECTION_SCRIPT =
   `<script>(function(){var box=document.querySelector('input[name="admin_enabled"]');` +
@@ -143,14 +151,16 @@ export function orgPickerPage(input: {
   /** Renders the admin opt-in row only when the paired identity is an admin. */
   showAdminOption: boolean;
   /**
-   * The admin's authenticator for the opt-in row. Rendered only beside the
-   * opt-in row: absent for a non-admin and for a failed admin check. Verified
-   * renders the ticked checkbox alone; unverified adds the enrolment subsection.
+   * The admin's authenticator for the opt-in row. Present for an eligible
+   * admin, absent for a non-admin and for a failed admin check. Verified
+   * renders the ticked checkbox alone; unverified renders the checkbox plus
+   * the enroll button, and the enrolment subsection only when revealed.
    */
   authenticator?: AuthenticatorView | null;
   /**
-   * Reveal the enrolment subsection on a re-render after a refused admin
-   * submit, whose (never pre-checked) box would otherwise leave it collapsed.
+   * The only state under which the enrolment subsection (secret + otpauth URI
+   * + code field) is in the response body: the enroll POST's render, or a
+   * refused opt-in submit whose re-render must keep its prompt.
    */
   authenticatorRevealed?: boolean;
   /** Fail-closed explanation shown when the admin check could not be reached. */
@@ -171,14 +181,31 @@ export function orgPickerPage(input: {
   // enrol submit must not resubmit it pre-ticked. Ticked for an admin whose
   // authenticator is verified, because the checkbox is the only place the page
   // shows that enrolled state and the tick must survive every re-render and
-  // reload. The subsection exists only before verification.
+  // reload. The revealed subsection also exists only before verification.
   const verifiedAuthenticator = input.authenticator?.verified === true;
+  // The enrolment material (secret + otpauth URI) is response-body evidence of
+  // a bearer-equivalent MFA credential, so it renders ONLY in a response to an
+  // explicit reveal action from the cookie-bound browser (`authenticatorRevealed`):
+  // the enroll POST, or a refused opt-in submit that must keep its prompt. The
+  // plain picker GET carries no secret at all and offers the enroll button
+  // instead; a verified admin keeps the ticked checkbox and no subsection.
   const otpSectionHtml =
-    input.showAdminOption && input.authenticator && !verifiedAuthenticator
-      ? authenticatorSectionHtml({
-          secret: input.authenticator.secret,
-          revealed: input.authenticatorRevealed === true,
-        })
+    input.showAdminOption &&
+    input.authenticator &&
+    !verifiedAuthenticator &&
+    input.authenticatorRevealed === true
+      ? authenticatorSectionHtml({ secret: input.authenticator.secret })
+      : '';
+  // Before verification the setup material is one enroll action away: a
+  // separate form posts `enroll=1` back to this same URL and the response then
+  // carries the subsection. It renders AFTER the main form — a nested form is
+  // invalid HTML and the parser would drop its tag, submitting the outer form
+  // (and the pre-checked personal context) instead.
+  const enrollHtml =
+    input.showAdminOption && input.authenticator && !verifiedAuthenticator && !otpSectionHtml
+      ? `<form method="post" action="${escapeHtml(input.actionUrl)}">` +
+        `<button class="secondary" type="submit" name="enroll" value="1">Add an authenticator</button>` +
+        `</form>`
       : '';
   const adminHtml = input.showAdminOption
     ? `<label class="org"><input type="checkbox" name="admin_enabled" value="on"${verifiedAuthenticator ? ' checked' : ''}>` +
@@ -190,17 +217,20 @@ export function orgPickerPage(input: {
   const noticeHtml = input.adminNotice
     ? `<p class="notice">${escapeHtml(input.adminNotice)}</p>`
     : '';
-  const body =
-    `<h1>Choose a Kilo organization</h1>` +
-    `<p><strong>${escapeHtml(input.clientName)}</strong> is connecting to Kilo MCP. ` +
-    `Pick the account to use.</p>` +
-    errorHtml +
+  const mainForm =
     `<form method="post" action="${escapeHtml(input.actionUrl)}">` +
     `<div class="orgs">${optionsHtml}</div>` +
     adminHtml +
     noticeHtml +
     `<button class="cta" type="submit">Connect</button>` +
     `</form>`;
+  const body =
+    `<h1>Choose a Kilo organization</h1>` +
+    `<p><strong>${escapeHtml(input.clientName)}</strong> is connecting to Kilo MCP. ` +
+    `Pick the account to use.</p>` +
+    errorHtml +
+    mainForm +
+    enrollHtml;
   const page = authPage('Choose a Kilo organization', body);
   // The picker needs radio-list layout the shared shell does not carry.
   return htmlResponse(page.replace('</head>', `<style>${PICKER_STYLE}</style></head>`));

@@ -36,6 +36,14 @@ export const oauthPendingAuthorizations = sqliteTable(
     organization_id: text('organization_id'),
     /** Kilo API token from the approved pairing (s6); never logged. */
     kilo_token: text('kilo_token'),
+    /**
+     * The unpredictable token GET /authorize set as the flow cookie in the
+     * browser that started this authorization; /authorize/status and
+     * /authorize/org refuse a request whose cookie does not match. Empty on
+     * rows created before the column existed (they live at most
+     * PENDING_TTL_SECONDS) and checked closed: an empty token matches nothing.
+     */
+    flow_token: text('flow_token').notNull().default(''),
     created_at: text('created_at').notNull(),
     expires_at: text('expires_at').notNull(),
   },

@@ -110,7 +110,8 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       // authenticate strict refresh replays using issued hashes, and hold the
       // OTP authenticators and protected requests (o2). The dropped approval
       // queue tables are gone (o5). The account-wide wrong-code limiter adds
-      // `failed_attempts` and `locked_until` in migration 0008.
+      // `failed_attempts` and `locked_until` in migration 0008, the
+      // flow-cookie binding adds `flow_token` in migration 0009.
       expect(tables.map(t => t.name)).toEqual([
         '__drizzle_migrations',
         'mcp_admin_authenticators',
@@ -123,10 +124,14 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         .all() as Array<{ name: string }>;
       expect(authenticatorColumns.map(column => column.name)).toContain('failed_attempts');
       expect(authenticatorColumns.map(column => column.name)).toContain('locked_until');
+      const pendingColumns = db
+        .prepare('PRAGMA table_info(oauth_pending_authorizations)')
+        .all() as Array<{ name: string }>;
+      expect(pendingColumns.map(column => column.name)).toContain('flow_token');
       const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
         n: number;
       };
-      expect(applied.n).toBe(9);
+      expect(applied.n).toBe(10);
     });
 
     it('a second DO instance over the same storage does not re-apply the migration', async () => {
@@ -134,7 +139,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
         n: number;
       };
-      expect(applied.n).toBe(9);
+      expect(applied.n).toBe(10);
     });
   });
 
@@ -256,6 +261,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       id: 'pa-1',
       authRequest,
       deviceAuthCode: 'PAIR-PA-1',
+      flowToken: 'flow-tok-1',
       createdAt: NOW,
       expiresAt: LATER,
       ...overrides,
@@ -271,6 +277,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         kiloUserId: null,
         organizationId: null,
         kiloToken: null,
+        flowToken: 'flow-tok-1',
         createdAt: NOW,
         expiresAt: LATER,
       });
@@ -620,13 +627,19 @@ describe('production token routing (real provider + DO SQLite)', () => {
         context as unknown as ExecutionContext
       );
       expect(page.status).toBe(200);
-      // The pending record the consent page just created carries its own id.
+      // The pending record the consent page just created carries its own id
+      // and the flow token the page set as the binding cookie.
       const row = db
-        .prepare('SELECT id FROM oauth_pending_authorizations ORDER BY created_at DESC LIMIT 1')
-        .get() as { id: string } | undefined;
+        .prepare(
+          'SELECT id, flow_token FROM oauth_pending_authorizations ORDER BY created_at DESC LIMIT 1'
+        )
+        .get() as { id: string; flow_token: string } | undefined;
       const id = row?.id ?? '';
+      const cookie = `kilo_mcp_flow=${row?.flow_token ?? ''}`;
       const status = await worker.fetch(
-        new Request(`https://kilo-mcp.test/authorize/status?id=${encodeURIComponent(id)}`),
+        new Request(`https://kilo-mcp.test/authorize/status?id=${encodeURIComponent(id)}`, {
+          headers: { Cookie: cookie },
+        }),
         env,
         context as unknown as ExecutionContext
       );
@@ -634,7 +647,7 @@ describe('production token routing (real provider + DO SQLite)', () => {
       const chosen = await worker.fetch(
         new Request(`https://kilo-mcp.test/authorize/org?id=${encodeURIComponent(id)}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: cookie },
           body: new URLSearchParams({ organization_id: 'personal' }),
         }),
         env,

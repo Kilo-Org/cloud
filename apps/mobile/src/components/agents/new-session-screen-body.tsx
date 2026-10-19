@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The screen body wires the form, draft, model, and provider hooks end-to-end from the thin route. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -45,10 +45,12 @@ import {
 } from '@/components/agents/new-session-prefill';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
@@ -190,6 +192,36 @@ export function NewSessionScreenBody() {
   const runOnUserPickedRef = useRef(false);
 
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
+
+  // The Organization section above Run on. Switching the account switches the
+  // whole new-session screen with it: the create is attributed to the active
+  // account, and the org-scoped picks (repositories, models, profiles) belong
+  // to the previous one, so the body remounts through a stack-safe replace
+  // carrying the new ?organizationId. The durable text draft survives — the
+  // prompt is the session's own state, not an org pick. A clone entry is
+  // locked: the source session belongs to its own org (no section rendered).
+  const { t: orgT } = useTranslation();
+  const stackSafeRouter = useStackSafeReplace();
+  const handleOrganizationSwitch = useCallback(
+    (nextOrganizationId: string | null) => {
+      // See ModelSelector: the sheet never re-anchors after the keyboard
+      // hides, so the keyboard must be down before this push.
+      Keyboard.dismiss();
+      const query = nextOrganizationId
+        ? `?organizationId=${encodeURIComponent(nextOrganizationId)}`
+        : '';
+      stackSafeRouter.replace(`/(app)/agent-chat/new${query}` as Href);
+    },
+    [stackSafeRouter]
+  );
+  const organizationSection = isCloneEntry ? undefined : (
+    <View className="mt-5">
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {orgT('common.organization')}
+      </Text>
+      <ContextControl onSelectionChange={handleOrganizationSwitch} />
+    </View>
+  );
 
   // Durable new-session draft. The form mounts immediately — typing must never
   // wait on the `user.getMe` query — and the stored draft settles behind it.
@@ -1070,6 +1102,7 @@ export function NewSessionScreenBody() {
         onManualVarsChange={setManualVars}
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
+        organizationSection={organizationSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}

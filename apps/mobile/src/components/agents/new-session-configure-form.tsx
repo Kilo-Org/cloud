@@ -53,6 +53,11 @@ type NewSessionProfileOverrideProps = {
   onManualCommandsChange: (next: string[]) => void;
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
+  /**
+   * The Organization section above Run on: the active account the create is
+   * attributed to. Undefined hides the section entirely (the clone entry).
+   */
+  organizationSection?: React.ReactNode;
 };
 
 /**
@@ -121,6 +126,7 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
+  organizationSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -213,6 +219,7 @@ export function NewSessionConfigureForm({
         />
       </View>
 
+      {organizationSection}
       <NewSessionRunTarget
         showRunOnSelector={showRunOnSelector}
         runOnInstance={runOnInstance}

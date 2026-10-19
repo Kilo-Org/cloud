@@ -23,7 +23,10 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
  * so the sheet lives in the caller's tree (a portal-free `Modal`) instead of a
  * process-wide action-sheet provider.
  */
-export function useContextPicker(orgs: OrgListEntry[] | undefined) {
+export function useContextPicker(
+  orgs: OrgListEntry[] | undefined,
+  onSelectionChange?: (organizationId: string | null) => void
+) {
   const { t } = useTranslation();
   const { setOrganizationId, organizationId } = useOrganization();
   const [open, setOpen] = useState(false);
@@ -52,11 +55,13 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
     }
     if (index === 0) {
       setOrganizationId(null);
+      onSelectionChange?.(null);
       return;
     }
     const org = orgs?.[index - 1];
     if (org) {
       setOrganizationId(org.organizationId);
+      onSelectionChange?.(org.organizationId);
     }
   };
 
@@ -86,7 +91,12 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
 export function ContextControl({
   scope,
   showOrganizationName = true,
-}: Readonly<{ scope?: ContextDisplayScope; showOrganizationName?: boolean }>) {
+  onSelectionChange,
+}: Readonly<{
+  scope?: ContextDisplayScope;
+  showOrganizationName?: boolean;
+  onSelectionChange?: (organizationId: string | null) => void;
+}>) {
   const context = useOrganization();
   const { token } = useAuth();
   const trpc = useTRPC();
@@ -97,7 +107,7 @@ export function ContextControl({
     enabled: token != null,
   });
   const orgs = organizations.data;
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker, picker } = useContextPicker(orgs, onSelectionChange);
   const organizationId = scope ? scope.organizationId : context.organizationId;
   const isResolved = scope ? scope.isResolved : context.isLoaded;
   const providerError = scope ? null : context.error;

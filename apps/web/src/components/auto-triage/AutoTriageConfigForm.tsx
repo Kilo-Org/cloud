@@ -54,7 +54,10 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
   );
 
   // Fetch available models
-  const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
+  const { modelOptions, isLoadingModels } = useOrganizationModels(
+    organizationId,
+    'shared_services'
+  );
 
   // Local state
   const [isEnabled, setIsEnabled] = useState(false);
@@ -63,7 +66,6 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
   const [skipLabels, setSkipLabels] = useState<string>('');
   const [requiredLabels, setRequiredLabels] = useState<string>('');
   const [duplicateThreshold, setDuplicateThreshold] = useState('0.8');
-  const [autoFixThreshold, setAutoFixThreshold] = useState('0.9');
   const [customInstructions, setCustomInstructions] = useState('');
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [maxClassificationTime, setMaxClassificationTime] = useState([5]);
@@ -77,7 +79,6 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
       setSkipLabels((configData.skip_labels || []).join(', '));
       setRequiredLabels((configData.required_labels || []).join(', '));
       setDuplicateThreshold(String(configData.duplicate_threshold || 0.8));
-      setAutoFixThreshold(String(configData.auto_fix_threshold || 0.9));
       setCustomInstructions(configData.custom_instructions || '');
       setSelectedModel(configData.model_slug);
       setMaxClassificationTime([configData.max_classification_time_minutes || 5]);
@@ -177,7 +178,6 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
         skip_labels: skipLabelsArray,
         required_labels: requiredLabelsArray,
         duplicate_threshold: parseFloat(duplicateThreshold),
-        auto_fix_threshold: parseFloat(autoFixThreshold),
         custom_instructions: customInstructions.trim() || null,
         model_slug: selectedModel,
         max_classification_time_minutes: maxClassificationTime[0],
@@ -190,7 +190,6 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
         skip_labels: skipLabelsArray,
         required_labels: requiredLabelsArray,
         duplicate_threshold: parseFloat(duplicateThreshold),
-        auto_fix_threshold: parseFloat(autoFixThreshold),
         custom_instructions: customInstructions.trim() || null,
         model_slug: selectedModel,
         max_classification_time_minutes: maxClassificationTime[0],

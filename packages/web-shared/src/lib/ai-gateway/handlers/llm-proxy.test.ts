@@ -15,6 +15,7 @@ import {
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
@@ -35,7 +36,10 @@ import {
   fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import {
+  findCustomRouter,
+  findEffectiveLegacyPoolRouter,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import {
   signAutoDecision,
   type AutoDecisionPayload,
@@ -43,10 +47,6 @@ import {
   type CustomRouterDefinition,
 } from '@kilocode/auto-routing-contracts';
 import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
-import {
-  FRONTIER_CODE_MODEL,
-  FRONTIER_MODE_TO_MODEL,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
@@ -170,6 +170,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () =
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   findCustomRouter: jest.fn(),
+  findEffectiveLegacyPoolRouter: jest.fn().mockResolvedValue(null),
 }));
 let mockDecisionSecret = 'test-decision-secret';
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -213,6 +214,7 @@ const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage)
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedFetchCustomRouterDecision = jest.mocked(fetchCustomRouterDecision);
 const mockedFindCustomRouter = jest.mocked(findCustomRouter);
+const mockedFindEffectiveLegacyPoolRouter = jest.mocked(findEffectiveLegacyPoolRouter);
 const mockedDeniedAutoRoutingCandidates = jest.mocked(deniedAutoRoutingCandidates);
 const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
@@ -1050,6 +1052,9 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect(getRoutingProviderConfig).toBeDefined();
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
+    expect(jest.mocked(getOrganizationGroupPolicyContext)).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-1', fromDb: readDb })
+    );
   });
 
   describe('Anthropic provider for Claude', () => {
@@ -1248,7 +1253,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     'google/gemma-4-26b-a4b-it:free',
     'google/gemma-4-31b-it:free',
     'thinkingmachines/inkling:free',
-  ])('rejects the unavailable or disabled model %s before upstream', async modelId => {
+  ])('rejects the unavailable model %s before upstream', async modelId => {
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
@@ -1533,7 +1538,6 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
     mockedCollectDataCollectionRequiredAutoRoutingModelIds.mockResolvedValue([]);
-    mockedIsReleaseToggleEnabled.mockResolvedValue(false);
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
       if (opts.frontierDecision) await opts.frontierDecision();
@@ -1547,23 +1551,19 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
   });
 
-  it.each([
-    { name: 'disabled flag', enabled: false, decision: false },
-    { name: 'enabled flag with frontier decision', enabled: true, decision: true },
-    { name: 'enabled flag with missing frontier table', enabled: true, decision: false },
-  ])('routes frontier with $name', async ({ enabled, decision }) => {
-    mockedIsReleaseToggleEnabled.mockResolvedValue(enabled);
+  it('routes Frontier through the worker without reading a release toggle', async () => {
+    mockedIsReleaseToggleEnabled.mockImplementation(async () => {
+      throw new Error('Frontier must not read a release toggle');
+    });
     mockedFetchEfficientAutoDecision.mockResolvedValue({
-      decision: decision
-        ? {
-            model: 'anthropic/claude-haiku-4',
-            taskType: 'implementation',
-            subtaskType: 'feature_development',
-            source: 'benchmark',
-            tableVersion: 'frontier-v1',
-            sticky: false,
-          }
-        : null,
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'frontier-v1',
+        sticky: false,
+      },
       costUsd: 0,
     });
     const actualResolution = jest.requireActual<typeof AutoModelResolution>(
@@ -1576,39 +1576,42 @@ describe('kilo-auto/efficient classifier billing', () => {
     const response = await handleLlmProxyRequest(request);
 
     expect(response.status).toBe(200);
-    expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith(
-      'kilo-auto-frontier-routing',
-      'user-123'
+    expect(mockedIsReleaseToggleEnabled).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('anthropic/claude-haiku-4');
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: 'kilo-auto/frontier', router: 'frontier' })
     );
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
-      decision ? 'anthropic/claude-haiku-4' : FRONTIER_MODE_TO_MODEL.architect.model
-    );
-    if (enabled) {
-      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
-        expect.objectContaining({ requestedModel: 'kilo-auto/frontier', router: 'frontier' })
-      );
-    } else {
-      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
-    }
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
   });
 
-  it('preserves the frontier code fallback when the worker request fails', async () => {
-    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
-    mockedFetchEfficientAutoDecision.mockResolvedValue(null);
-    const actualResolution = jest.requireActual<typeof AutoModelResolution>(
-      '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
-    );
-    mockedApplyResolvedAutoModel.mockImplementation(actualResolution.applyResolvedAutoModel);
+  it.each([null, { decision: null, costUsd: 0 }, { decision: null, costUsd: 0.002 }])(
+    'fails closed without a legacy frontier fallback when the worker returns %j',
+    async result => {
+      mockedFetchEfficientAutoDecision.mockResolvedValue(result);
+      const actualResolution = jest.requireActual<typeof AutoModelResolution>(
+        '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
+      );
+      mockedApplyResolvedAutoModel.mockImplementation(actualResolution.applyResolvedAutoModel);
 
-    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
 
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(FRONTIER_CODE_MODEL.model);
-  });
+      expect(response.status).toBe(503);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(response.headers.get('retry-after')).toBe('1');
+      expect(await response.json()).toMatchObject({ error_type: 'auto_routing_unavailable' });
+      if (result?.costUsd) {
+        expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            model: 'auto-routing/classifier',
+            cost_mUsd: 2000,
+          }),
+          expect.objectContaining({ requested_model: 'kilo-auto/frontier' })
+        );
+      }
+    }
+  );
 
   it('forwards effective privacy and policy denials to frontier routing', async () => {
-    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: 'user-123', microdollars_used: 0 } as User,
       authFailedResponse: null,
@@ -1650,7 +1653,6 @@ describe('kilo-auto/efficient classifier billing', () => {
   });
 
   it('does not classify frontier requests without an authenticated user', async () => {
-    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
@@ -2146,74 +2148,70 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(stats.cost_mUsd).toBe(1000); // toMicrodollars(0.001)
   });
 
-  it('reports an auto-routing selection failure when a group blocks every pool model', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        google_user_email: 'test@example.com',
-        microdollars_used: 0,
-      } as User,
-      authFailedResponse: null,
-      organizationId: 'org-123',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: {},
-      plan: 'enterprise',
-    });
-    mockedGetEffectiveModelDecision.mockResolvedValue({
-      allowed: false,
-      denialSource: 'group_model',
-    });
-    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+  it.each(['kilo-auto/efficient', 'kilo-auto/frontier'])(
+    'preserves group model restrictions for %s',
+    async model => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-123',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: {},
+        plan: 'enterprise',
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue({
+        allowed: false,
+        denialSource: 'group_model',
+      });
+      mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
 
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({
-      error_type: 'model_not_allowed',
-      message: expect.stringContaining('Auto-routing could not select an eligible model'),
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(model === 'kilo-auto/frontier' ? 404 : 503);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
 
-  it('reports an auto-routing selection failure when an organization blocks every pool model', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        google_user_email: 'test@example.com',
-        microdollars_used: 0,
-      } as User,
-      authFailedResponse: null,
-      organizationId: 'org-123',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: { model_deny_list: ['anthropic/claude-haiku-4'] },
-      plan: 'enterprise',
-    });
-    mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue(['anthropic/claude-haiku-4']);
-    mockedGetEffectiveModelDecision.mockResolvedValue({
-      allowed: false,
-      denialSource: 'organization_model',
-    });
-    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+  it.each(['kilo-auto/efficient', 'kilo-auto/frontier'])(
+    'preserves organization model restrictions for %s',
+    async model => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-123',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { model_deny_list: ['anthropic/claude-haiku-4'] },
+        plan: 'enterprise',
+      });
+      mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue(['anthropic/claude-haiku-4']);
+      mockedGetEffectiveModelDecision.mockResolvedValue({
+        allowed: false,
+        denialSource: 'organization_model',
+      });
+      mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
 
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({
-      error_type: 'model_not_allowed',
-      message: expect.stringContaining('Auto-routing could not select an eligible model'),
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(model === 'kilo-auto/frontier' ? 404 : 503);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('auto-routing shadow classifier', () => {
@@ -2302,6 +2300,7 @@ describe('custom routers and signed auto decisions', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedFindEffectiveLegacyPoolRouter.mockResolvedValue(null);
     mockDecisionSecret = 'test-decision-secret';
     setUserAuth();
     mockedGetProvider.mockResolvedValue({
@@ -2334,6 +2333,65 @@ describe('custom routers and signed auto decisions', () => {
   });
 
   describe('gateway path', () => {
+    it.each(['kilo-auto/efficient', 'kilo-auto/balanced'])(
+      'routes migrated %s through the canonical pool without changing billing attribution',
+      async model => {
+        const migrated: CustomRouterDefinition = {
+          ...personalRouter,
+          slug: 'efficient',
+          baseRouter: 'efficient',
+          legacyPool: true,
+        };
+        mockedFindEffectiveLegacyPoolRouter.mockResolvedValue(migrated);
+        mockedFindCustomRouter.mockResolvedValue(migrated);
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
+
+        expect(response.status).toBe(200);
+        expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
+          expect.objectContaining({
+            customRouter: { scope: 'user', slug: 'efficient' },
+            requestedModel: model,
+          })
+        );
+        expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+        expect(usageContext()).toMatchObject({ auto_model: model });
+      }
+    );
+
+    it('does not serve a platform fallback for a migrated pool when its worker is unavailable', async () => {
+      const migrated: CustomRouterDefinition = {
+        ...personalRouter,
+        slug: 'efficient',
+        baseRouter: 'efficient',
+        legacyPool: true,
+      };
+      mockedFindEffectiveLegacyPoolRouter.mockResolvedValue(migrated);
+      mockedFindCustomRouter.mockResolvedValue(migrated);
+      mockedFetchCustomRouterDecision.mockResolvedValue({ kind: 'unavailable' });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+      expect(response.status).toBe(503);
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('answers a retryable auto_routing_unavailable when the pool lookup for denials fails', async () => {
+      setOrganizationAuth('org-1');
+      mockedCollectDeniedAutoRoutingModelIds.mockRejectedValueOnce(
+        new Error('Could not resolve the organization pool during the migration notice period')
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('retry-after')).toBe('1');
+      expect(await response.json()).toMatchObject({ error_type: 'auto_routing_unavailable' });
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
     it('routes a personal router inside its pool and attributes usage to it', async () => {
       const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
 

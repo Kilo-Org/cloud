@@ -33,10 +33,11 @@ import { toast } from 'sonner';
 import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
 import type { FileWorkspaceTab, TerminalWorkspaceTab, WorkspaceTabId } from './workspace-tabs';
 import type { StoredSession } from './types';
+import type { TerminalStatus } from './useCloudAgentTerminal';
 import type { PendingWorktreeChat } from './worktree-chat-pending';
 
 type TerminalStatusSummary = {
-  status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'exited' | 'error';
+  status: TerminalStatus;
   statusText: string;
 };
 

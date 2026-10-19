@@ -10,7 +10,7 @@ export const CODE_REVIEW_PLATFORM = 'code-review';
 /**
  * Origins whose new sessions run on the control plane: interactive web, the
  * chat bots, Security Agent analysis/remediation, webhook ingest and scheduled
- * runs. Every other origin — auto-triage, autofix, app-builder, CLI and unknown
+ * runs. Every other origin — auto-triage, app-builder, CLI and unknown
  * values — stays legacy until it is moved explicitly.
  */
 const CONTROL_PLANE_ORIGINS: ReadonlySet<string> = new Set([

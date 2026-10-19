@@ -76,16 +76,16 @@ function withFileProviderSourceFiles(config) {
       // production prebuild strips it from the copied file the target signs
       // with (the Swift side gates the testing mode the same way).
       if (isProductionBuild) {
-        const entitlementsPath = path.join(
-          targetDirectory,
-          `${TARGET_NAME}.entitlements`
-        );
+        const entitlementsPath = path.join(targetDirectory, `${TARGET_NAME}.entitlements`);
         fs.writeFileSync(
           entitlementsPath,
           fs
             .readFileSync(entitlementsPath, 'utf8')
             .replace(/<!--[\s\S]*?-->/gu, '')
-            .replace(/\s*<key>com\.apple\.developer\.fileprovider\.testing-mode<\/key>\s*<true\/>/u, '')
+            .replace(
+              /\s*<key>com\.apple\.developer\.fileprovider\.testing-mode<\/key>\s*<true\/>/u,
+              ''
+            )
         );
       }
       return modConfig;

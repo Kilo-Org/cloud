@@ -216,9 +216,7 @@ const config: ExpoConfig = {
       // this capability on distribution profiles, so production builds must
       // not carry it (with the paired extension entitlement in
       // plugins/withArtifactFileProvider.js).
-      ...(isProductionBuild
-        ? {}
-        : { 'com.apple.developer.fileprovider.testing-mode': true }),
+      ...(isProductionBuild ? {} : { 'com.apple.developer.fileprovider.testing-mode': true }),
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

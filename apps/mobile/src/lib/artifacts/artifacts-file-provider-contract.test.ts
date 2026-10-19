@@ -141,9 +141,7 @@ describe('artifacts File Provider extension contract', () => {
     // The stage path holds the invariant at the boundary: the component it
     // appends to the per-fetch UUID directory is sanitized again as a
     // last-resort fallback, so an unsafe name can never reach the path API.
-    expect(extensionSource).toContain(
-      'let stagedName = ArtifactPath.isSafeComponent(filename)'
-    );
+    expect(extensionSource).toContain('let stagedName = ArtifactPath.isSafeComponent(filename)');
   });
 
   it('exposes an item version and honours the requested version', () => {
@@ -166,7 +164,9 @@ describe('artifacts File Provider extension contract', () => {
     expect(extensionSource).toContain('NSFileProviderErrorDomain');
     expect(extensionSource).toContain('-2009');
     expect(extensionSource).not.toContain('.versionNoLongerAvailable)');
-    expect(fetchContentsBody).toContain('requestedVersion.contentVersion != current.contentVersion');
+    expect(fetchContentsBody).toContain(
+      'requestedVersion.contentVersion != current.contentVersion'
+    );
   });
 
   it('registers the domain with the dev-only testing mode', () => {
@@ -181,10 +181,8 @@ describe('artifacts File Provider extension contract', () => {
     // pins the pairing so neither half drifts.
     expect(entitlements).toContain('com.apple.developer.fileprovider.testing-mode');
     expect(pluginSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");
-    expect(pluginSource).toContain(
-      "process.env.EAS_BUILD_PROFILE === 'production'"
-    );
-    expect(pluginSource).toContain('com\\.apple\\.developer\\.fileprovider\\.testing-mode');
+    expect(pluginSource).toContain("process.env.EAS_BUILD_PROFILE === 'production'");
+    expect(pluginSource).toContain(String.raw`com\.apple\.developer\.fileprovider\.testing-mode`);
     expect(providerModuleSource).toContain('domain.testingModes = [.alwaysEnabled]');
     expect(providerModuleSource).toContain('#if DEBUG');
     expect(appConfigSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");

@@ -759,7 +759,7 @@ describe('queue', () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
-  it('does not flush buffered items when malformed JSON forces a retry', async () => {
+  it('completes the message and removes staging after an incomplete parse', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
     mockIngestWithR2(ingest);
 
@@ -803,11 +803,14 @@ describe('queue', () => {
       { waitUntil: vi.fn() } as unknown as ExecutionContext
     );
 
+    // No item parses from the broken body, so nothing reaches the DO and no
+    // metadata flush has anything to flush.
     expect(ingest).not.toHaveBeenCalled();
     expect(transaction).not.toHaveBeenCalled();
-    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
-    expect(ack).not.toHaveBeenCalled();
-    expect(deleteObject).not.toHaveBeenCalled();
+    // The message completes and the staging object is removed.
+    expect(retry).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(deleteObject).toHaveBeenCalledWith('staging/malformed');
   });
 
   it('flushes already-committed metadata changes when a later chunk fails', async () => {

@@ -33,6 +33,20 @@ export interface IngestQueueMessage {
 
 export const QUEUE_RETRY_DELAY_SECONDS = 5 * 60;
 
+/**
+ * Reports a staged body whose JSON did not parse completely. The consumer
+ * removes the staging object and completes the message instead of retrying.
+ */
+class StagingParseError extends Error {
+  constructor(
+    readonly r2Key: string,
+    cause: Error
+  ) {
+    super(`Malformed JSON in staging object ${r2Key}: ${cause.message}`);
+    this.name = 'StagingParseError';
+  }
+}
+
 // A queue message is an envelope for one POST's R2 payload for one session.
 // That payload can contain many session items. Batch those items into chunked
 // ingest() RPCs to that session's DO instead of one RPC per item. Prod snapshot
@@ -78,6 +92,17 @@ async function processMessage(
       mergedAttentionSignals,
       ctx
     );
+    if (err instanceof StagingParseError) {
+      // A staged payload that does not parse is completed rather than retried;
+      // the staging object is removed and earlier chunks above may be persisted.
+      console.error('Removing staging object after an incomplete parse', {
+        r2Key: msg.r2Key,
+        sessionId: msg.sessionId,
+        error: err.message,
+      });
+      await env.SESSION_INGEST_R2.delete(msg.r2Key);
+      return;
+    }
     throw err;
   }
 
@@ -142,7 +167,7 @@ async function ingestStagedSessionItems(
   const parseError = await streamSessionItems(msg.r2Key, body, rawItem => chunker.stage(rawItem));
 
   if (parseError) {
-    throw new Error(`Malformed JSON in staging object ${msg.r2Key}: ${parseError.message}`);
+    throw new StagingParseError(msg.r2Key, parseError);
   }
 
   // Handle any remaining items not flushed yet.

@@ -161,7 +161,8 @@ These rules extend rules 8-12 and take effect only after `PAID_CREDIT_EXPIRATION
   MUST clamp to February 28. Yearly cadence anchors each monthly allotment to its issuance, not to the annual payment.
 - Terms MUST come from the subscription term captured at checkout or renewal, never from the setting at webhook or cron
   time. Annual terms paid before activation MUST keep legacy (non-expiring) base credits until renewal.
-- Base credits from App Store subscriptions MUST NOT expire.
+- Base credits from App Store and Google Play subscriptions MUST NOT expire. Store-billed Kilo Pass is being retired
+  before activation, and its purchase flows never disclosed an expiry.
 - Bonus, welcome-promo, and referral deadlines are unchanged by these rules.
 - Credits with the earliest deadline MUST be consumed first; non-expiring credits last. Expiration alone MUST NOT trigger
   automatic top-up.

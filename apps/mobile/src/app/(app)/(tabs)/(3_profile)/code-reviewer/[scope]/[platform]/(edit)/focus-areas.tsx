@@ -31,11 +31,11 @@ export default function FocusAreasRoute() {
   } as const;
 
   // A stored area outside REVIEW_FOCUS_AREAS has no enum row of its own; show
-  // each one with the localized fallback label so the user can see and unselect
-  // it instead of it silently persisting.
-  const unknownAreas = selected.filter(
-    area => !(REVIEW_FOCUS_AREAS as readonly string[]).includes(area)
-  );
+  // each distinct one with the localized fallback label so the user can see
+  // and unselect it instead of it silently persisting.
+  const unknownAreas = [
+    ...new Set(selected.filter(area => !(REVIEW_FOCUS_AREAS as readonly string[]).includes(area))),
+  ];
 
   const toggleArea = (area: string) => {
     // Read the cache at call time, not the render-time snapshot above, so

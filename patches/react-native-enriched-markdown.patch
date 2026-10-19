@@ -1,101 +1,5 @@
-diff --git a/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdown.kt b/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdown.kt
-index b6b38b4cc1a37eacf53f48f940608ed7ead26f93..ef75ddf445d282a078236c0fe2f1d05f5d465158 100644
---- a/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdown.kt
-+++ b/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdown.kt
-@@ -628,6 +628,26 @@ class EnrichedMarkdown(
-     b: Int,
-   ) {
-     layoutSegments()
-+    correctUnderMeasuredHeight(b - t)
-+  }
-+
-+  // The shadow-node measure builds its StaticLayout with a single TextPaint,
-+  // while the display TextView resolves per-run font fallback (e.g. combining
-+  // marks). A run that falls back can wrap into more lines than the measure
-+  // saw, so the laid-out children overflow the Yoga-assigned height and the
-+  // text paints outside its parent. When the laid-out children are taller than
-+  // the assigned frame, re-measure: invalidate the shadow-node cache and bump
-+  // the height-recalculation counter so Yoga adopts the real height.
-+  private fun correctUnderMeasuredHeight(assignedHeight: Int) {
-+    if (assignedHeight <= 0) return
-+    val childrenHeight = computeSegmentsTotalHeight()
-+    if (childrenHeight <= assignedHeight) return
-+    MeasurementStore.invalidate(id)
-+    val wrapper = stateWrapper ?: return
-+    val state = Arguments.createMap()
-+    state.putInt("forceHeightRecalculationCounter", ++forceHeightRecalculationCounter)
-+    wrapper.updateState(state)
-+    requestLayout()
-   }
- 
-   fun onImageLayoutChanged() {
-diff --git a/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownText.kt b/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownText.kt
-index f3bb9122d27d80746b9b8ed07ca5247f080a25d0..7c7fde155fb8109357c45d1516157229449596f8 100644
---- a/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownText.kt
-+++ b/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownText.kt
-@@ -511,6 +511,21 @@ class EnrichedMarkdownText
-     ) {
-       applyContentBoxInset(widthMeasureSpec)
-       super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-+      correctMeasuredHeight()
-+    }
-+
-+    // The TextView's own span-aware layout (per-run font fallback for combining
-+    // marks) can wrap lines the single-paint StaticLayout in MeasurementStore
-+    // cannot reproduce, so the Yoga-assigned height can be shorter than the
-+    // drawn text and the text overflows its parent. After the first real
-+    // layout pass, feed the laid-out height back through the measurement store
-+    // so Yoga re-measures with the authoritative value.
-+    private fun correctMeasuredHeight() {
-+      val laidOutHeight = layout?.height?.toFloat() ?: return
-+      val assignedHeight = measuredHeight.toFloat()
-+      if (laidOutHeight <= assignedHeight) return
-+      if (layoutManager.invalidateLayout(laidOutHeight)) return
-+      layoutManager.invalidateLayout()
-     }
- 
-     /**
-diff --git a/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownTextLayoutManager.kt b/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownTextLayoutManager.kt
-index 3ba2159a7c6389b0202bbbd886f1b88f8aa6d9e5..99e7c7ed1c58241843b99a440bb2f91870b3b969 100644
---- a/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownTextLayoutManager.kt
-+++ b/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownTextLayoutManager.kt
-@@ -7,15 +7,30 @@ class EnrichedMarkdownTextLayoutManager(
- ) {
-   private var forceHeightRecalculationCounter = 0
- 
--  fun invalidateLayout() {
-+  fun invalidateLayout(): Boolean {
-     val text = view.text
-     val paint = view.paint
--    val heightChanged = MeasurementStore.store(view.id, text, paint, view.trailingMarginBottomPx())
--    if (!heightChanged) return
--    val stateWrapper = view.stateWrapper ?: return
-+    // The TextView's own layout height is authoritative: its span-aware
-+    // ParagraphStyle layout (per-run font fallback for combining marks) can
-+    // wrap lines a single-paint StaticLayout cannot reproduce. `layout` is
-+    // null until the first traversal; the -1 default then keeps the
-+    // StaticLayout estimate and the next pass corrects it.
-+    val laidOutHeight = view.layout?.height?.toFloat() ?: -1f
-+    return invalidateLayout(laidOutHeight)
-+  }
-+
-+  /** Re-stores the measurement with an explicit height override in px. Returns true when the height changed. */
-+  fun invalidateLayout(heightOverridePx: Float): Boolean {
-+    val text = view.text
-+    val paint = view.paint
-+    val heightChanged =
-+      MeasurementStore.store(view.id, text, paint, view.trailingMarginBottomPx(), heightOverridePx)
-+    if (!heightChanged) return false
-+    val stateWrapper = view.stateWrapper ?: return false
-     val state = Arguments.createMap()
-     state.putInt("forceHeightRecalculationCounter", ++forceHeightRecalculationCounter)
-     stateWrapper.updateState(state)
-+    return true
-   }
- 
-   fun releaseMeasurementStore() {
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..f51c55d40b95615eaaf0fe431b9c9d02cb72b2e4 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..92a8cd39e4ed013f91a02b33467e0a86d10c7e4b 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 @@ -50,6 +50,14 @@ import kotlin.math.ceil
@@ -113,35 +17,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..f51c55d40b95615eaaf0fe431b9c9d02
    private data class PaintParams(
      val typeface: Typeface,
      val fontSize: Float,
-@@ -113,6 +121,7 @@ object MeasurementStore {
-     spannable: CharSequence?,
-     paint: TextPaint,
-     trailingMarginBottomPx: Float = 0f,
-+    heightOverridePx: Float = -1f,
-   ): Boolean {
-     val cached = data[id]
-     val width = cached?.cachedWidth ?: 0f
-@@ -120,7 +129,18 @@ object MeasurementStore {
-     val existingHash = cached?.markdownHash ?: 0
-     val paintParams = PaintParams(paint.typeface ?: Typeface.DEFAULT, paint.textSize)
- 
--    var newSize = measure(width, spannable, paint, id)
-+    var newSize =
-+      if (heightOverridePx >= 0f) {
-+        // The display TextView's own span-aware layout (per-run font fallback for
-+        // combining marks) can wrap lines the single-paint StaticLayout here
-+        // cannot reproduce, so trust the view's laid-out height when it exists.
-+        YogaMeasureOutput.make(
-+          if (width > 0f) PixelUtil.toDIPFromPixel(width) else YogaMeasureOutput.getWidth(measure(width, spannable, paint, id)),
-+          PixelUtil.toDIPFromPixel(heightOverridePx),
-+        )
-+      } else {
-+        measure(width, spannable, paint, id)
-+      }
-     if (trailingMarginBottomPx > 0f) {
-       newSize =
-         YogaMeasureOutput.make(
-@@ -543,9 +563,26 @@ object MeasurementStore {
+@@ -543,9 +551,26 @@ object MeasurementStore {
              segment.styledText.replaceMathSpansWithPlaceholders(context)
  
              val layout = createStaticLayout(segment.styledText, fontSize, widthPx, id)
@@ -169,7 +45,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..f51c55d40b95615eaaf0fe431b9c9d02
              maxContentWidthPx = maxOf(maxContentWidthPx, ceil(segmentMaxLineWidth))
  
              if (includeBottomMargin) {
-@@ -737,17 +774,62 @@ object MeasurementStore {
+@@ -737,17 +762,62 @@ object MeasurementStore {
  
      val layout = builder.build()
      val visibleLineCount = visibleLineCount(layout, viewId)

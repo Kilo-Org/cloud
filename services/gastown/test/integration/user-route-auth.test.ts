@@ -130,6 +130,36 @@ describe('Personal user route authorization', () => {
     }
   );
 
+  it.each(routes.filter(([method]) => method !== 'GET'))(
+    'rejects cross-user admin writes for %s %s',
+    async (method, path) => {
+      const response = await SELF.fetch(url(ownerId, path), {
+        method,
+        headers: await headersFor(callerId, { isAdmin: true }),
+        body: requestBody(method),
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ success: false, error: 'Forbidden' });
+      await expectPrivateState();
+    }
+  );
+
+  it.each([
+    ['POST', 'rigs', 201],
+    ['DELETE', 'towns/:townId', 200],
+    ['DELETE', 'rigs/:rigId', 200],
+  ] as const)('allows admin writes to owned resources for %s %s', async (method, path, status) => {
+    const response = await SELF.fetch(url(ownerId, path), {
+      method,
+      headers: await headersFor(ownerId, { isAdmin: true }),
+      body: requestBody(method),
+    });
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ success: true });
+  });
+
   it('rejects a missing token', async () => {
     const response = await SELF.fetch(url(ownerId, 'towns'));
     expect(response.status).toBe(401);

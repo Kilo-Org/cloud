@@ -1649,7 +1649,18 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         });
         for (const [key, value] of retained) await state.storage.put(key, value);
         expect(await state.storage.get('control_plane_generation')).toBe(2);
-        db.insert(allocationTable).values(allocation).run();
+        db.run(sql`INSERT INTO allocation (
+          id, state, allocation_id, connection_id, provider_ref, wrapper_id, last_frame_at,
+          last_activity_at, create_deadline_at, first_connect_deadline_at, stop_attempt,
+          stop_pending, stop_at, unconfirmed_provider_ref, provider_pin
+        ) VALUES (
+          ${allocation.id}, ${allocation.state}, ${allocation.allocation_id},
+          ${allocation.connection_id}, ${allocation.provider_ref}, ${allocation.wrapper_id},
+          ${allocation.last_frame_at}, ${allocation.last_activity_at},
+          ${allocation.create_deadline_at}, ${allocation.first_connect_deadline_at},
+          ${allocation.stop_attempt}, ${allocation.stop_pending ? 1 : 0}, ${allocation.stop_at},
+          ${allocation.unconfirmed_provider_ref}, ${allocation.provider_pin}
+        )`);
         // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
         db.run(
           sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)

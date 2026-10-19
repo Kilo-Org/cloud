@@ -1,4 +1,4 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { asc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -259,4 +259,83 @@ describe('sandbox control V2 consolidated migrations', () => {
       });
     });
   });
+
+  it.each([false, true])(
+    'applies migration 0003 on wake before allocation reads and writes with an existing row=%s',
+    async existingRow => {
+      const stub = newSandboxStub();
+      await runInDurableObject(stub, async (instance, state) => {
+        await instance.getAllocationState();
+        const db = drizzle(state.storage, { logger: false });
+        clearSchema(db);
+        await migrate(db, {
+          journal: {
+            entries: migrations.journal.entries.filter(
+              entry => entry.when < ADMISSION_LIMIT_MIGRATION_AT
+            ),
+          },
+          migrations: migrations.migrations,
+        });
+        expect(await state.storage.get('control_plane_generation')).toBe(2);
+        expect(appliedMigrations(db).at(-1)?.created_at).toBe(REPO_KEY_MIGRATION_AT);
+        expect(columnSignatures(db, 'allocation')).toEqual(
+          EXPECTED_ALLOCATION_COLUMNS.filter(column => column.name !== 'admission_limit')
+        );
+        if (existingRow) {
+          const oldAllocation = sqliteTable('allocation', {
+            id: text('id').primaryKey(),
+            state: text('state').notNull(),
+            last_activity_at: integer('last_activity_at'),
+            stop_attempt: integer('stop_attempt').notNull(),
+            stop_pending: integer('stop_pending', { mode: 'boolean' }).notNull(),
+          });
+          db.insert(oldAllocation)
+            .values({
+              id: 'current',
+              state: 'stopped',
+              last_activity_at: 111,
+              stop_attempt: 0,
+              stop_pending: false,
+            })
+            .run();
+        }
+      });
+
+      await evictAllDurableObjects();
+      expect(await stub.getAllocationState()).toMatchObject({
+        kind: 'stopped',
+        lastActivityAt: existingRow ? 111 : null,
+        admissionLimit: null,
+      });
+      await runInDurableObject(stub, (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);
+        expect(appliedMigrations(db).map(entry => entry.created_at)).toEqual([
+          CONSOLIDATED_MIGRATION_AT,
+          SCOPE_GRANTS_MIGRATION_AT,
+          REPO_KEY_MIGRATION_AT,
+          ADMISSION_LIMIT_MIGRATION_AT,
+        ]);
+        expect(db.select().from(allocationTable).get()?.last_activity_at).toBe(
+          existingRow ? 111 : undefined
+        );
+      });
+
+      await stub.reportProviderGone();
+      await evictAllDurableObjects();
+      expect(await stub.getAllocationState()).toMatchObject({
+        kind: 'stopped',
+        admissionLimit: null,
+      });
+      await runInDurableObject(stub, (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        expect(db.select().from(allocationTable).all()).toEqual([
+          expect.objectContaining({ id: 'current', state: 'stopped', admission_limit: null }),
+        ]);
+        expect(
+          appliedMigrations(db).filter(entry => entry.created_at === ADMISSION_LIMIT_MIGRATION_AT)
+        ).toHaveLength(1);
+      });
+    }
+  );
 });

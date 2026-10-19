@@ -68,7 +68,16 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
         completionHandler(nil, NSFileProviderError(.noSuchItem))
         return progress
       }
-      completionHandler(ArtifactItem(file: file, sessionId: sessionId), nil)
+      let modified = fileAttributes(sessionId: sessionId, fileId: fileId)?.modified
+      completionHandler(
+        ArtifactItem(
+          file: file,
+          sessionId: sessionId,
+          filename: resolvedFilename(file: file, sessionId: sessionId),
+          contentModificationDate: modified
+        ),
+        nil
+      )
     case .unknown:
       completionHandler(nil, NSFileProviderError(.noSuchItem))
     }
@@ -104,9 +113,13 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
     // not match what it asked for, so a mismatch fails and the system
     // re-fetches the current state instead.
     if let requestedVersion, let current = item.itemVersion,
-      requestedVersion.contentVersion != current
+      requestedVersion.contentVersion.map({ Data($0.utf8) }) != current.map({ Data($0.utf8) })
     {
-      completionHandler(nil, nil, NSFileProviderError(.versionNoLongerAvailable))
+      completionHandler(nil, nil, NSError(
+        domain: NSFileProviderErrorDomain,
+        code: -2009, // NSFileProviderErrorVersionNoLongerAvailable, unavailable on iOS
+        userInfo: nil
+      ))
       return progress
     }
     do {
@@ -753,8 +766,7 @@ enum ArtifactFileName {
 
   /** One sanitized basename, or an empty string when nothing survives. */
   private static func sanitizeName(_ raw: String) -> String {
-    let basename = raw
-      .slice(with: (raw.lastIndex(of: "/").map { raw.index(after: $0) } ?? raw.startIndex)...)
+    let basename = raw[raw.lastIndex(of: "/").map { raw.index(after: $0) } ?? raw.startIndex...]
     var withoutControls = ""
     for character in basename {
       if let scalar = character.unicodeScalars.first,

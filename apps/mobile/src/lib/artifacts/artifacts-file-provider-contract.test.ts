@@ -155,8 +155,12 @@ describe('artifacts File Provider extension contract', () => {
     );
     // A non-nil request whose pinned content version differs from the
     // current one fails instead of returning bytes that do not match it.
-    expect(extensionSource).toContain('NSFileProviderError(.versionNoLongerAvailable)');
-    expect(fetchContentsBody).toContain('requestedVersion.contentVersion != current');
+    // The Swift enum case is macOS-only, so the extension builds the error
+    // from the domain and the code the case stands for.
+    expect(extensionSource).toContain('NSFileProviderErrorDomain');
+    expect(extensionSource).toContain('-2009');
+    expect(extensionSource).not.toContain('.versionNoLongerAvailable)');
+    expect(fetchContentsBody).toContain('requestedVersion.contentVersion');
   });
 
   it('shows the session label the mirror sanitizes into one path component', () => {

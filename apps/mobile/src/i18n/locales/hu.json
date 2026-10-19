@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nincs csatlakoztatva",
     "notifications": "Értesítések",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Adattárak",
     "securityAgent": "Biztonsági ügynök",
     "unknown": "Ismeretlen",
@@ -57,13 +57,13 @@
     "draft": "Piszkozat",
     "enabled": "Engedélyezve",
     "github": "GitHub",
-    "imageUnavailable": "A kép nem érhető el.",
+    "imageUnavailable": "A kép nem érhető el",
     "loading": "Betöltés…",
     "loadMore": "Továbbiak betöltése",
     "message": "Üzenet",
     "off": "Ki",
     "organization": "Szervezet",
-    "platform": "Szolgáltató",
+    "platform": "Platform",
     "prReview": "PR-ellenőrzés",
     "queued": "Várólistán",
     "remove": "Eltávolítás",
@@ -105,7 +105,7 @@
     "newSession": "Új munkamenet",
     "noKiloclawInstances": "Nincsenek KiloClaw-példányok",
     "noModelsAvailable": "Nem érhetők el modellek",
-    "notFound": "Nem található.",
+    "notFound": "Nem található",
     "online": "Elérhető",
     "open": "{{name}} megnyitása",
     "openPullRequest": "PR megnyitása",
@@ -114,7 +114,7 @@
     "preferences": "Beállítások",
     "privacyPolicy": "Adatvédelmi tájékoztató",
     "profile": "Profil",
-    "reactions": "Reakció",
+    "reactions": "Reakciók",
     "recent": "Legutóbbiak",
     "recommended": "Ajánlott",
     "remaining": "Hátralévő",
@@ -948,7 +948,7 @@
       "limit_other": "Legfeljebb {{displayCount}} fájlt csatolhatsz."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, állapot: {{status}}",
+      "accessibility": "{{filename}}, {{status}}",
       "retryUploading": "{{filename}} feltöltésének újrapróbálása",
       "remove": "{{filename}} eltávolítása"
     },
@@ -982,7 +982,7 @@
       "takePhoto": "Fotó készítése",
       "photoLibrary": "Fotótár",
       "files": "Fájl",
-      "cameraAccessMessage": "Fénykép készítéséhez engedélyezd a kamera használatát a Beállításokban."
+      "cameraAccessMessage": "Fotó készítéséhez engedélyezd a kamera használatát a Beállításokban."
     },
     "typingIndicator": {
       "someone": "Valaki",
@@ -2024,19 +2024,19 @@
   },
   "agents": {
     "search": {
-      "searching": "Keresés",
+      "searching": "Keresés folyamatban",
       "searchSessions": "Munkamenetek keresése",
-      "searchSessionsPlaceholder": "Munkamenetek keresése"
+      "searchSessionsPlaceholder": "Munkamenetek keresése…"
     },
     "sessionList": {
-      "couldNotLoadActive": "Nem sikerült betölteni az aktív munkameneteket.",
+      "couldNotLoadActive": "Nem sikerült betölteni az aktív munkameneteket",
       "couldNotRefresh": "Nem sikerült frissíteni",
       "noSessionsYetDescription": "Indíts egy programozási feladatot a telefonodról. A munkameneteid itt jelennek meg.",
       "viewHistory": "Munkamenet-előzmények",
       "noMatches": "Nincs egyező munkamenet",
       "tryDifferentSearch": "Próbálj másik keresőszót.",
       "tryAdjustFilters": "Próbáld módosítani vagy törölni a szűrőket.",
-      "couldNotSearch": "Nem sikerült keresni a munkamenetek között.",
+      "couldNotSearch": "Nem sikerült keresni a munkamenetek között",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
       "pastSessions": "Korábbi munkamenetek",
@@ -2050,13 +2050,13 @@
       "renameMessage": "Adj meg új nevet a munkamenetnek.",
       "copyId": "Munkamenet-azonosító másolása",
       "idCopied": "Munkamenet-azonosító másolva",
-      "couldNotCopyId": "Nem sikerült másolni a munkamenet azonosítóját.",
+      "couldNotCopyId": "Nem sikerült másolni a munkamenet-azonosítót",
       "untitled": "Névtelen munkamenet",
       "actions": "Munkamenet műveletei",
       "sessionDeleted": "Munkamenet törölve",
       "needsInput": "válaszra vár",
-      "fromPlatform": "innen: {{platform}}",
-      "cent_one": "dollárcent",
+      "fromPlatform": "forrás: {{platform}}",
+      "cent_one": "cent",
       "cent": "cent",
       "cent_other": "cent",
       "dollar_one": "dollár",
@@ -2162,33 +2162,33 @@
     },
     "tasks": {
       "progress": "{{completed}}/{{total}}",
-      "progressAccessibility": "Feladatok, {{total}}ból {{completed}} kész",
-      "rowAccessibility": "Feladatok, {{total}}ból {{completed}} kész. Jelenlegi feladat: {{task}}"
+      "progressAccessibility": "Feladatok: {{completed}}/{{total}} kész",
+      "rowAccessibility": "Feladatok: {{completed}}/{{total}} kész. Jelenlegi feladat: {{task}}"
     },
     "newSession": {
       "recentlyUsed": "Legutóbb használt",
-      "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat.",
-      "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-tárolókat.",
-      "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-tárolókat.",
-      "connectGithubDescription": "Kapcsold össze a GitHub-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
-      "connectGitlabDescription": "Kapcsold össze a GitLab-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
-      "connectBitbucketDescription": "Kapcsold össze a Bitbucket-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
+      "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-adattárakat.",
+      "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-adattárakat.",
+      "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-adattárakat.",
+      "connectGithubDescription": "Kapcsold össze a GitHub-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
+      "connectGitlabDescription": "Kapcsold össze a GitLab-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
+      "connectBitbucketDescription": "Kapcsold össze a Bitbucket-fiókodat a böngészőben, majd térj vissza ide, és válassz egy adattárat.",
       "openGithub": "GitHub megnyitása",
       "openGitlab": "GitLab megnyitása",
       "openBitbucket": "Bitbucket megnyitása",
-      "refreshRepositories": "Tárolók frissítése",
+      "refreshRepositories": "Adattárak frissítése",
       "githubConnected": "GitHub csatlakoztatva",
       "gitlabConnected": "GitLab csatlakoztatva",
-      "noRepositoriesVisible": "Egyetlen tároló sem látható. Ellenőrizd, hogy a Kilo GitHub-alkalmazás hozzáfér-e a tárolókhoz, majd frissítsd a listát.",
-      "noRepositoriesVisibleGitlab": "Egyetlen tároló sem látható. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissítsd a listát.",
-      "noRepositoriesVisibleBitbucket": "Egyetlen tároló sem látható. Ellenőrizd a Bitbucket-tárolókhoz való hozzáférést, majd frissítsd a listát.",
+      "noRepositoriesVisible": "Egyetlen adattár sem látható. Ellenőrizd, hogy a Kilo GitHub-alkalmazás hozzáfér-e az adattárakhoz, majd frissítsd a listát.",
+      "noRepositoriesVisibleGitlab": "Egyetlen adattár sem látható. Ellenőrizd a GitLab-adattárakhoz való hozzáférést, majd frissítsd a listát.",
+      "noRepositoriesVisibleBitbucket": "Egyetlen adattár sem látható. Ellenőrizd a Bitbucket-adattárakhoz való hozzáférést, majd frissítsd a listát.",
       "bitbucketOrganizationsOnly": "A Bitbucket csak szervezetek számára érhető el.",
       "branchPickerTitle": "Ág kiválasztása",
       "branchDefault": "Alapértelmezett",
       "branchAccessibility": "Ág: {{label}}",
       "branchLoading": "Ágak betöltése",
       "branchLoadError": "Nem sikerült betölteni az ágakat",
-      "branchUnavailable": "Ehhez a tárolóhoz nem érhetők el ágak. Ellenőrizd a jogosultságodat a szolgáltatónál, majd válassz másik tárolót.",
+      "branchUnavailable": "Ehhez az adattárhoz nem érhetők el ágak. Ellenőrizd a jogosultságodat a szolgáltatónál, majd válassz másik adattárat.",
       "branchEmpty": "Nincs elérhető ág",
       "branchPlaceholder": "Válassz ágat",
       "runOnWithTarget": "Futtatás helye: {{target}}",
@@ -2200,16 +2200,16 @@
       "leaveChanges": "Változtatások megtartása",
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
-      "selectRepositoryToStart": "Válassz egy tárolót az indításhoz.",
+      "selectRepositoryToStart": "Válassz egy adattárat az indításhoz.",
       "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
-      "prefillRepoAndModelUnavailable": "Az eredeti munkamenet tárolója és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",
-      "prefillRepoUnavailable": "Ez a tároló már nem érhető el: {{repo}}. Válassz másik tárolót az alábbiak közül.",
+      "prefillRepoAndModelUnavailable": "Az eredeti munkamenet adattára és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",
+      "prefillRepoUnavailable": "Ez az adattár már nem érhető el: {{repo}}. Válassz másik adattárat az alábbiak közül.",
       "prefillModelUnavailable": "Ez a modell már nem érhető el: {{model}}. Helyette az alapértelmezett modelledet használjuk.",
       "couldNotReadPendingSessions": "Nem sikerült beolvasni a függőben lévő munkameneteket. Próbáld újra.",
       "failedToCreate": "Nem sikerült létrehozni a munkamenetet.",
-      "couldNotRefreshRepositories": "Nem sikerült frissíteni a tárolókat. Próbáld újra.",
+      "couldNotRefreshRepositories": "Nem sikerült frissíteni az adattárakat. Próbáld újra.",
       "discardDraftTitle": "Piszkozat elvetése?",
       "discardDraftMessage": "Az utasításod elvész.",
       "discardWithUploadsMessage": "Az utasításod és az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
@@ -2327,14 +2327,14 @@
       "askDescription": "Válaszok és magyarázatok kérése"
     },
     "repoPicker": {
-      "title": "Tároló kiválasztása",
+      "title": "Adattár kiválasztása",
       "searchLabel": "Adattárak keresése",
       "searchPlaceholder": "Adattárak keresése",
       "noMatches": "Nincs találat",
-      "noRepositories": "Nincs elérhető tároló",
-      "noRepositoriesDescription": "Egyetlen tároló sincs a fiókodhoz kapcsolva.",
+      "noRepositories": "Nincs elérhető adattár",
+      "noRepositoriesDescription": "Egyetlen adattár sincs a fiókodhoz kapcsolva.",
       "loading": "Betöltés…",
-      "accessibility": "Tároló: {{label}}",
+      "accessibility": "Adattár: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
@@ -2421,12 +2421,12 @@
       "deny": "Megtagadás",
       "allowOnce": "Egyszeri engedélyezés",
       "allowOnceAccessibility": "Egyszeri engedélyezés",
-      "alwaysAllow": "Engedélyezés mindig",
-      "alwaysAllowAccessibility": "Engedélyezés mindig",
+      "alwaysAllow": "Mindig engedélyezés",
+      "alwaysAllowAccessibility": "Mindig engedélyezés",
       "retrying": "Újrapróbálás…"
     },
     "questionCard": {
-      "title": "Az ügynök válaszra vár",
+      "title": "Az ügynök válaszra vagy jóváhagyásra vár",
       "skipQuestionsTitle": "Kérdések kihagyása?",
       "skipQuestionsMessage": "Az ügynök kihagyja ezt a lépést.",
       "answerProgress": "{{answered}}/{{total}} megválaszolva",
@@ -2663,7 +2663,7 @@
     },
     "sessionChanges": {
       "viewChanges": "Változtatások megtekintése",
-      "asOf": "Állapot: {{time}}",
+      "asOf": "Frissítve: {{time}}",
       "tooLarge": "Ez a különbségnézet túl nagy a mobilon való megjelenítéshez.",
       "empty": "Ebben a munkamenetben még nincsenek fájlváltoztatások."
     },
@@ -2673,10 +2673,10 @@
       "unavailable": "Ez a munkamenet nem tud engedélykéréseket fogadni."
     },
     "prBadge": {
-      "open": "pR megnyitása",
+      "open": "nyitott PR",
       "closed": "lezárt PR",
       "merged": "beolvasztott PR",
-      "draft": "pR-piszkozat",
+      "draft": "PR-piszkozat",
       "updating": "Frissítés, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -3505,8 +3505,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Az ügynök indításához utasítás szükséges. Adj hozzá utasítást, és futtasd újra.",
-      "repositoryUnknown": "A Kilo nem ismeri fel a {{repository}} nevet GitHub- vagy GitLab-adattárként. Válassz másik adattárat a Kilóban.",
-      "repositoryUnsupported": "A {{repository}} egy Bitbucket-adattár — Az Ügynök indítása még nem tudja használni. Válassz másik adattárat a Kilóban."
+      "repositoryUnknown": "A Kilo nem ismeri fel a {{repository}} nevet GitHub- vagy GitLab-adattárként. Válassz másik adattárat a Kiloban.",
+      "repositoryUnsupported": "A {{repository}} egy Bitbucket-adattár — az ügynök indítása még nem tudja használni. Válassz másik adattárat a Kiloban."
     }
   },
   "launcher": {

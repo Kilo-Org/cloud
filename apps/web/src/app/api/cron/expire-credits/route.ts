@@ -6,6 +6,7 @@ import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   processLocalExpirations,
+  processOrganizationExpirations,
   processOrganizationExpirationsBatch,
 } from '@kilocode/web-shared/lib/creditExpiration';
 import {
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
     let usersProcessed = 0;
     let organizationsProcessed = 0;
     let usersFailed = 0;
+    let organizationsFailed = 0;
     let batchesRun = 0;
     let hasMoreUsers = true;
     let hasMoreOrganizations = true;
@@ -83,8 +85,24 @@ export async function GET(request: Request) {
           .limit(BATCH_SIZE + 1);
         const owners = orgs.slice(0, BATCH_SIZE);
         if (owners.length > 0) {
-          await processOrganizationExpirationsBatch(owners, now);
-          organizationsProcessed += owners.length;
+          try {
+            await processOrganizationExpirationsBatch(owners, now);
+            organizationsProcessed += owners.length;
+          } catch (batchError) {
+            captureException(batchError, { tags: { source: 'expire_credits_cron' } });
+            for (const owner of owners) {
+              try {
+                await processOrganizationExpirations(owner, now);
+                organizationsProcessed++;
+              } catch (error) {
+                organizationsFailed++;
+                captureException(error, {
+                  tags: { source: 'expire_credits_cron' },
+                  extra: { organization_id: owner.id },
+                });
+              }
+            }
+          }
         }
         hasMoreOrganizations = orgs.length > BATCH_SIZE;
       }
@@ -97,14 +115,20 @@ export async function GET(request: Request) {
       usersProcessed,
       usersFailed,
       organizationsProcessed,
+      organizationsFailed,
       batchSize: BATCH_SIZE,
       batchesRun,
       hasMore: hasMoreUsers || hasMoreOrganizations,
       cutoffDate,
     };
-    if (usersFailed > 0) {
+    if (usersFailed > 0 || organizationsFailed > 0) {
       emitScheduledJobEvent(
-        buildScheduledJobFailureEvent(run, new Error(`${usersFailed} user expirations failed`))
+        buildScheduledJobFailureEvent(
+          run,
+          new Error(
+            `${usersFailed} user and ${organizationsFailed} organization expirations failed`
+          )
+        )
       );
       return NextResponse.json(result, { status: 500 });
     }

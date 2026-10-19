@@ -9,6 +9,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/creditExpiration', () => ({
   processLocalExpirations: jest.fn(),
+  processOrganizationExpirations: jest.fn(),
   processOrganizationExpirationsBatch: jest.fn(),
 }));
 jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
@@ -27,6 +28,7 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import {
   processLocalExpirations,
+  processOrganizationExpirations,
   processOrganizationExpirationsBatch,
 } from '@kilocode/web-shared/lib/creditExpiration';
 import { GET, maxDuration } from './route';
@@ -132,8 +134,31 @@ describe('credit expiry cron', () => {
     });
     expect(jest.mocked(buildScheduledJobFailureEvent).mock.calls[0]).toEqual([
       undefined,
-      new Error('1 user expirations failed'),
+      new Error('1 user and 0 organization expirations failed'),
     ]);
     expect(buildScheduledJobSuccessEvent).not.toHaveBeenCalled();
+  });
+
+  it('falls back to per-organization reconciliation when a batch fails', async () => {
+    queueBatch([]);
+    queueBatch([{ id: 'failing-org' }, { id: 'org' }]);
+    const failure = new Error('org reconcile failed');
+    jest.mocked(processOrganizationExpirationsBatch).mockRejectedValueOnce(new Error('batch'));
+    jest.mocked(processOrganizationExpirations).mockRejectedValueOnce(failure);
+    const response = await GET(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      organizationsProcessed: 1,
+      organizationsFailed: 1,
+      hasMore: false,
+    });
+    expect(jest.mocked(processOrganizationExpirations).mock.calls.map(([org]) => org)).toEqual([
+      { id: 'failing-org' },
+      { id: 'org' },
+    ]);
+    expect(captureException).toHaveBeenCalledWith(failure, {
+      tags: { source: 'expire_credits_cron' },
+      extra: { organization_id: 'failing-org' },
+    });
   });
 });

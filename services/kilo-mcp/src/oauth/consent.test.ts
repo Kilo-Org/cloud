@@ -707,7 +707,11 @@ describe('GET /authorize/status', () => {
   });
 
   it('answers unknown without the flow cookie, with a wrong name, or a wrong token', async () => {
-    for (const cookie of [null, flowCookie('pa-other', FLOW_TOKEN), flowCookie('pa-1', 'wrong-tok')]) {
+    for (const cookie of [
+      null,
+      flowCookie('pa-other', FLOW_TOKEN),
+      flowCookie('pa-1', 'wrong-tok'),
+    ]) {
       const store = createFakeStore();
       const id = await seedPaired(store);
       const handler = createDefaultHandler(deps(store, flowFetch()));

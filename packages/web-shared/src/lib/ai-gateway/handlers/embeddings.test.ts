@@ -189,12 +189,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     {
       privacy: { data_collection: 'allow', zdr: false },
       settings: { data_collection: 'deny' },
-      translated: { zeroDataRetention: false, disallowPromptTraining: true },
-    },
-    {
-      privacy: { data_collection: 'deny', zdr: true },
-      settings: undefined,
-      translated: { zeroDataRetention: true, disallowPromptTraining: true },
+      translated: { disallowPromptTraining: true },
     },
   ] as const)('translates privacy into Vercel BYOK gateway options: %j', async testCase => {
     setUserAuth(testCase.settings);
@@ -213,5 +208,23 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
         ...testCase.translated,
       },
     });
+  });
+
+  it('returns 400 for a caller-key request that asks for zero data retention', async () => {
+    mockedGetEmbeddingProvider.mockResolvedValue({
+      provider: VERCEL_AI_GATEWAY,
+      userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
+    });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({ provider: { data_collection: 'deny', zdr: true } })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'invalid_request',
+      message: expect.stringContaining('Zero data retention'),
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 });

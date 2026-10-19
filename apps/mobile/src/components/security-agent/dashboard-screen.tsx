@@ -245,11 +245,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('common.securityAgent')}
-        // Three size-11 (44dp) icon buttons: findings, settings, and the
-        // audit overflow when the viewer can manage the agent. Declaring the
-        // worst-case width reflows the actions onto their own row before the
-        // one-line CJK title is squeezed into a mid-word break.
-        headerRightWidth={3 * 44}
+        // Size-11 (44dp) icon buttons: findings and settings, plus the audit
+        // overflow when the viewer can manage the agent. Declaring exactly the
+        // buttons this viewer renders drops the actions onto their own row
+        // before the one-line CJK title loses its readable minimum.
+        headerRightWidth={canManage ? 3 * 44 : 2 * 44}
         headerRight={
           <View className="flex-row items-center">
             <Pressable

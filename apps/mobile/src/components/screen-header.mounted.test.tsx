@@ -594,7 +594,14 @@ describe('ScreenHeader mounted', () => {
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
       if (props.reserveTitleSpace) {
-        expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
+        const large = props.size === 'large';
+        let reserveClass = large ? 'min-h-[72px]' : 'min-h-14';
+        if (cappedLines > 2) {
+          reserveClass = large ? 'min-h-[108px]' : 'min-h-21';
+        } else if (cappedLines === 1) {
+          reserveClass = large ? 'min-h-9' : 'min-h-7';
+        }
+        expect(title.parent?.props.className).toContain(reserveClass);
         expect(title.parent?.props.className).toContain('justify-center');
       }
       if (props.context) {

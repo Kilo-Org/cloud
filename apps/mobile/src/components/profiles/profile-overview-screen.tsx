@@ -211,7 +211,12 @@ export function ProfileOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={profile?.name ?? t('profiles.title')} />
+      <ScreenHeader
+        title={profile?.name ?? t('profiles.title')}
+        // The profile name is user prose, not a UI label, so it keeps a second
+        // line for a natural break.
+        titleNumberOfLines={2}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-6 pt-4"

@@ -182,13 +182,21 @@ type ScreenHeaderProps = {
  * height is `1.75rem`, the large 30px variant's is 36px. Class names must be
  * static because NativeWind extracts them at build time. The reserve tracks the
  * line cap so a title that grows a line (loading -> loaded, rename) cannot move
- * the body below the header.
+ * the body below the header — and a one-line cap reserves one line, not the
+ * two-line default it replaced, or the header keeps a blank line it can never
+ * fill.
  */
 function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: number): string {
   if (size === 'large') {
-    return titleLines > 2 ? 'min-h-[108px]' : 'min-h-[72px]';
+    if (titleLines > 2) {
+      return 'min-h-[108px]';
+    }
+    return titleLines === 1 ? 'min-h-9' : 'min-h-[72px]';
   }
-  return titleLines > 2 ? 'min-h-21' : 'min-h-14';
+  if (titleLines > 2) {
+    return 'min-h-21';
+  }
+  return titleLines === 1 ? 'min-h-7' : 'min-h-14';
 }
 
 export function ScreenHeader({

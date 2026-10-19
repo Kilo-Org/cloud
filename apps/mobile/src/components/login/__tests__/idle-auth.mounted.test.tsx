@@ -937,6 +937,48 @@ describe('IdleAuth email continue copy', () => {
     });
     expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
   });
+
+  it('reads the whole sentence from one accessible wrapper in visible order', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    // Android's screen reader does not keep the row's visual order once the
+    // line wraps (pt-BR announced the Privacy link before Terms), so the
+    // wrapper — not the flattened children — carries the sentence.
+    const wrapper = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        n.props.accessible === true &&
+        typeof n.props.accessibilityLabel === 'string' &&
+        n.props.accessibilityLabel.includes('By continuing')
+    );
+    expect(wrapper.props.accessibilityRole).toBe('text');
+    expect(wrapper.props.accessibilityLabel).toBe(
+      'By continuing you agree to our Terms and Privacy Policy.'
+    );
+    expect(wrapper.props.accessibilityActions).toEqual([
+      { name: 'openTerms', label: 'Terms' },
+      { name: 'openPrivacy', label: 'Privacy Policy' },
+    ]);
+
+    // The wrapper's action handlers open the same URLs the hidden links do.
+    const handleAction = wrapper.props.onAccessibilityAction as (event: {
+      nativeEvent: { actionName: string };
+    }) => void;
+    act(() => {
+      handleAction({ nativeEvent: { actionName: 'openTerms' } });
+    });
+    expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
+    act(() => {
+      handleAction({ nativeEvent: { actionName: 'openPrivacy' } });
+    });
+    expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });
 
 describe('IdleAuth email validation layout', () => {
@@ -956,9 +998,11 @@ describe('IdleAuth email validation layout', () => {
     // The message renders in the field's own flow: no zero-opacity reserve, so
     // no empty hole under the input on the happy path.
     expect(field.props.reserveErrorMessages).toBeUndefined();
-    expect(
-      renderer.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
-    ).toHaveLength(0);
+    // The legal sentence's wrapper hides its children from the a11y tree; the
+    // field contributes none, so every hidden node belongs to the sentence.
+    expect(field.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })).toHaveLength(
+      0
+    );
     const button = findButton(renderer.root, 'Continue with email');
     expect(button.props.disabled).toBe(false);
     const siblings = field.parent?.children;
@@ -1034,9 +1078,22 @@ describe('IdleAuth layout repairs', () => {
     // the input; the two-line 'Unable to deliver email...' message reserved a
     // 35pt hole the owner measured as a 50pt input-to-Continue gap.
     expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toBeUndefined();
-    expect(
-      renderer.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
-    ).toHaveLength(0);
+    // The only `no-hide-descendants` nodes on the screen are the legal
+    // sentence's own five children under its accessible wrapper.
+    const hidden = renderer.root.findAllByProps({
+      importantForAccessibility: 'no-hide-descendants',
+    });
+    expect(hidden).toHaveLength(5);
+    const wrapper = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        n.props.accessible === true &&
+        typeof n.props.accessibilityLabel === 'string' &&
+        n.props.accessibilityLabel.includes('By continuing')
+    );
+    const wrapperNodes = new Set(wrapper.findAll(() => true));
+    expect(hidden.every(node => wrapperNodes.has(node))).toBe(true);
 
     act(() => {
       renderer.unmount();

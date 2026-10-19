@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 
 import { filterButtonAccessibilityLabel } from '@/components/agents/session-filter-button-label';
 import { Text } from '@/components/ui/text';
-import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_HIT_SLOP_DP, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionFilterButtonProps = {
@@ -22,18 +23,13 @@ type SessionFilterButtonProps = {
 };
 
 /**
- * 36pt square + 8pt slop = 52pt, past the 44pt minimum target `DESIGN.md` asks
- * for. The box is a real layout size, not slop alone: the on-device explorer
- * measures laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not
- * `h-9` — the app's native rem is 14pt, so `h-9` lays out at 31.5pt. The box
- * carries `shrink-0`, so the header row cannot squeeze it under the audit's
- * 28dp floor.
- *
- * The sides are spelled out rather than a single uniform number: the agents
- * header row caps this control's two horizontal sides at its `gap-4` gap (the
- * row mirrors under RTL while `hitSlop` does not, so the cap cannot sit on one
- * physical side) and passes the capped insets in through the prop below. The
- * test that guards that invariant reads the insets.
+ * 48dp square box — Android's minimum touch target, measured by the audit on
+ * the node's own rect. The sides are spelled out rather than a single uniform
+ * number: the agents header row caps this control's two horizontal sides at
+ * its `gap-4` gap (the row mirrors under RTL while `hitSlop` does not, so the
+ * cap cannot sit on one physical side) and passes the capped insets in through
+ * the prop below. The test that guards that invariant reads the insets. With
+ * the 48dp box the slop is reach only; the box alone already meets the target.
  */
 const FILTER_HIT_SLOP = {
   top: COMPACT_CONTROL_HIT_SLOP_DP,
@@ -61,9 +57,10 @@ export function SessionFilterButton({
     <Pressable
       onPress={onPress}
       // The frame is the tap target the size audit measures, not the 20pt
-      // glyph; `FILTER_HIT_SLOP` above carries it past the 44pt minimum. A
-      // caller sharing a row may state the sides it faces, so the two touch
-      // regions can meet inside the row gap instead of overlapping.
+      // glyph; the 48dp box alone meets Android's minimum, and
+      // `FILTER_HIT_SLOP` above only extends the reach. A caller sharing a
+      // row may state the sides it faces, so the two touch regions can meet
+      // inside the row gap instead of overlapping.
       hitSlop={hitSlop}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
@@ -73,7 +70,7 @@ export function SessionFilterButton({
         activeCount
       )}
       testID={testID}
-      className="h-[36px] w-[36px] shrink-0 items-center justify-center active:opacity-70"
+      className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
     >
       {/* Anchored to the icon, not the 36pt box, so enlarging the target never
           drifts the badge off the glyph's top-right corner. */}

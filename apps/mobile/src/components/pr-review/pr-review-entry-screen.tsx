@@ -17,6 +17,8 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
@@ -304,8 +306,10 @@ export function PrReviewEntryScreen() {
           }}
           accessibilityRole="button"
           accessibilityLabel={t('prReview.entry.pasteLink')}
-          hitSlop={4}
-          className="h-11 w-11 items-center justify-center rounded-md border border-border bg-card active:opacity-70"
+          className={cn(
+            ICON_TARGET_BOX_CLASS,
+            'rounded-md border border-border bg-card active:opacity-70'
+          )}
         >
           <ClipboardIcon size={18} color={colors.mutedForeground} />
         </Pressable>

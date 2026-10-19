@@ -10,6 +10,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
 import { OfflineBannerSpaceProvider } from './offline-banner-space';
@@ -240,13 +241,11 @@ describe('ScreenHeader mounted', () => {
     Object.assign(layout, { width: 390, fontScale: 1 });
   });
 
-  it('gives the back control a 44-point target and no hit slop', () => {
+  it('gives the back control the 48dp icon target and no hit slop', () => {
     const renderer = renderHeader({ title: 'Sessions' });
 
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('h-11 w-11');
-    expect(back.props.className).toContain('items-center');
-    expect(back.props.className).toContain('justify-center');
+    expect(back.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(back.props.className).toContain('-ms-4');
     expect(back.props.className).toContain('shrink-0');
     expect(back.props.className).toContain('active:opacity-70');
@@ -561,8 +560,7 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({});
 
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('h-11 w-11');
-    expect(back.props.className).toContain('items-center justify-center');
+    expect(back.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(back.props.hitSlop).toBeUndefined();
   });
 
@@ -663,7 +661,7 @@ describe('ScreenHeader mounted', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'View' &&
-        node.props.className === 'h-11 w-11 shrink-0'
+        node.props.className === 'h-[48px] w-[48px] shrink-0'
     );
     expect(spacer).toBeDefined();
   });
@@ -676,7 +674,7 @@ describe('ScreenHeader mounted', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'View' &&
-        node.props.className === 'h-11 w-11 shrink-0'
+        node.props.className === 'h-[48px] w-[48px] shrink-0'
     );
     expect(spacers).toHaveLength(0);
   });
@@ -701,7 +699,7 @@ describe('ScreenHeader mounted', () => {
         renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
       });
       expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
-      expect(findBackPressable(renderer.root).props.className).toContain('h-11 w-11');
+      expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
       renderer.unmount();
     }
   });

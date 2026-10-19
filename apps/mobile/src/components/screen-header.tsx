@@ -10,6 +10,7 @@ import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
@@ -358,11 +359,15 @@ export function ScreenHeader({
   // before layout (YogaLayoutableShadowNode `swapLeftAndRightInYogaStyleProps`),
   // so `-mr-4` under RTL becomes a negative END margin — the side facing the
   // title — and the heading (the next sibling, whose interactive title fills
-  // it) starts 12 points under the back control's 44-point target. Measured on
+  // it) starts 12 points under the back control's target. Measured on
   // the row: the title box covered 0.27 of the back target's area, and the
   // explorer's `overlapping_controls` scan reports above 0.25. A
   // `marginInlineStart` is resolved to Yoga Start in both directions, so `-ms-4`
   // pulls the control into the gutter and leaves the 4-point `gap-1` intact.
+  //
+  // The control's box is the shared 48dp icon target (`ICON_TARGET_BOX_CLASS`):
+  // the audit reads the node's view rect, so `hitSlop` cannot carry an
+  // `h-11` frame to Android's 48dp minimum.
   const backControl = canGoBack ? (
     <Pressable
       onPress={() => {
@@ -377,7 +382,8 @@ export function ScreenHeader({
       accessibilityRole="button"
       accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
       className={cn(
-        'h-11 w-11 shrink-0 items-center justify-center active:opacity-70',
+        ICON_TARGET_BOX_CLASS,
+        'shrink-0 active:opacity-70',
         !separateHeading && '-ms-4'
       )}
     >
@@ -410,7 +416,11 @@ export function ScreenHeader({
     backControl &&
     (!inlineActions || stackInlineActions) &&
     (!headerRight || stackActions) ? (
-      <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
+      <View
+        className="h-[48px] w-[48px] shrink-0"
+        accessibilityElementsHidden
+        pointerEvents="none"
+      />
     ) : null;
   // The inline controls keep the title's row only while it can still hold a
   // readable title; below that they take a row of their own. On their own row

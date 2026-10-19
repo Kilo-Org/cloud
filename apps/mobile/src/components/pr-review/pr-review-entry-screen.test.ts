@@ -176,4 +176,22 @@ describe('provider-neutral URL field', () => {
     const after = render();
     expect(find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link')).toBeTruthy();
   });
+
+  it('gives the paste control the shared 48dp icon target with no hit slop', async () => {
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    // The audit reads the node's own rect, so the box — not a hit slop —
+    // carries the 48dp minimum Android requires. The literal matches
+    // ICON_TARGET_BOX_CLASS; importing the module here would pull
+    // react-native into a suite whose harness mocks it wholesale.
+    expect(String(paste.props?.className)).toContain(
+      'h-[48px] w-[48px] items-center justify-center'
+    );
+    expect(String(paste.props?.className)).not.toContain('h-11 w-11');
+    expect(paste.props?.hitSlop).toBeUndefined();
+  });
 });

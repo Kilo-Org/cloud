@@ -19,6 +19,8 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_AGENTS: AgentProfileDetail['agents'] = [];
@@ -77,7 +79,7 @@ function AgentRowView({
         ) : null}
       </View>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('profiles.agents.edit')}
         onPress={onEdit}
@@ -85,7 +87,7 @@ function AgentRowView({
         <Pencil size={18} color={colors.mutedForeground} />
       </Pressable>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
         onPress={onDelete}

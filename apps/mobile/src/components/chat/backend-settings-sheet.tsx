@@ -24,6 +24,8 @@ import {
   useChatBackends,
 } from '@/lib/chat/backend-store';
 import { backendTargetId } from '@/lib/chat/backend-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { BackendForm } from './backend-form';
 import {
@@ -52,7 +54,7 @@ export function BackendSettingsControl(selection: ProviderSelection) {
         }}
         accessibilityRole="button"
         accessibilityLabel={t('modelChat.backends.manage')}
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
       >
         <Server size={22} color={colors.foreground} />
       </Pressable>

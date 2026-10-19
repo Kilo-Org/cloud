@@ -153,13 +153,16 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 type Insets = { top: number; right: number; bottom: number; left: number };
 
 /**
- * A control's hitSlop as per-side insets. Both controls in this header pass
- * per-side insets: the shared `IconButton` takes a per-side object, and
- * `SessionFilterButton` spells out four equal sides (`FILTER_HIT_SLOP`). The
- * scalar branch mirrors React Native's own `number | Rect` hitSlop type, where
- * one number applies to every side.
+ * A control's hitSlop as per-side insets. `SessionFilterButton` passes a
+ * per-side object (`FILTER_HIT_SLOP`); the new-session control now carries the
+ * 48dp box and no slop, so `undefined` reads as all-zero insets. The scalar
+ * branch mirrors React Native's own `number | Rect` hitSlop type, where one
+ * number applies to every side.
  */
 function hitSlopInsets(hitSlop: unknown): Insets {
+  if (hitSlop === undefined) {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
   if (typeof hitSlop === 'number') {
     return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
   }

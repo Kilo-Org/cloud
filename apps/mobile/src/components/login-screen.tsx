@@ -19,6 +19,8 @@ import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -300,11 +302,13 @@ export function LoginScreen() {
           router.push('/(auth)/language-picker' as Href);
         }}
         disabled={globeDisabled}
-        hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={t('common.language')}
         accessibilityState={{ disabled: globeDisabled }}
-        className="absolute h-11 w-11 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
+        className={cn(
+          ICON_TARGET_BOX_CLASS,
+          'absolute rounded-full active:opacity-70 disabled:opacity-50'
+        )}
         // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
         style={{ top: insets.top + 8, ...globeTrailing }}
       >

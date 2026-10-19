@@ -91,8 +91,8 @@ vi.mock('@/lib/code-reviewer-config', () => ({
     bitbucket: { label: 'Bitbucket', reviewMd: false },
   },
 }));
-vi.mock('@/lib/hooks/use-available-models', () => ({
-  useAvailableModels: () => ({ models: [], isLoading: false }),
+vi.mock('@/lib/hooks/use-reviewer-models', () => ({
+  useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => provider,

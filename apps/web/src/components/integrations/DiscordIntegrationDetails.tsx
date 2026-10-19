@@ -38,8 +38,11 @@ export function DiscordIntegrationDetails({
   } = useQuery(trpc.discord.getInstallation.queryOptions(input));
 
   // Fetch models for the model selector
-  const { data: openRouterModels, isLoading: isLoadingModels } =
-    useModelSelectorList(organizationId);
+  const { data: openRouterModels, isLoading: isLoadingModels } = useModelSelectorList(
+    organizationId,
+    true,
+    'shared_services'
+  );
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (

@@ -12,6 +12,7 @@ const CreateOptInSchema = z.object({
   target_type: z.enum(['account', 'organization']),
   target_id: z.string().trim().min(1).max(255),
   reason: z.string().trim().min(1).max(1000),
+  errors_only: z.boolean().default(false),
 });
 
 const DeleteOptInSchema = z.object({ id: z.string().uuid() });
@@ -27,6 +28,7 @@ export const adminRequestLoggingOptInsRouter = createTRPCRouter({
       reason: input.reason.trim(),
       added_by_email: ctx.user.google_user_email,
       added_at: new Date().toISOString(),
+      errors_only: input.errors_only,
     };
     const result = await createRequestLoggingOptIn(entry);
     if (result === 'duplicate') {

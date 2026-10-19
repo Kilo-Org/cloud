@@ -289,6 +289,10 @@ function parseJsonSafe(text: string): unknown {
   return JSON.parse(text) as unknown;
 }
 
+function isManualProviderSyncEnabled(): boolean {
+  return process.env.VERCEL_ENV !== 'production';
+}
+
 const AddNoteSchema = z.object({
   kilo_user_id: z.string(),
   noteContent: z.string().min(1, 'Note content cannot be empty').trim(),
@@ -2274,7 +2278,14 @@ export const adminRouter = createTRPCRouter({
   }),
 
   syncProviders: createTRPCRouter({
+    getManualSyncEnabled: adminProcedure.query(() => isManualProviderSyncEnabled()),
     triggerSync: adminProcedure.mutation(async () => {
+      if (!isManualProviderSyncEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+        });
+      }
       const result = await syncAndStoreProviders();
       return result;
     }),

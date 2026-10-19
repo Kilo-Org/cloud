@@ -3,7 +3,8 @@ import * as z from 'zod';
 import { admin_action_audit_logs } from '@kilocode/db/schema';
 import { AdminActionAuditAction, AdminActionAuditTargetType } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { superadminProcedure } from '@/lib/trpc/admin-procedures';
 
 const CursorSchema = z.object({
   createdAt: z.string().datetime(),
@@ -25,7 +26,7 @@ function escapeLike(value: string): string {
 }
 
 export const adminActionAuditLogsRouter = createTRPCRouter({
-  list: adminProcedure.input(AdminActionAuditLogListInputSchema).query(async ({ input }) => {
+  list: superadminProcedure.input(AdminActionAuditLogListInputSchema).query(async ({ input }) => {
     const conditions: SQL[] = [];
     if (input.action) conditions.push(eq(admin_action_audit_logs.action, input.action));
     if (input.actorEmail) {

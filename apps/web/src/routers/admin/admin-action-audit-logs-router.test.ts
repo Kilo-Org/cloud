@@ -14,6 +14,7 @@ describe('admin.actionAuditLogs.list', () => {
   async function seed() {
     const admin = await insertTestUser({
       is_admin: true,
+      is_super_admin: true,
       google_user_email: `Auditor-${crypto.randomUUID()}@kilocode.ai`,
     });
     await db.insert(admin_action_audit_logs).values([
@@ -94,8 +95,11 @@ describe('admin.actionAuditLogs.list', () => {
     expect(result.rows).toHaveLength(0);
   });
 
-  test('rejects non-admin callers', async () => {
-    const user = await insertTestUser({ is_admin: false });
+  test.each([
+    ['non-admin', { is_admin: false }],
+    ['admin without superadmin', { is_admin: true, is_super_admin: false }],
+  ])('rejects %s callers', async (_label, flags) => {
+    const user = await insertTestUser(flags);
     const caller = await createCallerForUser(user.id);
 
     await expect(caller.admin.actionAuditLogs.list({})).rejects.toMatchObject({

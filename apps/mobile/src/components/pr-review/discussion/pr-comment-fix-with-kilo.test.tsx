@@ -24,7 +24,12 @@ const { pushMock, putSharePayloadMock } = vi.hoisted(() => ({
 /** Mutable `Platform.OS` for the iOS/Android parity cases below. */
 const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
 
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: pushMock }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: pushMock }),
+  // The pill's single-push guard registers a focus reset; this suite presses
+  // once per mount, so a no-op keeps the guard armed for that one press.
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/lib/share-payload', () => ({ putSharePayload: putSharePayloadMock }));
 vi.mock('react-native', () => ({
   Platform: platformState,

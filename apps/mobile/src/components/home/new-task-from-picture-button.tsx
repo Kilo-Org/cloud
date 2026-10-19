@@ -5,6 +5,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { View } from 'react-native';
 
 import { pickAgentPicture } from '@/components/agents/attachment-picker';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { Button } from '@/components/ui/button';
 import { Camera } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -29,6 +30,7 @@ export function NewTaskFromPictureButton({
   organizationId,
 }: Readonly<NewTaskFromPictureButtonProps>) {
   const router = useRouter();
+  const { beginNewSessionNavigation } = useNewSessionNavigator();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const themedSheet = useThemedActionSheetOptions();
@@ -37,12 +39,15 @@ export function NewTaskFromPictureButton({
 
   const openComposerWithPicture = useCallback(
     (candidates: AgentAttachmentCandidate[]) => {
+      if (candidates.length === 0 || !beginNewSessionNavigation()) {
+        return;
+      }
       const href = stagePictureForNewSession({ candidates, organizationId });
       if (href !== null) {
         router.push(href as Href);
       }
     },
-    [organizationId, router]
+    [beginNewSessionNavigation, organizationId, router]
   );
 
   // Android can recreate the Activity while the camera or the picker is open,

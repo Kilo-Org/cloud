@@ -19,6 +19,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable } from 'react-native';
 
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { WandSparkles } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -55,6 +56,7 @@ export function PrCommentFixWithKilo({
 }: Readonly<PrCommentFixWithKiloProps>) {
   const scope = useProviderPrScope({ owner, repo, number });
   const router = useRouter();
+  const { beginNewSessionNavigation } = useNewSessionNavigator();
   const { t } = useTranslation();
   const colors = useThemeColors();
 
@@ -64,6 +66,9 @@ export function PrCommentFixWithKilo({
   }
 
   const onPress = () => {
+    if (!beginNewSessionNavigation()) {
+      return;
+    }
     const shareId = putSharePayload({
       text: fixWithKiloMessage(commentUrl),
       files: [],

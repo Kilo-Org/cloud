@@ -24,8 +24,8 @@ design, invariants, and rollout/rollback.
   frontier uses only `FRONTIER_CASES`, including its harder long-context tasks, tagged `frontier`.
   Results land in the decider registry (`benchmark_profiles`), keyed by
   `(router, model, variant, engine identity, repetitions)`. Engine identity includes the router
-  and a hash of all selected dataset inputs. Efficient platform and owner pools share their
-  measurements; frontier measurements never satisfy efficient profiles.
+  and a hash of all selected dataset inputs. Each router's platform list and owner requests share
+  that router's measurements; frontier measurements never satisfy efficient profiles.
 - Normalized results live in D1 (`BENCH_DB`); published artifacts are cached in
   the shared `AUTO_ROUTING_CONFIG` KV namespace (publish = delete the keys so the
   next read repopulates from D1).
@@ -43,6 +43,10 @@ objects include the router, so an otherwise identical call on another router can
 deduplicated as a retry of the first call.
 Capability lookups derive candidate IDs from the selected router's table; the capability
 cache remains a shared model-ID union because modalities and context limits belong to models.
+
+Both routers are custom-router bases (ADR 0005): owner profile admission, the owner queue,
+owner-pool tables, custom router tables, and client evals accept `efficient` and `frontier`.
+Owner work for a base uses that base's configuration, dataset, engine identity, and quota.
 
 ## System-optimal policy settings
 
@@ -97,13 +101,14 @@ and CLI-reported latency remain unchanged.
 `BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
 `modelConcurrency: 12`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
 Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
-`shares` defaults to `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1}`.
+`shares` defaults to
+`{"efficient/platform":2,"frontier/platform":2,"efficient/user":1,"frontier/user":1}`.
 The least-occupied weighted share receives the next eligible claim; unused shares are
 borrowed without reservations or preempting active work. Model caps span variants and runs.
 Provider identities come from the catalog's optional `inference_provider_ids`, which uses
 the existing gateway provider index. Every possible provider is conservatively counted;
 missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
-treated as serving providers. Frontier has no owner queue.
+treated as serving providers. Each router has an owner queue with its own share.
 
 Admins can override `slots`, `modelConcurrency`, `providerConcurrency`, and
 `unknownProviderConcurrency` at runtime, without a deploy, from the Scheduler card on the
@@ -244,6 +249,7 @@ Expand a route to inspect every ranked model/effort pair.
 - Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
 - `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
+- A candidate whose `estimatedRequestCostUsd` is exactly 0 outranks every paid candidate inside the accuracy band and takes no cost term (ADR 0005): $0 candidates are ordered by `effectiveLatency^1.5 / wilson^15` alone, so a free-but-slow or thinly measured one still loses to a free candidate with latency and coverage. Paid ordering is unchanged. Client models in a custom router are the usual source of $0.
 - The other candidates follow by accuracy, then cost.
 - When `lowConfidenceThreshold` is set and the classifier's route confidence is below it, the worker picks the most accurate eligible candidate of the route instead of the first-ranked one.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
@@ -550,8 +556,9 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 (the gateway's admin panel proxies these with the internal secret):
 
 GET endpoints accept `?router=efficient|frontier`; mutations accept `router` in their body
-or query. Omission selects efficient. Owner profile registration/status and custom-table
-endpoints reject frontier. The classifier-winner endpoint returns the shared winner.
+or query. Omission selects efficient. Owner profile, owner-pool table, and custom router
+endpoints accept both routers. The classifier-winner endpoint returns the shared winner.
+The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 
 
 | Endpoint | Purpose |
@@ -562,17 +569,21 @@ endpoints reject frontier. The classifier-winner endpoint returns the shared win
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
+| `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
-| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of the pool models (quota 10 models/24h) |
+| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of the pool models (quota 20 models per base router per 24h) |
 | `POST /admin/profiles/status` | Read current per-effort coverage; free re-admission for engine-stale pairs |
 | `POST /admin/custom-routing-table` | Rank ready/current exact pairs for the selected models (`table: null` → balanced fallback) |
+| `POST /admin/custom-router-table` | Custom router table from platform and owner client measurements (`CustomRouterBenchmarkContextSchema`) |
+| `POST /admin/custom-router-status` | Per-variant status of every custom router entry (`CustomRouterStatusResponseSchema`) |
 
 ## Owner pools and Benchmark profiles
 
 Owners (personal users or organizations) can constrain `kilo-auto/efficient` to
-1–10 **pool models**. The pool lives in the auto-routing Durable Object, whose
+1–10 **pool models**, and custom routers name gateway models of either base router
+(ADR 0005). The pool lives in the auto-routing Durable Object, whose
 read path collapses and deduplicates legacy exact-pair pools. Each selected model
 expands through the live catalog into every supported reasoning effort, or one
 default pair when there are no reasoning controls. This worker measures exact
@@ -590,10 +601,10 @@ row is global, so the pair is benchmarked once and serves both.
 | Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
-| Execution share | Efficient and frontier each have default weight 2 | Efficient has default weight 1 |
-| Run lifecycle | One active run per router/queue | One active efficient owner run |
+| Execution share | Efficient and frontier each have default weight 2 | Efficient and frontier each have default weight 1 |
+| Run lifecycle | One active run per router/queue | One active owner run per router |
 
-All three shares use the same bounded chunk scheduler and borrow unused capacity.
+All four shares use the same bounded chunk scheduler and borrow unused capacity.
 `benchmark_runs.max_concurrency` is retained for storage compatibility but new decider
 runs write zero: it is not an execution reservation. Registry admission is still atomic
 per exact pair, and the per-router/queue run lifecycle gate remains independent of slots.
@@ -613,7 +624,9 @@ Already ready/current or pending/running pairs are reused by every owner.
 
 `POST /admin/profiles/register` admits missing, stale, or retried pairs and records
 one quota request event per newly requested model in the same D1 batch. The rolling
-quota counts models, not efforts. Engine-stale remeasurement is quota-free.
+quota allows 20 new models per base router per owner in 24 hours; it counts models,
+not efforts, and ready or pending models are reused without a charge. Engine-stale
+remeasurement is quota-free.
 Concurrent requests share one global pair; the first admission wins and the
 others report its status.
 
@@ -637,8 +650,9 @@ pending → running → ready
   transition — a newer pending/ready row is never clobbered.
 
 Currency: a profile is current only when `engine_identity`, `repetitions`, and
-exact variant match the live decider engine. Stale rows are never returned as
-Ready or assembled into custom tables.
+exact variant match the live decider engine. The platform table and owner-pool tables
+never use a stale row. Custom router tables serve a stale row, flagged `stale`, until the
+current one is ready (see below).
 
 **Per-queue drain** (after any decider terminal state, on the admin's manual
 trigger, and on the one-minute cron):
@@ -661,6 +675,44 @@ first flips it to `running`, so it is still measured exactly once.
 
 Long waits stay `Benchmarking` in the UI; there is no second timeout state in v1.
 
+### Prompt transport re-measure
+
+Every result row carries `prompt_revision` (`PROMPT_TRANSPORT_REVISION` in
+`src/prompt-transport.ts`). Revision 1 passed the prompt as a `kilo run` argument, which
+quoted prompts containing a space and escaped their inner `"`, and omitted long-context
+snapshots. Revision 2 materializes the snapshot and writes the prompt verbatim to stdin.
+`argvAffectedCases(router)` lists the cases revision 1 measured unreliably: every
+long-context case, and efficient cases whose prompt has an inner `"` and whose check is
+`exact`, `contains_all` or `regex` (frontier inner-quote cases join when
+`REMEASURE_FRONTIER_INNER_QUOTE_CASES` is set). The engine identity does not change.
+
+A re-measure claims the pair in `profile_remeasures`, not on the profile: the profile stays
+`ready` on its previous run, so the platform table, owner tables and status keep serving.
+The re-measure run copies the previous run's results except the affected revision-1 rows,
+so only those cases are scheduled, under the normal scheduler caps. When the run completes,
+the profile's `run_id` moves to it, the claim is removed, and the platform table republishes
+as after any decider run. A failed run, a dead lane or an orphaned claim drops the claim and
+keeps the previous measurement; an unwritten run returns the claim to the queue. Prior-case
+reuse never copies an affected revision-1 row into a new run. A container result recovered
+after its caller died is stamped with the revision the paid call was opened under
+(`scheduler_executions.prompt_revision`, defaulting to 1 for calls opened before this
+change), so output a previous deploy produced stays re-measurable instead of being trusted.
+
+Runbook, after the whole stack is merged and deployed (the migration applies on deploy):
+
+1. Dry run (writes nothing): `POST /admin/registry/remeasure-prompt-transport` with
+   `{"action":"dry-run"}`, or `{"router":"efficient","action":"dry-run"}` for one router.
+   Each router reports its affected pairs, affected results, and projected spend: the
+   measured cost of each affected result plus, for long-context cases, the snapshot's
+   prompt tokens at the catalog prompt price. `unknownCostResults` counts results this
+   estimate cannot price.
+2. Queue: the same call with `"action":"request"`. The next drain (at most one minute)
+   starts the runs.
+3. Verify: the dry run reports `pairs: 0` per router, `profile_remeasures` is empty, and
+   `GET /admin/routing-table` shows a new version.
+4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
+   its run.
+
 ### Sparse custom routing tables
 
 `POST /admin/custom-routing-table` with 1–10 entries returns
@@ -675,6 +727,64 @@ Long waits stay `Benchmarking` in the UI; there is no second timeout state in v1
 - If no requested entry is ready/current → `{ table: null }` so the gateway
   falls back to balanced. Never fabricate candidates.
 
+## Custom routers and client measurements
+
+ADR 0005 custom routers rank a pool of gateway and client entries against one base
+router. The serving worker and the web app resolve the router from PostgreSQL and send
+its context (`CustomRouterBenchmarkContextSchema`: owner, base router, entries, and the
+entry keys the owner's CLI measures); this worker has no PostgreSQL access.
+
+- **Client profiles** (`client_profiles`) are keyed by owner, base router, entry kind,
+  provider, model, variant, engine identity, and repetitions. They hold a rollup of the
+  owner's uploads: accuracy, errors, timeouts, mean cost, p50/p95 latency, and per-route
+  summaries. `client_case_results` keeps each uploaded output with its cost, duration,
+  exit code, timeout flag, score, and grader cost. Each upload takes the next value of the
+  profile's `upload_seq` as its `revision`, so revisions never repeat, even after a case is
+  deleted and uploaded again: the rollup is written only if every stored upload still
+  carries the revision the view was computed from, so a stale view never overwrites a
+  newer one. A failed grader charge deletes only the upload with its own revision. Client rows never
+  feed the platform table and are never copied into `benchmark_profiles`.
+- A client profile is `ready` once one uploaded case ran without error, `failed` once every
+  planned case repetition was uploaded and none did, and `pending` otherwise. Latency comes
+  from the uploader's machine.
+- **Tables** (`POST /admin/custom-router-table`): each pair serves its current ready
+  measurement, otherwise its newest ready measurement from an older engine identity with
+  `stale: true`. Gateway entries the platform measures use `benchmark_profiles`; client
+  entries become `client:<provider>/<model>` candidates priced from the entry (absent
+  pricing is $0). Thresholds and ranking knobs are the base router's effective policy.
+  The version includes the base router, engine identity, and each client profile's upload
+  count.
+- **Status** (`POST /admin/custom-router-status`): `ready`, `stale`, `pending`, `running`,
+  `failed`, or `missing` per variant. A platform pair with only older-engine rows is
+  re-admitted for free, as owner-pool status lookups do.
+
+### Client eval API
+
+The auto-routing worker forwards the CLI's public calls to these routes with the owner
+context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
+`CustomRouterErrorResponseSchema` with `CUSTOM_ROUTER_ERROR_HTTP_STATUS`.
+
+| Route | Request | Behavior |
+|---|---|---|
+| `POST /v1/eval/plan` | `InternalClientEvalPlanRequestSchema` | Every (entry, variant, case, repetition) without a current-engine upload, plus `staleEntries` that still serve an older-engine measurement |
+| `POST /v1/eval/case` | `InternalClientEvalCaseRequestSchema` | `prompt`: the exact `kilo run` prompt the platform container sends (`deciderCliPrompt`, so client and platform rows share byte-identical prompts), and the 180-second timeout; checks and golden answers stay here |
+| `POST /v1/eval/result` | `InternalClientEvalResultRequestSchema` | Grade with the platform graders, store, roll up the profile, return the score |
+
+- An upload for another engine identity returns `stale_engine_identity` (409); the CLI
+  requests a new plan. Unknown cases, variants outside the entry, and repetitions beyond
+  the base router's `deciderRepetitions` return `invalid_request`.
+- Grading matches the platform: a nonzero exit, a timeout, or empty output scores 0;
+  otherwise the case's mechanical check or the System One judge grades it.
+- Judged grading cost is billed to `billing.userId` and `billing.organizationId` as usage
+  model `auto-routing/grader` through `/api/internal/usage/record`, before the result is
+  stored. The usage id derives from the graded case, so a retried upload records it once.
+  If usage cannot be recorded the upload fails with `internal_error` and nothing is stored.
+  The serving worker checks the paying owner's balance before forwarding.
+- A case repetition that is already stored returns its stored score without grading again.
+
+Rollout: apply the additive D1 migration (new tables and the `profile_request_events.router`
+column, defaulting existing rows to `efficient`) with the deploy; no queue pause is needed.
+
 ## Local development
 
 The worker is part of the dev runner. From the repo root:
@@ -685,7 +795,8 @@ pnpm dev:start auto-routing
 
 This brings up the auto-routing worker (:8810), this worker (:8814), and the
 Next.js gateway (:3000). Logs land in `dev/logs/*.log`; the tmux session is
-`kilo-dev-<worktree>`.
+`kilo-dev-<worktree>`. The `predev` script applies this worker's D1 migrations to
+the local database before `wrangler dev` starts, so a fresh stack has every table.
 
 ### Required env / secrets
 
@@ -702,6 +813,21 @@ Next.js gateway (:3000). Logs land in `dev/logs/*.log`; the tmux session is
 ```bash
 SECRET=$(grep '^INTERNAL_API_SECRET=' ../../.env.local | cut -d= -f2- | tr -d '"')
 curl -s http://localhost:8814/admin/config -H "Authorization: Bearer $SECRET"
+```
+
+A fresh local database has no benchmark configuration, and none is fabricated
+(ADR 0002): profile admission, owner-pool tables, custom routers, and client evals
+answer 400 `benchmark config not set` until one is saved. Save one per base router
+you use, with models from your local catalog, through the admin panel's Benchmarks
+tab or this call (repeat with `?router=frontier` for frontier):
+
+```bash
+curl -s -X PUT 'http://localhost:8814/admin/config?router=efficient' \
+  -H "Authorization: Bearer $SECRET" -H 'content-type: application/json' \
+  -H 'x-updated-by: you@kilocode.ai' \
+  -d '{"classifierModels":["<system-one-model>"],"deciderModels":[{"id":"<catalog-model>"}],
+       "minAccuracy":0.7,"switchCostFactor":3,"benchmarkUserId":null,
+       "updatedAt":null,"updatedBy":null}'
 ```
 
 Decider runs use the worker's default benchmark user and org unless
@@ -724,7 +850,9 @@ pnpm typecheck && pnpm test
 ```
 
 Migrations apply on deploy via the `predeploy` hook
-(`wrangler d1 migrations apply auto-routing-benchmark --remote`).
+(`wrangler d1 migrations apply auto-routing-benchmark --remote`), and to the local
+database via the `predev` hook (`--local`; `CI=1` skips wrangler's confirmation prompt,
+which would otherwise block the dev runner's tmux pane).
 
 Inspect local D1 by copying the sqlite out (direct reads often hit miniflare
 locks):
@@ -740,6 +868,11 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
   The D1 live-slot uniqueness constraint and claim tokens protect container ownership.
   CLI runs remain serialized because they share SQLite state.
 - `/warmup` initializes the local CLI database once per container without making an inference request.
+- The case prompt reaches `kilo run` on stdin, never as an argument. Long-context cases are
+  materialized with their workspace snapshot (up to about 640 KB for 160k-token targets),
+  which exceeds Linux's 128 KiB limit on one argument, and `kilo run` re-quotes argument
+  messages that contain spaces. With no positional message the CLI reads stdin to EOF and
+  sends it verbatim as the user message.
 - The server handles SIGTERM and drains the CLI case it already accepted, then exits.
   A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
   paid call, so a rollout is never charged for work it interrupts. Idle containers therefore

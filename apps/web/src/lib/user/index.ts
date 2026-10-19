@@ -50,6 +50,7 @@ import {
   device_sessions,
   native_attested_keys,
   auto_top_up_configs,
+  auto_routing_custom_routers,
   platform_integrations,
   platform_oauth_credentials,
   platform_access_token_credentials,
@@ -997,7 +998,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, review memory feedback/proposals,
- *   device_auth_requests, auto_top_up_configs,
+ *   device_auth_requests, auto_top_up_configs, auto_routing_custom_routers,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences)
@@ -1521,6 +1522,9 @@ export async function anonymizeCloudUserData(
   // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
   await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
   await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
+  await tx
+    .delete(auto_routing_custom_routers)
+    .where(eq(auto_routing_custom_routers.owned_by_user_id, userId));
   await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
   await tx
     .update(kiloclaw_cli_runs)

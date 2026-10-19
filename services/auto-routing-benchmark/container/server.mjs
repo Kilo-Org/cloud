@@ -115,13 +115,17 @@ function warmUpOnce() {
   return warmup;
 }
 
+// The prompt goes to the CLI on stdin, never argv: Linux caps one argv string at
+// 128 KiB (MAX_ARG_STRLEN), which a long-context case exceeds, and `kilo run` re-quotes
+// argv messages that contain spaces. With no positional message it reads stdin to EOF
+// and sends that text verbatim as the user message.
 function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, variant }) {
   const resolvedOrgId = typeof orgId === 'string' && orgId.length > 0 ? orgId : null;
   const args = ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`];
   if (typeof variant === 'string' && variant.length > 0) args.push('--variant', variant);
-  args.push(prompt);
   return runCli({
     args,
+    stdin: prompt,
     env: {
       ...process.env,
       KILO_AUTH_CONTENT: JSON.stringify({
@@ -141,7 +145,7 @@ function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, varia
   });
 }
 
-async function runCli({ args, env, timeoutMs, kiloToken }) {
+async function runCli({ args, stdin, env, timeoutMs, kiloToken }) {
   let dir;
   try {
     dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
@@ -163,12 +167,17 @@ async function runCli({ args, env, timeoutMs, kiloToken }) {
         child = spawn('kilo', args, {
           cwd: dir,
           env,
-          stdio: ['ignore', 'pipe', 'pipe'],
+          stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
           detached: true,
         });
       } catch (error) {
         // A synchronous spawn failure creates no process, so no provider call happened.
         throw new NotStartedError(error instanceof Error ? error.message : 'case process failed');
+      }
+      if (stdin !== undefined) {
+        // A CLI that exits before reading everything closes the pipe; its exit code reports it.
+        child.stdin.on('error', () => {});
+        child.stdin.end(stdin);
       }
       let finished = false;
       let finishTimer;

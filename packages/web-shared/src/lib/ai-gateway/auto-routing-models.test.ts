@@ -1,16 +1,15 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { addAutoRoutingModels } from './auto-routing-models';
+import { addAutoRoutingModels, addCustomRouterModels } from './auto-routing-models';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
-  getCachedFrontierRoutingTable: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),
 }));
 
-const { getCachedRoutingTable, getCachedFrontierRoutingTable } = jest.requireMock(
+const { getCachedRoutingTable } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache'
 );
 const { getAutoFreeCandidates } = jest.requireMock(
@@ -18,7 +17,6 @@ const { getAutoFreeCandidates } = jest.requireMock(
 );
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
-const mockedGetCachedFrontierRoutingTable = jest.mocked(getCachedFrontierRoutingTable);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -49,7 +47,6 @@ describe('addAutoRoutingModels', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     mockedGetCachedRoutingTable.mockResolvedValue(null);
-    mockedGetCachedFrontierRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
   });
 
@@ -76,11 +73,19 @@ describe('addAutoRoutingModels', () => {
     const frontierModel = makeModel('kilo-auto/frontier');
     const opusModel = makeModel('openai/gpt-frontier');
     const sonnetModel = makeModel('google/gemini-frontier');
-    mockedGetCachedFrontierRoutingTable.mockResolvedValue(
-      routingTable([opusModel.id, sonnetModel.id, 'hidden/model', 'kilo-auto/frontier'])
+    const efficientOnlyModel = makeModel('google/gemini-efficient');
+    mockedGetCachedRoutingTable.mockImplementation(async (router?: string) =>
+      router === 'frontier'
+        ? routingTable([opusModel.id, sonnetModel.id, 'hidden/model', 'kilo-auto/frontier'])
+        : routingTable([efficientOnlyModel.id])
     );
 
-    const result = await addAutoRoutingModels([frontierModel, sonnetModel, opusModel]);
+    const result = await addAutoRoutingModels([
+      frontierModel,
+      sonnetModel,
+      opusModel,
+      efficientOnlyModel,
+    ]);
 
     expect(result).toEqual([
       {
@@ -89,6 +94,7 @@ describe('addAutoRoutingModels', () => {
       },
       sonnetModel,
       opusModel,
+      efficientOnlyModel,
     ]);
   });
 
@@ -220,5 +226,57 @@ describe('addAutoRoutingModels', () => {
     expect(result).toEqual([model]);
     expect(mockedGetCachedRoutingTable).not.toHaveBeenCalled();
     expect(mockedGetAutoFreeCandidates).not.toHaveBeenCalled();
+  });
+});
+
+describe('addCustomRouterModels', () => {
+  const router = {
+    id: '00000000-0000-4000-8000-000000000001',
+    ownerType: 'user' as const,
+    ownerId: 'user-1',
+    slug: 'coding',
+    name: 'Coding',
+    baseRouter: 'frontier' as const,
+    mode: 'best_accuracy' as const,
+    entries: [
+      { kind: 'gateway' as const, model: 'google/gemini-2.5-flash' },
+      { kind: 'gateway' as const, model: 'openai/denied-by-policy' },
+      {
+        kind: 'client' as const,
+        provider: 'ollama',
+        model: 'qwen3:8b',
+        variants: [],
+        capabilities: {
+          contextLength: null,
+          inputModalities: ['text'],
+          toolCall: true,
+          reasoning: false,
+        },
+        pricing: null,
+      },
+    ],
+    defaultEntryKey: 'gateway:google/gemini-2.5-flash',
+  };
+
+  test('lists personal and organization router IDs with their visible gateway models', () => {
+    const visible = makeModel('google/gemini-2.5-flash');
+
+    const result = addCustomRouterModels(
+      [visible],
+      [router, { ...router, ownerType: 'org', ownerId: 'org-1', slug: 'team', name: 'Team' }]
+    );
+
+    expect(result.map(model => [model.id, model.name, model.autoRouting])).toEqual([
+      ['google/gemini-2.5-flash', 'google/gemini-2.5-flash', undefined],
+      ['kilo-auto/custom/coding', 'Coding', { models: ['google/gemini-2.5-flash'] }],
+      ['kilo-auto/custom/org/team', 'Team', { models: ['google/gemini-2.5-flash'] }],
+    ]);
+  });
+
+  test('omits autoRouting when no gateway entry is visible', () => {
+    const [, custom] = addCustomRouterModels([makeModel('other/model')], [router]);
+
+    expect(custom?.id).toBe('kilo-auto/custom/coding');
+    expect(custom?.autoRouting).toBeUndefined();
   });
 });

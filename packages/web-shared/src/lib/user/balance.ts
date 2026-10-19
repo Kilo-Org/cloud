@@ -4,6 +4,7 @@ import { after } from 'next/server';
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import { subHours } from 'date-fns';
+import { accountBalanceMicrodollars } from '@kilocode/worker-utils/account-access';
 
 export type BalanceForUser = Awaited<ReturnType<typeof getBalanceForUser>>;
 export async function getBalanceForUser(
@@ -32,6 +33,6 @@ export async function getBalanceForUser(
   }
 
   after(() => maybePerformAutoTopUp(user));
-  const balance = (user.total_microdollars_acquired - user.microdollars_used) / 1_000_000;
+  const balance = accountBalanceMicrodollars(user) / 1_000_000;
   return { balance };
 }

@@ -9,7 +9,6 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-settings-route-ha
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
-  getCachedFrontierRoutingTable: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),
@@ -44,8 +43,10 @@ function makeModel(id: string): OpenRouterModel {
   };
 }
 
-function request(headers?: Record<string, string>) {
-  return new NextRequest('http://localhost:3000/api/organizations/org-1/models', { headers });
+function request(headers?: Record<string, string>, search = '') {
+  return new NextRequest(`http://localhost:3000/api/organizations/org-1/models${search}`, {
+    headers,
+  });
 }
 
 describe('GET /api/organizations/[id]/models', () => {
@@ -87,6 +88,22 @@ describe('GET /api/organizations/[id]/models', () => {
     });
   });
 
+  test('preserves organization custom routers for both organization target pickers', async () => {
+    const model = makeModel('openai/gpt-5.4-mini');
+    const router = {
+      ...makeModel('kilo-auto/custom/org/coding'),
+      autoRouting: { models: [model.id] },
+    };
+    listAvailableModels.mockResolvedValue({ data: [model, router] });
+
+    const response = await handleOrganizationModelsRequest(request(), {
+      params: Promise.resolve({ id: 'org-1' }),
+    });
+
+    expect(listAvailableModels).toHaveBeenCalledWith({ organizationId: 'org-1' });
+    await expect(response.json()).resolves.toEqual({ data: [model, router] });
+  });
+
   test('returns the catalog unchanged when auto models are absent', async () => {
     const model = makeModel('openai/gpt-5.4-mini');
     listAvailableModels.mockResolvedValue({ data: [model] });
@@ -98,5 +115,27 @@ describe('GET /api/organizations/[id]/models', () => {
     await expect(response.json()).resolves.toEqual({ data: [model] });
     expect(mockedGetCachedRoutingTable).not.toHaveBeenCalled();
     expect(mockedGetAutoFreeCandidates).not.toHaveBeenCalled();
+  });
+
+  test('passes the shared-services audience to the catalog', async () => {
+    listAvailableModels.mockResolvedValue({ data: [] });
+
+    await handleOrganizationModelsRequest(request(undefined, '?audience=shared_services'), {
+      params: Promise.resolve({ id: 'org-1' }),
+    });
+
+    expect(listAvailableModels).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      audience: 'shared_services',
+    });
+  });
+
+  test('rejects an unknown audience', async () => {
+    const response = await handleOrganizationModelsRequest(request(undefined, '?audience=bot'), {
+      params: Promise.resolve({ id: 'org-1' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(listAvailableModels).not.toHaveBeenCalled();
   });
 });

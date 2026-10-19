@@ -58,7 +58,6 @@ function providerInput(requestedModel: string) {
     } satisfies GatewayRequest,
     user,
     organizationId: undefined,
-    taskId: undefined,
   };
 }
 
@@ -71,7 +70,6 @@ function responsesInput(requestedModel: string) {
     } satisfies GatewayRequest,
     user,
     organizationId: undefined,
-    taskId: undefined,
     clientIp: null,
     machineId: null,
   };
@@ -195,7 +193,6 @@ describe('getProvider local fake deterministic routing', () => {
         expect(shouldRouteToVercel).toHaveBeenCalledWith(
           modelId,
           input.request,
-          user.id,
           expect.any(Function)
         );
       }

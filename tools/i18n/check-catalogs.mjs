@@ -437,6 +437,15 @@ for (const catalog of CATALOGS) {
       .filter(Boolean)
       .map(parts => parts.base)
   );
+  // English copy that interpolates {{count}} but whose words inflect none or
+  // only by count, so English ships a flat key (or a family). A language whose
+  // nouns do change with the count may declare a family for that base; see the
+  // locale loop below.
+  const englishCountedBases = new Set(
+    [...english]
+      .filter(([key, value]) => /{{\s*count\s*}}/.test(value))
+      .map(([key]) => pluralBaseKey(key))
+  );
   const englishValues = new Set(english.values());
   // Keys whose English text is identical. Short strings only: a long sentence
   // repeated verbatim is rare, and a 60-character cap keeps the groups to the
@@ -514,22 +523,59 @@ for (const catalog of CATALOGS) {
     localeValues.set(tag, translated);
     const ownValues = new Set(translated.values());
 
+    // A locale-driven plural family: the English base interpolates {{count}}
+    // but has no English family. When the locale declares any member, it must
+    // declare every category of its tag; the English `_one`/`_other` siblings
+    // of a family English does declare stay mandatory except where the locale
+    // carries the flat base key instead.
+    const localeFamilies = new Set(
+      [...translated.keys()]
+        .map(pluralParts)
+        .filter(Boolean)
+        .map(parts => parts.base)
+    );
     for (const key of english.keys()) {
-      if (!translated.has(key)) {
-        fail(`${label}: missing key "${key}"`);
+      if (translated.has(key)) {
+        continue;
       }
+      const parts = pluralParts(key);
+      if (
+        parts &&
+        englishFamilies.has(parts.base) &&
+        !localeFamilies.has(parts.base) &&
+        translated.has(parts.base)
+      ) {
+        // The locale kept the flat base key; its family is still the English
+        // one and the missing categories are reported below.
+        continue;
+      }
+      fail(`${label}: missing key "${key}"`);
     }
     for (const key of translated.keys()) {
       if (english.has(key)) {
         continue;
       }
       const parts = pluralParts(key);
-      if (!(parts && englishFamilies.has(parts.base))) {
-        fail(`${label}: extra key "${key}" is not in en.json`);
+      if (
+        parts &&
+        (englishFamilies.has(parts.base) || englishCountedBases.has(parts.base))
+      ) {
+        continue;
       }
+      fail(`${label}: extra key "${key}" is not in en.json`);
     }
     const requiredCategories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
-    for (const family of englishFamilies) {
+    // A locale that declares no member of an English family falls back to its
+    // flat base key, so it cannot lack categories it never opted into. A
+    // locale-driven family (declared here but not in English) or an English
+    // family the locale carries must be complete.
+    for (const family of new Set([...englishFamilies, ...localeFamilies])) {
+      const localeDeclared = localeFamilies.has(family);
+      const englishDriven =
+        englishFamilies.has(family) && !englishCountedBases.has(family) && translated.has(family);
+      if (!localeDeclared && !englishDriven) {
+        continue;
+      }
       for (const category of requiredCategories) {
         if (!translated.has(`${family}_${category}`)) {
           fail(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
@@ -541,14 +587,14 @@ for (const catalog of CATALOGS) {
         continue;
       }
       const parts = pluralParts(key);
-      if (!(parts && englishFamilies.has(parts.base))) {
+      if (!(parts && (englishFamilies.has(parts.base) || englishCountedBases.has(parts.base)))) {
         continue;
       }
       const englishRef =
         english.get(`${parts.base}_${parts.category}`) ??
         english.get(`${parts.base}_other`) ??
         english.get(parts.base);
-      const allowed = new Set(placeholders(englishRef).split(',').filter(Boolean));
+      const allowed = new Set(placeholders(englishRef ?? '').split(',').filter(Boolean));
       for (const ph of placeholders(value).split(',').filter(Boolean)) {
         if (!allowed.has(ph)) {
           fail(`${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`);

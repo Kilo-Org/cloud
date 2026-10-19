@@ -249,7 +249,7 @@ describe('device-sessions', () => {
       expect(retry.ok).toBe(true);
 
       // Two holders of the session diverged: refuse and revoke.
-      const replay = await rotateRefreshToken(refreshToken);
+      const replay = await rotateRefreshToken(lost.refreshToken);
       expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
       expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
     });

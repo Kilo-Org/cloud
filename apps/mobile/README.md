@@ -39,6 +39,8 @@ Native compatibility requirements:
 - Root React types stay aligned with the root/web runtime; mobile declares its own
   SDK-matched types. Keep both explicit so cached dependency hoisting cannot mix
   the web and native JSX type identities.
+- Deferred cache maintenance keeps a 500 ms timer fallback alongside idle work.
+  The first delivery cancels the other so invalidation runs once during sustained JS work.
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.

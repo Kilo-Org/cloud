@@ -1,8 +1,8 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d76bc3f16 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..8abb1a944e1c7cf4cbd5cee92dd571177c0e3ef6 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-@@ -50,6 +50,19 @@ import kotlin.math.ceil
+@@ -50,6 +50,21 @@ import kotlin.math.ceil
  object MeasurementStore {
    private const val TAG = "MeasurementStore"
  
@@ -16,13 +16,15 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
 +   * display gets slack without reserving a line — was measured on device and
 +   * still wrapped: the display view's advance exceeded the widened width, so
 +   * reserving is the only direction that keeps the text inside its bubble.
++   * The margin is small enough that a message wrapping at the reserved width
++   * but not at the reported width has never been observed on the emulator.
 +   */
 +  private const val HUG_WIDTH_SAFETY_PX = 2
 +
    private data class PaintParams(
      val typeface: Typeface,
      val fontSize: Float,
-@@ -120,7 +133,9 @@ object MeasurementStore {
+@@ -120,7 +135,9 @@ object MeasurementStore {
      val existingHash = cached?.markdownHash ?: 0
      val paintParams = PaintParams(paint.typeface ?: Typeface.DEFAULT, paint.textSize)
  
@@ -33,7 +35,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
      if (trailingMarginBottomPx > 0f) {
        newSize =
          YogaMeasureOutput.make(
-@@ -177,7 +192,8 @@ object MeasurementStore {
+@@ -177,7 +194,8 @@ object MeasurementStore {
        }
      }
  
@@ -43,7 +45,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
  
      // Honor the Yoga width contract. When the parent assigns an exact width
      // (flex child, alignItems: stretch, explicit width / width: "100%"), fill it
-@@ -273,6 +289,7 @@ object MeasurementStore {
+@@ -273,6 +291,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -51,7 +53,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
      props: ReadableMap?,
      splitTableSegments: Boolean,
    ): Long {
-@@ -282,21 +299,21 @@ object MeasurementStore {
+@@ -282,21 +301,21 @@ object MeasurementStore {
  
      // Split measurement always goes through the full measure path (no spannable caching)
      if (splitTableSegments) {
@@ -78,7 +80,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
        data[safeId] = cached.copy(cachedWidth = width, cachedSize = newSize)
        return newSize
      }
-@@ -368,6 +385,7 @@ object MeasurementStore {
+@@ -368,6 +387,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -86,7 +88,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
      props: ReadableMap?,
      allowFontScaling: Boolean,
      fontScale: Float,
-@@ -408,7 +426,7 @@ object MeasurementStore {
+@@ -408,7 +428,7 @@ object MeasurementStore {
        )
      spannable?.replaceMathSpansWithPlaceholders(context)
      val textToMeasure = spannable ?: markdown
@@ -95,7 +97,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
  
      // 3. Calculate Margin
      val allowTrailingMargin = props.getBooleanOrDefault("allowTrailingMargin", false)
-@@ -435,6 +453,7 @@ object MeasurementStore {
+@@ -435,6 +455,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -103,7 +105,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
      props: ReadableMap?,
      allowFontScaling: Boolean,
      fontScale: Float,
-@@ -543,9 +562,32 @@ object MeasurementStore {
+@@ -543,9 +564,32 @@ object MeasurementStore {
              segment.styledText.replaceMathSpansWithPlaceholders(context)
  
              val layout = createStaticLayout(segment.styledText, fontSize, widthPx, id)
@@ -137,7 +139,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
              maxContentWidthPx = maxOf(maxContentWidthPx, ceil(segmentMaxLineWidth))
  
              if (includeBottomMargin) {
-@@ -610,7 +652,7 @@ object MeasurementStore {
+@@ -610,7 +654,7 @@ object MeasurementStore {
        result
      } catch (e: Exception) {
        Log.w(TAG, "Split measurement failed, falling back", e)
@@ -146,7 +148,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
      }
    }
  
-@@ -698,6 +740,7 @@ object MeasurementStore {
+@@ -698,6 +742,7 @@ object MeasurementStore {
  
    private fun measure(
      maxWidth: Float,
@@ -154,7 +156,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
      text: CharSequence?,
      paintParams: PaintParams,
      viewId: Int?,
-@@ -705,11 +748,12 @@ object MeasurementStore {
+@@ -705,11 +750,12 @@ object MeasurementStore {
      measurePaint.reset()
      measurePaint.typeface = paintParams.typeface
      measurePaint.textSize = paintParams.fontSize
@@ -168,7 +170,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -737,17 +781,62 @@ object MeasurementStore {
+@@ -737,17 +783,62 @@ object MeasurementStore {
  
      val layout = builder.build()
      val visibleLineCount = visibleLineCount(layout, viewId)
@@ -232,7 +234,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
    // Applies the per-view numberOfLines / ellipsizeMode clamp to a builder, matching
    // RN's TextLayoutManager.buildLayout: only when a line limit is set.
    private fun applyLineLimit(
-@@ -816,6 +905,7 @@ object MeasurementStore {
+@@ -816,6 +907,7 @@ object MeasurementStore {
     */
    private fun measureWithLayout(
      maxWidth: Float,
@@ -240,7 +242,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -847,10 +937,31 @@ object MeasurementStore {
+@@ -847,10 +939,31 @@ object MeasurementStore {
        (0 until visibleLineCount)
          .maxOfOrNull { layout.getLineWidth(it) } ?: 0f
  

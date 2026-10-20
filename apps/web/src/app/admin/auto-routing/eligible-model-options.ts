@@ -1,6 +1,5 @@
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 
 const DIRECT_BYOK_PROVIDER_PREFIXES = new Set(
@@ -13,6 +12,7 @@ type SelectorListModel = {
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
+  isCustomLlm?: boolean;
   opencode?: { variants?: Record<string, unknown> } | null;
 };
 
@@ -32,7 +32,7 @@ function isEligibleBenchmarkModel(model: SelectorListModel): boolean {
   return (
     model.id.length > 0 &&
     !isVirtualAutoModelId(model.id) &&
-    !model.id.startsWith(CUSTOM_LLM_PREFIX) &&
+    !model.isCustomLlm &&
     !isDirectByokOnlyModel(model)
   );
 }

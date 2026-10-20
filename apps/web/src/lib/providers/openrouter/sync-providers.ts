@@ -38,6 +38,7 @@ import {
 } from '@/lib/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getVercelModelIdOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -188,8 +189,9 @@ async function syncProviders(params: {
     unavailableModelIds
   );
 
-  injectExtraProviderModels(vercelModels, providerModelData);
-  injectVercelOnlyProviders(vercelModels, providerModelData);
+  const vercelModelIdOverrides = await getVercelModelIdOverrides();
+  injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
+  injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm =>

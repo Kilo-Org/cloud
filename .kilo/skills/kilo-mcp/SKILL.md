@@ -51,7 +51,7 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**837 procedures** — **356 queries**, **481 mutations** — under **49 prefixes**.
+**835 procedures** — **356 queries**, **479 mutations** — under **49 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -64,11 +64,11 @@ each row's `summary` and `tags` are what the search matches.
 | `kiloPass` | 21 | 11 | 10 |
 | `githubPrReview` | 20 | 6 | 14 |
 | `githubApps` | 19 | 9 | 10 |
-| `cliSessionsV2` | 18 | 10 | 8 |
+| `cliSessionsV2` | 17 | 10 | 7 |
 | `appBuilder` | 16 | 6 | 10 |
-| `cliSessions` | 16 | 7 | 9 |
 | `providerReview` | 16 | 8 | 8 |
 | `todos` | 16 | 6 | 10 |
+| `cliSessions` | 15 | 7 | 8 |
 | `deployments` | 14 | 6 | 8 |
 | `moderation` | 11 | 3 | 8 |
 | `codeReviews` | 9 | 6 | 3 |

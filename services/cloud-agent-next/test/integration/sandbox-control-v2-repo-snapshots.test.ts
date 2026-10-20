@@ -96,7 +96,7 @@ function createFakeProvider(
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(ref, launchEnv, launchOptions) {
+    async launch(ref, { env: launchEnv }, launchOptions) {
       const launchIndex = provider.launchEnvs.length;
       provider.launchEnvs.push({ ...launchEnv });
       const { deadlineAt, ...recordedOptions } = launchOptions ?? {};
@@ -199,6 +199,9 @@ async function setup(
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
       NEXTAUTH_SECRET: WORKER_SECRET,
+      // A local `.dev.vars` WORKER_URL turns on log upload, which adds a
+      // per-launch wrapper instance ID to the launch env.
+      WORKER_URL: undefined,
       ...extraEnv,
     });
     Object.assign(instance, {
@@ -461,19 +464,27 @@ describe('repository snapshot launch', () => {
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-    expect(provider.launchEnvs[1]).toEqual({
-      ...provider.launchEnvs[0],
-      SANDBOX_CONTROL_CREDENTIAL: expect.any(String),
-    });
-    expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
-      provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
-    );
+    const stableEnv = (env: Record<string, string>) =>
+      Object.fromEntries(
+        Object.entries(env).filter(
+          ([key]) =>
+            key !== 'SANDBOX_CONTROL_CREDENTIAL' &&
+            !key.startsWith('CONTROL_LOG_') &&
+            key !== 'CONTROL_WRAPPER_INSTANCE_ID'
+        )
+      );
+    expect(stableEnv(provider.launchEnvs[1])).toEqual(stableEnv(provider.launchEnvs[0]));
+    expect(
+      provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL !==
+        provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
+    ).toBe(true);
     expect(provider.launchDeadlines[0]).toEqual(expect.any(Number));
     expect(provider.launchDeadlines[0]).toBe(launchDeadline);
     expect(provider.launchDeadlines[1]).toBe(launchDeadline);
     await prepareFrameOf(wrapper);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
+      startupMode: 'preinstalled',
       startSource: 'image',
       confirmed: true,
     });
@@ -563,6 +574,7 @@ describe('repository snapshot launch', () => {
     expect(provider.launchEnvs).toHaveLength(1);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
+      startupMode: 'preinstalled',
       startSource: 'repository',
       confirmed: true,
     });
@@ -701,6 +713,7 @@ describe('repository snapshot launch', () => {
     expect(frame.spec.capture).toBe(true);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
+      startupMode: 'preinstalled',
       startSource: 'repository',
       confirmed: true,
     });

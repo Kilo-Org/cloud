@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
+import { selectedRuntimeCli } from '../../src/shared/runtime-distribution.js';
 import {
   createSafeProcessDiagnostic,
   isTimeoutTermination,
@@ -1198,7 +1199,7 @@ export async function restoreSession(
     log(
       `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
     );
-    const importResult = await runProcess('kilo', ['import', tmpPath], {
+    const importResult = await runProcess(selectedRuntimeCli(process.env), ['import', tmpPath], {
       cwd: workspacePath,
       env,
       inheritEnv: false,

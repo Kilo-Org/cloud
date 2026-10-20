@@ -14,6 +14,6 @@
     "services/*/container/plugin/*",
     "services/*/plugins/*/src/*",
     "apps/web/src/app/(app)/*/*/merges/*",
-    "apps/web/src/app/(app)/organizations/*/*/merges/page.tsx"
+    "apps/web/src/app/(app)/organizations/*/*/*/merges/page.tsx"
   ]
 }

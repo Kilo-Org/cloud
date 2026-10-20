@@ -4,8 +4,8 @@ import { signKiloToken, verifyKiloToken, type KiloTokenPayload } from './kilo-to
 export const SESSION_ACCESS_INVALIDATION_CREDENTIAL_TTL_SECONDS = 60;
 
 export type SessionAccessInvalidationCredentialVerification =
-  | { ok: true }
-  | { ok: false; reason: 'invalid_credential' | 'subject_mismatch' };
+  | { ok: true; userId: string; organizationId: string | undefined }
+  | { ok: false; reason: 'invalid_credential' };
 
 export async function signSessionAccessInvalidationCredential(input: {
   userId: string;
@@ -27,8 +27,6 @@ export async function signSessionAccessInvalidationCredential(input: {
 export async function verifySessionAccessInvalidationCredential(input: {
   token: string;
   secret: string;
-  userId: string;
-  organizationId: string;
 }): Promise<SessionAccessInvalidationCredentialVerification> {
   let payload: KiloTokenPayload;
   try {
@@ -39,9 +37,5 @@ export async function verifySessionAccessInvalidationCredential(input: {
     return { ok: false, reason: 'invalid_credential' };
   }
 
-  if (payload.kiloUserId !== input.userId || payload.organizationId !== input.organizationId) {
-    return { ok: false, reason: 'subject_mismatch' };
-  }
-
-  return { ok: true };
+  return { ok: true, userId: payload.kiloUserId, organizationId: payload.organizationId };
 }

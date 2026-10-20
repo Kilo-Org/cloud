@@ -24,6 +24,7 @@ import type {
   RecordStartResult,
 } from '@kilocode/container-usage';
 import type { Env } from '../types.js';
+import { containerLimitError } from '../container-limit-test-helpers.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
@@ -408,6 +409,28 @@ describe('ContainersBilling identity and admission', () => {
     expect(context).toBeDefined();
     expect(context?.measurementStarted).toBe(false);
     expect(storage.map.get(START_ACK_KEY)).toBeUndefined();
+  });
+
+  it('sends the capacity marker and drops the generation at the container limit', async () => {
+    const admitted = setup();
+    await expect(admit(admitted.instance, 'standard-4')).resolves.toEqual({ success: true });
+    expect(admitted.meter.recordStartInputs).toEqual([
+      expect.objectContaining({ enforceCapacity: true }),
+    ]);
+
+    const limited = setup();
+    const limit = containerLimitError('organization', 50);
+    limited.meter.startResult = {
+      success: false,
+      error: { code: 'container_limit_reached', message: limit.message },
+    };
+
+    await expect(admit(limited.instance, 'standard-4')).rejects.toMatchObject({
+      code: 'container_limit_reached',
+      message: limit.message,
+    });
+    expect(limited.storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+    expect(limited.storage.map.get(START_ACK_KEY)).toBeUndefined();
   });
 
   it('does not skip an unmeasured context that carries a pending stop', async () => {

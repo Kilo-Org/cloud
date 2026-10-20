@@ -1,14 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ContainerUsageAdmissionError,
   getBillingContext,
   updateBillingContext,
   type ContainerUsageRpcMethods,
 } from '@kilocode/container-usage';
-import type * as ContainerConcurrencyExports from './container-concurrency.js';
-
-type ContainerConcurrencyModule = typeof ContainerConcurrencyExports;
-
 // oxlint-disable-next-line no-empty-object-type -- Matches the mocked Sandbox constructor.
 type SandboxDurableObjectState = DurableObjectState<{}>;
 
@@ -103,22 +99,9 @@ const sdk = vi.hoisted(() => {
 
 vi.mock('@cloudflare/sandbox', () => ({ Sandbox: sdk.StockSandbox }));
 
-const capacity = vi.hoisted(() => ({
-  assertContainerCapacity: vi.fn<(env: unknown, request: unknown) => Promise<void>>(
-    async () => undefined
-  ),
-}));
-
-vi.mock('./container-concurrency.js', async importOriginal => ({
-  ...(await importOriginal<ContainerConcurrencyModule>()),
-  assertContainerCapacity: capacity.assertContainerCapacity,
-}));
-
 import { billingHeartbeatSeconds, MeteredSandbox } from './container-usage.js';
-import {
-  ContainerCapacityUnavailableError,
-  ContainerConcurrencyLimitError,
-} from './container-concurrency.js';
+import { ContainerCapacityUnavailableError } from './container-concurrency.js';
+import { containerLimitError } from './container-limit-test-helpers.js';
 import {
   PREVIEW_MARKER_ALLOCATION_HEADER,
   PREVIEW_MARKER_PORT_HEADER,
@@ -202,7 +185,7 @@ function createSandbox(
     | 'SandboxSmallContainment'
     | 'SandboxCodeReview'
     | 'SandboxDIND' = 'SandboxSmallContainment',
-  heartbeatSeconds?: string
+  env: Record<string, string> = {}
 ) {
   const storage = new MemoryStorage();
   const shadowTasks: Promise<unknown>[] = [];
@@ -240,7 +223,7 @@ function createSandbox(
     flushShadowTasks: () => Promise.all(shadowTasks),
     sandbox: new TestSandbox(ctx, {
       CONTAINER_USAGE_METER: rpc,
-      CONTAINER_BILLING_HEARTBEAT_SECONDS: heartbeatSeconds,
+      ...env,
     } as never) as unknown as TestRuntime,
   };
 }
@@ -511,12 +494,9 @@ describe('MeteredSandbox', () => {
 
   it('accepts any successful meter admission before a selected cold start', async () => {
     const rpc = createRpc();
-    const { sandbox, flushShadowTasks } = createSandbox(
-      rpc,
-      false,
-      'SandboxSmallContainment',
-      '60'
-    );
+    const { sandbox, flushShadowTasks } = createSandbox(rpc, false, 'SandboxSmallContainment', {
+      CONTAINER_BILLING_HEARTBEAT_SECONDS: '60',
+    });
 
     await expect(
       sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
@@ -1549,66 +1529,169 @@ describe('MeteredSandbox', () => {
 });
 
 describe('MeteredSandbox container capacity', () => {
-  beforeEach(() => {
-    capacity.assertContainerCapacity.mockReset();
-    capacity.assertContainerCapacity.mockResolvedValue(undefined);
-  });
+  const capacityMarker = expect.objectContaining({ enforceCapacity: true });
+
+  function limitRpc() {
+    const rpc = createRpc();
+    const limit = containerLimitError('organization', 50);
+    vi.mocked(rpc.recordStart).mockResolvedValue({
+      success: false,
+      error: { code: 'container_limit_reached', message: limit.message },
+    });
+    return { rpc, limit };
+  }
 
   it.each(['start', 'startAndWaitForPorts'] as const)(
-    'checks the attributed account before a cold %s',
+    'opens the interval with the capacity marker before a cold %s',
     async method => {
-      const { sandbox } = createSandbox();
+      const { sandbox, rpc, storage, flushShadowTasks } = createSandbox();
       await sandbox.configureBilling(billingInput);
 
       await sandbox[method]();
+      await sandbox.onStart();
+      await flushShadowTasks();
 
-      expect(capacity.assertContainerCapacity).toHaveBeenCalledWith(expect.anything(), {
-        subject: billingInput.subject,
-        actor: billingInput.actor,
-        instanceId: billingInput.sandboxId,
-        checkpoint: 'sandbox-start',
-        billingOrigin: billingInput.metadata.origin,
-      });
+      expect(rpc.recordStart).toHaveBeenCalledOnce();
+      expect(rpc.recordStart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: billingInput.subject,
+          actor: billingInput.actor,
+          instanceId: billingInput.sandboxId,
+          enforceCapacity: true,
+        })
+      );
       expect(sandbox.startCalls).toBe(1);
+      expect(await getBillingContext(storage)).toMatchObject({ measurementStarted: true });
     }
   );
 
-  it.each([
-    new ContainerConcurrencyLimitError('organization', 50),
-    new ContainerCapacityUnavailableError(),
-  ])('refuses the physical start after capacity denial: %s', async denial => {
-    const { sandbox } = createSandbox();
+  it('refuses the physical start at the container limit and drops the generation', async () => {
+    const { rpc, limit } = limitRpc();
+    const { sandbox, storage } = createSandbox(rpc);
     await sandbox.configureBilling(billingInput);
-    capacity.assertContainerCapacity.mockRejectedValue(denial);
 
-    await expect(sandbox.start()).rejects.toBe(denial);
+    await expect(sandbox.start()).rejects.toMatchObject({
+      code: 'container_limit_reached',
+      message: limit.message,
+    });
+    expect(sandbox.startCalls).toBe(0);
+    expect(await getBillingContext(storage)).toBeUndefined();
+  });
+
+  it('returns the container limit from billing admission', async () => {
+    const { rpc, limit } = limitRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+
+    await expect(sandbox.ensureBillingAdmission(billingInput)).rejects.toMatchObject({
+      code: 'container_limit_reached',
+      message: limit.message,
+    });
+    expect(rpc.recordStart).toHaveBeenCalledWith(capacityMarker);
+    expect(await getBillingContext(storage)).toBeUndefined();
+  });
+
+  it('refuses the physical start when the meter cannot confirm admission', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStart).mockRejectedValue(new Error('meter unavailable'));
+    const { sandbox } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+
+    await expect(sandbox.start()).rejects.toBeInstanceOf(ContainerCapacityUnavailableError);
     expect(sandbox.startCalls).toBe(0);
   });
 
-  it('does not check a container that is already running', async () => {
-    const { sandbox } = createSandbox(createRpc(), true);
+  describe('after a failed physical start', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    async function failFirstStart() {
+      vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] });
+      const setup = createSandbox();
+      await setup.sandbox.configureBilling(billingInput);
+      const superStart = vi
+        .spyOn(sdk.StockSandbox.prototype, 'start')
+        .mockRejectedValueOnce(new Error('no container instance available'));
+      await expect(setup.sandbox.start()).rejects.toThrow('no container instance available');
+      expect(setup.rpc.recordStart).toHaveBeenCalledWith(capacityMarker);
+      return { ...setup, superStart };
+    }
+
+    it('reuses a recent admission without a meter call', async () => {
+      const { sandbox, rpc, superStart } = await failFirstStart();
+      vi.advanceTimersByTime(60_000);
+
+      await sandbox.start();
+
+      expect(rpc.recordStart).toHaveBeenCalledOnce();
+      expect(superStart).toHaveBeenCalledTimes(2);
+    });
+
+    it('admits a stale admission again so the cap applies', async () => {
+      const { sandbox, rpc, storage, superStart } = await failFirstStart();
+      const limit = containerLimitError('organization', 50);
+      vi.mocked(rpc.recordStart).mockResolvedValue({
+        success: false,
+        error: { code: 'container_limit_reached', message: limit.message },
+      });
+      vi.advanceTimersByTime(30 * 60_000);
+
+      await expect(sandbox.start()).rejects.toMatchObject({ code: 'container_limit_reached' });
+
+      expect(rpc.recordStop).toHaveBeenCalledWith(expect.objectContaining({ usageSinceLast: 0 }));
+      expect(rpc.recordStart).toHaveBeenCalledTimes(2);
+      expect(rpc.recordStart).toHaveBeenLastCalledWith(capacityMarker);
+      expect(superStart).toHaveBeenCalledOnce();
+      expect(await getBillingContext(storage)).toBeUndefined();
+    });
+  });
+
+  it('omits the capacity marker when the E2E Worker turns the cap off', async () => {
+    const { sandbox, rpc } = createSandbox(createRpc(), false, 'SandboxSmallContainment', {
+      CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
+    });
     await sandbox.configureBilling(billingInput);
 
-    await sandbox.startAndWaitForPorts();
+    await sandbox.start();
 
-    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
+    expect(rpc.recordStart).not.toHaveBeenCalledWith(capacityMarker);
     expect(sandbox.startCalls).toBe(1);
   });
 
-  it('does not check code review sandboxes', async () => {
-    const { sandbox } = createSandbox(createRpc(), false, 'SandboxCodeReview');
+  it('does not admit a container that is already running', async () => {
+    const { sandbox, rpc, container } = createSandbox();
+    await sandbox.configureBilling(billingInput);
+    // A running container without a generation would otherwise fail admission as stopping.
+    container.running = true;
+
+    await sandbox.startAndWaitForPorts();
+
+    expect(rpc.recordStart).not.toHaveBeenCalled();
+    expect(sandbox.startCalls).toBe(1);
+  });
+
+  it('does not admit code review sandboxes before the start', async () => {
+    const { sandbox, rpc } = createSandbox(createRpc(), false, 'SandboxCodeReview');
+    await sandbox.configureBilling({
+      ...billingInput,
+      sandboxId: 'crv-abcdef',
+      metadata: { origin: 'code-review' },
+    });
 
     await sandbox.start();
 
-    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+    expect(rpc.recordStart).not.toHaveBeenCalled();
+    expect(sandbox.startCalls).toBe(1);
   });
 
   it('admits a start without attribution', async () => {
-    const { sandbox } = createSandbox();
+    const { sandbox, rpc } = createSandbox();
 
     await sandbox.start();
 
-    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+    expect(rpc.recordStart).not.toHaveBeenCalled();
     expect(sandbox.startCalls).toBe(1);
   });
 });

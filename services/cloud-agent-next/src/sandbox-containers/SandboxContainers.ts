@@ -1,6 +1,7 @@
 import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
+import { containerCapacityEnforced } from '../container-concurrency.js';
 import { billingHeartbeatSeconds } from '../container-usage.js';
 import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import { logger } from '../logger.js';
@@ -1534,6 +1535,7 @@ export class SandboxContainers extends DurableObject<Env> {
       container: this,
       storage: this.ctx.storage,
       meter: this.env.CONTAINER_USAGE_METER,
+      enforceContainerCapacity: containerCapacityEnforced(this.env),
       heartbeatSeconds: billingHeartbeatSeconds(this.env.CONTAINER_BILLING_HEARTBEAT_SECONDS),
       isContainerRunning: () => this.ctx.container?.running === true,
       stopContainer: () => this.stopBillingContainer(),

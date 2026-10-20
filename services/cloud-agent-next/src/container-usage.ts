@@ -20,7 +20,7 @@ import {
   type BillingIdentity,
   type ContainerStopParams,
 } from './metered-billing-lifecycle.js';
-import { assertContainerCapacity } from './container-concurrency.js';
+import { containerCapacityEnforced } from './container-concurrency.js';
 
 export function billingHeartbeatSeconds(value: string | undefined): number {
   if (value === undefined || value.trim() === '') return DEFAULT_BILLING_HEARTBEAT_SECONDS;
@@ -43,6 +43,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     this.billing = new MeteredBillingLifecycle({
       storage: this.ctx.storage,
       usageClient: this.usageClient,
+      enforceContainerCapacity: containerCapacityEnforced(env),
       schedule: (delaySeconds, callback, payload) => this.schedule(delaySeconds, callback, payload),
       deleteSchedules: callback => this.deleteSchedules(callback),
       getState: () => this.getState(),
@@ -132,9 +133,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     ) {
       return;
     }
-    const attribution = await this.billing.getStartAttribution();
-    if (!attribution) return;
-    await assertContainerCapacity(this.env, { ...attribution, checkpoint: 'sandbox-start' });
+    await this.billing.admitBeforeStart(this.billingIdentity);
   }
 
   override async onStart(): Promise<void> {

@@ -26,12 +26,13 @@ import {
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
-import {
-  assertContainerCapacity,
-  getContainerCapacityFailureReason,
-} from '../../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
-import { createVercelBillingRuntime, type VercelBillingRuntime } from './vercel-billing-runtime.js';
+import {
+  createVercelBillingRuntime,
+  type VercelBillingRuntime,
+  type VercelCreateAdmission,
+} from './vercel-billing-runtime.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -4198,18 +4199,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 'Runtime preflight timed out'
               );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
-        if (pin.billing) {
-          await assertContainerCapacity(this.env, {
-            subject: pin.billing.subject,
-            actor: pin.billing.actor,
-            instanceId: pin.billing.sandboxId,
-            checkpoint: 'control-plane-create',
-            billingOrigin: pin.billing.metadata?.origin,
-          });
-        }
-
         if (pin.provider === 'vercel') {
-          let admission: 'admitted' | 'blocked' | 'unavailable' | 'retry' = 'retry';
+          let admission: VercelCreateAdmission = 'retry';
           let admissionRejected = false;
           let admissionStarted = false;
           try {
@@ -4232,7 +4223,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
             await this.failCreationRoutes(
               allocationId,
               admission === 'retry',
-              admission === 'blocked' ? 'billing_blocked' : 'billing_unavailable'
+              admission === 'blocked'
+                ? 'billing_blocked'
+                : admission === 'limit_reached'
+                  ? 'container_limit_reached'
+                  : 'billing_unavailable'
             );
             return;
           }
@@ -5197,9 +5192,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  private async admitVercelCreate(
-    pin: StoredProviderPin
-  ): Promise<'admitted' | 'blocked' | 'unavailable' | 'retry'> {
+  private async admitVercelCreate(pin: StoredProviderPin): Promise<VercelCreateAdmission> {
     return this.billingRuntime.admitCreate(pin);
   }
 

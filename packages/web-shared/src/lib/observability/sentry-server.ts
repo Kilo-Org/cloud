@@ -5,7 +5,11 @@
 
 import type { Event } from '@sentry/nextjs';
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
-import { sanitizeAnalyticsPathname } from '@kilocode/web-shared/lib/sanitize-analytics-url';
+import {
+  SENSITIVE_PATHS,
+  SENSITIVE_QUERY_PARAMS,
+  sanitizeAnalyticsPathname,
+} from '@kilocode/web-shared/lib/sanitize-analytics-url';
 
 type DrizzleQueryError = Error & {
   query: string;
@@ -79,12 +83,12 @@ function isTRPC4xxError(error: unknown): boolean {
   );
 }
 
-// The GitHub OAuth callback uses `state` as a short-lived bearer token, the
-// mobile app handoff carries a C1 bearer in `installState`, and `/s/*` carries
-// a session-share JWT in the path. Sentry's automatic request-data integration
-// can capture those in the request URL or query string, so strip them while
-// keeping the rest of the request data.
-const REDACTED_QUERY_KEYS = new Set(['state', 'installState'].map(key => key.toLowerCase()));
+// Sentry's automatic request-data integration can capture credentials from the
+// request URL or query string. Request metadata is filtered with the shared
+// sensitive-URL policy plus `installState`, which only the server app-flow
+// handoff carries. Share tokens in the path are redacted by
+// `sanitizeAnalyticsPathname`.
+const EXTRA_REDACTED_QUERY_KEYS = new Set(['installstate']);
 
 // Decode a raw query key the way URLSearchParams would, so percent-encoded
 // forms of the key are compared against their decoded value. Malformed
@@ -101,7 +105,8 @@ function decodeQueryKey(rawKey: string): string {
 // object. Keys are matched after URL-decoding and case-folding so percent-
 // encoded (`%73tate`) and mixed-case (`State`) forms cannot survive.
 function isRedactedQueryKey(rawKey: string): boolean {
-  return REDACTED_QUERY_KEYS.has(decodeQueryKey(rawKey).toLowerCase());
+  const key = decodeQueryKey(rawKey).toLowerCase();
+  return SENSITIVE_QUERY_PARAMS.has(key) || EXTRA_REDACTED_QUERY_KEYS.has(key);
 }
 
 type SentryRequest = NonNullable<Event['request']>;
@@ -115,16 +120,19 @@ function sanitizeStringQuery(queryString: string): string {
 }
 
 // Relative URLs cannot be parsed with `new URL`; split off the query string
-// manually, reuse the same sanitizer, and preserve any fragment.
+// manually, reuse the same sanitizers, and preserve any fragment. A sensitive
+// path keeps no query string, matching the shared policy.
 function sanitizeRelativeRequestUrl(url: string): string {
   const hashIndex = url.indexOf('#');
   const fragment = hashIndex === -1 ? '' : url.slice(hashIndex);
   const pathAndQuery = hashIndex === -1 ? url : url.slice(0, hashIndex);
   const queryIndex = pathAndQuery.indexOf('?');
-  if (queryIndex === -1) {
-    return `${sanitizeAnalyticsPathname(pathAndQuery)}${fragment}`;
+  const path = sanitizeAnalyticsPathname(
+    queryIndex === -1 ? pathAndQuery : pathAndQuery.slice(0, queryIndex)
+  );
+  if (queryIndex === -1 || SENSITIVE_PATHS.has(path)) {
+    return `${path}${fragment}`;
   }
-  const path = sanitizeAnalyticsPathname(pathAndQuery.slice(0, queryIndex));
   const sanitizedQuery = sanitizeStringQuery(pathAndQuery.slice(queryIndex + 1));
   return sanitizedQuery.length > 0 ? `${path}?${sanitizedQuery}${fragment}` : `${path}${fragment}`;
 }
@@ -133,6 +141,10 @@ function sanitizeRequestUrl(url: string): string {
   try {
     const parsed = new URL(url);
     parsed.pathname = sanitizeAnalyticsPathname(parsed.pathname);
+    if (SENSITIVE_PATHS.has(parsed.pathname)) {
+      parsed.search = '';
+      return parsed.toString();
+    }
     for (const [key] of Array.from(parsed.searchParams)) {
       if (isRedactedQueryKey(key)) {
         parsed.searchParams.delete(key);
@@ -250,9 +262,9 @@ export function initServerSentry(): void {
         }
       }
 
-      // Automatic request data can retain the GitHub OAuth `state` token, the
-      // app-flow `installState` bearer, or a `/s/{jwt}` share token; strip them
-      // while keeping the rest.
+      // Automatic request data can retain credentials in the request URL or
+      // query string; sanitize it with the shared sensitive-URL policy while
+      // keeping the rest.
       sanitizeSentryRequestData(event);
 
       return event;

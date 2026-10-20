@@ -44,6 +44,10 @@ Commands:
 
 Required environment:
   FAKE_LLM_BASE_URL  https://<fake-host>/api/openrouter
+  E2E_HYPERDRIVE_ID  Hyperdrive configuration id of the dedicated e2e database. Must differ from
+                     the id in wrangler.jsonc; the renderer refuses the shared one.
+  E2E_R2_BUCKET      Name of the dedicated e2e R2 bucket. Must differ from the bucket in
+                     wrangler.jsonc; the renderer refuses the shared one.
 Optional environment:
   E2E_INTERNAL_API_SECRET Value uploaded as the Worker's INTERNAL_API_SECRET when supplied. Needed
                           for the first deploy or a rotation; omit it on a redeploy to keep the
@@ -191,6 +195,8 @@ main() {
   esac
 
   require_env FAKE_LLM_BASE_URL
+  require_env E2E_HYPERDRIVE_ID
+  require_env E2E_R2_BUCKET
 
   case "$command" in
     render)

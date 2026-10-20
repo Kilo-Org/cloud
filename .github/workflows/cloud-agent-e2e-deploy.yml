@@ -19,8 +19,10 @@ jobs:
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
       E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
       FAKE_LLM_WORKER_URL: https://fake-llm.engineering-e11.workers.dev
-      # The e2e Worker writes to production Postgres and R2, so this deployed
-      # stack is a deliberate opt-in, not an isolation boundary.
+      # The e2e Worker binds its own Hyperdrive and R2 bucket. The renderer
+      # refuses to render without both, and refuses the wrangler.jsonc values.
+      E2E_HYPERDRIVE_ID: ${{ vars.E2E_HYPERDRIVE_ID }}
+      E2E_R2_BUCKET: ${{ vars.E2E_R2_BUCKET }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:

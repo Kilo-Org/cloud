@@ -25,6 +25,8 @@ import { LOCAL_E2E_INTERNAL_API_SECRET } from '../e2e/e2e-internal-secret';
 const overrides = {
   workerUrl: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev',
   kiloOpenRouterBase: 'https://fake-llm.engineering-e11.workers.dev/api/openrouter',
+  hyperdriveId: '1f0e9c2b7d4a4f0e8c1b3a5d7e9f0a2c',
+  r2Bucket: 'cloud-agent-e2e-test-sessions',
 };
 
 const REMOVED_CONTAINER_CLASSES = [
@@ -71,7 +73,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.$schema).toBe('../node_modules/wrangler/config-schema.json');
   });
 
-  it('keeps only Sandbox with a rebased image and a 20-instance cap', () => {
+  it('keeps only Sandbox with a rebased image and a 40-instance cap', () => {
     const { config } = render();
     expect(config.containers).toHaveLength(1);
     expect(config.containers[0].class_name).toBe('Sandbox');
@@ -325,7 +327,41 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS).toBe('');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS).toBe('');
     expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('false');
+    expect(config.vars.E2E_SESSION_ADMISSION).toBe('internal-key');
     expect(config.vars.KILO_SESSION_INGEST_URL).toBe('https://ingest.kilosessions.ai');
+  });
+
+  it('binds only the operator-supplied Hyperdrive and R2 bucket', () => {
+    const { config } = render();
+    expect(config.hyperdrive).toEqual([{ binding: 'HYPERDRIVE', id: overrides.hyperdriveId }]);
+    expect(config.r2_buckets).toEqual([{ binding: 'R2_BUCKET', bucket_name: overrides.r2Bucket }]);
+  });
+
+  it('refuses to render without a dedicated Hyperdrive id and R2 bucket', () => {
+    const source = readSourceConfig();
+    for (const missing of [
+      { hyperdriveId: undefined },
+      { hyperdriveId: '' },
+      { hyperdriveId: '   ' },
+      { r2Bucket: undefined },
+      { r2Bucket: '' },
+    ]) {
+      expect(() => buildE2eWorkerConfig(source, { ...overrides, ...missing })).toThrow(
+        /is required: point it at the dedicated e2e data store/
+      );
+    }
+  });
+
+  it('refuses the source config Hyperdrive id and R2 bucket', () => {
+    const source = readSourceConfig();
+    const sourceHyperdriveId = source.hyperdrive[0].id;
+    const sourceR2Bucket = source.r2_buckets[0].bucket_name;
+    expect(() =>
+      buildE2eWorkerConfig(source, { ...overrides, hyperdriveId: sourceHyperdriveId })
+    ).toThrow(/must name a dedicated e2e data store/);
+    expect(() => buildE2eWorkerConfig(source, { ...overrides, r2Bucket: sourceR2Bucket })).toThrow(
+      /must name a dedicated e2e data store/
+    );
   });
 
   it('renders no surface allowlist: the deployed secret is a Worker secret, not a var', () => {
@@ -412,6 +448,13 @@ describe('local e2e worker config', () => {
   it('renders no surface allowlist into the top level or the preserved env.dev vars', () => {
     const { config } = renderLocalConfig();
     expect(JSON.stringify(config)).not.toContain('E2E_SURFACE_USER_IDS');
+  });
+
+  it('leaves the session-start admission gate off, so the local web app is unaffected', () => {
+    const { config } = renderLocalConfig();
+    expect(config.vars).not.toHaveProperty('E2E_SESSION_ADMISSION');
+    expect(config.env.dev.vars).not.toHaveProperty('E2E_SESSION_ADMISSION');
+    expect(JSON.stringify(config)).not.toContain('E2E_SESSION_ADMISSION');
   });
 
   it('binds the callback sink in both the top level and env.dev, and migrates it after v10', () => {

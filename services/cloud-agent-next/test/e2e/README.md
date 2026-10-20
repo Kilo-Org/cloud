@@ -364,7 +364,7 @@ Two Workers, in deploy order:
    `test/e2e/deploy/deploy-fake-llm.sh deploy`.
 2. `cloud-agent-e2e-test` — private render of this package's Worker;
    deploy second with
-   `FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
+   `E2E_HYPERDRIVE_ID=<id> E2E_R2_BUCKET=<bucket> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
    Add `E2E_INTERNAL_API_SECRET=<secret>` on the first deploy or to rotate it; a
    redeploy without it keeps the deployed Worker secret.
 
@@ -605,12 +605,14 @@ prompt carries that shard's marker; a request the harness dials without the
 scenario's prompt (for example a buggy lazy create) is not attributed and stays a
 documented limit.
 
-Accepted production-coupling risk (repeated from `deploy/README.md`): dedicated
-Worker names keep the stack addressable separately from production; they do
-**not** isolate its resources. The e2e Worker render clones the production
-bindings — the production Hyperdrive/Postgres database, the `kilocode-sessions`
-R2 bucket, and production service bindings — and its endpoints are public with
-valid-token admission only, with no per-user isolation.
+Resource boundary: dedicated Worker names keep the stack addressable separately
+from production. The e2e Worker render binds the dedicated Hyperdrive and R2
+bucket named by `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET` (the renderer refuses a
+missing value or the `wrangler.jsonc` value), keeps the production service, KV
+and Secrets Store bindings, removes the report queue, and renames the callback
+queue. Session starts on the deployment additionally require the e2e key
+`x-internal-api-key` on `POST /trpc/start` and `POST /trpc/createWorktreeChat`;
+the driver presents it. Concurrent runs are not isolated from each other.
 
 Docker scope boundary: deploying the fake Worker needs no Docker (it is a Worker
 and a Durable Object, not a container image); deploying the Cloud Agent e2e

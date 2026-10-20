@@ -311,7 +311,10 @@ async function startSessionUnified(
           : {}),
       },
     },
-    { signal: args.signal }
+    {
+      ...(config.internalApiSecret ? { internalApiSecret: config.internalApiSecret } : {}),
+      signal: args.signal,
+    }
   );
 }
 

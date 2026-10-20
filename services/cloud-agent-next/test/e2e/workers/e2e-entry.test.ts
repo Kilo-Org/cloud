@@ -5,6 +5,7 @@ import { inArray } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import production from '../../../src/index.js';
+import e2eWorker, { isSessionStartRequest } from '../../../src/e2e-entry.js';
 import { e2eSurfaceApp } from '../../../src/e2e-surface/app.js';
 
 const ALLOWED_USER = 'usr_e2e_surface_allowed';
@@ -221,5 +222,114 @@ describe('internal tRPC reachability (deliberately widened by the single secret)
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error?: { message?: string } };
     expect(body.error?.message).toBe('Invalid or missing internal API key');
+  });
+});
+
+const SESSION_START_ROUTES = ['/trpc/start', '/trpc/createWorktreeChat'];
+
+function sessionStartRequest(path: string, credentials: Credentials = {}): Request {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    // Skip the balance check so an admitted request reaches input validation
+    // instead of the balance backend.
+    'x-skip-balance-check': 'true',
+    ...(credentials.token === undefined ? {} : { Authorization: `Bearer ${credentials.token}` }),
+    ...(credentials.secret === undefined ? {} : { 'x-internal-api-key': credentials.secret }),
+  };
+  return new Request(`https://worker.test${path}`, {
+    method: 'POST',
+    headers,
+    body: credentials.body ?? '{}',
+  });
+}
+
+/** The deployed render's admission gate; local renders leave it unset. */
+function admissionEnv(
+  overrides: { E2E_SESSION_ADMISSION?: string; INTERNAL_API_SECRET?: string } = {}
+) {
+  return { ...env, E2E_SESSION_ADMISSION: 'internal-key', ...overrides };
+}
+
+describe('session-start admission', () => {
+  it('classifies both session-start procedures, and any batch member, as session starts', () => {
+    expect(isSessionStartRequest('POST', '/trpc/start')).toBe(true);
+    expect(isSessionStartRequest('POST', '/trpc/createWorktreeChat')).toBe(true);
+    expect(isSessionStartRequest('POST', '/trpc/getSession,start')).toBe(true);
+    expect(isSessionStartRequest('POST', '/trpc/getSession')).toBe(false);
+    expect(isSessionStartRequest('POST', '/trpc/startSomethingElse')).toBe(false);
+    expect(isSessionStartRequest('GET', '/trpc/start')).toBe(false);
+  });
+
+  it('rejects both procedures without the key before the token is read', async () => {
+    for (const path of SESSION_START_ROUTES) {
+      const response = await e2eWorker.fetch(
+        sessionStartRequest(path, { token: tokenFor(ALLOWED_USER) }),
+        admissionEnv(),
+        createExecutionContext()
+      );
+      expect(response.status, path).toBe(401);
+      await expect(response.text()).resolves.toBe('Unauthorized');
+    }
+  });
+
+  it('rejects both procedures with a wrong key', async () => {
+    for (const path of SESSION_START_ROUTES) {
+      const response = await e2eWorker.fetch(
+        sessionStartRequest(path, {
+          token: tokenFor(ALLOWED_USER),
+          secret: 'wrong-key-value',
+        }),
+        admissionEnv(),
+        createExecutionContext()
+      );
+      expect(response.status, path).toBe(401);
+      await expect(response.text()).resolves.toBe('Unauthorized');
+    }
+  });
+
+  it('fails closed when the Worker binds no internal secret', async () => {
+    const response = await e2eWorker.fetch(
+      sessionStartRequest('/trpc/start', {
+        token: tokenFor(ALLOWED_USER),
+        secret: 'presented-but-unconfigured-key',
+      }),
+      admissionEnv({ INTERNAL_API_SECRET: undefined }),
+      createExecutionContext()
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('admits the key and a valid token, so the handler reports its own input error', async () => {
+    for (const path of SESSION_START_ROUTES) {
+      const response = await e2eWorker.fetch(
+        sessionStartRequest(path, { token: tokenFor(ALLOWED_USER), secret: internalApiSecret }),
+        admissionEnv(),
+        createExecutionContext()
+      );
+      expect(response.status, path).toBe(400);
+      const body = (await response.json()) as { error?: { message?: string } };
+      expect(typeof body.error?.message, path).toBe('string');
+    }
+  });
+
+  it('keeps an admitted session start behind the token gate', async () => {
+    const response = await e2eWorker.fetch(
+      sessionStartRequest('/trpc/start', { secret: internalApiSecret }),
+      admissionEnv(),
+      createExecutionContext()
+    );
+    expect(response.status).toBe(401);
+    const body = (await response.json()) as { error?: { message?: string } };
+    expect(body.error?.message).not.toBe('Unauthorized');
+  });
+
+  it('leaves the gate off when the render does not set it', async () => {
+    expect('E2E_SESSION_ADMISSION' in env).toBe(false);
+    for (const path of SESSION_START_ROUTES) {
+      const response = await SELF.fetch(
+        sessionStartRequest(path, { token: tokenFor(ALLOWED_USER) })
+      );
+      expect(response.status, path).toBe(400);
+    }
   });
 });

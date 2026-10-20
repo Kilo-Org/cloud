@@ -74,14 +74,28 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
 4. Render and deploy the e2e Worker:
 
    ```sh
-   FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh dry-run
-   FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy
+   E2E_HYPERDRIVE_ID=<id> E2E_R2_BUCKET=<bucket> \
+     FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh dry-run
+   E2E_HYPERDRIVE_ID=<id> E2E_R2_BUCKET=<bucket> \
+     FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy
    # add E2E_INTERNAL_API_SECRET=<secret> on the first deploy, or to rotate it
    ```
 
-   The deployed test Worker writes to production Postgres and R2. Every
-   authenticated Kilo user can start control-plane sessions and create worktrees
-   on it.
+   The deployment binds the Hyperdrive configuration and R2 bucket named by
+   `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET`. Both are required: the renderer
+   refuses to render when either is missing, or when it names the value from
+   `wrangler.jsonc`. The services, KV and Secrets Store bindings still come from
+   the source config. See
+   [Provisioning the e2e data stores](#provisioning-the-e2e-data-stores) for the
+   runbook.
+
+   Session starts on the deployment require the e2e key as well as the ordinary
+   Kilo token. `POST /trpc/start` and `POST /trpc/createWorktreeChat` without a
+   matching `x-internal-api-key` are rejected with `401` by
+   `src/e2e-entry.ts` before the token is verified or the database is touched;
+   every other route is unchanged. The key is the Worker's `INTERNAL_API_SECRET`,
+   the same value the surface and the internal procedures use, and the driver
+   presents it on those two procedures.
 
    `deploy` uploads `E2E_INTERNAL_API_SECRET` as the Worker's
    `INTERNAL_API_SECRET` secret when a source supplies it. `wrangler deploy` never
@@ -109,8 +123,9 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    the exception: it deletes session resources without the
    `requireCurrentSessionAccess` check the public `deleteSession` applies, so the
    secret plus any valid JWT can trigger cleanup of an **unowned** session id;
-   seed remains the only no-JWT path. The deployed e2e Worker writes to
-   production Postgres and R2, so "separate deployment" is not a data boundary.
+   seed remains the only no-JWT path. The rendered deployment binds only the
+   Hyperdrive and R2 resources named by `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET`,
+   so its session rows, usage rows and logs stay in the e2e data stores.
 
    The deployed driver resolves the e2e secret with the same order as the
    fake-LLM admin token (`E2E_INTERNAL_API_SECRET` → auth-file
@@ -124,6 +139,34 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    bearer with the same order and exports the resolved value into
    `FAKE_LLM_ADMIN_TOKEN` for the run, so the control helpers read it through
    `resolveFakeAdminToken()`; a mismatch shows up as 401s from `/test/*`.
+
+## Provisioning the e2e data stores
+
+The rendered deployment reads and writes only the resources below; no data store
+from `wrangler.jsonc` is reused.
+
+1. Create a Postgres database used only by the e2e deployment and apply the
+   repository schema (`packages/db` migrations, as for any environment).
+2. Seed the funded test account the driver authenticates as: a `kilocode_users`
+   row whose id and `api_token_pepper` match that account's Kilo token, plus the
+   organization rows the scenarios use. The run keeps one `cli_sessions_v2` row
+   per started session here.
+3. Create the Hyperdrive configuration and note the returned id:
+
+   ```sh
+   pnpm -C services/cloud-agent-next exec wrangler hyperdrive create cloud-agent-e2e-test \
+     --connection-string="postgres://<user>:<password>@<host>:5432/<database>"
+   ```
+
+4. Create the bucket:
+
+   ```sh
+   pnpm -C services/cloud-agent-next exec wrangler r2 bucket create cloud-agent-e2e-test-sessions
+   ```
+
+5. Export `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET` for a manual deploy, or set the
+   repository variables `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET` so the
+   `Cloud Agent E2E deploy` workflow renders with them.
 
 ## Environment variables
 
@@ -165,6 +208,8 @@ script never falls back to another token and never prints the token value.
 | `E2E_USER_TOKEN` | no | An ordinary personal Kilo API token for the driver, presented verbatim. Takes precedence over the auth file's `token` field and needs no separate `userId`/`email`. Not read by `deploy-fake-llm.sh`. |
 | `E2E_INTERNAL_API_SECRET` | required for the deployed driver; optional for deploy | Value uploaded as the `cloud-agent-e2e-test` Worker's `INTERNAL_API_SECRET` secret when a source supplies it, and always presented by the driver as both the surface key and the internal tRPC key. Needed for the first deploy or a rotation; a redeploy without it keeps the deployed value. When unset or empty, both `deploy-e2e-worker.sh` and the deployed driver resolve it from the `E2E_AUTH_FILE`'s `e2eInternalApiSecret` field. The shared `requireE2eInternalSecret` rules require at least 16 characters, no whitespace, and not the development default; the dotenv alphabet `[A-Za-z0-9._~-]` is a local-renderer concern only, so a base64 value is accepted here. Must differ from production's `INTERNAL_API_SECRET` (an operator requirement the scripts cannot prove). |
 | `FAKE_LLM_BASE_URL` | yes | Must be `https://<fake-host>/api/openrouter`. |
+| `E2E_HYPERDRIVE_ID` | yes for render, dry-run and deploy | Hyperdrive configuration id of the dedicated e2e database. The renderer refuses a missing value and the id in `wrangler.jsonc`. Read by `deploy-e2e-worker.sh`, which also requires it, and by the deploy workflow from the repository variable of the same name. |
+| `E2E_R2_BUCKET` | yes for render, dry-run and deploy | Name of the dedicated e2e R2 bucket. The renderer refuses a missing value and the bucket in `wrangler.jsonc`. Read by `deploy-e2e-worker.sh`, which also requires it, and by the deploy workflow from the repository variable of the same name. |
 | `FAKE_LLM_ADMIN_TOKEN` | yes | Bearer for the fake's `/test/*` routes. Uploaded as the Worker secret by `deploy-fake-llm.sh` and exported for the driver. When unset or empty, the script resolves it from `E2E_AUTH_FILE`. Never the development default. |
 | `WORKER_URL` | no | Default `https://cloud-agent-e2e-test.engineering-e11.workers.dev`. |
 | `FAKE_LLM_WORKER_URL` | no | Default `https://fake-llm.engineering-e11.workers.dev`. |
@@ -202,7 +247,9 @@ semantics.
 | `main` and container `image` paths rebased (`../src/index.ts`, `../Dockerfile*`) | The rendered config lives one directory deeper, in `.wrangler/`. |
 | Report-queue producer and consumer removed | The e2e Worker must not produce or consume the production report queue. |
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
-| Only the `Sandbox` container class kept, `max_instances = 20`, `ssh.enabled = true` | The stack only runs normal non-contained `ses-` sessions, which route to `Sandbox`; `20` is a cap rather than a reservation and leaves parallelism headroom for later parallel runs. Enables SSH inspection. |
+| Only the `Sandbox` container class kept, `max_instances = 40`, `ssh.enabled = true` | The stack only runs normal non-contained `ses-` sessions, which route to `Sandbox`; `40` is a cap rather than a reservation and leaves parallelism headroom for later parallel runs. Enables SSH inspection. |
+| `HYPERDRIVE` replaced by `E2E_HYPERDRIVE_ID`, `R2_BUCKET` replaced by `E2E_R2_BUCKET` | The deployment keeps its own database and bucket; the renderer refuses a missing value and the `wrangler.jsonc` value. |
+| `E2E_SESSION_ADMISSION=internal-key` | `src/e2e-entry.ts` admits `POST /trpc/start` and `POST /trpc/createWorktreeChat` only with `x-internal-api-key`. The local render does not set it. |
 | The other container classes removed from `containers`, `durable_objects.bindings` and `migrations` | A container class is all three entries; keeping a binding or migration without its class fails the deploy. Removing them removes unused capacity and deploy cost. |
 | Billing flags off (`CLOUD_AGENT_CONTAINER_BILLING_*`) | Matches the dev profile. |
 | `CREDENTIAL_CONTAINMENT_ENABLED=false` | Non-contained dispatch; see plan sections 5 and 11.6. |
@@ -213,7 +260,7 @@ semantics.
 ### Container classes and removed bindings
 
 The e2e Worker provisions exactly one container class, `Sandbox`, with
-`max_instances: 20`. The value is an upper cap, not a reservation, and gives
+`max_instances: 40`. The value is an upper cap, not a reservation, and gives
 parallelism headroom for later parallel runs. `Sandbox` keeps the rendered
 `image` and `instance_type`; only `max_instances` and `ssh.enabled` change.
 
@@ -304,20 +351,23 @@ touched again.
   session data.
 - The stack is public test endpoints with capped, not guaranteed, capacity.
   The e2e Worker provisions only the `Sandbox` container class with
-  `max_instances: 20`; that is a cap, not a reservation, and it gives
+  `max_instances: 40`; that is a cap, not a reservation, and it gives
   parallelism headroom for later parallel runs. Capacity is not guaranteed.
-- There is no per-user admission guarantee and no concurrent-run isolation.
+- Session starts require the e2e key in addition to a valid Kilo token, so only
+  a caller holding the key reaches `start` or `createWorktreeChat`. Concurrent
+  runs are still not isolated from each other.
 - Capacity is capped but there is no total-spending cap.
 - The supported profile is short streams only. `gate`/`hang` directives are
   reachable on the deployed fake (they need a valid model token and, for
   `gate`, an admin-token release), but they are unsupported by the deployed
   profile and are NOT guaranteed to terminate within two minutes or to survive
   an eviction. `sleepAfter` limits sidecar inactivity only.
-- Dedicated Worker names keep the stack addressable separately from production;
-  they do not isolate its resources. The e2e Worker render clones the production
-  bindings: the production Hyperdrive/Postgres database, the `kilocode-sessions`
-  R2 bucket, and the production service bindings. The endpoints are public with
-  valid-token admission only, and there is no per-user isolation.
+- Dedicated Worker names keep the stack addressable separately from production.
+  The render binds the e2e Hyperdrive and R2 resources named by
+  `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET`, and keeps the source config's
+  service, KV and Secrets Store bindings. The report queue is removed and the
+  callback queue is renamed, so no queue message crosses between the two
+  deployments.
 
 ## Running the deployed matrix
 

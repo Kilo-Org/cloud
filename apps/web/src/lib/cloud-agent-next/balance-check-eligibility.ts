@@ -44,8 +44,9 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   modelId: string;
   organizationId?: string;
 }): Promise<BalanceCheckModelEligibility> {
-  const isFree = isFreeModel(params.modelId);
-  if (isFree) {
+  // Naming a custom LLM the user cannot call skips this check too, but the
+  // gateway refuses every request for it, so the session cannot run inference.
+  if (await isFreeModel(params.modelId)) {
     return { isFree: true, hasUserByokAvailable: false };
   }
 

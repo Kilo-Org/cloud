@@ -6,12 +6,21 @@ set -euo pipefail
 # Usage:
 #   scripts/typecheck-all.sh                  # full (all workspace packages)
 #   scripts/typecheck-all.sh --changes-only   # incremental (changed packages only)
+#   scripts/typecheck-all.sh --group <name>   # CI: one group of KILO_AFFECTED
+#
+# Groups split the work across parallel CI jobs:
+#   web       apps/web, scripts/web-env and storybook
+#   trpc      the tRPC build and the apps that compile against it
+#   packages  every other workspace package
+# KILO_AFFECTED is the JSON printed by scripts/affected-workspaces.mjs.
 
 PATH="node_modules/.bin:$PATH"
 
 changes_only=false
+group=""
 case "${1:-}" in
   --changes-only) changes_only=true ;;
+  --group) group="${2:?--group needs web, trpc or packages}" ;;
   "") ;;
   *) echo "Unknown option: $1" >&2; exit 1 ;;
 esac
@@ -19,6 +28,68 @@ esac
 # Exclude the root package so the recursive workspace typecheck does not invoke
 # this script again.
 workspace_typecheck_filters=(--filter '!kilocode-monorepo' --filter '!web' --filter '!@kilocode/trpc')
+
+if [ -n "$group" ]; then
+  affected="${KILO_AFFECTED:?KILO_AFFECTED is required with --group}"
+  full=$(jq -r '.full or (.full_checks | index("typecheck") != null)' <<< "$affected")
+  affects() {
+    [ "$full" = true ] || jq -e --arg name "$1" '.packages | index($name)' <<< "$affected" > /dev/null
+  }
+  case "$group" in
+    web)
+      if affects web; then
+        # A full check: from main's build info, an edit to a shared module
+        # rechecks more than a full check costs.
+        tsgo --noEmit -p apps/web/tsconfig.json --incremental false
+        tsgo --noEmit -p scripts/web-env/tsconfig.json
+      fi
+      if affects @kilocode/storybook; then
+        pnpm --filter @kilocode/storybook run typecheck
+      fi
+      ;;
+    trpc)
+      # kilo-app typechecks in kilo-app CI, which runs whenever kilo-app is
+      # affected. The extension has no other job that typechecks it outside its
+      # own workflow, which skips unrelated PRs.
+      # CI restores or builds the declarations first and sets
+      # KILO_TYPECHECK_TRPC_BUILT=1.
+      if [ "${KILO_TYPECHECK_TRPC_BUILT:-}" != 1 ]; then
+        pnpm --filter @kilocode/trpc run build
+        export KILO_TYPECHECK_TRPC_BUILT=1
+      fi
+      if affects kilo-extension; then
+        pnpm --filter kilo-extension run typecheck
+      fi
+      ;;
+    packages)
+      # The web, trpc and extension checks belong to their own groups.
+      # kilo-app typechecks in kilo-app CI, which runs whenever kilo-app is
+      # affected; its typecheck needs the compiled harness SDK, which this
+      # group does not build.
+      excluded=(
+        --filter '!@kilocode/storybook'
+        --filter '!kilo-app'
+        --filter '!kilo-extension'
+      )
+      if [ "$full" = true ]; then
+        pnpm -r "${workspace_typecheck_filters[@]}" "${excluded[@]}" run typecheck
+        exit 0
+      fi
+      filters=()
+      while IFS= read -r name; do
+        case "$name" in
+          web | @kilocode/trpc | @kilocode/storybook | kilo-app | kilo-extension) ;;
+          *) filters+=(--filter "$name") ;;
+        esac
+      done < <(jq -r '.packages[]' <<< "$affected")
+      if [ ${#filters[@]} -gt 0 ]; then
+        pnpm -r "${filters[@]}" run typecheck
+      fi
+      ;;
+    *) echo "Unknown group: $group" >&2; exit 1 ;;
+  esac
+  exit 0
+fi
 
 base=""
 if $changes_only; then

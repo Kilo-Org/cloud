@@ -1,12 +1,15 @@
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  faviconIcon,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'martian',
   base_url: 'https://api.withmartian.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
-  default_ai_sdk_provider: 'openrouter',
+  reasoning_details_transform: null,
   transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'martian',
@@ -20,4 +23,14 @@ export default {
       },
     ],
   }),
+  provider_listing: {
+    dataPolicy: {
+      training: true,
+      retainsPrompts: true,
+      canPublish: false,
+      termsOfServiceURL: 'https://withmartian.com/terms-of-service',
+      privacyPolicyURL: 'https://withmartian.com/privacy-policy',
+    },
+    icon: faviconIcon('https://withmartian.com/'),
+  },
 } satisfies DirectByokProvider;

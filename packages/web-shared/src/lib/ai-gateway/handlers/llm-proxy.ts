@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
@@ -33,10 +34,7 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import {
-  isDisabledKiloExclusiveModel,
-  isKiloExclusiveRateLimitedModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -59,6 +57,10 @@ import {
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
+  customRouterErrorResponse,
+  autoRoutingUnavailableResponse,
+  invalidAutoDecisionResponse,
+  paidModelAuthRequiredResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -83,13 +85,7 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
-import {
-  checkFreeModelRateLimit,
-  checkFreeModelRateLimitByUser,
-  logFreeModelRequest,
-  checkPromotionLimit,
-} from '@kilocode/web-shared/lib/free-model-rate-limiter';
-import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@kilocode/web-shared/lib/constants';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
@@ -105,17 +101,31 @@ import {
   KILO_AUTO_FRONTIER_MODEL,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import {
+  applyResolvedAutoModel,
+  applyResolvedModel,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import { decideCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
+import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
+import {
+  fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
-  FRONTIER_ROUTING_FLAG,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import type { AutoRouter } from '@kilocode/auto-routing-contracts';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import {
+  AUTO_DECISION_HEADER,
+  customRouterModelId,
+  isCustomRouterModelId,
+  type AutoRouter,
+  type CustomRouterReference,
+} from '@kilocode/auto-routing-contracts';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
+  dataCollectionRequiredAutoRoutingCandidates,
+  deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
+import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -132,6 +142,7 @@ import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/orga
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
+  type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
@@ -146,9 +157,6 @@ import {
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
-
-const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
-const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 
 /**
  * Checks if a string starts with a required prefix and removes it.
@@ -186,14 +194,11 @@ function validatePath(
   return { errorResponse: invalidPathResponse() };
 }
 
-async function resolveRateLimit(
+async function resolveFreeModelRateLimitKey(
   feature: FeatureValue | null,
   ipAddress: string,
   authPromise: Promise<{ user: { id: string } | null }>
-): Promise<
-  | NextResponseType<unknown>
-  | { result: { allowed: boolean; requestCount: number }; subject: string }
-> {
+): Promise<NextResponseType<unknown> | string> {
   if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
     const { user } = await authPromise;
     if (!user) {
@@ -205,15 +210,9 @@ async function resolveRateLimit(
         { status: 401 }
       );
     }
-    return {
-      result: await checkFreeModelRateLimitByUser(user.id),
-      subject: `user: ${user.id}`,
-    };
+    return `user:${user.id}`;
   }
-  return {
-    result: await checkFreeModelRateLimit(ipAddress),
-    subject: `ip address: ${ipAddress}`,
-  };
+  return `ip:${ipAddress}`;
 }
 
 export async function handleLlmProxyRequest(
@@ -334,6 +333,7 @@ export async function handleLlmProxyRequest(
     const context = await getOrganizationGroupPolicyContext({
       organizationId: auth.organizationId,
       subject: { type: 'member', kiloUserId: auth.user.id },
+      fromDb: readDb,
     });
     return evaluateEffectiveModelAccessPolicy(context);
   });
@@ -399,63 +399,151 @@ export async function handleLlmProxyRequest(
   // validation after resolution.
   let routingTarget: string | null = null;
   let legacyClassifierCostUsd = 0;
-  // Efficient/balanced requests resolve through the auto-routing pool. Kept for
+  let autoRoutingUnavailable = false;
+  // Efficient/balanced and custom router requests resolve through an auto-routing pool. Kept for
   // the org policy check below so a failed routing decision gets a specific
   // auto-routing error instead of the generic model-not-allowed error.
-  let isAutoEfficientRequest = false;
-  if (isKiloAutoModel(requestedModelLowerCased)) {
+  let isAutoRoutedRequest = false;
+  // Custom routers and signed CLI decisions bill an account, so they never fall through to
+  // anonymous handling.
+  const authenticatedRoutingCaller = async () => {
+    const { user, authFailedResponse, credentialsRejected, organizationId } = await authPromise;
+    if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
+    if (!user || authFailedResponse) return paidModelAuthRequiredResponse();
+    return { userId: user.id, organizationId: organizationId ?? null };
+  };
+  const autoRoutingDenials = async (
+    fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
+    fromPrivacy: () => Promise<string[]>,
+    candidateIds: ReadonlyArray<string> = []
+  ) => {
+    const { settings, plan } = await balanceAndSettingsPromise;
+    const groupPolicy = await organizationGroupPolicyPromise;
+    const deniedSettings = new Set(
+      !groupPolicy && plan === 'enterprise'
+        ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
+        : []
+    );
+    const deniedFromSettings = [
+      ...deniedSettings,
+      ...candidateIds.filter(modelId => deniedSettings.has(normalizeModelId(modelId))),
+    ];
+    const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
+      groupPolicy ? fromPolicy(groupPolicy) : [],
+      isDataCollectionExplicitlyDisallowed(effectivePrivacy) ? fromPrivacy() : [],
+    ]);
+    return [...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy])];
+  };
+  const decisionRequest = (caller: { userId: string; organizationId: string | null }) => ({
+    apiKind: requestBodyParsed.kind,
+    body: requestBodyParsed.body,
+    providerHints: autoRoutingProviderHints,
+    bodyBytes: Buffer.byteLength(requestBodyText),
+    userId: caller.userId,
+    organizationId: caller.organizationId,
+    sessionId: taskId ?? sessionHeader,
+    machineId: machineIdHeader,
+    clientRequestId,
+    mode: modeHeader,
+    userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+  });
+
+  const autoDecisionToken = request.headers.get(AUTO_DECISION_HEADER);
+  if (autoDecisionToken !== null) {
+    const caller = await authenticatedRoutingCaller();
+    if (caller instanceof NextResponse) return caller;
+    if (!AUTO_ROUTING_DECISION_SECRET) {
+      console.error(`${AUTO_DECISION_HEADER} received but AUTO_ROUTING_DECISION_SECRET is unset`);
+      return temporarilyUnavailableResponse();
+    }
+    const check = await checkAutoDecision({
+      token: autoDecisionToken,
+      secret: AUTO_ROUTING_DECISION_SECRET,
+      nowMs: Date.now(),
+      userId: caller.userId,
+      organizationId: caller.organizationId,
+      model: requestedModel,
+    });
+    if (check.kind === 'rejected') return invalidAutoDecisionResponse(check.reason);
+    applyResolvedModel(requestBodyParsed, check.resolved);
+    autoModel = check.routerModelId;
+  } else if (isKiloAutoModel(requestedModelLowerCased)) {
+    if (isCustomRouterModelId(requestedModelLowerCased)) {
+      const caller = await authenticatedRoutingCaller();
+      if (caller instanceof NextResponse) return caller;
+    }
     autoModel = requestedModelLowerCased;
     const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
-    isAutoEfficientRequest = isAutoEfficientId;
+    isAutoRoutedRequest = isAutoEfficientId || isCustomRouterModelId(requestedModelLowerCased);
+    let legacyPoolTarget = false;
+    const legacyPoolRouter = async (): Promise<CustomRouterReference | null> => {
+      const auth = await authPromise;
+      if (!auth.user || auth.authFailedResponse) return null;
+      const router = await findEffectiveLegacyPoolRouter({
+        userId: auth.user.id,
+        organizationId: auth.organizationId ?? null,
+      });
+      legacyPoolTarget = router !== null;
+      return router ? { scope: router.ownerType, slug: router.slug } : null;
+    };
     const decisionForRouter = async (router: AutoRouter) => {
       const { user, authFailedResponse, organizationId } = await authPromise;
       // The classifier uses Kilo's paid credential. Unauthenticated callers
       // must never spend classification without a user to attribute it to.
       if (!user || authFailedResponse) return null;
-      if (
-        router === 'frontier' &&
-        !(await isReleaseToggleEnabled(FRONTIER_ROUTING_FLAG, user.id))
-      ) {
-        return null;
-      }
-      const { settings, plan } = await balanceAndSettingsPromise;
-      const groupPolicy = await organizationGroupPolicyPromise;
-      const deniedFromSettings =
-        !groupPolicy && plan === 'enterprise'
-          ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
-          : [];
       const owner = { userId: user.id, organizationId: organizationId ?? null };
-      const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
-        groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy, owner) : [],
-        isDataCollectionExplicitlyDisallowed(effectivePrivacy)
-          ? collectDataCollectionRequiredAutoRoutingModelIds(owner)
-          : [],
-      ]);
-      const deniedModelIds = [
-        ...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy]),
-      ];
+      const deniedModelIds = await autoRoutingDenials(
+        policy => collectDeniedAutoRoutingModelIds(policy, owner, router),
+        () => collectDataCollectionRequiredAutoRoutingModelIds(owner, router)
+      );
       const result = await fetchEfficientAutoDecision({
+        ...decisionRequest(owner),
         ...(router === 'frontier' ? { router } : {}),
-        apiKind: requestBodyParsed.kind,
-        body: requestBodyParsed.body,
         requestedModel,
-        providerHints: autoRoutingProviderHints,
-        bodyBytes: Buffer.byteLength(requestBodyText),
-        userId: user.id,
-        organizationId: organizationId ?? null,
-        sessionId: taskId ?? sessionHeader,
-        machineId: machineIdHeader,
-        clientRequestId,
-        mode: modeHeader,
-        userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
         deniedModelIds,
       });
       legacyClassifierCostUsd = result?.costUsd ?? 0;
       return result?.decision ?? null;
     };
-    const efficientDecision = isAutoEfficientId ? () => decisionForRouter('efficient') : undefined;
+    const customRouterDecision = async (reference: CustomRouterReference) => {
+      const caller = await authenticatedRoutingCaller();
+      if (caller instanceof NextResponse) {
+        return {
+          kind: 'rejected',
+          code: 'unauthorized',
+          message: 'Custom routers require an authenticated user',
+        } as const;
+      }
+      return await decideCustomRouter({
+        reference,
+        ...caller,
+        deniedModelIds: candidateIds =>
+          autoRoutingDenials(
+            policy => deniedAutoRoutingCandidates(policy, candidateIds),
+            () => dataCollectionRequiredAutoRoutingCandidates(candidateIds),
+            candidateIds
+          ),
+        decide: async (router, deniedModelIds) => {
+          const outcome = await fetchCustomRouterDecision({
+            ...decisionRequest(caller),
+            router: router.baseRouter,
+            customRouter: reference,
+            requestedModel: legacyPoolTarget
+              ? requestedModel
+              : customRouterModelId(router.ownerType, router.slug),
+            deniedModelIds,
+          });
+          if (outcome.kind === 'ok') legacyClassifierCostUsd = outcome.costUsd;
+          return outcome;
+        },
+      });
+    };
+    const efficientDecision =
+      isAutoEfficientId || requestedModelLowerCased === ORG_AUTO_MODEL.id
+        ? () => decisionForRouter('efficient')
+        : undefined;
     const frontierDecision =
       requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id ||
       requestedModelLowerCased === ORG_AUTO_MODEL.id
@@ -465,12 +553,13 @@ export async function handleLlmProxyRequest(
       {
         model: requestedModelLowerCased,
         modeHeader,
-        featureHeader: feature,
         sessionId: taskId ?? null,
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
         efficientDecision,
         frontierDecision,
+        customRouterDecision,
+        legacyPoolRouter,
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;
@@ -487,10 +576,16 @@ export async function handleLlmProxyRequest(
     if (autoResult.kind === 'organization_auto_configuration_error') {
       return organizationAutoConfigurationResponse(autoResult.message);
     }
-    routingTarget = autoResult.routingTarget ?? null;
+    if (autoResult.kind === 'custom_router_error') {
+      return customRouterErrorResponse(autoResult.code, autoResult.message);
+    }
+    autoRoutingUnavailable = autoResult.kind === 'auto_routing_unavailable';
+    routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Custom LLMs count as free; `getProvider` still refuses callers without access.
+  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -506,18 +601,17 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // For rate-limited Kilo-exclusive models: check the limit and log at start.
-  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
-  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
-  // All other products rate-limit per IP (fast pre-auth path).
-  const isRateLimitedModelRequest = isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased);
-  if (isRateLimitedModelRequest) {
-    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
-    if (rateLimit instanceof NextResponse) return rateLimit;
+  // For rate-limited Kilo-exclusive models: server-side products (cloud-agent,
+  // code-review, app-builder, gastown) rate-limit per user when the request comes
+  // from Cloudflare IPs (Kilo infrastructure). All other products rate-limit per
+  // IP (fast pre-auth path).
+  if (isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
+    const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
+    if (rateLimitKey instanceof NextResponse) return rateLimitKey;
 
-    if (!rateLimit.result.allowed) {
+    if (await isFreeModelRateLimited(request, rateLimitKey)) {
       console.warn(
-        `Model rate limit exceeded, ${rateLimit.subject}, model: ${effectiveModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
+        `Model rate limit exceeded, ${rateLimitKey}, model: ${effectiveModelIdLowerCased}`
       );
       return NextResponse.json(
         {
@@ -558,44 +652,8 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeModel(effectiveModelIdLowerCased)) {
-      // Paid model requires authentication
-      return NextResponse.json(
-        {
-          error: {
-            code: PAID_MODEL_AUTH_REQUIRED,
-            message: 'You need to sign in to use this model.',
-          },
-          error_type: ProxyErrorType.paid_model_auth_required,
-        },
-        { status: 401 }
-      );
-    }
-
-    if (isRateLimitedModelRequest) {
-      const promotionLimit = await checkPromotionLimit(ipAddress);
-
-      if (!promotionLimit.allowed) {
-        console.warn(
-          `Promotion model limit exceeded, ip: ${ipAddress}, ` +
-            `model: ${effectiveModelIdLowerCased}, ` +
-            `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
-            `in ${PROMOTION_WINDOW_HOURS}h window`
-        );
-
-        return NextResponse.json(
-          {
-            error: {
-              code: PROMOTION_MODEL_LIMIT_REACHED,
-              message:
-                'Sign up for free to continue and explore 500 other models. ' +
-                'Takes 2 minutes, no credit card required. Or come back later.',
-            },
-            error_type: ProxyErrorType.promotion_limit_reached,
-          },
-          { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
-        );
-      }
+    if (!isFreeRequestedModel) {
+      return paidModelAuthRequiredResponse();
     }
 
     // Anonymous access for free model (rate-limited above when configured)
@@ -709,21 +767,13 @@ export async function handleLlmProxyRequest(
       })()
     );
   }
+  if (autoRoutingUnavailable) return autoRoutingUnavailableResponse(requestedModelLowerCased);
 
   if (
     requestBodyParsed.kind === 'responses' &&
     (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
   ) {
     return storeAndPreviousResponseIdIsNotSupported();
-  }
-
-  // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRateLimitedModelRequest) {
-    await logFreeModelRequest(
-      ipAddress,
-      effectiveModelIdLowerCased,
-      isAnonymousContext(user) ? undefined : user.id
-    );
   }
 
   async function resolveAccessCheck(modelId: string) {
@@ -783,7 +833,6 @@ export async function handleLlmProxyRequest(
     user,
     organizationId,
     botId,
-    taskId,
     getRoutingProviderConfig: async () =>
       withIgnoredProviders(
         (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
@@ -794,6 +843,10 @@ export async function handleLlmProxyRequest(
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
     // instead of silently serving the request through another billing path.
     return chatGptReconnectResponse(providerResult.message);
+  }
+  if (providerResult.kind === 'custom-llm-unavailable') {
+    // Same response as an unknown model id, so callers cannot probe for custom LLMs.
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   const effectiveProviderContext = providerResult;
 
@@ -829,10 +882,7 @@ export async function handleLlmProxyRequest(
     return temporarilyUnavailableResponse();
   }
 
-  if (
-    isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
-    (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased)))
-  ) {
+  if (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased))) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
     return unavailableModelResponse();
   }
@@ -848,8 +898,8 @@ export async function handleLlmProxyRequest(
     } = await accessCheckResolver.get();
 
     if (
-      balance <= 0 &&
-      !isFreeModel(effectiveModelIdLowerCased) &&
+      !canSpendPaidUsage(balance) &&
+      !isFreeRequestedModel &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -862,7 +912,7 @@ export async function handleLlmProxyRequest(
     }
 
     if (!groupModelAllowed) {
-      return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();
 
@@ -925,7 +975,7 @@ export async function handleLlmProxyRequest(
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
-    hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased) &&
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();
@@ -967,11 +1017,20 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
+  const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
+  const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,
     providerContext: effectiveProviderContext,
     request: requestBodyParsed,
+    costLimit:
+      requestCostLimit !== null && requestCostBalance
+        ? {
+            maximumMicrodollars: requestCostLimit,
+            availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
+          }
+        : undefined,
   });
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
@@ -1010,6 +1069,10 @@ export async function handleLlmProxyRequest(
     requestStartedAt
   );
   usageContext.status_code = response.status;
+  const userByokProviderIds =
+    effectiveProviderContext.userByok === null
+      ? null
+      : effectiveProviderContext.userByok.map(byok => byok.providerId);
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.
   // Skip this conversion when user BYOK is used - the 402 is about their account, not ours.
@@ -1020,6 +1083,7 @@ export async function handleLlmProxyRequest(
       response,
       organizationId,
       model: finalUpstreamModel,
+      gatewayModel: effectiveModelIdLowerCased,
       errorMessage: `${effectiveProviderContext.provider.id} returned 402 Payment Required`,
       trackInSentry: true,
     });
@@ -1035,6 +1099,8 @@ export async function handleLlmProxyRequest(
       response,
       organizationId,
       model: finalUpstreamModel,
+      gatewayModel: effectiveModelIdLowerCased,
+      byokProviderIds: userByokProviderIds,
       errorMessage: `${effectiveProviderContext.provider.id} returned error ${response.status}`,
       trackInSentry: response.status >= 500,
     });
@@ -1058,10 +1124,7 @@ export async function handleLlmProxyRequest(
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
-      userByokProviderIds:
-        effectiveProviderContext.userByok === null
-          ? null
-          : effectiveProviderContext.userByok.map(byok => byok.providerId),
+      userByokProviderIds,
     });
     if (errorResponse) {
       await logUnrewrittenResponse({

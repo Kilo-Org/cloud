@@ -15,7 +15,7 @@ import { buildControlNetworkPolicy, type SessionCredentialGrant } from './sessio
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
 import { ProviderCreationError } from './provider.js';
-import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
+import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
 
@@ -140,6 +140,7 @@ export function createVercelProviderAdapter(deps: {
    * must prevent the REST create.
    */
   readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
+  readAcceptedRuntimeProxyHandles?: () => Promise<ReadonlyMap<string, readonly string[]>>;
 }): ProviderAdapter {
   const config = deps.config;
   if (!config) {
@@ -216,7 +217,10 @@ export function createVercelProviderAdapter(deps: {
       // Read the authoritative grants and build the policy before the REST
       // create: the sandbox must never open with an empty or stale policy, so a
       // reader failure prevents the create entirely.
-      const networkPolicy = buildControlNetworkPolicy(await deps.readContainedGrants());
+      const networkPolicy = buildControlNetworkPolicy(
+        await deps.readContainedGrants(),
+        await deps.readAcceptedRuntimeProxyHandles?.()
+      );
       const created = await restClient
         .createSandbox({
           name: intent.allocationName ?? deps.sandboxName,
@@ -241,12 +245,14 @@ export function createVercelProviderAdapter(deps: {
       await recordBillingLifetime(providerRef, created.session);
       return { providerRef };
     },
-    async launch(ref, env) {
+    async launch(ref, { command, env }) {
       const parsed = decodeOwnedProviderRef(ref);
       if (!parsed) throw new ProviderCreationError('invalid_configuration');
+      const [executable, ...args] = command.argv;
+      if (!executable) throw new ProviderCreationError('invalid_configuration');
       await restClient.executeCommand(parsed.sessionId, {
-        command: 'sh',
-        args: ['-lc', `exec ${CONTROL_SUPERVISOR_PATH}`],
+        command: executable,
+        args,
         cwd: '/',
         env: {
           ...env,
@@ -373,7 +379,10 @@ export function createVercelProviderAdapter(deps: {
     async applyContainedCredentials(providerRef, grants) {
       const parsed = decodeOwnedProviderRef(providerRef);
       if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
-      const networkPolicy = buildControlNetworkPolicy(grants);
+      const networkPolicy = buildControlNetworkPolicy(
+        grants,
+        await deps.readAcceptedRuntimeProxyHandles?.()
+      );
       const session = await restClient.updateNetworkPolicy(
         parsed.sessionId,
         parsed.sandboxName,

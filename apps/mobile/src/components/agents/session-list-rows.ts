@@ -14,7 +14,7 @@ import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
  */
 export type SessionListRow =
   | { kind: 'section-header'; key: string; title: string; count: number }
-  | { kind: 'skeleton'; key: string }
+  | { kind: 'skeleton'; key: string; index: number }
   | { kind: 'session'; key: string; session: StoredSession };
 
 /** Reserved loading rows shown while the first history page loads. */
@@ -34,6 +34,7 @@ export function skeletonSessionRows(
   return Array.from({ length: count }, (_, index) => ({
     kind: 'skeleton' as const,
     key: `skeleton:${index}`,
+    index,
   }));
 }
 

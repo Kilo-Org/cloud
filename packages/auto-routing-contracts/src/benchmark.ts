@@ -10,7 +10,7 @@ import {
 } from './routing-table';
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
-import { AutoRouterSchema, DEFAULT_AUTO_ROUTER } from './router';
+import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 import {
   PolicySettingComputedMapSchema,
   PolicySettingOverridesSchema,
@@ -51,20 +51,54 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
  */
 export const BENCHMARK_CONTAINER_BUDGET = 250;
 
-/**
- * Containers withheld from owner-queue runs. User-queue runs stop at
- * BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS, and a
- * platform run may claim the whole budget minus the user lanes already live, so
- * these containers are always available to platform runs.
- */
-export const BENCHMARK_PLATFORM_RESERVED_CONTAINERS = 100;
+/** Scheduler limits an admin can override at runtime, without a deploy. */
+export const BENCHMARK_SCHEDULER_SETTING_KEYS = [
+  'slots',
+  'modelConcurrency',
+  'providerConcurrency',
+  'unknownProviderConcurrency',
+] as const;
+export const BenchmarkSchedulerSettingKeySchema = z.enum(BENCHMARK_SCHEDULER_SETTING_KEYS);
+export type BenchmarkSchedulerSettingKey = z.infer<typeof BenchmarkSchedulerSettingKeySchema>;
+
+export const BenchmarkSchedulerLimitSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(BENCHMARK_CONTAINER_BUDGET);
 
 /**
- * Containers owner-queue runs may hold. User runs wait for platform runs once
- * they hold this many, so the platform reserve always stays available.
+ * Admin scheduler overrides. PUT replaces the whole set: a null or missing limit
+ * falls back to the worker's `BENCHMARK_SCHEDULER_CONFIG`, then its default.
  */
-export const BENCHMARK_USER_CONTAINER_LIMIT =
-  BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS;
+export const BenchmarkSchedulerOverridesSchema = z.strictObject({
+  slots: BenchmarkSchedulerLimitSchema.nullable().default(null),
+  modelConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
+  providerConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
+  unknownProviderConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
+});
+export type BenchmarkSchedulerOverrides = z.infer<typeof BenchmarkSchedulerOverridesSchema>;
+
+export const BenchmarkSchedulerSettingSourceSchema = z.enum(['admin', 'env', 'default']);
+export type BenchmarkSchedulerSettingSource = z.infer<typeof BenchmarkSchedulerSettingSourceSchema>;
+
+/** `fallback` is the env or default value the setting returns to without an override. */
+export const BenchmarkSchedulerSettingSchema = z.object({
+  effective: BenchmarkSchedulerLimitSchema,
+  source: BenchmarkSchedulerSettingSourceSchema,
+  override: BenchmarkSchedulerLimitSchema.nullable(),
+  fallback: BenchmarkSchedulerLimitSchema,
+});
+export type BenchmarkSchedulerSetting = z.infer<typeof BenchmarkSchedulerSettingSchema>;
+
+export const BenchmarkSchedulerConfigResponseSchema = z.object({
+  settings: z.record(BenchmarkSchedulerSettingKeySchema, BenchmarkSchedulerSettingSchema),
+  updatedAt: z.string().nullable(),
+  updatedBy: z.string().nullable(),
+});
+export type BenchmarkSchedulerConfigResponse = z.infer<
+  typeof BenchmarkSchedulerConfigResponseSchema
+>;
 
 /** Exact model/effort identity in persisted benchmark run snapshots. */
 export const BenchmarkDeciderModelSchema = z
@@ -92,7 +126,15 @@ export const BenchmarkPlatformModelSchema = z.object({
 });
 export type BenchmarkPlatformModel = z.infer<typeof BenchmarkPlatformModelSchema>;
 
-export const DEFAULT_BENCHMARK_USER_ID = '1f7125a8-351a-45a5-af1f-2b7c24ca7dc3';
+export const DEFAULT_BENCHMARK_DECIDER_MODEL_IDS: Record<AutoRouter, string> = {
+  efficient: '~deepseek/deepseek-flash-latest',
+  frontier: '~openai/gpt-sol-latest',
+};
+
+// Decider runs mint their CLI token from apps/web's internal bot-token
+// endpoint, which only issues for `bot-internal-*` bot users in an org.
+export const INTERNAL_BOT_USER_ID_PREFIX = 'bot-internal-';
+export const DEFAULT_BENCHMARK_USER_ID = 'bot-internal-benchmark';
 export const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
 // Flags each list entry whose (trimmed) id already appeared earlier in the
@@ -121,13 +163,14 @@ export const BenchmarkConfigSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
     classifierModels: z.array(z.string().trim().min(1)).min(1),
-    deciderModels: z.array(BenchmarkPlatformModelSchema).min(1),
+    deciderModels: z.array(BenchmarkPlatformModelSchema).min(1).optional(),
     // Accuracy threshold for "gets the job done" (per taxonomy route).
     minAccuracy: z.number().min(0).max(1),
     accuracyNoiseBand: z.number().min(0).max(1).default(0.05),
     frontierMinAccuracyDelta: z.number().min(0).max(1).default(0),
     // Optional override for the Kilo user whose identity/billing the decider
     // CLI runs execute under. Null means the worker uses DEFAULT_BENCHMARK_USER_ID.
+    // The effective user must be an internal bot (`bot-internal-*`).
     benchmarkUserId: z.string().trim().min(1).nullable(),
     // Optional override for the organization context. Null means the worker
     // uses DEFAULT_BENCHMARK_ORG_ID.
@@ -161,6 +204,12 @@ export const BenchmarkConfigSchema = z
     updatedAt: z.string().nullable(),
     updatedBy: z.string().nullable(),
   })
+  .transform(config => ({
+    ...config,
+    deciderModels: config.deciderModels ?? [
+      { id: DEFAULT_BENCHMARK_DECIDER_MODEL_IDS[config.router] },
+    ],
+  }))
   .superRefine((config, ctx) => {
     addDuplicateModelIssues(config.classifierModels, 'classifierModels', ctx);
     addDuplicateModelIssues(
@@ -171,11 +220,30 @@ export const BenchmarkConfigSchema = z
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
-export function resolveBenchmarkIdentity(
-  config: Pick<BenchmarkConfig, 'benchmarkUserId' | 'benchmarkOrgId'>
-): { benchmarkUserId: string; benchmarkOrgId: string } {
+export type BenchmarkIdentity = { benchmarkUserId: string; benchmarkOrgId: string };
+export type BenchmarkIdentityOverrides = Pick<
+  BenchmarkConfig,
+  'benchmarkUserId' | 'benchmarkOrgId'
+>;
+
+/** A saved identity override the bot-token mint would refuse. */
+export class BenchmarkIdentityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BenchmarkIdentityError';
+  }
+}
+
+export function resolveBenchmarkIdentity(config: BenchmarkIdentityOverrides): BenchmarkIdentity {
+  const benchmarkUserId = config.benchmarkUserId ?? DEFAULT_BENCHMARK_USER_ID;
+  if (!benchmarkUserId.startsWith(INTERNAL_BOT_USER_ID_PREFIX)) {
+    throw new BenchmarkIdentityError(
+      `benchmarkUserId override "${benchmarkUserId}" is not an internal bot user; ` +
+        `use a ${INTERNAL_BOT_USER_ID_PREFIX}* user or clear the override`
+    );
+  }
   return {
-    benchmarkUserId: config.benchmarkUserId ?? DEFAULT_BENCHMARK_USER_ID,
+    benchmarkUserId,
     benchmarkOrgId: config.benchmarkOrgId ?? DEFAULT_BENCHMARK_ORG_ID,
   };
 }
@@ -316,6 +384,36 @@ export const RequeueBenchmarkRegistryResponseSchema = z.object({
   requeued: z.number().int(),
 });
 
+export const RefreshBenchmarkProfilesRequestSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
+  mode: z.enum(['refresh', 'repair_unavailable']),
+  entries: z
+    .array(
+      BenchmarkPairSchema.refine(entry => !entry.model.startsWith('~'), {
+        message: 'Refresh requires concrete model IDs.',
+      })
+    )
+    .min(1)
+    .max(100)
+    .superRefine((entries, ctx) => {
+      const seen = new Set<string>();
+      entries.forEach((entry, index) => {
+        const key = JSON.stringify([entry.model, entry.variant]);
+        if (seen.has(key)) {
+          ctx.addIssue({ code: 'custom', path: [index], message: 'Duplicate benchmark pair.' });
+        }
+        seen.add(key);
+      });
+    }),
+});
+export type RefreshBenchmarkProfilesRequest = z.infer<typeof RefreshBenchmarkProfilesRequestSchema>;
+
+export const RefreshBenchmarkProfilesResponseSchema = z.object({
+  refreshed: z.array(BenchmarkPairSchema),
+  unavailable: z.array(BenchmarkPairSchema),
+  skipped: z.array(BenchmarkPairSchema),
+});
+
 export const BenchmarkRoutingTableResponseSchema = z.object({
   table: RoutingTableSchema.nullable(),
   publishedAt: z.string().nullable(),
@@ -388,10 +486,32 @@ export type RegisterBenchmarkProfilesRequest = z.input<
   typeof RegisterBenchmarkProfilesRequestSchema
 >;
 
-export const BenchmarkProfileStatusesRequestSchema = z.object({
-  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-  entries: EfficientModelPoolSchema,
+export const SyncBenchmarkSubscriptionsRequestSchema = z.object({
+  ownerType: BenchmarkProfileOwnerTypeSchema,
+  ownerId: z.string().trim().min(1),
+  entries: EfficientModelPoolSchema.nullable(),
+  restorePrevious: z.boolean().optional(),
 });
+export type SyncBenchmarkSubscriptionsRequest = z.infer<
+  typeof SyncBenchmarkSubscriptionsRequestSchema
+>;
+
+export const BenchmarkProfileStatusesRequestSchema = z
+  .object({
+    router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
+    ownerType: BenchmarkProfileOwnerTypeSchema.optional(),
+    ownerId: z.string().trim().min(1).optional(),
+    entries: EfficientModelPoolSchema,
+  })
+  .superRefine((request, ctx) => {
+    if ((request.ownerType === undefined) !== (request.ownerId === undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [request.ownerType === undefined ? 'ownerType' : 'ownerId'],
+        message: 'ownerType and ownerId must be provided together',
+      });
+    }
+  });
 export type BenchmarkProfileStatusesRequest = z.input<typeof BenchmarkProfileStatusesRequestSchema>;
 
 export const BenchmarkProfileStatusesResponseSchema = z.object({
@@ -409,10 +529,22 @@ export const BenchmarkProfileQuotaErrorSchema = z.object({
 });
 export type BenchmarkProfileQuotaError = z.infer<typeof BenchmarkProfileQuotaErrorSchema>;
 
-export const CustomRoutingTableRequestSchema = z.object({
-  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-  entries: EfficientModelPoolSchema,
-});
+export const CustomRoutingTableRequestSchema = z
+  .object({
+    router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
+    ownerType: BenchmarkProfileOwnerTypeSchema.optional(),
+    ownerId: z.string().trim().min(1).optional(),
+    entries: EfficientModelPoolSchema,
+  })
+  .superRefine((request, ctx) => {
+    if ((request.ownerType === undefined) !== (request.ownerId === undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [request.ownerType === undefined ? 'ownerType' : 'ownerId'],
+        message: 'ownerType and ownerId must be provided together',
+      });
+    }
+  });
 export type CustomRoutingTableRequest = z.input<typeof CustomRoutingTableRequestSchema>;
 
 export const CustomRoutingTableResponseSchema = z.object({

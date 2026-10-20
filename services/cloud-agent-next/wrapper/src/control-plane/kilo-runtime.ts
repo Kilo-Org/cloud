@@ -1,3 +1,4 @@
+import { selectedRuntimeCli } from '../../../src/shared/runtime-distribution.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -10,6 +11,7 @@ import type {
   KiloRestartFaultReason,
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from '../../../src/shared/runtime-credential-proxy-handle.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
@@ -231,10 +233,14 @@ async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<Ki
   input.onProcessScope?.(processes);
   const credential = createKiloServerCredential();
   // Own process group via the owned-process scope's detached spawn.
-  const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
-    cwd: input.directory,
-    env: { ...input.env, ...credential.env },
-  });
+  const proc = processes.spawn(
+    selectedRuntimeCli(process.env),
+    ['serve', '--hostname=127.0.0.1', '--port=0'],
+    {
+      cwd: input.directory,
+      env: { ...input.env, ...credential.env },
+    }
+  );
   proc.stderr.resume();
   const exited = new Promise<void>(resolve => {
     proc.once('exit', () => resolve());
@@ -364,6 +370,21 @@ export type KiloRuntime = {
   refreshActivity(): Promise<void>;
   shutdown(): Promise<void>;
 };
+
+/**
+ * The runtime's client only while it is live. A restarting or unavailable
+ * runtime has no client, and reading `.client` throws; a clean-up caller must
+ * resolve through this so a release during a restart is a no-op instead of an
+ * exception that escapes the frame handler.
+ */
+export function liveRuntimeClient(runtime: KiloRuntime | undefined): WrapperKiloClient | undefined {
+  if (!runtime || runtime.isRestarting() || runtime.isUnavailable()) return undefined;
+  try {
+    return runtime.client;
+  } catch {
+    return undefined;
+  }
+}
 
 type HealthProbeObservation = {
   startedAt: number;
@@ -1207,6 +1228,23 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     ensure,
     isRetiredClient: candidate => retiredClients.has(candidate),
     async installCredentials(env: Record<string, string>): Promise<void> {
+      const installedHandle = options.env.KILOCODE_TOKEN;
+      const incomingHandle = env.KILOCODE_TOKEN;
+      const installedExp = proxyHandleExpiry(installedHandle);
+      const incomingExp = proxyHandleExpiry(incomingHandle);
+      if (installedExp !== undefined && incomingExp !== undefined) {
+        // Both sides are proxy handles. A repeated frame must not roll the
+        // credential (and must not clear a latched rollover); a stale frame
+        // whose handle expires earlier is ignored entirely.
+        if (installedHandle === incomingHandle) {
+          options.env = env;
+          return;
+        }
+        if (incomingExp <= installedExp) return;
+        options.env = env;
+        pendingCredentials = true;
+        return;
+      }
       // Store the refreshed env immediately; the running process keeps the old
       // grant (valid below 1 h) until an idle restart applies the new one.
       options.env = env;
@@ -1285,10 +1323,11 @@ export type KiloRuntimes = {
 };
 
 /**
- * A per-session route asked to reuse a warm runtime whose materialized MCP
- * servers differ. The route must fail rather than silently accept the change
- * (legacy `worktree-runtime.ts` `mcpSignature` drift rejection). Non-retryable:
- * the caller must not drop and recreate the runtime to "fix" it.
+ * A route asked to reuse a warm shared runtime whose materialized MCP servers
+ * differ. MCP is workspace configuration, so the route must fail rather than
+ * silently run with another session's servers (legacy `worktree-runtime.ts`
+ * `mcpSignature` drift rejection). Non-retryable: the caller must not drop and
+ * recreate the runtime to "fix" it.
  */
 export class KiloWorktreeMcpMismatchError extends Error {
   constructor() {
@@ -1298,9 +1337,62 @@ export class KiloWorktreeMcpMismatchError extends Error {
 }
 
 /**
+ * A route asked to share a runtime with another route whose Kilo credential is
+ * a different class: one side carries a runtime-credential-proxy handle, the
+ * other a legacy alias. The runtime holds exactly one credential source, so
+ * reusing it would serve a route through the wrong authorization path.
+ * Non-retryable: the caller must not drop and recreate the runtime to "fix" it.
+ */
+export class KiloWorktreeCredentialClassMismatchError extends Error {
+  constructor() {
+    super('Kilo worktree credential class mismatch');
+    this.name = 'KiloWorktreeCredentialClassMismatchError';
+  }
+}
+
+/**
+ * The runtime-credential-proxy handle audience. A handle is an HS256 JWT the
+ * Worker mints; the wrapper decodes it locally (no Worker import) only to tell
+ * a modern proxy credential from a legacy alias, never to verify it.
+ */
+function decodeProxyHandlePayload(token: string | undefined): Record<string, unknown> | undefined {
+  if (!token) return undefined;
+  const parts = token.split('.');
+  if (parts.length !== 3) return undefined;
+  try {
+    const decoded = Buffer.from(parts[1], 'base64url').toString('utf8');
+    const value: unknown = JSON.parse(decoded);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+    return value as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether an env token is a runtime-credential-proxy handle. Presence only:
+ * grant ids and handle strings are never compared.
+ */
+export function isProxyHandleToken(token: string | undefined): boolean {
+  return proxyHandleExpiry(token) !== undefined;
+}
+
+/**
+ * The handle expiry in milliseconds, or undefined when the token is not a
+ * decodable proxy handle. Undecodable tokens are treated as "different/newer"
+ * by callers, so this deliberately returns undefined rather than throwing.
+ */
+export function proxyHandleExpiry(token: string | undefined): number | undefined {
+  const payload = decodeProxyHandlePayload(token);
+  if (!payload || payload.aud !== RUNTIME_CREDENTIAL_PROXY_AUDIENCE) return undefined;
+  const exp = payload.exp;
+  return typeof exp === 'number' && Number.isFinite(exp) && exp > 0 ? exp * 1000 : undefined;
+}
+
+/**
  * The MCP portion of the runtime configuration. Credential refreshes rotate the
  * Kilo alias inside `KILO_CONFIG_CONTENT`, so comparing the whole config would
- * false-positive; only `mcp` identifies the session's server set.
+ * false-positive; only `mcp` identifies the runtime's server set.
  */
 function mcpConfigurationSignature(env: Record<string, string>): string {
   const raw = env.KILO_CONFIG_CONTENT;
@@ -1315,7 +1407,7 @@ function mcpConfigurationSignature(env: Record<string, string>): string {
 }
 
 /**
- * One Kilo runtime per directory (or per session under per-session isolation).
+ * One Kilo runtime per directory.
  * A fresh `ensure` after the restart budget is spent replaces the runtime,
  * which resets the budget (spec §7 "Preparation": a re-prepare starts fresh).
  */
@@ -1330,7 +1422,16 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
     async ensure(input) {
       const existing = runtimes.get(input.key);
       if (existing && !existing.isUnavailable()) {
-        // A per-session MCP route must own its runtime: reuse only when the
+        // One runtime holds one credential source: a proxy handle and a legacy
+        // alias must never share it. Compare presence only; a proxy handle's
+        // grant id or string is deliberately ignored.
+        if (
+          isProxyHandleToken(existing.env.KILOCODE_TOKEN) !==
+          isProxyHandleToken(input.env.KILOCODE_TOKEN)
+        ) {
+          throw new KiloWorktreeCredentialClassMismatchError();
+        }
+        // A runtime is shared by every route on its key: reuse only when the
         // materialized servers are unchanged.
         if (mcpConfigurationSignature(existing.env) !== mcpConfigurationSignature(input.env)) {
           throw new KiloWorktreeMcpMismatchError();

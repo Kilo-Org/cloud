@@ -85,8 +85,6 @@ describe('session plane identity', () => {
     undefined,
     '',
     'cloud-agent',
-    'auto-triage',
-    'autofix',
     'app-builder',
     'cli',
     'code-review',
@@ -181,7 +179,7 @@ describe('session plane identity', () => {
     expect(isControlPlaneOrigin({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
     expect(isControlPlaneOrigin({ createdOnPlatform: 'slack' })).toBe(true);
     expect(isControlPlaneOrigin({ createdOnPlatform: 'webhook' })).toBe(true);
-    expect(isControlPlaneOrigin({ createdOnPlatform: 'auto-triage' })).toBe(false);
+    expect(isControlPlaneOrigin({ createdOnPlatform: 'app-builder' })).toBe(false);
     expect(isControlPlaneOrigin({})).toBe(false);
     expect(isControlPlaneOrigin()).toBe(false);
   });

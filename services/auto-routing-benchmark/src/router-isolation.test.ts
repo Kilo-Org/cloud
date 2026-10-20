@@ -169,7 +169,7 @@ describe('router contracts and database isolation', () => {
   });
 });
 
-describe('atomic running-container admission', () => {
+describe('atomic run lifecycle admission', () => {
   const SCHEMA_SQL = `
     CREATE TABLE benchmark_runs (
       id TEXT PRIMARY KEY NOT NULL,
@@ -221,9 +221,7 @@ describe('atomic running-container admission', () => {
       sqlite.prepare(query.sql).run(...(query.params as never[]));
     };
     const rejects = (index: number): void => {
-      expect(() => apply(index)).toThrow(
-        'NOT NULL constraint failed: benchmark_runs.max_concurrency'
-      );
+      expect(() => apply(index)).toThrow('UNIQUE constraint failed');
     };
     const lanes = (): unknown =>
       sqlite
@@ -232,39 +230,18 @@ describe('atomic running-container admission', () => {
     return { sqlite, db, queries, apply, rejects, lanes };
   }
 
-  it('caps the total across every router and purpose', async () => {
-    const { sqlite, db, queries, apply, rejects, lanes } = admissionHarness();
+  it('admits every queue independently without reserving run-lifetime containers', async () => {
+    const { sqlite, db, queries, apply, lanes } = admissionHarness();
     try {
       await insertRun(db, { ...run, id: 'efficient-platform' }, [], []);
       await insertRun(
         db,
-        { ...run, id: 'frontier-platform', router: 'frontier', max_concurrency: 100 },
-        [],
-        []
-      );
-      await insertRun(
-        db,
-        { ...run, id: 'user-overflow', purpose: 'user', max_concurrency: 1 },
-        [],
-        []
-      );
-
-      apply(0);
-      apply(1);
-      rejects(2);
-      expect(lanes()).toEqual({ lanes: 250 });
-      expect(queries).toHaveLength(3);
-    } finally {
-      sqlite.close();
-    }
-  });
-
-  it('caps owner runs at 150 and leaves 100 lanes for platform runs', async () => {
-    const { sqlite, db, queries, apply, rejects, lanes } = admissionHarness();
-    try {
-      await insertRun(
-        db,
-        { ...run, id: 'user-full', purpose: 'user', max_concurrency: 150 },
+        {
+          ...run,
+          id: 'frontier-platform',
+          router: 'frontier',
+          max_concurrency: 100,
+        },
         [],
         []
       );
@@ -273,26 +250,64 @@ describe('atomic running-container admission', () => {
         {
           ...run,
           id: 'user-overflow',
-          router: 'frontier',
           purpose: 'user',
           max_concurrency: 1,
         },
         [],
         []
       );
-      await insertRun(db, { ...run, id: 'platform-into-reserve', max_concurrency: 100 }, [], []);
+      apply(0);
+      apply(1);
+      apply(2);
+      expect(lanes()).toEqual({ lanes: 251 });
+      expect(queries).toHaveLength(3);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('atomically keeps one active lifecycle per router and queue, not per container budget', async () => {
+    const { sqlite, db, queries, apply, rejects, lanes } = admissionHarness();
+    try {
       await insertRun(
         db,
-        { ...run, id: 'platform-past-reserve', router: 'frontier', max_concurrency: 1 },
+        {
+          ...run,
+          id: 'user-active',
+          purpose: 'user',
+          max_concurrency: 0,
+        },
         [],
         []
       );
-
+      await insertRun(
+        db,
+        {
+          ...run,
+          id: 'duplicate-user',
+          purpose: 'user',
+          max_concurrency: 0,
+        },
+        [],
+        []
+      );
+      await insertRun(db, { ...run, id: 'efficient-platform', max_concurrency: 0 }, [], []);
+      await insertRun(
+        db,
+        {
+          ...run,
+          id: 'frontier-platform',
+          router: 'frontier',
+          max_concurrency: 0,
+        },
+        [],
+        []
+      );
       apply(0);
       rejects(1);
       apply(2);
-      rejects(3);
-      expect(lanes()).toEqual({ lanes: 250 });
+      apply(3);
+      expect(lanes()).toEqual({ lanes: 0 });
       expect(queries).toHaveLength(4);
     } finally {
       sqlite.close();

@@ -48,12 +48,19 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  AUTO_DECISION_HEADER,
+  CUSTOM_ROUTER_ERROR_HTTP_STATUS,
+  type CustomRouterErrorCode,
+} from '@kilocode/auto-routing-contracts';
+import type { AutoDecisionRejection } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
 const fimSuffixFakeSysPrompMarkers = { begin: '[FIM_SUFFIX:', end: ']' } as const;
+
+const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
 export function invalidPathResponse() {
   return NextResponse.json(
@@ -224,14 +231,17 @@ export function checkExclusiveModelProviderAllowed(
   if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
-  const inferenceProvider = getInferenceProvider(exclusiveModel)?.slug;
-  if (!inferenceProvider) return null;
+  const inferenceProviders = exclusiveModel.inference_providers;
+  if (inferenceProviders.length === 0) return null;
   if (
-    (!provider.only || provider.only.includes(inferenceProvider)) &&
-    (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+    inferenceProviders.some(
+      inferenceProvider =>
+        (!provider.only || provider.only.includes(inferenceProvider)) &&
+        (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+    )
   )
     return null;
-  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProvider}`;
+  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {
       error: error,
@@ -281,29 +291,49 @@ const byokUpstreamErrorSchema = z.object({
   message: z.string().optional().catch(undefined),
 });
 
-async function byokErrorMessage(
-  response: Response,
-  userByokProviderIds: UserByokProviderId[]
-): Promise<string | undefined> {
-  if (response.status === 403 && userByokProviderIds.includes('opencode-go')) {
-    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
-  }
-  const specificMessage = byokErrorMessages[response.status];
-  if (specificMessage) return specificMessage;
-  if (response.status < 400 || response.status >= 500) return undefined;
-
+async function readByokProviderMessage(response: Response): Promise<string | undefined> {
   const body: unknown = await response
     .clone()
     .json()
     .catch(() => null);
   const parsed = byokUpstreamErrorSchema.safeParse(body);
-  const providerMessage = parsed.success ? (parsed.data.error?.message ?? parsed.data.message) : '';
-  const message = providerMessage
-    ?.replace(/\p{Cc}/gu, ' ')
-    .trim()
-    .slice(0, 300);
-  return message
-    ? `[BYOK] ${message}`
+  if (!parsed.success) return undefined;
+  const providerMessage = parsed.data.error?.message ?? parsed.data.message;
+  return (
+    providerMessage
+      ?.replace(/\p{Cc}/gu, ' ')
+      .trim()
+      .slice(0, 300) || undefined
+  );
+}
+
+function specificByokErrorMessage(
+  status: number,
+  userByokProviderIds: UserByokProviderId[]
+): string | undefined {
+  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
+    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
+  }
+  return byokErrorMessages[status];
+}
+
+async function byokErrorMessage(
+  response: Response,
+  userByokProviderIds: UserByokProviderId[]
+): Promise<string | undefined> {
+  const specificMessage = specificByokErrorMessage(response.status, userByokProviderIds);
+  if (!specificMessage && (response.status < 400 || response.status >= 500)) return undefined;
+
+  // The provider's own explanation (for example an expired rather than revoked
+  // key) is often more actionable than our status-based summary.
+  const providerMessage = await readByokProviderMessage(response);
+  if (specificMessage) {
+    return providerMessage
+      ? `${specificMessage} Provider message: ${providerMessage}`
+      : specificMessage;
+  }
+  return providerMessage
+    ? `[BYOK] ${providerMessage}`
     : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
 }
 
@@ -391,9 +421,11 @@ export async function makeErrorReadable({
   const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
   if (vertexByokResponse) return vertexByokResponse;
 
-  const hasSpecificByokMessage =
-    userByokProviderIds !== null && byokErrorMessages[response.status] !== undefined;
-  if (!hasSpecificByokMessage) {
+  const specificByokMessage =
+    userByokProviderIds === null
+      ? undefined
+      : specificByokErrorMessage(response.status, userByokProviderIds);
+  if (specificByokMessage === undefined) {
     const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
     if (providerErrorResponse) return providerErrorResponse;
 
@@ -404,8 +436,10 @@ export async function makeErrorReadable({
   if (userByokProviderIds !== null) {
     const byokMessage = await byokErrorMessage(response, userByokProviderIds);
     if (byokMessage) {
-      if (hasSpecificByokMessage) {
-        warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      if (specificByokMessage !== undefined) {
+        // Log only the fixed text so this line stays stable to search on;
+        // captureProxyError already logs the upstream body.
+        warnExceptInTest(`Responding with ${response.status} ${specificByokMessage}`);
       }
       return NextResponse.json(
         {
@@ -519,6 +553,48 @@ export function organizationAutoConfigurationResponse(message: string) {
   );
 }
 
+export function paidModelAuthRequiredResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: PAID_MODEL_AUTH_REQUIRED,
+        message: 'You need to sign in to use this model.',
+      },
+      error_type: ProxyErrorType.paid_model_auth_required,
+    },
+    { status: 401 }
+  );
+}
+
+export function customRouterErrorResponse(code: CustomRouterErrorCode, message: string) {
+  return NextResponse.json(
+    { error: { code, message }, error_type: ProxyErrorType.custom_router, message },
+    { status: CUSTOM_ROUTER_ERROR_HTTP_STATUS[code] }
+  );
+}
+
+// A custom router never falls back outside its pool, so a worker that cannot decide fails the
+// request with a retryable status instead of serving another model.
+export function autoRoutingUnavailableResponse(model: string) {
+  const error = `Auto-routing for ${model} is temporarily unavailable. Please retry.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.auto_routing_unavailable, message: error },
+    { status: 503, headers: { 'Retry-After': '1' } }
+  );
+}
+
+export function invalidAutoDecisionResponse(reason: AutoDecisionRejection) {
+  const message = `The ${AUTO_DECISION_HEADER} header is not valid for this request (${reason}). Request a new routing decision.`;
+  return NextResponse.json(
+    {
+      error: { code: ProxyErrorType.invalid_auto_decision, reason, message },
+      error_type: ProxyErrorType.invalid_auto_decision,
+      message,
+    },
+    { status: reason === 'malformed' ? 400 : 403 }
+  );
+}
+
 export function storeAndPreviousResponseIdIsNotSupported() {
   const error = 'The store and previous_response_id fields are not supported.';
   return NextResponse.json(
@@ -536,6 +612,9 @@ export function getOutputHeaders(response: Response) {
   }
   outputHeaders.set('Content-Encoding', 'identity');
   // Content-Encoding: identity is here because Vercel modifies encoding/compression and causes issues
+  // no-transform keeps a proxy in front of the gateway, such as the web app's rewrite to the
+  // ai-gateway app in local dev, from compressing a stream and holding it until the end.
+  outputHeaders.set('Cache-Control', 'no-cache, no-transform');
 
   return outputHeaders;
 }
@@ -558,6 +637,30 @@ export function accountForMicrodollarUsage(
   after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Field names, never values, of the request as sent upstream, so rejections
+ * such as "unknown field" can be attributed from logs alone.
+ */
+function describeRequestFields(request: unknown): Record<string, string> {
+  if (!isObjectRecord(request)) {
+    return {};
+  }
+  const fields: Record<string, string> = {
+    requestFields: Object.keys(request).sort().join(','),
+  };
+  if (Array.isArray(request.messages)) {
+    const messageFields = new Set(
+      request.messages.filter(isObjectRecord).flatMap(message => Object.keys(message))
+    );
+    fields.messageFields = [...messageFields].sort().join(',');
+  }
+  return fields;
+}
+
 export async function captureProxyError(params: {
   errorMessage: string;
   user: { id: string };
@@ -565,18 +668,35 @@ export async function captureProxyError(params: {
   response: Response;
   organizationId: string | undefined;
   model: string;
+  gatewayModel?: string;
+  byokProviderIds?: ReadonlyArray<string> | null;
   trackInSentry: boolean;
 }) {
-  const { errorMessage, user, response, organizationId, model, trackInSentry } = params;
+  const {
+    errorMessage,
+    user,
+    request,
+    response,
+    organizationId,
+    model,
+    gatewayModel,
+    byokProviderIds,
+    trackInSentry,
+  } = params;
   after(
     (async () => {
       const extraErrorData: Record<string, string | number> = {
         kiloUserId: user.id,
         model,
+        ...(gatewayModel && gatewayModel !== model ? { gatewayModel } : {}),
+        ...(byokProviderIds && byokProviderIds.length > 0
+          ? { byokProviderIds: byokProviderIds.join(',') }
+          : {}),
         status: response.status,
         statusText: response.statusText,
         responseContentType: response.headers.get('content-type') || '',
         ...(organizationId && { organizationId }),
+        ...describeRequestFields(request),
       };
 
       const clonedReponse = response.clone();

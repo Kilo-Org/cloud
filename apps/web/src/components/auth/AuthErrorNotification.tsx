@@ -3,8 +3,17 @@
 import React from 'react';
 import { BlockedNotification } from '@/components/auth/BlockedNotification';
 import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
+import { getProviderById } from '@/lib/auth/provider-metadata';
+import { parseSignupStepUpMethodsParam } from '@/lib/auth/redirect-urls';
 
-export function AuthErrorNotification({ error }: { error: string }) {
+export function AuthErrorNotification({
+  error,
+  stepUpMethods,
+}: {
+  error: string;
+  /** The untrusted `methods` query value that accompanies `SIGNUP-STEP-UP`. */
+  stepUpMethods?: string;
+}) {
   if (error === 'BLOCKED') return <BlockedNotification />;
 
   if (error === 'DIFFERENT-OAUTH')
@@ -95,6 +104,21 @@ export function AuthErrorNotification({ error }: { error: string }) {
         </ErrorNotificationBox>
       </div>
     );
+
+  if (error === 'SIGNUP-STEP-UP') {
+    const methodNames = parseSignupStepUpMethodsParam(stepUpMethods).map(
+      method => getProviderById(method).name
+    );
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Finish Creating Your Account">
+          {methodNames.length > 0
+            ? `To create your account, continue with ${new Intl.ListFormat('en', { type: 'disjunction' }).format(methodNames)}.`
+            : 'To create your account, continue with a different sign-in method.'}
+        </ErrorNotificationBox>
+      </div>
+    );
+  }
 
   if (error === 'SIGNUP-UNAVAILABLE')
     return (

@@ -3,10 +3,13 @@ import { AUTO_ROUTERS, POLICY_SETTING_KEYS } from '@kilocode/auto-routing-contra
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
+import { registerClientEvalRoutes } from './client-eval';
 import type { HonoEnv } from './hono-env';
 import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
+import { isRetryableContainerAvailabilityError } from './cli-runner';
 import {
   processDeadLetter,
+  acceptContainerCaseResult,
   processJob,
   drainQueues,
   publishPlatformRoutingTable,
@@ -15,6 +18,7 @@ import {
   sweepStaleRunsAndDrain,
   type BenchmarkJobMessage,
 } from './run';
+import { dailyReconcileSubscriptions } from './subscriptions';
 
 // Queue name of the dead-letter queue, matched against batch.queue.
 const DLQ_NAME = 'auto-routing-benchmark-dlq';
@@ -25,10 +29,17 @@ const PLATFORM_SYNC_CRON = '0 5 * * *';
 export { BenchRunnerContainer } from './bench-runner-container';
 
 export const app = new Hono<HonoEnv>();
+// Containers cannot hold the backend secret; the paid-execution claim token
+// authenticates their result instead, so this route precedes the auth middleware.
+app.post('/container/case-result', async c => {
+  const accepted = await acceptContainerCaseResult(c.env, await c.req.json().catch(() => null));
+  return c.body(null, accepted ? 204 : 404);
+});
 app.use('*', authMiddleware);
 app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing-benchmark' }));
 
 registerAdminRoutes(app);
+registerClientEvalRoutes(app);
 
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler());
@@ -54,6 +65,15 @@ export default {
           );
         } else {
           const staleRunIds = await sweepStaleRuns(env);
+          await dailyReconcileSubscriptions(env, router).catch(() => {
+            console.warn(
+              JSON.stringify({
+                event: 'benchmark_subscription_daily_failed',
+                category: 'daily_reconciliation',
+                router,
+              })
+            );
+          });
           const { desiredEntries } = await syncPlatformRegistry(env, fetch, router);
           const computed = await reevaluateSystemOptimalSettings(env, router, production).catch(
             error => {
@@ -82,12 +102,7 @@ export default {
               })
             );
           }
-          const startedRuns = await drainQueues(
-            env,
-            router === 'frontier' ? 'platform' : 'both',
-            undefined,
-            router
-          );
+          const startedRuns = await drainQueues(env, 'both', undefined, router);
           const published = await publishPlatformRoutingTable(env, fetch, router).catch(error => {
             console.warn(
               JSON.stringify({
@@ -125,27 +140,33 @@ export default {
     if (errors.length > 0) throw new AggregateError(errors, 'Benchmark scheduled routers failed');
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
-    // Dead-lettered messages: record the lane death and try to finalize the
-    // run. Same retry contract as the jobs branch: a throw (transient D1
-    // failure after the death was recorded) skips the ack so the message
-    // retries and finalization is re-attempted. A message still failing after
-    // max_retries is dropped (the DLQ has no DLQ); the stale sweep remains
-    // the backstop for runs that never finalize.
-    if (batch.queue === DLQ_NAME) {
-      for (const message of batch.messages) {
-        await processDeadLetter(env, message.body);
-        message.ack();
-      }
-      return;
-    }
     for (const message of batch.messages) {
-      // Deliberately no try/catch: a throw from processJob (transient token,
-      // D1 or container failures) must skip the ack so the queue retries the
-      // whole (run, model, rep, chunk) unit, dead-lettering after max_retries.
-      // Case-level failures are recorded as failed rows inside processJob and
-      // do not throw. Swallowing the throw here would silently drop chunks.
-      await processJob(env, message.body);
-      message.ack();
+      try {
+        if (batch.queue === DLQ_NAME) {
+          await processDeadLetter(env, message.body);
+        } else {
+          await processJob(env, message.body);
+        }
+        message.ack();
+      } catch (error) {
+        if (batch.queue !== DLQ_NAME && isRetryableContainerAvailabilityError(error)) {
+          try {
+            await env.BENCH_QUEUE.send(message.body, { delaySeconds: 30 });
+            message.ack();
+            continue;
+          } catch (dispatchError) {
+            console.error(
+              JSON.stringify({
+                event: 'benchmark_capacity_requeue_failed',
+                error: String(dispatchError),
+              })
+            );
+          }
+        }
+        console.error(JSON.stringify({ event: 'benchmark_job_retry', error: String(error) }));
+        // Explicit retry preserves redelivery without reducing Queue consumer concurrency.
+        message.retry();
+      }
     }
   },
 };

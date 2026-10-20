@@ -256,6 +256,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
 
         <ChatComposerArea
           status={state.status}
+          messages={messages}
           failureKey={state.failureKey}
           retryable={!actions.hasUnanswered}
           onRetry={() => void retry()}

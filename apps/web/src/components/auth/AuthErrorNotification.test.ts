@@ -53,4 +53,20 @@ describe('AuthErrorNotification', () => {
     expect(html).toContain('Oops! Something went wrong trying to log in.');
     expect(html).not.toContain('untrusted-query-error');
   });
+
+  it.each([
+    ['google,apple', ['Google', 'Apple'], []],
+    ['apple', ['Apple'], ['Google']],
+    ['apple,github,passkey,Apple,<b>x</b>', ['Apple'], ['Google', 'GitHub', 'Passkey', '<b>x</b>']],
+    [undefined, [], ['Google', 'Apple']],
+    ['github', [], ['Google', 'Apple', 'GitHub']],
+  ])('names only known step-up methods from the query %s', (methods, named, absent) => {
+    const html = renderToStaticMarkup(
+      createElement(AuthErrorNotification, { error: 'SIGNUP-STEP-UP', stepUpMethods: methods })
+    );
+
+    expect(html).toContain('role="alert"');
+    for (const name of named) expect(html).toContain(name);
+    for (const name of absent) expect(html).not.toContain(name);
+  });
 });

@@ -21,16 +21,16 @@ const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url))
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
 
 for (const [file, name, command, condition] of [
-  ['ci.yml', 'typecheck', 'scripts/typecheck-all.sh'],
-  ['ci.yml', 'lint', harnessBuild],
+  ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
+  ['ci.yml', 'lint-groups', harnessBuild],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
   [
     'ci.yml',
     'workspace-tests',
-    harnessBuild,
-    "matrix.workspace.name == 'kilo-app' || matrix.workspace.name == '@kilocode/harness-sdk'",
+    'pnpm --filter ${{ matrix.workspace.name }} test',
+    "matrix.workspace.name == '@kilocode/harness-sdk'",
   ],
-  ...['typecheck', 'lint', 'i18n-leftover', 'check-unused', 'test'].map(name => [
+  ...['typecheck', 'lint', 'check-unused', 'mobile-test'].map(name => [
     'kilo-app-ci.yml',
     name,
     harnessBuild,
@@ -39,7 +39,9 @@ for (const [file, name, command, condition] of [
   test(`${file} ${name} restores the compiler plugin cache after install and before use`, () => {
     const steps = workflows[file].jobs[name].steps;
     const cacheIndex = steps.findIndex(step => step.name === 'Cache compiler plugins');
-    const installIndex = steps.findIndex(step => step.run === 'pnpm install --frozen-lockfile');
+    const installIndex = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
     const buildIndex = steps.findIndex(step => step.run === command);
     assert.ok(installIndex >= 0 && cacheIndex > installIndex && buildIndex > cacheIndex);
     const cache = steps[cacheIndex];

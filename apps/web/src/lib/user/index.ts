@@ -50,6 +50,7 @@ import {
   device_sessions,
   native_attested_keys,
   auto_top_up_configs,
+  auto_routing_custom_routers,
   platform_integrations,
   platform_oauth_credentials,
   platform_access_token_credentials,
@@ -63,8 +64,6 @@ import {
   security_remediation_attempts,
   security_remediations,
   security_audit_log,
-  auto_triage_tickets,
-  auto_fix_tickets,
   slack_bot_requests,
   bot_requests,
   cloud_agent_pending_uploads,
@@ -74,11 +73,9 @@ import {
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
-  user_period_cache,
   user_feedback,
   app_builder_feedback,
   cloud_agent_feedback,
-  free_model_usage,
   security_advisor_scans,
   kilo_pass_scheduled_changes,
   security_analysis_owner_state,
@@ -86,6 +83,7 @@ import {
   security_agent_repository_sync_state,
   kiloclaw_subscriptions,
   kiloclaw_admin_audit_logs,
+  admin_action_audit_logs,
   kiloclaw_cli_runs,
   user_push_tokens,
   user_activity_tokens,
@@ -131,10 +129,19 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
+  agent_briefing_reports,
+  agent_briefing_events,
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
-import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
+import {
+  hosted_domain_specials,
+  knownSignupStepUpMethods,
+  type AuthErrorType,
+  type SignupStepUpMethod,
+} from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
@@ -143,7 +150,6 @@ import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import * as z from 'zod';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
@@ -154,6 +160,7 @@ import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
+import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
   deleteAllOwnedByUserIdPages,
@@ -175,7 +182,6 @@ import {
   type ParsedImpactReferralTouch,
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
-import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
@@ -213,7 +219,7 @@ function getSignupIp(requestHeaders?: Headers): string | null {
 async function checkNormalizedEmailUnique(
   normalizedEmail: string,
   tx: DrizzleTransaction
-): Promise<Result<null, AuthErrorType>> {
+): Promise<Result<null, 'EMAIL-ALREADY-USED'>> {
   const [existing] = await tx
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
@@ -239,6 +245,24 @@ export type CreateOrUpdateUserArgs = {
   provider_account_id: string;
   display_name?: string | null;
 };
+
+/** A user settlement error other than a signup step-up, which carries its methods. */
+type UserSettlementError = Exclude<AuthErrorType, 'SIGNUP-STEP-UP'>;
+
+/** Bouncer admits this signup only with a stronger sign-in method; nothing was created. */
+export type SignupStepUpFailure = {
+  success: false;
+  error: 'SIGNUP-STEP-UP';
+  /** The known methods Bouncer admits now, in display order. Empty when it named none we know. */
+  methods: SignupStepUpMethod[];
+};
+
+export type CreateOrUpdateUserResult =
+  | Result<
+      { user: User; isNew: boolean; deferredSignInEvent?: DeferredSignInEvent },
+      UserSettlementError
+    >
+  | SignupStepUpFailure;
 
 export type CreateOrUpdateUserTrackingContext = {
   affiliateTouch?: ParsedImpactAffiliateTouch | null;
@@ -434,9 +458,7 @@ export async function createOrUpdateUser(
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
   deferSignInAnalytics?: boolean
-): Promise<
-  Result<{ user: User; isNew: boolean; deferredSignInEvent?: DeferredSignInEvent }, AuthErrorType>
-> {
+): Promise<CreateOrUpdateUserResult> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
     if (deferSignInAnalytics) {
@@ -591,11 +613,15 @@ export async function createOrUpdateUser(
   const operationId = signupOperationId(normalizedEmail);
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
   if (!IS_DEVELOPMENT) {
+    // Subdomains of one registrable domain share Bouncer's domain counter.
+    const emailHost = normalizedEmail.slice(normalizedEmail.lastIndexOf('@') + 1);
     const verdict = bouncerIp
       ? await signupDecide({
           operationId,
           ip: bouncerIp,
           ja4: normalizeJa4(requestHeaders?.get('x-vercel-ja4-digest')),
+          method: args.provider,
+          emailDomain: getDomain(emailHost, { allowPrivateDomains: true }) ?? emailHost,
         })
       : null;
     console.info('[auth] Bouncer signup admission', {
@@ -617,8 +643,14 @@ export async function createOrUpdateUser(
         operationId,
         outcome: 'rejected',
         reason: 'bouncer',
+        code: verdict.code,
       });
-      return failureResult('SIGNUP-RATE-LIMITED');
+      if (verdict.code === 'signup_rate_limited') return failureResult('SIGNUP-RATE-LIMITED');
+      return {
+        success: false,
+        error: 'SIGNUP-STEP-UP',
+        methods: knownSignupStepUpMethods(verdict.methods),
+      } satisfies SignupStepUpFailure;
     }
   }
   const newUserId = turnstile_guid ?? randomUUID();
@@ -661,7 +693,7 @@ export async function createOrUpdateUser(
     email_domain: extractEmailDomain(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
-  type TxResult = Result<{ user: User }, AuthErrorType>;
+  type TxResult = Result<{ user: User }, UserSettlementError>;
   let txResult: TxResult;
   let caughtError: unknown;
   try {
@@ -765,7 +797,7 @@ export async function createOrUpdateUser(
 export async function linkAccountToExistingUser(
   existingKiloUserId: string,
   authProviderData: CreateOrUpdateUserArgs
-): Promise<Result<{ user: User }, AuthErrorType>> {
+): Promise<Result<{ user: User }, UserSettlementError>> {
   // Verify the existing user exists
   const existingUser = await findUserById(existingKiloUserId);
   if (!existingUser) return failureResult('USER-NOT-FOUND');
@@ -939,11 +971,12 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - organization_user_limits/usage
  * - organization_audit_logs (actor PII nulled)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
+ * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
  * - model_eval_ingestions (promoter email anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
- * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - user_feedback / app_builder_feedback (FK nulled)
  * - user_data_exports and their multipart/outbox state (external object keys
  *   are copied to durable deletion tombstones for Worker cleanup)
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
@@ -966,11 +999,11 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   security_remediation_attempts actor references,
  *   security_finding_notifications addressed to the user,
  *   security_analysis_queue (via cascade when security_findings are deleted),
- *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
+ *   slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, review memory feedback/proposals,
- *   device_auth_requests, auto_top_up_configs,
+ *   device_auth_requests, auto_top_up_configs, auto_routing_custom_routers,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
- *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
+ *   kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences)
  * - the organization's shared-services openai_chatgpt_connections row is kept
  *   (it belongs to the organization): the deleted connector's reference is
@@ -1041,9 +1074,6 @@ export async function anonymizeCloudUserData(
       normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
     });
   }
-
-  // ── Gateway cleanup ───────────────────────────────────────────────────
-  await revokeGatewayStateForUser(tx, userId);
 
   // Remove recipient-addressed Security Agent notifications before user
   // anonymization and org membership removal. Org-owned findings can remain.
@@ -1462,8 +1492,6 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(security_remediations).where(eq(security_remediations.owned_by_user_id, userId));
   await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
-  await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
-  await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
   await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
   await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
   // Delete the private objects first: the ledger rows are the only handle the
@@ -1492,6 +1520,9 @@ export async function anonymizeCloudUserData(
   // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
   await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
   await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
+  await tx
+    .delete(auto_routing_custom_routers)
+    .where(eq(auto_routing_custom_routers.owned_by_user_id, userId));
   await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
   await tx
     .update(kiloclaw_cli_runs)
@@ -1530,6 +1561,14 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
+  await tx.delete(agent_briefing_reports).where(eq(agent_briefing_reports.kilo_user_id, userId));
+  await tx.delete(agent_briefing_events).where(eq(agent_briefing_events.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_context_preferences)
+    .where(eq(agent_briefing_context_preferences.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_preferences)
+    .where(eq(agent_briefing_preferences.kilo_user_id, userId));
   // Spend alerts are account-owned configuration, counters, and delivery
   // payloads; delivery recipients carry billing contact PII. Personal scope
   // keys use `user:<id>`, and deleting the settings row cascades to its rules
@@ -1575,7 +1614,6 @@ export async function anonymizeCloudUserData(
         OR recipients->'emails' ? ${originalEmail}::text
       )
   `);
-  await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
   await tx
     .delete(kilo_pass_scheduled_changes)
     .where(eq(kilo_pass_scheduled_changes.kilo_user_id, userId));
@@ -1696,6 +1734,21 @@ export async function anonymizeCloudUserData(
     .where(eq(kiloclaw_admin_audit_logs.target_user_id, userId));
 
   await tx
+    .update(admin_action_audit_logs)
+    .set({ actor_email: null, actor_name: null })
+    .where(eq(admin_action_audit_logs.actor_id, userId));
+
+  await tx
+    .update(admin_action_audit_logs)
+    .set({ target_id: 'deleted-user' })
+    .where(
+      and(
+        eq(admin_action_audit_logs.target_type, 'user'),
+        eq(admin_action_audit_logs.target_id, userId)
+      )
+    );
+
+  await tx
     .update(model_eval_ingestions)
     .set({ promoted_by_email: `deleted+${userId}@deleted.invalid` })
     .where(sql`lower(${model_eval_ingestions.promoted_by_email}) = lower(${originalEmail})`);
@@ -1782,10 +1835,6 @@ export async function anonymizeCloudUserData(
     .update(cloud_agent_feedback)
     .set({ kilo_user_id: null })
     .where(eq(cloud_agent_feedback.kilo_user_id, userId));
-  await tx
-    .update(free_model_usage)
-    .set({ kilo_user_id: null })
-    .where(eq(free_model_usage.kilo_user_id, userId));
   await tx
     .update(stripe_early_fraud_warning_cases)
     .set({ kilo_user_id: null })

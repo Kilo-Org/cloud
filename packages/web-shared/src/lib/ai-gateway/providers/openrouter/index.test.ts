@@ -5,7 +5,6 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
-  shouldSuppressOpenRouterModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import {
@@ -17,18 +16,28 @@ import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/k
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   findKiloExclusiveModel,
-  isDisabledKiloExclusiveModel,
   kiloExclusiveModels,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   AUTO_MODELS,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModels,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
+  const actual = jest.requireActual<typeof UnavailableModelsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/unavailable-models'
+  );
+  return { ...actual, getUnavailableModelIds: jest.fn(actual.getUnavailableModelIds) };
+});
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -38,27 +47,13 @@ jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
   () => ({
     getDataCollectionRequiredModelIds: jest.fn(() => Promise.resolve(new Set())),
+    getProviderSlugsForModels: jest.fn((ids: readonly string[]) =>
+      Promise.resolve(new Map(ids.map(id => [id, new Set<string>()])))
+    ),
   })
 );
 
 const originalFetch = global.fetch;
-
-const disabledPaidModel = {
-  ...qwen36_plus_stealth_model,
-  public_id: 'vendor/disabled-paid-model',
-  internal_id: 'vendor/disabled-paid-model-internal',
-  display_name: 'Disabled Paid Kilo Model',
-  status: 'disabled',
-} satisfies KiloExclusiveModel;
-
-const disabledFreeModel = {
-  ...qwen36_plus_stealth_model,
-  public_id: 'vendor/disabled-free-model',
-  internal_id: 'vendor/disabled-free-model-internal',
-  display_name: 'Disabled Free Kilo Model',
-  status: 'disabled',
-  pricing: null,
-} satisfies KiloExclusiveModel;
 
 function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
   return {
@@ -178,26 +173,11 @@ describe('formatName', () => {
   });
 });
 
-describe('shouldSuppressOpenRouterModel', () => {
-  it('does not suppress disabled paid Kilo-exclusive models returned by OpenRouter', () => {
-    expect(disabledPaidModel.pricing).not.toBeNull();
-    expect(shouldSuppressOpenRouterModel(disabledPaidModel)).toBe(false);
-  });
-
-  it('suppresses disabled free Kilo-exclusive models from OpenRouter', () => {
-    expect(disabledFreeModel.status).toBe('disabled');
-    expect(disabledFreeModel.pricing).toBeNull();
-    expect(shouldSuppressOpenRouterModel(disabledFreeModel)).toBe(true);
-  });
-
-  it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {
-    expect(gemma_4_26b_a4b_it_free_model.status).toBe('hidden');
-    expect(shouldSuppressOpenRouterModel(gemma_4_26b_a4b_it_free_model)).toBe(true);
-  });
-});
-
 describe('auto models', () => {
   beforeEach(() => {
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(async ids => new Map(ids.map(id => [id, new Set<string>()])));
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
@@ -289,6 +269,19 @@ describe('auto models', () => {
         alias_target: { slug: 'vendor/ignored' },
       },
     });
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [
+              id,
+              id === target.id
+                ? new Set(['Google-Vertex', 'google-ai-studio'])
+                : new Set(['deepinfra']),
+            ])
+          )
+      );
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
@@ -305,6 +298,107 @@ describe('auto models', () => {
     const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
     expect(response.data.find(model => model.id === alias.id)?.alias_target).toBe(target.id);
     expect(response.data.find(model => model.id === target.id)?.alias_target).toBeUndefined();
+    expect(response.data.find(model => model.id === alias.id)?.inference_provider_ids).toEqual([
+      'google-vertex',
+      'google-ai-studio',
+    ]);
+    expect(response.data.find(model => model.id === target.id)?.inference_provider_ids).toEqual([
+      'google-vertex',
+      'google-ai-studio',
+    ]);
+  });
+
+  it('publishes normalized endpoint identities and preserves the public schema field', async () => {
+    jest.mocked(getProviderSlugsForModels).mockClear();
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [id, new Set(['DeepInfra/fp8', 'Fireworks', 'Together', 'deepinfra'])])
+          )
+      );
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as typeof fetch;
+
+    const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
+    expect(
+      response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
+    ).toEqual(['deepinfra', 'fireworks', 'together']);
+    expect(getProviderSlugsForModels).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not infer an upstream from the model author when metadata is missing', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as typeof fetch;
+
+    const response = await getEnhancedOpenRouterModels();
+    expect(
+      response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
+    ).toEqual([]);
+  });
+
+  it('publishes authoritative exclusive model inference providers', async () => {
+    const response = await getEnhancedOpenRouterModels();
+    const unavailableModelIds = await getUnavailableModelIds();
+    const models = kiloExclusiveModels.filter(model => !unavailableModelIds.has(model.public_id));
+    expect(models.length).toBeGreaterThan(0);
+    for (const model of models) {
+      if (model.inference_providers.length === 0) continue;
+      expect(
+        response.data.find(entry => entry.id === model.public_id)?.inference_provider_ids
+      ).toEqual(model.inference_providers);
+    }
+  });
+
+  it('lists every exclusive model except unavailable ones', async () => {
+    jest
+      .mocked(getUnavailableModelIds)
+      .mockResolvedValueOnce(new Set([qwen36_plus_stealth_model.public_id]));
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === qwen36_plus_stealth_model.public_id)).toBe(false);
+    for (const model of kiloExclusiveModels) {
+      if (model === qwen36_plus_stealth_model) continue;
+      expect(models.data.some(entry => entry.id === model.public_id)).toBe(true);
+    }
+  });
+
+  it('hides the hard-coded unavailable Gemma model', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: { data: [buildModel({ id: gemma_4_26b_a4b_it_free_model.public_id })] },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === gemma_4_26b_a4b_it_free_model.public_id)).toBe(
+      false
+    );
+  });
+
+  it('replaces an OpenRouter model that shares an exclusive public id', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [buildModel({ id: qwen36_plus_stealth_model.public_id, name: 'Upstream' })],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels();
+    const matches = models.data.filter(model => model.id === qwen36_plus_stealth_model.public_id);
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.name).not.toBe('Upstream');
   });
 
   it('excludes OpenRouter batch variants from the public model list', async () => {
@@ -348,7 +442,6 @@ describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
       expect(matches).toHaveLength(1);
       expect(matches[0]).toMatchObject({ ...catalogModel, isFree: true });
       expect(findKiloExclusiveModel(modelId)).toBeNull();
-      expect(isDisabledKiloExclusiveModel(modelId)).toBe(false);
     });
 
     it('does not inject the model when OpenRouter omits it', async () => {
@@ -553,33 +646,6 @@ describe('mayTrainOnYourPrompts', () => {
     expect(mayTrain('meta/muse-spark-1.3-contributor')).toBe(true);
     expect(mayTrain('meta/muse-spark-1.3')).toBe(false);
     expect(mayTrain('vendor/model:free')).toBe(true);
-  });
-});
-
-describe('disabled paid Kilo-exclusive model fallback', () => {
-  beforeEach(() => {
-    kiloExclusiveModels.push(disabledPaidModel);
-    global.fetch = jest.fn(() =>
-      Promise.resolve(
-        createMockResponse({
-          jsonData: { data: [buildModel({ id: disabledPaidModel.public_id })] },
-        })
-      )
-    ) as unknown as typeof fetch;
-  });
-
-  afterEach(() => {
-    const modelIndex = kiloExclusiveModels.indexOf(disabledPaidModel);
-    if (modelIndex >= 0) kiloExclusiveModels.splice(modelIndex, 1);
-    global.fetch = originalFetch;
-  });
-
-  it('keeps the OpenRouter model listed without active Kilo-exclusive routing', async () => {
-    const models = await getEnhancedOpenRouterModels();
-
-    expect(models.data.some(model => model.id === disabledPaidModel.public_id)).toBe(true);
-    expect(isDisabledKiloExclusiveModel(disabledPaidModel.public_id)).toBe(true);
-    expect(findKiloExclusiveModel(disabledPaidModel.public_id)).toBeNull();
   });
 });
 

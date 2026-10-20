@@ -12,6 +12,7 @@ import {
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import type { PreparationStepKind } from '../../src/shared/protocol.js';
+import { parseControlPlaneCredential } from '../../src/shared/control-plane-credential.js';
 import { writeCloudAgentRulesFile } from './cloud-agent-rules-file.js';
 import {
   createSafeProcessDiagnostic,
@@ -362,39 +363,25 @@ async function cleanupWorkspace(
   ]);
 }
 
-function isCodeReviewSession(request: WrapperSessionReadyRequest): boolean {
-  return request.materialized.env.KILO_PLATFORM === 'code-review';
-}
-
-function isBitbucketReviewSession(
-  request: WrapperSessionReadyRequest
-): request is WrapperSessionReadyRequest & {
-  repo: Extract<NonNullable<WrapperSessionReadyRequest['repo']>, { kind: 'git' }>;
-} {
-  const repo = request.repo;
-  return isCodeReviewSession(request) && repo?.kind === 'git' && repo.platform === 'bitbucket';
-}
-
 // Wire-format prefix of a Bitbucket outbound session capability (see the
 // git-token-service BitbucketSessionCapabilityCodec). Presence of a capability
 // qualifies the session for blobless clone; the credential helper authenticates
 // later lazy fetches.
 const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
 
-function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): boolean {
+export function isBloblessReviewCloneEligible(
+  origin: string | undefined,
+  platform: string | undefined,
+  token: string | undefined
+): boolean {
+  if (origin !== 'code-review') return false;
+  if (platform === 'github' || platform === 'gitlab') return true;
   return (
-    isBitbucketReviewSession(request) &&
-    typeof request.repo.token === 'string' &&
-    request.repo.token.startsWith(BITBUCKET_CAPABILITY_PREFIX)
+    platform === 'bitbucket' &&
+    token !== undefined &&
+    (token.startsWith(BITBUCKET_CAPABILITY_PREFIX) ||
+      parseControlPlaneCredential(token)?.purpose === 'bitbucket')
   );
-}
-
-function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
-  if (!isCodeReviewSession(request)) return false;
-  const repo = request.repo;
-  if (repo?.kind === 'github') return true;
-  if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
-  return hasBitbucketReviewCapability(request);
 }
 
 async function cloneRepository(
@@ -418,7 +405,11 @@ async function cloneRepository(
   // is retained, so incremental diffs and merge-base still work. See
   // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
   // capability-backed Bitbucket). The credential helper authenticates lazy fetch.
-  const useBlobless = isBloblessReviewCloneEligible(request);
+  const useBlobless = isBloblessReviewCloneEligible(
+    request.materialized.env.KILO_PLATFORM,
+    platform,
+    repo.token
+  );
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {
     await removePath(request.workspace.workspacePath, signal);
@@ -685,6 +676,28 @@ async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promis
   await writeCloudAgentRulesFile(request.workspace.sessionHome, {
     bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
   });
+}
+
+function isSafeInstructionName(name: string): boolean {
+  // The profile validator owns the reserved-name decision; this guard keeps a
+  // bypassing caller from overwriting the Cloud-Agent-owned rules file.
+  return name !== 'cloud-agent' && /^[a-z0-9][a-z0-9-]*$/.test(name);
+}
+
+async function writeRuntimeInstructions(request: WrapperSessionReadyRequest): Promise<void> {
+  const instructions = request.materialized.runtimeInstructions;
+  if (!instructions?.length) return;
+
+  const rulesDir = path.join(request.workspace.sessionHome, '.kilocode/rules');
+  await fs.mkdir(rulesDir, { recursive: true });
+
+  for (const instruction of instructions) {
+    if (!isSafeInstructionName(instruction.name)) {
+      logToFile(`bootstrap rejected unsafe instruction name=${JSON.stringify(instruction.name)}`);
+      continue;
+    }
+    await fs.writeFile(path.join(rulesDir, `${instruction.name}.md`), instruction.content);
+  }
 }
 
 async function bootstrapEmptyKiloSession(
@@ -1236,6 +1249,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     await writeCloudAgentRules(request);
+    await writeRuntimeInstructions(request);
 
     if (workspaceWasWarm) {
       logToFile(

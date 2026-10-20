@@ -57,7 +57,7 @@
     "typecheck:e2e": "ttsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "drizzle-orm": "catalog:",
     "effect": "3.22.1",
     "eventsource-parser": "3.0.8",

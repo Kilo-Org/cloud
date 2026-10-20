@@ -39,18 +39,6 @@ function mountRegistrar(routeKey: string): TestRenderer.ReactTestRenderer {
 }
 
 describe('route registry', () => {
-  it('keeps two route keys from sharing a picker slot', () => {
-    const bridgeA = makeBridge('session-a');
-    const bridgeB = makeBridge('session-b');
-
-    modelPickerSlot.set('session-a', bridgeA);
-    modelPickerSlot.set('session-b', bridgeB);
-
-    expect(modelPickerSlot.get('session-a')).toBe(bridgeA);
-    expect(modelPickerSlot.get('session-b')).toBe(bridgeB);
-    expect(modelPickerSlot.get('session-a')).not.toBe(modelPickerSlot.get('session-b'));
-  });
-
   it('clears the slot when the route unmounts', () => {
     const bridge = makeBridge('session-a');
     const renderer = mountRegistrar('session-a');

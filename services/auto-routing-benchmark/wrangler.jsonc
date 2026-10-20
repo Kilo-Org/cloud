@@ -4,7 +4,9 @@
   "name": "auto-routing-benchmark",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-15",
-  "compatibility_flags": ["nodejs_compat"],
+  // enable_request_signal aborts an incoming request's signal when its caller goes away;
+  // BenchRunnerContainer relays that to the container so it posts a lost caller's outcome.
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
   "workers_dev": false,
   "preview_urls": false,
   "logpush": true,
@@ -15,12 +17,12 @@
       "custom_domain": true,
     },
   ],
-  // 05:00 daily: platform auto-decider sync (may start a platform run).
-  // Every 15 min: drain pending Benchmark-profile work into the profile slot.
-  "triggers": { "crons": ["0 5 * * *", "*/15 * * * *"] },
+  // The frequent tick recovers expired leases; completion dispatches immediately.
+  "triggers": { "crons": ["0 5 * * *", "* * * * *"] },
   "dev": { "port": 8814, "local_protocol": "http", "ip": "0.0.0.0" },
   "observability": { "enabled": true },
   "vars": {
+    "BENCHMARK_SCHEDULER_CONFIG": "{}",
     // Base URL for reaching apps/web's /api/internal/* routes. Other workers
     // that call apps/web internal endpoints use app.kilo.ai.
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
@@ -28,6 +30,9 @@
     // CLI's KILO_API_URL. Local dev overrides both vars via .dev.vars (see
     // .dev.vars.example) so the decider benchmark runs fully locally.
     "KILO_CLI_API_URL": "https://api.kilo.ai",
+    // Where a container posts a case outcome after losing its caller (for
+    // example during a version rollout). Local dev overrides it via .dev.vars.
+    "BENCH_RESULT_URL": "https://auto-routing-benchmark.kiloapps.io/container/case-result",
   },
   "containers": [
     {
@@ -87,6 +92,12 @@
       "binding": "INTERNAL_API_SECRET_PROD",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+    {
+      // Authenticates only apps/web's POST /api/internal/bot-token mint.
+      "binding": "BOT_TOKEN_MINT_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "BOT_TOKEN_MINT_SECRET",
     },
     {
       "binding": "OPENROUTER_API_KEY",

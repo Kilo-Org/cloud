@@ -34,13 +34,12 @@ const nonFlexExclusiveModel: KiloExclusiveModel = {
   internal_id: 'test/non-flex',
   display_name: 'Non-Flex test model',
   description: 'Test model',
-  status: 'public',
   context_length: 8_192,
   max_completion_tokens: 4_096,
   provider: OPENROUTER,
   flags: [],
   pricing: null,
-  inference_provider_restriction: [],
+  inference_providers: [],
 };
 
 const flexExclusiveModel: KiloExclusiveModel = {
@@ -247,6 +246,68 @@ describe('applyProviderSpecificLogic recursive tool schemas', () => {
   });
 });
 
+describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
+  async function applyToTool(model: string) {
+    const request = makeMessagesRequest(model);
+    request.body.tools = [
+      {
+        name: 'nteract_create_cell',
+        description: 'Create a cell.',
+        input_schema: {
+          type: 'object',
+          properties: { notebook_id: { type: ['string', 'null'] } },
+          oneOf: [{ required: ['notebook_id'] }],
+        },
+      },
+    ];
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    return request.body.tools[0];
+  }
+
+  it('removes top-level combinators for Claude models', async () => {
+    const tool = await applyToTool('anthropic/claude-opus-5.5');
+
+    expect(tool).toEqual({
+      name: 'nteract_create_cell',
+      description:
+        'Create a cell.\n\nThe input must also match exactly one of these JSON schemas: [{"required":["notebook_id"]}]',
+      input_schema: {
+        type: 'object',
+        properties: { notebook_id: { type: ['string', 'null'] } },
+        required: ['notebook_id'],
+      },
+    });
+  });
+
+  it('preserves top-level combinators for other models', async () => {
+    const tool = await applyToTool('vendor/model');
+
+    expect(tool).toEqual({
+      name: 'nteract_create_cell',
+      description: 'Create a cell.',
+      input_schema: {
+        type: 'object',
+        properties: { notebook_id: { type: ['string', 'null'] } },
+        oneOf: [{ required: ['notebook_id'] }],
+      },
+    });
+  });
+});
+
 describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {
@@ -280,6 +341,62 @@ describe('applyReasoningDetailsTransform', () => {
     const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
     expect('reasoning_details' in assistant).toBe(false);
     expect(assistant.reasoning_content).toBe('thinking hard');
+  });
+
+  it('drops the legacy reasoning string next to reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'thinking hard';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('thinking hard');
+  });
+
+  it('folds a legacy reasoning string into reasoning_content without reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps existing reasoning_content over a legacy reasoning string', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = 'upstream thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('drops the legacy reasoning string for Gemini', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'thinking hard';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
   });
 
   it('leaves reasoning_details untouched without a transform', () => {

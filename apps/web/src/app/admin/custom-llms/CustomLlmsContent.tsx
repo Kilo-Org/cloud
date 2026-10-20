@@ -27,11 +27,14 @@ import {
   useUpsertCustomLlm,
   useDeleteCustomLlm,
 } from '@/app/admin/api/custom-llms/hooks';
-import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
+import {
+  CustomLlmCredentialsSchema,
+  CustomLlmDefinitionSchema,
+  CustomLlmPublicIdSchema,
+} from '@kilocode/db/schema-types';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { toast } from 'sonner';
 import { Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
@@ -153,15 +156,13 @@ export function CustomLlmsContent() {
       return;
     }
 
-    if (!publicId.startsWith(CUSTOM_LLM_PREFIX)) {
+    const publicIdResult = CustomLlmPublicIdSchema.safeParse(publicId);
+    if (!publicIdResult.success) {
       setCopy(prev =>
         prev
           ? {
               ...prev,
-              validationError: {
-                field: 'publicId',
-                message: `New public ID must start with "${CUSTOM_LLM_PREFIX}"`,
-              },
+              validationError: { field: 'publicId', message: formatZodError(publicIdResult.error) },
             }
           : prev
       );
@@ -208,12 +209,12 @@ export function CustomLlmsContent() {
       return;
     }
 
-    if (!trimmedPublicId.startsWith(CUSTOM_LLM_PREFIX)) {
-      setEditor(prev => ({
-        ...prev,
-        validationError: `public_id must start with "${CUSTOM_LLM_PREFIX}"`,
-      }));
-      return;
+    if (editor.mode === 'create') {
+      const publicIdResult = CustomLlmPublicIdSchema.safeParse(trimmedPublicId);
+      if (!publicIdResult.success) {
+        setEditor(prev => ({ ...prev, validationError: formatZodError(publicIdResult.error) }));
+        return;
+      }
     }
 
     let parsedCredentials: CustomLlmCredentials | undefined = undefined;
@@ -395,7 +396,7 @@ export function CustomLlmsContent() {
                   }))
                 }
                 disabled={editor.mode === 'edit'}
-                placeholder={`e.g. ${CUSTOM_LLM_PREFIX}my-custom-model`}
+                placeholder="e.g. acme/my-custom-model"
                 className="font-mono"
               />
             </div>
@@ -448,6 +449,21 @@ export function CustomLlmsContent() {
                     instead when the provider expects an{' '}
                     <code className="text-foreground">x-api-key</code> header.
                   </p>
+                  <p className="mt-2">
+                    To route through the secure proxy, set the definition&apos;s{' '}
+                    <code className="text-foreground">base_url</code> to the proxy&apos;s{' '}
+                    <code className="text-foreground">/api/proxy</code> URL and use:
+                  </p>
+                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
+                    {`{
+  "type": "secure_proxy",
+  "proxy_secret": "KILO_AI_GATEWAY_SECURE_PROXY_SECRET value",
+  "config": {
+    "url": "https://upstream.example.com/v1",
+    "extra_headers": { "Authorization": "Bearer YOUR_API_KEY" }
+  }
+}`}
+                  </pre>
                 </div>
               )}
             </div>
@@ -485,6 +501,12 @@ export function CustomLlmsContent() {
                 <code>&quot;internal_id&quot;: &quot;provider-model&quot;</code> to send an upstream{' '}
                 <code>model</code>; omit <code>internal_id</code> to remove <code>model</code> from
                 the outbound request body.
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
+                must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
+                <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
+                OpenRouter or Kilo-exclusive model.
               </p>
             </div>
 
@@ -533,7 +555,7 @@ export function CustomLlmsContent() {
                     prev ? { ...prev, publicId: event.target.value, validationError: null } : prev
                   )
                 }
-                placeholder={`e.g. ${CUSTOM_LLM_PREFIX}my-copied-model`}
+                placeholder="e.g. acme/my-copied-model"
                 className="font-mono"
                 aria-invalid={copy?.validationError?.field === 'publicId'}
                 aria-describedby={

@@ -142,8 +142,10 @@ function renderReport(findings: unknown[] = [FINDING]): I {
 }
 
 function renderedText(root: I): string[] {
-  return root
-    .findAll(node => node.type === 'Text')
+  const texts = root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'Text'
+  );
+  return texts
     .map(node => {
       const children: unknown[] = Array.isArray(node.props.children)
         ? node.props.children

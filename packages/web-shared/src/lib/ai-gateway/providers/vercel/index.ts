@@ -73,13 +73,17 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
+
+  if (
+    isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels) ||
+    isVercelRoutingOptOut(vercelModelId, routingConfig.vercelOptOutModels)
+  ) {
     console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
     return false;
   }
 
   const vercelModels = await getVercelModelsFromDatabase();
-  const vercelModelId = await mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;

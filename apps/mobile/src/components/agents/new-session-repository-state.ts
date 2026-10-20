@@ -170,7 +170,9 @@ export function detectRepositoryPlatform(
   if (!gitUrl) {
     return undefined;
   }
-  let hostname: string | undefined = /^git@([^:]+):/.exec(gitUrl)?.[1];
+  // The scp-style host is compared case-insensitively: `new URL().hostname`
+  // below is already lowercased, so both accepted forms must share one rule.
+  let hostname: string | undefined = /^git@([^:]+):/.exec(gitUrl)?.[1]?.toLowerCase();
   if (hostname === undefined) {
     try {
       hostname = new URL(gitUrl).hostname;

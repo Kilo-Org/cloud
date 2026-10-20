@@ -59,9 +59,9 @@ catalogs:
   # ones that test through `@cloudflare/vitest-pool-workers` (it peers only
   # `^4.1.0`, so vitest 5 breaks its pool) and the excluded features.
   vitest5:
-    '@vitest/coverage-v8': 5.0.4
-    '@vitest/ui': 5.0.4
-    vitest: 5.0.4
+    '@vitest/coverage-v8': 5.0.5
+    '@vitest/ui': 5.0.5
+    vitest: 5.0.5
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:

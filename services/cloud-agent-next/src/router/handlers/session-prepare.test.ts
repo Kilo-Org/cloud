@@ -248,6 +248,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     const caller = router.createCaller(context);
     await caller.prepareSession({
       prompt: 'child',
+      callbackTarget: { url: 'session:parent' },
       mode: 'code',
       model: 'kilo/test-model',
       githubRepo: 'acme/repo',
@@ -258,6 +259,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
     expect(request.allowSubagentSessions).toBe(false);
     expect(request.options.createdOnPlatform).toBe('cloud-agent');
+    expect(request.options.callbackTarget).toEqual({ url: 'session:parent' });
     expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
     await caller.prepareSession({
       prompt: 'grandchild-enabled child',
@@ -294,6 +296,21 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(startNewSessionMock).not.toHaveBeenCalled();
   });
 
+  it('rejects a parent callback without authenticated spawn authority before creating a session', async () => {
+    await expect(
+      router.createCaller(createContext()).prepareSession({
+        prompt: 'ordinary session',
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        callbackTarget: { url: 'session:parent' },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+  });
+
   it('does not accept caller lineage on ordinary preparation', async () => {
     const caller = router.createCaller(createContext());
     const input = {
@@ -306,6 +323,18 @@ describe('prepareSession operation-ledger admission gate', () => {
     };
     await caller.prepareSession(input);
     expect(startNewSessionMock.mock.calls[0][0].parentCloudAgentSessionId).toBeUndefined();
+  });
+
+  it('rejects setting a parent callback through updateSession before accessing the session', async () => {
+    await expect(
+      router.createCaller(createContext()).updateSession({
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        callbackTarget: { url: 'session:parent' },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'A parent callback can only be set when a Cloud Agent parent launches a session',
+    });
   });
 
   it('retains normal repository and model access checks for opted-in parents', async () => {

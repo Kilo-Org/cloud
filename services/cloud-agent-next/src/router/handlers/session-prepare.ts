@@ -14,6 +14,7 @@
  * execution-scoped callback target override on `send`.
  */
 import { TRPCError } from '@trpc/server';
+import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
 import type * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
 import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
@@ -190,6 +191,12 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
       const request = prepareInputToSessionCreateRequest(input);
+      if (input.callbackTarget?.url === PARENT_SESSION_CALLBACK_URL && !ctx.cloudAgentAuthority) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A parent callback requires a session launched by a Cloud Agent parent',
+        });
+      }
       if (ctx.cloudAgentAuthority) {
         request.parentCloudAgentSessionId = ctx.cloudAgentAuthority.parentSessionId;
         request.options = { ...request.options, createdOnPlatform: 'cloud-agent' };
@@ -259,6 +266,12 @@ const updateSessionHandler = internalApiProtectedProcedure
   .output(UpdateSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'updateSession' }, async () => {
+      if (input.callbackTarget?.url === PARENT_SESSION_CALLBACK_URL) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A parent callback can only be set when a Cloud Agent parent launches a session',
+        });
+      }
       logger.setTags({
         cloudAgentSessionId: input.cloudAgentSessionId,
         userId: ctx.userId,

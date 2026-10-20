@@ -725,7 +725,7 @@ async function handleRpcMessage(
           ...(clientName !== undefined ? { clientName } : {}),
         });
         const childSessionInstructions = auth.cloudAgentAuthority
-          ? ` This session may launch child Cloud Agent sessions. Launch one only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task.`
+          ? ` This session may launch child Cloud Agent sessions. Launch one only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task. To receive the child's completion, failure or interruption as a new message in this parent session, include callbackTarget: { url: "session:parent" }. Omit callbackTarget when no notification is needed. Do not poll or wait in a tool for a callback; finish your turn and resume when it arrives.`
           : '';
         return jsonRpcResult(id ?? 0, {
           protocolVersion,

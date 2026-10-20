@@ -4989,43 +4989,6 @@
     ],
     "searchBlob": "cliSessions.share Share a CLI session by creating a public share link that copies the session data. Use this to let other people view a session. clisessions share session_id shared_state session_id shared_state"
   },
-  "cliSessions.shareForWebhookTrigger": {
-    "path": "cliSessions.shareForWebhookTrigger",
-    "kind": "mutation",
-    "summary": "Share a CLI session publicly as part of a webhook trigger. The call checks trigger access and session ownership before creating the share.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "kilo_session_id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "trigger_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "organization_id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "kilo_session_id",
-        "trigger_id"
-      ]
-    },
-    "tags": [
-      "clisessions",
-      "shareforwebhooktrigger",
-      "kilo_session_id",
-      "trigger_id",
-      "organization_id"
-    ],
-    "searchBlob": "cliSessions.shareForWebhookTrigger Share a CLI session publicly as part of a webhook trigger. The call checks trigger access and session ownership before creating the share. clisessions shareforwebhooktrigger kilo_session_id trigger_id organization_id kilo_session_id trigger_id organization_id"
-  },
   "cliSessions.update": {
     "path": "cliSessions.update",
     "kind": "mutation",
@@ -5713,42 +5676,6 @@
       "session_id"
     ],
     "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id session_id"
-  },
-  "cliSessionsV2.shareForWebhookTrigger": {
-    "path": "cliSessionsV2.shareForWebhookTrigger",
-    "kind": "mutation",
-    "summary": "Share a session on behalf of a webhook trigger, verifying the trigger and session ownership. Return the share token and session ID.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "kilo_session_id": {
-          "type": "string",
-          "pattern": "^ses_.*"
-        },
-        "trigger_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "organization_id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "kilo_session_id",
-        "trigger_id"
-      ]
-    },
-    "tags": [
-      "clisessionsv2",
-      "shareforwebhooktrigger",
-      "kilo_session_id",
-      "trigger_id",
-      "organization_id"
-    ],
-    "searchBlob": "cliSessionsV2.shareForWebhookTrigger Share a session on behalf of a webhook trigger, verifying the trigger and session ownership. Return the share token and session ID. clisessionsv2 shareforwebhooktrigger kilo_session_id trigger_id organization_id kilo_session_id trigger_id organization_id"
   },
   "cliSessionsV2.unshare": {
     "path": "cliSessionsV2.unshare",

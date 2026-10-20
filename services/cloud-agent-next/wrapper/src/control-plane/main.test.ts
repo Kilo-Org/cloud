@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
+import type { WrapperSentryContext, WrapperSentryReporter } from '../sentry.js';
 import type { ControlPlaneConnection } from './connection.js';
 import {
   controlPlaneExitPolicy,
@@ -20,7 +25,7 @@ function createFakeProcess(): FakeProcess {
   const handlers = new Map<string, AnyHandler>();
   const process: FakeProcess = {
     once(event, listener) {
-      handlers.set(event, listener);
+      handlers.set(event, listener as AnyHandler);
       return process;
     },
     on(event, listener) {
@@ -70,6 +75,7 @@ function createLifecycle(
     exit?: (code: number) => void;
     log?: (message: string) => void;
     stop?: () => Promise<void>;
+    sentry?: WrapperSentryReporter;
   } = {}
 ): {
   lifecycle: ControlPlaneLifecycle;
@@ -112,6 +118,12 @@ function createLifecycle(
     exit: options.exit ?? (code => exits.push(code)),
     process: proc,
     log: options.log ?? (message => logs.push(message)),
+    sentry: options.sentry,
+    sentryContext: {
+      allocationId: 'allocation_one',
+      providerInstanceId: 'sandbox_one',
+      wrapperInstanceId: connectionState.connection.wrapperId,
+    },
     ...(options.stop
       ? {
           stop: async () => {
@@ -143,7 +155,150 @@ describe('controlPlaneExitPolicy', () => {
   });
 });
 
+describe('control-plane wrapper startup process', () => {
+  it('preserves the original startup diagnostic and stack without a DSN and exits 1', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'control-plane-startup-'));
+    const sentinel = 'wrapper-startup-diagnostic-sentinel';
+    const child = Bun.spawn([process.execPath, 'run', join(import.meta.dir, 'main.ts')], {
+      env: {
+        ...process.env,
+        HOME: directory,
+        CLOUD_AGENT_SENTRY_DSN: '',
+        CLOUD_AGENT_SENTRY_ENVIRONMENT: '',
+        SANDBOX_INTERCEPT_HTTPS: '',
+        CONTROL_PLANE_NATIVE_LOGS: '',
+        CONTROL_LOG_UPLOAD_URL: '',
+        CONTROL_LOG_UPLOAD_GRANT: '',
+        CONTROL_WORKLOAD_LIMIT_MB: '1',
+        CONTROL_WORKLOAD_RESERVE_MB: '1024',
+        SANDBOX_CONTROL_URL: sentinel,
+        SANDBOX_CONTROL_CREDENTIAL: 'startup-test-credential',
+        [CONTROL_PLANE_ALLOCATION_ID_ENV]: 'allocation_startup',
+        WRAPPER_LOG_PATH: join(directory, 'wrapper.log'),
+      },
+      stdout: 'ignore',
+      stderr: 'pipe',
+      timeout: 5_000,
+    });
+    const stderr = new Response(child.stderr).text();
+    try {
+      expect(await child.exited).toBe(1);
+      const diagnostic = await stderr;
+      expect(diagnostic).toContain('TypeError:');
+      expect(diagnostic).toContain(sentinel);
+      expect(diagnostic).toContain('at createControlTerminalRuntime');
+      expect(diagnostic).toContain('terminal-runtime.ts:');
+      expect(diagnostic).not.toContain('wrapper Sentry eventId=');
+    } finally {
+      if (child.exitCode === null) child.kill();
+      await child.exited;
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 10_000);
+});
+
 describe('createControlPlaneLifecycle', () => {
+  it('captures the original fatal exception once and flushes before the existing exit', async () => {
+    const captures: Array<{ error: unknown; context: WrapperSentryContext }> = [];
+    const flushing = Promise.withResolvers<void>();
+    let flushes = 0;
+    const state = createLifecycle({
+      sentry: {
+        capture: (error, context) => {
+          captures.push({ error, context });
+          return 'event_one';
+        },
+        flush: () => {
+          flushes += 1;
+          return flushing.promise;
+        },
+      },
+    });
+    const error = new TypeError('Wrapper crash');
+    state.process.emit('uncaughtException', error);
+    state.process.emit('uncaughtException', error);
+    await Bun.sleep(0);
+    expect(captures).toEqual([
+      {
+        error,
+        context: {
+          operation: 'uncaught_exception',
+          allocationId: 'allocation_one',
+          providerInstanceId: 'sandbox_one',
+          wrapperInstanceId: 'wrapper_test',
+          exitCode: 1,
+        },
+      },
+    ]);
+    expect(flushes).toBe(1);
+    expect(state.exits).toEqual([]);
+    flushing.resolve();
+    await Bun.sleep(0);
+    expect(state.exits).toEqual([1]);
+    expect(state.finalizes()).toEqual({ diagnostics: 1, fileLogs: 1 });
+  });
+
+  it('captures an original rejection but continues without exit or fatal flush', async () => {
+    const captures: Array<{ error: unknown; context: WrapperSentryContext }> = [];
+    let flushes = 0;
+    const state = createLifecycle({
+      sentry: {
+        capture: (error, context) => {
+          captures.push({ error, context });
+          return 'event_one';
+        },
+        flush: async () => {
+          flushes += 1;
+        },
+      },
+    });
+    const reason = new Error('Model request failed');
+    state.process.emit('unhandledRejection', reason);
+    await Bun.sleep(0);
+    expect(captures).toEqual([
+      {
+        error: reason,
+        context: {
+          operation: 'unhandled_rejection',
+          allocationId: 'allocation_one',
+          providerInstanceId: 'sandbox_one',
+          wrapperInstanceId: 'wrapper_test',
+        },
+      },
+    ]);
+    expect(flushes).toBe(0);
+    expect(state.exits).toEqual([]);
+    expect(state.logs.some(message => message.includes('Model request failed'))).toBe(true);
+    expect(state.finalizes()).toEqual({ diagnostics: 0, fileLogs: 0 });
+  });
+
+  it('does not report signal or normal exits, or crash errors after shutdown started', async () => {
+    for (const signal of ['SIGTERM', 'SIGINT', 'shutdown']) {
+      let captures = 0;
+      let flushes = 0;
+      const state = createLifecycle({
+        sentry: {
+          capture: () => {
+            captures += 1;
+            return 'event_one';
+          },
+          flush: async () => {
+            flushes += 1;
+          },
+        },
+      });
+      if (signal === 'shutdown') await state.lifecycle.shutdown(0, 'normal shutdown');
+      else state.process.emit(signal);
+      if (signal !== 'SIGINT') {
+        state.process.emit('uncaughtException', new Error('Shutdown error'));
+        state.process.emit('unhandledRejection', new Error('Shutdown rejection'));
+      }
+      await Bun.sleep(0);
+      expect(captures).toBe(0);
+      expect(flushes).toBe(0);
+    }
+  });
+
   it('starts the connection and recycles on demand', () => {
     const { lifecycle, connectionState } = createLifecycle();
     lifecycle.start();

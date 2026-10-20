@@ -15,3 +15,7 @@ apps/web/src/lib/cloud-agent/preview-link\.test\.ts
 # in branch history. Exclude the fixture path so the historical commit does not
 # fail the scan.
 apps/mobile/src/lib/telemetry/sentry-scrub-message-redaction\.test\.ts
+
+# Sentry privacy fixtures use synthetic URL credentials to test sanitization.
+# Exclude this fixture path because the literal URI remains in branch history.
+services/cloud-agent-next/src/shared/sentry\.test\.ts

@@ -8,6 +8,7 @@ import {
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../../../src/shared/control-plane-protocol.js';
 
 const MAIN_PATH = join(import.meta.dir, 'main.ts');
+const PRELOAD_PATH = join(import.meta.dir, 'main-cert-refusal-preload.ts');
 const CREDENTIAL = 'test-credential';
 
 function childEnv(url: string): Record<string, string> {
@@ -17,6 +18,10 @@ function childEnv(url: string): Record<string, string> {
   }
   return {
     ...environment,
+    CLOUD_AGENT_SENTRY_DSN: '',
+    CLOUD_AGENT_SENTRY_ENVIRONMENT: '',
+    CONTROL_LOG_UPLOAD_URL: '',
+    CONTROL_LOG_UPLOAD_GRANT: '',
     CONTROL_PLANE_NATIVE_LOGS: '1',
     [SANDBOX_INTERCEPT_HTTPS_ENV]: '1',
     SANDBOX_CONTROL_URL: url,
@@ -27,13 +32,17 @@ function childEnv(url: string): Record<string, string> {
 }
 
 async function waitForExit(child: Bun.Subprocess, timeoutMs: number): Promise<number> {
-  return Promise.race([
-    child.exited,
-    (async () => {
-      await Bun.sleep(timeoutMs);
-      return Number.NaN;
-    })(),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      child.exited,
+      new Promise<number>(resolve => {
+        timer = setTimeout(() => resolve(Number.NaN), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 describe('control-plane wrapper cert refusal process', () => {
@@ -46,9 +55,7 @@ describe('control-plane wrapper cert refusal process', () => {
         return new Response('unexpected', { status: 500 });
       },
     });
-    // The default containment CA path is absent in the test environment, so the
-    // real main process refuses after the wait and exits before any socket.
-    const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {
+    const child = Bun.spawn([process.execPath, 'run', `--preload=${PRELOAD_PATH}`, MAIN_PATH], {
       env: childEnv(`ws://127.0.0.1:${server.port}/sandbox-control/fake`),
       stdout: 'ignore',
       stderr: 'pipe',
@@ -56,13 +63,10 @@ describe('control-plane wrapper cert refusal process', () => {
     try {
       expect(await waitForExit(child, 12_000)).toBe(1);
 
-      const stderr = await new Response(
-        child.stderr as unknown as ReadableStream<Uint8Array>
-      ).text();
+      const stderr = await new Response(child.stderr).text();
       const refusalLines = stderr
         .split('\n')
         .filter(line => line.includes('"interceptTrustFailure":"cert_unavailable"'));
-      // Exactly one line, flushed before exit.
       expect(refusalLines).toHaveLength(1);
       expect(stderr).not.toContain(CONTAINERS_INTERCEPT_CA_PATH);
       expect(stderr).not.toContain(CREDENTIAL);

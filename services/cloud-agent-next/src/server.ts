@@ -1,5 +1,6 @@
 import { byocVercelOwnerSchema } from './byoc/vercel-owner.js';
 import { Hono } from 'hono';
+import { captureCloudAgentException, instrumentCloudAgentWorker } from './sentry.js';
 import type { Context, Next } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
 import { appRouter } from './router.js';
@@ -908,6 +909,7 @@ app.use(
       request: c.req.raw,
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
+      captureCloudAgentException(error, { operation: path ?? 'trpc' });
       logger.setTags({ path });
       logger
         .withFields({
@@ -920,7 +922,11 @@ app.use(
 );
 
 app.notFound(createNotFoundHandler());
-app.onError(createErrorHandler(logger, { includeMessage: false }));
+const errorHandler = createErrorHandler(logger, { includeMessage: false });
+app.onError((error, c) => {
+  captureCloudAgentException(error, { operation: 'http' });
+  return errorHandler(error, c);
+});
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
 export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
@@ -929,7 +935,7 @@ export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
 // the collector floors `scheduledTime` to 5-minute buckets, so extra ticks only repeat a bucket.
 export const OUTCOME_AGGREGATE_CRONS = new Set([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
 
-export default {
+const worker = {
   fetch(incoming: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
     // The preview marker selects the physical sandbox DO's port path, so a client
     // copy never passes ingress, whichever route later forwards the request.
@@ -950,7 +956,7 @@ export default {
 
     return app.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env, _ctx?: ExecutionContext): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer(env);
       return consumer(batch as MessageBatch<CallbackJob>);
@@ -961,7 +967,11 @@ export default {
 
     logger.warn(`Received message from unexpected queue: ${batch.queue}`);
   },
-  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    _ctx?: ExecutionContext
+  ): Promise<void> {
     if (controller.cron === REPORT_RETENTION_CRON) {
       await removeExpiredCloudAgentReportData(env);
       return;
@@ -978,7 +988,9 @@ export default {
       cron: controller.cron,
     });
   },
-};
+} satisfies ExportedHandler<Env>;
+
+export default instrumentCloudAgentWorker(worker);
 
 export { Sandbox } from '@cloudflare/sandbox';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

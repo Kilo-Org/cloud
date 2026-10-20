@@ -49,6 +49,7 @@ jest.mock('@octokit/rest', () => ({
             { id: 1, name: 'repo', full_name: 'acme/repo', private: true, archived: false },
           ],
         },
+        headers: {},
       }),
     },
   })),

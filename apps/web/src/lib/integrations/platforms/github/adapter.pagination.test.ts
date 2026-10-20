@@ -36,13 +36,14 @@ import {
   fetchGitHubRepositoriesForMaintenance,
 } from './adapter';
 
-function branchPage(page: number, count: number) {
+function branchPage(page: number, count: number, link?: string) {
   return {
     data: Array.from({ length: count }, (_, index) => ({ name: `branch-${page}-${index}` })),
+    headers: link ? { link } : {},
   };
 }
 
-function repoPage(page: number, count: number, archivedCount = 0) {
+function repoPage(page: number, count: number, archivedCount = 0, link?: string) {
   return {
     data: {
       repositories: Array.from({ length: count }, (_, index) => ({
@@ -54,6 +55,7 @@ function repoPage(page: number, count: number, archivedCount = 0) {
         created_at: '2024-01-01T00:00:00Z',
       })),
     },
+    headers: link ? { link } : {},
   };
 }
 
@@ -91,6 +93,33 @@ describe('fetchGitHubBranches pagination bounds', () => {
       isDefault: true,
     });
     expect(warnExceptInTest).not.toHaveBeenCalled();
+  });
+
+  it('warns only when a full page at the ceiling still has a next page', async () => {
+    mockGetRepo.mockResolvedValue({ data: { default_branch: 'main' } });
+    mockListBranches.mockImplementation(async ({ page }: { page: number }) =>
+      branchPage(
+        page,
+        100,
+        page < 10
+          ? `<https://api.github.com/x?page=${page + 1}>; rel="next"`
+          : '<https://api.github.com/x?page=1>; rel="first"'
+      )
+    );
+
+    await fetchGitHubBranches('123456', 'acme/repo');
+    expect(mockListBranches).toHaveBeenCalledTimes(10);
+    // The final page reports no next page, so nothing was dropped.
+    expect(warnExceptInTest).not.toHaveBeenCalled();
+
+    jest.clearAllMocks();
+    mockGetRepo.mockResolvedValue({ data: { default_branch: 'main' } });
+    mockListBranches.mockImplementation(async ({ page }: { page: number }) =>
+      branchPage(page, 100, `<https://api.github.com/x?page=${page + 1}>; rel="next"`)
+    );
+
+    await fetchGitHubBranches('123456', 'acme/repo');
+    expect(warnExceptInTest).toHaveBeenCalledTimes(1);
   });
 });
 

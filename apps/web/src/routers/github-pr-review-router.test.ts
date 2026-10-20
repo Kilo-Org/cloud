@@ -903,17 +903,15 @@ describe('githubPrReviewRouter.listReviewThreads comment pagination bounds', () 
 
     const threads = result.threads as Array<{ comments: unknown[] }>;
     expect(threads).toHaveLength(PAGE_SIZE);
-    // 500 follow-up comments per request at 50 per page.
-    expect(followUpRequests).toBe(10);
+    // 500 follow-up comments split across 50 threads: 10 each, one request each.
+    expect(followUpRequests).toBe(50);
     const followUpComments = threads.reduce(
       (total: number, thread) => total + thread.comments.length - PAGE_SIZE,
       0
     );
     expect(followUpComments).toBe(500);
-    // Every thread keeps its initial page; threads reached after the shared
-    // budget is spent carry no follow-up comments.
-    expect(threads.every(thread => thread.comments.length >= PAGE_SIZE)).toBe(true);
-    expect(threads.some(thread => thread.comments.length === PAGE_SIZE)).toBe(true);
+    // Every thread keeps its initial page plus its even share.
+    expect(threads.every(thread => thread.comments.length === PAGE_SIZE + 10)).toBe(true);
   });
 });
 

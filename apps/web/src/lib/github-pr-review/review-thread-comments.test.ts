@@ -261,11 +261,13 @@ describe('thread comment pagination bounds', () => {
     expect(comments).toHaveLength(300);
   });
 
-  it('spends one follow-up budget across threads and stops asking once it is empty', async () => {
-    // One page of 50 plus 10 from the next page, then the budget is spent.
+  it('asks for only what the allowance keeps and stops when it is spent', async () => {
+    // One page of 50 plus 10 from the next page, then the allowance is spent.
     const budget = { remainingFollowUpComments: 60 };
+    const requestedFirsts: number[] = [];
     let nextId = 5000;
-    const request = jest.fn(async () => {
+    const request = jest.fn(async (_path: string, options: { variables: { first: number } }) => {
+      requestedFirsts.push(options.variables.first);
       const start = nextId;
       nextId += REVIEW_THREAD_COMMENTS_PAGE_SIZE;
       return {
@@ -277,23 +279,16 @@ describe('thread comment pagination bounds', () => {
       };
     });
 
-    const first = await fetchAllThreadComments({
+    const comments = await fetchAllThreadComments({
       octokit: { request } as never,
       threadId: 'thread_1',
       initialConnection: commentPage(1, 1, true),
       budget,
     });
-    const requestsAfterFirst = request.mock.calls.length;
-    const second = await fetchAllThreadComments({
-      octokit: { request } as never,
-      threadId: 'thread_2',
-      initialConnection: commentPage(2, 1, true),
-      budget,
-    });
 
-    expect(request).toHaveBeenCalledTimes(requestsAfterFirst);
-    expect(first).toHaveLength(61);
-    expect(second).toHaveLength(1);
+    // The second request asks only for the 10 comments the allowance still holds.
+    expect(requestedFirsts).toEqual([50, 10]);
+    expect(comments).toHaveLength(61);
     expect(budget.remainingFollowUpComments).toBe(0);
   });
 
@@ -320,7 +315,7 @@ describe('thread comment pagination bounds', () => {
     expect(maxInFlight).toBe(5);
   });
 
-  it('caps follow-up comments per request while every thread keeps its initial page', async () => {
+  it('splits the request budget evenly before any request and repeats it identically', async () => {
     const request = jest.fn(async () => ({
       data: {
         data: {
@@ -335,12 +330,16 @@ describe('thread comment pagination bounds', () => {
       threadNode(index, commentPage(index * 10 + 1, 1, true))
     );
 
-    const threads = await enrichReviewThreads({ octokit: { request } as never, nodes });
+    const first = await enrichReviewThreads({ octokit: { request } as never, nodes });
+    const second = await enrichReviewThreads({ octokit: { request } as never, nodes });
 
-    const collected = threads.reduce((total, thread) => total + thread.comments.length, 0);
+    const collected = first.reduce((total, thread) => total + thread.comments.length, 0);
+    // 500 follow-up comments split across 20 threads: 25 each.
     expect(collected - threadCount).toBe(500);
-    // Threads reached after the budget is spent still carry their initial page.
-    expect(threads.some(thread => thread.comments.length === 1)).toBe(true);
-    expect(threads.every(thread => thread.comments.length >= 1)).toBe(true);
+    expect(first.every(thread => thread.comments.length === 26)).toBe(true);
+    // Identical responses produce identical per-thread results every run.
+    expect(second.map(thread => thread.comments.length)).toEqual(
+      first.map(thread => thread.comments.length)
+    );
   });
 });

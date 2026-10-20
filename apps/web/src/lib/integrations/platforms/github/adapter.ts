@@ -182,26 +182,36 @@ type GitHubBranch = {
 
 const LISTING_PAGE_SIZE = 100;
 // One listing call performs at most this many provider page requests and keeps
-// at most `pages × LISTING_PAGE_SIZE` rows. Past the ceiling the remainder is
-// dropped and the call logs a warning, the same bounded-scan convention the
-// capped review scans use.
+// at most `pages × LISTING_PAGE_SIZE` rows. Reaching the ceiling means more rows
+// may exist, in which case the remainder is dropped and the call logs a warning,
+// the same bounded-scan convention the capped review scans use.
 const MAX_REPOSITORY_PAGES = 50; // 5,000 repositories
 const MAX_BRANCH_PAGES = 10; // 1,000 branches
+
+type ListingPage<T> = { items: T[]; hasNextPage?: boolean };
+
+/** GitHub's `Link` header is authoritative about another page when present. */
+function linkHasNextPage(link: string | undefined): boolean | undefined {
+  return typeof link === 'string' ? link.includes('rel="next"') : undefined;
+}
 
 async function collectListingPages<T>(params: {
   maxPages: number;
   scope: string;
-  fetchPage: (page: number) => Promise<T[]>;
+  fetchPage: (page: number) => Promise<ListingPage<T>>;
 }): Promise<T[]> {
   const collected: T[] = [];
   for (let page = 1; page <= params.maxPages; page += 1) {
-    const items = await params.fetchPage(page);
+    const { items, hasNextPage } = await params.fetchPage(page);
     collected.push(...items);
     if (items.length < LISTING_PAGE_SIZE) return collected;
+    // A provider that says the full page is the last one ends the walk here.
+    if (hasNextPage === false) return collected;
+    if (page < params.maxPages) continue;
+    warnExceptInTest(
+      `GitHub ${params.scope} reached the ${params.maxPages}-page ceiling; returning the first ${collected.length} entries`
+    );
   }
-  warnExceptInTest(
-    `GitHub ${params.scope} reached the ${params.maxPages}-page ceiling; returning the first ${collected.length} entries`
-  );
   return collected;
 }
 
@@ -222,9 +232,16 @@ export async function fetchGitHubRepositories(
   const repositories = await collectListingPages({
     maxPages: MAX_REPOSITORY_PAGES,
     scope: 'repository listing',
-    fetchPage: async page =>
-      (await octokit.apps.listReposAccessibleToInstallation({ per_page: LISTING_PAGE_SIZE, page }))
-        .data.repositories,
+    fetchPage: async page => {
+      const response = await octokit.apps.listReposAccessibleToInstallation({
+        per_page: LISTING_PAGE_SIZE,
+        page,
+      });
+      return {
+        items: response.data.repositories,
+        hasNextPage: linkHasNextPage(response.headers.link),
+      };
+    },
   });
 
   return repositories
@@ -247,9 +264,16 @@ export async function fetchGitHubRepositoriesForMaintenance(
   const repositories = await collectListingPages({
     maxPages: MAX_REPOSITORY_PAGES,
     scope: 'maintenance repository listing',
-    fetchPage: async page =>
-      (await octokit.apps.listReposAccessibleToInstallation({ per_page: LISTING_PAGE_SIZE, page }))
-        .data.repositories,
+    fetchPage: async page => {
+      const response = await octokit.apps.listReposAccessibleToInstallation({
+        per_page: LISTING_PAGE_SIZE,
+        page,
+      });
+      return {
+        items: response.data.repositories,
+        hasNextPage: linkHasNextPage(response.headers.link),
+      };
+    },
   });
 
   return repositories
@@ -289,8 +313,15 @@ export async function fetchGitHubBranches(
   const branches = await collectListingPages({
     maxPages: MAX_BRANCH_PAGES,
     scope: `branch listing for ${repositoryFullName}`,
-    fetchPage: async page =>
-      (await octokit.repos.listBranches({ owner, repo, per_page: LISTING_PAGE_SIZE, page })).data,
+    fetchPage: async page => {
+      const response = await octokit.repos.listBranches({
+        owner,
+        repo,
+        per_page: LISTING_PAGE_SIZE,
+        page,
+      });
+      return { items: response.data, hasNextPage: linkHasNextPage(response.headers.link) };
+    },
   });
 
   return branches.map(branch => ({

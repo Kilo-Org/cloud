@@ -632,10 +632,10 @@ export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
 export const normalizeReactions_FOR_TEST = normalizeReactions;
 export const normalizeComment_FOR_TEST = normalizeComment;
 
-// Follow-up comment budget for one review-threads request. `listReviewThreads`
-// creates one and hands it to every thread on the page, so the total number of
-// extra comments retained by a single call is fixed regardless of how many
-// threads the pull request carries.
+// Follow-up comment allowance for one thread. `enrichReviewThreads` splits the
+// request's budget across the page's threads before any request runs, so one
+// call's retained follow-up comments stay fixed and each thread's share never
+// depends on completion order.
 export type ThreadCommentBudget = { remainingFollowUpComments: number };
 
 export async function fetchAllThreadComments(args: {
@@ -649,19 +649,18 @@ export async function fetchAllThreadComments(args: {
   let cursor: string | null = initialConnection.pageInfo.endCursor;
   let hasNext = initialConnection.pageInfo.hasNextPage;
   // Follow the comment cursor page by page, bounded per thread (page count) and
-  // per request (the shared budget), so a long thread or a pull request full of
-  // long threads keeps the work and the response bounded. Past either ceiling
-  // the thread keeps what was collected.
+  // by the thread's allowance, so a long thread keeps the work and the response
+  // bounded. Past either ceiling the thread keeps what was collected.
   for (let page = 1; page <= REVIEW_THREAD_COMMENTS_MAX_PAGES; page += 1) {
     if (!hasNext || !cursor) break;
-    // Reserve the page's share before requesting it, so concurrent threads
-    // never fetch a page whose comments the budget can no longer hold.
+    // Reserve the page's share before requesting it and ask only for that many
+    // comments, so the provider never returns more than the budget keeps.
     const reserved = Math.min(REVIEW_THREAD_COMMENTS_PAGE_SIZE, budget.remainingFollowUpComments);
     if (reserved <= 0) break;
     budget.remainingFollowUpComments -= reserved;
     const response = (await octokit.request('POST /graphql', {
       query: REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
-      variables: { threadId, first: REVIEW_THREAD_COMMENTS_PAGE_SIZE, after: cursor },
+      variables: { threadId, first: reserved, after: cursor },
     })) as {
       data: {
         data: { node: { comments: GraphQlCommentConnection } | null } | null;
@@ -701,20 +700,20 @@ export type ReviewThreadEnrichment = {
 
 /**
  * Attach every thread's comments to its node for one review-threads page.
- * The threads share one follow-up comment budget, and at most
- * `REVIEW_THREADS_ENRICHMENT_CONCURRENCY` GitHub requests are in flight, so a
- * pull request with many long threads keeps both provider work and the
- * response bounded. A thread reached after the budget is spent keeps its
- * initial-page comments.
+ * The request's follow-up comment budget is split evenly across the threads
+ * before any request runs, so identical responses produce identical results
+ * regardless of completion order, and at most
+ * `REVIEW_THREADS_ENRICHMENT_CONCURRENCY` GitHub requests are in flight. A
+ * thread keeps its initial-page comments beyond its share.
  */
 export async function enrichReviewThreads(args: {
   octokit: Octokit;
   nodes: GraphQlReviewThreadNode[];
 }): Promise<ReviewThreadEnrichment[]> {
   const { octokit, nodes } = args;
-  const budget: ThreadCommentBudget = {
-    remainingFollowUpComments: REVIEW_THREAD_COMMENTS_MAX_PER_REQUEST,
-  };
+  const perThreadFollowUpComments = nodes.length
+    ? Math.floor(REVIEW_THREAD_COMMENTS_MAX_PER_REQUEST / nodes.length)
+    : 0;
   const limit = pLimit(REVIEW_THREADS_ENRICHMENT_CONCURRENCY);
   return Promise.all(
     nodes.map(node =>
@@ -723,7 +722,7 @@ export async function enrichReviewThreads(args: {
           octokit,
           threadId: node.id,
           initialConnection: node.comments,
-          budget,
+          budget: { remainingFollowUpComments: perThreadFollowUpComments },
         });
         return {
           id: node.id,

@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..460a87791a2c97d6bcb7d731b7b918c0984a4573 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..7a8093d2cc99029c0fd1d83af71b612d76bc3f16 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 @@ -50,6 +50,19 @@ import kotlin.math.ceil
@@ -168,7 +168,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..460a87791a2c97d6bcb7d731b7b918c0
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -737,17 +781,65 @@ object MeasurementStore {
+@@ -737,17 +781,62 @@ object MeasurementStore {
  
      val layout = builder.build()
      val visibleLineCount = visibleLineCount(layout, viewId)
@@ -185,10 +185,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..460a87791a2c97d6bcb7d731b7b918c0
 +    // measured as fitting at that width can wrap in the display view. When the
 +    // widest line fills the assigned width, re-measure at a hair narrower and
 +    // adopt the taller height only if that layout actually wraps into more
-+    // lines — text that fits keeps the height measured above. Verified on an
-+    // ar-SA emulator: a wrapped combining-mark message gets the taller height,
-+    // and single-line multi-word messages keep the one-line height because the
-+    // narrower layout does not wrap them.
++    // lines — text that fits keeps the height measured above.
 +    val displayWidthPx = if (exactWidth) safeWidth else minOf(safeWidth, ceil(measuredWidth).toInt())
 +    val fillsAssignedWidth = measuredWidth > displayWidthPx - HUG_WIDTH_SAFETY_PX
 +    if (fillsAssignedWidth) {
@@ -235,7 +232,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..460a87791a2c97d6bcb7d731b7b918c0
    // Applies the per-view numberOfLines / ellipsizeMode clamp to a builder, matching
    // RN's TextLayoutManager.buildLayout: only when a line limit is set.
    private fun applyLineLimit(
-@@ -816,6 +908,7 @@ object MeasurementStore {
+@@ -816,6 +905,7 @@ object MeasurementStore {
     */
    private fun measureWithLayout(
      maxWidth: Float,
@@ -243,7 +240,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..460a87791a2c97d6bcb7d731b7b918c0
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -847,10 +940,31 @@ object MeasurementStore {
+@@ -847,10 +937,31 @@ object MeasurementStore {
        (0 until visibleLineCount)
          .maxOfOrNull { layout.getLineWidth(it) } ?: 0f
  

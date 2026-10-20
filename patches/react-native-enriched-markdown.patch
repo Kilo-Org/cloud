@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..fa206afdc825e292b5394a2b89c7781a0bddd08e 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..43521ec309e0992f4c0c7ee00c993f182923b183 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 @@ -50,6 +50,21 @@ import kotlin.math.ceil
@@ -121,7 +121,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..fa206afdc825e292b5394a2b89c7781a
 +            // single TextPaint, so a line measured as fitting at that width can
 +            // still wrap. When the widest line fills the assigned width,
 +            // re-measure at a hair narrower and adopt the taller height only if
-+            // that layout actually wraps into more lines — text that fits keeps
++            // that layout actually comes out taller — text that fits keeps
 +            // the height measured above.
 +            val displayWidthPx =
 +              if (exactWidth) widthPx else minOf(widthPx, ceil(segmentMaxLineWidth).toInt())
@@ -129,7 +129,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..fa206afdc825e292b5394a2b89c7781a
 +            if (fillsAssignedWidth) {
 +              val huggedWidth = maxOf(1, displayWidthPx - LINE_FLIP_MARGIN_PX)
 +              val huggedLayout = createStaticLayout(segment.styledText, fontSize, huggedWidth, id)
-+              if (huggedLayout.lineCount > layout.lineCount) {
++              if (huggedLayout.height > layout.height) {
 +                segmentHeightPx = huggedLayout.height.toFloat()
 +              }
 +            }
@@ -193,9 +193,9 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..fa206afdc825e292b5394a2b89c7781a
 +    if (fillsAssignedWidth) {
 +      val huggedMeasureWidth = maxOf(1, displayWidthPx - LINE_FLIP_MARGIN_PX)
 +      val huggedLayout = buildLayout(text = content, paint = paint, widthPx = huggedMeasureWidth, viewId = viewId)
-+      val huggedLineCount = visibleLineCount(huggedLayout, viewId)
-+      if (huggedLineCount > visibleLineCount) {
-+        measuredHeight = truncatedHeight(huggedLayout, huggedLineCount, content)
++      val huggedHeight = truncatedHeight(huggedLayout, visibleLineCount(huggedLayout, viewId), content)
++      if (huggedHeight > measuredHeight) {
++        measuredHeight = huggedHeight
 +      }
 +    }
 +
@@ -242,7 +242,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..fa206afdc825e292b5394a2b89c7781a
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -847,10 +939,31 @@ object MeasurementStore {
+@@ -847,10 +939,28 @@ object MeasurementStore {
        (0 until visibleLineCount)
          .maxOfOrNull { layout.getLineWidth(it) } ?: 0f
  
@@ -258,11 +258,8 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..fa206afdc825e292b5394a2b89c7781a
 +    val height =
 +      if (fillsAssignedWidth) {
 +        val huggedLayout = buildLayout(content, paint, maxOf(1, displayWidthPx - LINE_FLIP_MARGIN_PX), viewId)
-+        if (visibleLineCount(huggedLayout, viewId) > visibleLineCount) {
-+          truncatedHeight(huggedLayout, visibleLineCount(huggedLayout, viewId), content)
-+        } else {
-+          truncatedHeight(layout, visibleLineCount, content)
-+        }
++        val huggedHeight = truncatedHeight(huggedLayout, visibleLineCount(huggedLayout, viewId), content)
++        maxOf(huggedHeight, truncatedHeight(layout, visibleLineCount, content))
 +      } else {
 +        truncatedHeight(layout, visibleLineCount, content)
 +      }

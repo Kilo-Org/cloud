@@ -33,7 +33,7 @@ import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import { useScreenInsets } from '@/lib/screen-insets';
 
 export function LoginScreen() {
-  const { sessionEnded, signIn } = useAuth();
+  const { sessionEnded, signIn, token: publishedToken } = useAuth();
   const router = useRouter();
   const {
     status,
@@ -70,16 +70,24 @@ export function LoginScreen() {
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
         clearLoginDrafts();
-        // Signed in: the session took over, so the unmount persistence must
-        // not write a typed email from this attempt into SecureStore after
-        // the drafts were cleared above.
-        signedInRef.current = true;
       } catch {
         setPersistError(t('login.couldNotCompleteSignIn'));
       }
     },
     [signIn, t]
   );
+
+  // Every provider's completed sign-in — device code, email code, Apple,
+  // Google, passkey — publishes its token through the auth context, so this
+  // one watch covers them all: the unmount persistence must not write a
+  // typed email from the abandoned attempt into SecureStore once a session
+  // took over, or the next login mount would pre-fill the previous account's
+  // address.
+  useEffect(() => {
+    if (publishedToken !== undefined) {
+      signedInRef.current = true;
+    }
+  }, [publishedToken]);
 
   useEffect(() => {
     let cancelled = false;

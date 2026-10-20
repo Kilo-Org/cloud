@@ -331,7 +331,7 @@ export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
-/** Longest preparation step-output string the client accepts, in characters. */
+/** Longest single preparation output delta the client accepts, in characters. */
 export const PREPARATION_OUTPUT_MAX_LENGTH = 65_536;
 /**
  * Most recent step-output bytes the client retains per step. Mirrors the
@@ -343,6 +343,20 @@ export const PREPARATION_OUTPUT_TAIL_MAX_BYTES = 65_536;
 export const SESSION_QUEUE_MAX_IDS = 1_000;
 /** Most questions a `question.asked` event may carry. */
 export const SESSION_QUESTION_MAX_QUESTIONS = 32;
+
+/**
+ * A snapshot's retained tail carries the same byte budget the client applies
+ * when it trims step output. The character maximum is a cheap first pass: a
+ * string can never encode to fewer bytes than it has characters, so anything
+ * rejected there would fail the byte check too.
+ */
+const preparationOutputTailSchema = z
+  .string()
+  .max(PREPARATION_OUTPUT_TAIL_MAX_BYTES)
+  .refine(
+    value => new TextEncoder().encode(value).byteLength <= PREPARATION_OUTPUT_TAIL_MAX_BYTES,
+    { message: `Output tail cannot exceed ${PREPARATION_OUTPUT_TAIL_MAX_BYTES} UTF-8 bytes` }
+  );
 
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
 const remoteSlashCommandInfoSchema = z
@@ -838,7 +852,7 @@ const preparationStepSchema = z.object({
   command: z.string().optional(),
   commandIndex: z.number().optional(),
   commandCount: z.number().optional(),
-  outputTail: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
+  outputTail: preparationOutputTailSchema.optional(),
   outputTruncated: z.boolean().optional(),
   exitCode: z.number().optional(),
 });

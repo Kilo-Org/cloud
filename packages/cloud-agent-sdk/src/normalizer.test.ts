@@ -1,6 +1,7 @@
 import { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
 import {
   PREPARATION_OUTPUT_MAX_LENGTH,
+  PREPARATION_OUTPUT_TAIL_MAX_BYTES,
   REMOTE_COMMAND_MAX_COMMANDS,
   REMOTE_COMMAND_MAX_HINTS,
   SESSION_QUEUE_MAX_IDS,
@@ -1430,32 +1431,44 @@ describe('normalize', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null when a step snapshot tail exceeds the wire limit', () => {
-      const stepSnapshot = {
-        id: 'command:install',
-        key: 'setup_commands',
-        kind: 'setup_command',
-        label: 'Install dependencies',
-        status: 'running',
-        startedAt: 1000,
+    const snapshotEvent = (outputTail: string) =>
+      createRaw('preparing', {
+        step: 'setup_commands',
+        message: 'Preparation snapshot',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'msg-1',
         revision: 5,
-        outputTail: 'x'.repeat(PREPARATION_OUTPUT_MAX_LENGTH + 1),
-      };
-      const result = normalize(
-        createRaw('preparing', {
-          step: 'setup_commands',
-          message: 'Preparation snapshot',
-          version: 2,
-          attemptId: 'attempt-1',
-          triggerMessageId: 'msg-1',
+        timestamp: 2000,
+        action: 'step_snapshot',
+        stepId: 'command:install',
+        stepSnapshot: {
+          id: 'command:install',
+          key: 'setup_commands',
+          kind: 'setup_command',
+          label: 'Install dependencies',
+          status: 'running',
+          startedAt: 1000,
           revision: 5,
-          timestamp: 2000,
-          action: 'step_snapshot',
-          stepId: stepSnapshot.id,
-          stepSnapshot,
-        })
-      );
-      expect(result).toBeNull();
+          outputTail,
+        },
+      });
+
+    it('returns null when a step snapshot tail exceeds the wire limit', () => {
+      expect(normalize(snapshotEvent('x'.repeat(PREPARATION_OUTPUT_MAX_LENGTH + 1)))).toBeNull();
+    });
+
+    it('accepts a step snapshot tail within the byte budget', () => {
+      const outputTail = 'é'.repeat(PREPARATION_OUTPUT_TAIL_MAX_BYTES / 2);
+      expect(normalize(snapshotEvent(outputTail))).toMatchObject({
+        type: 'preparing',
+        action: 'step_snapshot',
+        stepSnapshot: { outputTail },
+      });
+    });
+
+    it('returns null when a step snapshot tail exceeds the byte budget', () => {
+      expect(normalize(snapshotEvent('𝄞'.repeat(PREPARATION_OUTPUT_TAIL_MAX_BYTES)))).toBeNull();
     });
 
     it('is classified as a ServiceEvent, not a ChatEvent', () => {

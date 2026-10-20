@@ -188,8 +188,9 @@ export async function trpcCall<T>(
     // LLM performs no billable inference.
     headers['x-skip-balance-check'] = 'true';
   }
-  if (opts?.internalApiSecret) {
-    headers['x-internal-api-key'] = opts.internalApiSecret;
+  const internalApiSecret = opts?.internalApiSecret ?? config.internalApiSecret;
+  if (internalApiSecret) {
+    headers['x-internal-api-key'] = internalApiSecret;
   }
   const fetchOpts: RequestInit = { method, headers, signal: opts?.signal };
   if (method === 'POST') {

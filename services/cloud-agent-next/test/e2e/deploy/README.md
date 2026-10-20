@@ -90,12 +90,15 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    runbook.
 
    Session starts on the deployment require the e2e key as well as the ordinary
-   Kilo token. `POST /trpc/start` and `POST /trpc/createWorktreeChat` without a
-   matching `x-internal-api-key` are rejected with `401` by
-   `src/e2e-entry.ts` before the token is verified or the database is touched;
-   every other route is unchanged. The key is the Worker's `INTERNAL_API_SECRET`,
-   the same value the surface and the internal procedures use, and the driver
-   presents it on those two procedures.
+   Kilo token. `POST /trpc/start`, `POST /trpc/createWorktreeChat`,
+   `POST /trpc/send`, `POST /trpc/sendMessageV2` and
+   `POST /trpc/initiateFromKilocodeSessionV2` without a matching
+   `x-internal-api-key` are rejected with `401` by `src/e2e-entry.ts` before the
+   token is verified or the database is touched; every other route is unchanged.
+   Those five are the user-token procedures that create a session or enqueue the
+   work whose flusher starts its container. The key is the Worker's
+   `INTERNAL_API_SECRET`, the same value the surface and the internal procedures
+   use, and the driver presents it on every call.
 
    `deploy` uploads `E2E_INTERNAL_API_SECRET` as the Worker's
    `INTERNAL_API_SECRET` secret when a source supplies it. `wrangler deploy` never

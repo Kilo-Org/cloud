@@ -225,7 +225,13 @@ describe('internal tRPC reachability (deliberately widened by the single secret)
   });
 });
 
-const SESSION_START_ROUTES = ['/trpc/start', '/trpc/createWorktreeChat'];
+const SESSION_START_ROUTES = [
+  '/trpc/start',
+  '/trpc/createWorktreeChat',
+  '/trpc/send',
+  '/trpc/sendMessageV2',
+  '/trpc/initiateFromKilocodeSessionV2',
+];
 
 function sessionStartRequest(path: string, credentials: Credentials = {}): Request {
   const headers: Record<string, string> = {
@@ -252,8 +258,9 @@ function admissionEnv(
 
 describe('session-start admission', () => {
   it('classifies both session-start procedures, and any batch member, as session starts', () => {
-    expect(isSessionStartRequest('POST', '/trpc/start')).toBe(true);
-    expect(isSessionStartRequest('POST', '/trpc/createWorktreeChat')).toBe(true);
+    for (const path of SESSION_START_ROUTES) {
+      expect(isSessionStartRequest('POST', path), path).toBe(true);
+    }
     expect(isSessionStartRequest('POST', '/trpc/getSession,start')).toBe(true);
     expect(isSessionStartRequest('POST', '/trpc/getSession')).toBe(false);
     expect(isSessionStartRequest('POST', '/trpc/startSomethingElse')).toBe(false);

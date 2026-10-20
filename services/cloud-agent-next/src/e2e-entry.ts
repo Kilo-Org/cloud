@@ -35,14 +35,18 @@ export { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 const INTERNAL_API_KEY_HEADER = 'x-internal-api-key';
 
 /**
- * Procedures that create a session, and therefore a container. `prepareSession`
- * is already behind `internalApiProtectedProcedure` (secret plus token), and
- * every other container-starting procedure needs a session that one of these
- * routes created, so this pair is the session-start surface the entry gates.
+ * Every user-token procedure that can start a session's container: the two
+ * creation routes, and the three that enqueue work whose alarm-driven flusher
+ * starts or restores the sandbox for an existing session. `prepareSession` is
+ * already behind `internalApiProtectedProcedure` (secret plus token), so it
+ * needs no entry here.
  */
 const SESSION_START_PROCEDURES: Record<string, true> = {
   start: true,
   createWorktreeChat: true,
+  send: true,
+  sendMessageV2: true,
+  initiateFromKilocodeSessionV2: true,
 };
 
 function isE2eSurfacePath(pathname: string): boolean {

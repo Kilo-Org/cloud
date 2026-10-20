@@ -611,8 +611,9 @@ bucket named by `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET` (the renderer refuses a
 missing value or the `wrangler.jsonc` value), keeps the production service, KV
 and Secrets Store bindings, removes the report queue, and renames the callback
 queue. Session starts on the deployment additionally require the e2e key
-`x-internal-api-key` on `POST /trpc/start` and `POST /trpc/createWorktreeChat`;
-the driver presents it. Concurrent runs are not isolated from each other.
+`x-internal-api-key` on `start`, `createWorktreeChat`, `send`, `sendMessageV2`
+and `initiateFromKilocodeSessionV2`; the driver presents it on every call.
+Concurrent runs are not isolated from each other.
 
 Docker scope boundary: deploying the fake Worker needs no Docker (it is a Worker
 and a Durable Object, not a container image); deploying the Cloud Agent e2e

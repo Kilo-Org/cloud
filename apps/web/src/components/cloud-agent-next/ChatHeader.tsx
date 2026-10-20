@@ -32,6 +32,10 @@ export function computeBillingRefetchInterval(
 
 type ChatHeaderProps = {
   cloudAgentSessionId: string;
+  changesCloudAgentSessionId?: string;
+  worktreeId?: string;
+  /** The worktree, or the session when it has none: chats of one worktree share its sandbox. */
+  sandboxScopeId: string;
   kiloSessionId?: string;
   organizationId?: string;
   repository: string;
@@ -56,6 +60,8 @@ type ChatHeaderProps = {
 
 export function ChatHeader({
   cloudAgentSessionId,
+  changesCloudAgentSessionId = cloudAgentSessionId,
+  worktreeId,
   repository,
   branch,
   gitUrl,
@@ -75,6 +81,7 @@ export function ChatHeader({
   sessionActive,
   sandboxStatusEligible = false,
   canForkToCloud = false,
+  sandboxScopeId,
 }: ChatHeaderProps) {
   const [showActionsDialog, setShowActionsDialog] = useState(false);
   const moreOptionsTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -137,21 +144,25 @@ export function ChatHeader({
         canForkToCloud={canForkToCloud}
       />
       <div className="flex min-w-0 items-center gap-1">
+        {/* First, so its late-loading counts grow into the reserved space on the left
+            instead of moving the other controls. */}
+        {onToggleChanges && (
+          <WorktreeChangesButton
+            key={`worktree-changes:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            cloudAgentSessionId={changesCloudAgentSessionId}
+            organizationId={organizationId}
+            worktreeId={worktreeId}
+            open={changesOpen}
+            onToggle={onToggleChanges}
+          />
+        )}
         {sandboxStatusEligible && (
           <SandboxStatusIndicator
-            key={`sandbox-status:${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
+            key={`sandbox-status:${organizationId ?? 'personal'}:${sandboxScopeId}`}
+            scopeId={sandboxScopeId}
             cloudAgentSessionId={cloudAgentSessionId}
             organizationId={organizationId}
             sessionActive={sessionActive}
-          />
-        )}
-        {onToggleChanges && (
-          <WorktreeChangesButton
-            key={`worktree-changes:${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
-            cloudAgentSessionId={cloudAgentSessionId}
-            organizationId={organizationId}
-            open={changesOpen}
-            onToggle={onToggleChanges}
           />
         )}
         {onToggleSound && (

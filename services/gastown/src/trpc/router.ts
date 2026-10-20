@@ -8,7 +8,7 @@
 /* eslint-disable @typescript-eslint/await-thenable -- DO RPC stubs return Rpc.Promisified which is thenable at runtime */
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { router, gastownProcedure, adminProcedure } from './init';
+import { router, gastownProcedure, gastownFlaggedProcedure, adminProcedure } from './init';
 import { getTownDOStub } from '../dos/Town.do';
 import { getTownContainerStub } from '../dos/TownContainer.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
@@ -16,7 +16,6 @@ import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
-import { checkTownCreationEligibility } from '../util/town-creation.util';
 import { TownConfigSchema, TownConfigUpdateSchema, RigOverrideConfigSchema } from '../types';
 import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
@@ -344,13 +343,10 @@ async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper:
 }
 
 export const gastownRouter = router({
-  createTown: gastownProcedure
+  createTown: gastownFlaggedProcedure
     .input(z.object({ name: z.string().min(1).max(64) }))
     .output(RpcTownOutput)
     .mutation(async ({ ctx, input }) => {
-      const eligibility = await checkTownCreationEligibility(ctx.env, ctx.userId);
-      if (!eligibility.allowed) throw new TRPCError(eligibility);
-
       const user = userFromCtx(ctx);
       const userStub = getGastownUserStub(ctx.env, user.id);
       const town = await userStub.createTown({ name: input.name, owner_user_id: user.id });
@@ -1558,15 +1554,13 @@ export const gastownRouter = router({
       return stub.listTowns();
     }),
 
-  createOrgTown: gastownProcedure
+  createOrgTown: gastownFlaggedProcedure
     .input(z.object({ organizationId: z.string().uuid(), name: z.string().min(1).max(64) }))
     .output(RpcOrgTownOutput)
     .mutation(async ({ input, ctx }) => {
       const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role === 'billing_manager')
         throw new TRPCError({ code: 'FORBIDDEN' });
-      const eligibility = await checkTownCreationEligibility(ctx.env, ctx.userId);
-      if (!eligibility.allowed) throw new TRPCError(eligibility);
 
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       const town = await stub.createTown({

@@ -62,6 +62,9 @@ type WorktreeChangesDependencies = {
     transactionSync<T>(callback: () => T): T;
   };
   saveSnapshotEvent?(snapshot: WorktreeChangesSnapshot): (() => void) | undefined;
+  refreshSnapshot?(
+    context: WorktreeChangesContext
+  ): Promise<RefreshWorktreeChangesOutput | undefined>;
   readContext(): Promise<WorktreeChangesContext | null>;
   requestCapture(
     context: WorktreeChangesContext,
@@ -176,6 +179,16 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       if (trigger.context && !sameContext(trigger.context, context)) {
         return { status: 'failed', snapshot };
       }
+      const shared = await deps.refreshSnapshot?.(context);
+      if (shared !== undefined) {
+        if (trigger.generation !== generation || suppressed || preparing) {
+          return { status: 'failed', snapshot: shared.snapshot };
+        }
+        if (shared.status === 'refreshed' && shared.snapshot) {
+          deps.saveSnapshotEvent?.(shared.snapshot)?.();
+        }
+        return shared;
+      }
       revision = Math.max(revision, snapshot?.revision ?? 0) + 1;
       if (!Number.isSafeInteger(revision)) return { status: 'failed', snapshot };
       const requestedRevision = revision;
@@ -284,6 +297,17 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
   }
 
   return {
+    saved(): { snapshot: WorktreeChangesSnapshot; files: WorktreeFileRecord[] } | undefined {
+      const snapshot = readSnapshot();
+      if (!snapshot) return undefined;
+      return {
+        snapshot,
+        files: snapshot.files.flatMap(file => {
+          const selected = readRecordAgainstManifest(snapshot, file.path);
+          return selected ? [selected.record] : [];
+        }),
+      };
+    },
     recovery(): WorktreeRecovery | undefined {
       const snapshot = readSnapshot();
       if (!snapshot || snapshot.files.length === 0 || suppressed) return undefined;

@@ -393,6 +393,7 @@ describe('restoreSession', () => {
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
       SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
       RESTORE_PROCESS_ONLY: process.env.RESTORE_PROCESS_ONLY,
+      KILO_RUNTIME_CLI_PATH: process.env.KILO_RUNTIME_CLI_PATH,
       PATH: process.env.PATH,
       TMPDIR: process.env.TMPDIR,
     };
@@ -400,6 +401,7 @@ describe('restoreSession', () => {
     process.env.KILO_SESSION_INGEST_URL = 'http://localhost:9999';
     process.env.KILOCODE_TOKEN = 'test-token';
     delete process.env.KILOCODE_TOKEN_FILE;
+    delete process.env.KILO_RUNTIME_CLI_PATH;
     process.env.PATH = `${binDir}:${process.env.PATH}`;
     process.env.TMPDIR = tmpDir;
 
@@ -444,6 +446,39 @@ describe('restoreSession', () => {
       expect(result.error).toContain('KILOCODE_TOKEN');
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
+    }
+  });
+
+  it('imports history with the selected runtime CLI when the global CLI cannot run', async () => {
+    const selected = '/opt/kilo-cloud/cli/' + 'a'.repeat(64) + '/kilo';
+    const selectedBin = path.join(tmpDir, 'selected-bin');
+    const capturedSnapshot = path.join(tmpDir, 'selected-import.json');
+    fs.mkdirSync(selectedBin);
+    writeCapturingMockKilo(selectedBin, capturedSnapshot);
+    writeMockKilo(binDir, 42);
+    process.env.KILO_RUNTIME_CLI_PATH = selected;
+    mockFetchStatus(200, makeSnapshot([]));
+    const runProcess = processUtils.runProcess;
+    const processSpy = spyOn(processUtils, 'runProcess').mockImplementation(
+      (command, args, options) =>
+        runProcess(command === selected ? path.join(selectedBin, 'kilo') : command, args, options)
+    );
+    try {
+      const env = buildWorktreeKiloEnvironment(workspace, path.join(tmpDir, 'home'), {
+        scopeId: 'selected_runtime_restore',
+        token: 'synthetic-guest-token',
+        targets: {
+          backendBaseUrl: 'https://backend.example.test',
+          providerBaseUrl: 'https://provider.example.test',
+          sessionIngestBaseUrl: 'https://ingest.example.test',
+        },
+      });
+      expect(env.KILO_RUNTIME_CLI_PATH).toBeUndefined();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, { env });
+      expect(result.ok).toBe(true);
+      expect(JSON.parse(fs.readFileSync(capturedSnapshot, 'utf8')).info.id).toBe(SESSION_ID);
+    } finally {
+      processSpy.mockRestore();
     }
   });
 

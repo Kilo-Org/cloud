@@ -4,6 +4,7 @@ import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits'
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  clientKiloSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
@@ -452,6 +453,8 @@ const PrepareSessionNonCloneVariant = z.object({
   autoInitiate: z.boolean().optional(),
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey: z.string().uuid().optional(),
+  /** Client-proposed Kilo session ID, so the client can show the session before prepare returns. */
+  kiloSessionId: clientKiloSessionIdSchema.optional(),
   /**
    * Optional source Kilo session to clone into this Cloud Agent session.
    * Old callers omit the field and create an empty destination session.
@@ -538,6 +541,8 @@ export const baseCreateWorktreeChatNextSchema = z
   .object({
     sourceKiloSessionId: kiloSessionIdSchema,
     operationKey: z.uuid(),
+    /** Client-proposed id for the new chat, so the client can show it before this returns. */
+    kiloSessionId: clientKiloSessionIdSchema.optional(),
   })
   .strict();
 

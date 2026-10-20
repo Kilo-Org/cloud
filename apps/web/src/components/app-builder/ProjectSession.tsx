@@ -88,7 +88,6 @@ export function useProjectState(): ProjectState {
   return context.state;
 }
 
-/** Access both the ProjectManager and current state. */
 export function useProject(): ProjectContextValue {
   const context = useContext(ProjectContext);
   if (!context) {

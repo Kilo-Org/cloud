@@ -104,15 +104,48 @@ describe('Personal user route authorization', () => {
     }
   );
 
-  it('does not create a town when account age cannot be verified', async () => {
+  it('rejects town creation without Gastown access', async () => {
     const response = await SELF.fetch(url(ownerId, 'towns'), {
       method: 'POST',
       headers: await headersFor(ownerId),
       body: requestBody('POST'),
     });
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Gastown access required',
+    });
     await expectPrivateState();
+  });
+
+  it('does not exempt admins without Gastown access', async () => {
+    const response = await SELF.fetch(url(ownerId, 'towns'), {
+      method: 'POST',
+      headers: await headersFor(ownerId, { isAdmin: true }),
+      body: requestBody('POST'),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Gastown access required',
+    });
+    await expectPrivateState();
+  });
+
+  it('allows town creation with Gastown access', async () => {
+    const response = await SELF.fetch(url(ownerId, 'towns'), {
+      method: 'POST',
+      headers: await headersFor(ownerId, { gastownAccess: true }),
+      body: requestBody('POST'),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { name: 'New resource', owner_user_id: ownerId },
+    });
   });
 
   it.each(['towns', 'towns/:townId/rigs'])(

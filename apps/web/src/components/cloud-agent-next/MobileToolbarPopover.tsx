@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
@@ -59,6 +60,10 @@ export function MobileToolbarPopover({
   const displayName = selectedModel
     ? formatShortModelDisplayName(selectedModel.name)
     : 'Select model';
+
+  if (!selectedModel && isLoadingModels) {
+    return <Skeleton className={cn('h-9 w-36 motion-reduce:animate-none', className)} />;
+  }
 
   return (
     <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>

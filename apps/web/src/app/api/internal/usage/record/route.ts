@@ -1,8 +1,7 @@
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { UsageRecordRequestSchema, type UsageRecordResponse } from '@kilocode/usage-contracts';
 import {
@@ -32,10 +31,8 @@ import {
 export const maxDuration = 150;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const secret = request.headers.get('x-internal-api-key');
-  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(request);
+  if (unauthorized) return unauthorized;
 
   // Phase timings, paired with the in-process pool gauges, are what identified that
   // pool acquisition rather than PostgreSQL or the event loop dominates this
@@ -77,6 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { core, metadata, prior_microdollar_usage, posthog_distinct_id, bouncer_usage_event } =
     parsed.data;
+  const source = request.headers.get('x-usage-write-source');
 
   // Redelivery is handled inside the write, not by a lookup here.
   const result = await saveUsageRelatedDataLocally(
@@ -84,7 +82,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     metadata,
     prior_microdollar_usage,
     posthog_distinct_id,
-    bouncer_usage_event ?? null
+    bouncer_usage_event ?? null,
+    {
+      entrypoint: 'writer_endpoint',
+      writer_caller: source === 'queue' || source === 'region_handoff' ? source : 'unknown',
+    }
   );
   timer.mark('write');
 

@@ -439,6 +439,80 @@ describe('applyVercelSettings BYOK pinning', () => {
     expect(request.body.provider).toBeUndefined();
   });
 
+  it('keeps the same gateway options on BYOK and managed paths for identical provider preferences', async () => {
+    const provider = {
+      sort: 'latency' as const,
+      zdr: true,
+      data_collection: 'deny' as const,
+    };
+    const byok = byokRequest([]);
+    byok.body.provider = { ...provider };
+    const managed: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ...provider },
+      },
+    };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', byok, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+    const managedOptions = convertProviderOptions(managed, null).gateway;
+    if (!managedOptions) {
+      throw new Error('convertProviderOptions did not produce managed gateway options');
+    }
+
+    const gatewayOptions = byok.body.providerOptions?.gateway;
+    if (!gatewayOptions) {
+      throw new Error('applyVercelSettings did not produce BYOK gateway options');
+    }
+    const byokCredentials = gatewayOptions.byok;
+    expect(byokCredentials).toEqual({ anthropic: [{ apiKey: 'sk-anthropic' }] });
+    for (const [key, value] of Object.entries(managedOptions)) {
+      if (key === 'only' || key === 'order' || key === 'sessionId') {
+        continue;
+      }
+      expect(gatewayOptions[key as keyof typeof gatewayOptions]).toEqual(value);
+    }
+    expect(gatewayOptions.zeroDataRetention).toBe(true);
+    expect(gatewayOptions.disallowPromptTraining).toBe(true);
+  });
+
+  it('sets zeroDataRetention and disallowPromptTraining in the BYOK gateway options', async () => {
+    const request = byokRequest([]);
+    request.body.provider = { zdr: true, data_collection: 'deny' };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      zeroDataRetention: true,
+      disallowPromptTraining: true,
+      only: ['anthropic', 'bedrock'],
+      byok: {
+        anthropic: [{ apiKey: 'sk-anthropic' }],
+        bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
+      },
+    });
+    expect(request.body.provider).toBeUndefined();
+  });
+
+  it('leaves zeroDataRetention and disallowPromptTraining unset when the provider settings omit them', async () => {
+    const request = byokRequest([]);
+    request.body.provider = { data_collection: 'allow' };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.zeroDataRetention).toBeUndefined();
+    expect(request.body.providerOptions?.gateway?.disallowPromptTraining).toBeUndefined();
+  });
+
   it('drops a BYOK provider the caller ignored when another serving provider remains', async () => {
     const request = byokRequest(['anthropic']);
 

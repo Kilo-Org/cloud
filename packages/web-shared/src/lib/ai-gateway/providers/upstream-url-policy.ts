@@ -10,7 +10,7 @@
 import { lookup } from 'node:dns/promises';
 import { captureMessage } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { isIpAddress, isPublicIp } from '@kilocode/mcp-gateway';
+import { isIpAddress, isPublicIp } from './ip-address';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';

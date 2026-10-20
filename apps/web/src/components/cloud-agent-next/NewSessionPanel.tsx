@@ -20,7 +20,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { startOfDay, subDays } from 'date-fns';
-import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
+import { useTRPC } from '@/lib/trpc/utils';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
 import { getSandboxAllocationKey } from '@kilocode/worker-utils/sandbox-allocation';
@@ -71,22 +71,11 @@ import {
   findAllGitPlatformUrls,
   detectGitPlatform,
 } from '@/components/cloud-agent-next/utils/git-utils';
-import { isAmbiguousCloudSessionCreationError, type AgentMode } from './types';
-import { formatSessionError } from '@kilocode/cloud-agent-sdk';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
-import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
-import { CloudAgentBillingError } from './CloudAgentBillingError';
-import { billingPayerPresentation } from './billing-payer-presentation';
-import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { AgentMode } from './types';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
-import { PendingChatView } from './PendingChatView';
-import { PENDING_FIRST_CHAT_STATUS_LABEL, usePendingFirstChat } from './pending-first-chat';
-import {
-  createFirstChatCreationGuard,
-  resolveFirstChatCreationAttempt,
-  type FirstChatCreationAttempt,
-  type FirstChatCreationGuard,
-} from './first-chat-creation';
+import { createFirstChatCreationGuard, type FirstChatCreationGuard } from './first-chat-creation';
+import { useLocalSessions } from './local-sessions/LocalSessionsProvider';
+import type { LocalSessionRequest } from './local-sessions/local-session-request';
 import {
   buildCloudAgentAttachments,
   useCloudAgentAttachmentUpload,
@@ -134,15 +123,7 @@ type Repository = {
 };
 
 type NewSessionPanelProps = {
-  currentUserId: string;
   organizationId?: string;
-  organizationName?: string;
-  organizationRole?: OrganizationRole;
-};
-
-type PendingFirstChatCreation = {
-  prompt: string;
-  attachmentNames: string[];
 };
 
 type ContextualTipProps = {
@@ -152,15 +133,9 @@ type ContextualTipProps = {
   onDismiss: () => void;
 };
 
-export function NewSessionPanel({
-  currentUserId,
-  organizationId,
-  organizationName,
-  organizationRole,
-}: NewSessionPanelProps) {
+export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
-  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,17 +144,7 @@ export function NewSessionPanel({
   if (creationGuardRef.current === null) {
     creationGuardRef.current = createFirstChatCreationGuard();
   }
-  const { setPendingFirstChat } = usePendingFirstChat();
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-  const [firstChatCreationOperation, setFirstChatCreationOperation] =
-    useState<FirstChatCreationAttempt | null>(null);
-  const [pendingCreation, setPendingCreation] = useState<PendingFirstChatCreation | null>(null);
+  const { createLocalSession, discardedPrompt, clearDiscardedPrompt } = useLocalSessions();
   const [isGitHubIdentityHintDismissed, setIsGitHubIdentityHintDismissed] = useState<
     boolean | null
   >(null);
@@ -190,9 +155,6 @@ export function NewSessionPanel({
     trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
 
-  // ---------------------------------------------------------------------------
-  // Eligibility
-  // ---------------------------------------------------------------------------
   const personalEligibilityQuery = useQuery({
     ...trpc.cloudAgentNext.checkEligibility.queryOptions(),
     enabled: !organizationId,
@@ -211,9 +173,6 @@ export function NewSessionPanel({
     !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
   const hasLimitedAccess = !isEligibilityLoading && eligibilityData?.accessLevel === 'limited';
 
-  // ---------------------------------------------------------------------------
-  // Models
-  // ---------------------------------------------------------------------------
   const { data: modelsData } = useModelSelectorList(organizationId);
   const { lastSelected: serverLastSelected, setLastSelected: persistServerLastSelected } =
     useModelPreferences(organizationId);
@@ -234,10 +193,10 @@ export function NewSessionPanel({
     return options.filter(option => option.isFree || option.hasUserByokAvailable);
   }, [allModels, hasLimitedAccess]);
 
-  // ---------------------------------------------------------------------------
-  // Form state
-  // ---------------------------------------------------------------------------
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(() => discardedPrompt ?? '');
+  useEffect(() => {
+    if (discardedPrompt !== null) clearDiscardedPrompt();
+  }, [clearDiscardedPrompt, discardedPrompt]);
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedGitHubIntegrationId, setSelectedGitHubIntegrationId] = useState<
     string | undefined
@@ -249,15 +208,11 @@ export function NewSessionPanel({
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
-  const [billingFailure, setBillingFailure] = useState<CustomerBillingFailure | null>(null);
   const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
   // Repo profile bindings are only keyed by GitHub/GitLab today.
   const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
     selectedPlatform === 'bitbucket' ? undefined : selectedPlatform;
 
-  // ---------------------------------------------------------------------------
-  // GitHub identity awareness
-  // ---------------------------------------------------------------------------
   const {
     data: githubUserAuthorization,
     isLoading: isGitHubUserAuthorizationLoading,
@@ -281,13 +236,9 @@ export function NewSessionPanel({
   const isAttachmentLimitReached =
     attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
 
-  // ---------------------------------------------------------------------------
-  // Session form atoms (profile override)
-  // ---------------------------------------------------------------------------
   const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
   const resetSessionForm = useSetAtom(resetSessionFormAtom);
 
-  // Clear any lingering manual overrides whenever the page loads
   useEffect(() => {
     safeLocalStorage.removeItem('cloud-agent:devcontainer-enabled');
     resetSessionForm();
@@ -314,9 +265,6 @@ export function NewSessionPanel({
   });
   const sandboxAllocation = sandbox.picker.allocation;
 
-  // ---------------------------------------------------------------------------
-  // Model auto-selection
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (modelOptions.length === 0) {
       if (model) {
@@ -393,10 +341,6 @@ export function NewSessionPanel({
     [model, organizationId, persistServerLastSelected]
   );
 
-  // ---------------------------------------------------------------------------
-  // Profiles — used for the selector and to clear a stale selection when a
-  // selected profile is deleted elsewhere.
-  // ---------------------------------------------------------------------------
   const { data: combinedProfilesData } = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
@@ -413,7 +357,6 @@ export function NewSessionPanel({
       ]
     : (personalProfiles ?? []);
 
-  // If the override profile was deleted, clear the selection
   useEffect(() => {
     if (!selectedProfileId || allProfiles.length === 0) return;
     if (!allProfiles.some(p => p.id === selectedProfileId)) {
@@ -471,9 +414,6 @@ export function NewSessionPanel({
   const displayVariant = hasAgentModelOverride ? agentVariantOverride : variant;
   const displayVariants = hasAgentModelOverride ? [] : availableVariants;
 
-  // ---------------------------------------------------------------------------
-  // Repositories (GitHub + GitLab + Bitbucket)
-  // ---------------------------------------------------------------------------
   const {
     data: githubRepoData,
     isLoading: isLoadingGitHubRepos,
@@ -611,10 +551,8 @@ export function NewSessionPanel({
     [organizationId]
   );
 
-  // ---------------------------------------------------------------------------
   // Auto-select repo from saved preference, recent session, or the only
   // available repository, in that priority order.
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (selectedRepo || isRepoUserSelected || unifiedRepositories.length === 0) return;
 
@@ -655,9 +593,6 @@ export function NewSessionPanel({
     bitbucketRepoError,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Auto-select repo from pasted GitHub/GitLab URLs
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (isRepoUserSelected) return;
 
@@ -900,9 +835,6 @@ export function NewSessionPanel({
     refreshBitbucketRepositories,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Integration missing check
-  // ---------------------------------------------------------------------------
   const githubIntegrationMissing =
     !isLoadingGitHubRepos && githubRepoData?.integrationInstalled === false;
   const gitlabIntegrationMissing =
@@ -916,9 +848,7 @@ export function NewSessionPanel({
     ? `/organizations/${organizationId}/integrations/bitbucket`
     : null;
 
-  // ---------------------------------------------------------------------------
   // Repo popover state (must be declared before early returns to satisfy Rules of Hooks)
-  // ---------------------------------------------------------------------------
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
 
   const repositoryKey = (repo: RepositoryOption) =>
@@ -955,9 +885,6 @@ export function NewSessionPanel({
     [handleRepoSelect]
   );
 
-  // ---------------------------------------------------------------------------
-  // Slash commands
-  // ---------------------------------------------------------------------------
   const slashCommands = useMemo<SlashCommand[]>(() => {
     const defaults = commandsOrDefault(undefined).map(cmd => ({
       trigger: cmd.name,
@@ -1006,9 +933,6 @@ export function NewSessionPanel({
     listRef: commandListRef,
   });
 
-  // ---------------------------------------------------------------------------
-  // Submit
-  // ---------------------------------------------------------------------------
   const isPromptTooLong = prompt.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
 
   const selectedModelOption = modelOptions.find(m => m.id === model);
@@ -1084,7 +1008,7 @@ export function NewSessionPanel({
   const sandboxSelectionError = resolveSandboxSelectionSubmissionError({
     error: sandbox.error,
     intent: creationIntent,
-    pendingOperation: firstChatCreationOperation,
+    pendingOperation: null,
   });
   const sandboxDescriptionId = sandboxSelectionError ? 'new-session-sandbox-error' : undefined;
 
@@ -1096,7 +1020,7 @@ export function NewSessionPanel({
     (!hasInsufficientBalance || limitedAccessModelIsAllowed) &&
     !attachmentUpload.hasUploadingAttachments;
 
-  const handleStartSession = useCallback(async () => {
+  const handleStartSession = useCallback(() => {
     const guard = creationGuardRef.current;
     if (!guard || !guard.tryBegin()) return;
 
@@ -1131,126 +1055,66 @@ export function NewSessionPanel({
     }
 
     const submittedPrompt = prompt.trim();
-    const submittedAttachmentNames = attachmentUpload.attachments.map(a => a.file.name);
-    setPendingCreation({ prompt: submittedPrompt, attachmentNames: submittedAttachmentNames });
-
-    try {
-      const operation = resolveFirstChatCreationAttempt(
-        firstChatCreationOperation,
-        creationIntent,
-        uuidv4,
-        generateMessageId
-      );
-      setFirstChatCreationOperation(operation);
-      const baseInput = {
-        ...creationInput,
-        initialMessageId: operation.initialMessageId,
-        operationKey: operation.operationKey,
-      };
-      let result: { kiloSessionId: string; cloudAgentSessionId: string };
-
-      if (organizationId) {
-        const organizationInput = {
-          ...baseInput,
-          organizationId,
-          ...(sandboxAllocation ? { sandboxAllocation } : {}),
-        };
-        if (selectedPlatform === 'gitlab') {
-          result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...organizationInput,
-            gitlabProject: selectedRepo,
-          });
-        } else if (selectedPlatform === 'bitbucket' && bitbucketRepo) {
-          result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...organizationInput,
-            bitbucketRepo,
-          });
-        } else {
-          result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...organizationInput,
-            githubRepo: selectedRepo,
-            githubIntegrationId: selectedGitHubIntegrationId,
-          });
+    const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+    const initialMessageId = generateMessageId();
+    const sessionInput = { ...creationInput, initialMessageId };
+    const sandboxInput = sandboxAllocation ? { sandboxAllocation } : {};
+    const request: LocalSessionRequest = organizationId
+      ? {
+          kind: 'new-organization-session',
+          input: {
+            ...sessionInput,
+            ...sandboxInput,
+            organizationId,
+            ...(selectedPlatform === 'gitlab'
+              ? { gitlabProject: selectedRepo }
+              : selectedPlatform === 'bitbucket' && bitbucketRepo
+                ? { bitbucketRepo }
+                : { githubRepo: selectedRepo, githubIntegrationId: selectedGitHubIntegrationId }),
+          },
         }
-      } else if (selectedPlatform === 'gitlab') {
-        result = await trpcClient.cloudAgentNext.prepareSession.mutate({
-          ...baseInput,
-          ...(sandboxAllocation ? { sandboxAllocation } : {}),
-          gitlabProject: selectedRepo,
-        });
-      } else {
-        result = await trpcClient.cloudAgentNext.prepareSession.mutate({
-          ...baseInput,
-          ...(sandboxAllocation ? { sandboxAllocation } : {}),
-          githubRepo: selectedRepo,
-        });
-      }
+      : {
+          kind: 'new-session',
+          input: {
+            ...sessionInput,
+            ...sandboxInput,
+            ...(selectedPlatform === 'gitlab'
+              ? { gitlabProject: selectedRepo }
+              : { githubRepo: selectedRepo }),
+          },
+        };
+    if (!hasAgentModelOverride) setLastUsedModel(model, organizationId);
+    if (!hasAgentModelOverride && variant) setLastUsedVariant(model, variant, organizationId);
 
-      setFirstChatCreationOperation(current =>
-        current?.operationKey === operation.operationKey ? null : current
-      );
-
-      if (!hasAgentModelOverride) {
-        setLastUsedModel(model, organizationId);
-      }
-      if (!hasAgentModelOverride && variant) {
-        setLastUsedVariant(model, variant, organizationId);
-      }
-
-      void queryClient.invalidateQueries({
-        queryKey: trpc.cliSessionsV2.list.queryKey({
-          limit: 3,
-          createdOnPlatform: 'cloud-agent',
-          orderBy: 'updated_at',
-          organizationId: organizationId ?? null,
-        }),
-      });
-
-      attachmentUpload.clearAttachments();
-      setAttachmentMessageUuid(uuidv4());
-
-      // A completion that lands after the panel is gone must not yank the user
-      // back to this session; the created session stays reachable from the
-      // sidebar.
-      if (!mountedRef.current) return;
-
-      setPendingFirstChat({
-        operationKey: operation.operationKey,
-        initialMessageId: operation.initialMessageId,
+    // The chat opens at once from local data; the store owns the request, so it
+    // continues after this panel unmounts and the chat page shows its outcome.
+    const kiloSessionId = createLocalSession({
+      organizationId: organizationId ?? null,
+      worktreeId: null,
+      request,
+      repository: selectedRepo,
+      branch: null,
+      composer: {
+        mode: creationInput.mode,
+        model: creationInput.model,
+        variant: creationInput.variant ?? null,
+      },
+      firstMessage: {
+        id: initialMessageId,
         prompt: submittedPrompt,
-        attachmentNames: submittedAttachmentNames,
-        kiloSessionId: result.kiloSessionId,
-      });
-      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
-      router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
-      setBillingFailure(null);
-      // The pending view and its single-flight lock stay in place through the
-      // route change: the panel must not flash the empty composer while the
-      // chat route loads. The lock is released only on failure.
-    } catch (error) {
-      if (!isAmbiguousCloudSessionCreationError(error)) {
-        setFirstChatCreationOperation(null);
-      }
-      // No setPendingFirstChat(null) here: this attempt publishes the shared
-      // value only after success, so clearing it could only drop another
-      // panel's newer creation.
-      setPendingCreation(null);
-      guard.end();
-      const failure = parseCustomerBillingFailure(error);
-      setBillingFailure(failure);
-      console.error('Failed to prepare session:', error);
-      if (!failure) {
-        toast.error('Failed to create session', {
-          description: formatSessionError(error),
-        });
-      }
-    }
+        attachmentNames: attachmentUpload.attachments.map(a => a.file.name),
+      },
+    });
+    attachmentUpload.clearAttachments();
+    setAttachmentMessageUuid(uuidv4());
+    // The lock stays held: the panel unmounts with this navigation, and a second
+    // submit before then would create a second session.
+    router.push(`${basePath}/chat?sessionId=${kiloSessionId}`);
   }, [
     attachmentUpload,
     bitbucketRepo,
+    createLocalSession,
     creationInput,
-    creationIntent,
-    firstChatCreationOperation,
     hasAgentModelOverride,
     sandboxAllocation,
     sandboxSelectionError,
@@ -1258,19 +1122,12 @@ export function NewSessionPanel({
     variant,
     organizationId,
     prompt,
-    queryClient,
     router,
-    setPendingFirstChat,
     selectedPlatform,
     selectedRepo,
     selectedGitHubIntegrationId,
-    trpc.cliSessionsV2.list,
-    trpcClient,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Textarea auto-resize
-  // ---------------------------------------------------------------------------
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -1332,9 +1189,6 @@ export function NewSessionPanel({
     setIsGitHubIdentityHintDismissed(true);
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Integration missing view
-  // ---------------------------------------------------------------------------
   if (isIntegrationMissing) {
     return (
       <div className="relative flex h-full flex-col items-center justify-start overflow-y-auto px-4 py-8">
@@ -1354,25 +1208,6 @@ export function NewSessionPanel({
     );
   }
 
-  if (pendingCreation) {
-    // Full width below a gap the height of the chat route's workspace header
-    // (two rows below `sm`), so the pending turn sits where the chat route
-    // renders it and the prompt does not move on the route change.
-    return (
-      <div className="relative flex h-full flex-col pt-24 sm:pt-14">
-        <SetPageTitle title="Cloud Agent">
-          <Badge variant="new">new</Badge>
-        </SetPageTitle>
-        <MobileSidebarToggle />
-        <PendingChatView
-          prompt={pendingCreation.prompt}
-          attachmentNames={pendingCreation.attachmentNames}
-          statusLabel={PENDING_FIRST_CHAT_STATUS_LABEL}
-        />
-      </div>
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -1383,22 +1218,6 @@ export function NewSessionPanel({
       </SetPageTitle>
       <MobileSidebarToggle />
       <div className="w-full max-w-2xl space-y-4">
-        {billingFailure && (
-          <CloudAgentBillingError
-            failure={billingFailure}
-            presentation={billingPayerPresentation(billingFailure, {
-              currentUserId,
-              organization:
-                organizationId && organizationName && organizationRole
-                  ? {
-                      id: organizationId,
-                      name: organizationName,
-                      role: organizationRole,
-                    }
-                  : undefined,
-            })}
-          />
-        )}
         {/* Organization members intentionally see the shared balance: the existing eligibility API returns it to members. */}
         {hasInsufficientBalance && eligibilityData && !hasLimitedAccess && (
           <InsufficientBalanceBanner
@@ -1924,9 +1743,7 @@ function ContextualTip({ body, linkLabel, href, onDismiss }: ContextualTipProps)
   );
 }
 
-// ---------------------------------------------------------------------------
 // Internal sub-component for repo items in the Command list
-// ---------------------------------------------------------------------------
 function RepoCommandItem({
   repo,
   isSelected,

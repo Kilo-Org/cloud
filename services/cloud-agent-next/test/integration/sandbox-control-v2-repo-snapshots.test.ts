@@ -100,7 +100,7 @@ function createFakeProvider(
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(ref, launchEnv, launchOptions) {
+    async launch(ref, { env: launchEnv }, launchOptions) {
       const launchIndex = provider.launchEnvs.length;
       provider.launchEnvs.push({ ...launchEnv });
       const { deadlineAt, ...recordedOptions } = launchOptions ?? {};
@@ -203,7 +203,9 @@ async function setup(
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
       NEXTAUTH_SECRET: WORKER_SECRET,
-      WORKER_URL,
+      // A local `.dev.vars` WORKER_URL turns on log upload, which adds a
+      // per-launch wrapper instance ID to the launch env.
+      WORKER_URL: undefined,
       ...extraEnv,
     });
     Object.assign(instance, {
@@ -528,6 +530,7 @@ describe('repository snapshot launch', () => {
       await prepareFrameOf(wrapper);
       expect(await readLaunchRecord(stub)).toEqual({
         allocationId,
+        startupMode: 'preinstalled',
         startSource: 'image',
         confirmed: true,
       });
@@ -618,6 +621,7 @@ describe('repository snapshot launch', () => {
     expect(provider.launchEnvs).toHaveLength(1);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
+      startupMode: 'preinstalled',
       startSource: 'repository',
       confirmed: true,
     });
@@ -756,6 +760,7 @@ describe('repository snapshot launch', () => {
     expect(frame.spec.capture).toBe(true);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
+      startupMode: 'preinstalled',
       startSource: 'repository',
       confirmed: true,
     });

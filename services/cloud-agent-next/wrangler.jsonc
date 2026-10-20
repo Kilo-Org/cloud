@@ -77,7 +77,7 @@
     "CONTAINER_REPO_SNAPSHOT_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
     "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
     "PREVIEW_HOST_SUFFIX": "cloud-agent.kiloapps.ai",
-    "PREVIEW_ENABLED_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130,9d278969-5453-4ae3-a51f-a8d2274a7b56",
+    "PREVIEW_ENABLED_IDS": "*",
     "VERCEL_SANDBOX_ORG_IDS": "",
     "VERCEL_PROJECT_ID": "",
     "VERCEL_TEAM_ID": "",
@@ -545,6 +545,10 @@
         {
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
+        },
+        {
+          "binding": "RUNTIME_RELEASE_BUCKET",
+          "bucket_name": "cloud-agent-runtime-dev",
         },
       ],
       "containers": [

@@ -10,6 +10,7 @@ import {
   listInternalBotUsers,
 } from '@/lib/bot-users/bot-user-service';
 import { INTERNAL_BOT_SLUG_PATTERN } from '@/lib/bot-users/types';
+import { recordAdminAction, userActionTarget } from '@/lib/admin/admin-action-audit';
 
 export const CreateInternalBotUserInputSchema = z.object({
   slug: z
@@ -25,23 +26,33 @@ export const CreateInternalBotUserInputSchema = z.object({
 export const adminInternalBotUsersRouter = createTRPCRouter({
   list: adminProcedure.query(() => listInternalBotUsers()),
 
-  create: adminProcedure.input(CreateInternalBotUserInputSchema).mutation(async ({ input }) => {
-    const [organization] = await db
-      .select({ id: organizations.id })
-      .from(organizations)
-      .where(and(eq(organizations.id, input.organizationId), isNull(organizations.deleted_at)))
-      .limit(1);
-    if (!organization) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    try {
-      const { user, created } = await ensureInternalBotUser(input);
-      return { id: user.id, created };
-    } catch (error) {
-      if (error instanceof InternalBotUnusableError) {
-        throw new TRPCError({ code: 'CONFLICT', message: error.message });
+  create: adminProcedure
+    .input(CreateInternalBotUserInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const [organization] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(and(eq(organizations.id, input.organizationId), isNull(organizations.deleted_at)))
+        .limit(1);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
-      throw error;
-    }
-  }),
+      try {
+        const { user, created } = await ensureInternalBotUser(input);
+        if (created) {
+          await recordAdminAction(ctx, {
+            action: 'internal_bot_user.create',
+            target: userActionTarget(user.id),
+            message: 'Created internal bot user',
+            metadata: { slug: input.slug, organizationId: input.organizationId },
+          });
+        }
+        return { id: user.id, created };
+      } catch (error) {
+        if (error instanceof InternalBotUnusableError) {
+          throw new TRPCError({ code: 'CONFLICT', message: error.message });
+        }
+        throw error;
+      }
+    }),
 });

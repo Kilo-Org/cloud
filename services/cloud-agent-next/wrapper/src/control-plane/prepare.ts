@@ -46,7 +46,11 @@ import {
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
 } from './kilo-runtime.js';
-import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
+import {
+  configureWorkspaceGitAuthor,
+  createGitProgressReporter,
+  isBloblessReviewCloneEligible,
+} from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
 import { restoreWorktreeRecovery } from './worktree-recovery.js';
@@ -108,13 +112,19 @@ const MANAGED_GITHUB_PREPARATION_GIT_CONFIG = [
 
 /**
  * The single eligibility decision for the two invocation-scoped options. Both
- * options or neither: the command must be preparation clone/fetch, the platform
+ * options or neither: the command must be preparation clone/fetch (or a review
+ * checkout that can lazily fetch blobs), the platform
  * must be managed GitHub, the token must parse as a `github` control alias, and
  * the URL must be the direct HTTPS default-port github.com URL. Callers judge
  * `spec.git.url`, never the password parsed back out of the authenticated URL.
  */
 function managedGitHubPreparationGitArgs(spec: ControlPlaneRouteSpec, command: string): string[] {
-  if (command !== 'clone' && command !== 'fetch') return [];
+  if (
+    command !== 'clone' &&
+    command !== 'fetch' &&
+    !(command === 'checkout' && spec.createdOnPlatform === 'code-review')
+  )
+    return [];
   const git = spec.git;
   if (!git || git.platform !== 'github') return [];
   if (!git.token || parseControlPlaneCredential(git.token)?.purpose !== 'github') return [];
@@ -599,6 +609,44 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (!(await hasGit(directory))) {
       const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
       const gitConfigArgs = managedGitHubPreparationGitArgs(spec, 'clone');
+      const useBlobless = isBloblessReviewCloneEligible(
+        spec.createdOnPlatform,
+        spec.git.platform,
+        spec.git.token
+      );
+      const noCheckout =
+        spec.createdOnPlatform === 'code-review' &&
+        spec.branch !== undefined &&
+        isSyntheticReviewRef(spec.branch) &&
+        spec.branchMode !== 'working';
+      const startedAt = Date.now();
+      let cloneAttempts = 0;
+      let filterRejected = false;
+      const runClone = async (): Promise<ExecResult> => {
+        signal.throwIfAborted();
+        cloneAttempts += 1;
+        const cloned = await runGit(
+          [
+            ...gitConfigArgs,
+            'clone',
+            '--progress',
+            ...(useBlobless && !filterRejected ? ['--filter=blob:none'] : []),
+            ...(noCheckout ? ['--no-checkout'] : []),
+            cloneUrl,
+            directory,
+          ],
+          {
+            env,
+            inheritEnv: false,
+            signal,
+            onOutput: createGitProgressReporter(progressText =>
+              emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
+            ),
+          }
+        );
+        signal.throwIfAborted();
+        return cloned;
+      };
       let lastError: WrapperBootstrapError | undefined;
       for (let attempt = 1; attempt <= CLONE_RETRY_ATTEMPTS; attempt += 1) {
         signal.throwIfAborted();
@@ -609,17 +657,22 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             `Retrying clone (attempt ${attempt} of ${CLONE_RETRY_ATTEMPTS})`
           );
         }
-        const cloned = await runGit(
-          [...gitConfigArgs, 'clone', '--progress', cloneUrl, directory],
-          {
-            env,
-            inheritEnv: false,
-            signal,
-            onOutput: createGitProgressReporter(progressText =>
-              emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
-            ),
-          }
-        );
+        let cloned = await runClone();
+        if (
+          useBlobless &&
+          !filterRejected &&
+          cloned.exitCode !== 0 &&
+          !cloned.terminationReason &&
+          /(?:filter(?:ing)?[^\r\n]*(?:not supported|not recognized|rejected)|(?:does not support|unsupported|invalid)[^\r\n]*filter)/i.test(
+            `${cloned.stderr}\n${cloned.stdout}`
+          )
+        ) {
+          filterRejected = true;
+          log(
+            `control-plane blobless clone rejected; retrying full clone session=${spec.sessionId}`
+          );
+          cloned = await runClone();
+        }
         if (cloned.exitCode === 0) {
           lastError = undefined;
           break;
@@ -629,6 +682,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         await sleep(CLONE_RETRY_BACKOFF_MS[attempt - 1] ?? 0, signal);
       }
       if (lastError) throw lastError;
+      let filterHonored = false;
+      if (useBlobless && !filterRejected) {
+        const promisor = await runGit(['config', '--get', 'remote.origin.promisor'], {
+          cwd: directory,
+          env,
+          inheritEnv: false,
+          signal,
+        });
+        filterHonored = promisor.exitCode === 0 && promisor.stdout.trim() === 'true';
+      }
+      const mode = filterRejected ? 'blobless_fallback' : filterHonored ? 'blobless' : 'full';
+      log(
+        `control-plane clone complete session=${spec.sessionId} mode=${mode} attempts=${cloneAttempts} durationMs=${Date.now() - startedAt}`
+      );
     }
   }
 
@@ -660,7 +727,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     emitProgress(spec.sessionId, 'checkout');
     const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
     const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
-      runGit(args, { ...options, cwd: directory, env, inheritEnv: false, signal });
+      runGit([...managedGitHubPreparationGitArgs(spec, args[0]), ...args], {
+        ...options,
+        cwd: directory,
+        env,
+        inheritEnv: false,
+        signal,
+      });
     // Spec §7 "Checkout, branch restore" (legacy apply-attach branch logic):
     // `-B <branch> origin/<branch>` breaks a working branch or a `session/*`
     // branch that has no upstream, so resolve the refs first.
@@ -668,8 +741,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (isSyntheticReviewRef(branch) && spec.branchMode !== 'working') {
       await checkoutSyntheticReviewRef({
         runGit: (args, options) => {
-          const gitConfigArgs =
-            args[0] === 'fetch' ? managedGitHubPreparationGitArgs(spec, 'fetch') : [];
+          const gitConfigArgs = managedGitHubPreparationGitArgs(spec, args[0]);
           return runGit([...gitConfigArgs, ...args], {
             ...options,
             cwd: directory,

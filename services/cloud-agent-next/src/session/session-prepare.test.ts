@@ -1981,7 +1981,7 @@ describe('createSessionWithLedger admission ladder', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'auto-triage',
+          createdOnPlatform: 'app-builder',
           kilocodeOrganizationId: orgId,
         },
       })
@@ -1997,7 +1997,7 @@ describe('createSessionWithLedger admission ladder', () => {
     );
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
-        identity: expect.objectContaining({ orgId, createdOnPlatform: 'auto-triage' }),
+        identity: expect.objectContaining({ orgId, createdOnPlatform: 'app-builder' }),
         workspace: expect.objectContaining({
           sandboxId,
           sandboxProvider: 'cloudflare',
@@ -2013,7 +2013,7 @@ describe('createSessionWithLedger admission ladder', () => {
       runtime: { sandboxAllocation: 'isolated-standard' },
       options: {
         operationKey: OPERATION_KEY,
-        createdOnPlatform: 'auto-triage',
+        createdOnPlatform: 'app-builder',
         kilocodeOrganizationId: orgId,
       },
     });
@@ -2254,7 +2254,6 @@ describe('createSessionWithLedger admission ladder', () => {
   it.each([
     ['missing platform', undefined, undefined],
     ['app-builder origin', 'browser', 'app-builder'],
-    ['auto-triage origin', 'browser', 'auto-triage'],
     ['code-review origin', undefined, 'code-review'],
   ] as const)(
     'keeps non-control-plane %s creates on agent_ sessions',
@@ -2864,6 +2863,30 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
     });
+  });
+
+  it('creates under a client-proposed session id and fingerprints it', async () => {
+    const proposed = 'ses_0123456789abABCDEFGHIJKLMN';
+    const request = makeRequest({
+      options: { operationKey: OPERATION_KEY, kiloSessionId: proposed },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ canonical_result: null }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+
+    const result = await runCreate(makeContext(makeDoStub()), request);
+
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: proposed,
+    });
+    expect(generateKiloSessionIdMock).not.toHaveBeenCalled();
+    const unproposed = makeRequest({ options: { operationKey: OPERATION_KEY } });
+    expect(await sessionCreateIntentFingerprint(request)).not.toBe(
+      await sessionCreateIntentFingerprint(unproposed)
+    );
   });
 
   it('(b) runs a fresh create when the ownership row is absent despite recorded IDs', async () => {
@@ -4922,7 +4945,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'auto-triage',
+          createdOnPlatform: 'app-builder',
           kilocodeOrganizationId: orgId,
         },
       })

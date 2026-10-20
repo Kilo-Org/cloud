@@ -37,7 +37,7 @@ export type OpenAiChatGptOwner =
 
 /**
  * The organization's shared-services connection. It is the connection the
- * platform's own callers (code reviewer, Slack bot, auto-triage) use instead of
+ * platform's own callers (code reviewer, Slack bot) use instead of
  * a member's personal connection.
  */
 export function openAiChatGptSharedServicesOwner(organizationId: string): OpenAiChatGptOwner {

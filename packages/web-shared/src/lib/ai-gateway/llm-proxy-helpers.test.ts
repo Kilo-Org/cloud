@@ -77,14 +77,14 @@ describe('getOutputHeaders', () => {
   );
 
   it.each(['application/json', 'text/plain', 'text/event-stream-other'])(
-    'does not change caching or compression policy for %s responses',
+    'prevents intermediary caching and compression of %s responses',
     contentType => {
       const headers = getOutputHeaders(
         new Response(null, { headers: { 'content-type': contentType } })
       );
 
       expect(headers.get('content-encoding')).toBe('identity');
-      expect(headers.has('cache-control')).toBe(false);
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
     }
   );
 });

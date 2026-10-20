@@ -47,14 +47,6 @@ const groups: ServiceGroup[] = [
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
-    id: 'auto-triage',
-    label: 'Auto Triage',
-    alwaysOn: false,
-    groupDependsOn: ['cloud-agent'],
-    sectionBreakBefore: true,
-  },
-  { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  {
     id: 'security-agent',
     label: 'Security Agent',
     alwaysOn: false,
@@ -223,18 +215,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'code-review',
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/code-review-infra',
-  },
-  // auto-triage
-  'cloudflare-auto-triage-infra': {
-    group: 'auto-triage',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-triage-infra',
-  },
-  // auto-fix
-  'cloudflare-auto-fix-infra': {
-    group: 'auto-fix',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-fix-infra',
   },
   // security-agent
   'cloudflare-security-sync': {

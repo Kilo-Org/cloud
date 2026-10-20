@@ -181,6 +181,9 @@ export const GitHubPrReviewReviewThreadSchema = z
     diffSide: z.enum(['LEFT', 'RIGHT']).nullable(),
     diffHunk: z.string().nullable(),
     comments: z.array(GitHubPrReviewReviewCommentSchema),
+    // True when the thread has more comments than this response includes, so a
+    // client can present the list as partial rather than as the whole thread.
+    commentsTruncated: z.boolean().optional(),
   })
   .strict();
 export type GitHubPrReviewReviewThread = z.infer<typeof GitHubPrReviewReviewThreadSchema>;

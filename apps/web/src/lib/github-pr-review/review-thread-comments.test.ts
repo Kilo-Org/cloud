@@ -101,7 +101,7 @@ describe('fetchAllThreadComments', () => {
 
     const octokit = { request } as never;
 
-    const comments = await fetchAllThreadComments({
+    const { comments, truncated } = await fetchAllThreadComments({
       octokit,
       threadId: 'thread_1',
       initialConnection: {
@@ -111,8 +111,9 @@ describe('fetchAllThreadComments', () => {
       budget: { remainingFollowUpComments: REVIEW_THREAD_COMMENTS_MAX_PER_REQUEST },
     });
 
-    // All three pages aggregated to completion — no silent truncation.
+    // All three pages aggregated to completion.
     expect(comments.map(c => c.databaseId)).toEqual([1, 2, 3]);
+    expect(truncated).toBe(false);
     // Zero-count reactionGroups are dropped; DTO reactions stay empty.
     expect(comments.map(c => c.reactions)).toEqual([[], [], []]);
     expect(request).toHaveBeenCalledTimes(2);
@@ -150,7 +151,7 @@ describe('fetchAllThreadComments', () => {
   });
 
   it('keeps only reactionGroups with totalCount > 0 in the DTO shape', async () => {
-    const comments = await fetchAllThreadComments({
+    const { comments } = await fetchAllThreadComments({
       octokit: { request: jest.fn() } as never,
       threadId: 'thread_1',
       initialConnection: {
@@ -248,7 +249,7 @@ describe('thread comment pagination bounds', () => {
       };
     });
 
-    const comments = await fetchAllThreadComments({
+    const { comments, truncated } = await fetchAllThreadComments({
       octokit: { request } as never,
       threadId: 'thread_1',
       initialConnection: commentPage(1, REVIEW_THREAD_COMMENTS_PAGE_SIZE, true),
@@ -259,6 +260,7 @@ describe('thread comment pagination bounds', () => {
     expect(request).toHaveBeenCalledTimes(5);
     // Initial page plus the 5-follow-up-page ceiling, 50 comments per page.
     expect(comments).toHaveLength(300);
+    expect(truncated).toBe(true);
   });
 
   it('asks for only what the allowance keeps and stops when it is spent', async () => {
@@ -279,7 +281,7 @@ describe('thread comment pagination bounds', () => {
       };
     });
 
-    const comments = await fetchAllThreadComments({
+    const { comments, truncated } = await fetchAllThreadComments({
       octokit: { request } as never,
       threadId: 'thread_1',
       initialConnection: commentPage(1, 1, true),
@@ -289,6 +291,7 @@ describe('thread comment pagination bounds', () => {
     // The second request asks only for the 10 comments the allowance still holds.
     expect(requestedFirsts).toEqual([50, 10]);
     expect(comments).toHaveLength(61);
+    expect(truncated).toBe(true);
     expect(budget.remainingFollowUpComments).toBe(0);
   });
 

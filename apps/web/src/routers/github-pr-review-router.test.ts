@@ -901,7 +901,10 @@ describe('githubPrReviewRouter.listReviewThreads comment pagination bounds', () 
       direction: 'forward',
     });
 
-    const threads = result.threads as Array<{ comments: unknown[] }>;
+    const threads = result.threads as Array<{
+      comments: unknown[];
+      commentsTruncated?: boolean;
+    }>;
     expect(threads).toHaveLength(PAGE_SIZE);
     // 500 follow-up comments split across 50 threads: 10 each, one request each.
     expect(followUpRequests).toBe(50);
@@ -912,6 +915,7 @@ describe('githubPrReviewRouter.listReviewThreads comment pagination bounds', () 
     expect(followUpComments).toBe(500);
     // Every thread keeps its initial page plus its even share.
     expect(threads.every(thread => thread.comments.length === PAGE_SIZE + 10)).toBe(true);
+    expect(threads.every(thread => thread.commentsTruncated === true)).toBe(true);
   });
 });
 

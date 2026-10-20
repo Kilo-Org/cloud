@@ -643,7 +643,7 @@ export async function fetchAllThreadComments(args: {
   threadId: string;
   initialConnection: GraphQlCommentConnection;
   budget: ThreadCommentBudget;
-}): Promise<ReviewCommentDto[]> {
+}): Promise<{ comments: ReviewCommentDto[]; truncated: boolean }> {
   const { octokit, threadId, initialConnection, budget } = args;
   const collected: ReviewCommentDto[] = initialConnection.nodes.map(normalizeComment);
   let cursor: string | null = initialConnection.pageInfo.endCursor;
@@ -680,7 +680,9 @@ export async function fetchAllThreadComments(args: {
     hasNext = node.comments.pageInfo.hasNextPage;
     cursor = node.comments.pageInfo.endCursor;
   }
-  return collected;
+  // Leaving the loop with another page still available means the thread has
+  // comments this response does not include.
+  return { comments: collected, truncated: hasNext && cursor !== null };
 }
 
 export type ReviewThreadEnrichment = {
@@ -695,6 +697,7 @@ export type ReviewThreadEnrichment = {
   originalStartLine: number | null;
   diffSide: GraphQlReviewThreadNode['diffSide'];
   diffHunk: string | null;
+  commentsTruncated: boolean;
   comments: ReviewCommentDto[];
 };
 
@@ -718,7 +721,7 @@ export async function enrichReviewThreads(args: {
   return Promise.all(
     nodes.map(node =>
       limit(async () => {
-        const comments = await fetchAllThreadComments({
+        const { comments, truncated } = await fetchAllThreadComments({
           octokit,
           threadId: node.id,
           initialConnection: node.comments,
@@ -736,6 +739,7 @@ export async function enrichReviewThreads(args: {
           originalStartLine: node.originalStartLine,
           diffSide: node.diffSide,
           diffHunk: node.comments.nodes[0]?.diffHunk ?? null,
+          commentsTruncated: truncated,
           comments,
         };
       })

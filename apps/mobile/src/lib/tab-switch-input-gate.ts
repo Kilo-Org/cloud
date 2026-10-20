@@ -16,10 +16,10 @@ export const TAB_SWITCH_INPUT_FALLBACK_MS = 1200;
 
 /**
  * A press on the tab that is already focused has no incoming screen, so it
- * settles on its own timer. It still waits long enough to cover a pop back to
- * that tab's root.
+ * settles on its own timer. The tab's stack reports the end of a pop back to
+ * that tab's root far earlier; this only bounds that wait.
  */
-export const TAB_SWITCH_ACTIVE_TAB_SETTLE_MS = 250;
+export const TAB_SWITCH_ACTIVE_TAB_SETTLE_MS = 500;
 
 type SettleTimer = ReturnType<typeof setTimeout>;
 

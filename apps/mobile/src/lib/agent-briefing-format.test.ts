@@ -19,4 +19,9 @@ describe('briefingMoney', () => {
     expect(briefingMoney(0, 'pt-BR')).toBe('US$\u00A00,00');
     expect(briefingMoney(0, 'en-US')).toBe('$0.00');
   });
+
+  it('states a lower bound at the currency precision, without the below-unit marker', () => {
+    expect(briefingMoney(1800, 'pt-BR', { lowerBound: true })).toBe('US$\u00A00,00');
+    expect(briefingMoney(182_000, 'pt-BR', { lowerBound: true })).toBe('US$\u00A00,18');
+  });
 });

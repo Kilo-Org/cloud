@@ -48,16 +48,15 @@ export function BriefingScorecard({ report }: { readonly report: BriefingReport 
   return (
     <View className="gap-2 px-4 py-3">
       {rows.map(row => {
+        const lowerBound =
+          row.coverage !== 'complete' && row.amount > 0 && row.coverage !== 'unavailable';
         let value = t('common.unknown');
         if (row.coverage !== 'unavailable' && (row.coverage === 'complete' || row.amount > 0)) {
           value = row.money
-            ? briefingMoney(row.amount, i18n.language)
+            ? briefingMoney(row.amount, i18n.language, { lowerBound })
             : formatNumber(row.amount, i18n.language);
         }
-        const displayValue =
-          row.coverage !== 'complete' && row.amount > 0 && row.coverage !== 'unavailable'
-            ? t('agentBriefing.atLeast', { value })
-            : value;
+        const displayValue = lowerBound ? t('agentBriefing.atLeast', { value }) : value;
         return (
           <View key={row.label} className="min-h-6 flex-row items-center gap-2">
             <Text className="text-sm font-semibold text-foreground">{displayValue}</Text>

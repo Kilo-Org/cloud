@@ -147,16 +147,20 @@ export function BriefingDetailScreen() {
           <View className="gap-2">
             <Text className="font-semibold">{t('common.agents')}</Text>
             {report.sessions.map(session => {
+              const coverage = report.coverage.spend;
+              const lowerBound =
+                coverage !== 'complete' &&
+                coverage !== 'unavailable' &&
+                session.spendMicrodollars > 0;
               let spend = t('common.unknown');
               if (
-                report.coverage.spend !== 'unavailable' &&
-                (report.coverage.spend === 'complete' || session.spendMicrodollars > 0)
+                coverage !== 'unavailable' &&
+                (coverage === 'complete' || session.spendMicrodollars > 0)
               ) {
-                const amount = briefingMoney(session.spendMicrodollars, i18n.language);
-                spend =
-                  report.coverage.spend === 'complete'
-                    ? amount
-                    : t('agentBriefing.atLeast', { value: amount });
+                const amount = briefingMoney(session.spendMicrodollars, i18n.language, {
+                  lowerBound,
+                });
+                spend = lowerBound ? t('agentBriefing.atLeast', { value: amount }) : amount;
               }
               return (
                 <Pressable

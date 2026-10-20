@@ -110,12 +110,19 @@ function resolveExistingPath(target: string): string {
   }
 }
 
-function isInsideRepository(manifestPath: string): boolean {
-  const root = resolveExistingPath(repositoryRoot());
-  const relative = path.relative(root, resolveExistingPath(manifestPath));
+function isPathInside(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
   return (
     relative === '' ||
     (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+  );
+}
+
+function isInsideRepository(manifestPath: string): boolean {
+  const root = resolveExistingPath(repositoryRoot());
+  return (
+    isPathInside(root, path.resolve(manifestPath)) ||
+    isPathInside(root, resolveExistingPath(manifestPath))
   );
 }
 

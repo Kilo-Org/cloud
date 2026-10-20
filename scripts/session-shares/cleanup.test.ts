@@ -1,5 +1,15 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, stat, symlink, unlink } from 'node:fs/promises';
+import {
+  chmod,
+  lstat,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
@@ -881,6 +891,28 @@ void describe('session share maintenance', () => {
       );
     } finally {
       await unlink(linkPath);
+    }
+
+    const outsideDirectory = await mkdtemp(path.join(tmpdir(), 'session-share-target-'));
+    const outsideManifestPath = path.join(outsideDirectory, 'manifest.json');
+    const outsideManifest = createManifest({
+      target: 'v2-webhook-bot',
+      databaseIdentityHash: identityHash,
+    });
+    await writeFile(outsideManifestPath, `${JSON.stringify(outsideManifest, null, 2)}\n`, 'utf8');
+    const inRepoDirectory = await mkdtemp(path.join(process.cwd(), '.session-share-link-'));
+    const inRepoLink = path.join(inRepoDirectory, 'manifest-link.json');
+    await symlink(outsideManifestPath, inRepoLink, 'file');
+    try {
+      assert.throws(() => createFileManifestStore(inRepoLink), /outside the repository/);
+      assert.equal((await lstat(inRepoLink)).isSymbolicLink(), true);
+      assert.equal(
+        await readFile(outsideManifestPath, 'utf8'),
+        `${JSON.stringify(outsideManifest, null, 2)}\n`
+      );
+    } finally {
+      await rm(inRepoDirectory, { recursive: true, force: true });
+      await rm(outsideDirectory, { recursive: true, force: true });
     }
 
     const directory = await mkdtemp(path.join(tmpdir(), 'session-share-manifest-'));

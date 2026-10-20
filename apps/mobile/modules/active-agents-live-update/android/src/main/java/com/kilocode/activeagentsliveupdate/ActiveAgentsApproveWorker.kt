@@ -233,9 +233,6 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
     /** Input key carrying the approval key of the request the card showed. */
     const val KEY_APPROVAL_KEY = "approval_key"
 
-    /** Input key carrying the scope the card was followed in. */
-    const val KEY_ORGANIZATION_ID = "organization_id"
-
     /**
      * Headless task key the JS entrypoint registers with `AppRegistry` (the
      * constant s5 owns; keep the two names in step).

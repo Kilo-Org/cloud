@@ -336,7 +336,12 @@ observable behavior is the same.
 2. Approve MUST appear only for a permission wait that carries an approval key,
    and it MUST run the same revalidating approval the iOS card runs, for the
    explicit session and the exact request the card shows.
-3. A user dismissal of the notification MUST count as Unfollow: the app MUST
+3. Approve MUST run only for an unlocked device. From Android 12 the action
+   MUST carry the platform's authentication requirement; below it, and as the
+   rule on every version, the tap MUST start the approval only after the keyguard
+   is dismissed. A declined unlock MUST leave the request open with Approve in
+   place.
+4. A user dismissal of the notification MUST count as Unfollow: the app MUST
    stop following that session, MUST delete the session's server row, and MUST
    NOT re-post the notification for a later update of that session.
 
@@ -442,3 +447,10 @@ observable behavior is the same.
   disabled so they appear on the Lock Screen with the default system settings.
 - Await a pushed end's own row release instead of superseding it with another.
 - Re-post the current scope's stored followed cards after a force-stop.
+
+### 2026-10-20 -- Approve requires an unlocked device
+
+- Approve runs for an unlocked device: the action carries the platform's
+  authentication requirement from Android 12, and on every version the approval
+  starts after the keyguard is dismissed. A declined unlock leaves the
+  permission request waiting with Approve in place.

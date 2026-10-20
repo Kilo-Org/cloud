@@ -9,9 +9,13 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 
 /**
- * Answers the ongoing notification's Approve action, a session
- * notification's dismissal, and a session notification's quiet alarm, without
- * an Activity.
+ * Answers a session notification's dismissal and quiet alarm, without an
+ * Activity, and an Approve action from a card posted by an older build.
+ *
+ * Approve from the current cards goes through `ActiveAgentsApprovalActivity`,
+ * which starts the headless approval once the device is unlocked
+ * (`ApprovalGate`). The branch below answers an older card's action under the
+ * same unlocked-device requirement.
  *
  * The receiver only enqueues and returns: a broadcast has a short budget, and a
  * background `startService` is restricted on Android 8+, so the answer runs as
@@ -49,41 +53,31 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
       // has its own unique work: a clear-all dismisses several cards at once,
       // and one shared name would let `KEEP` drop all but the first.
       SessionNotifications.cancel(context, sessionId)
-      enqueueHeadless(context, "$DISMISS_WORK_PREFIX$sessionId", ACTION_DISMISS, sessionId, null)
+      enqueueDismiss(context, sessionId)
       return
     }
-    enqueueHeadless(
-      context,
-      ActiveAgentsApproveWorker.UNIQUE_WORK_NAME,
-      ACTION_APPROVE,
-      sessionId,
-      intent.getStringExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY)
-    )
+    if (ApprovalGate.isDeviceLocked(context)) {
+      return
+    }
+    ApprovalGate.enqueue(context, intent)
   }
 
-  /** Run one action as headless JS through the approval worker. */
-  private fun enqueueHeadless(
-    context: Context,
-    uniqueName: String,
-    action: String,
-    sessionId: String?,
-    approvalKey: String?
-  ) {
+  /** Stop following one dismissed session, as headless JS. */
+  private fun enqueueDismiss(context: Context, sessionId: String) {
     val request = OneTimeWorkRequest.Builder(ActiveAgentsApproveWorker::class.java)
       .setInputData(
         Data.Builder()
-          .putString(ActiveAgentsApproveWorker.KEY_ACTION, action)
+          .putString(ActiveAgentsApproveWorker.KEY_ACTION, ACTION_DISMISS)
           .putString(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
-          .putString(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
           .build()
       )
       .build()
     WorkManager.getInstance(context)
-      .enqueueUniqueWork(uniqueName, ExistingWorkPolicy.KEEP, request)
+      .enqueueUniqueWork("$DISMISS_WORK_PREFIX$sessionId", ExistingWorkPolicy.KEEP, request)
   }
 
   companion object {
-    /** Explicit action on the notification's Approve PendingIntent. */
+    /** The Approve action a card posted by an older build carries. */
     const val ACTION_APPROVE = "com.kilocode.activeagentsliveupdate.action.APPROVE"
 
     /**
@@ -98,7 +92,7 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
     /** The quiet moment the alarm was armed for, in epoch milliseconds. */
     const val EXTRA_QUIET_AT = "quiet_at"
 
-    /** Unique work per dismissed session; see `onReceive`. */
+    /** Unique work per dismissed session; see `enqueueDismiss`. */
     private const val DISMISS_WORK_PREFIX = "active-agents-dismiss:"
   }
 }

@@ -18,6 +18,15 @@
     <receiver
       android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsActionReceiver"
       android:exported="false" />
+    <!-- The Approve action's target: an invisible gate that starts the
+         headless approval once the device is unlocked. Its own task, no
+         history, and no content of its own. -->
+    <activity
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApprovalActivity"
+      android:excludeFromRecents="true"
+      android:exported="false"
+      android:taskAffinity=""
+      android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     <!-- The headless-task-service chain the same Approve action can take. -->
     <receiver
       android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveReceiver"

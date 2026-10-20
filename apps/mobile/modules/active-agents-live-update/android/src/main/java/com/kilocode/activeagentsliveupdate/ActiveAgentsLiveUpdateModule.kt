@@ -311,30 +311,16 @@ class ActiveAgentsLiveUpdateModule : Module() {
   }
 
   /**
-   * The Approve action: one broadcast the receiver turns into a unique answer,
-   * with no Activity. The phone can be locked when the surface answers, and the
-   * approval needs no screen.
+   * The Approve action: the one tap that answers a waiting permission. It goes
+   * through `ActiveAgentsApprovalActivity`, which starts the headless approval
+   * once the device is unlocked, and `ApprovalGate.action` adds the platform's
+   * own authentication requirement where the platform has one.
    */
   private fun approvePendingIntent(
     sessionId: String? = null,
     approvalKey: String? = null
-  ): PendingIntent {
-    val intent = Intent(context, ActiveAgentsActionReceiver::class.java)
-      .setAction(ActiveAgentsActionReceiver.ACTION_APPROVE)
-    // A session notification answers its own session and the exact request it
-    // shows; the aggregate card passes neither, and the headless body reads the
-    // recorded ask for that case.
-    if (sessionId != null) {
-      intent.putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
-      intent.putExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
-    }
-    return PendingIntent.getBroadcast(
-      context,
-      APPROVE_REQUEST_CODE,
-      intent,
-      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-  }
+  ): PendingIntent =
+    ApprovalGate.pendingIntent(context, APPROVE_REQUEST_CODE, sessionId, approvalKey)
 
   /**
    * The New agent action: the app's fixed new-agent deep link. One constant URL,
@@ -428,8 +414,11 @@ class ActiveAgentsLiveUpdateModule : Module() {
 
     // Approve first, then Open, then New agent. An action the card does not
     // offer is omitted, not disabled: the JS side drops Approve once the wait is
-    // answered elsewhere or while an answer is in flight.
-    card.approveLabel?.let { builder.addAction(action(it, approvePendingIntent())) }
+    // answered elsewhere or while an answer is in flight. Approve runs once the
+    // device is unlocked, so it goes through the gate activity.
+    card.approveLabel?.let {
+      builder.addAction(ApprovalGate.action(context, smallIconId(), it, approvePendingIntent()))
+    }
     builder.addAction(action(card.openLabel, contentIntent))
     card.newAgentLabel?.let { builder.addAction(action(it, newAgentPendingIntent(card.newAgentUrl))) }
 

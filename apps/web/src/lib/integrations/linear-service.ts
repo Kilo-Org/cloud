@@ -219,19 +219,19 @@ export type LinearOAuthIdentity = {
 };
 
 /**
- * Query `viewer` and `organization` with a freshly-issued user-actor
- * access token. The returned `viewerId` is the Linear user id we will
- * link to the Kilo user; `organizationId` is checked against the signed
- * state so a multi-workspace user cannot link from a different workspace
- * than the one the link token was issued for.
+ * Query `viewer` — and the workspace the viewer belongs to — with a
+ * freshly-issued Linear access token. The returned `viewerId` is the Linear
+ * user id for `actor=user` tokens and the app user id for `actor=app` install
+ * tokens; `organizationId` comes from `viewer { organization { id } }`, the
+ * same lookup the Chat SDK Linear adapter uses to key an installation.
  *
  * `LinearClient` wraps the GraphQL request / response handling and
  * throws `LinearGraphQLError` for both HTTP and GraphQL-level failures,
  * so errors propagate to the caller with a useful message.
  */
 export async function fetchLinearOAuthIdentity(accessToken: string): Promise<LinearOAuthIdentity> {
-  const linear = new LinearClient({ accessToken });
-  const [viewer, organization] = await Promise.all([linear.viewer, linear.organization]);
+  const viewer = await new LinearClient({ accessToken }).viewer;
+  const organization = await viewer.organization;
 
   return {
     viewerId: viewer.id,

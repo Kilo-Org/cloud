@@ -47,13 +47,16 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@linear/sdk', () => ({
   LinearClient: jest.fn(() => ({
     get viewer() {
-      return Promise.resolve({ id: 'linear-bot-user', displayName: 'Kilo' });
-    },
-    get organization() {
       return Promise.resolve({
-        id: mockLinearOrganizationId.current,
-        name: 'Victim Workspace',
-        urlKey: 'victim',
+        id: 'linear-bot-user',
+        displayName: 'Kilo',
+        get organization() {
+          return Promise.resolve({
+            id: mockLinearOrganizationId.current,
+            name: 'Victim Workspace',
+            urlKey: 'victim',
+          });
+        },
       });
     },
   })),

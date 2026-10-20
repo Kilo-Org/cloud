@@ -109,7 +109,9 @@
     "online": "Tiešsaistē",
     "open": "Atvērt {{name}}",
     "openPullRequest": "Atvērt izmaiņu pieprasījumu",
+    "completed": "Pabeigts",
     "pending": "Gaida",
+    "running": "Darbojas",
     "performance": "Veiktspēja",
     "preferences": "Lietotāja iestatījumi",
     "privacyPolicy": "Privātuma politika",
@@ -1547,8 +1549,6 @@
     "updateFailed": "Neizdevās atjaunināt koda pārskatītāju.",
     "configSaveFailed": "Neizdevās saglabāt koda pārskatīšanas iestatījumus.",
     "status": {
-      "running": "Darbojas",
-      "completed": "Pabeigts",
       "interrupted": "Pārtraukta"
     },
     "reviewStyle": {
@@ -3716,6 +3716,7 @@
       "description": "Komandas apraksts",
       "template": "Veidne",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",

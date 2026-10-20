@@ -109,7 +109,9 @@
     "online": "Uppkopplad",
     "open": "Öppna {{name}}",
     "openPullRequest": "Öppna PR",
+    "completed": "Slutförd",
     "pending": "Väntar",
+    "running": "Körs",
     "performance": "Prestanda",
     "preferences": "Inställningar",
     "privacyPolicy": "Integritetspolicy",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Kunde inte uppdatera granskaren.",
     "configSaveFailed": "Kunde inte spara granskningsinställningarna.",
     "status": {
-      "running": "Körs",
-      "completed": "Slutförd",
       "interrupted": "Avbruten"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Kommandobeskrivning",
       "template": "Mall",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Förklara $ARGUMENTS",
       "subtask": "Kör som deluppgift",
       "edit": "Redigera snedstreck kommando",

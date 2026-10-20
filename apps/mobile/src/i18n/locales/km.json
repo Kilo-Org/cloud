@@ -109,7 +109,9 @@
     "online": "អនឡាញ",
     "open": "បើក {{name}}",
     "openPullRequest": "បើកសំណើបញ្ចូលកូដ",
+    "completed": "បានបញ្ចប់",
     "pending": "កំពុងរង់ចាំ",
+    "running": "កំពុងដំណើរការ",
     "performance": "ប្រសិទ្ធភាព",
     "preferences": "ចំណូលចិត្ត",
     "privacyPolicy": "គោលការណ៍ឯកជនភាព",
@@ -1528,8 +1530,6 @@
     "updateFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពឧបករណ៍ត្រួតពិនិត្យកូដបានទេ។",
     "configSaveFailed": "មិនអាចរក្សាទុកការកំណត់ការត្រួតពិនិត្យបានទេ។",
     "status": {
-      "running": "កំពុងដំណើរការ",
-      "completed": "បានបញ្ចប់",
       "interrupted": "បានផ្អាកកណ្តាលទី"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "ការពិពណ៌នាពាក្យបញ្ជា",
       "template": "គំរូ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "ពន្យល់ $ARGUMENTS",
       "subtask": "ដំណើរការជាកិច្ចការរង",
       "edit": "កែសម្រួលពាក្យបញ្ជា slash",

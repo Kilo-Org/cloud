@@ -109,7 +109,9 @@
     "online": "In linea",
     "open": "Apri {{name}}",
     "openPullRequest": "Apri la PR",
+    "completed": "Completata",
     "pending": "In attesa",
+    "running": "In esecuzione",
     "performance": "Prestazioni",
     "preferences": "Preferenze",
     "privacyPolicy": "Informativa sulla privacy",
@@ -988,8 +990,6 @@
     "updateFailed": "Impossibile aggiornare il revisore.",
     "configSaveFailed": "Impossibile salvare la configurazione della revisione.",
     "status": {
-      "running": "In esecuzione",
-      "completed": "Completata",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {
@@ -3716,6 +3716,7 @@
       "description": "Descrizione del comando",
       "template": "Modello",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spiega $ARGUMENTS",
       "subtask": "Esegui come attività secondaria",
       "edit": "Comando Modifica barra",

@@ -109,7 +109,9 @@
     "online": "Onlajn",
     "open": "Iftaħ {{name}}",
     "openPullRequest": "Ftuħ tal-PR",
+    "completed": "Lest",
     "pending": "Pendenti",
+    "running": "Għaddej",
     "performance": "Prestazzjoni",
     "preferences": "Preferenzi",
     "privacyPolicy": "Politika tal-privatezza",
@@ -1585,8 +1587,6 @@
     "updateFailed": "Ma setax jiġi aġġornat ir-reviżur.",
     "configSaveFailed": "Ma setgħetx tiġi ssejvjata l-konfigurazzjoni tar-reviżjoni.",
     "status": {
-      "running": "Għaddej",
-      "completed": "Lest",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {
@@ -3798,6 +3798,7 @@
       "description": "Deskrizzjoni tal-kmand",
       "template": "Mudell",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spjega $ARGUMENTS",
       "subtask": "Mexxi bħala subtask",
       "edit": "Editja kmand slash",

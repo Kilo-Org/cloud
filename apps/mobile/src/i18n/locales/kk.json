@@ -109,7 +109,9 @@
     "online": "Желіде",
     "open": "{{name}} ашу",
     "openPullRequest": "Біріктіру сұрауын ашу",
+    "completed": "Аяқталды",
     "pending": "Күтілуде",
+    "running": "Орындалуда",
     "performance": "Өнімділік",
     "preferences": "Параметрлер",
     "privacyPolicy": "Құпиялылық саясаты",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Код тексерушісін жаңарту мүмкін болмады.",
     "configSaveFailed": "Тексеру баптауларын сақтау мүмкін болмады.",
     "status": {
-      "running": "Орындалуда",
-      "completed": "Аяқталды",
       "interrupted": "Үзілді"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Команда сипаттамасы",
       "template": "Үлгі",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS түсіндіріңіз",
       "subtask": "Қосымша тапсырма ретінде іске қосыңыз",
       "edit": "Қиғаш сызықты өңдеу пәрмені",

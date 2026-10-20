@@ -109,7 +109,9 @@
     "online": "ఆన్‌లైన్",
     "open": "{{name}}ను తెరవండి",
     "openPullRequest": "ఓపెన్ పుల్ రిక్వెస్ట్",
+    "completed": "పూర్తయింది",
     "pending": "వేచి ఉంది",
+    "running": "నడుస్తోంది",
     "performance": "పనితీరు",
     "preferences": "ప్రాధాన్యతలు",
     "privacyPolicy": "గోప్యతా విధానం",
@@ -1528,8 +1530,6 @@
     "updateFailed": "కోడ్ సమీక్షకుడిని అప్‌డేట్ చేయలేకపోయాము.",
     "configSaveFailed": "సమీక్ష సెట్టింగ్‌లను సేవ్ చేయలేకపోయాము.",
     "status": {
-      "running": "నడుస్తోంది",
-      "completed": "పూర్తయింది",
       "interrupted": "అంతరాయం కలిగింది"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "కమాండ్ వివరణ",
       "template": "మూస",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTSని వివరించండి",
       "subtask": "సబ్‌టాస్క్‌గా అమలు చేయండి",
       "edit": "స్లాష్ ఆదేశాన్ని సవరించండి",

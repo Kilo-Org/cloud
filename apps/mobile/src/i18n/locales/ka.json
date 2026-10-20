@@ -109,7 +109,9 @@
     "online": "ქსელშია",
     "open": "{{name}}-ის გახსნა",
     "openPullRequest": "ღია PR",
+    "completed": "დასრულებულია",
     "pending": "მოლოდინშია",
+    "running": "მუშაობს",
     "performance": "წარმადობა",
     "preferences": "პარამეტრები",
     "privacyPolicy": "კონფიდენციალურობის პოლიტიკა",
@@ -1528,8 +1530,6 @@
     "updateFailed": "კოდის შემმოწმებლის განახლება ვერ მოხერხდა.",
     "configSaveFailed": "შემოწმების პარამეტრების შენახვა ვერ მოხერხდა.",
     "status": {
-      "running": "მუშაობს",
-      "completed": "დასრულებულია",
       "interrupted": "შეწყვეტილია"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "ბრძანების აღწერა",
       "template": "შაბლონი",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "ახსენით $ARGUMENTS",
       "subtask": "გაშვება როგორც ქვეამოცანა",
       "edit": "დახრილი ბრძანების რედაქტირება",

@@ -109,7 +109,9 @@
     "online": "מקוון",
     "open": "פתיחת {{name}}",
     "openPullRequest": "PR פתוח",
+    "completed": "הושלם",
     "pending": "ממתין",
+    "running": "בהרצה",
     "performance": "ביצועים",
     "preferences": "העדפות",
     "privacyPolicy": "מדיניות פרטיות",
@@ -1019,8 +1021,6 @@
     "updateFailed": "עדכון סוקר הקוד נכשל.",
     "configSaveFailed": "שמירת הגדרות הסקירה נכשלה.",
     "status": {
-      "running": "בהרצה",
-      "completed": "הושלם",
       "interrupted": "הופסקה"
     },
     "reviewStyle": {
@@ -3716,6 +3716,7 @@
       "description": "תיאור הפקודה",
       "template": "תבנית",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "הסבר $ARGUMENTS",
       "subtask": "הפעל כתת-מטלת",
       "edit": "ערוך פקודת נטוי",

@@ -109,7 +109,9 @@
     "online": "Në linjë",
     "open": "Hap {{name}}",
     "openPullRequest": "Hapja e kërkesës së bashkimit",
+    "completed": "Përfunduar",
     "pending": "Në pritje",
+    "running": "Në ekzekutim",
     "performance": "Performanca",
     "preferences": "Preferencat",
     "privacyPolicy": "Politika e privatësisë",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Nuk u përditësua shqyrtuesi.",
     "configSaveFailed": "Nuk u ruajt konfigurimi i shqyrtimit.",
     "status": {
-      "running": "Në ekzekutim",
-      "completed": "Përfunduar",
       "interrupted": "I ndërprerë"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Përshkrimi i komandës",
       "template": "shabllon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Shpjegoni $ARGUMENTS",
       "subtask": "Ekzekuto si nëndetyrë",
       "edit": "Redakto komandën e pjerrët",

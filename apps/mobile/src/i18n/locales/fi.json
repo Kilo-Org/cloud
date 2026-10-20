@@ -109,7 +109,9 @@
     "online": "Verkossa",
     "open": "Avaa {{name}}",
     "openPullRequest": "Avaa muutospyyntö",
+    "completed": "Valmis",
     "pending": "Odottaa",
+    "running": "Käynnissä",
     "performance": "Suorituskyky",
     "preferences": "Asetukset",
     "privacyPolicy": "Tietosuojakäytäntö",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Koodikatselmoijan päivitys epäonnistui.",
     "configSaveFailed": "Katselmointiasetusten tallennus epäonnistui.",
     "status": {
-      "running": "Käynnissä",
-      "completed": "Valmis",
       "interrupted": "Keskeytynyt"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Komennon kuvaus",
       "template": "Malli",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Selitä $ARGUMENTS",
       "subtask": "Suorita alitehtävänä",
       "edit": "Muokkaa vinoviivakomentoa",

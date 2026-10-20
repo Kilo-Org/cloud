@@ -109,7 +109,9 @@
     "online": "Kan layi",
     "open": "Buɗe {{name}}",
     "openPullRequest": "Buɗe buƙatar haɗa canje-canje",
+    "completed": "An kammala",
     "pending": "Yana jira",
+    "running": "Ana gudanarwa",
     "performance": "Ƙarfin aiki",
     "preferences": "Zaɓuɓɓuka",
     "privacyPolicy": "Manufar sirri",
@@ -1528,8 +1530,6 @@
     "updateFailed": "An kasa sabunta mai bita.",
     "configSaveFailed": "An kasa ajiye saitunan bita.",
     "status": {
-      "running": "Ana gudanarwa",
-      "completed": "An kammala",
       "interrupted": "An katse"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Bayanin umarni",
       "template": "Samfura",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Yi bayani $ARGUMENTS",
       "subtask": "Gudu azaman ƙaramin aiki",
       "edit": "Gyara umarnin slash",

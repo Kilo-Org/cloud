@@ -109,7 +109,9 @@
     "online": "ଅନଲାଇନ୍",
     "open": "{{name}} ଖୋଲନ୍ତୁ",
     "openPullRequest": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+    "completed": "ସମାପ୍ତ",
     "pending": "ଅପେକ୍ଷାରତ",
+    "running": "ଚାଲୁଛି",
     "performance": "କାର୍ଯ୍ୟଦକ୍ଷତା",
     "preferences": "ପସନ୍ଦ",
     "privacyPolicy": "ଗୋପନୀୟତା ନୀତି",
@@ -1528,8 +1530,6 @@
     "updateFailed": "କୋଡ୍ ସମୀକ୍ଷକ ଅପଡେଟ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "configSaveFailed": "ସମୀକ୍ଷା ସେଟିଂସ୍ ସଂରକ୍ଷଣ ହୋଇପାରିଲା ନାହିଁ।",
     "status": {
-      "running": "ଚାଲୁଛି",
-      "completed": "ସମାପ୍ତ",
       "interrupted": "ବ୍ୟାହତ"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "ନିର୍ଦ୍ଦେଶ ବର୍ଣ୍ଣନା",
       "template": "ଟେମ୍ପଲେଟ୍।",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ବ୍ୟାଖ୍ୟା କର।",
       "subtask": "ସବଟାସ୍କ ଭାବରେ ଚଲାନ୍ତୁ।",
       "edit": "ସ୍ଲାସ୍ କମାଣ୍ଡ୍ ଏଡିଟ୍ କରନ୍ତୁ।",

@@ -109,7 +109,9 @@
     "online": "Em linha",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
+    "completed": "Concluída",
     "pending": "Pendente",
+    "running": "Em execução",
     "performance": "Desempenho",
     "preferences": "Preferências",
     "privacyPolicy": "Política de privacidade",
@@ -1547,8 +1549,6 @@
     "updateFailed": "Não foi possível atualizar o revisor.",
     "configSaveFailed": "Não foi possível guardar a configuração da revisão.",
     "status": {
-      "running": "Em execução",
-      "completed": "Concluída",
       "interrupted": "Interrompida"
     },
     "reviewStyle": {
@@ -3716,6 +3716,7 @@
       "description": "Descrição do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Editar comando de barra",

@@ -109,7 +109,9 @@
     "online": "En línia",
     "open": "Obre {{name}}",
     "openPullRequest": "PR oberta",
+    "completed": "Finalitzada",
     "pending": "Pendent",
+    "running": "En execució",
     "performance": "Rendiment",
     "preferences": "Preferències",
     "privacyPolicy": "Política de privadesa",
@@ -1547,8 +1549,6 @@
     "updateFailed": "No s'ha pogut actualitzar el revisor.",
     "configSaveFailed": "No s'ha pogut desar la configuració de la revisió.",
     "status": {
-      "running": "En execució",
-      "completed": "Finalitzada",
       "interrupted": "Interrompuda"
     },
     "reviewStyle": {
@@ -3716,6 +3716,7 @@
       "description": "Descripció de l'ordre",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar com a subtasca",
       "edit": "Edita l'ordre de barra inclinada",

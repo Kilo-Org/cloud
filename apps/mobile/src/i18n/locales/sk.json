@@ -109,7 +109,9 @@
     "online": "Pripojené",
     "open": "Otvoriť {{name}}",
     "openPullRequest": "Otvoriť PR",
+    "completed": "Dokončené",
     "pending": "Čaká sa",
+    "running": "Prebieha",
     "performance": "Výkon",
     "preferences": "Predvoľby",
     "privacyPolicy": "Zásady ochrany osobných údajov",
@@ -1566,8 +1568,6 @@
     "updateFailed": "Kontrolóra kódu sa nepodarilo aktualizovať.",
     "configSaveFailed": "Nastavenia kontroly sa nepodarilo uložiť.",
     "status": {
-      "running": "Prebieha",
-      "completed": "Dokončené",
       "interrupted": "Prerušené"
     },
     "reviewStyle": {
@@ -3757,6 +3757,7 @@
       "description": "Popis príkazu",
       "template": "Šablóna",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Vysvetlite $ARGUMENTS",
       "subtask": "Spustiť ako podúlohu",
       "edit": "Príkaz na úpravu lomky",

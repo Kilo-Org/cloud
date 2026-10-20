@@ -109,7 +109,9 @@
     "online": "Onlayn",
     "open": "{{name}} aç",
     "openPullRequest": "Açıq birləşdirmə sorğusu",
+    "completed": "Tamamlanıb",
     "pending": "Gözləyir",
+    "running": "İşləyir",
     "performance": "Məhsuldarlıq",
     "preferences": "Seçimlər",
     "privacyPolicy": "Məxfilik siyasəti",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Kod yoxlayıcısını yeniləmək mümkün olmadı.",
     "configSaveFailed": "Kod yoxlamasının parametrlərini yadda saxlamaq mümkün olmadı.",
     "status": {
-      "running": "İşləyir",
-      "completed": "Tamamlanıb",
       "interrupted": "Yarımçıq qalıb"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Komandanın təsviri",
       "template": "Şablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS-i izah edin",
       "subtask": "Alt tapşırıq kimi işləyin",
       "edit": "Slash əmrini redaktə edin",

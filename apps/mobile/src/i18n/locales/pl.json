@@ -109,7 +109,9 @@
     "online": "W sieci",
     "open": "Otwórz {{name}}",
     "openPullRequest": "Otwórz PR",
+    "completed": "Ukończono",
     "pending": "Oczekuje",
+    "running": "W toku",
     "performance": "Wydajność",
     "preferences": "Preferencje",
     "privacyPolicy": "Polityka prywatności",
@@ -1022,8 +1024,6 @@
     "updateFailed": "Nie udało się zaktualizować recenzenta kodu.",
     "configSaveFailed": "Nie udało się zapisać konfiguracji przeglądu.",
     "status": {
-      "running": "W toku",
-      "completed": "Ukończono",
       "interrupted": "Przerwano"
     },
     "reviewStyle": {
@@ -3757,6 +3757,7 @@
       "description": "Opis polecenia",
       "template": "Szablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Wyjaśnij $ARGUMENTS",
       "subtask": "Uruchom jako podzadanie",
       "edit": "Edytuj polecenie ukośnika",

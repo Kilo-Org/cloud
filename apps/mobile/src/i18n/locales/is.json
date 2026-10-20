@@ -109,7 +109,9 @@
     "online": "Á netinu",
     "open": "Opna {{name}}",
     "openPullRequest": "Opna samrunabeiðni",
+    "completed": "Lokið",
     "pending": "Í bið",
+    "running": "Í gangi",
     "performance": "Afköst",
     "preferences": "Kjörstillingar",
     "privacyPolicy": "Persónuverndarstefna",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Ekki tókst að uppfæra kóðarýninn.",
     "configSaveFailed": "Ekki tókst að vista yfirferðarstillingar.",
     "status": {
-      "running": "Í gangi",
-      "completed": "Lokið",
       "interrupted": "Rofið"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Skipunarlýsing",
       "template": "Sniðmát",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",

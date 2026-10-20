@@ -414,7 +414,7 @@ describe('ReviewDetailScreen details metadata', () => {
   it('labels the completion-timestamp row in the Details list', () => {
     // The Details key-value list pairs every label with its value in one
     // MetaRow. The completion row must pass the localized
-    // `codeReviewer.status.completed` copy as MetaRow's label beside its
+    // `common.completed` copy as MetaRow's label beside its
     // timeAgo value; a value-only row would leave the label column blank
     // (finding: review-detail.png).
     detail.data = {
@@ -428,7 +428,7 @@ describe('ReviewDetailScreen details metadata', () => {
     };
 
     const renderer = mountScreen();
-    const completedLabel = i18n.t('codeReviewer.status.completed');
+    const completedLabel = i18n.t('common.completed');
 
     // `timeAgo` is mocked to "now" in this suite, so the completion row is the
     // one MetaRow that carries the completion label and the timeAgo value.
@@ -466,7 +466,7 @@ describe('ReviewDetailScreen details metadata', () => {
     };
 
     const renderer = mountScreen();
-    const completedLabel = i18n.t('codeReviewer.status.completed');
+    const completedLabel = i18n.t('common.completed');
 
     expect(
       renderer.root.findAll(node => node.type === MetaRow && node.props.label === completedLabel)

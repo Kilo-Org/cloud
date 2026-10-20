@@ -109,7 +109,9 @@
     "online": "آنلاین",
     "open": "باز کردن {{name}}",
     "openPullRequest": "پول ریکوئست باز",
+    "completed": "تکمیل‌شده",
     "pending": "در انتظار",
+    "running": "در حال اجرا",
     "performance": "عملکرد",
     "preferences": "تنظیمات دلخواه",
     "privacyPolicy": "خط‌مشی حریم خصوصی",
@@ -1528,8 +1530,6 @@
     "updateFailed": "به‌روزرسانی بررسی‌کننده کد ممکن نشد.",
     "configSaveFailed": "ذخیره تنظیمات بررسی ممکن نشد.",
     "status": {
-      "running": "در حال اجرا",
-      "completed": "تکمیل‌شده",
       "interrupted": "قطع شد"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "توضیحات فرمان",
       "template": "الگو",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS را توضیح دهید",
       "subtask": "به عنوان وظیفه فرعی اجرا شود",
       "edit": "ویرایش دستور اسلش",

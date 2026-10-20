@@ -109,7 +109,9 @@
     "online": "Mtandaoni",
     "open": "Fungua {{name}}",
     "openPullRequest": "Fungua ombi la kuunganisha",
+    "completed": "Imekamilika",
     "pending": "Inasubiri",
+    "running": "Inaendelea",
     "performance": "Utendaji",
     "preferences": "Mapendeleo",
     "privacyPolicy": "Sera ya faragha",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Imeshindikana kusasisha mkaguzi.",
     "configSaveFailed": "Imeshindikana kuhifadhi usanidi wa ukaguzi.",
     "status": {
-      "running": "Inaendelea",
-      "completed": "Imekamilika",
       "interrupted": "Umekatizwa"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Maelezo ya amri",
       "template": "Kiolezo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Eleza $ARGUMENTS",
       "subtask": "Endesha kama kazi ndogo",
       "edit": "Hariri amri ya kufyeka",

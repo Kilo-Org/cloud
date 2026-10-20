@@ -109,7 +109,9 @@
     "online": "অনলাইন",
     "open": "{{name}} খুলুন",
     "openPullRequest": "খোলা পুল রিকোয়েস্ট",
+    "completed": "সম্পন্ন",
     "pending": "অপেক্ষমাণ",
+    "running": "চলছে",
     "performance": "কর্মদক্ষতা",
     "preferences": "পছন্দের সেটিংস",
     "privacyPolicy": "গোপনীয়তা নীতি",
@@ -1528,8 +1530,6 @@
     "updateFailed": "কোড রিভিউয়ার আপডেট করা যায়নি।",
     "configSaveFailed": "পর্যালোচনার কনফিগারেশন সংরক্ষণ করা যায়নি।",
     "status": {
-      "running": "চলছে",
-      "completed": "সম্পন্ন",
       "interrupted": "বাধাগ্রস্ত"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "কমান্ডের বিবরণ",
       "template": "টেমপ্লেট",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ব্যাখ্যা করুন",
       "subtask": "সাবটাস্ক হিসাবে চালান",
       "edit": "স্ল্যাশ কমান্ড সম্পাদনা করুন",

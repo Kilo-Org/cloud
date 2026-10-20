@@ -109,7 +109,9 @@
     "online": "Nakakonekta",
     "open": "Buksan ang {{name}}",
     "openPullRequest": "Buksan ang PR",
+    "completed": "Nakumpleto",
     "pending": "Nakabinbin",
+    "running": "Tumatakbo",
     "performance": "Pagganap",
     "preferences": "Mga kagustuhan",
     "privacyPolicy": "Patakaran sa pribasiya",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Hindi na-update ang tagasuri.",
     "configSaveFailed": "Hindi na-save ang mga setting ng pagsusuri.",
     "status": {
-      "running": "Tumatakbo",
-      "completed": "Nakumpleto",
       "interrupted": "Naputol"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Paglalarawan ng utos",
       "template": "Padron",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",

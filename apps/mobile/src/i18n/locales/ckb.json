@@ -109,7 +109,9 @@
     "online": "سەرهێڵ",
     "open": "کردنەوەی {{name}}",
     "openPullRequest": "کردنەوەی داواکاری یەکخستن",
+    "completed": "تەواوکراو",
     "pending": "چاوەڕوان",
+    "running": "لە کاردا",
     "performance": "کارایی",
     "preferences": "ڕێکخستنە کەسییەکان",
     "privacyPolicy": "سیاسەتی تایبەتی",
@@ -1528,8 +1530,6 @@
     "updateFailed": "نەتوانرا پێداچوونەوەکار نوێ بکرێتەوە.",
     "configSaveFailed": "نەتوانرا ڕێکخستنەکانی پێداچوونەوە پاشەکەوت بکرێن.",
     "status": {
-      "running": "لە کاردا",
-      "completed": "تەواوکراو",
       "interrupted": "پچڕاو"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "وەسفکردنی فەرمان",
       "template": "قاڵب",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ڕوون بکەرەوە",
       "subtask": "وەکو ئەرکی لاوەکی کارپێبکە",
       "edit": "فەرمانی دەستکاریکردنی slash",

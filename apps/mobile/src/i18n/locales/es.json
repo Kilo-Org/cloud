@@ -109,7 +109,9 @@
     "online": "En línea",
     "open": "Abrir {{name}}",
     "openPullRequest": "PR abierta",
+    "completed": "Completado",
     "pending": "Pendiente",
+    "running": "En ejecución",
     "performance": "Rendimiento",
     "preferences": "Preferencias",
     "privacyPolicy": "Política de privacidad",
@@ -1019,8 +1021,6 @@
     "updateFailed": "No se pudo actualizar el revisor.",
     "configSaveFailed": "No se pudo guardar la configuración de revisión.",
     "status": {
-      "running": "En ejecución",
-      "completed": "Completado",
       "interrupted": "Interrumpida"
     },
     "reviewStyle": {
@@ -3716,6 +3716,7 @@
       "description": "Descripción del comando",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explique $ARGUMENTS",
       "subtask": "Ejecutar como subtarea",
       "edit": "Editar comando de barra diagonal",

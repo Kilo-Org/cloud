@@ -109,7 +109,9 @@
     "online": "ಆನ್‌ಲೈನ್",
     "open": "{{name}} ತೆರೆಯಿರಿ",
     "openPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
+    "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
     "pending": "ಬಾಕಿ ಇದೆ",
+    "running": "ಚಾಲನೆಯಲ್ಲಿದೆ",
     "performance": "ಕಾರ್ಯಕ್ಷಮತೆ",
     "preferences": "ಆದ್ಯತೆಗಳು",
     "privacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
@@ -1528,8 +1530,6 @@
     "updateFailed": "ಕೋಡ್ ಪರಿಶೀಲಕವನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "configSaveFailed": "ಪರಿಶೀಲನೆಯ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "status": {
-      "running": "ಚಾಲನೆಯಲ್ಲಿದೆ",
-      "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
       "interrupted": "ಮಧ್ಯದಲ್ಲಿ ನಿಂತಿದೆ"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "ಆಜ್ಞೆಯ ವಿವರಣೆ",
       "template": "ಟೆಂಪ್ಲೇಟ್",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ಅನ್ನು ವಿವರಿಸಿ",
       "subtask": "ಉಪಕಾರ್ಯದಂತೆ ರನ್ ಮಾಡಿ",
       "edit": "ಸ್ಲಾಶ್ ಆಜ್ಞೆಯನ್ನು ಸಂಪಾದಿಸಿ",

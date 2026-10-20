@@ -109,7 +109,9 @@
     "online": "متصل",
     "open": "فتح {{name}}",
     "openPullRequest": "فتح طلب السحب",
+    "completed": "تم الاكتمال",
     "pending": "قيد الانتظار",
+    "running": "قيد التشغيل",
     "performance": "الأداء",
     "preferences": "التفضيلات",
     "privacyPolicy": "سياسة الخصوصية",
@@ -1028,8 +1030,6 @@
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
     "status": {
-      "running": "قيد التشغيل",
-      "completed": "تم الاكتمال",
       "interrupted": "متوقفة"
     },
     "reviewStyle": {
@@ -3839,6 +3839,7 @@
       "description": "وصف الأمر",
       "template": "نموذج",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "شرح $ARGUMENTS",
       "subtask": "تشغيل كمهمة فرعية",
       "edit": "تحرير أمر الشرطة المائلة",

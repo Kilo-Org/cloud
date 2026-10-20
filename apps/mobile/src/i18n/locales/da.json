@@ -109,7 +109,9 @@
     "online": "Forbundet",
     "open": "Åbn {{name}}",
     "openPullRequest": "Åbn PR",
+    "completed": "Afsluttet",
     "pending": "Afventer",
+    "running": "Kører",
     "performance": "Ydeevne",
     "preferences": "Indstillinger",
     "privacyPolicy": "Privatlivspolitik",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Code Reviewer kunne ikke opdateres.",
     "configSaveFailed": "Indstillingerne for gennemgange kunne ikke gemmes.",
     "status": {
-      "running": "Kører",
-      "completed": "Afsluttet",
       "interrupted": "Afbrudt"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Kommandobeskrivelse",
       "template": "Skabelon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Forklar $ARGUMENTS",
       "subtask": "Kør som underopgave",
       "edit": "Rediger skråstreg kommando",

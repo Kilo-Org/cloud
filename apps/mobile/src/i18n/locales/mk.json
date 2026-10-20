@@ -109,7 +109,9 @@
     "online": "Онлајн",
     "open": "Отвори {{name}}",
     "openPullRequest": "Отворен PR",
+    "completed": "Завршено",
     "pending": "На чекање",
+    "running": "Во тек",
     "performance": "Перформанси",
     "preferences": "Лични поставки",
     "privacyPolicy": "Политика за приватност",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Не успеа ажурирањето на прегледувачот на код.",
     "configSaveFailed": "Не успеа зачувувањето на поставките за преглед.",
     "status": {
-      "running": "Во тек",
-      "completed": "Завршено",
       "interrupted": "Прекинато"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Опис на командата",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Објасни $ARGUMENTS",
       "subtask": "Стартувај како подзадача",
       "edit": "Уреди команда коса црта",

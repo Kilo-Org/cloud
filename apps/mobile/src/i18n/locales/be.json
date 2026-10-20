@@ -109,7 +109,9 @@
     "online": "У сетцы",
     "open": "Адкрыць {{name}}",
     "openPullRequest": "Адкрыць запыт на зліццё",
+    "completed": "Завершана",
     "pending": "Чакае",
+    "running": "Працуе",
     "performance": "Прадукцыйнасць",
     "preferences": "Налады",
     "privacyPolicy": "Палітыка прыватнасці",
@@ -1566,8 +1568,6 @@
     "updateFailed": "Не атрымалася абнавіць агента праверкі кода.",
     "configSaveFailed": "Не атрымалася захаваць налады праверкі кода.",
     "status": {
-      "running": "Працуе",
-      "completed": "Завершана",
       "interrupted": "Перапынена"
     },
     "reviewStyle": {
@@ -3757,6 +3757,7 @@
       "description": "Апісанне каманды",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Растлумачце $ARGUMENTS",
       "subtask": "Запуск як падзадача",
       "edit": "Рэдагаваць каманду касой рысы",

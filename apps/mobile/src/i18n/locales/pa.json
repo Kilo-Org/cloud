@@ -109,7 +109,9 @@
     "online": "ਔਨਲਾਈਨ",
     "open": "{{name}} ਖੋਲ੍ਹੋ",
     "openPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
+    "completed": "ਮੁਕੰਮਲ",
     "pending": "ਉਡੀਕ ਵਿੱਚ",
+    "running": "ਚੱਲ ਰਿਹਾ ਹੈ",
     "performance": "ਕਾਰਗੁਜ਼ਾਰੀ",
     "preferences": "ਤਰਜੀਹਾਂ",
     "privacyPolicy": "ਗੋਪਨੀਯਤਾ ਨੀਤੀ",
@@ -1528,8 +1530,6 @@
     "updateFailed": "ਸਮੀਖਿਅਕ ਅੱਪਡੇਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "configSaveFailed": "ਸਮੀਖਿਆ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਸੇਵ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
     "status": {
-      "running": "ਚੱਲ ਰਿਹਾ ਹੈ",
-      "completed": "ਮੁਕੰਮਲ",
       "interrupted": "ਵਿਚਕਾਰ ਰੁਕਿਆ"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "ਕਮਾਂਡ ਦਾ ਵੇਰਵਾ",
       "template": "ਟੈਂਪਲੇਟ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ਦੀ ਵਿਆਖਿਆ ਕਰੋ",
       "subtask": "ਸਬਟਾਸਕ ਵਜੋਂ ਚਲਾਓ",
       "edit": "ਸਲੈਸ਼ ਕਮਾਂਡ ਨੂੰ ਸੋਧੋ",

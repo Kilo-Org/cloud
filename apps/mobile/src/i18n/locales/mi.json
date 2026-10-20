@@ -109,7 +109,9 @@
     "online": "Tuihono",
     "open": "Whakatuwheratia a {{name}}",
     "openPullRequest": "Tuwhera te tono kume",
+    "completed": "Kua oti",
     "pending": "E tatari ana",
+    "running": "Kei te whakahaere",
     "performance": "Mahinga",
     "preferences": "Ngā manakohanga",
     "privacyPolicy": "Kaupapahere tūmataiti",
@@ -1528,8 +1530,6 @@
     "updateFailed": "I rahua te whakahou i te kaiarotake.",
     "configSaveFailed": "I rahua te tiaki i te whirihoranga arotake.",
     "status": {
-      "running": "Kei te whakahaere",
-      "completed": "Kua oti",
       "interrupted": "I haukotia"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Whakaahuatanga whakahau",
       "template": "tauira",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Whakamaramahia $ARGUMENTS",
       "subtask": "Whakahaerehia hei mahi iti",
       "edit": "Whakatika whakahau rītaha",

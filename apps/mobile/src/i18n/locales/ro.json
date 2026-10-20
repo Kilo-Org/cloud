@@ -109,7 +109,9 @@
     "online": "Conectat",
     "open": "Deschide {{name}}",
     "openPullRequest": "Deschidere PR",
+    "completed": "Finalizat",
     "pending": "În așteptare",
+    "running": "Rulează",
     "performance": "Performanță",
     "preferences": "Preferințe",
     "privacyPolicy": "Politica de confidențialitate",
@@ -1547,8 +1549,6 @@
     "updateFailed": "Nu s-a putut actualiza agentul de revizuire a codului.",
     "configSaveFailed": "Nu s-a putut salva configurația revizuirii.",
     "status": {
-      "running": "Rulează",
-      "completed": "Finalizat",
       "interrupted": "Întreruptă"
     },
     "reviewStyle": {
@@ -3716,6 +3716,7 @@
       "description": "Descrierea comenzii",
       "template": "Șablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explicați $ARGUMENTS",
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",

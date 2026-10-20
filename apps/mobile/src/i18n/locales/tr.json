@@ -109,7 +109,9 @@
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "completed": "Tamamlandı",
     "pending": "Bekliyor",
+    "running": "Çalışıyor",
     "performance": "Performans",
     "preferences": "Tercihler",
     "privacyPolicy": "Gizlilik politikası",
@@ -1016,8 +1018,6 @@
     "updateFailed": "Kod inceleyici güncellenemedi.",
     "configSaveFailed": "İnceleme ayarları kaydedilemedi.",
     "status": {
-      "running": "Çalışıyor",
-      "completed": "Tamamlandı",
       "interrupted": "Kesintiye uğradı"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Komut açıklaması",
       "template": "Şablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS'ı açıklayın",
       "subtask": "Alt görev olarak çalıştır",
       "edit": "Eğik çizgi komutunu düzenle",

@@ -109,7 +109,9 @@
     "online": "Ar líne",
     "open": "Oscail {{name}}",
     "openPullRequest": "Oscail an t-iarratas tarraingthe",
+    "completed": "Críochnaithe",
     "pending": "Ar feitheamh",
+    "running": "Ag rith",
     "performance": "Feidhmíocht",
     "preferences": "Roghanna",
     "privacyPolicy": "Beartas príobháideachta",
@@ -1585,8 +1587,6 @@
     "updateFailed": "Níorbh fhéidir an t-athbhreithneoir a nuashonrú.",
     "configSaveFailed": "Níorbh fhéidir cumraíocht an athbhreithnithe a shábháil.",
     "status": {
-      "running": "Ag rith",
-      "completed": "Críochnaithe",
       "interrupted": "Idirbhriste"
     },
     "reviewStyle": {
@@ -3798,6 +3798,7 @@
       "description": "Cur síos ar ordú",
       "template": "Teimpléad",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Mínigh $ARGUMENTS",
       "subtask": "Rith mar fhothasc",
       "edit": "Cuir ordú slais in eagar",

@@ -109,7 +109,9 @@
     "online": "Verbunden",
     "open": "{{name}} öffnen",
     "openPullRequest": "Pull-Request öffnen",
+    "completed": "Abgeschlossen",
     "pending": "Ausstehend",
+    "running": "Läuft",
     "performance": "Leistung",
     "preferences": "Einstellungen",
     "privacyPolicy": "Datenschutzerklärung",
@@ -1016,8 +1018,6 @@
     "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
     "status": {
-      "running": "Läuft",
-      "completed": "Abgeschlossen",
       "interrupted": "Unterbrochen"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Befehlsbeschreibung",
       "template": "Vorlage",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Erklären Sie $ARGUMENTS",
       "subtask": "Als Unteraufgabe ausführen",
       "edit": "Slash-Befehl bearbeiten",

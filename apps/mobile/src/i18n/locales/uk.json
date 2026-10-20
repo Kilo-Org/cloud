@@ -109,7 +109,9 @@
     "online": "У мережі",
     "open": "Відкрити {{name}}",
     "openPullRequest": "Відкрити запит на злиття",
+    "completed": "Завершено",
     "pending": "Очікує",
+    "running": "Виконується",
     "performance": "Продуктивність",
     "preferences": "Налаштування",
     "privacyPolicy": "Політика конфіденційності",
@@ -1022,8 +1024,6 @@
     "updateFailed": "Не вдалося оновити налаштування перевірки коду.",
     "configSaveFailed": "Не вдалося зберегти налаштування перевірки.",
     "status": {
-      "running": "Виконується",
-      "completed": "Завершено",
       "interrupted": "Перервано"
     },
     "reviewStyle": {
@@ -3757,6 +3757,7 @@
       "description": "Опис команди",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Поясніть $ARGUMENTS",
       "subtask": "Запуск як підзавдання",
       "edit": "Редагувати команду косої риски",

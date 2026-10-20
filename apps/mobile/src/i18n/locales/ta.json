@@ -109,7 +109,9 @@
     "online": "இணையத்தில்",
     "open": "{{name}} என்பதைத் திறக்கவும்",
     "openPullRequest": "PR திறப்பு",
+    "completed": "முடிந்தது",
     "pending": "நிலுவையில்",
+    "running": "இயங்குகிறது",
     "performance": "செயல்திறன்",
     "preferences": "விருப்பத்தேர்வுகள்",
     "privacyPolicy": "தனியுரிமைக் கொள்கை",
@@ -1528,8 +1530,6 @@
     "updateFailed": "மதிப்பாய்வாளரைப் புதுப்பிக்க முடியவில்லை.",
     "configSaveFailed": "மதிப்பாய்வு அமைப்புகளைச் சேமிக்க முடியவில்லை.",
     "status": {
-      "running": "இயங்குகிறது",
-      "completed": "முடிந்தது",
       "interrupted": "தடைப்பட்டது"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "கட்டளை விளக்கம்",
       "template": "டெம்ப்ளேட்",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTSஐ விளக்கவும்",
       "subtask": "துணைப் பணியாக இயக்கவும்",
       "edit": "ஸ்லாஷ் கட்டளையைத் திருத்தவும்",

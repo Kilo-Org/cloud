@@ -109,7 +109,9 @@
     "online": "Aanlyn",
     "open": "Maak {{name}} oop",
     "openPullRequest": "Oop trekversoek",
+    "completed": "Voltooi",
     "pending": "Hangend",
+    "running": "Aktief",
     "performance": "Werkverrigting",
     "preferences": "Voorkeure",
     "privacyPolicy": "Privaatheidsbeleid",
@@ -1528,8 +1530,6 @@
     "updateFailed": "Die Kodehersiener kon nie bygewerk word nie.",
     "configSaveFailed": "Die hersieningsinstellings kon nie gestoor word nie.",
     "status": {
-      "running": "Aktief",
-      "completed": "Voltooi",
       "interrupted": "Onderbreek"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Opdrag beskrywing",
       "template": "Sjabloon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Verduidelik $ARGUMENTS",
       "subtask": "Hardloop as subtaak",
       "edit": "Wysig skuinsstreep opdrag",

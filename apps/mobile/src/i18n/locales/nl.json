@@ -109,7 +109,9 @@
     "online": "Verbonden",
     "open": "{{name}} openen",
     "openPullRequest": "PR openen",
+    "completed": "Voltooid",
     "pending": "In afwachting",
+    "running": "Actief",
     "performance": "Prestaties",
     "preferences": "Voorkeuren",
     "privacyPolicy": "Privacybeleid",
@@ -1016,8 +1018,6 @@
     "updateFailed": "De beoordelaar kon niet worden bijgewerkt.",
     "configSaveFailed": "De reviewinstellingen konden niet worden opgeslagen.",
     "status": {
-      "running": "Actief",
-      "completed": "Voltooid",
       "interrupted": "Onderbroken"
     },
     "reviewStyle": {
@@ -3675,6 +3675,7 @@
       "description": "Beschrijving van de opdracht",
       "template": "Sjabloon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Leg $ARGUMENTS uit",
       "subtask": "Uitvoeren als subtaak",
       "edit": "Bewerk de slash-opdracht",

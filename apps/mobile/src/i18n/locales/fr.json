@@ -109,7 +109,9 @@
     "online": "En ligne",
     "open": "Ouvrir {{name}}",
     "openPullRequest": "Ouverture de la PR",
+    "completed": "Terminé",
     "pending": "En attente",
+    "running": "En cours",
     "performance": "Performances",
     "preferences": "Préférences",
     "privacyPolicy": "Politique de confidentialité",
@@ -988,8 +990,6 @@
     "updateFailed": "Impossible de mettre à jour l'agent de revue de code.",
     "configSaveFailed": "Impossible d'enregistrer la configuration de la revue.",
     "status": {
-      "running": "En cours",
-      "completed": "Terminé",
       "interrupted": "Interrompue"
     },
     "reviewStyle": {
@@ -3716,6 +3716,7 @@
       "description": "Description de la commande",
       "template": "Modèle",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Expliquez $ARGUMENTS",
       "subtask": "Exécuter en tant que sous-tâche",
       "edit": "Modifier la commande barre oblique",

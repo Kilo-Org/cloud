@@ -36,6 +36,9 @@ Native compatibility requirements:
   runtime hook and conforms to the generated native spec.
 - The iOS App Actions bridge uses `@JS` for Expo's noncopyable JavaScript values.
   Its runtime-owned reference releases the dispatcher on the JavaScript thread.
+- Root React types stay aligned with the root/web runtime; mobile declares its own
+  SDK-matched types. Keep both explicit so cached dependency hoisting cannot mix
+  the web and native JSX type identities.
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.

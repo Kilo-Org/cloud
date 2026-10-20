@@ -387,35 +387,25 @@ describe('shouldRouteToVercel', () => {
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 
-  async function resolveCatalogId(modelId: string) {
-    jest.resetModules();
-    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      resolveOpenRouterModelAlias: jest.fn(
-        async (id: string) => ({ '~kilo-fast': 'anthropic/claude-sonnet-4-5' })[id] ?? id
-      ),
-    }));
-    const { mapModelIdToVercel } =
-      await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel');
-    return mapModelIdToVercel(modelId);
-  }
+  const aliasTargets: Record<string, string> = { '~kilo-fast': 'anthropic/claude-sonnet-4-5' };
 
-  it.each(['claude-sonnet-4.5', 'mistralai/mistral-large-2512', '~kilo-fast'])(
-    'keeps an opted-out model off the Vercel route %#',
-    async modelId => {
-      const catalogId = await resolveCatalogId(modelId);
-      const shouldRouteToVercel = await loadShouldRouteToVercel({
-        optOutModels: [catalogId],
-        vercelModels: [catalogId],
-        aliasTargets: { '~kilo-fast': 'anthropic/claude-sonnet-4-5' },
-      });
-      const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
+  it.each([
+    ['claude-sonnet-4.5', 'anthropic/claude-sonnet-4.5'],
+    ['mistralai/mistral-large-2512', 'mistral/mistral-large-3'],
+    ['~kilo-fast', 'anthropic/claude-sonnet-4.5'],
+  ])('keeps an opted-out model off the Vercel route %#', async (modelId, catalogId) => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel({
+      optOutModels: [catalogId],
+      vercelModels: [catalogId],
+      aliasTargets,
+    });
+    const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
 
-      await expect(shouldRouteToVercel(modelId, request(), getRoutingProviderConfig)).resolves.toBe(
-        false
-      );
-      expect(getRoutingProviderConfig).not.toHaveBeenCalled();
-    }
-  );
+    await expect(shouldRouteToVercel(modelId, request(), getRoutingProviderConfig)).resolves.toBe(
+      false
+    );
+    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+  });
 
   it('routes models outside the opt-out set to Vercel', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel({

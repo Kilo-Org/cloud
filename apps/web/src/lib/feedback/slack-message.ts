@@ -26,8 +26,8 @@ export type FeedbackSlackMessage = {
   unfurl_media: false;
 };
 
-function codeLabel(value: string): string {
-  return `\`${escapeSlackLabel(truncateSlackText(value, METADATA_LIMIT))}\``;
+function metadataValue(value: string): string {
+  return escapeSlackLabel(truncateSlackText(value, METADATA_LIMIT));
 }
 
 function bodySection(label: string, value: string, limit: number): AnyBlock {
@@ -52,10 +52,10 @@ export type UserFeedbackSlackInput = {
 /** Message for the shared feedback service (`feedback.submit`, HTTP `/feedback`). */
 export function buildUserFeedbackSlackMessage(input: UserFeedbackSlackInput): FeedbackSlackMessage {
   const metadataLines = [
-    `• user: ${codeLabel(input.userId)}`,
-    `• for: ${codeLabel(input.feedbackFor ?? FeedbackFor.Unknown)}`,
-    `• source: ${codeLabel(input.source ?? FeedbackSource.Unknown)}`,
-    ...(input.feedbackBatch ? [`• batch: ${codeLabel(input.feedbackBatch)}`] : []),
+    `• user: ${metadataValue(input.userId)}`,
+    `• for: ${metadataValue(input.feedbackFor ?? FeedbackFor.Unknown)}`,
+    `• source: ${metadataValue(input.source ?? FeedbackSource.Unknown)}`,
+    ...(input.feedbackBatch ? [`• batch: ${metadataValue(input.feedbackBatch)}`] : []),
   ];
 
   return {

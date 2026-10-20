@@ -59,8 +59,8 @@ describe('buildUserFeedbackSlackMessage', () => {
 
     const metadata = sectionTexts(message).find(section => section.text.includes('• user:'))!;
     expect(metadata.kind).toBe('mrkdwn');
-    expect(metadata.text).toContain('• for: `&lt;!channel&gt;`');
-    expect(metadata.text).toContain("• source: `web'source`");
+    expect(metadata.text).toContain('• for: &lt;!channel&gt;');
+    expect(metadata.text).toContain("• source: web'source");
     expect(metadata.text).toContain(SLACK_TRUNCATION_MARKER);
     expect(metadata.text).not.toContain('<!channel>');
   });

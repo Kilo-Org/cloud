@@ -340,6 +340,7 @@ describe('prepareReviewPayload', () => {
         platform: 'github',
         repoFullName: REPO,
         prNumber: 123,
+        platformIntegrationId: integration.id,
       },
       'headsha123'
     );
@@ -649,6 +650,7 @@ describe('prepareReviewPayload', () => {
         platform: 'gitlab',
         repoFullName: REPO,
         prNumber: 123,
+        platformIntegrationId: gitlabIntegration.id,
       },
       'headsha123'
     );
@@ -1149,5 +1151,54 @@ describe('prepareReviewPayload', () => {
       platform: 'github',
       upstreamBranch: 'refs/pull/1235/head',
     });
+  });
+
+  it('continues the previous GitLab session found within the review integration', async () => {
+    const prNumber = 1236;
+    mockFindPreviousCompletedReview.mockResolvedValueOnce({
+      head_sha: 'gitlab-previous-sha',
+      session_id: 'previous-gitlab-cloud-agent-session',
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          pr_number: prNumber,
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/${prNumber}`,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected inserted review');
+    }
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      agentConfig: {
+        config: baseAgentConfig,
+      },
+      platform: 'gitlab',
+    });
+
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(
+      {
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'gitlab',
+        repoFullName: REPO,
+        prNumber,
+        platformIntegrationId: gitlabIntegration.id,
+      },
+      'headsha123'
+    );
+    expect(payload.previousCloudAgentSessionId).toBe('previous-gitlab-cloud-agent-session');
   });
 });

@@ -110,6 +110,12 @@ export type ReviewScope = {
   platformIntegrationId?: string;
 };
 
+/**
+ * Review scope that names the platform integration. The previous-review lookup
+ * requires it, so a review is matched only against reviews in the same scope.
+ */
+export type IntegrationReviewScope = ReviewScope & { platformIntegrationId: string };
+
 function reviewScopeConditions(scope: ReviewScope) {
   return [
     scope.owner.type === 'org'
@@ -2284,11 +2290,12 @@ export function cancelActiveReviewsForPRInTransaction(
 }
 
 /**
- * Finds the most recent completed review in an exact review scope with a different SHA.
- * Returns the previous HEAD SHA and session ID from the same row.
+ * Finds the most recent completed review in an exact, integration-scoped review
+ * scope with a different SHA. Returns the previous HEAD SHA and session ID from
+ * the same row.
  */
 export async function findPreviousCompletedReview(
-  scope: ReviewScope,
+  scope: IntegrationReviewScope,
   excludeSha: string
 ): Promise<{ head_sha: string; session_id: string | null } | null> {
   try {

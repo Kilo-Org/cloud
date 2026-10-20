@@ -18,6 +18,7 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     getSession: mockGetSession,
+    getPreparationAttempts: jest.fn(async () => []),
     deleteSession: mockDeleteCloudAgentSession,
   })),
 }));

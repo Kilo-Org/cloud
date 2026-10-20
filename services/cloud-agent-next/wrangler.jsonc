@@ -546,6 +546,10 @@
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
         },
+        {
+          "binding": "RUNTIME_RELEASE_BUCKET",
+          "bucket_name": "cloud-agent-runtime-dev",
+        },
       ],
       "containers": [
         // A local sandbox holds about 1.5 GiB. The small classes the e2e matrix boots

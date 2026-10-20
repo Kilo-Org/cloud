@@ -36,7 +36,9 @@ import type {
   AgentStatus,
   CloudStatus,
   FilePart,
+  CachedSessionSnapshotPage,
   MessageDeliveryState,
+  PreparationAttempt,
   ResolvedSession,
   SessionActivity,
   SessionInfo,
@@ -697,6 +699,115 @@ describe('createSessionManager', () => {
       mgr.destroy();
     });
 
+    it('saves the loaded transcript when the session is left without a switch', async () => {
+      const cached = new Map<string, SessionSnapshotPage>();
+      const config = createMockConfig({
+        writeCachedSnapshotPage: page => cached.set(page.info.id, page),
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      latestStorage?.upsertMessage(createStoredMessage('latest-message', 'ses-1', 'user').info);
+
+      mgr.destroy();
+
+      expect(cached.get('ses-1')?.messages).toHaveLength(1);
+    });
+
+    it('repaints cached preparation rows until live state reports its own', async () => {
+      const cached = new Map<string, CachedSessionSnapshotPage>();
+      const attempt: PreparationAttempt = {
+        id: 'prep-1',
+        triggerMessageId: 'latest-message',
+        status: 'completed',
+        startedAt: 1,
+        completedAt: 2,
+        revision: 1,
+        steps: [],
+      };
+      const livePreparation = jest.fn<readonly PreparationAttempt[], []>(() => [attempt]);
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      Object.assign(mockSession.state, { getPreparationAttempts: livePreparation });
+      try {
+        const config = createMockConfig({
+          writeCachedSnapshotPage: page => cached.set(page.info.id, page),
+          readCachedSnapshotPage: async id => cached.get(id) ?? null,
+          fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        const storage = latestStorage;
+        if (!storage) throw new Error('Expected session storage');
+        storage.upsertMessage(createStoredMessage('latest-message', 'ses-1', 'user').info);
+        notifyStateChange?.();
+
+        livePreparation.mockReturnValue([]);
+        await mgr.switchSession(kiloId('ses-2'));
+        expect(cached.get('ses-1')?.preparationAttempts).toEqual([attempt]);
+
+        // The new live state is empty until its replay lands.
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        notifyStateChange?.();
+        expect(config.store.get(mgr.atoms.preparationAttempts)).toEqual([attempt]);
+
+        const replayed = { ...attempt, revision: 2 };
+        livePreparation.mockReturnValue([replayed]);
+        notifyStateChange?.();
+        expect(config.store.get(mgr.atoms.preparationAttempts)).toEqual([replayed]);
+        mgr.destroy();
+      } finally {
+        delete (mockSession.state as { getPreparationAttempts?: unknown }).getPreparationAttempts;
+      }
+    });
+
+    it("shows the live page's preparation rows until the stream reports its own", async () => {
+      const attempt: PreparationAttempt = {
+        id: 'prep-1',
+        triggerMessageId: 'msg-1',
+        status: 'completed',
+        startedAt: 1,
+        completedAt: 2,
+        revision: 1,
+        steps: [],
+      };
+      const livePreparation = jest.fn<readonly PreparationAttempt[], []>(() => []);
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      Object.assign(mockSession.state, { getPreparationAttempts: livePreparation });
+      try {
+        const config = createMockConfig({
+          fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+          fetchSnapshotPage: createPageFetchMock(async () => ({
+            ...makePage({ kiloSessionId: 'ses-1', messages: [] }),
+            preparationAttempts: [attempt],
+          })),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        notifyStateChange?.();
+        expect(config.store.get(mgr.atoms.preparationAttempts)).toEqual([attempt]);
+
+        const replayed = { ...attempt, revision: 2 };
+        livePreparation.mockReturnValue([replayed]);
+        notifyStateChange?.();
+        expect(config.store.get(mgr.atoms.preparationAttempts)).toEqual([replayed]);
+        mgr.destroy();
+      } finally {
+        delete (mockSession.state as { getPreparationAttempts?: unknown }).getPreparationAttempts;
+      }
+    });
+
     it('continues switching when the outgoing transcript cache fails', async () => {
       const config = createMockConfig({
         writeCachedSnapshotPage: () => {
@@ -720,6 +831,24 @@ describe('createSessionManager', () => {
 
       await promise;
       expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+    });
+
+    it('ends the open with its error when the stream refuses it before connecting', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      mockSession.state.getActivity.mockReturnValue({ type: 'connecting' } as SessionActivity);
+      mockSession.connect.mockImplementationOnce(() => {});
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+
+      mockSessionCallbacks.onError?.('Session not found or access denied');
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+      expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Session not found or access denied' })
+      );
+      mgr.destroy();
     });
 
     describe('cached initial transcript', () => {
@@ -773,6 +902,28 @@ describe('createSessionManager', () => {
         expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
       });
 
+      it('applies a synchronous cached page and its settings before switchSession yields', () => {
+        const sessionConfig = {
+          sessionId: kiloId('ses-1'),
+          repository: 'kilo/repo',
+          mode: 'code',
+          model: 'kilo/model',
+        };
+        const config = createMockConfig({
+          readCachedSnapshotPage: id => ({ ...cachedPage(id, ['msg-cache-1']), sessionConfig }),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        void mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
+        expect(config.store.get(mgr.atoms.sessionConfig)).toEqual(sessionConfig);
+        expect(config.store.get(mgr.atoms.cachedTranscriptSessionId)).toBe('ses-1');
+        expect(config.store.get(mgr.atoms.activeSessionType)).toBe('cloud-agent');
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+      });
+
       it('advertises a cached transcript refresh until the live page lands', async () => {
         const live = deferred<SessionSnapshotPageOutcome | null>();
         const config = createMockConfig({
@@ -800,6 +951,22 @@ describe('createSessionManager', () => {
         expect(atomValue<boolean>(config.store, mgr.atoms.isRefreshingCachedTranscript)).toBe(
           false
         );
+      });
+
+      it('reports live history replay from switch until replay completes, and again on reconnect', async () => {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(config.store.get(mgr.atoms.isReplayingLiveHistory)).toBe(true);
+
+        mockSessionCallbacks.onReplayComplete?.();
+        expect(config.store.get(mgr.atoms.isReplayingLiveHistory)).toBe(false);
+
+        mockSessionCallbacks.onSessionCreated?.({ id: kiloId('ses-1') });
+        expect(config.store.get(mgr.atoms.isReplayingLiveHistory)).toBe(true);
+        mgr.destroy();
       });
 
       it('clears the cached transcript refresh on a replay-complete-only transport', async () => {
@@ -1167,7 +1334,7 @@ describe('createSessionManager', () => {
         expect(config.fetchSession).toHaveBeenCalledTimes(2);
       });
 
-      it('keeps the skeleton when the cached page has no messages', async () => {
+      it('shows a cached empty transcript as this session, not as loading', async () => {
         const config = createMockConfig({
           readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', [])),
         });
@@ -1177,7 +1344,8 @@ describe('createSessionManager', () => {
         await mgr.switchSession(kiloId('ses-1'));
 
         expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
-        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+        expect(config.store.get(mgr.atoms.cachedTranscriptSessionId)).toBe('ses-1');
       });
 
       it('ignores a cached page whose session id does not match', async () => {

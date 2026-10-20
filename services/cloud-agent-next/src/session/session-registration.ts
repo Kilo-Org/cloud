@@ -763,7 +763,7 @@ async function allocateNewSession(
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
-  const kiloSessionId = generateKiloSessionId();
+  const kiloSessionId = input.options?.kiloSessionId ?? generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
       ? new Date().toISOString()
@@ -1803,6 +1803,8 @@ export async function sessionCreateIntentFingerprint(
   return sha256Hex(
     canonicalJson({
       initialTurn,
+      // Undefined for creates without a proposed ID, so their fingerprint is unchanged.
+      kiloSessionId: input.options?.kiloSessionId,
       // A different cut is a different intent: a same-key retry conflicts.
       clone: input.clone
         ? {

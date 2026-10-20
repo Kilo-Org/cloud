@@ -561,6 +561,12 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Optional until a downloaded target provisions its private artifact bucket. */
+  RUNTIME_RELEASE_BUCKET?: R2Bucket;
+  RUNTIME_STARTUP_MODE?: string;
+  NATIVE_RUNTIME_IMAGE?: string;
+  /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
+  RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */

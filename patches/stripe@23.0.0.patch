@@ -1,0 +1,52 @@
+diff --git a/cjs/resources/InvoiceItems.d.ts b/cjs/resources/InvoiceItems.d.ts
+index dde0e734c09590565330280a3118141843d53da4..8829dd2ec91770517b69d317c0c01723636a26a9 100644
+--- a/cjs/resources/InvoiceItems.d.ts
++++ b/cjs/resources/InvoiceItems.d.ts
+@@ -212,7 +212,7 @@ export declare namespace InvoiceItem {
+             /**
+              * The ID of the price this item is associated with.
+              */
+-            price: string | Price;
++            price: string;
+             /**
+              * The ID of the product this item is associated with.
+              */
+diff --git a/cjs/resources/InvoiceLineItems.d.ts b/cjs/resources/InvoiceLineItems.d.ts
+index 0704dea83535980f227260c4c03034eb25336db0..09ccc46b6e9d4f30de3fd2d50d95879f6d72168e 100644
+--- a/cjs/resources/InvoiceLineItems.d.ts
++++ b/cjs/resources/InvoiceLineItems.d.ts
+@@ -260,7 +260,7 @@ export declare namespace InvoiceLineItem {
+             /**
+              * The ID of the price this item is associated with.
+              */
+-            price: string | Price;
++            price: string;
+             /**
+              * The ID of the product this item is associated with.
+              */
+diff --git a/esm/resources/InvoiceItems.d.ts b/esm/resources/InvoiceItems.d.ts
+index dde0e734c09590565330280a3118141843d53da4..8829dd2ec91770517b69d317c0c01723636a26a9 100644
+--- a/esm/resources/InvoiceItems.d.ts
++++ b/esm/resources/InvoiceItems.d.ts
+@@ -212,7 +212,7 @@ export declare namespace InvoiceItem {
+             /**
+              * The ID of the price this item is associated with.
+              */
+-            price: string | Price;
++            price: string;
+             /**
+              * The ID of the product this item is associated with.
+              */
+diff --git a/esm/resources/InvoiceLineItems.d.ts b/esm/resources/InvoiceLineItems.d.ts
+index 0704dea83535980f227260c4c03034eb25336db0..09ccc46b6e9d4f30de3fd2d50d95879f6d72168e 100644
+--- a/esm/resources/InvoiceLineItems.d.ts
++++ b/esm/resources/InvoiceLineItems.d.ts
+@@ -260,7 +260,7 @@ export declare namespace InvoiceLineItem {
+             /**
+              * The ID of the price this item is associated with.
+              */
+-            price: string | Price;
++            price: string;
+             /**
+              * The ID of the product this item is associated with.
+              */

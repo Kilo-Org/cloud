@@ -44,7 +44,7 @@ catalog:
   jose: 6.2.3
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
-  stripe: 19.3.1
+  stripe: 23.0.0
   tsx: 4.21.0
   typescript: 5.9.3
   ulid: 3.0.2
@@ -281,6 +281,7 @@ patchedDependencies:
   # A finished first entry made a cold start re-enqueue with REPLACE, which
   # cancelled the glanceable refresh run in progress.
   expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
+  stripe@23.0.0: patches/stripe@23.0.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

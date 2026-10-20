@@ -77,9 +77,11 @@ export async function createOrReuseKiloPassCheckoutSession(
           await params.onSession?.(tx, session);
           return { url: session.url };
         }
-        await stripe.checkout.sessions.expire(session.id, {
-          timeout: STRIPE_CHECKOUT_TIMEOUT_MS,
-        });
+        await stripe.checkout.sessions.expire(
+          session.id,
+          {},
+          { timeout: STRIPE_CHECKOUT_TIMEOUT_MS }
+        );
       }
       checkoutCursor =
         openSessions.has_more && checkoutPageCount < MAX_STRIPE_PAGES

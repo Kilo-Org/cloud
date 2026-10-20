@@ -166,16 +166,9 @@ const KiloPassTierSchema = z.enum(KiloPassTier);
 const KiloPassCadenceSchema = z.enum(KiloPassCadence);
 const KiloPassPaymentProviderSchema = z.enum(KiloPassPaymentProvider);
 
-const KiloPassSubscriptionStatusSchema = z.union([
-  z.literal('active'),
-  z.literal('canceled'),
-  z.literal('incomplete'),
-  z.literal('incomplete_expired'),
-  z.literal('past_due'),
-  z.literal('paused'),
-  z.literal('trialing'),
-  z.literal('unpaid'),
-]);
+// The provider reports subscription statuses as an open set, so the response
+// carries the stored value unchanged.
+const KiloPassSubscriptionStatusSchema = z.string();
 
 type KiloPassBonusKind =
   | KiloPassIssuanceItemKind.Bonus

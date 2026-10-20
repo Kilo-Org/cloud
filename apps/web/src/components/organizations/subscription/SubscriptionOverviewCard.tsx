@@ -1,7 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, Users, AlertTriangle, Clock, RefreshCcw } from 'lucide-react';
-import type Stripe from 'stripe';
 import { toast } from 'sonner';
 import {
   useStopOrganizationSubscriptionCancellation,
@@ -70,7 +69,7 @@ type PendingCycleChange = {
 };
 
 function detectPendingCycleChange(
-  subscription: Stripe.Subscription,
+  subscription: SubscriptionWithPeriod,
   currentBillingInterval: string | undefined
 ): PendingCycleChange | null {
   const schedule = subscription.schedule;
@@ -106,7 +105,7 @@ export function SubscriptionOverviewCard({
   seatsUsed,
   totalSeats,
 }: {
-  subscription: Stripe.Subscription;
+  subscription: SubscriptionWithPeriod;
   organizationId: string;
   userRole: string;
   seatsUsed: number;

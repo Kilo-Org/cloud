@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
+import type { StripeSubscriptionStatus } from '@kilocode/db/schema-types';
 
 import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
-import type Stripe from 'stripe';
 import {
   type KiloPassPaymentProvider,
   KiloPassPaymentProvider as KiloPassPaymentProviderValue,
@@ -25,7 +25,7 @@ export type KiloPassSubscriptionState = {
   providerSubscriptionId: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
-  status: Stripe.Subscription.Status;
+  status: StripeSubscriptionStatus;
   cancelAtPeriodEnd: boolean;
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
@@ -40,7 +40,7 @@ type KiloPassSubscriptionRowForState = {
   providerSubscriptionId: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
-  status: Stripe.Subscription.Status;
+  status: StripeSubscriptionStatus;
   cancelAtPeriodEnd: boolean;
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;

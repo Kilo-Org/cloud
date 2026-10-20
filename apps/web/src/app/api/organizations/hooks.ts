@@ -7,6 +7,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/trial-utils';
 import { z } from 'zod';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
+import type { SubscriptionWithPeriod } from '@/components/organizations/subscription/types';
 
 export function useOrganizationWithMembers(id: string, options?: { enabled?: boolean }) {
   const trpc = useTRPC();
@@ -498,6 +499,14 @@ export function useOrganizationSubscription(organizationId: string) {
             skipBatch: true,
           },
         },
+        // The API returns the Stripe subscription itself, but the generated
+        // client declaration cannot reproduce Stripe's recursive account graph,
+        // so its inferred type is not assignable to the view the cards read.
+        select: data =>
+          data && {
+            ...data,
+            subscription: data.subscription as SubscriptionWithPeriod | null,
+          },
       }
     )
   );

@@ -2503,6 +2503,10 @@ export type StoredModel = z.infer<typeof StoredModelSchema>;
 // C. Stripe type (inline)
 // =============================================================================
 
+// Stripe treats subscription statuses as an open set: the SDK types every
+// generated enum as its documented values plus an arbitrary string, because the
+// provider can return a value a pinned SDK version does not list. The column
+// stores the provider's value unchanged, so the domain type mirrors that.
 export type StripeSubscriptionStatus =
   | 'incomplete'
   | 'incomplete_expired'
@@ -2511,7 +2515,8 @@ export type StripeSubscriptionStatus =
   | 'past_due'
   | 'canceled'
   | 'unpaid'
-  | 'paused';
+  | 'paused'
+  | (string & {});
 
 // --- Code review terminal reasons ---
 

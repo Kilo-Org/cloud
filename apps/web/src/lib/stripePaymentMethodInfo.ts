@@ -1,12 +1,20 @@
 import { client } from '@kilocode/web-shared/lib/stripe-client';
 
-export type PaymentMethodInfo = NonNullable<Awaited<ReturnType<typeof retrievePaymentMethodInfo>>>;
+export type PaymentMethodInfo = {
+  type: string;
+  last4: string | null;
+  brand: string | null;
+  linkEmail: string | null;
+  stripePaymentMethodId: string;
+};
+
 /**
  * Retrieves payment method info from Stripe for a given payment method ID.
  * Returns null if the payment method ID is null/undefined, doesn't exist, or was deleted.
  */
-
-export async function retrievePaymentMethodInfo(stripePaymentMethodId: string | null | undefined) {
+export async function retrievePaymentMethodInfo(
+  stripePaymentMethodId: string | null | undefined
+): Promise<PaymentMethodInfo | null> {
   if (!stripePaymentMethodId) {
     return null;
   }

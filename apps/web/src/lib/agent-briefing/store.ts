@@ -304,13 +304,22 @@ export async function serializeBriefing(row: BriefingReportRow): Promise<Briefin
         .select({ timezone: agent_briefing_preferences.timezone })
         .from(agent_briefing_preferences)
         .where(eq(agent_briefing_preferences.kilo_user_id, row.kilo_user_id));
+  const timezone = row.timezone ?? preferences?.timezone ?? 'UTC';
   return briefingReportSchema.parse({
     id: row.id,
     kind: row.kind,
     createdAt: iso(row.created_at),
-    timezone: row.timezone ?? preferences?.timezone ?? 'UTC',
+    timezone,
     context,
-    localDate: row.local_date,
+    localDate:
+      row.kind === 'one_off'
+        ? new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date(row.cutoff_at))
+        : row.local_date,
     nightStartAt: iso(row.night_start_at),
     cutoffAt: iso(row.cutoff_at),
     morningEndAt: iso(row.morning_end_at),
@@ -338,7 +347,7 @@ export async function listBriefings(
   const contexts = await briefingContexts(userId);
   if (input.organizationId) await requireBriefingContext(userId, input.organizationId);
   const now = new Date().toISOString();
-  const limit = input.limit ?? 30;
+  const limit = Math.min(input.limit ?? 20, 20);
   const scopeFilter =
     input.scope === 'personal'
       ? isNull(agent_briefing_reports.organization_id)
@@ -384,15 +393,24 @@ export async function listBriefings(
     .orderBy(desc(agent_briefing_reports.cutoff_at), desc(agent_briefing_reports.id))
     .limit(limit + 1);
   const reports: BriefingReport[] = [];
+  let responseBytes = 0;
+  let nextCursor = rows.length > limit ? (rows[limit - 1]?.id ?? null) : null;
   for (const row of rows.slice(0, limit)) {
     try {
-      reports.push(await serializeBriefing(await briefingReportRow(userId, row.id)));
+      const report = await serializeBriefing(await briefingReportRow(userId, row.id));
+      const bytes = Buffer.byteLength(JSON.stringify(report), 'utf8');
+      if (reports.length > 0 && responseBytes + bytes > 3_000_000) {
+        nextCursor = reports.at(-1)?.id ?? null;
+        break;
+      }
+      reports.push(report);
+      responseBytes += bytes;
     } catch (error) {
       if (!(error instanceof TRPCError && ['NOT_FOUND', 'FORBIDDEN'].includes(error.code)))
         throw error;
     }
   }
-  return { reports, nextCursor: rows.length > limit ? (rows[limit - 1]?.id ?? null) : null };
+  return { reports, nextCursor };
 }
 export async function refreshBriefingEvidence(row: BriefingReportRow): Promise<BriefingReportRow> {
   if (row.kind === 'one_off') return revalidateOneOffEvidence(row);
@@ -452,6 +470,7 @@ async function revalidateOneOffEvidence(row: BriefingReportRow): Promise<Briefin
     ...new Set([
       ...facts.sessions.map(session => session.sessionId),
       ...facts.sources.map(source => source.sessionId),
+      ...z.array(z.string()).parse(row.facts.evidenceSessionIds ?? []),
     ]),
   ];
   if (sessionIds.length === 0) return row;
@@ -486,8 +505,18 @@ async function revalidateOneOffEvidence(row: BriefingReportRow): Promise<Briefin
                 : undefined
             )
           );
-  const costSources = facts.sources.filter(source => source.kind === 'cost');
-  const usageIds = costSources.map(source => source.id.slice(6));
+  const costReferences = [
+    ...facts.sources
+      .filter(source => source.kind === 'cost')
+      .map(source => ({
+        id: source.id.slice(6),
+        sessionId: source.sessionId,
+      })),
+    ...z
+      .array(z.object({ id: z.string(), sessionId: z.string() }))
+      .parse(row.facts.evidenceUsage ?? []),
+  ];
+  const usageIds = costReferences.map(source => source.id);
   const usage =
     usageIds.length === 0
       ? []
@@ -509,8 +538,8 @@ async function revalidateOneOffEvidence(row: BriefingReportRow): Promise<Briefin
           );
   const usageById = new Map(usage.map(item => [item.id, item.sessionId]));
   const sessionById = new Map(sessions.map(session => [session.id, session]));
-  const costsAccessible = costSources.every(source => {
-    const sessionId = usageById.get(source.id.slice(6));
+  const costsAccessible = costReferences.every(source => {
+    const sessionId = usageById.get(source.id);
     const session = sessionById.get(source.sessionId);
     return (
       sessionId !== undefined &&
@@ -619,12 +648,7 @@ export async function prepareOneOffBriefing(
       timezone: input.timezone,
       language: input.language,
       evidence_recorded_before: createdAt,
-      local_date: new Intl.DateTimeFormat('en-CA', {
-        timeZone: input.timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date(end)),
+      local_date: null,
       night_start_at: new Date(start).toISOString(),
       cutoff_at: new Date(end).toISOString(),
       morning_end_at: new Date(Date.parse(createdAt) + 30 * 86400_000).toISOString(),

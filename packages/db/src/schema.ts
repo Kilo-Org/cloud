@@ -11368,7 +11368,8 @@ export const agent_briefing_reports = pgTable(
     timezone: text(),
     language: text(),
     evidence_recorded_before: timestamp({ withTimezone: true, mode: 'string' }),
-    local_date: text().notNull(),
+    // NULL leaves one-off reports outside the scheduled uniqueness key.
+    local_date: text(),
     night_start_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     cutoff_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     morning_end_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
@@ -11391,13 +11392,10 @@ export const agent_briefing_reports = pgTable(
     notification_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
-    uniqueIndex('agent_briefing_reports_window')
-      .on(table.kilo_user_id, table.context_key, table.local_date)
-      .where(sql`${table.kind} = 'scheduled'`),
-    check('agent_briefing_reports_kind', sql`${table.kind} IN ('scheduled', 'one_off')`),
-    check(
-      'agent_briefing_reports_one_off',
-      sql`${table.kind} <> 'one_off' OR (${table.timezone} IS NOT NULL AND ${table.language} IS NOT NULL AND ${table.evidence_recorded_before} IS NOT NULL AND ${table.next_refresh_at} IS NULL)`
+    uniqueIndex('agent_briefing_reports_window').on(
+      table.kilo_user_id,
+      table.context_key,
+      table.local_date
     ),
     index('agent_briefing_reports_user_history').on(table.kilo_user_id, table.cutoff_at),
     index('agent_briefing_reports_active').on(table.morning_end_at),

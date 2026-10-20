@@ -1,4 +1,19 @@
-import { and, asc, desc, eq, gte, isNull, isNotNull, lt, lte, notLike, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  isNull,
+  isNotNull,
+  lt,
+  lte,
+  notLike,
+  or,
+  sql,
+} from 'drizzle-orm';
+import { unionAll } from 'drizzle-orm/pg-core';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_events,
@@ -8,6 +23,15 @@ import {
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
 import { redactBriefingExcerpt, type BriefingSource } from '@kilocode/app-shared/agent-briefing';
+import {
+  boundBriefingSlices,
+  freezeBriefingEvidence,
+  ONE_OFF_ANCESTRY_LIMIT,
+  ONE_OFF_BUCKETS,
+  ONE_OFF_ROWS_PER_BUCKET,
+  ONE_OFF_SESSION_LIMIT,
+  sampleBriefingItems,
+} from './one-off-evidence';
 
 type Session = Pick<
   typeof cli_sessions_v2.$inferSelect,
@@ -321,56 +345,121 @@ export async function collectBriefingEvidence(
         .select({ createdAt: agent_briefing_preferences.created_at })
         .from(agent_briefing_preferences)
         .where(eq(agent_briefing_preferences.kilo_user_id, userId));
-      const events = await tx
-        .select()
-        .from(agent_briefing_events)
-        .where(
-          and(
-            eventScope,
-            gte(agent_briefing_events.occurred_at, nightStartAt),
-            lte(agent_briefing_events.occurred_at, cutoffAt)
+      const sliceCount = freeze ? ONE_OFF_BUCKETS : 1;
+      const ranges = Array.from({ length: sliceCount }, (_, slice) => ({
+        slice,
+        startAt: new Date(start + ((cutoff - start) * slice) / sliceCount).toISOString(),
+        endAt: new Date(start + ((cutoff - start) * (slice + 1)) / sliceCount).toISOString(),
+      }));
+      const eventQueries = ranges.flatMap(range => {
+        const query = (reverse: boolean) => {
+          const order = reverse ? desc : asc;
+          return tx
+            .select({
+              ...getTableColumns(agent_briefing_events),
+              slice: sql<number>`${range.slice}::integer`.as('slice'),
+            })
+            .from(agent_briefing_events)
+            .where(
+              and(
+                eventScope,
+                gte(agent_briefing_events.occurred_at, range.startAt),
+                range.slice === sliceCount - 1
+                  ? lte(agent_briefing_events.occurred_at, range.endAt)
+                  : lt(agent_briefing_events.occurred_at, range.endAt)
+              )
+            )
+            .orderBy(order(agent_briefing_events.occurred_at), order(agent_briefing_events.id));
+        };
+        return freeze
+          ? [
+              query(false).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
+              query(true).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
+            ]
+          : [query(false)];
+      });
+      const [firstEvents, secondEvents, ...remainingEvents] = eventQueries;
+      if (firstEvents === undefined) throw new Error('Missing briefing event range');
+      const eventRows =
+        secondEvents !== undefined
+          ? await unionAll(firstEvents, secondEvents, ...remainingEvents)
+          : await firstEvents;
+      const eventSample = freeze
+        ? boundBriefingSlices(eventRows, compareEvents)
+        : { records: eventRows, truncated: false };
+      const events = eventSample.records;
+      const usageQueries = ranges.flatMap(range => {
+        const query = (reverse: boolean) => {
+          const order = reverse ? desc : asc;
+          return tx
+            .select({
+              id: microdollar_usage.id,
+              sessionId: cli_sessions_v2.session_id,
+              cost: microdollar_usage.cost,
+              occurredAt: microdollar_usage.created_at,
+              slice: sql<number>`${range.slice}::integer`.as('slice'),
+            })
+            .from(microdollar_usage)
+            .innerJoin(
+              microdollar_usage_metadata,
+              eq(microdollar_usage_metadata.id, microdollar_usage.id)
+            )
+            .innerJoin(
+              cli_sessions_v2,
+              and(
+                or(
+                  eq(cli_sessions_v2.session_id, microdollar_usage_metadata.session_id),
+                  eq(cli_sessions_v2.cloud_agent_session_id, microdollar_usage_metadata.session_id)
+                ),
+                scope
+              )
+            )
+            .where(
+              and(
+                eq(microdollar_usage.kilo_user_id, userId),
+                notLike(microdollar_usage_metadata.session_id, 'agent-briefing:%'),
+                organizationId === null
+                  ? isNull(microdollar_usage.organization_id)
+                  : eq(microdollar_usage.organization_id, organizationId),
+                gte(microdollar_usage.created_at, range.startAt),
+                lt(microdollar_usage.created_at, range.endAt)
+              )
+            )
+            .orderBy(order(microdollar_usage.created_at), order(microdollar_usage.id));
+        };
+        return freeze
+          ? [
+              query(false).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
+              query(true).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
+            ]
+          : [query(false)];
+      });
+      const [firstUsage, secondUsage, ...remainingUsage] = usageQueries;
+      if (firstUsage === undefined) throw new Error('Missing briefing usage range');
+      const usageRows =
+        secondUsage !== undefined
+          ? await unionAll(firstUsage, secondUsage, ...remainingUsage)
+          : await firstUsage;
+      const usageSample = freeze
+        ? boundBriefingSlices(
+            usageRows,
+            (a, b) =>
+              Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)
           )
-        )
-        .orderBy(asc(agent_briefing_events.occurred_at), asc(agent_briefing_events.id));
-      const usage = await tx
-        .select({
-          id: microdollar_usage.id,
-          sessionId: cli_sessions_v2.session_id,
-          cost: microdollar_usage.cost,
-          occurredAt: microdollar_usage.created_at,
-        })
-        .from(microdollar_usage)
-        .innerJoin(
-          microdollar_usage_metadata,
-          eq(microdollar_usage_metadata.id, microdollar_usage.id)
-        )
-        .innerJoin(
-          cli_sessions_v2,
-          and(
-            or(
-              eq(cli_sessions_v2.session_id, microdollar_usage_metadata.session_id),
-              eq(cli_sessions_v2.cloud_agent_session_id, microdollar_usage_metadata.session_id)
-            ),
-            scope
-          )
-        )
-        .where(
-          and(
-            eq(microdollar_usage.kilo_user_id, userId),
-            notLike(microdollar_usage_metadata.session_id, 'agent-briefing:%'),
-            organizationId === null
-              ? isNull(microdollar_usage.organization_id)
-              : eq(microdollar_usage.organization_id, organizationId),
-            gte(microdollar_usage.created_at, nightStartAt),
-            lt(microdollar_usage.created_at, cutoffAt)
-          )
-        );
-      const activeSessionIds = [
-        ...new Set([
-          ...events.map(event => event.session_id),
-          ...usage.map(item => item.sessionId),
-        ]),
-      ];
+        : { records: usageRows, truncated: false };
+      const usage = usageSample.records;
+      const activity = [
+        ...events.map(event => ({ sessionId: event.session_id, occurredAt: event.occurred_at })),
+        ...usage.map(item => ({ sessionId: item.sessionId, occurredAt: item.occurredAt })),
+      ].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt));
+      const allActiveSessionIds = [...new Set(activity.map(item => item.sessionId))];
+      const activeSessionIds = freeze
+        ? sampleBriefingItems(allActiveSessionIds, ONE_OFF_SESSION_LIMIT)
+        : allActiveSessionIds;
+      let truncated =
+        eventSample.truncated ||
+        usageSample.truncated ||
+        activeSessionIds.length !== allActiveSessionIds.length;
       const baseline =
         activeSessionIds.length === 0
           ? []
@@ -396,8 +485,19 @@ export async function collectBriefingEvidence(
         { session_id: string; parent_session_id: string | null; title: string | null }
       >();
       const requested = new Set(activeSessionIds);
+      const queried = new Set<string>();
       let pending = activeSessionIds;
       while (pending.length > 0) {
+        const queryIds = freeze
+          ? pending.slice(0, Math.max(0, ONE_OFF_ANCESTRY_LIMIT - rows.size))
+          : pending;
+        if (queryIds.length === 0) {
+          truncated = true;
+          break;
+        }
+        if (freeze) {
+          for (const id of queryIds) queried.add(id);
+        }
         const found = await tx
           .select({
             session_id: cli_sessions_v2.session_id,
@@ -406,9 +506,9 @@ export async function collectBriefingEvidence(
           })
           .from(cli_sessions_v2)
           .where(
-            and(scope, sql`${cli_sessions_v2.session_id} = ANY(${sql.param(pending)}::text[])`)
+            and(scope, sql`${cli_sessions_v2.session_id} = ANY(${sql.param(queryIds)}::text[])`)
           );
-        pending = [];
+        pending = freeze ? pending.slice(queryIds.length) : [];
         for (const row of found) {
           rows.set(row.session_id, row);
           if (row.parent_session_id !== null && !requested.has(row.parent_session_id)) {
@@ -431,9 +531,45 @@ export async function collectBriefingEvidence(
           )
         )
         .limit(1);
+      const completeRows = freeze
+        ? [...rows.values()].filter(row => {
+            let current = row;
+            const seen = new Set([row.session_id]);
+            while (current.parent_session_id) {
+              const parent = rows.get(current.parent_session_id);
+              if (!parent) return queried.has(current.parent_session_id);
+              if (seen.has(parent.session_id)) return false;
+              seen.add(parent.session_id);
+              current = parent;
+            }
+            return true;
+          })
+        : [...rows.values()];
+      truncated ||= completeRows.length !== rows.size;
+      const latest =
+        freeze && completeRows.length > 0
+          ? await tx
+              .selectDistinctOn([agent_briefing_events.session_id])
+              .from(agent_briefing_events)
+              .where(
+                and(
+                  eventScope,
+                  eq(agent_briefing_events.kind, 'status'),
+                  sql`${agent_briefing_events.session_id} = ANY(${sql.param(completeRows.map(row => row.session_id))}::text[])`,
+                  lte(agent_briefing_events.occurred_at, cutoffAt)
+                )
+              )
+              .orderBy(
+                agent_briefing_events.session_id,
+                desc(agent_briefing_events.occurred_at),
+                desc(sql`coalesce(${agent_briefing_events.payload}->>'transitionId', '')`),
+                desc(agent_briefing_events.id)
+              )
+          : [];
+      const allEvents = [...baseline, ...events, ...latest];
       const facts = aggregateBriefingEvidence(
-        [...rows.values()],
-        [...baseline, ...events],
+        completeRows,
+        allEvents,
         usage,
         nightStartAt,
         cutoffAt,
@@ -442,16 +578,17 @@ export async function collectBriefingEvidence(
           legacyStatusInWindow: legacyStatus !== undefined,
         }
       );
-      return {
-        ...facts,
-        ...(freeze
-          ? {
-              evidenceEventIds: [...baseline, ...events]
-                .filter(event => rows.has(event.session_id))
-                .map(event => event.id),
-            }
-          : {}),
-      };
+      if (!freeze) return facts;
+      const readableSessions = new Set(completeRows.map(row => row.session_id));
+      return freezeBriefingEvidence(facts, {
+        eventIds: [
+          ...new Set(
+            allEvents.filter(event => readableSessions.has(event.session_id)).map(event => event.id)
+          ),
+        ],
+        sessionIds: [...readableSessions],
+        partial: truncated,
+      });
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );

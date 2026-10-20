@@ -1,5 +1,5 @@
 {
-  "id": "636e79bf-bd91-4f6a-b6e2-53cc584ab5a9",
+  "id": "91ae2f7b-5431-45f8-8763-10b0fdb3c06a",
   "prevId": "140eaf3d-3dc3-47a6-8127-257c20dfa20d",
   "version": "7",
   "dialect": "postgresql",
@@ -582,7 +582,7 @@
           "name": "local_date",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "night_start_at": {
           "name": "night_start_at",
@@ -732,7 +732,6 @@
             }
           ],
           "isUnique": true,
-          "where": "\"agent_briefing_reports\".\"kind\" = 'scheduled'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -835,16 +834,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "agent_briefing_reports_kind": {
-          "name": "agent_briefing_reports_kind",
-          "value": "\"agent_briefing_reports\".\"kind\" IN ('scheduled', 'one_off')"
-        },
-        "agent_briefing_reports_one_off": {
-          "name": "agent_briefing_reports_one_off",
-          "value": "\"agent_briefing_reports\".\"kind\" <> 'one_off' OR (\"agent_briefing_reports\".\"timezone\" IS NOT NULL AND \"agent_briefing_reports\".\"language\" IS NOT NULL AND \"agent_briefing_reports\".\"evidence_recorded_before\" IS NOT NULL AND \"agent_briefing_reports\".\"next_refresh_at\" IS NULL)"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.agent_configs": {

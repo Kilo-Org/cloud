@@ -97,35 +97,6 @@
     ],
     "searchBlob": "activeSessions.widgetSnapshot Get the home widget snapshot of active agents and sessions for the current user, optionally scoped to an organization, for rendering a glanceable dashboard widget. Use this to fetch the widget's data payload. activesessions widgetsnapshot organizationid organizationId"
   },
-  "agentBriefing.createOneOff": {
-    "path": "agentBriefing.createOneOff",
-    "kind": "mutation",
-    "summary": "Finalize a prepared one-off briefing report, optionally validating a cost estimate, and start generating its AI summary in the background.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "reportId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "estimateToken": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "reportId"
-      ]
-    },
-    "tags": [
-      "agentbriefing",
-      "createoneoff",
-      "reportid",
-      "estimatetoken"
-    ],
-    "searchBlob": "agentBriefing.createOneOff Finalize a prepared one-off briefing report, optionally validating a cost estimate, and start generating its AI summary in the background. agentbriefing createoneoff reportid estimatetoken reportId estimateToken"
-  },
   "agentBriefing.dismiss": {
     "path": "agentBriefing.dismiss",
     "kind": "mutation",

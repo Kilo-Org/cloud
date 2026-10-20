@@ -1,4 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { after } from 'next/server';
 import type * as NextServer from 'next/server';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
@@ -496,7 +497,12 @@ it('keeps duplicate selected periods independent, preserves scheduled uniqueness
     .select()
     .from(agent_briefing_reports)
     .where(eq(agent_briefing_reports.id, first.report.id));
-  const scheduled = { ...row, id: crypto.randomUUID(), kind: 'scheduled' as const };
+  const scheduled = {
+    ...row,
+    id: crypto.randomUUID(),
+    kind: 'scheduled' as const,
+    local_date: first.report.localDate,
+  };
   await db.insert(agent_briefing_reports).values(scheduled);
   await expect(
     db.insert(agent_briefing_reports).values({ ...scheduled, id: crypto.randomUUID() })
@@ -646,4 +652,195 @@ it('opens a frozen report with high-volume provenance', async () => {
   const report = await caller.get({ reportId: prepared.report.id });
   expect(report.scorecard.sessions).toBe(1);
   expect(report.sessions[0]?.title).toBe('Historical work');
+}, 30_000);
+
+it.each([
+  { rootStatus: 'question', expectedStatus: 'question' },
+  { rootStatus: 'idle', expectedStatus: null },
+])(
+  'bounds a busy $rootStatus report and preserves hidden charge provenance',
+  async ({ rootStatus, expectedStatus }) => {
+    const caller = agentBriefingRouter.createCaller({ user });
+    const input = {
+      ...period(),
+      startAt: '2026-07-31T23:30:00.000Z',
+      endAt: '2026-08-31T23:30:00.000Z',
+      timezone: 'Pacific/Auckland',
+    };
+    const { sessionId } = await seedActivity(input);
+    const childId = `ses_child_${crypto.randomUUID()}`;
+    const siblingId = `ses_sibling_${crypto.randomUUID()}`;
+    await db.insert(cli_sessions_v2).values([
+      {
+        session_id: childId,
+        parent_session_id: sessionId,
+        kilo_user_id: user.id,
+        title: 'Child work',
+        created_on_platform: 'cli',
+        status: 'idle',
+      },
+      {
+        session_id: siblingId,
+        parent_session_id: sessionId,
+        kilo_user_id: user.id,
+        title: 'Unselected sibling',
+        created_on_platform: 'cli',
+        status: 'question',
+      },
+    ]);
+    await db.insert(agent_briefing_events).values([
+      {
+        id: 'child-baseline',
+        session_id: childId,
+        kilo_user_id: user.id,
+        kind: 'status',
+        status: 'idle',
+        occurred_at: new Date(Date.parse(input.startAt) - 3600_000).toISOString(),
+        payload: { transitionId: 'child-idle', previousStatusKnown: true, previousStatus: 'busy' },
+      },
+      {
+        id: 'root-question',
+        session_id: sessionId,
+        kilo_user_id: user.id,
+        kind: 'status',
+        status: rootStatus,
+        occurred_at: new Date(
+          Date.parse(input.startAt) +
+            (Date.parse(input.endAt) - Date.parse(input.startAt)) * (8.5 / 16)
+        ).toISOString(),
+        payload: {
+          transitionId: 'root-question',
+          previousStatusKnown: true,
+          previousStatus: 'idle',
+        },
+      },
+      {
+        id: 'sibling-question',
+        session_id: siblingId,
+        kilo_user_id: user.id,
+        kind: 'status',
+        status: 'question',
+        occurred_at: new Date(
+          Date.parse(input.startAt) +
+            (Date.parse(input.endAt) - Date.parse(input.startAt)) * (8.5 / 16) +
+            1
+        ).toISOString(),
+        payload: {
+          transitionId: 'sibling-question',
+          previousStatusKnown: true,
+          previousStatus: 'idle',
+        },
+      },
+    ]);
+    await db.insert(agent_briefing_preferences).values({
+      kilo_user_id: user.id,
+      timezone: input.timezone,
+      created_at: '2026-07-30T00:00:00.000Z',
+      next_run_at: new Date(Date.now() + 86400_000).toISOString(),
+    });
+    await db.execute(sql`
+    INSERT INTO ${agent_briefing_events}
+      (id, session_id, kilo_user_id, kind, occurred_at, payload)
+    SELECT 'window-' || n, ${childId}, ${user.id}, 'activity',
+      ${input.startAt}::timestamptz +
+        (${input.endAt}::timestamptz - ${input.startAt}::timestamptz) * (n::double precision / 5000),
+      jsonb_build_object('excerpt', ${'量'.repeat(600)}::text)
+    FROM generate_series(0, 4999) AS n
+  `);
+    await db.execute(sql`
+    WITH inserted AS (
+      INSERT INTO ${microdollar_usage}
+        (id, kilo_user_id, cost, input_tokens, output_tokens, cache_write_tokens, cache_hit_tokens, created_at)
+      SELECT gen_random_uuid(), ${user.id}, 7, 1, 1, 0, 0,
+        ${input.startAt}::timestamptz +
+          (${input.endAt}::timestamptz - ${input.startAt}::timestamptz) * (n::double precision / 5000)
+      FROM generate_series(0, 4999) AS n
+      RETURNING id
+    )
+    INSERT INTO ${microdollar_usage_metadata} (id, session_id, message_id)
+    SELECT id, ${childId}, 'bounded-' || id::text FROM inserted
+  `);
+    const prepared = await caller.prepareOneOff(input);
+    const [row] = await db
+      .select()
+      .from(agent_briefing_reports)
+      .where(eq(agent_briefing_reports.id, prepared.report.id));
+    if (!row) throw new Error('Missing snapshot fixture');
+    expect(Buffer.byteLength(JSON.stringify(row.facts), 'utf8')).toBeLessThanOrEqual(64_000);
+    expect({
+      coverage: prepared.report.coverage.activity,
+      storedDate: row.local_date,
+      localDate: prepared.report.localDate,
+      status: prepared.report.sessions[0]?.status,
+    }).toEqual({
+      coverage: 'partial',
+      storedDate: null,
+      localDate: '2026-09-01',
+      status: expectedStatus,
+    });
+    const times = prepared.report.sources.map(source => Date.parse(source.occurredAt));
+    expect(Math.min(...times)).toBeLessThan(Date.parse(input.startAt) + 86400_000);
+    expect(Math.max(...times)).toBeGreaterThan(Date.parse(input.endAt) - 86400_000);
+    const references = z
+      .array(z.object({ id: z.string(), sessionId: z.string() }))
+      .parse(row.facts.evidenceUsage);
+    const visibleCharges = new Set(
+      prepared.report.sources
+        .filter(source => source.kind === 'cost')
+        .map(source => source.id.slice(6))
+    );
+    const hiddenCharge = references.find(reference => !visibleCharges.has(reference.id));
+    if (!hiddenCharge) throw new Error('Busy snapshot did not omit charge details');
+    await db
+      .update(agent_briefing_reports)
+      .set({
+        published_at: new Date().toISOString(),
+        summary: { ...row.summary, status: 'ready', text: 'Historical cost details' },
+      })
+      .where(eq(agent_briefing_reports.id, row.id));
+    await db
+      .delete(microdollar_usage_metadata)
+      .where(eq(microdollar_usage_metadata.id, hiddenCharge.id));
+    const sanitized = await caller.get({ reportId: row.id });
+    expect({
+      sessions: sanitized.scorecard.sessions,
+      spend: sanitized.scorecard.spendMicrodollars,
+      sources: sanitized.sources.length,
+      summary: sanitized.summary.status,
+      text: sanitized.summary.text,
+    }).toEqual({ sessions: 0, spend: 0, sources: 0, summary: 'outdated', text: null });
+  },
+  30_000
+);
+
+it('pages large saved reports within the response budget without losing history', async () => {
+  const caller = agentBriefingRouter.createCaller({ user });
+  const input = period();
+  await seedActivity(input);
+  const prepared = await caller.prepareOneOff(input);
+  const [row] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, prepared.report.id));
+  if (!row) throw new Error('Missing history fixture');
+  const ids = Array.from({ length: 60 }, () => crypto.randomUUID());
+  await db.insert(agent_briefing_reports).values(
+    ids.map((id, index) => ({
+      ...row,
+      id,
+      created_at: new Date(Date.now() - index * 1000).toISOString(),
+      published_at: new Date().toISOString(),
+      summary: { ...row.summary, status: 'ready', text: String.fromCodePoint(1).repeat(32_000) },
+    }))
+  );
+  let page = await caller.list({ scope: 'personal', limit: 100 });
+  expect(Buffer.byteLength(JSON.stringify(page), 'utf8')).toBeLessThan(4_500_000);
+  const seen = page.reports.map(report => report.id);
+  for (let index = 0; page.nextCursor && index < ids.length; index += 1) {
+    page = await caller.list({ scope: 'personal', limit: 100, cursor: page.nextCursor });
+    expect(Buffer.byteLength(JSON.stringify(page), 'utf8')).toBeLessThan(4_500_000);
+    seen.push(...page.reports.map(report => report.id));
+  }
+  expect(page.nextCursor).toBeNull();
+  expect(seen.sort()).toEqual(ids.sort());
 }, 30_000);

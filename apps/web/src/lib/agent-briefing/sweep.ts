@@ -89,6 +89,10 @@ export async function sweepAgentBriefings(now = new Date()) {
     .orderBy(asc(agent_briefing_reports.next_refresh_at))
     .limit(500);
   for (const original of active) {
+    const localDate = original.local_date;
+    if (localDate === null) {
+      throw new Error('Scheduled briefing is missing its local date');
+    }
     try {
       await requireBriefingContext(original.kilo_user_id, original.organization_id);
     } catch (error) {
@@ -100,7 +104,7 @@ export async function sweepAgentBriefings(now = new Date()) {
       await freezeBriefingContexts(
         original.kilo_user_id,
         {
-          localDate: original.local_date,
+          localDate,
           nightStartAt: new Date(original.night_start_at).toISOString(),
           cutoffAt: new Date(original.cutoff_at).toISOString(),
           morningEndAt: new Date(original.morning_end_at).toISOString(),
@@ -238,7 +242,7 @@ export async function sweepAgentBriefings(now = new Date()) {
       new Date(row.morning_end_at) > now &&
       (await dispatchAgentBriefingPush({
         userId: row.kilo_user_id,
-        localDate: row.local_date,
+        localDate,
         expiresAt: new Date(row.morning_end_at).toISOString(),
       }))
     ) {

@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import {
   decodeKiloSdkMessagesCursor,
-  encodeKiloSdkMessagesCursor,
+  tryEncodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   MAX_SESSION_DIFF_READ_BYTES,
   messageIdSchema,
@@ -314,7 +314,7 @@ function finishBoundedKiloSdkMessageInfoEnumeration(
   }
   return {
     pageNewestFirst,
-    nextCursor: encodeKiloSdkMessagesCursor(oldestReturnedMessage.identity),
+    nextCursor: tryEncodeKiloSdkMessagesCursor(oldestReturnedMessage.identity),
     omittedItemCount,
   };
 }

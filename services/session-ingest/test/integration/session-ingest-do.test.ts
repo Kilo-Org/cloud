@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
   decodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
   MAX_SESSION_DIFF_READ_BYTES,
 } from '@kilocode/session-ingest-contracts';
 import {
@@ -737,6 +738,37 @@ describe('SessionIngestDO integration', () => {
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
       expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
       expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('ends the page instead of failing when the boundary identity does not fit a cursor', async () => {
+      const sessionId = 'ses_sdk_page_cursor_fit_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const longId = `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}`;
+      const message = (id: string, created: number) => ({
+        id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      });
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (const info of [message('msg_short', 100), message(longId, 200)]) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+            `message/${info.id}`,
+            'message',
+            JSON.stringify(info)
+          );
+        }
+      });
+
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toMatchObject({
+        messages: [{ info: { id: longId } }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
     });
 
     it('reads the newest page without scanning the part rows that sort after message rows', async () => {

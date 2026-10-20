@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES } from '@kilocode/session-ingest-contracts';
 
 import {
   INGEST_CHUNK_MAX_BYTES,
@@ -88,6 +89,26 @@ describe('validateAndParseIngestPayload', () => {
       validItemCount: 1,
       skippedItemCount: 2,
       totalValidItemBytes: encoder.encode(JSON.stringify(validItem.data)).byteLength,
+    });
+  });
+
+  it('skips a message whose id exceeds the cursor id length', () => {
+    const validItem = { type: 'message', data: { id: 'msg_valid' } };
+    const result = validate({
+      data: [
+        validItem,
+        {
+          type: 'message',
+          data: { id: `msg${'"'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}` },
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      items: [validItem],
+      validItemCount: 1,
+      skippedItemCount: 1,
     });
   });
 

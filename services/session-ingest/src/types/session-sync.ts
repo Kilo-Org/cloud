@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fitsKiloSdkMessagesCursorId } from '@kilocode/session-ingest-contracts';
 
 // Session ingest payload.
 // Intentionally minimal validation: enforce only identity fields needed for compaction.
@@ -8,6 +9,12 @@ const storageKeySegmentSchema = z
   .refine(segment => !segment.includes('/') && !segment.includes('\u0000'), {
     message: 'storage key segments must not contain / or U+0000',
   });
+
+// Message ids are re-emitted as history cursors, so they share the cursor id
+// length rather than keeping their own.
+const messageStorageKeySegmentSchema = storageKeySegmentSchema.refine(fitsKiloSdkMessagesCursorId, {
+  message: 'message ids must fit the message cursor id byte limit',
+});
 
 export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
@@ -26,7 +33,7 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message'),
     data: z.looseObject({
-      id: storageKeySegmentSchema,
+      id: messageStorageKeySegmentSchema,
     }),
   }),
   z.object({

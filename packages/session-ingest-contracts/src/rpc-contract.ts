@@ -837,11 +837,24 @@ export const persistedKiloSdkMessageHistorySchema = z.preprocess(
 export type KiloSdkMessageHistory = z.infer<typeof kiloSdkMessageHistorySchema>;
 
 /**
- * Longest message identity, in UTF-8 bytes, that an opaque history cursor may
- * carry. The encoder serializes the id as UTF-8, so the cursor bound below is
- * derived from this byte length.
+ * Longest message identity, in the bytes its JSON serialization contributes to
+ * an encoded cursor, that the cursor may carry. Escapes count: a `"` in the id
+ * is two bytes once serialized. The wire length below is derived from this.
  */
 export const MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES = 64;
+
+const utf8Encoder = new TextEncoder();
+
+/**
+ * True when a message identity fits the cursor id length. Ingest uses the same
+ * rule so every stored identity can be encoded back into a cursor.
+ */
+export function fitsKiloSdkMessagesCursorId(id: string): boolean {
+  return (
+    utf8Encoder.encode(JSON.stringify(id).slice(1, -1)).length <=
+    MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES
+  );
+}
 
 /**
  * Worst-case JSON envelope of a valid cursor: the empty id plus the longest
@@ -864,14 +877,11 @@ export const MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH =
 /** Base64 and base64url alphabets, plus the optional trailing padding. */
 const KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
-const utf8Encoder = new TextEncoder();
-
 export const kiloSdkMessagesLegacyCursorSchema = z
   .object({
-    id: messageIdSchema.refine(
-      id => utf8Encoder.encode(id).length <= MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
-      { message: 'message cursor ids must fit the cursor id byte limit' }
-    ),
+    id: messageIdSchema.refine(fitsKiloSdkMessagesCursorId, {
+      message: 'message cursor ids must fit the cursor id byte limit',
+    }),
     time: z.number().nonnegative(),
   })
   .strict();
@@ -880,14 +890,27 @@ export type KiloSdkMessagesLegacyCursor = z.infer<typeof kiloSdkMessagesLegacyCu
 export const kiloSdkMessagesCursorSchema = kiloSdkMessagesLegacyCursorSchema;
 export type KiloSdkMessagesCursor = KiloSdkMessagesLegacyCursor;
 
-export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
-  const parsed = kiloSdkMessagesCursorSchema.parse(cursor);
-  const bytes = new TextEncoder().encode(JSON.stringify(parsed));
+function serializeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
+  const bytes = utf8Encoder.encode(JSON.stringify(cursor));
   let binary = '';
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
+  return serializeKiloSdkMessagesCursor(kiloSdkMessagesCursorSchema.parse(cursor));
+}
+
+/**
+ * Encodes a cursor when it satisfies the contract, and returns `null` when it
+ * does not. History reads use this so a stored identity outside the contract
+ * ends the page instead of failing it.
+ */
+export function tryEncodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string | null {
+  const parsed = kiloSdkMessagesCursorSchema.safeParse(cursor);
+  return parsed.success ? serializeKiloSdkMessagesCursor(parsed.data) : null;
 }
 
 export function decodeKiloSdkMessagesCursor(cursor: string): KiloSdkMessagesCursor {

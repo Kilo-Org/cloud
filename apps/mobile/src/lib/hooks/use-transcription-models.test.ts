@@ -133,6 +133,7 @@ describe('fetchTranscriptionModels', () => {
     expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
       level: 'warning',
       fingerprint: ['transcription-models-fetch', 'http.500'],
+      report: 'none',
       tags: { ...DECLARED_OUTCOME_TAGS, 'http.status': 500 },
     });
   });
@@ -148,6 +149,7 @@ describe('fetchTranscriptionModels', () => {
     expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
       level: 'warning',
       fingerprint: ['transcription-models-fetch', 'transport'],
+      report: 'none',
       tags: DECLARED_OUTCOME_TAGS,
     });
   });
@@ -203,7 +205,7 @@ describe('fetchTranscriptionModels', () => {
     });
   });
 
-  it('records an expected answer as a breadcrumb instead of an event', async () => {
+  it('leaves an expected answer to the network layer', async () => {
     fetchMock.mockResolvedValue(
       Response.json({ error: 'Unauthorized' }, { status: 401, statusText: 'Unauthorized' })
     );
@@ -213,7 +215,7 @@ describe('fetchTranscriptionModels', () => {
     expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
       level: 'warning',
       fingerprint: ['transcription-models-fetch', 'http.401'],
-      report: 'breadcrumb',
+      report: 'none',
       tags: { ...DECLARED_OUTCOME_TAGS, 'http.status': 401 },
     });
   });
@@ -237,6 +239,7 @@ describe('fetchTranscriptionModels', () => {
     expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
       level: 'warning',
       fingerprint: ['transcription-models-fetch', 'http.500'],
+      report: 'none',
       tags: { ...DECLARED_OUTCOME_TAGS, 'http.status': 500 },
     });
   });

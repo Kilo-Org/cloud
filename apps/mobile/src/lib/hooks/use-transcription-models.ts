@@ -9,7 +9,6 @@ import {
   toModelOptions,
 } from '@/lib/hooks/use-available-models';
 import { TELEMETRY_DESCRIPTION_KEY, type TelemetryDescription } from '@/lib/telemetry/error-sink';
-import { isExpectedStatus } from '@/lib/telemetry/network-errors';
 
 const TRANSCRIPTION_MODELS_TIMEOUT_MS = 15_000;
 
@@ -36,7 +35,7 @@ class TranscriptionModelsFetchError extends Error {
     options: {
       cause?: unknown;
       level?: 'warning' | 'error';
-      report?: 'event' | 'breadcrumb';
+      report?: 'event' | 'none';
       tags?: Record<string, string | number>;
     } = {}
   ) {
@@ -90,10 +89,10 @@ export async function fetchTranscriptionModels(organizationId?: string): Promise
         `Failed to fetch transcription models: ${response.status} ${response.statusText}`,
         {
           tags: { 'http.status': response.status },
-          // A rate limit, a stale token, or a not-found answer names no defect:
-          // the network layer already keeps those as breadcrumbs, so this
-          // failure records its own trail entry instead of an issue.
-          ...(isExpectedStatus(response.status, {}) ? { report: 'breadcrumb' } : {}),
+          // The global fetch wrapper already owns every error-status response:
+          // an event for statuses that name a defect, a breadcrumb for the
+          // expected ones. A second record here would duplicate it.
+          report: 'none',
         }
       );
     }
@@ -142,7 +141,9 @@ export async function fetchTranscriptionModels(organizationId?: string): Promise
     throw new TranscriptionModelsFetchError(
       'transport',
       'Failed to reach the transcription models endpoint',
-      { cause: error }
+      // The fetch wrapper records a transport failure as a breadcrumb, never an
+      // event; filing one here would break that policy.
+      { report: 'none', cause: error }
     );
   } finally {
     clearTimeout(timeoutId);

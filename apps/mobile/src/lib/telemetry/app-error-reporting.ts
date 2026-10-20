@@ -13,7 +13,6 @@ import { CancelledError } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import {
-  addTelemetryBreadcrumb,
   captureTelemetry,
   TELEMETRY_DESCRIPTION_KEY,
   type TelemetryDescription,
@@ -38,7 +37,7 @@ const JsonTextSchema = z.string();
 const TelemetryDescriptionSchema = z.looseObject({
   fingerprint: z.array(z.string()).min(1),
   level: z.enum(['warning', 'error']).optional(),
-  report: z.enum(['event', 'breadcrumb']).optional(),
+  report: z.enum(['event', 'none']).optional(),
   tags: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
   contexts: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   extra: z.record(z.string(), z.unknown()).optional(),
@@ -193,16 +192,10 @@ export function reportAppError(error: unknown, context: AppErrorContext): void {
       return;
     }
     const declared = declaredTelemetryDescription(error);
-    if (declared?.report === 'breadcrumb') {
-      // An expected answer (a 401 the auth layer refreshes, a 404 for a deleted
-      // object): the trail entry explains the next event instead of opening an
-      // issue for a condition the app already handles.
-      addTelemetryBreadcrumb({
-        category: 'app-error',
-        level: declared.level ?? 'warning',
-        message: errorMessage(error),
-        ...(declared.tags === undefined ? {} : { data: declared.tags }),
-      });
+    if (declared?.report === 'none') {
+      // The network layer owns this answer (an error-status response, or a
+      // transport failure it keeps as a breadcrumb): a second record here would
+      // duplicate it.
       return;
     }
     captureTelemetry({

@@ -115,11 +115,8 @@ const FORBIDDEN_STATUS = 403;
  * 403s come from the edge firewall (OFAC-sanctioned regions, IP blocks), whose
  * body is not a tRPC error. A 403 from a tRPC procedure carries its code
  * (`FORBIDDEN`) and names app code, so it is still reported.
- *
- * Exported so a query-level reporter can apply the same policy to a raw REST
- * response that never passes through this module's fetch wrapper.
  */
-export function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
+function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   return (
     EXPECTED_HTTP_STATUSES.has(status) || (status === FORBIDDEN_STATUS && trpc.code === undefined)
   );

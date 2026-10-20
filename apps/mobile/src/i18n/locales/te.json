@@ -1862,6 +1862,9 @@
       "viewA11y": "ఆడిట్ నివేదికను చూడండి"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo అడ్మిన్",
+      "actorMaskedUser": "దాగిన వినియోగదారు",
+      "actorSystem": "Kilo సిస్టమ్",
       "couldNotLoad": "ఆడిట్ నివేదికను లోడ్ చేయలేకపోయాము.",
       "events": "సంఘటనలు",
       "generated": "రూపొందించిన సమయం: {{generatedAt}}.",

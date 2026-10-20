@@ -1862,6 +1862,9 @@
       "viewA11y": "Eeg warbixinta hanti-dhawrka"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Maamulaha Kilo",
+      "actorMaskedUser": "Isticmaale qarsoon",
+      "actorSystem": "Nidaamka Kilo",
       "couldNotLoad": "Warbixinta hanti-dhawrka lama soo dejin karin.",
       "events": "Dhacdooyin",
       "generated": "Waxaa la soo saaray {{generatedAt}}.",

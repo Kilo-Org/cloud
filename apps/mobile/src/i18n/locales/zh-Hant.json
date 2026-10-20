@@ -1120,6 +1120,9 @@
       "triageModel": "初步評估模型"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo 管理員",
+      "actorMaskedUser": "已隱藏使用者",
+      "actorSystem": "Kilo 系統",
       "couldNotLoad": "無法載入稽核報告。",
       "events": "事件",
       "generated": "已於 {{generatedAt}} 產生。",

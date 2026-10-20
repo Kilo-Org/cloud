@@ -1862,6 +1862,9 @@
       "viewA11y": "Jereo ny tatitra fanaraha-maso"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Mpitantana Kilo",
+      "actorMaskedUser": "Mpampiasa voatafina",
+      "actorSystem": "Rafitra Kilo",
       "couldNotLoad": "Tsy nety nampidirina ny tatitra fanaraha-maso.",
       "events": "Zava-nitranga",
       "generated": "Noforonina tamin'ny {{generatedAt}}.",

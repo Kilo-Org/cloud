@@ -1862,6 +1862,9 @@
       "viewA11y": "Ikusi auditoria-txostena"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratzailea",
+      "actorMaskedUser": "Ezkutuko erabiltzailea",
+      "actorSystem": "Kilo sistema",
       "couldNotLoad": "Ezin izan da auditoria-txostena kargatu.",
       "events": "Gertaerak",
       "generated": "Txostena sortu da: {{generatedAt}}.",

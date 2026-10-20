@@ -1862,6 +1862,9 @@
       "viewA11y": "ເບິ່ງລາຍງານການກວດສອບ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "ຜູ້ດູແລ Kilo",
+      "actorMaskedUser": "ຜູ້ໃຊ້ທີ່ປິດບັງ",
+      "actorSystem": "ລະບົບ Kilo",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດລາຍງານການກວດສອບໄດ້.",
       "events": "ເຫດການ",
       "generated": "ສ້າງເມື່ອ {{generatedAt}}.",

@@ -1862,6 +1862,9 @@
       "viewA11y": "Audit hesabatına bax"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratoru",
+      "actorMaskedUser": "Maskalı istifadəçi",
+      "actorSystem": "Kilo sistemi",
       "couldNotLoad": "Audit hesabatını yükləmək mümkün olmadı.",
       "events": "Hadisələr",
       "generated": "Hesabat {{generatedAt}} tarixində yaradılıb.",

@@ -1862,6 +1862,9 @@
       "viewA11y": "Lihat laporan audit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Admin Kilo",
+      "actorMaskedUser": "Pengguna disamarkan",
+      "actorSystem": "Sistem Kilo",
       "couldNotLoad": "Tidak dapat memuatkan laporan audit.",
       "events": "Peristiwa",
       "generated": "Laporan dijana pada {{generatedAt}}.",

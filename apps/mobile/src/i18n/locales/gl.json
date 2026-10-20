@@ -1862,6 +1862,9 @@
       "viewA11y": "Ver informe de auditoría"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador de Kilo",
+      "actorMaskedUser": "Usuario enmascarado",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Non se puido cargar o informe de auditoría.",
       "events": "Eventos",
       "generated": "O informe xerouse o {{generatedAt}}.",

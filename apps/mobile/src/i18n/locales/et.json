@@ -1862,6 +1862,9 @@
       "viewA11y": "Vaata auditiaruannet"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administraator",
+      "actorMaskedUser": "Varjatud kasutaja",
+      "actorSystem": "Kilo süsteem",
       "couldNotLoad": "Auditiaruannet ei õnnestunud laadida.",
       "events": "Sündmused",
       "generated": "Aruanne on loodud {{generatedAt}}.",

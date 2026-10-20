@@ -1862,6 +1862,9 @@
       "viewA11y": "Прегледай одитния доклад"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Администратор на Kilo",
+      "actorMaskedUser": "Маскиран потребител",
+      "actorSystem": "Система Kilo",
       "couldNotLoad": "Не успяхме да заредим одитния доклад.",
       "events": "Събития",
       "generated": "Докладът е генериран на {{generatedAt}}.",

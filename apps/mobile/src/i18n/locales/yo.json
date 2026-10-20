@@ -1862,6 +1862,9 @@
       "viewA11y": "Wo ìròyìn àyẹ̀wò"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Alákoso Kilo",
+      "actorMaskedUser": "Olùlo tí a fi pamọ́",
+      "actorSystem": "Ètò Kilo",
       "couldNotLoad": "A kò lè gbé ìròyìn àyẹ̀wò wọlé.",
       "events": "Àwọn ìṣẹ̀lẹ̀",
       "generated": "A ṣe é ní {{generatedAt}}.",

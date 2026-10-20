@@ -1120,6 +1120,9 @@
       "triageModel": "प्राथमिक जाँच का मॉडल"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo एडमिन",
+      "actorMaskedUser": "छिपा हुआ उपयोगकर्ता",
+      "actorSystem": "Kilo सिस्टम",
       "couldNotLoad": "ऑडिट रिपोर्ट लोड नहीं हो सकी।",
       "events": "घटनाएँ",
       "generated": "रिपोर्ट तैयार हुई: {{generatedAt}}।",

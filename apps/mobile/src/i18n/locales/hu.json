@@ -1862,6 +1862,9 @@
       "viewA11y": "Auditjelentés megtekintése"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo adminisztrátor",
+      "actorMaskedUser": "Rejtett felhasználó",
+      "actorSystem": "Kilo rendszer",
       "couldNotLoad": "Nem sikerült betölteni az auditjelentést.",
       "events": "Események",
       "generated": "A jelentés elkészült: {{generatedAt}}.",

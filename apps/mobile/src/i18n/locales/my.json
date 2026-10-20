@@ -1862,6 +1862,9 @@
       "viewA11y": "စစ်ဆေးမှုအစီရင်ခံစာ ကြည့်ရှုပါ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo စီမံခန့်ခွဲသူ",
+      "actorMaskedUser": "လျှို့ဝှက်ထားသော အသုံးပြုသူ",
+      "actorSystem": "Kilo စနစ်",
       "couldNotLoad": "စစ်ဆေးမှုအစီရင်ခံစာကို ရယူ၍ မရပါ။",
       "events": "အဖြစ်အပျက်များ",
       "generated": "{{generatedAt}} တွင် ထုတ်ပေးထားသည်။",

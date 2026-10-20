@@ -1862,6 +1862,9 @@
       "viewA11y": "Gabaasa qorannoo ilaali"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Bulchaa Kilo",
+      "actorMaskedUser": "Fayyadamaa dhokataa",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Gabaasa qorannoo fe'uun hin danda'amne.",
       "events": "Taateewwan",
       "generated": "{{generatedAt}} irratti uumame.",

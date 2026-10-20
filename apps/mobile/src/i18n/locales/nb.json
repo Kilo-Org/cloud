@@ -1862,6 +1862,9 @@
       "viewA11y": "Vis revisjonsrapport"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-administrator",
+      "actorMaskedUser": "Maskert bruker",
+      "actorSystem": "Kilo-system",
       "couldNotLoad": "Kunne ikke laste inn revisjonsrapporten.",
       "events": "Hendelser",
       "generated": "Rapporten ble generert {{generatedAt}}.",

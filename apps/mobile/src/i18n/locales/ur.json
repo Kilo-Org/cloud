@@ -1862,6 +1862,9 @@
       "viewA11y": "آڈٹ رپورٹ دیکھیں"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ایڈمن",
+      "actorMaskedUser": "چھپا ہوا صارف",
+      "actorSystem": "Kilo سسٹم",
       "couldNotLoad": "آڈٹ رپورٹ لوڈ نہیں ہو سکی۔",
       "events": "واقعات",
       "generated": "رپورٹ {{generatedAt}} کو تیار کی گئی۔",

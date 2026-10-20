@@ -1862,6 +1862,9 @@
       "viewA11y": "Audit hisobotini ko'rish"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratori",
+      "actorMaskedUser": "Yashirilgan foydalanuvchi",
+      "actorSystem": "Kilo tizimi",
       "couldNotLoad": "Audit hisobotini yuklab bo'lmadi.",
       "events": "Hodisalar",
       "generated": "Yaratilgan vaqt: {{generatedAt}}.",

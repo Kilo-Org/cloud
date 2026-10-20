@@ -1862,6 +1862,9 @@
       "viewA11y": "ಆಡಿಟ್ ವರದಿಯನ್ನು ನೋಡಿ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ನಿರ್ವಾಹಕ",
+      "actorMaskedUser": "ಮರೆಮಾಡಲಾದ ಬಳಕೆದಾರ",
+      "actorSystem": "Kilo ವ್ಯವಸ್ಥೆ",
       "couldNotLoad": "ಆಡಿಟ್ ವರದಿಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "events": "ಘಟನೆಗಳು",
       "generated": "{{generatedAt}} ರಂದು ರಚಿಸಲಾಗಿದೆ.",

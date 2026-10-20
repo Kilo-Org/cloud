@@ -1862,6 +1862,9 @@
       "viewA11y": "Skoða endurskoðunarskýrslu"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-stjórnandi",
+      "actorMaskedUser": "Maskeraður notandi",
+      "actorSystem": "Kilo-kerfi",
       "couldNotLoad": "Ekki tókst að sækja endurskoðunarskýrsluna.",
       "events": "Atburðir",
       "generated": "Skýrslan var búin til {{generatedAt}}.",

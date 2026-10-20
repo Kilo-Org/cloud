@@ -1132,6 +1132,9 @@
       "triageModel": "نموذج الفرز الأولي"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "مسؤول Kilo",
+      "actorMaskedUser": "مستخدم مقنّع",
+      "actorSystem": "نظام Kilo",
       "couldNotLoad": "تعذّر تحميل تقرير التدقيق.",
       "events": "الأحداث",
       "generated": "أُنشئ التقرير في {{generatedAt}}.",

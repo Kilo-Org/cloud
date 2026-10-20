@@ -1862,6 +1862,9 @@
       "viewA11y": "Προβολή αναφοράς ελέγχου"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Διαχειριστής Kilo",
+      "actorMaskedUser": "Κρυμμένος χρήστης",
+      "actorSystem": "Σύστημα Kilo",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της αναφοράς ελέγχου.",
       "events": "Συμβάντα",
       "generated": "Η αναφορά δημιουργήθηκε: {{generatedAt}}.",

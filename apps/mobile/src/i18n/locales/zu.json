@@ -1862,6 +1862,9 @@
       "viewA11y": "Buka umbiko wokuhlola"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Umphathi we-Kilo",
+      "actorMaskedUser": "Umsebenzisi ofihliwe",
+      "actorSystem": "Isistimu ye-Kilo",
       "couldNotLoad": "Asikwazanga ukulayisha umbiko wokuhlola.",
       "events": "Izehlakalo",
       "generated": "Umbiko wenziwe ngo-{{generatedAt}}.",

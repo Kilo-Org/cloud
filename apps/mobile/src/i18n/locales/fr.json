@@ -1092,6 +1092,9 @@
       "triageModel": "Modèle de triage"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrateur Kilo",
+      "actorMaskedUser": "Utilisateur masqué",
+      "actorSystem": "Système Kilo",
       "couldNotLoad": "Impossible de charger le rapport d'audit.",
       "events": "Événements",
       "generated": "Ce rapport a été généré le {{generatedAt}}.",

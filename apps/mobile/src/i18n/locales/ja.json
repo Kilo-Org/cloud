@@ -1120,6 +1120,9 @@
       "triageModel": "トリアージモデル"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo管理者",
+      "actorMaskedUser": "マスク済みユーザー",
+      "actorSystem": "Kiloシステム",
       "couldNotLoad": "監査レポートを読み込めませんでした。",
       "events": "イベント",
       "generated": "{{generatedAt}}に生成しました。",

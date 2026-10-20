@@ -1862,6 +1862,9 @@
       "viewA11y": "ڕاپۆرتی وردبینی ببینە"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "بەڕێوەبەری Kilo",
+      "actorMaskedUser": "بەکارهێنەری شاراوە",
+      "actorSystem": "سیستەمی Kilo",
       "couldNotLoad": "نەتوانرا ڕاپۆرتی وردبینی بار بکرێت.",
       "events": "ڕووداوەکان",
       "generated": "لە {{generatedAt}} دروست کراوە.",

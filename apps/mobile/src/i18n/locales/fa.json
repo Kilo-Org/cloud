@@ -1862,6 +1862,9 @@
       "viewA11y": "مشاهده گزارش ممیزی"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "مدیر Kilo",
+      "actorMaskedUser": "کاربر ناشناس",
+      "actorSystem": "سیستم Kilo",
       "couldNotLoad": "بارگذاری گزارش ممیزی ممکن نشد.",
       "events": "رویدادها",
       "generated": "این گزارش در {{generatedAt}} تولید شده است.",

@@ -1862,6 +1862,9 @@
       "viewA11y": "Tirohia te pūrongo arotake"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kaiwhakahaere Kilo",
+      "actorMaskedUser": "Kaiwhakamahi huna",
+      "actorSystem": "Pūnaha Kilo",
       "couldNotLoad": "Kāore i taea te uta i te pūrongo arotake.",
       "events": "Ngā takahanga",
       "generated": "I hangaia i te {{generatedAt}}.",

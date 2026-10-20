@@ -1862,6 +1862,9 @@
       "viewA11y": "មើលរបាយការណ៍សវនកម្ម"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "អ្នកគ្រប់គ្រង Kilo",
+      "actorMaskedUser": "អ្នកប្រើប្រាស់ដែលបិទបាំង",
+      "actorSystem": "ប្រព័ន្ធ Kilo",
       "couldNotLoad": "មិនអាចផ្ទុករបាយការណ៍សវនកម្មបានទេ។",
       "events": "ព្រឹត្តិការណ៍",
       "generated": "បានបង្កើតនៅ {{generatedAt}}។",

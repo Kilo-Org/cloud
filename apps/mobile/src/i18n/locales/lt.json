@@ -1908,6 +1908,9 @@
       "viewA11y": "Peržiūrėti audito ataskaitą"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratorius",
+      "actorMaskedUser": "Paslėptas naudotojas",
+      "actorSystem": "Kilo sistema",
       "couldNotLoad": "Nepavyko įkelti audito ataskaitos.",
       "events": "Įvykiai",
       "generated": "Ataskaita sugeneruota {{generatedAt}}.",

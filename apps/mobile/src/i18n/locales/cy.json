@@ -1954,6 +1954,9 @@
       "viewA11y": "Gweld adroddiad archwilio"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Gweinyddwr Kilo",
+      "actorMaskedUser": "Defnyddiwr cudd",
+      "actorSystem": "System Kilo",
       "couldNotLoad": "Ni ellid llwytho'r adroddiad archwilio.",
       "events": "Digwyddiadau",
       "generated": "Cynhyrchwyd yr adroddiad {{generatedAt}}.",

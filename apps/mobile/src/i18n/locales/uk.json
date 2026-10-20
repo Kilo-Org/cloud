@@ -1126,6 +1126,9 @@
       "triageModel": "Модель первинної оцінки"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Адміністратор Kilo",
+      "actorMaskedUser": "Прихований користувач",
+      "actorSystem": "Система Kilo",
       "couldNotLoad": "Не вдалося завантажити звіт аудиту.",
       "events": "Події",
       "generated": "Звіт сформовано {{generatedAt}}.",

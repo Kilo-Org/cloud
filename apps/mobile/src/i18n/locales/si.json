@@ -1862,6 +1862,9 @@
       "viewA11y": "විගණන වාර්තාව බලන්න"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo පරිපාලක",
+      "actorMaskedUser": "සැඟවුණු පරිශීලක",
+      "actorSystem": "Kilo පද්ධතිය",
       "couldNotLoad": "විගණන වාර්තාව පූරණය කළ නොහැකි විය.",
       "events": "සිදුවීම්",
       "generated": "{{generatedAt}} සකස් කර ඇත.",

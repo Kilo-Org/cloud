@@ -1862,6 +1862,9 @@
       "viewA11y": "የኦዲት ሪፖርት ይመልከቱ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "የKilo አስተዳዳሪ",
+      "actorMaskedUser": "የተደበቀ ተጠቃሚ",
+      "actorSystem": "የKilo ሥርዓት",
       "couldNotLoad": "የኦዲት ሪፖርቱን መጫን አልተቻለም።",
       "events": "ክስተቶች",
       "generated": "ሪፖርቱ በ{{generatedAt}} ተዘጋጅቷል።",

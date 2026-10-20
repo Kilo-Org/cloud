@@ -1092,6 +1092,9 @@
       "triageModel": "Modello per la valutazione preliminare"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Amministratore Kilo",
+      "actorMaskedUser": "Utente mascherato",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Impossibile caricare il report di audit.",
       "events": "Eventi",
       "generated": "Il report è stato generato il {{generatedAt}}.",

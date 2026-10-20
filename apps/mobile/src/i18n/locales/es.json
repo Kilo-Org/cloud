@@ -1123,6 +1123,9 @@
       "triageModel": "Modelo de evaluación inicial"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador de Kilo",
+      "actorMaskedUser": "Usuario enmascarado",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "No se pudo cargar el informe de auditoría.",
       "events": "Eventos",
       "generated": "El informe se generó el {{generatedAt}}.",

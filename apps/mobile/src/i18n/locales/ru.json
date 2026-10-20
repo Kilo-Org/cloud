@@ -1126,6 +1126,9 @@
       "triageModel": "Модель для первичной оценки"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Администратор Kilo",
+      "actorMaskedUser": "Скрытый пользователь",
+      "actorSystem": "Система Kilo",
       "couldNotLoad": "Не удалось загрузить отчёт аудита.",
       "events": "События",
       "generated": "Отчёт создан: {{generatedAt}}.",

@@ -1862,6 +1862,9 @@
       "viewA11y": "Shiko raportin e auditimit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administratori Kilo",
+      "actorMaskedUser": "Përdorues i maskuar",
+      "actorSystem": "Sistemi Kilo",
       "couldNotLoad": "Nuk u ngarkua raporti i auditimit.",
       "events": "Ngjarjet",
       "generated": "Raporti u gjenerua më {{generatedAt}}.",

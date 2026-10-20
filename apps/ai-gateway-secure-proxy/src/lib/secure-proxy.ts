@@ -2,6 +2,11 @@ import {
   SECURE_PROXY_BODY_KEY,
   SecureProxyRequestBodySchema,
 } from '@kilocode/ai-gateway-secure-proxy-contracts';
+import {
+  checkUpstreamUrl,
+  isUpstreamUrlPolicyEnforced,
+  upstreamDispatcher,
+} from '@kilocode/upstream-url-policy';
 import { NextResponse } from 'next/server';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
@@ -95,14 +100,32 @@ export async function handleSecureProxyRequest(request: Request): Promise<Respon
   const startedAt = performance.now();
   let response: Response;
   try {
-    response = await fetch(config.url, {
+    // The relay fetches a URL from its body, so it applies the same URL policy
+    // as the gateway that sent the body, and connects only to the addresses
+    // that check approved.
+    const verdict = isUpstreamUrlPolicyEnforced()
+      ? await checkUpstreamUrl(config.url, { signal: request.signal })
+      : null;
+    if (verdict && !verdict.allowed) {
+      console.warn('[secure-proxy] Refused upstream URL', {
+        upstreamHost,
+        violation: verdict.violation,
+      });
+      return errorResponse(502, `Upstream request refused: ${verdict.violation}`);
+    }
+
+    // Held in a variable because `dispatcher` is a runtime option that the
+    // platform's request-init type does not declare.
+    const fetchInit: RequestInit & { dispatcher?: unknown } = {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
       // Following a redirect would resend the upstream credentials to a host the config did not name.
       redirect: 'manual',
+      ...(verdict && { dispatcher: upstreamDispatcher() }),
       signal: request.signal,
-    });
+    };
+    response = await fetch(config.url, fetchInit);
   } catch (error) {
     const details = { upstreamHost, ...describeFetchError(error) };
     if (request.signal.aborted) {

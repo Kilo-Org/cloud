@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { checkUpstreamUrl, upstreamDispatcher } from '@kilocode/upstream-url-policy';
 import { handleSecureProxyRequest } from './secure-proxy';
+
+vi.mock('@kilocode/upstream-url-policy', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  checkUpstreamUrl: vi.fn(),
+}));
+
+const policyCheck = vi.mocked(checkUpstreamUrl);
 
 const originalFetch = global.fetch;
 const originalSecret = process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET;
@@ -196,5 +204,63 @@ describe('handleSecureProxyRequest', () => {
     const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
     expect(logged).not.toContain('query-secret');
     expect(logged).not.toContain('upstream-key');
+  });
+});
+
+// A non-literal key keeps this assignable: @types/node marks NODE_ENV readonly.
+function setNodeEnvironment(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
+describe('handleSecureProxyRequest with the URL policy enforced', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  beforeEach(() => {
+    setNodeEnvironment('NODE_ENV', 'production');
+    process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    policyCheck.mockReset();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    setNodeEnvironment('NODE_ENV', originalNodeEnv);
+    process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
+    vi.restoreAllMocks();
+  });
+
+  it('refuses an upstream URL the policy rejects without contacting it', async () => {
+    policyCheck.mockResolvedValue({ allowed: false, violation: 'non_public_host' });
+    const fetchMock = mockUpstream(new Response('{}'));
+
+    const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Upstream request refused: non_public_host',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(policyCheck).toHaveBeenCalledWith('https://llm.example.com', {
+      signal: expect.anything() as AbortSignal,
+    });
+  });
+
+  it('connects through the pinned dispatcher once the URL is approved', async () => {
+    policyCheck.mockResolvedValue({
+      allowed: true,
+      hostname: 'llm.example.com',
+      addresses: ['104.18.2.115'],
+    });
+    const fetchMock = mockUpstream(new Response('{}'));
+
+    const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));
+
+    expect(response.status).toBe(200);
+    const { init } = onlyFetchCall(fetchMock);
+    expect(init?.redirect).toBe('manual');
+    expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBe(upstreamDispatcher());
   });
 });

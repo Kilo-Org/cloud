@@ -18,8 +18,8 @@ import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
+import { isUpstreamUrlPolicyEnforced, upstreamDispatcher } from '@kilocode/upstream-url-policy';
 import {
-  isUpstreamUrlPolicyEnforced,
   rejectDisallowedUpstreamUrls,
   rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
@@ -339,8 +339,10 @@ export async function upstreamRequest({
         })
       : { url: targetUrl, headers, body: JSON.stringify(body) };
 
-    // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
-    // upstream URL from the relay body, so both hops are checked.
+    // Upstream URL rules: see upstream-url-policy.ts. The secure proxy fetches
+    // the upstream URL from the relay body, so both hops are checked. A checked
+    // request connects through the dispatcher that only carries approved
+    // addresses.
     const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
     const urlRejection = enforceUrlPolicy
       ? await rejectDisallowedUpstreamUrls({
@@ -355,15 +357,21 @@ export async function upstreamRequest({
       return { type: 'error', response: urlRejection };
     }
 
-    const response = await fetch(outgoing.url, {
+    const fetchInit: RequestInit = {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
       redirect: enforceUrlPolicy ? 'manual' : 'follow',
-      // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
-      duplex: 'half',
       signal: combinedSignal,
-    });
+    };
+    // Spread in the options the platform types do not declare: `dispatcher`
+    // binds the socket to an approved address, and `duplex` accompanies a
+    // string body; see https://github.com/node-fetch/node-fetch/issues/1769.
+    const fetchExtras = {
+      duplex: 'half',
+      ...(enforceUrlPolicy && { dispatcher: upstreamDispatcher() }),
+    };
+    const response = await fetch(outgoing.url, { ...fetchInit, ...fetchExtras });
     headersReceivedAfterMs = performance.now() - fetchStartedAt;
     const redirectRejection = enforceUrlPolicy
       ? await rejectUpstreamRedirect({

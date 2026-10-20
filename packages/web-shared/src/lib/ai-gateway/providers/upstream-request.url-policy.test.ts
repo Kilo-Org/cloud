@@ -1,7 +1,8 @@
 import { lookup } from 'node:dns/promises';
+import { clearUpstreamUrlPolicyCache, upstreamDispatcher } from '@kilocode/upstream-url-policy';
+import type { Provider } from './types';
 import { buildDirectProvider } from './build-direct-provider';
 import { upstreamRequest } from './upstream-request';
-import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
 
 jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
 
@@ -16,7 +17,7 @@ jest.mock('next/server', () => ({
 }));
 
 const originalFetch = global.fetch;
-const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+const originalNodeEnv = process.env.NODE_ENV;
 
 const PUBLIC_IP_URL = 'https://104.18.2.115/v1';
 
@@ -51,7 +52,7 @@ function mockFetch(response: Response = new Response('{}')) {
   return fetchMock;
 }
 
-function send(provider: ReturnType<typeof directProvider>, signal?: AbortSignal) {
+function send(provider: Provider, signal?: AbortSignal) {
   return upstreamRequest({
     chatApi: 'chat_completions',
     search: '',
@@ -67,9 +68,14 @@ function send(provider: ReturnType<typeof directProvider>, signal?: AbortSignal)
 
 const lookupMock = jest.mocked(lookup);
 
-function setTargetEnv(value: string | undefined) {
-  if (value === undefined) delete process.env.VERCEL_TARGET_ENV;
-  else process.env.VERCEL_TARGET_ENV = value;
+// A non-literal key keeps this assignable: @types/node marks NODE_ENV readonly.
+function setNodeEnv(value: string | undefined) {
+  restoreEnvironmentVariable('NODE_ENV', value);
+}
+
+function restoreEnvironmentVariable(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
 }
 
 describe('upstreamRequest upstream URL policy', () => {
@@ -80,12 +86,12 @@ describe('upstreamRequest upstream URL policy', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-    setTargetEnv(originalTargetEnv);
+    setNodeEnv(originalNodeEnv);
   });
 
-  describe('when VERCEL_TARGET_ENV is staging', () => {
+  describe('in a deployed environment', () => {
     beforeEach(() => {
-      setTargetEnv('staging');
+      setNodeEnv('production');
     });
 
     it('sends to a public HTTPS upstream without following redirects', async () => {
@@ -98,6 +104,7 @@ describe('upstreamRequest upstream URL policy', () => {
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe(`${PUBLIC_IP_URL}/chat/completions`);
       expect(init?.redirect).toBe('manual');
+      expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBe(upstreamDispatcher());
     });
 
     it.each([
@@ -105,7 +112,9 @@ describe('upstreamRequest upstream URL policy', () => {
       ['https://localhost:8080/v1', 'its host is not public'],
       ['https://169.254.169.254/latest', 'its host is not public'],
       ['https://[::1]/v1', 'its host is not public'],
+      ['https://internal.example.com/v1', 'resolves to a non-public address'],
     ])('rejects %s before sending anything', async (baseUrl, reason) => {
+      lookupMock.mockResolvedValue([{ address: '10.1.2.3', family: 4 }] as never);
       const fetchMock = mockFetch();
 
       const result = await send(directProvider(baseUrl));
@@ -136,7 +145,7 @@ describe('upstreamRequest upstream URL policy', () => {
     });
 
     it('releases the request when the client disconnects during a stalled DNS lookup', async () => {
-      lookupMock.mockReturnValue(new Promise(() => {}));
+      lookupMock.mockReturnValue(new Promise(() => {}) as never);
       const fetchMock = mockFetch();
       const client = new AbortController();
 
@@ -180,18 +189,16 @@ describe('upstreamRequest upstream URL policy', () => {
     });
   });
 
-  it.each(['production', 'preview', undefined])(
-    'leaves the request unchecked when VERCEL_TARGET_ENV is %s',
-    async targetEnv => {
-      setTargetEnv(targetEnv);
-      const fetchMock = mockFetch();
+  it('leaves the request unchecked in local development', async () => {
+    setNodeEnv('development');
+    const fetchMock = mockFetch();
 
-      const result = await send(directProvider('http://localhost:8080/v1'));
+    const result = await send(directProvider('http://localhost:8080/v1'));
 
-      expect(result.type).toBe('success');
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toBe('http://localhost:8080/v1/chat/completions');
-      expect(init?.redirect).toBe('follow');
-    }
-  );
+    expect(result.type).toBe('success');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/chat/completions');
+    expect(init?.redirect).toBe('follow');
+    expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
+  });
 });

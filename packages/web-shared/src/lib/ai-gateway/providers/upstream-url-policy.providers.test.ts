@@ -5,10 +5,7 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import type { ProviderApiUrlOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import {
-  clearUpstreamUrlPolicyCache,
-  findUpstreamUrlViolation,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import { checkUpstreamUrl, clearUpstreamUrlPolicyCache } from '@kilocode/upstream-url-policy';
 
 function urlsOf(name: string, apiUrl: string, overrides: ProviderApiUrlOverrides) {
   return [
@@ -45,14 +42,14 @@ describe('hard-coded provider URLs', () => {
   // address; this checks the scheme and host each URL is written with.
   it.each(PROVIDER_URLS)('%s (%s) passes the upstream URL policy', async (_name, url) => {
     const resolvedHosts: string[] = [];
-    const violation = await findUpstreamUrlViolation(url, {
+    const verdict = await checkUpstreamUrl(url, {
       resolveHostAddresses: async hostname => {
         resolvedHosts.push(hostname);
         return ['104.18.2.115'];
       },
     });
 
-    expect(violation).toBeNull();
+    expect(verdict.allowed).toBe(true);
     expect(resolvedHosts).toHaveLength(1);
   });
 });

@@ -386,6 +386,17 @@ describe('shouldRouteToVercel', () => {
     ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
+
+  it('routes models outside the opt-out set to Vercel', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel({
+      optOutModels: ['anthropic/claude-sonnet-4.5'],
+      vercelModels: ['anthropic/claude-sonnet-4.5', 'openai/gpt-5.4'],
+    });
+
+    await expect(shouldRouteToVercel('gpt-5.4', request(), async () => undefined)).resolves.toBe(
+      true
+    );
+  });
 });
 
 describe('applyVercelSettings BYOK pinning', () => {

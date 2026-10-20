@@ -771,11 +771,14 @@ export function NewSessionScreenBody() {
           userId,
           surface: 'agent-new',
           sessionId: null,
+          // Carried so a launch this screen loses to an Activity recreation
+          // reopens the same organization scope.
+          organizationId: organizationId ?? null,
         },
         themedSheet
       )
     );
-  }, [addCandidates, showActionSheetWithOptions, userId, themedSheet]);
+  }, [addCandidates, showActionSheetWithOptions, userId, themedSheet, organizationId]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {

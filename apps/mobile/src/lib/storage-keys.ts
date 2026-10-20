@@ -117,6 +117,15 @@ export const PENDING_DEEP_LINK_KEY = 'pending-deep-link';
  */
 export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
 /**
+ * The composer a camera or library launch belongs to, kept for the launch that
+ * never comes back: Activity recreation rebuilds the app on its opening route
+ * and drops the composer. Written next to `PICKER_LAUNCH_CONTEXT_KEY` before
+ * the launch and cleared by the same JS once the picker returns, so a record
+ * that outlives the launch means the composer did not survive. Deleted on
+ * sign-out: it carries a user id and a session id.
+ */
+export const PICKER_RESTORE_RECORD_KEY = 'picker-restore-record';
+/**
  * Per-user network-fallback consent for voice transcription (P1-I-68a). Not
  * deleted on sign-out — a per-user decision must survive sign-out and sign-in
  * of the same account, matching `CONSENT_USER_KEY_PREFIX`.

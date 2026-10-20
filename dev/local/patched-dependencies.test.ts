@@ -18,6 +18,11 @@ const lockfilePath = path.join(repoRoot, 'pnpm-lock.yaml');
 
 type PatchEntry = { selector: string; patchPath: string };
 
+type Lockfile = {
+  patchedDependencies?: Record<string, string>;
+  packages?: Record<string, unknown>;
+};
+
 function readPatchedDependencies(filePath: string): PatchEntry[] {
   const document = load(fs.readFileSync(filePath, 'utf8')) as {
     patchedDependencies?: Record<string, string>;
@@ -26,6 +31,10 @@ function readPatchedDependencies(filePath: string): PatchEntry[] {
     selector,
     patchPath,
   }));
+}
+
+function readLockfile(): Lockfile {
+  return load(fs.readFileSync(lockfilePath, 'utf8')) as Lockfile;
 }
 
 function entryProblems({ selector, patchPath }: PatchEntry): string[] {
@@ -59,10 +68,26 @@ test('the lockfile records the same patch selectors as the workspace', () => {
   const selectors = readPatchedDependencies(workspacePath)
     .map(({ selector }) => selector)
     .sort();
-  const lockfile = load(fs.readFileSync(lockfilePath, 'utf8')) as {
-    patchedDependencies?: Record<string, string>;
-  };
-  assert.deepEqual(Object.keys(lockfile.patchedDependencies ?? {}).sort(), selectors);
+  assert.deepEqual(Object.keys(readLockfile().patchedDependencies ?? {}).sort(), selectors);
+});
+
+test('every pinned version is the one the lockfile resolves', () => {
+  const selectors = readPatchedDependencies(workspacePath).map(({ selector }) => selector);
+  const packages = readLockfile().packages ?? {};
+  assert.deepEqual(
+    selectors.filter(selector => !Object.hasOwn(packages, selector)),
+    []
+  );
+
+  // A bump that leaves the selector behind resolves nothing, so pnpm stops
+  // applying the patch instead of failing: the stale selector must be reported.
+  const bumped: Record<string, unknown> = { ...packages };
+  bumped['expo-server-sdk@6.2.0'] = bumped['expo-server-sdk@6.1.0'];
+  delete bumped['expo-server-sdk@6.1.0'];
+  assert.deepEqual(
+    selectors.filter(selector => !Object.hasOwn(bumped, selector)),
+    ['expo-server-sdk@6.1.0']
+  );
 });
 
 test('the version check rejects a selector without a version', () => {

@@ -108,6 +108,7 @@ describe('TabBarButton tab switch gate', () => {
   // A gesture dragged off the entry never presses, so it must not hold the gate
   // open for the fallback.
   it('closes the gate when a touched entry is never pressed', async () => {
+    vi.useFakeTimers();
     const button = renderButton({ onPress: vi.fn<() => void>() });
     const props = button.props as PressProps;
     act(() => {
@@ -115,16 +116,14 @@ describe('TabBarButton tab switch gate', () => {
       props.onPressOut({});
     });
 
-    await new Promise<void>(resolve => {
-      setTimeout(() => {
-        resolve();
-      }, 0);
-    });
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
 
     expect(isTabSwitchPending()).toBe(false);
   });
 
   it('keeps the gate open when the press completes', async () => {
+    vi.useFakeTimers();
     const onPress = vi.fn<() => void>();
     const button = renderButton({ onPress });
     const props = button.props as PressProps;
@@ -134,11 +133,8 @@ describe('TabBarButton tab switch gate', () => {
       props.onPress({});
     });
 
-    await new Promise<void>(resolve => {
-      setTimeout(() => {
-        resolve();
-      }, 0);
-    });
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
 
     expect(onPress).toHaveBeenCalledTimes(1);
     expect(isTabSwitchPending()).toBe(true);

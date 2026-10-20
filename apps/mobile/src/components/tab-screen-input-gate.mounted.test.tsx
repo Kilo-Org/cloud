@@ -14,9 +14,11 @@ import { TabSwitchInputGate, TabSwitchInputSettle } from './tab-screen-input-gat
 const focus = vi.hoisted(() => ({ active: true }));
 
 vi.mock('expo-router', () => ({
-  useFocusEffect: (callback: () => void | (() => void)) => {
+  // The focus effect is a callback by contract; the mock runs it when the
+  // screen is focused.
+  useFocusEffect: (effect: () => (() => void) | undefined) => {
     if (focus.active) {
-      callback();
+      effect();
     }
   },
 }));

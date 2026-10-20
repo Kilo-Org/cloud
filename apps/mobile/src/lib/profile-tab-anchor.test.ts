@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
+import { type Href } from 'expo-router';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -88,8 +89,8 @@ describe('profile tab anchor', () => {
   });
 
   it('returns to the profile root when the profile tab is pressed', () => {
-    const navigate = vi.fn();
-    const preventDefault = vi.fn();
+    const navigate = vi.fn<(href: Href) => void>();
+    const preventDefault = vi.fn<() => void>();
     const listeners = profileTabPressListeners({ navigate })({
       navigation: { isFocused: () => false },
     });

@@ -450,7 +450,7 @@
         "failingChecksDetail": "Pakollisia tilatarkistuksia on epäonnistunut.",
         "unstableTitle": "Osa tarkistuksista epäonnistui",
         "unstableDetail": "Osa valinnaisista tarkistuksista on epäonnistunut. Ne eivät estä yhdistämistä.",
-        "draftTitle": "Muutospyynnön luonnos",
+        "draftTitle": "Muutospyyntöluonnos",
         "draftDetail": "Merkitse muutospyyntö valmiiksi katselmointiin ennen yhdistämistä.",
         "behindTitle": "Haara ei ole ajan tasalla",
         "behindDetailUpdatable": "Päivitä haara kohdehaarasta tai uudelleenperusta se ennen yhdistämistä.",
@@ -887,7 +887,7 @@
       "leaveMessage": "Tämä poistaa keskustelun listaltasi.",
       "openHint": "Avaa keskustelun. Pitkä painallus avaa uudelleennimeämis- ja poistumisvalinnat.",
       "unread": "Lukematon",
-      "optionsFor": "Keskustelun {{title}} toiminnot",
+      "optionsFor": "Keskustelun ”{{title}}” toiminnot",
       "options": "Keskustelun toiminnot",
       "renameTitle": "Keskustelun nimen vaihto",
       "renamePlaceholder": "Uusi nimi",
@@ -907,7 +907,7 @@
       "accessibility": "Reaktio: {{emoji}}, määrä: {{displayCount}}"
     },
     "composer": {
-      "replyingTo": "Vastaat käyttäjälle",
+      "replyingTo": "Vastaus viestiin",
       "cancelReply": "Peruuta vastaus",
       "openInstance": "Avaa instanssi",
       "attachFile": "Liitä tiedosto",
@@ -963,20 +963,20 @@
     },
     "messageActions": {
       "copied": "Kopioitu",
-      "copyFailed": "Kopiointi epäonnistui.",
+      "copyFailed": "Kopiointi epäonnistui",
       "title": "Viestin toiminnot",
       "deleteTitle": "Poistetaanko viesti?",
       "deleteMessage": "Tämä poistaa viestin keskustelusta.",
-      "deleteFailed": "Viestin poistaminen epäonnistui.",
-      "removeReactionFailed": "Reaktion poistaminen epäonnistui.",
-      "addReactionFailed": "Reaktion lisääminen epäonnistui.",
+      "deleteFailed": "Viestin poistaminen epäonnistui",
+      "removeReactionFailed": "Reaktion poistaminen epäonnistui",
+      "addReactionFailed": "Reaktion lisääminen epäonnistui",
       "retrySend": "Yritä lähettää uudelleen",
       "moreReactions": "Lisää reaktioita",
       "edit": "Muokkaa",
-      "sendFailed": "Viestin lähetys epäonnistui.",
-      "retrySendFailed": "Viestin lähettäminen uudelleen epäonnistui.",
-      "editFailed": "Viestin muokkaus epäonnistui.",
-      "executeFailed": "Toiminnon suoritus epäonnistui."
+      "sendFailed": "Viestin lähetys epäonnistui",
+      "retrySendFailed": "Viestin lähettäminen uudelleen epäonnistui",
+      "editFailed": "Viestin muokkaus epäonnistui",
+      "executeFailed": "Toiminnon suoritus epäonnistui"
     },
     "attachmentPicker": {
       "takePhoto": "Ota valokuva",
@@ -2026,14 +2026,14 @@
     "search": {
       "searching": "Haetaan",
       "searchSessions": "Hae istuntoja",
-      "searchSessionsPlaceholder": "Hae istuntoja"
+      "searchSessionsPlaceholder": "Hae istuntoja..."
     },
     "sessionList": {
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata.",
       "couldNotRefresh": "Päivitys epäonnistui",
       "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
       "viewHistory": "Istuntojen historia",
-      "noMatches": "Ei hakua vastaavia istuntoja",
+      "noMatches": "Ei vastaavia istuntoja",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
       "tryAdjustFilters": "Kokeile muuttaa tai tyhjentää suodattimet.",
       "couldNotSearch": "Istuntoja ei voitu hakea.",
@@ -2063,7 +2063,7 @@
       "dollar": "dollaria",
       "dollar_other": "dollaria",
       "costSpoken": "kustannus {{cost}}",
-      "costSpokenWithTime": "hinta {{cost}}, {{time}}",
+      "costSpokenWithTime": "kustannus {{cost}}, {{time}}",
       "pullRequest": "muutospyyntö {{number}}"
     },
     "githubInstall": {
@@ -2082,7 +2082,7 @@
       "didNotCompleteMessage": "GitHub-sovelluksen asennus jäi kesken. Yritä uudelleen sovelluksesta."
     },
     "remoteSpawnRetryable": "Instanssiin ei saatu yhteyttä. Sen yhteys on voinut katketa.",
-    "remoteSpawnNonRetryable": "Instanssi ei pystynyt käynnistämään istuntoa. Tarkista kone tai päivitä komentorivikäyttöliittymä.",
+    "remoteSpawnNonRetryable": "Instanssi ei pystynyt käynnistämään istuntoa. Tarkista kone tai päivitä Kilo CLI.",
     "remoteSpawnInstanceDisconnected": "Valitun instanssin yhteys katkesi. Aloita istunto Cloud Agentissa tai valitse toinen instanssi.",
     "liveCount_one": "{{count}} REAALIAJASSA",
     "liveCount_other": "{{count}} REAALIAJASSA"
@@ -2094,13 +2094,13 @@
       "backToSessions": "Takaisin istuntoihin",
       "follow": "Seuraa lukitusnäytöllä",
       "unfollow": "Lopeta seuraaminen lukitusnäytöllä",
-      "couldNotLoad": "Istuntoa ei voitu ladata.",
-      "failedToLoadDetails": "Istunnon tietojen lataus epäonnistui.",
-      "failedToStopExecution": "Suorituksen pysäyttäminen epäonnistui.",
+      "couldNotLoad": "Istuntoa ei voitu ladata",
+      "failedToLoadDetails": "Istunnon tietojen lataus epäonnistui",
+      "failedToStopExecution": "Suorituksen pysäyttäminen epäonnistui",
       "stopped": "Istunto pysäytetty",
-      "committing": "Tallennetaan…",
-      "committed": "Tallennettu",
-      "commitFailed": "Tallennus epäonnistui",
+      "committing": "Luodaan muutostallennusta…",
+      "committed": "Muutostallennus luotu",
+      "commitFailed": "Muutostallennus epäonnistui",
       "renameSession": "Nimeä istunto uudelleen",
       "renamePlaceholder": "Istunnon nimi",
       "transcriptAccessibility": "Istunnon viestihistoria",
@@ -2111,7 +2111,7 @@
       "emptyTitle": "Ei vielä viestejä",
       "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
       "cloningSession": "Kloonataan istuntoa",
-      "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata.",
+      "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
       "notEnoughCredits": "Krediitit eivät riitä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellistä tehtävää viimeistellään vielä. Odota hetki.",
@@ -2214,7 +2214,7 @@
       "discardDraftMessage": "Kehotteesi poistetaan.",
       "discardWithUploadsMessage": "Kehotteesi ja palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
-      "remoteHint": "Voit hallita paikallista kilo-prosessia suorittamalla `kilo remote` tietokoneellasi tai `/remote` käynnissä olevassa CLI-istunnossa.",
+      "remoteHint": "Käynnistä Kilo tietokoneellasi ja jätä se käyntiin.",
       "continueFrom": "Jatketaan istuntoa: {{title}}.",
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
@@ -2265,7 +2265,7 @@
       "toolGlob": "tiedostohaku",
       "toolGrep": "sisältöhaku",
       "toolList": "luettele",
-      "toolPatch": "käytä korjausta",
+      "toolPatch": "korjaus",
       "toolTask": "tehtävä",
       "readTodos": "Lue suunnitelma",
       "updateTodos": "Päivitä suunnitelma",
@@ -2406,7 +2406,7 @@
     },
     "preparation": {
       "exitCode": "Paluukoodi: {{code}}",
-      "earlierOutputOmitted": "Aiempi tuloste on jätetty pois.",
+      "earlierOutputOmitted": "Aiempi tuloste on jätetty pois",
       "preparingEnvironment": "Valmistellaan ympäristöä",
       "preparationComplete": "Valmistelu valmis",
       "preparationFailed": "Valmistelu epäonnistui",
@@ -2417,7 +2417,7 @@
       "title": "Lupa tarvitaan",
       "allowQuestion": "Sallitaanko {{permission}}?",
       "appliesTo": "Koskee:",
-      "denyPermission": "Hylkää lupapyyntö",
+      "denyPermission": "Kiellä lupapyyntö",
       "deny": "Kiellä",
       "allowOnce": "Salli kerran",
       "allowOnceAccessibility": "Salli kerran",
@@ -2617,8 +2617,8 @@
       "compactDescription": "tiivistä nykyisen istunnon konteksti",
       "goalDescription": "Jatka työskentelyä istunnon tavoitetta kohti. /goal <objective> tai pause, resume, clear",
       "initDescription": "opastettu AGENTS.md-asetus",
-      "resumeClaudeDescription": "tuo Claude Code -istunnon litterointi",
-      "resumeCodexDescription": "tuo OpenAI Codex -istunnon litterointi",
+      "resumeClaudeDescription": "tuo Claude Code -istunnon viestihistoria",
+      "resumeCodexDescription": "tuo OpenAI Codex -istunnon viestihistoria",
       "reviewDescription": "tarkista muutokset [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Käytä /{{command}}",
       "useSkillCommand": "Käytä taitoa /{{command}}",
@@ -2676,7 +2676,7 @@
       "open": "avoin muutospyyntö",
       "closed": "suljettu muutospyyntö",
       "merged": "yhdistetty muutospyyntö",
-      "draft": "muutospyynnön luonnos",
+      "draft": "muutospyyntöluonnos",
       "updating": "Päivitetään, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -3506,7 +3506,7 @@
     "start": {
       "promptRequired": "Agentin käynnistys vaatii kehotteen. Lisää kehote ja suorita se uudelleen.",
       "repositoryUnknown": "Kilo ei tunnista {{repository}}-kohdetta GitHub- tai GitLab-koodivarastoksi. Valitse toinen koodivarasto Kilossa.",
-      "repositoryUnsupported": "{{repository}} on Bitbucket-koodivarasto — Käynnistä agentti ei voi vielä käyttää sitä. Valitse toinen koodivarasto Kilossa."
+      "repositoryUnsupported": "{{repository}} on Bitbucket-koodivarasto — Agentin käynnistys ei voi vielä käyttää sitä. Valitse toinen koodivarasto Kilossa."
     }
   },
   "launcher": {

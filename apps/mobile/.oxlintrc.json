@@ -338,6 +338,18 @@
     "@typescript-eslint/strict-boolean-expressions": "off",
     "@typescript-eslint/no-import-type-side-effects": "off",
     "@typescript-eslint/consistent-type-definitions": ["error", "type"],
+    "@typescript-eslint/no-deprecated": [
+      "error",
+      {
+        "allow": [
+          {
+            "from": "package",
+            "package": "react-native-gesture-handler",
+            "name": ["Gesture", "Pan"]
+          }
+        ]
+      }
+    ],
     "@typescript-eslint/no-namespace": "off",
     "import/no-namespace": "off",
     "oxc/no-rest-spread-properties": "off",

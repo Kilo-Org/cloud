@@ -704,7 +704,8 @@ export class SandboxContainers extends DurableObject<Env> {
     if (!container || typeof container.destroy !== 'function') {
       throw new Error('Native container destruction is unavailable');
     }
-    await this.recordStopRequest(Date.now());
+    const recordBeforeDestroy = await this.readRecord();
+    if (recordBeforeDestroy.billingConfigured === true) await this.recordStopRequest(Date.now());
     await container.destroy();
     const record = await this.readRecord();
     await this.writeRecord(this.terminalRecord(record));
@@ -1281,7 +1282,7 @@ export class SandboxContainers extends DurableObject<Env> {
       return stopPath('no_container_not_started', 'terminal');
     }
     const destroyStartedAt = Date.now();
-    await this.recordStopRequest(destroyStartedAt);
+    if (record.billingConfigured === true) await this.recordStopRequest(destroyStartedAt);
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
     } catch (error) {

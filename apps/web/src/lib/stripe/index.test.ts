@@ -98,7 +98,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { softDeleteUser } from '@/lib/user';
 import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
 import { eq, and, count } from 'drizzle-orm';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import {
@@ -137,6 +137,7 @@ const sampleStripePaymentMethod = (): Stripe.PaymentMethod => ({
   card: sampleStripeCard(),
   created: 1234567890,
   customer: null,
+  customer_account: null,
   livemode: false,
   metadata: {},
   type: 'card',
@@ -4372,10 +4373,12 @@ describe('handleUpdateSeatCount organization Kilo Pass service fee', () => {
       pretax_credit_amounts: null,
       pricing: {
         type: 'price_details',
-        unit_amount_decimal: String(params.amount),
+        unit_amount_decimal: Stripe.Decimal.from(params.amount),
         price_details: { price: params.priceId, product: params.productId },
       },
       quantity: 10,
+      quantity_decimal: Stripe.Decimal.from(10),
+      subtotal: params.amount,
       subscription: subscriptionId,
       taxes: null,
     } as Stripe.InvoiceLineItem;

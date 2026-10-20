@@ -1,5 +1,5 @@
 import { describe, expect, test, jest } from '@jest/globals';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 
 import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import { getKnownStripePriceIdsForKiloClaw } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
@@ -77,7 +77,7 @@ function pricedLine(
     amount,
     pricing: {
       type: 'price_details',
-      unit_amount_decimal: String(amount),
+      unit_amount_decimal: Stripe.Decimal.from(amount),
       price_details: { price: priceId, product: extra.pricing?.price_details?.product ?? 'prod_x' },
     },
     ...extra,
@@ -193,14 +193,14 @@ describe('service fee metadata and line classifiers', () => {
     const seatLine = pricedLine(SEAT_PRICE_ID, 72_000, {
       pricing: {
         type: 'price_details',
-        unit_amount_decimal: '72000',
+        unit_amount_decimal: Stripe.Decimal.from('72000'),
         price_details: { price: SEAT_PRICE_ID, product: SEAT_PRODUCT_ID },
       },
     });
     const freeSeatLine = pricedLine('price_free_seats', 0, {
       pricing: {
         type: 'price_details',
-        unit_amount_decimal: '0',
+        unit_amount_decimal: Stripe.Decimal.from('0'),
         price_details: { price: 'price_free_seats', product: SEAT_PRODUCT_ID },
       },
     });
@@ -211,7 +211,7 @@ describe('service fee metadata and line classifiers', () => {
       metadata: buildServiceFeeLineMetadata('invoice:in_test'),
       pricing: {
         type: 'price_details',
-        unit_amount_decimal: '245',
+        unit_amount_decimal: Stripe.Decimal.from('245'),
         price_details: { price: KILO_PASS_PRICE_ID, product: 'prod_fee' },
       },
     });
@@ -263,7 +263,7 @@ describe('eligible Kilo Pass subtotal', () => {
         id: 'il_seat',
         pricing: {
           type: 'price_details',
-          unit_amount_decimal: '72000',
+          unit_amount_decimal: Stripe.Decimal.from('72000'),
           price_details: { price: SEAT_PRICE_ID, product: SEAT_PRODUCT_ID },
         },
         pretax_credit_amounts: [{ amount: 72_000, type: 'discount', discount: 'di_seat' }],

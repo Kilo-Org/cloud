@@ -1,5 +1,5 @@
 import { describe, expect, test, jest } from '@jest/globals';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 
 import {
   markServiceFeeAssessmentCharged,
@@ -230,6 +230,8 @@ function invoiceLine(
     pretax_credit_amounts: null,
     pricing: null,
     quantity: 1,
+    quantity_decimal: Stripe.Decimal.from(1),
+    subtotal: amount,
     subscription: null,
     taxes: null,
   } as Stripe.InvoiceLineItem;
@@ -249,13 +251,14 @@ function creditNoteLine(
     discount_amounts: [],
     invoice_line_item: invoiceLineItem,
     livemode: false,
+    metadata: {},
     pretax_credit_amounts: [],
     quantity: 1,
     tax_rates: [],
     taxes: null,
     type: 'invoice_line_item',
     unit_amount: amount,
-    unit_amount_decimal: String(amount),
+    unit_amount_decimal: Stripe.Decimal.from(amount),
   } as Stripe.CreditNoteLineItem;
 }
 

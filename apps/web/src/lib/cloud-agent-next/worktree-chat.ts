@@ -4,16 +4,11 @@ import { cli_sessions_v2, organization_memberships, organizations } from '@kiloc
 import {
   activeOrganizationJoinCondition,
   organizationMembershipJoinCondition,
-  parentOrganizationJoinCondition,
-  parentOrganizationMembershipJoinCondition,
-  parentOrganizationsTable,
-  parentOrganizationMembershipsTable,
-  personalOrInheritedOrganizationCondition,
 } from '@kilocode/worker-utils/organization-membership';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
@@ -137,7 +132,8 @@ export async function createWorktreeChat({
   const organizationCondition = organizationId
     ? and(
         eq(cli_sessions_v2.organization_id, organizationId),
-        personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id)
+        isNotNull(organization_memberships.id),
+        isNotNull(organizations.id)
       )
     : isNull(cli_sessions_v2.organization_id);
 
@@ -152,11 +148,6 @@ export async function createWorktreeChat({
       organizationMembershipJoinCondition(user.id, cli_sessions_v2.organization_id)
     )
     .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
-    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
-    .leftJoin(
-      parentOrganizationMembershipsTable,
-      parentOrganizationMembershipJoinCondition(user.id)
-    )
     .where(
       and(
         eq(cli_sessions_v2.session_id, sourceKiloSessionId),

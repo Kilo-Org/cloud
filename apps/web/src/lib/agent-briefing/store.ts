@@ -283,17 +283,6 @@ export async function serializeBriefing(row: BriefingReportRow): Promise<Briefin
     expiresAt: iso(row.morning_end_at),
   });
 }
-/**
- * Names why a report could not be read, without repeating its stored payload:
- * a summary or facts body is user content. The schema paths are what a stored
- * value that no longer parses has to be diagnosed by.
- */
-function briefingListFailure(error: unknown): string {
-  if (error instanceof TRPCError) return `TRPCError ${error.code}`;
-  if (error instanceof ZodError)
-    return `ZodError ${error.issues.map(issue => issue.path.join('.')).join(', ')}`;
-  return error instanceof Error ? error.name : 'unknown error';
-}
 export async function listBriefings(
   userId: string,
   input: {
@@ -340,14 +329,17 @@ export async function listBriefings(
     try {
       reports.push(await serializeBriefing(await briefingReportRow(userId, row.id)));
     } catch (error) {
-      // One unreadable report must not fail the page: the page would always be
-      // fetched from the same window, so a retry could never get past it and the
-      // older reports would stay unreachable. The cursor comes from the row
-      // window, so skipping the report still advances past it.
       if (error instanceof TRPCError && ['NOT_FOUND', 'FORBIDDEN'].includes(error.code)) continue;
+      // A stored payload that no longer parses is the report's own fault, and
+      // failing the page would make it permanent: every retry asks for the same
+      // window, so the older reports would stay unreachable. Skip it and let the
+      // cursor, which comes from the row window, advance past it. Anything else
+      // is an operational fault and still fails the request so it stays
+      // retryable and visible.
+      if (!(error instanceof ZodError)) throw error;
       console.error('Agent briefing report skipped', {
         reportId: row.id,
-        failure: briefingListFailure(error),
+        failure: `ZodError ${error.issues.map(issue => issue.path.join('.')).join(', ')}`,
       });
     }
   }

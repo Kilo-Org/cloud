@@ -2,13 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { computeDatabaseUrl, createDrizzleClient } from '@kilocode/db';
-import {
-  CleanupUsageError,
-  runCleanup,
-  targetUsesV1,
-  type BlobStore,
-  type CleanupMode,
-} from './cleanup-core';
+import { createR2BlobStore } from './blob-store';
+import { CleanupUsageError, runCleanup, targetUsesV1, type CleanupMode } from './cleanup-core';
 import {
   CLEANUP_TARGETS,
   ManifestError,
@@ -144,19 +139,6 @@ function parseArgs(args: string[]): CliOptions {
     manifestPath,
     batchSize,
     maxAttempts,
-  };
-}
-
-async function createR2BlobStore(): Promise<BlobStore> {
-  const { deleteBlobs } = await import('../../apps/web/src/lib/r2/cli-sessions');
-  return {
-    async deleteShareBlobs(shareId, filenames, options) {
-      await deleteBlobs(
-        shareId,
-        filenames.map(filename => ({ folderName: 'shared-sessions', filename })),
-        options
-      );
-    },
   };
 }
 

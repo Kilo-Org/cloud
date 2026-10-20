@@ -42,6 +42,7 @@ if [ -n "$group" ]; then
         # rechecks more than a full check costs.
         tsgo --noEmit -p apps/web/tsconfig.json --incremental false
         tsgo --noEmit -p scripts/web-env/tsconfig.json
+        tsgo --noEmit -p scripts/session-shares/tsconfig.json
       fi
       if affects @kilocode/storybook; then
         pnpm --filter @kilocode/storybook run typecheck
@@ -135,6 +136,7 @@ fi
 # 2. Root typechecks (always — they are fast with incremental tsgo)
 tsgo --noEmit -p apps/web/tsconfig.json
 tsgo --noEmit -p scripts/web-env/tsconfig.json
+tsgo --noEmit -p scripts/session-shares/tsconfig.json
 
 # 3. Workspace typecheck
 if ! $changes_only; then

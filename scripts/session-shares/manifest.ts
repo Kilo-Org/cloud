@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { chmod, mkdir, open, readFile, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -91,9 +92,31 @@ function repositoryRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 }
 
+function resolveExistingPath(target: string): string {
+  let current = path.resolve(target);
+  const missingSegments: string[] = [];
+
+  while (true) {
+    try {
+      const resolved = realpathSync(current);
+      return missingSegments.length > 0 ? path.join(resolved, ...missingSegments) : resolved;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(target);
+      missingSegments.unshift(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
 function isInsideRepository(manifestPath: string): boolean {
-  const relative = path.relative(repositoryRoot(), path.resolve(manifestPath));
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  const root = resolveExistingPath(repositoryRoot());
+  const relative = path.relative(root, resolveExistingPath(manifestPath));
+  return (
+    relative === '' ||
+    (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+  );
 }
 
 async function assertPrivateDirectory(directory: string): Promise<void> {
@@ -104,6 +127,16 @@ async function assertPrivateDirectory(directory: string): Promise<void> {
   if ((directoryStat.mode & 0o077) !== 0) {
     throw new ManifestError('Manifest directory must not be accessible by group or other users');
   }
+}
+
+async function ensurePrivateDirectory(directory: string): Promise<void> {
+  try {
+    await stat(directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+  }
+  await assertPrivateDirectory(directory);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -275,9 +308,7 @@ export function createFileManifestStore(manifestPath: string): ManifestStore {
 
     async save(manifest) {
       const directory = path.dirname(resolvedPath);
-      await mkdir(directory, { recursive: true, mode: 0o700 });
-      await chmod(directory, 0o700);
-      await assertPrivateDirectory(directory);
+      await ensurePrivateDirectory(directory);
 
       const temporaryPath = path.join(
         directory,
@@ -300,14 +331,14 @@ export function createFileManifestStore(manifestPath: string): ManifestStore {
 export function createMemoryManifestStore(
   initial: CleanupManifest | null = null
 ): ManifestStore & { current(): CleanupManifest | null } {
-  let manifest = initial;
+  let serialized = initial === null ? null : JSON.stringify(initial);
   return {
-    current: () => manifest,
+    current: () => (serialized === null ? null : parseManifest(serialized)),
     async load() {
-      return manifest;
+      return serialized === null ? null : parseManifest(serialized);
     },
     async save(next) {
-      manifest = next;
+      serialized = JSON.stringify(next);
     },
   };
 }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, stat } from 'node:fs/promises';
+import { chmod, mkdtemp, stat, symlink, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
@@ -11,6 +11,7 @@ import {
   kilocode_users,
   sharedCliSessions,
 } from '@kilocode/db/schema';
+import { createBlobStore } from './blob-store';
 import {
   runCleanup,
   type BlobStore,
@@ -585,6 +586,7 @@ void describe('session share maintenance', () => {
       })
     );
     assert.equal(repeat.apply?.complete, true);
+    assert.equal(repeat.apply?.blobs_deleted, 0);
     assert.deepEqual(blobStore.deleted, deletedBefore);
   });
 
@@ -687,10 +689,17 @@ void describe('session share maintenance', () => {
     assert.equal(first.apply?.failed, 1);
     assert.equal(first.apply?.pending_blob_deletes, 1);
     assert.equal(first.apply?.remaining, 1);
+    assert.equal(first.apply?.blobs_deleted, 0);
     assert.equal(blobStore.attempts, 2);
     assert.equal(await readShare(SHARE_MISMATCH_A), undefined);
     assert.ok(blobStore.objects.has(blobKey(SHARE_MISMATCH_A, 'ui_messages')));
     assert.ok(blobStore.objects.has(blobKey(SHARE_MISMATCH_A, 'git_state')));
+
+    const persisted = await store.load();
+    const persistedItem = persisted?.items.find(item => item.kind === 'v1');
+    assert.equal(persistedItem?.state, 'row_deleted');
+    assert.equal(persistedItem?.last_error, 'blob_delete_error');
+    assert.deepEqual(persistedItem?.blob_filenames, ['ui_messages', 'git_state']);
 
     blobStore.failForShareId = null;
     const resumed = await runCleanup(
@@ -705,6 +714,7 @@ void describe('session share maintenance', () => {
 
     assert.equal(resumed.apply?.complete, true);
     assert.equal(resumed.apply?.remaining, 0);
+    assert.equal(resumed.apply?.blobs_deleted, 2);
     assert.ok(!blobStore.objects.has(blobKey(SHARE_MISMATCH_A, 'ui_messages')));
     assert.ok(!blobStore.objects.has(blobKey(SHARE_MISMATCH_A, 'git_state')));
 
@@ -719,6 +729,7 @@ void describe('session share maintenance', () => {
       })
     );
     assert.equal(repeat.apply?.complete, true);
+    assert.equal(repeat.apply?.blobs_deleted, 0);
     assert.deepEqual(blobStore.deleted, deletedBefore);
   });
 
@@ -818,6 +829,31 @@ void describe('session share maintenance', () => {
     assert.equal((await readV2Row(SESSION_V2_WEBHOOK, BOT_WEBHOOK))?.public_id, PUBLIC_ID_WEBHOOK);
   });
 
+  void it('propagates adapter delete failures and maps share blob keys', async () => {
+    const calls: Array<{
+      shareId: string;
+      blobs: Array<{ folderName: string; filename: ShareBlobFilename }>;
+      options?: { signal?: AbortSignal };
+    }> = [];
+    const signal = new AbortController().signal;
+    const store = createBlobStore(async (shareId, blobs, options) => {
+      calls.push({ shareId, blobs, options });
+      throw new Error('delete failed');
+    });
+
+    await assert.rejects(
+      store.deleteShareBlobs(SHARE_MISMATCH_A, ['ui_messages', 'git_state'], { signal }),
+      /delete failed/
+    );
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.shareId, SHARE_MISMATCH_A);
+    assert.deepEqual(calls[0]?.blobs, [
+      { folderName: 'shared-sessions', filename: 'ui_messages' },
+      { folderName: 'shared-sessions', filename: 'git_state' },
+    ]);
+    assert.equal(calls[0]?.options?.signal, signal);
+  });
+
   void it('writes a private manifest and refuses repository paths', async () => {
     await insertUser(BOT_WEBHOOK);
     await insertV2({
@@ -830,6 +866,22 @@ void describe('session share maintenance', () => {
       () => createFileManifestStore(path.join(process.cwd(), 'session-share-manifest.json')),
       /outside the repository/
     );
+    assert.throws(
+      () => createFileManifestStore(path.join(process.cwd(), '..manifest.json')),
+      /outside the repository/
+    );
+
+    const linkRoot = await mkdtemp(path.join(tmpdir(), 'session-share-link-'));
+    const linkPath = path.join(linkRoot, 'repo-link');
+    await symlink(process.cwd(), linkPath, 'dir');
+    try {
+      assert.throws(
+        () => createFileManifestStore(path.join(linkPath, 'manifest.json')),
+        /outside the repository/
+      );
+    } finally {
+      await unlink(linkPath);
+    }
 
     const directory = await mkdtemp(path.join(tmpdir(), 'session-share-manifest-'));
     const manifestPath = path.join(directory, 'manifest.json');
@@ -847,6 +899,25 @@ void describe('session share maintenance', () => {
     assert.equal((await stat(manifestPath)).mode & 0o777, 0o600);
     assert.equal((await stat(directory)).mode & 0o077, 0);
     assert.equal((await store.load())?.items.length, 1);
+
+    const createdDirectory = path.join(directory, 'nested');
+    const createdStore = createFileManifestStore(path.join(createdDirectory, 'manifest.json'));
+    await createdStore.save(
+      createManifest({ target: 'v2-webhook-bot', databaseIdentityHash: identityHash })
+    );
+    assert.equal((await stat(createdDirectory)).mode & 0o077, 0);
+    assert.equal((await stat(path.join(createdDirectory, 'manifest.json'))).mode & 0o777, 0o600);
+
+    const sharedDirectory = await mkdtemp(path.join(tmpdir(), 'session-share-parent-'));
+    await chmod(sharedDirectory, 0o755);
+    const sharedStore = createFileManifestStore(path.join(sharedDirectory, 'manifest.json'));
+    await assert.rejects(
+      sharedStore.save(
+        createManifest({ target: 'v2-webhook-bot', databaseIdentityHash: identityHash })
+      ),
+      /accessible by group or other users/
+    );
+    assert.equal((await stat(sharedDirectory)).mode & 0o777, 0o755);
 
     await chmod(manifestPath, 0o644);
     await assert.rejects(store.load(), /accessible by group or other users/);

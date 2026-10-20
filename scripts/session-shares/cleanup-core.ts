@@ -435,7 +435,7 @@ async function applyV1Item(
   item: V1CleanupItem,
   options: CleanupOptions,
   persist: () => Promise<void>
-): Promise<void> {
+): Promise<number> {
   const blobStore = options.blobStore;
   if (!blobStore) throw new CleanupUsageError('Blob store is required for v1 candidates');
   const sleep = options.sleep ?? defaultSleep;
@@ -489,13 +489,13 @@ async function applyV1Item(
     if (revalidated === null) {
       markFailure(item, 'db_error');
       await persist();
-      return;
+      return 0;
     }
     if (revalidated === 'changed') {
       item.state = 'changed';
       item.last_error = null;
       await persist();
-      return;
+      return 0;
     }
 
     item.state = 'revoking';
@@ -521,7 +521,7 @@ async function applyV1Item(
     if (deleted === null) {
       markFailure(item, 'db_error');
       await persist();
-      return;
+      return 0;
     }
     if (deleted.length === 0) {
       const [stillThere] = await options.db
@@ -533,7 +533,7 @@ async function applyV1Item(
         item.state = 'changed';
         item.last_error = null;
         await persist();
-        return;
+        return 0;
       }
     }
 
@@ -542,13 +542,13 @@ async function applyV1Item(
     await persist();
   }
 
-  if (item.state !== 'row_deleted') return;
+  if (item.state !== 'row_deleted') return 0;
 
   if (item.blob_filenames.length === 0) {
     item.state = 'done';
     item.last_error = null;
     await persist();
-    return;
+    return 0;
   }
 
   const deleted = await retry(
@@ -560,12 +560,13 @@ async function applyV1Item(
   if (deleted === null) {
     markFailure(item, 'blob_delete_error');
     await persist();
-    return;
+    return 0;
   }
 
   item.state = 'done';
   item.last_error = null;
   await persist();
+  return item.blob_filenames.length;
 }
 
 function countItems(items: CleanupItem[]): {
@@ -574,7 +575,6 @@ function countItems(items: CleanupItem[]): {
   remaining: number;
   pending_blob_deletes: number;
   failed: number;
-  blobs_deleted: number;
   unsafe_blob_items: number;
 } {
   let completed = 0;
@@ -582,14 +582,12 @@ function countItems(items: CleanupItem[]): {
   let remaining = 0;
   let pendingBlobDeletes = 0;
   let failed = 0;
-  let blobsDeleted = 0;
   let unsafeBlobItems = 0;
 
   for (const item of items) {
     if (item.kind === 'v1' && item.unsafe_blob_filenames.length > 0) unsafeBlobItems += 1;
     if (item.state === 'done') {
       completed += 1;
-      if (item.kind === 'v1') blobsDeleted += item.blob_filenames.length;
       continue;
     }
     if (item.state === 'changed') {
@@ -607,7 +605,6 @@ function countItems(items: CleanupItem[]): {
     remaining,
     pending_blob_deletes: pendingBlobDeletes,
     failed,
-    blobs_deleted: blobsDeleted,
     unsafe_blob_items: unsafeBlobItems,
   };
 }
@@ -683,6 +680,7 @@ export async function runCleanup(options: CleanupOptions): Promise<CleanupReport
   }
 
   let batchIndex = 0;
+  let blobsDeleted = 0;
   const actionable = manifest.items.filter(
     item => item.state !== 'done' && item.state !== 'changed'
   );
@@ -692,7 +690,7 @@ export async function runCleanup(options: CleanupOptions): Promise<CleanupReport
       if (item.kind === 'v2') {
         await applyV2Item(item, options, persist);
       } else {
-        await applyV1Item(item, options, persist);
+        blobsDeleted += await applyV1Item(item, options, persist);
       }
     }
     await options.onBatch?.({
@@ -717,7 +715,7 @@ export async function runCleanup(options: CleanupOptions): Promise<CleanupReport
       remaining: counts.remaining,
       pending_blob_deletes: counts.pending_blob_deletes,
       failed: counts.failed,
-      blobs_deleted: counts.blobs_deleted,
+      blobs_deleted: blobsDeleted,
       unsafe_blob_items: counts.unsafe_blob_items,
       complete: counts.remaining === 0,
     },

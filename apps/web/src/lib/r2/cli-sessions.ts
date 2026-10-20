@@ -128,7 +128,7 @@ export async function deleteBlobs(
     Key: getBlobKey(sessionId, blob.folderName, blob.filename),
   }));
 
-  await r2Client.send(
+  const response = await r2Client.send(
     new DeleteObjectsCommand({
       Bucket: r2CliSessionsBucketName,
       Delete: {
@@ -138,6 +138,10 @@ export async function deleteBlobs(
     }),
     options?.signal ? { abortSignal: options.signal } : undefined
   );
+
+  if (response.Errors && response.Errors.length > 0) {
+    throw new Error(`Failed to delete ${response.Errors.length} session blob(s)`);
+  }
 }
 
 export async function getBlobContent(blobKey: string): Promise<unknown> {

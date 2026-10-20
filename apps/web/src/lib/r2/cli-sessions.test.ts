@@ -291,6 +291,24 @@ describe('cli-sessions', () => {
         },
       });
     });
+
+    test('throws when the delete response reports per-key errors', async () => {
+      mockSend.mockResolvedValueOnce({
+        Errors: [{ Key: 'sessions/session-123/ui_messages.json', Code: 'AccessDenied' }],
+      });
+
+      await expect(
+        deleteBlobs('session-123', [{ folderName: 'sessions', filename: 'ui_messages' }])
+      ).rejects.toThrow('Failed to delete 1 session blob(s)');
+    });
+
+    test('accepts an empty delete response', async () => {
+      mockSend.mockResolvedValueOnce({ Errors: [] });
+
+      await expect(
+        deleteBlobs('session-123', [{ folderName: 'sessions', filename: 'ui_messages' }])
+      ).resolves.toBeUndefined();
+    });
   });
 
   describe('getBlobContent', () => {

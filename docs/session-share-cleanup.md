@@ -135,7 +135,9 @@ organization shares to compensate for these categories. Review them separately.
 
 The script tests use a fake in-memory blob store with the same key shape as the
 R2 adapter; they do not use a real R2-compatible service. Database effects run
-against a real local PostgreSQL database.
+against a real local PostgreSQL database. CI typechecks the tooling, but does
+not run this suite because it needs a disposable database; run it manually
+before applying changes.
 
 ```sh
 POSTGRES_URL='postgres://postgres:postgres@localhost:5432/share_cleanup_test' \

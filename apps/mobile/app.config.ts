@@ -436,11 +436,13 @@ const config: ExpoConfig = {
       },
     ],
     'expo-apple-authentication',
-    // Play flavor (the defaults the plugin already applies). The plugin strips
-    // and re-adds the `missingDimensionStrategy "platform", ...` line on every
-    // prebuild, so its "Added missingDimensionStrategy for play flavor" log line
-    // is expected output, not a misconfiguration.
-    ['expo-iap', { isHorizonEnabled: false, isFireOsEnabled: false }],
+    // Play store, pinned: `modules.horizon` and `modules.amazon.fireOS` are the
+    // flags the plugin reads, so pinning both false keeps a stray
+    // EXPO_IAP_HORIZON or EXPO_IAP_FIREOS from selecting another store. With no
+    // store pinned the plugin logs "No store pin; Gradle picks the store from
+    // the task flavor or the connected debug device", which is expected output,
+    // not a misconfiguration.
+    ['expo-iap', { modules: { horizon: false, amazon: { fireOS: false } } }],
     [
       'expo-tracking-transparency',
       {

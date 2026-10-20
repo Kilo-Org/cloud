@@ -106,6 +106,18 @@ describe('handleSlackOAuthCallback organization authority', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it('refuses a member completion that carries no install purpose', async () => {
+    mockEnsureOrganizationAccess.mockRejectedValue(permissionDeniedError);
+
+    const { response } = await callCallback(`org_${ORGANIZATION_ID}`, undefined);
+
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
+      'permission_required'
+    );
+    expect(mockUpsertSlackInstallation).not.toHaveBeenCalled();
+    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+  });
+
   it('completes an organization install for an admin and authorizes a workspace change', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('admin');
 

@@ -170,6 +170,24 @@ describe('session access invalidation route', () => {
     expect(closeViewerSockets).not.toHaveBeenCalled();
   });
 
+  it('rejects a credential signed with the general internal secret', async () => {
+    const { cache, closeViewerSockets } = setInvalidationDos();
+    const { token } = await signKiloToken({
+      userId: INVALIDATION_USER_ID,
+      secret: 'internal-secret',
+      expiresInSeconds: 60,
+      audience: SESSION_INGEST_INVALIDATION_AUDIENCE,
+      extra: { organizationId: INVALIDATION_ORG_ID },
+    });
+
+    const res = await invalidationRequest({ token });
+
+    expect(res.status).toBe(401);
+    expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
+    expect(closeViewerSockets).not.toHaveBeenCalled();
+  });
+
   it('rejects invalidation without a credential', async () => {
     const { cache, closeViewerSockets } = setInvalidationDos();
 

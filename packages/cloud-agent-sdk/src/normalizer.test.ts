@@ -1468,7 +1468,9 @@ describe('normalize', () => {
     });
 
     it('returns null when a step snapshot tail exceeds the byte budget', () => {
-      expect(normalize(snapshotEvent('𝄞'.repeat(PREPARATION_OUTPUT_TAIL_MAX_BYTES)))).toBeNull();
+      const outputTail = 'é'.repeat(PREPARATION_OUTPUT_TAIL_MAX_BYTES / 2 + 1);
+      expect(outputTail.length).toBeLessThan(PREPARATION_OUTPUT_TAIL_MAX_BYTES);
+      expect(normalize(snapshotEvent(outputTail))).toBeNull();
     });
 
     it('is classified as a ServiceEvent, not a ChatEvent', () => {

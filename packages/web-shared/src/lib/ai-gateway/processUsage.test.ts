@@ -296,6 +296,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         {
           api_kind: apiKind,
           isStreaming: false,
+          is_free: false,
         } as MicrodollarUsageContext,
         undefined
       )
@@ -681,6 +682,7 @@ describe('logMicrodollarUsage', () => {
       isStreaming: true,
       project_id: null,
       requested_model: 'anthropic/claude-3.7-sonnet',
+      is_free: false,
       promptInfo: {
         system_prompt_prefix: 'You are a helpful assistant',
         system_prompt_length: 'You are a helpful assistant'.length,
@@ -1431,6 +1433,7 @@ describe('logMicrodollarUsage', () => {
           ...createBaseUsageContext(user),
           provider: 'custom',
           requested_model: 'acme/free-custom-model',
+          is_free: true,
         }
       );
     } finally {
@@ -1463,6 +1466,7 @@ describe('logMicrodollarUsage', () => {
           organizationId: organization.id,
           provider: 'custom',
           requested_model: modelId,
+          is_free: true,
         };
 
         await deleteCustomLlmForTest(modelId);
@@ -1529,6 +1533,41 @@ describe('logMicrodollarUsage', () => {
       market_cost: 700,
     });
     expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 1700);
+  });
+
+  test('preserves a paid snapshot when the requested id later becomes a custom model', async () => {
+    const user = await insertTestUser({
+      id: 'test-paid-snapshot-user',
+      microdollars_used: 1000,
+      google_user_email: 'paid-snapshot@example.com',
+    });
+    const modelId = 'acme/registered-after-routing';
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: modelId,
+      is_free: false,
+    };
+
+    await insertCustomLlmForTest(modelId);
+    try {
+      expect(await isCustomLlm(modelId)).toBe(true);
+      const result = await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+        usageContext
+      );
+      assert(result);
+      const usageRecord = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, result.usageId),
+      });
+      expect(usageRecord).toMatchObject({ cost: 700, cache_discount: 50 });
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.id, result.usageId),
+      });
+      expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 700 });
+      expect((await findUserById(user.id))?.microdollars_used).toBe(1700);
+    } finally {
+      await deleteCustomLlmForTest(modelId);
+    }
   });
 
   test('does not report a bouncer usage event without the bouncer context', async () => {
@@ -1722,6 +1761,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       isStreaming: false,
       project_id: null,
       requested_model: 'provider/requested-model',
+      is_free: false,
       promptInfo: {
         system_prompt_prefix: 'sys-prefix',
         system_prompt_length: 10,

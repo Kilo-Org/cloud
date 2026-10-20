@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
+import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -44,6 +45,7 @@ import {
   checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
+  countAndStoreEmbeddingUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
@@ -373,6 +375,41 @@ describe('parseEditUsageFromResponse', () => {
   });
 });
 
+describe('countAndStoreEmbeddingUsage', () => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+  });
+
+  it.each([
+    { is_free: false, user_byok: false, expectedCost: 1000 },
+    { is_free: true, user_byok: false, expectedCost: 0 },
+    { is_free: false, user_byok: true, expectedCost: 0 },
+  ])('uses the free/BYOK snapshots for embedding cost: %j', async testCase => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      is_free: testCase.is_free,
+      user_byok: testCase.user_byok,
+    };
+    const response = new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'test/embedding',
+        usage: { prompt_tokens: 10, cost: 0.001 },
+      })
+    );
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: testCase.expectedCost, market_cost: 1000 }),
+      usageContext
+    );
+  });
+});
+
 describe('countAndStoreFimUsage', () => {
   function makeUsageContext(
     overrides: Partial<MicrodollarUsageContext> = {}
@@ -399,6 +436,7 @@ describe('countAndStoreFimUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: null,
@@ -458,8 +496,11 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(390);
   });
 
-  it('does not bill BYOK requests', async () => {
-    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext({ user_byok: true }), undefined);
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('does not bill BYOK or free requests: %j', async overrides => {
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(overrides), undefined);
 
     await new Promise(resolve => setImmediate(resolve));
 
@@ -496,6 +537,7 @@ describe('countAndStoreEditUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: null,
@@ -519,7 +561,10 @@ describe('countAndStoreEditUsage', () => {
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
 
-  it('zeros both cost_mUsd and cacheDiscount_mUsd for BYOK requests', async () => {
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('zeros costs for BYOK or free requests: %j', async overrides => {
     const response = makeUpstreamResponse({
       id: 'edit-byok',
       model: 'mercury-edit-2',
@@ -532,7 +577,7 @@ describe('countAndStoreEditUsage', () => {
       choices: [],
     });
 
-    countAndStoreEditUsage(response, makeUsageContext({ user_byok: true }), undefined);
+    countAndStoreEditUsage(response, makeUsageContext(overrides), undefined);
 
     // Allow the async usage parse + after() callback to settle.
     await new Promise(resolve => setImmediate(resolve));

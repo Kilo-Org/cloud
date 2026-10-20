@@ -836,9 +836,33 @@ export const persistedKiloSdkMessageHistorySchema = z.preprocess(
 );
 export type KiloSdkMessageHistory = z.infer<typeof kiloSdkMessageHistorySchema>;
 
+/** Longest message identity an opaque history cursor may carry. */
+export const MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH = 64;
+
+/**
+ * Worst-case JSON envelope of a valid cursor: the empty id plus the longest
+ * decimal a non-negative finite double serializes to (`1.7976931348623157e+308`).
+ */
+const MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_LENGTH = '{"id":"","time":1.7976931348623157e+308}'
+  .length;
+
+/**
+ * Longest encoded cursor a valid cursor can produce, counting base64 padding.
+ * Request schemas cap the wire value at this length and the decoder rejects
+ * anything longer before it allocates or parses the decoded payload.
+ */
+export const MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH =
+  4 *
+  Math.ceil(
+    (MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_LENGTH + MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH) / 3
+  );
+
+/** Base64 and base64url alphabets, plus the optional trailing padding. */
+const KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
+
 export const kiloSdkMessagesLegacyCursorSchema = z
   .object({
-    id: messageIdSchema,
+    id: messageIdSchema.max(MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH),
     time: z.number().nonnegative(),
   })
   .strict();
@@ -858,6 +882,12 @@ export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): stri
 }
 
 export function decodeKiloSdkMessagesCursor(cursor: string): KiloSdkMessagesCursor {
+  if (
+    cursor.length > MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH ||
+    !KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN.test(cursor)
+  ) {
+    throw new Error('message cursor is not valid');
+  }
   const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
   const paddingLength = (4 - (base64.length % 4)) % 4;
   const binary = atob(base64 + '='.repeat(paddingLength));
@@ -877,7 +907,7 @@ export function validateKiloSdkMessagesCursor(cursor: string): boolean {
 export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
   .extend({
     limit: z.number().int().nonnegative().max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE).optional(),
-    before: z.string().min(1).optional(),
+    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.before !== undefined && (params.limit === undefined || params.limit === 0)) {
@@ -919,7 +949,9 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
  * `before` requires a positive `limit`; the default guarantees this unless
- * the caller explicitly supplies a non-positive `limit`.
+ * the caller explicitly supplies a non-positive `limit`. `before` is capped at
+ * `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized value never reaches
+ * the decoder.
  */
 export const getSessionMessagesSchema = z
   .object({
@@ -931,7 +963,7 @@ export const getSessionMessagesSchema = z
       .positive()
       .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
       .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    before: z.string().min(1).optional(),
+    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.before === undefined) return;

@@ -59,7 +59,11 @@ import {
   decodeKiloSdkMessagesCursor,
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   encodeKiloSdkMessagesCursor,
+  getCloudAgentRootSessionMessagesSchema,
+  getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
   messageIdSchema,
   partIdSchema,
@@ -1960,6 +1964,89 @@ describe('Kilo SDK message cursor codec', () => {
     expect(() =>
       decodeKiloSdkMessagesCursor(encodeUnchecked({ id: 'other_01', time: 1 }))
     ).toThrow();
+  });
+
+  it('round-trips the longest cursor the schemas accept', () => {
+    const cursor = {
+      id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH - 3)}`,
+      time: 1761000000100,
+    };
+    const encoded = encodeKiloSdkMessagesCursor(cursor);
+
+    expect(encoded.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(decodeKiloSdkMessagesCursor(encoded)).toEqual(cursor);
+    expect(validateKiloSdkMessagesCursor(encoded)).toBe(true);
+  });
+
+  it('rejects an encoded cursor longer than the wire cap without decoding it', () => {
+    const oversized = 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1);
+
+    expect(validateKiloSdkMessagesCursor(oversized)).toBe(false);
+    expect(() => decodeKiloSdkMessagesCursor(oversized)).toThrow();
+    expect(validateKiloSdkMessagesCursor(btoa('x'.repeat(65536)))).toBe(false);
+  });
+
+  it('rejects a cursor whose decoded message id is longer than the id cap', () => {
+    const oversized = btoa(
+      JSON.stringify({
+        id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH - 2)}`,
+        time: 1,
+      })
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    expect(oversized.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(validateKiloSdkMessagesCursor(oversized)).toBe(false);
+    expect(() => decodeKiloSdkMessagesCursor(oversized)).toThrow();
+  });
+
+  it('rejects characters outside the base64 cursor alphabet', () => {
+    expect(validateKiloSdkMessagesCursor('not-valid')).toBe(false);
+    expect(validateKiloSdkMessagesCursor('cursor with spaces')).toBe(false);
+    expect(validateKiloSdkMessagesCursor('eyJpZCI6Im1zZ191c2VyXzAxIiwidGltZSI6MX0=')).toBe(true);
+  });
+
+  it('rejects an over-length before cursor at the history request schemas', () => {
+    const oversized = 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1);
+    const generic = getSessionMessagesSchema.safeParse({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+      before: oversized,
+    });
+
+    expect(generic.success).toBe(false);
+    if (generic.success) throw new Error('expected the oversized cursor to be rejected');
+    expect(generic.error.issues.map(issue => issue.path[0])).toContain('before');
+    expect(
+      getCloudAgentRootSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 10,
+        before: oversized,
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts an encoded cursor at the history request schemas', () => {
+    const before = encodeKiloSdkMessagesCursor({ id: 'msg_user_01', time: 1761000000100 });
+
+    expect(
+      getSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        before,
+      }).success
+    ).toBe(true);
+    expect(
+      getCloudAgentRootSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 10,
+        before,
+      }).success
+    ).toBe(true);
   });
 });
 

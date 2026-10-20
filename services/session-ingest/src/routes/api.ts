@@ -7,6 +7,7 @@ import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
@@ -583,7 +584,7 @@ api.get('/session/:sessionId/messages', async c => {
   const beforeParsed =
     beforeParam === undefined
       ? { success: true as const, data: undefined }
-      : z.string().min(1).max(1024).safeParse(beforeParam);
+      : z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).safeParse(beforeParam);
   if (!beforeParsed.success) {
     return c.json({ success: false, error: 'Invalid before' }, 400);
   }

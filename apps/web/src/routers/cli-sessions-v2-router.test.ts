@@ -14,6 +14,7 @@ import {
 import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
@@ -1092,6 +1093,19 @@ describe('cli-sessions-v2-router', () => {
           session_id: sessionId,
           limit: 10,
           cursor: 'not-a-real-cursor',
+        })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects an over-length continuation cursor before calling the client', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 10,
+          cursor: 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1),
         })
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();

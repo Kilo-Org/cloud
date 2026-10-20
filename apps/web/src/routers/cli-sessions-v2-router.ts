@@ -44,6 +44,7 @@ import {
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
   isDefaultSessionTitle,
   projectPrivateWorktreePaths,
@@ -718,7 +719,7 @@ const GetSessionMessagesPageInputSchema = z
       .positive()
       .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
       .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).optional(),
+    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.cursor === undefined) return;

@@ -30,6 +30,7 @@ vi.mock('../services/session-access', () => ({
 }));
 
 import { getWorkerDb } from '@kilocode/db/client';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
@@ -1403,6 +1404,22 @@ describe('api routes', () => {
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid paging input' });
+  });
+
+  it('GET /session/:sessionId/messages returns 400 for an over-length before cursor', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        `http://local/session/ses_12345678901234567890123456/messages?limit=50&before=${'A'.repeat(
+          MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1
+        )}`,
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid before' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
   it('GET /session/:sessionId/messages returns 404 when the user does not own the session', async () => {

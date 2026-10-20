@@ -18,6 +18,10 @@
         "name": "STREAM_TICKET_NONCE_DO",
       },
       {
+        "class_name": "WorktreeCleanupCoordinator",
+        "name": "WORKTREE_CLEANUP",
+      },
+      {
         "class_name": "UserKiloFacade",
         "name": "USER_KILO_FACADE",
       },
@@ -63,6 +67,10 @@
     {
       "new_sqlite_classes": ["EnvironmentBuild"],
       "tag": "v12",
+    },
+    {
+      "new_sqlite_classes": ["WorktreeCleanupCoordinator"],
+      "tag": "v14",
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],

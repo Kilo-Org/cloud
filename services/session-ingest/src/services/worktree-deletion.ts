@@ -4,6 +4,7 @@ import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import {
   cli_sessions_v2,
   cloud_agent_worktrees,
+  github_branch_pull_requests,
   type CloudAgentWorktree,
 } from '@kilocode/db/schema';
 import {
@@ -13,6 +14,7 @@ import {
   containedKiloSessionIdSchema,
   kiloSdkSessionSnapshotOutcomeSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
+  WORKTREE_MERGED_PULL_REQUESTS_REQUIRED,
   type CanDestroyCloudAgentWorktreeSandboxResult,
   type UnresolvedCloudAgentSandboxOwner,
   type CloudAgentWorktreeDeletionParams,
@@ -272,6 +274,73 @@ async function lockRoots(db: WorktreeDb, params: CloudAgentWorktreeDeletionParam
     .for('update');
 }
 
+async function requireMergedPullRequests(
+  db: WorktreeDb,
+  params: CloudAgentWorktreeDeletionParams,
+  sessions: CloudAgentWorktreeDeletionState['manifest']['sessions']
+): Promise<void> {
+  if (!params.requireMergedPullRequests) return;
+  if (sessions.length === 0) throw new Error(WORKTREE_MERGED_PULL_REQUESTS_REQUIRED);
+  const rows = await db
+    .select({
+      organizationId: cli_sessions_v2.organization_id,
+      platform: cli_sessions_v2.platform,
+      prUrl: cli_sessions_v2.pr_url,
+      prNumber: cli_sessions_v2.pr_number,
+      verifiedAt: cli_sessions_v2.pr_link_verified_at,
+      prState: github_branch_pull_requests.pr_state,
+    })
+    .from(cli_sessions_v2)
+    .leftJoin(
+      github_branch_pull_requests,
+      and(
+        eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
+        eq(github_branch_pull_requests.pr_number, cli_sessions_v2.pr_number),
+        or(
+          and(
+            isNotNull(cli_sessions_v2.organization_id),
+            eq(
+              github_branch_pull_requests.owned_by_organization_id,
+              cli_sessions_v2.organization_id
+            )
+          ),
+          and(
+            isNull(cli_sessions_v2.organization_id),
+            eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
+          )
+        ),
+        isNotNull(cli_sessions_v2.pr_url),
+        isNotNull(cli_sessions_v2.pr_link_verified_at)
+      )
+    )
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
+        inArray(
+          cli_sessions_v2.session_id,
+          sessions.map(session => session.sessionId)
+        )
+      )
+    )
+    .orderBy(cli_sessions_v2.session_id)
+    .for('update', { of: cli_sessions_v2 });
+  const merged = (row: (typeof rows)[number]) =>
+    row.platform === 'github' &&
+    row.prUrl !== null &&
+    row.verifiedAt !== null &&
+    row.prState === 'merged';
+  if (
+    !rows.some(merged) ||
+    rows.some(
+      row =>
+        row.organizationId !== (params.organizationId ?? null) ||
+        ((row.prUrl !== null || row.prNumber !== null) && !merged(row))
+    )
+  ) {
+    throw new Error(WORKTREE_MERGED_PULL_REQUESTS_REQUIRED);
+  }
+}
+
 /**
  * The whole deletion-journal body, run on a caller-owned transaction so a
  * caller can hold the same worktree row lock (`lockWorktree`) across its own
@@ -323,6 +392,7 @@ async function beginWorktreeDeletionOn(
       sessions: await discoverMembers(tx, params),
     });
   }
+  await requireMergedPullRequests(tx, params, manifest.sessions);
   const runtimeLocations = locations(row);
   if (runtimeLocations.length === 0) {
     const cloudAgentSessionId = firstWorktreeSessionId(params.worktreeId);
@@ -692,6 +762,10 @@ export async function recordWorktreeCleanup(
       const sessions = new Map(
         state.manifest.sessions.map(session => [session.sessionId, session])
       );
+      await requireMergedPullRequests(tx, params, [
+        ...sessions.values(),
+        ...childSessions.map(child => ({ sessionId: child.sessionId, cloudAgentSessionId: null })),
+      ]);
       await recoverChildSessionLineage(
         tx,
         { ...params, childSessions },
@@ -779,6 +853,7 @@ export async function recordWorktreeCleanup(
         version: 1,
         sessions: [...sessions.values()],
       } satisfies typeof state.manifest;
+      await requireMergedPullRequests(tx, params, manifest.sessions);
       await tx
         .update(cloud_agent_worktrees)
         .set({ runtime_locations: runtimeLocations, deletion_manifest: manifest })

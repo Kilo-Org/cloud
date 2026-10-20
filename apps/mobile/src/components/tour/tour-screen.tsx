@@ -14,6 +14,7 @@ import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { useOrganization } from '@/lib/organization-context';
 import { PRESELECT_CLOUD_RUN_ON } from '@/lib/run-on-destination';
 import { dismissTour } from '@/lib/tour/tour-dismiss';
 import { useTourCompletion } from '@/lib/tour/tour-completion';
@@ -124,6 +125,11 @@ export function TourScreen() {
   const insets = useSafeAreaInsets();
   const { userId } = useCurrentUserId();
   const { recordCompleted } = useTourCompletion(userId);
+  // The hand-off's scope: the new-session form resolves its repositories, model
+  // catalog, profiles and create from this value, so a missing one lands the
+  // person in Personal even when their integration lives on the organization.
+  // Home's NewTaskButton passes the same selection.
+  const { organizationId } = useOrganization();
 
   // One dismissal decision: record it synchronously (the hook flips its
   // in-memory state before returning and persists in the background), then
@@ -145,13 +151,23 @@ export function TourScreen() {
   // `replace` produces. The run-on param is transient — the stored run-on
   // preference is never written here. The computer card omits it so the form
   // restores the stored preference and the person picks their computer there.
+  // The organization travels in the route (not as a stored preference) so this
+  // hand-off opens the same scope Home's new-task action does; Personal passes
+  // no param, which is the form's own default.
   const handOff = useCallback(
     (runOn?: string) => {
       recordCompleted();
-      const query = runOn ? `?preselectRunOn=${encodeURIComponent(runOn)}` : '';
-      stackSafeRouter.replace(`/(app)/agent-chat/new${query}` as Href);
+      const params = new URLSearchParams();
+      if (organizationId) {
+        params.set('organizationId', organizationId);
+      }
+      if (runOn) {
+        params.set('preselectRunOn', runOn);
+      }
+      const search = params.toString();
+      stackSafeRouter.replace(`/(app)/agent-chat/new${search ? `?${search}` : ''}` as Href);
     },
-    [recordCompleted, stackSafeRouter]
+    [organizationId, recordCompleted, stackSafeRouter]
   );
 
   const choosePath = useCallback(

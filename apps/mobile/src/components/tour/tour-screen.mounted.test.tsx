@@ -23,6 +23,10 @@ const stackSafeReplace = vi.hoisted(() => vi.fn());
 const routerCanGoBack = vi.hoisted(() => ({ value: true }));
 const recordCompleted = vi.hoisted(() => vi.fn());
 const completionState = vi.hoisted(() => ({ isLoaded: true, isCompleted: false }));
+// The scope the hand-off must carry: a member's integration lives on the
+// organization, so the form only lists those repositories when this value
+// travels in the route. null is Personal (the form's own default).
+const organizationState = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
 // Models React Native's BackHandler as a set of live subscriptions so a test
 // can press Back and observe exactly which listeners are registered.
 const backHandler = vi.hoisted(() => {
@@ -104,6 +108,14 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#666666' }),
+}));
+
+// The shell reads the active organization to scope its hand-off. The provider's
+// restore path (SecureStore + the organization list) is covered by
+// src/lib/organization-context.mounted.test.tsx; here the shell only consumes
+// the selected id.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: organizationState.organizationId }),
 }));
 
 vi.mock('@/lib/tour/tour-completion', () => ({
@@ -191,6 +203,7 @@ describe('TourScreen', () => {
     focusState.active = true;
     completionState.isLoaded = true;
     completionState.isCompleted = false;
+    organizationState.organizationId = 'org-1';
   });
 
   it('renders the fork question and both path cards', async () => {
@@ -248,7 +261,13 @@ describe('TourScreen', () => {
     // The hand-off goes through the stack-safe replace, not a literal
     // `router.replace`, so the tour and the form never swap in one commit.
     expect(stackSafeReplace).toHaveBeenCalledTimes(1);
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=cloud');
+    // The organization rides along: the form's repository section, model
+    // catalog and create are scoped by it, so the member sees the
+    // organization's connected repositories instead of the personal connect
+    // prompt. Cloud Agent stays the preselected target.
+    expect(stackSafeReplace).toHaveBeenCalledWith(
+      '/(app)/agent-chat/new?organizationId=org-1&preselectRunOn=cloud'
+    );
     expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
 
@@ -265,9 +284,29 @@ describe('TourScreen', () => {
     // preference and the person picks their computer there.
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(stackSafeReplace).toHaveBeenCalledTimes(1);
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new');
+    // No run-on param so the form restores the stored preference; the
+    // organization still scopes the form.
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?organizationId=org-1');
     expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('hands off without an organization param when Personal is active', async () => {
+    organizationState.organizationId = null;
+    const { renderer, unmount } = await mountTour();
+
+    pressControl(renderer, 'ChoiceRow', 'tour.cloudOptionTitle');
+    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
+
+    // Personal is the form's own default, so the hand-off names no scope and
+    // each card keeps its run-on behavior.
+    expect(stackSafeReplace).toHaveBeenNthCalledWith(
+      1,
+      '/(app)/agent-chat/new?preselectRunOn=cloud'
+    );
+    expect(stackSafeReplace).toHaveBeenNthCalledWith(2, '/(app)/agent-chat/new');
 
     unmount();
   });
@@ -366,7 +405,7 @@ describe('TourScreen', () => {
 
     pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
     expect(recordCompleted).toHaveBeenCalledTimes(1);
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new');
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?organizationId=org-1');
 
     unmount();
   });

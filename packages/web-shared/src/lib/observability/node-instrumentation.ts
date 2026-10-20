@@ -1,12 +1,13 @@
-import { getClient, SentryContextManager, validateOpenTelemetrySetup } from '@sentry/nextjs';
-import { SentryPropagator, SentrySampler, SentrySpanProcessor } from '@sentry/opentelemetry';
 import { registerOTel } from '@vercel/otel';
 import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-server';
 
 // Import this module only when NEXT_RUNTIME is 'nodejs'.
 //
-// Use Vercel's OpenTelemetry SDK (Node runtime) but supply the Sentry-required components
-// (sampler/propagator/context manager/span processor) ourselves.
+// The server runtime runs Vercel's OpenTelemetry SDK and Sentry side by side. Since
+// Sentry SDK 11 the two pipelines are independent: Sentry no longer registers a tracer
+// provider and no longer accepts Sentry span processor components, so a span created
+// through `@opentelemetry/api` is never turned into a Sentry span. Sentry tracing is off
+// here (see `initServerSentry`), so this module only wires the OTel provider.
 //
 // Notes on runtime split:
 // - `@vercel/otel` ships distinct entrypoints for Edge vs Node via conditional exports
@@ -19,24 +20,11 @@ import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-
 //   it provides only lightweight trace propagation, not full auto-instrumentation.
 //   See: https://www.npmjs.com/package/@vercel/otel (README describes Edge as "lightweight mode")
 //
-// We intentionally only enable the Sentry+OTel custom wiring in Node runtime for now.
-// Edge tracing should rely on Sentry's Edge SDK behavior configured in apps/web/sentry.edge.config.ts.
+// We intentionally only register OTel in the Node runtime.
+// Edge events rely on Sentry's Edge SDK behavior configured in apps/web/sentry.edge.config.ts.
 // ref: https://docs.sentry.io/platforms/javascript/guides/nextjs/opentelemetry/custom-setup/
 export function registerNodeInstrumentation(serviceName: string): void {
   initServerSentry();
 
-  const sentryClient = getClient();
-  if (!sentryClient) {
-    console.warn('Sentry client not found in instrumentation.ts');
-  }
-
-  registerOTel({
-    serviceName,
-    traceSampler: sentryClient ? new SentrySampler(sentryClient) : undefined,
-    spanProcessors: ['auto', new SentrySpanProcessor()],
-    propagators: ['auto', new SentryPropagator()],
-    contextManager: new SentryContextManager(),
-  });
-
-  validateOpenTelemetrySetup();
+  registerOTel({ serviceName });
 }

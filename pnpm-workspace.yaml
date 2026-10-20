@@ -114,12 +114,15 @@ minimumReleaseAgeExclude:
   - react-native-reanimated@4.7.1
 overrides:
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
-  # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)
-  # requires ^2.58.5 and calls @sentry/cli through its Node API. v3 replaced the
+  # @sentry/react-native pulls @sentry/bundler-plugins@10, which requires
+  # @sentry/cli ^2.58.5 and calls it through its Node API. v3 replaced the
   # CommonJS default class export with a named one, so forcing v3 makes every
   # `new SentryCli()` throw "_sentry_cli.default is not a constructor". The plugin
   # swallows that as a recoverable error, so builds stay green while silently
   # uploading nothing. This previously broke apps/web source maps for months.
+  # @sentry/nextjs 11 no longer consumes @sentry/cli (its bundler plugin uses the
+  # separate `sentry` CLI package), so the web path no longer relies on this rule;
+  # the mobile path still does.
   '@babel/plugin-transform-modules-systemjs': 7.29.7
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1

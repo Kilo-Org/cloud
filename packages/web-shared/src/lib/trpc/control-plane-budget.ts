@@ -17,8 +17,8 @@ import {
  * The app gives every control-plane call `CONTROL_PLANE_DEADLINE_MS = 15_000`
  * (`packages/event-service/src/deadline.ts`) and then abandons it. Without a
  * server-side bound the same request keeps running — and when the upstream
- * shared read (`getUserFromAuth` -> `findUserById(..., readDb)`) misses its
- * budget the gateway answers 504 instead of the app's own deadline. This budget
+ * shared read misses its budget the gateway answers 504 instead of the app's
+ * own deadline. This budget
  * is strictly *below* that client deadline, leaving transport slack, so the
  * slow path fails with a settled tRPC error the app already renders as
  * retryable rather than hanging to the gateway.

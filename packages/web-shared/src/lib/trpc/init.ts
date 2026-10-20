@@ -68,11 +68,10 @@ export type CreateTRPCContextOpts = {
 /**
  * @see: https://trpc.io/docs/server/context
  *
- * The shared auth read (`getUserFromAuth` -> `findUserById(..., readDb)`) is
- * the only upstream `user.getMe` awaits, and tRPC runs it *before* procedure
- * middleware. Wrapping it here is what keeps a hanging replica read from
- * becoming a gateway 504; the procedure middleware then consumes whatever
- * budget remains.
+ * The shared user read is the only upstream `user.getMe` awaits, and tRPC
+ * runs it *before* procedure middleware. Wrapping it here is what keeps a
+ * hanging user read from becoming a gateway 504; the procedure middleware
+ * then consumes whatever budget remains.
  */
 export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<TRPCContext> => {
   const headersList = opts?.req?.headers ?? (await headers());

@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
@@ -173,7 +173,7 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
     return authError(401, 'Unauthorized', '?');
   }
 
-  return resolveUserFromSession({ adminOnly: false }, db);
+  return resolveUserFromSession({ adminOnly: false });
 }
 
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
@@ -184,10 +184,10 @@ export async function getUserFromSessionForCredentialIssuanceOrRedirect(
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
 
-  const { user } = await resolveUserFromSession(
-    { adminOnly: false, DANGEROUS_allowBlockedUsers: true },
-    db
-  );
+  const { user } = await resolveUserFromSession({
+    adminOnly: false,
+    DANGEROUS_allowBlockedUsers: true,
+  });
   if (!user) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
@@ -232,8 +232,7 @@ export async function getUserFromBearerForCredentialExchange(
     { adminOnly: false },
     false,
     undefined,
-    undefined,
-    db
+    undefined
   );
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
@@ -291,7 +290,7 @@ async function resolveUserFromAuth(
       });
     }
 
-    const user = await findUserById(authorizationValidationResult.kiloUserId, readDb);
+    const user = await findUserById(authorizationValidationResult.kiloUserId, db);
 
     if (
       user &&
@@ -315,26 +314,22 @@ async function resolveUserFromAuth(
       false,
       organizationId,
       internalApiUse,
-      readDb,
       botId,
       tokenSource,
       deviceSessionId
     );
   }
 
-  return resolveUserFromSession(opts, readDb);
+  return resolveUserFromSession(opts);
 }
 
-async function resolveUserFromSession(
-  opts: RequiredPermissions,
-  fromDb: typeof db
-): Promise<GetAuthResponse> {
+async function resolveUserFromSession(opts: RequiredPermissions): Promise<GetAuthResponse> {
   const session = await getServerSession(sessionAuthOptions);
   const maybeKiloUserId = session?.kiloUserId;
 
   if (!maybeKiloUserId) return authError(401, 'Unauthorized', '?');
 
-  const user = await findUserById(maybeKiloUserId, fromDb);
+  const user = await findUserById(maybeKiloUserId, db);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
   if (!isWebSessionCurrent(session.webSessionPepper, user))
@@ -347,8 +342,7 @@ async function resolveUserFromSession(
     opts,
     session.isNewUser,
     undefined,
-    undefined,
-    fromDb
+    undefined
   );
 }
 
@@ -405,7 +399,6 @@ async function validateUserAuthorization(
   isNewUser?: boolean,
   organizationId?: Organization['id'],
   internalApiUse?: boolean,
-  fromDb: typeof db = db,
   botId?: string,
   tokenSource?: string,
   deviceSessionId?: string
@@ -425,7 +418,7 @@ async function validateUserAuthorization(
     if (!uuidResult.success) {
       return authError(400, 'Invalid organization ID format', kiloUserId);
     }
-    const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
+    const isMember = await isOrganizationMember(db, organizationId, kiloUserId);
     if (!isMember) {
       return authError(403, 'Access denied (not a member of the organization)', kiloUserId);
     }

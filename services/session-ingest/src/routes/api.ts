@@ -18,10 +18,15 @@ import type { Env } from '../env';
 import {
   activeOrganizationJoinCondition,
   organizationMembershipJoinCondition,
-  personalOrActiveOrganizationCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
   zodJsonValidator,
   withDORetry,
 } from '@kilocode/worker-utils';
+import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
@@ -366,7 +371,8 @@ api.delete('/session/:sessionId', async c => {
     )
     SELECT
       tree.session_id,
-      tree.organization_id IS NULL OR EXISTS (
+      tree.organization_id IS NULL
+      OR EXISTS (
         SELECT 1
         FROM ${organization_memberships}
         INNER JOIN ${organizations}
@@ -374,6 +380,22 @@ api.delete('/session/:sessionId', async c => {
           AND ${organizations.deleted_at} IS NULL
         WHERE ${organization_memberships.organization_id} = tree.organization_id
           AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM ${organizations} AS active_target_organization
+        INNER JOIN ${organizations} AS active_parent_organization
+          ON active_parent_organization.id = active_target_organization.parent_organization_id
+          AND active_parent_organization.deleted_at IS NULL
+        INNER JOIN ${organization_memberships} AS active_parent_membership
+          ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+          AND active_parent_membership.kilo_user_id = ${kiloUserId}
+          AND active_parent_membership.role IN (${sql.join(
+            ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+            sql`, `
+          )})
+        WHERE active_target_organization.id = tree.organization_id
+          AND active_target_organization.deleted_at IS NULL
       ) AS has_access
     FROM tree
     ORDER BY depth DESC
@@ -623,11 +645,16 @@ api.get('/session/:sessionId/messages', async c => {
       organizationMembershipJoinCondition(kiloUserId, cli_sessions_v2.organization_id)
     )
     .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(kiloUserId)
+    )
     .where(
       and(
         eq(cli_sessions_v2.session_id, inputParse.data.kiloSessionId),
         eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-        personalOrActiveOrganizationCondition(cli_sessions_v2.organization_id)
+        personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id)
       )
     )
     .limit(1);
@@ -766,6 +793,22 @@ api.post('/session/:sessionId/share', async c => {
             AND ${organizations.deleted_at} IS NULL
           WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
             AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM ${organizations} AS active_target_organization
+          INNER JOIN ${organizations} AS active_parent_organization
+            ON active_parent_organization.id = active_target_organization.parent_organization_id
+            AND active_parent_organization.deleted_at IS NULL
+          INNER JOIN ${organization_memberships} AS active_parent_membership
+            ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+            AND active_parent_membership.kilo_user_id = ${kiloUserId}
+            AND active_parent_membership.role IN (${sql.join(
+              ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+              sql`, `
+            )})
+          WHERE active_target_organization.id = ${cli_sessions_v2.organization_id}
+            AND active_target_organization.deleted_at IS NULL
         )
       )
     RETURNING ${cli_sessions_v2.public_id}

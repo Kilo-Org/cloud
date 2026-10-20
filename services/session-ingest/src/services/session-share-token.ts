@@ -11,7 +11,11 @@ import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import {
   activeOrganizationJoinCondition,
   organizationMembershipJoinCondition,
-  personalOrActiveOrganizationCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
 } from '@kilocode/worker-utils';
 import { z } from 'zod';
 
@@ -155,12 +159,17 @@ export async function resolveSessionShareToken(
       )
     )
     .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(cli_sessions_v2.kilo_user_id)
+    )
     .where(
       and(
         eq(cli_sessions_v2.session_id, payload.sub),
         isNotNull(cli_sessions_v2.public_id),
         eq(cli_sessions_v2.public_id, payload.jti),
-        personalOrActiveOrganizationCondition(cli_sessions_v2.organization_id)
+        personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id)
       )
     )
     .limit(1);

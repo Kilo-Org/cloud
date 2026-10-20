@@ -220,6 +220,46 @@ describe('organization admin router', () => {
           .where(inArray(organizations.id, [organization.id, otherOrganization.id]));
       }
     });
+
+    it('keeps the deletion and admin action when post-delete invalidation fails', async () => {
+      const organization = await createTestOrganization(
+        `Delete invalidation ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      jest
+        .mocked(invalidateOrganizationSessionAccess)
+        .mockRejectedValueOnce(new Error('invalidation unavailable'));
+
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.delete({ organizationId: organization.id })
+        ).resolves.toBeDefined();
+
+        const [deleted] = await db
+          .select({ deletedAt: organizations.deleted_at })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(deleted?.deletedAt).not.toBeNull();
+
+        const audits = await db
+          .select({ action: admin_action_audit_logs.action })
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.target_type, 'organization'),
+              eq(admin_action_audit_logs.target_id, organization.id)
+            )
+          );
+        expect(audits.map(audit => audit.action)).toContain('organization.delete');
+      } finally {
+        await db
+          .delete(organization_memberships)
+          .where(eq(organization_memberships.organization_id, organization.id));
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+      }
+    });
   });
 
   describe('getDetails', () => {

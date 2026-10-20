@@ -6,7 +6,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import { activeOrganizationAccessSql } from '@kilocode/web-shared/lib/organizations/active-organization-access';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 
 const PAGE_SIZE = 10;
 const RECENT_DAYS_LIMIT = 200;

@@ -256,10 +256,16 @@ export type {
 } from './security-finding-audit.js';
 
 export {
+  activeOrganizationAccessSql,
   activeOrganizationJoinCondition,
   hasOrganizationAccess,
   organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
   personalOrActiveOrganizationCondition,
+  personalOrInheritedOrganizationCondition,
 } from './organization-membership.js';
 
 export {

@@ -175,13 +175,13 @@ describe('organization access kilo_admin_elevation telemetry', () => {
       .where(eq(organizations.id, organization.id));
 
     await expect(ensureOrganizationAccess(ctxFor(member), organization.id)).rejects.toMatchObject({
-      code: 'UNAUTHORIZED',
+      code: 'NOT_FOUND',
     });
     const roles = await getOrganizationsAccessRoles(ctxFor(member), [organization.id]);
     expect(roles.has(organization.id)).toBe(false);
     await expect(
       ensureOrganizationAccessAndFetchOrg(ctxFor(member), organization.id)
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   test('keeps parent-inherited access while the target and parent are live', async () => {
@@ -223,7 +223,7 @@ describe('organization access kilo_admin_elevation telemetry', () => {
       .where(eq(organizations.id, child.id));
 
     await expect(ensureOrganizationAccess(ctxFor(parentOwner), child.id)).rejects.toMatchObject({
-      code: 'UNAUTHORIZED',
+      code: 'NOT_FOUND',
     });
   });
 

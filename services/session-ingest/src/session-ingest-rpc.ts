@@ -5,7 +5,11 @@ import { cli_sessions_v2, organization_memberships, organizations } from '@kiloc
 import {
   activeOrganizationJoinCondition,
   organizationMembershipJoinCondition,
-  personalOrActiveOrganizationCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
 } from '@kilocode/worker-utils';
 import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import {
@@ -96,7 +100,7 @@ function organizationJoin() {
 }
 
 function personalOrAccessibleOrganizationCondition() {
-  return personalOrActiveOrganizationCondition(cli_sessions_v2.organization_id);
+  return personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id);
 }
 
 function safeGitUrl(value: string | null): string | null {
@@ -580,6 +584,11 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       .from(cli_sessions_v2)
       .leftJoin(organization_memberships, organizationMembershipJoin(parsed.kiloUserId))
       .leftJoin(organizations, organizationJoin())
+      .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+      .leftJoin(
+        parentOrganizationMembershipsTable,
+        parentOrganizationMembershipJoinCondition(parsed.kiloUserId)
+      )
       .where(and(...conditions))
       .orderBy(desc(cli_sessions_v2.updated_at), desc(cli_sessions_v2.session_id))
       .limit(parsed.limit + 1);
@@ -649,6 +658,11 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       .from(cli_sessions_v2)
       .leftJoin(organization_memberships, organizationMembershipJoin(params.kiloUserId))
       .leftJoin(organizations, organizationJoin())
+      .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+      .leftJoin(
+        parentOrganizationMembershipsTable,
+        parentOrganizationMembershipJoinCondition(params.kiloUserId)
+      )
       .where(
         and(
           eq(cli_sessions_v2.session_id, params.kiloSessionId),

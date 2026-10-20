@@ -20,13 +20,28 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
-import { activeOrganizationJoinCondition } from '@kilocode/worker-utils';
+import { activeOrganizationJoinCondition } from '@kilocode/worker-utils/organization-membership';
 
 const parentOrganizations = alias(organizations, 'parent_organizations');
 
 export const OrganizationIdInputSchema = z.object({
   organizationId: z.uuid(),
 });
+
+/**
+ * A soft-deleted organization is reported as missing rather than as an
+ * authorization failure. Existing callers rely on NOT_FOUND for an
+ * organization that no longer exists, while a live organization the caller
+ * cannot access stays UNAUTHORIZED.
+ */
+async function isSoftDeletedOrganization(organizationId: Organization['id']): Promise<boolean> {
+  const [organization] = await db
+    .select({ deletedAt: organizations.deleted_at })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  return organization?.deletedAt != null;
+}
 
 const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
@@ -90,6 +105,12 @@ export async function ensureOrganizationAccess(
   const rows = [...directRows, ...inheritedRows];
 
   if (!rows.length) {
+    if (await isSoftDeletedOrganization(organizationId)) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'You do not have access to this organization',
@@ -274,6 +295,12 @@ export async function ensureOrganizationAccessAndFetchOrg(
   const rows = [...directRows, ...inheritedRows];
 
   if (!rows.length) {
+    if (await isSoftDeletedOrganization(organizationId)) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'You do not have access to this organization',

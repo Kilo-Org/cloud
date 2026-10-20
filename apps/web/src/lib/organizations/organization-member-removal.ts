@@ -119,16 +119,28 @@ export async function invalidateMemberSessionAccess(
 }
 
 /**
- * Invalidate cached session access and close live streams for every affected
- * user. Failures stay best-effort; the database-backed access predicate denies
- * immediately and the cache entry expires within its TTL.
+ * Invalidate cached session access and close live streams for affected users.
+ * Failures stay best-effort; the database-backed access predicate denies
+ * immediately and cached grants expire within their 60-second TTL.
+ *
+ * The fan-out is bounded so an organization deletion cannot hold a serverless
+ * invocation open for a membership count's worth of upstream calls. Users not
+ * reached before the budget elapses keep the existing cache bound.
  */
+export const MEMBER_SESSION_INVALIDATION_BUDGET_MS = 20_000;
+
 export async function invalidateOrganizationSessionAccessForUsers(
   organizationId: Organization['id'],
-  userIds: readonly User['id'][]
+  userIds: readonly User['id'][],
+  options: { budgetMs?: number } = {}
 ): Promise<void> {
+  const budgetMs = options.budgetMs ?? MEMBER_SESSION_INVALIDATION_BUDGET_MS;
+  const deadline = Date.now() + budgetMs;
   const batchSize = 10;
   for (let index = 0; index < userIds.length; index += batchSize) {
+    if (Date.now() >= deadline) {
+      break;
+    }
     await Promise.all(
       userIds
         .slice(index, index + batchSize)

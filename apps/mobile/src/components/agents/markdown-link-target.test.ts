@@ -56,7 +56,7 @@ describe('parseMarkdownLinkTarget web links', () => {
       host: 'example.com',
       href: 'https://example.com/x',
     });
-    expect(parseMarkdownLinkTarget('https://example.com:008080/x')).toMatchObject({
+    expect(parseMarkdownLinkTarget('https://example.com:08080/x')).toMatchObject({
       host: 'example.com:8080',
       href: 'https://example.com:8080/x',
     });
@@ -122,6 +122,8 @@ describe('parseMarkdownLinkTarget web links', () => {
     'https://[not-ipv6]/x',
     'https://[abc:zz]/x',
     'https://example.com:abc/',
+    'https://example.com:0x50/',
+    'https://example.com:1e3/',
     'https://example.com:99999/',
     'https://[2001:db8::1',
     'https://user@/',

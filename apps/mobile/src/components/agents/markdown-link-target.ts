@@ -72,8 +72,11 @@ function parseWebTarget(remainder: string, scheme: 'http' | 'https'): WebLinkTar
 
   // A port is a number, so the comparison and the opened URL both use its
   // numeric value.
+  if (parts.port !== '' && !PORT_PATTERN.test(parts.port)) {
+    return null;
+  }
   const port = parts.port === '' ? '' : String(Number(parts.port));
-  if (port !== '' && (!PORT_PATTERN.test(port) || Number(port) > 65_535)) {
+  if (port !== '' && Number(port) > 65_535) {
     return null;
   }
   const isDefaultPort =

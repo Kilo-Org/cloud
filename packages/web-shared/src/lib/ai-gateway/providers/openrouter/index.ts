@@ -40,7 +40,7 @@ import {
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
-import { loadConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
@@ -123,14 +123,19 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels, unavailableModelIds] =
-    await Promise.all([
-      getOpenRouterModelsMetadataFromDatabase(),
-      getDataCollectionRequiredModelIds(),
-      getPreferredModels(),
-      getUnavailableModelIds(),
-      loadConfiguredCustomPricing(),
-    ]);
+  const [
+    endpointsMetadata,
+    dataCollectionRequiredModelIds,
+    preferredModels,
+    unavailableModelIds,
+    configuredCustomPricing,
+  ] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getDataCollectionRequiredModelIds(),
+    getPreferredModels(),
+    getUnavailableModelIds(),
+    getConfiguredCustomPricing(),
+  ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const catalogModels = models
@@ -170,7 +175,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         .map(model => convertFromKiloExclusiveModel(model))
     )
     .concat(autoModels)
-    .map(applyCustomPricingToModel);
+    .map(model => applyCustomPricingToModel(model, configuredCustomPricing));
   const exclusiveById = new Map(kiloExclusiveModels.map(entry => [entry.public_id, entry]));
   const providerLookupId = (model: OpenRouterModel) =>
     exclusiveById.get(model.id)?.internal_id ?? model.alias_target ?? model.id;

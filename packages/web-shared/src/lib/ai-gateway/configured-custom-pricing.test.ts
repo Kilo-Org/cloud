@@ -1,19 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+import { beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   customPricingByModelId,
   getCustomPricing,
-  resolveCustomPricing,
-  setLoadedConfiguredCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import {
-  calculateCustomCost_mUsd,
-  applyCustomPricingToModel,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
-import {
-  loadConfiguredCustomPricing,
+  getConfiguredCustomPricing,
   readConfiguredCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 
@@ -28,16 +23,12 @@ beforeEach(async () => {
   await cleanupDbForTest();
 });
 
-afterEach(() => {
-  setLoadedConfiguredCustomPricing({});
-});
-
-describe('resolveCustomPricing', () => {
+describe('getCustomPricing', () => {
   test('falls back to built-in pricing', () => {
-    expect(resolveCustomPricing(GEMINI_FLASH_CURRENT_MODEL_ID, {})).toBe(
+    expect(getCustomPricing(GEMINI_FLASH_CURRENT_MODEL_ID, {})).toBe(
       customPricingByModelId[GEMINI_FLASH_CURRENT_MODEL_ID]
     );
-    expect(resolveCustomPricing('provider/unpriced', {})).toBeUndefined();
+    expect(getCustomPricing('provider/unpriced', {})).toBeUndefined();
   });
 
   test('prefers configured pricing over built-in pricing', () => {
@@ -45,14 +36,14 @@ describe('resolveCustomPricing', () => {
       pricing: [{ start_context_length: 0, pricing: configuredPricing }],
     } as const;
     expect(
-      resolveCustomPricing(GEMINI_FLASH_CURRENT_MODEL_ID, {
+      getCustomPricing(GEMINI_FLASH_CURRENT_MODEL_ID, {
         [GEMINI_FLASH_CURRENT_MODEL_ID]: configured,
       })
     ).toBe(configured);
   });
 
   test('ignores inherited object keys', () => {
-    expect(resolveCustomPricing('constructor', {})).toBeUndefined();
+    expect(getCustomPricing('constructor', {})).toBeUndefined();
   });
 });
 
@@ -107,50 +98,29 @@ describe('readConfiguredCustomPricing', () => {
   });
 });
 
-describe('loadConfiguredCustomPricing', () => {
-  test('makes configured pricing visible to synchronous lookups', async () => {
+describe('getConfiguredCustomPricing', () => {
+  test('bills stored pricing and keeps built-in pricing as the fallback', async () => {
     await db.insert(ai_gateway_config).values({
       custom_pricing: {
-        models: [
-          {
-            model: 'provider/model-a',
-            pricing: configuredPricing,
-            discountPercentage: 20,
-            fallbackOnly: false,
-          },
-        ],
+        models: [{ model: 'provider/model-a', pricing: configuredPricing, fallbackOnly: false }],
       },
     });
-    expect(getCustomPricing('provider/model-a')).toBeUndefined();
+    const usage = {
+      cost_mUsd: 999,
+      inputTokens: 1_000,
+      outputTokens: 100,
+      cacheHitTokens: 200,
+      cacheWriteTokens: 0,
+      is_byok: false,
+    };
 
-    await loadConfiguredCustomPricing();
+    const configured = await getConfiguredCustomPricing();
 
-    expect(getCustomPricing('provider/model-a')?.discountPercentage).toBe(20);
-    expect(
-      calculateCustomCost_mUsd('provider/model-a', {
-        cost_mUsd: 999,
-        inputTokens: 1_000,
-        outputTokens: 100,
-        cacheHitTokens: 200,
-        cacheWriteTokens: 0,
-        is_byok: false,
-      })
-    ).toBe(Math.round(800 * 0.5 + 100 * 2 + 200 * 0.05));
-    expect(
-      applyCustomPricingToModel({
-        id: 'provider/model-a',
-        name: 'Model A',
-        created: 0,
-        description: 'Model A',
-        architecture: {
-          input_modalities: ['text'],
-          output_modalities: ['text'],
-          tokenizer: 'Other',
-        },
-        top_provider: { is_moderated: false },
-        pricing: { prompt: '999', completion: '999' },
-        context_length: 1_000_000,
-      }).name
-    ).toBe('Model A (20% off)');
+    expect(calculateCustomCost_mUsd('provider/model-a', usage, configured)).toBe(
+      Math.round(800 * 0.5 + 100 * 2 + 200 * 0.05)
+    );
+    expect(calculateCustomCost_mUsd(GEMINI_FLASH_CURRENT_MODEL_ID, usage, configured)).toBe(
+      Math.round(800 * 0.75 + 100 * 3.75 + 200 * 0.075)
+    );
   });
 });

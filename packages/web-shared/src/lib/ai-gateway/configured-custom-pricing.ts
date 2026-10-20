@@ -6,10 +6,9 @@ import {
 } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import {
-  setLoadedConfiguredCustomPricing,
-  type ConfiguredCustomPricing,
-  type CustomPricing,
+import type {
+  ConfiguredCustomPricing,
+  CustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 
 function toCustomPricing(config: CustomPricingModelConfig): CustomPricing {
@@ -32,13 +31,9 @@ export async function readConfiguredCustomPricing(): Promise<ConfiguredCustomPri
   return Object.fromEntries(models.map(model => [model.model, toCustomPricing(model)]));
 }
 
-export const getConfiguredCustomPricing = createCachedFetch(
+/** Cached for one minute; on a read failure, returns the last valid value (or none). */
+export const getConfiguredCustomPricing = createCachedFetch<ConfiguredCustomPricing>(
   readConfiguredCustomPricing,
   60_000,
   {}
 );
-
-/** Call before synchronous `getCustomPricing` lookups so they see admin-configured pricing. */
-export async function loadConfiguredCustomPricing(): Promise<void> {
-  setLoadedConfiguredCustomPricing(await getConfiguredCustomPricing());
-}

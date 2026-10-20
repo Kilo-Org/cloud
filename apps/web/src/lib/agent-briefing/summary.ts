@@ -15,6 +15,7 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { textRequestPriceCeiling } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
@@ -102,14 +103,17 @@ export async function briefingPriceBound(
   prompt: string,
   maxSpendMicrodollars: number
 ) {
-  const models = await getOpenRouterModelsMetadataFromDatabase();
+  const [models, configuredCustomPricing] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getConfiguredCustomPricing(),
+  ]);
   const pricingModel = model.startsWith('~') ? (models[model]?.alias_target?.slug ?? model) : model;
   const metadata = models[pricingModel];
   if (!metadata || metadata.endpoints.length === 0) throw new Error('model_pricing_unavailable');
   if (Buffer.byteLength(prompt, 'utf8') > MAX_INPUT_BYTES) throw new Error('input_too_large');
   let price;
   try {
-    price = textRequestPriceCeiling(metadata);
+    price = textRequestPriceCeiling(metadata, configuredCustomPricing);
   } catch {
     throw new Error('invalid_model_pricing');
   }

@@ -1,7 +1,7 @@
 import type { OpenRouterPricing } from '@kilocode/db/schema-types';
 import {
   formatPricePerToken,
-  resolveCustomPricing,
+  getCustomPricing,
   type ConfiguredCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
@@ -22,7 +22,7 @@ export function getOfferingPricing(
   configuredCustomPricing: ConfiguredCustomPricing
 ): OfferingPricing {
   const listPricing = getModelDisplayPricing(endpointPricing) ?? endpointPricing;
-  const customPricing = resolveCustomPricing(modelVariantId, configuredCustomPricing);
+  const customPricing = getCustomPricing(modelVariantId, configuredCustomPricing);
   if (!customPricing || customPricing.fallbackOnly) {
     return { promptPrice: listPricing.prompt, completionPrice: listPricing.completion };
   }

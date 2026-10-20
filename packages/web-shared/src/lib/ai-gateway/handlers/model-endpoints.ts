@@ -4,7 +4,7 @@ import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/li
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 import { applyCustomPricingToPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
-import { loadConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 
 const CACHE_CONTROL = 'public, max-age=0, s-maxage=60, stale-while-revalidate=60';
 
@@ -21,9 +21,9 @@ export async function handleModelEndpointsRequest(
     );
   }
 
-  const [models] = await Promise.all([
+  const [models, configuredCustomPricing] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
-    loadConfiguredCustomPricing(),
+    getConfiguredCustomPricing(),
   ]);
   const storedModel = models[modelId];
 
@@ -45,7 +45,8 @@ export async function handleModelEndpointsRequest(
             ...endpoint,
             pricing: applyCustomPricingToPricing(
               storedModel.id,
-              displayPricing ?? endpoint.pricing
+              displayPricing ?? endpoint.pricing,
+              configuredCustomPricing
             ),
           };
         }),

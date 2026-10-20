@@ -17,7 +17,7 @@ import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
@@ -184,6 +184,8 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   autoInitiate?: boolean;
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
+  /** Client-proposed Kilo session ID, so the client can show the session before prepare returns. */
+  kiloSessionId?: string;
   cloneFromKiloSessionId?: undefined;
   cloneUpToMessageId?: undefined;
 };
@@ -221,6 +223,7 @@ export type CreateWorktreeChatInput = {
   sourceKiloSessionId: string;
   sourceCloudAgentSessionId: string;
   operationKey: string;
+  kiloSessionId?: string;
   kilocodeOrganizationId?: string;
   clientProvenance: 'browser';
 };
@@ -630,6 +633,9 @@ type CloudAgentNextTRPCClient = {
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
+  getPreparationAttempts: {
+    query: (input: GetSessionInput) => Promise<PreparationAttempt[]>;
+  };
   getPendingInteractions: {
     query: (input: GetSessionInput) => Promise<GetPendingInteractionsOutput>;
   };
@@ -862,6 +868,19 @@ export class CloudAgentNextClient {
     } catch (error) {
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'getSession' },
+        extra: { cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
+  /** The session's preparation attempts, as its stream replays them. */
+  async getPreparationAttempts(cloudAgentSessionId: string): Promise<PreparationAttempt[]> {
+    try {
+      return await this.client.getPreparationAttempts.query({ cloudAgentSessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getPreparationAttempts' },
         extra: { cloudAgentSessionId },
       });
       throw error;

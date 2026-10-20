@@ -6056,6 +6056,10 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "pattern": "^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         }
       },
       "required": [
@@ -6068,9 +6072,10 @@
       "cloudagentnext",
       "createworktreechat",
       "sourcekilosessionid",
-      "operationkey"
+      "operationkey",
+      "kilosessionid"
     ],
-    "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. cloudagentnext createworktreechat sourcekilosessionid operationkey sourceKiloSessionId operationKey"
+    "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. cloudagentnext createworktreechat sourcekilosessionid operationkey kilosessionid sourceKiloSessionId operationKey kiloSessionId"
   },
   "cloudAgentNext.getAttachmentDownloadUrl": {
     "path": "cloudAgentNext.getAttachmentDownloadUrl",
@@ -6728,6 +6733,10 @@
                   "type": "string",
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "kiloSessionId": {
+                  "type": "string",
+                  "pattern": "^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$"
                 },
                 "cloneFromKiloSessionId": {},
                 "cloneUpToMessageId": {},
@@ -17442,6 +17451,10 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             },
+            "kiloSessionId": {
+              "type": "string",
+              "pattern": "^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$"
+            },
             "organizationId": {
               "type": "string",
               "format": "uuid",
@@ -17463,9 +17476,10 @@
       "createworktreechat",
       "organizationid",
       "sourcekilosessionid",
-      "operationkey"
+      "operationkey",
+      "kilosessionid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid operationkey organizationId sourceKiloSessionId operationKey"
+    "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid operationkey kilosessionid organizationId sourceKiloSessionId operationKey kiloSessionId"
   },
   "organizations.cloudAgentNext.getAttachmentUploadUrl": {
     "path": "organizations.cloudAgentNext.getAttachmentUploadUrl",
@@ -18311,6 +18325,10 @@
                       "type": "string",
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "kiloSessionId": {
+                      "type": "string",
+                      "pattern": "^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$"
                     },
                     "cloneFromKiloSessionId": {},
                     "cloneUpToMessageId": {},

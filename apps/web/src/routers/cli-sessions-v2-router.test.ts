@@ -32,11 +32,13 @@ import { captureException } from '@sentry/nextjs';
 
 // Mock the cloud agent client for watermark and runtime-state tests.
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
+const mockGetPreparationAttempts = jest.fn().mockResolvedValue([]);
 const mockDeleteCloudAgentSession = jest.fn().mockResolvedValue({ success: true });
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     getSession: mockGetSession,
+    getPreparationAttempts: mockGetPreparationAttempts,
     deleteSession: mockDeleteCloudAgentSession,
   })),
   rethrowCloudAgentError: jest.fn(),
@@ -712,6 +714,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        preparationAttempts: [],
       });
       expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
         limit: 50,
@@ -772,6 +775,7 @@ describe('cli-sessions-v2-router', () => {
           omittedItemCount: 2,
         },
         watermarkEventId: null,
+        preparationAttempts: [],
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
       expect(message).toEqual(privateAssistantMessage());
@@ -785,7 +789,12 @@ describe('cli-sessions-v2-router', () => {
 
       await expect(
         caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
-      ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
+      ).resolves.toEqual({
+        kiloSessionId: sessionId,
+        history,
+        watermarkEventId: null,
+        preparationAttempts: [],
+      });
     });
 
     it.each([null, { kind: 'retryable_failure' as const, phase: 'page_parts' as const }])(
@@ -800,7 +809,12 @@ describe('cli-sessions-v2-router', () => {
 
         await expect(
           caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
-        ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
+        ).resolves.toEqual({
+          kiloSessionId: sessionId,
+          history,
+          watermarkEventId: null,
+          preparationAttempts: [],
+        });
       }
     );
 
@@ -886,6 +900,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        preparationAttempts: [],
         sessionGoal: goal,
       });
       expect(result).not.toHaveProperty('sessionMetadata');
@@ -911,6 +926,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        preparationAttempts: [],
       });
     });
 
@@ -937,6 +953,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: sessionId,
           history,
           watermarkEventId: null,
+          preparationAttempts: [],
         });
       }
     });
@@ -957,6 +974,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        preparationAttempts: [],
       });
     });
 
@@ -1144,6 +1162,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 42,
+          preparationAttempts: [],
         });
         expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
         // Verify both the watermark and the page were fetched.
@@ -1167,6 +1186,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          preparationAttempts: [],
         });
       });
 
@@ -1188,6 +1208,40 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          preparationAttempts: [],
+        });
+      });
+
+      it('carries the preparation attempts and fails open to none', async () => {
+        const attempt = {
+          id: 'attempt-1',
+          triggerMessageId: 'msg-1',
+          status: 'completed',
+          startedAt: 1000,
+          completedAt: 2000,
+          revision: 3,
+          steps: [],
+        };
+        mockGetSession.mockResolvedValue({ latestEventId: 42 });
+        mockGetPreparationAttempts.mockResolvedValueOnce([attempt]);
+        fetchSessionMessagesPage.mockResolvedValue({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const read = () =>
+          caller.cliSessionsV2.getSessionMessagesPage({
+            session_id: watermarkSessionId,
+            limit: 50,
+          });
+
+        await expect(read()).resolves.toMatchObject({ preparationAttempts: [attempt] });
+        expect(mockGetPreparationAttempts).toHaveBeenCalledWith(cloudAgentSessionId);
+
+        mockGetPreparationAttempts.mockRejectedValueOnce(new Error('No procedure found'));
+        await expect(read()).resolves.toMatchObject({
+          watermarkEventId: 42,
+          preparationAttempts: [],
         });
       });
 
@@ -1214,6 +1268,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          preparationAttempts: [],
         });
       });
 
@@ -1286,6 +1341,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 99,
+          preparationAttempts: [],
         });
       });
 

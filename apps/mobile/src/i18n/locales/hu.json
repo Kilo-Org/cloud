@@ -1585,7 +1585,7 @@
       "outcome": "Eredmény",
       "slaStatus": "SLA-állapot",
       "sortBy": "Rendezés",
-      "statusOpen": "Megnyitás",
+      "statusOpen": "Nyitott",
       "fixed": "Javítva",
       "statusIgnored": "Figyelmen kívül hagyva",
       "severityHigh": "Magas",
@@ -1651,7 +1651,7 @@
       "analyzed": "Elemezve",
       "exploitabilityReasoning": "Kihasználhatóság indoklása",
       "suggestedFix": "Javasolt javítás",
-      "whereFound": "Előfordulási helyek ({{displayCount}})",
+      "whereFound": "Hol található ({{displayCount}})",
       "fullReport": "Teljes elkészült jelentés",
       "yes": "Igen",
       "no": "Nem"
@@ -1750,7 +1750,7 @@
       "source": "Forrás",
       "sourceId": "Forrásazonosító",
       "viewAdvisory": "Biztonsági tájékoztató megtekintése a GitHubon",
-      "statusOpen": "Megnyitás",
+      "statusOpen": "Nyitott",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "a javítás már folyamatban van",
       "reasonNoBandwidth": "nincs szabad kapacitás",
@@ -1763,17 +1763,17 @@
       "couldNotLoadSettings": "Nem sikerült betölteni a biztonsági ügynök beállításait.",
       "couldNotLoadPermissions": "Nem sikerült betölteni a jogosultságokat.",
       "on": "Be",
-      "repositoriesCount_one": "{{displayCount}} kódtár kiválasztva",
+      "repositoriesCount_one": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount_other": "{{displayCount}} adattár kiválasztva",
-      "selectRepositoriesSubtitle": "Válaszd ki, mely kódtárakat figyelje a biztonsági ügynök",
+      "selectRepositoriesSubtitle": "Válaszd ki, mely adattárakat figyelje a biztonsági ügynök",
       "analysisModeSubtitle": "{{mode}} elemzés",
       "automationAllOff": "Mind kikapcsolva",
       "automationCount": "3 közül {{displayCount}} engedélyezve",
       "notificationsCount": "2 közül {{displayCount}} engedélyezve",
       "disabledNoManage": "A biztonsági ügynök ki van kapcsolva. Csak a szervezet tulajdonosai és a számlázásért felelős kezelők kapcsolhatják be.",
-      "disabledNoRepo": "A biztonsági ügynök engedélyezése előtt válassz ki legalább egy kódtárat.",
-      "disabledPrompt": "Kapcsold be a biztonsági ügynököt a Dependabot-riasztások szinkronizálásához, a kódtárak kiválasztásához és az automatizálás beállításához."
+      "disabledNoRepo": "A biztonsági ügynök engedélyezése előtt válassz ki legalább egy adattárat.",
+      "disabledPrompt": "Kapcsold be a biztonsági ügynököt a Dependabot-riasztások szinkronizálásához, az adattárak kiválasztásához és az automatizálás beállításához."
     },
     "remediation": {
       "cancellationRequested": "Megszakítás kérve",
@@ -1797,7 +1797,7 @@
         "failed": "Hibajavítás sikertelen",
         "blocked": "Hibajavítás blokkolva"
       },
-      "unavailable": "Ehhez a találathoz nem érhető el javítás."
+      "unavailable": "Ehhez a találathoz nem érhető el hibajavítás."
     },
     "analysisSettings": {
       "title": "Modellek és elemzés",
@@ -1817,12 +1817,12 @@
       "highDescription": "Jelentős adatkiszivárgás veszélye.",
       "mediumDescription": "Korlátozott hatás vagy speciális feltételek.",
       "lowDescription": "Minimális biztonsági hatás.",
-      "invalidDayCount": "adj meg egy egész számot 1 és 365 között a napok számához.",
+      "invalidDayCount": "Adj meg egy egész számot 1 és 365 között a napok számához.",
       "remediationDeadlineA11y": "{{label}}: hibajavítási határidő napokban",
       "enterWholeNumber": "Adj meg egy 1 és 365 közötti egész számot",
       "permissionNote": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők módosíthatják ezeket a beállításokat.",
       "enableTracking": "SLA-követés engedélyezése",
-      "enableTrackingSubtitle": "A találatok súlyossága alapján határozza meg a hibajavítási határidőket.",
+      "enableTrackingSubtitle": "A találatok súlyossága alapján határozd meg a hibajavítási határidőket.",
       "deadlinesHeading": "Hibajavítási határidők (nap)"
     },
     "findingDetail": {
@@ -2778,10 +2778,10 @@
   },
   "queryError": {
     "neutralDescription": "Próbáld újra.",
-    "offlineTitle": "Nem sikerült a betöltés.",
+    "offlineTitle": "Nem sikerült a betöltés",
     "permissionDescription": "Nincs jogosultságod ennek a megtekintéséhez.",
     "notFoundDescription": "Lehet, hogy ezt az elemet eltávolították, vagy már nem érhető el.",
-    "serverTitle": "Nem sikerült a betöltés.",
+    "serverTitle": "Nem sikerült betölteni",
     "serverDescription": "Nálunk hiba történt. Próbáld újra."
   },
   "screenHeader": {
@@ -3515,9 +3515,9 @@
   "spendAlerts": {
     "subtitle": "Küldj e-mailes vagy push értesítést a számlázási kapcsolatoknak, amikor ennek a hatókörnek a költése átlép egy limitet, vagy a szokásos óránkénti üteme fölé ugrik.",
     "thresholdTitle": "Küszöbátlépés",
-    "thresholdSubtitle": "A folyó költés átlépi a limited",
+    "thresholdSubtitle": "A hatókör gördülő költése a kiválasztott időablakban átlépi az általad beállított limitet",
     "anomalyTitle": "Óránkénti kiugrás",
-    "anomalySubtitle": "Egy óra messze a hatókör szokásos üteme felett van",
+    "anomalySubtitle": "A hatókör óránkénti üteme messze meghaladja a saját p95 alapszintjét",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Ablak",
     "window24h": "24 óra",

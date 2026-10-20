@@ -4,9 +4,9 @@ import { device_sessions } from '@kilocode/db/schema';
 import { getWorkerDb } from '@kilocode/db/client';
 import { and, eq, isNull } from 'drizzle-orm';
 
-import { deviceSessionIdSchema } from './device-session-claims.js';
+import { deviceSessionIdSchema } from './device-session-claims';
 
-export { deviceSessionIdSchema } from './device-session-claims.js';
+export { deviceSessionIdSchema } from './device-session-claims';
 
 export type DeviceSessionDb = Pick<NodePgDatabase<typeof schema>, 'select'>;
 

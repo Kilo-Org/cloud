@@ -905,8 +905,8 @@ describe('generateReviewPrompt (existing inline comment attribution)', () => {
       prompt.indexOf('<<<END EXISTING REVIEW COMMENTS>>>')
     );
     expect(block).toContain('first line \\| with pipe \\`tick\\` \\<tag\\>');
-    expect(block).toContain('src/\\`odd\\<path\\>.ts');
+    expect(block).toContain('| src/\\`odd\\<path\\>.ts | 7 |');
     expect(block).not.toContain('second line');
-    expect(block.split('\n').filter(line => line.startsWith('| `'))).toHaveLength(1);
+    expect(block.split('\n').filter(line => line.startsWith('| src/'))).toHaveLength(1);
   });
 });

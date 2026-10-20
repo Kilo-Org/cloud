@@ -369,7 +369,7 @@ export async function generateReviewPrompt(
       const firstLine = sanitizePromptDataValue(
         c.body.split('\n')[0].substring(0, INLINE_COMMENT_PREVIEW_LENGTH)
       );
-      prompt += `| \`${sanitizePromptDataValue(c.path)}\` | ${c.line ?? 'N/A'} | ${firstLine} |\n`;
+      prompt += `| ${sanitizePromptDataValue(c.path)} | ${c.line ?? 'N/A'} | ${firstLine} |\n`;
     }
 
     if (activeInlineComments.length > MAX_PROMPT_INLINE_COMMENTS) {

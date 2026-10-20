@@ -773,7 +773,7 @@ describe('fetchMRInlineComments authorship', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('propagates a failed token-user lookup instead of guessing authorship', async () => {
+  it('returns unattributed comments when the token-user lookup fails', async () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
@@ -794,8 +794,14 @@ describe('fetchMRInlineComments authorship', () => {
         headers: { get: () => null },
       });
 
-    await expect(fetchMRInlineComments('prat-token', 'group/project', 10)).rejects.toThrow(
-      'GitLab user fetch failed: 401'
-    );
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments).toEqual([
+      expect.objectContaining({
+        id: 1,
+        authoredByKilo: false,
+        user: { username: 'project_42_bot' },
+      }),
+    ]);
   });
 });

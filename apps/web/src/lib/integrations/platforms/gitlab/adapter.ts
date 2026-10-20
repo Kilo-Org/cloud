@@ -1341,8 +1341,23 @@ export async function fetchMRInlineComments(
     }
   }
 
-  const kiloUserId =
-    positionedNotes.length > 0 ? (await fetchGitLabUser(accessToken, instanceUrl)).id : null;
+  // Attribution is best-effort: a failed lookup leaves the comments unattributed for this
+  // run so the surrounding review state (summary, incremental mode, diff refs) is preserved.
+  let kiloUserId: number | null = null;
+  if (positionedNotes.length > 0) {
+    try {
+      kiloUserId = (await fetchGitLabUser(accessToken, instanceUrl)).id;
+    } catch (error) {
+      logExceptInTest(
+        '[fetchMRInlineComments] Token user lookup failed; comments stay unattributed',
+        {
+          projectId,
+          mrIid,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
+  }
   const inlineComments = positionedNotes.map(({ authorId, authorUsername, ...comment }) => ({
     ...comment,
     authoredByKilo: kiloUserId !== null && authorId === kiloUserId,

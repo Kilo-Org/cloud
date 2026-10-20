@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, count, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, count, eq, isNotNull, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { cliSessions, sharedCliSessions } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -193,33 +193,6 @@ export async function copySessionBlobs(
       });
     }
     throw error;
-  }
-}
-
-/**
- * Undo a share reservation whose copy did not complete. A row that another
- * request has already completed carries a blob url and is left in place.
- */
-export async function discardReservedShare(shareId: string): Promise<void> {
-  const deleted = await db
-    .delete(sharedCliSessions)
-    .where(
-      and(
-        eq(sharedCliSessions.share_id, shareId),
-        isNull(sharedCliSessions.api_conversation_history_blob_url),
-        isNull(sharedCliSessions.task_metadata_blob_url),
-        isNull(sharedCliSessions.ui_messages_blob_url),
-        isNull(sharedCliSessions.git_state_blob_url)
-      )
-    )
-    .returning({ share_id: sharedCliSessions.share_id });
-
-  if (deleted.length === 0) return;
-
-  try {
-    await deleteBlobs(shareId, sessionBlobRefs('shared-sessions'));
-  } catch {
-    // The row is gone; a cleanup failure must not replace the copy error.
   }
 }
 

@@ -1529,6 +1529,43 @@ describe('cli-sessions-router', () => {
       expect(stored.ui_messages_blob_url).toBe('sessions/new-id/ui_messages.json');
     });
 
+    it('completes a share after a copy attempt fails', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(copyBlobs).mockRejectedValueOnce(new Error('copy failed'));
+
+      await expect(
+        caller.cliSessions.share({
+          session_id: shareSessionId,
+          shared_state: CliSessionSharedState.Organization,
+        })
+      ).rejects.toThrow('copy failed');
+
+      const [pending] = await db
+        .select({
+          share_id: sharedCliSessions.share_id,
+          ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
+        })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.session_id, shareSessionId));
+
+      expect(pending.ui_messages_blob_url).toBeNull();
+
+      const result = await caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Organization,
+      });
+
+      expect(result.share_id).toBe(pending.share_id);
+
+      const [completed] = await db
+        .select({ ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, result.share_id));
+
+      expect(completed.ui_messages_blob_url).toBe('sessions/new-id/ui_messages.json');
+    });
+
     it('stores a share of a session that has no blobs', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const { copyBlobs } = await import('@/lib/r2/cli-sessions');

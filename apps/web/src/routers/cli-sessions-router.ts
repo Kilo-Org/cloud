@@ -31,7 +31,6 @@ import {
   copySessionBlobs,
   deleteSharedSessionCopies,
   discardReservedFork,
-  discardReservedShare,
   reserveForkedSession,
   reserveSharedSession,
   sessionBlobRefs,
@@ -262,7 +261,9 @@ async function getForkableSession(
 /**
  * Publish one session folder under a share id. A session already shared with
  * the same state reuses that row and link; a new share, or a row whose copy
- * never completed, is copied in full before its row claims any blob.
+ * never completed, is copied in full before its row claims any blob. A copy
+ * that fails leaves the row without a blob, which the next request for the
+ * same key completes.
  */
 async function createSharedSessionCopy(params: {
   kiloUserId: string;
@@ -272,21 +273,16 @@ async function createSharedSessionCopy(params: {
   const reservation = await reserveSharedSession(params);
 
   if (reservation.needsCopy) {
-    try {
-      const blobUrls = await copySessionBlobs(
-        params.sessionId,
-        'sessions',
-        reservation.shareId,
-        'shared-sessions'
-      );
-      await db
-        .update(sharedCliSessions)
-        .set(blobUrlColumns(blobUrls))
-        .where(eq(sharedCliSessions.share_id, reservation.shareId));
-    } catch (error) {
-      await discardReservedShare(reservation.shareId);
-      throw error;
-    }
+    const blobUrls = await copySessionBlobs(
+      params.sessionId,
+      'sessions',
+      reservation.shareId,
+      'shared-sessions'
+    );
+    await db
+      .update(sharedCliSessions)
+      .set(blobUrlColumns(blobUrls))
+      .where(eq(sharedCliSessions.share_id, reservation.shareId));
   }
 
   return { share_id: reservation.shareId, session_id: params.sessionId };

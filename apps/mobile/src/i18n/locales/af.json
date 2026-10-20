@@ -1448,7 +1448,7 @@
       "off": "Die hersieningsgeheue is af.",
       "on": "Die hersieningsgeheue is aan.",
       "offDescription": "Skakel dit aan sodat Kilo uit instandhouers se antwoorde kan leer en riglyne vir REVIEW.md kan voorstel.",
-      "readOnlyDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan hersieningsgeheue aktiveer.",
+      "readOnlyDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan hersieningsgeheue verander.",
       "enable": "Aktiveer hersieningsgeheue",
       "loadingProposals": "Laai voorstelle",
       "couldNotLoadProposals": "Die voorstelle kon nie gelaai word nie.",

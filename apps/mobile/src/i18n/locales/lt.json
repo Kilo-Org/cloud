@@ -1486,7 +1486,7 @@
       "off": "Peržiūros atmintis išjungta.",
       "on": "Peržiūros atmintis įjungta.",
       "offDescription": "Įjunk ją, kad Kilo mokytųsi iš prižiūrėtojų atsakymų ir siūlytų gaires REVIEW.md failui.",
-      "readOnlyDescription": "Peržiūros atmintį gali įjungti tik organizacijos savininkai ir atsiskaitymų administratoriai.",
+      "readOnlyDescription": "Peržiūros atmintį gali keisti tik organizacijos savininkai ir atsiskaitymų administratoriai.",
       "enable": "Įjungti peržiūros atmintį",
       "loadingProposals": "Įkeliami pasiūlymai",
       "couldNotLoadProposals": "Nepavyko įkelti pasiūlymų.",

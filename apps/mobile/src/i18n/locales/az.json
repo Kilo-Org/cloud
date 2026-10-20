@@ -1448,7 +1448,7 @@
       "off": "Kod yoxlaması yaddaşı deaktivdir.",
       "on": "Kod yoxlaması yaddaşı aktivdir.",
       "offDescription": "Kilo-nun layihəyə cavabdeh şəxslərin cavablarından öyrənməsi və REVIEW.md üçün təlimatlar təklif etməsi üçün yaddaşı aktivləşdir.",
-      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri və ödəniş menecerləri aktivləşdirə bilər.",
+      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
       "enable": "Kod yoxlaması yaddaşını aktivləşdir",
       "loadingProposals": "Təkliflər yüklənir",
       "couldNotLoadProposals": "Təklifləri yükləmək mümkün olmadı.",

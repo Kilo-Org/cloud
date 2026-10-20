@@ -1467,7 +1467,7 @@
       "off": "Memoria de revizuire este dezactivată.",
       "on": "Memoria de revizuire este activată.",
       "offDescription": "Activeaz-o pentru ca Kilo să învețe din răspunsurile responsabililor de proiect și să propună instrucțiuni pentru REVIEW.md.",
-      "readOnlyDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot activa memoria de revizuire.",
+      "readOnlyDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot modifica memoria de revizuire.",
       "enable": "Activează memoria de revizuire",
       "loadingProposals": "Se încarcă propunerile",
       "couldNotLoadProposals": "Nu s-au putut încărca propunerile.",

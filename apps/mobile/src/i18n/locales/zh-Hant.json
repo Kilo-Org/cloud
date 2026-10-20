@@ -989,7 +989,7 @@
       "off": "審查記憶已關閉。",
       "on": "審查記憶已開啟。",
       "offDescription": "啟用後，Kilo 會從維護者的回覆中學習，並提出 REVIEW.md 指引建議。",
-      "readOnlyDescription": "只有組織擁有者和帳單管理員可以啟用審查記憶。",
+      "readOnlyDescription": "只有組織擁有者和帳單管理員可以變更審查記憶。",
       "title": "審查記憶"
     },
     "scopeList": {

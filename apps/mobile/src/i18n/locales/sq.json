@@ -1448,7 +1448,7 @@
       "off": "Kujtesa e shqyrtimit është e çaktivizuar.",
       "on": "Kujtesa e shqyrtimit është e aktivizuar.",
       "offDescription": "Aktivizoje që Kilo të mësojë nga përgjigjet e mirëmbajtësve dhe të propozojë udhëzime për REVIEW.md.",
-      "readOnlyDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta aktivizojnë kujtesën e shqyrtimit.",
+      "readOnlyDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta ndryshojnë kujtesën e shqyrtimit.",
       "enable": "Aktivizo kujtesën e shqyrtimit",
       "loadingProposals": "Duke ngarkuar propozimet",
       "couldNotLoadProposals": "Nuk u ngarkuan propozimet.",

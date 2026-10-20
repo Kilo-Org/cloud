@@ -1448,7 +1448,7 @@
       "off": "Katselmointimuisti on pois käytöstä.",
       "on": "Katselmointimuisti on käytössä.",
       "offDescription": "Ota se käyttöön, jotta Kilo voi oppia ylläpitäjien vastauksista ja ehdottaa REVIEW.md-ohjeita.",
-      "readOnlyDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat ottaa katselmointimuistin käyttöön.",
+      "readOnlyDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat muuttaa katselmointimuistia.",
       "enable": "Ota katselmointimuisti käyttöön",
       "loadingProposals": "Ladataan ehdotuksia",
       "couldNotLoadProposals": "Ehdotuksia ei voitu ladata.",

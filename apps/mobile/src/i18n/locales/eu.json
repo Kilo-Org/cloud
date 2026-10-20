@@ -1448,7 +1448,7 @@
       "off": "Berrikuspen-memoria desgaituta dago.",
       "on": "Berrikuspen-memoria gaituta dago.",
       "offDescription": "Gaitu aukera hau Kilok mantentzaileen erantzunetatik ikas dezan eta REVIEW.md fitxategirako jarraibideak proposa ditzan.",
-      "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik gaitu dezakete berrikuspen-memoria.",
+      "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik alda dezakete berrikuspen-memoria.",
       "enable": "Gaitu berrikuspen-memoria",
       "loadingProposals": "Proposamenak kargatzen",
       "couldNotLoadProposals": "Ezin izan dira proposamenak kargatu.",

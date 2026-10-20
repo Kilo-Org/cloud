@@ -2,7 +2,15 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Switch, View, type ViewStyle } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  Switch,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
@@ -16,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { useTRPC } from '@/lib/trpc';
 
 const PAGE_SIZE = 20;
@@ -34,16 +43,25 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { bottom: bottomInset } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const ownerInput = reviewMemoryOwnerInput(scope);
   const permission = useReviewerPermission(scope);
 
   const summaryQuery = useQuery(trpc.reviewMemory.getDashboardSummary.queryOptions(ownerInput));
   const setEnabled = useSetReviewMemoryEnabled(scope);
-  // `setEnabled` returns the enabled value it stored, so a settled toggle shows
-  // immediately; the hook still invalidates the summary query, whose value
-  // takes over on the next render.
-  const summaryEnabled = summaryQuery.data?.enabled === true;
-  const enabled = setEnabled.data?.enabled ?? summaryEnabled;
+  const enabled = summaryQuery.data?.enabled === true;
+  // The tab bar draws over the screen, so the last row has to scroll clear of it.
+  const listContentStyle = useMemo(
+    () => ({
+      paddingBottom: getEffectiveTabBarHeight({
+        bottomInset,
+        platform: Platform.OS,
+        fontScale,
+      }),
+    }),
+    [bottomInset, fontScale]
+  );
 
   const proposalsQuery = useInfiniteQuery(
     trpc.reviewMemory.listProposalsPage.infiniteQueryOptions(
@@ -61,13 +79,14 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   );
 
   const readOnly = permission.status === 'ready' && !permission.canEdit;
+  const canToggle = !readOnly && !setEnabled.isPending;
   const hasLoadedPages = (proposalsQuery.data?.pages.length ?? 0) > 0;
   const firstPageError = proposalsQuery.isError && !hasLoadedPages;
   const laterPageError = proposalsQuery.isError && hasLoadedPages;
 
   const summaryLoading = summaryQuery.isPending;
   const summaryError = summaryQuery.isError && !summaryQuery.data;
-  const disabled = summaryQuery.data != null && !enabled;
+  const disabled = summaryQuery.data?.enabled === false;
   const proposalsLoading = enabled && proposalsQuery.isPending;
   const empty = enabled && !proposalsLoading && !firstPageError && proposals.length === 0;
   const happy = enabled && !proposalsLoading && !firstPageError && proposals.length > 0;
@@ -175,6 +194,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
       <FlashList
         data={proposals}
         style={listStyle}
+        contentContainerStyle={listContentStyle}
         keyExtractor={proposal => proposal.id}
         renderItem={({ item }) => (
           <View className="border-b-[0.5px] border-hair-soft px-6 py-3">
@@ -206,14 +226,41 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
       {enabled ? (
         <View className="px-6 pt-4">
           <View className="rounded-lg bg-secondary p-4">
-            <View className="flex-row items-center justify-between">
-              <Text className="flex-1 pr-3 text-sm font-medium">
-                {t('codeReviewer.reviewMemory.on')}
-              </Text>
-              <Switch
+            <View className="flex-row items-center justify-between gap-3">
+              {/* One named control with a 44pt target: the label is what a tap
+                  names, so it moves the value, and the native Switch stays out
+                  of the accessibility tree the way PreferenceRow does it. */}
+              <Pressable
+                className="min-h-11 min-w-0 flex-1 justify-center active:opacity-70"
+                disabled={!canToggle}
+                onPress={() => {
+                  setEnabled.mutate(!enabled);
+                }}
+                accessibilityRole="switch"
                 accessibilityLabel={t('codeReviewer.reviewMemory.title')}
+                accessibilityHint={
+                  readOnly ? t('codeReviewer.reviewMemory.readOnlyDescription') : undefined
+                }
+                accessibilityState={{
+                  disabled: !canToggle,
+                  busy: setEnabled.isPending,
+                  checked: enabled,
+                }}
+              >
+                <Text
+                  accessible={false}
+                  importantForAccessibility="no"
+                  className="text-sm font-medium"
+                >
+                  {t('codeReviewer.reviewMemory.on')}
+                </Text>
+              </Pressable>
+              <Switch
                 value={enabled}
-                disabled={readOnly || setEnabled.isPending}
+                disabled={!canToggle}
+                accessible={false}
+                importantForAccessibility="no"
+                accessibilityElementsHidden
                 onValueChange={value => {
                   setEnabled.mutate(value);
                 }}

@@ -989,7 +989,7 @@
       "off": "Der Review-Speicher ist deaktiviert.",
       "on": "Der Review-Speicher ist aktiviert.",
       "offDescription": "Aktiviere ihn, damit Kilo aus Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
-      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können den Review-Speicher aktivieren.",
+      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können den Review-Speicher ändern.",
       "title": "Gespeicherte Prüfhinweise"
     },
     "scopeList": {

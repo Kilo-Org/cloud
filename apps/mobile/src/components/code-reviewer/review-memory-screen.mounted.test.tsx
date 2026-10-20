@@ -56,13 +56,24 @@ const switches = vi.hoisted(() => ({
   rendered: [] as {
     value?: boolean;
     disabled?: boolean;
-    accessibilityLabel?: string;
+    accessible?: boolean;
     onValueChange?: (value: boolean) => void;
+  }[],
+}));
+
+const pressables = vi.hoisted(() => ({
+  rendered: [] as {
+    accessibilityRole?: string;
+    accessibilityLabel?: string;
+    accessibilityState?: { disabled?: boolean; busy?: boolean; checked?: boolean };
+    disabled?: boolean;
+    onPress?: () => void;
   }[],
 }));
 
 const flashList = vi.hoisted(() => ({
   onEndReached: null as (() => void) | null,
+  contentContainerStyle: null as { paddingBottom?: number } | null,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -110,15 +121,36 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
+  Pressable: (props: {
+    children?: unknown;
+    disabled?: boolean;
+    accessibilityRole?: string;
+    accessibilityLabel?: string;
+    accessibilityState?: { disabled?: boolean; busy?: boolean; checked?: boolean };
+    onPress?: () => void;
+  }) => {
+    pressables.rendered.push(props);
+    return props.children;
+  },
   Switch: (props: {
     value?: boolean;
     disabled?: boolean;
-    accessibilityLabel?: string;
+    accessible?: boolean;
     onValueChange?: (value: boolean) => void;
   }) => {
     switches.rendered.push(props);
     return 'Switch';
   },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 34, left: 0, right: 0, top: 59 }),
+}));
+
+vi.mock('@/lib/tab-bar-layout', () => ({
+  getEffectiveTabBarHeight: () => 83,
 }));
 
 vi.mock('@shopify/flash-list', () => ({
@@ -128,8 +160,10 @@ vi.mock('@shopify/flash-list', () => ({
     ListEmptyComponent?: ReactElement;
     ListFooterComponent?: ReactElement | null;
     onEndReached?: () => void;
+    contentContainerStyle?: { paddingBottom?: number };
   }): ReactElement | null => {
     flashList.onEndReached = props.onEndReached ?? null;
+    flashList.contentContainerStyle = props.contentContainerStyle ?? null;
     const data = props.data ?? [];
     if (data.length === 0) {
       return props.ListEmptyComponent ?? null;
@@ -207,7 +241,9 @@ beforeEach(() => {
   queryErrors.errors = [];
   buttons.rendered = [];
   switches.rendered = [];
+  pressables.rendered = [];
   flashList.onEndReached = null;
+  flashList.contentContainerStyle = null;
 });
 
 describe('ReviewMemoryScreen loading', () => {
@@ -272,7 +308,7 @@ describe('ReviewMemoryScreen feature disabled', () => {
     const renderer = renderScreen();
 
     expect(collectText(renderer.toJSON())).toContain(
-      'Only organization owners and billing managers can enable review memory.'
+      'Only organization owners and billing managers can change review memory.'
     );
     expect(
       buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
@@ -292,14 +328,14 @@ describe('ReviewMemoryScreen feature disabled', () => {
         buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
       ).toBeDefined();
       expect(collectText(renderer.toJSON())).not.toContain(
-        'Only organization owners and billing managers can enable review memory.'
+        'Only organization owners and billing managers can change review memory.'
       );
     }
   );
 });
 
 describe('ReviewMemoryScreen enabled state', () => {
-  it('shows the on state with a switch and keeps the empty proposals state below it', () => {
+  it('renders the on-state row above the empty proposals state', () => {
     summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
     permission.canEdit = true;
     proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
@@ -307,18 +343,48 @@ describe('ReviewMemoryScreen enabled state', () => {
     const renderer = renderScreen();
 
     const texts = collectText(renderer.toJSON());
-    expect(texts).toContain('Review memory is on');
-    expect(texts).toContain('EMPTY:No proposals');
+    const rowIndex = texts.indexOf('Review memory is on');
+    expect(rowIndex).toBeGreaterThanOrEqual(0);
+    expect(rowIndex).toBeLessThan(texts.indexOf('EMPTY:No proposals'));
     expect(switches.rendered).toHaveLength(1);
     expect(switches.rendered[0]?.value).toBe(true);
     expect(switches.rendered[0]?.disabled).toBe(false);
+  });
+
+  it('turns review memory off from the on-state row', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = true;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+
+    renderScreen();
+
+    const row = pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch');
+    expect(row?.accessibilityLabel).toBe('Review memory');
+    expect(row?.accessibilityState).toMatchObject({ checked: true, disabled: false });
     act(() => {
-      switches.rendered[0]?.onValueChange?.(false);
+      row?.onPress?.();
     });
     expect(setEnabled.mutate).toHaveBeenCalledWith(false);
   });
 
-  it('disables the switch while the mutation settles', () => {
+  it('pads the proposals list clear of the tab bar', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 1 };
+    permission.canEdit = true;
+    proposals.data = {
+      pages: [
+        {
+          proposals: [{ id: 'p1', title: 'Add auth guidance', repo_full_name: 'acme/repo' }],
+          nextCursor: null,
+        },
+      ],
+    };
+
+    renderScreen();
+
+    expect(flashList.contentContainerStyle?.paddingBottom).toBe(83);
+  });
+
+  it('disables the row while the mutation settles', () => {
     summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
     permission.canEdit = true;
     proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
@@ -327,9 +393,13 @@ describe('ReviewMemoryScreen enabled state', () => {
     renderScreen();
 
     expect(switches.rendered[0]?.disabled).toBe(true);
+    expect(
+      pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch')
+        ?.accessibilityState
+    ).toMatchObject({ disabled: true, busy: true });
   });
 
-  it('keeps the control visible and inert for a reader who cannot edit', () => {
+  it('keeps the row visible and inert for a reader who cannot edit', () => {
     summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
     permission.canEdit = false;
     proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
@@ -338,26 +408,11 @@ describe('ReviewMemoryScreen enabled state', () => {
 
     expect(switches.rendered).toHaveLength(1);
     expect(switches.rendered[0]?.disabled).toBe(true);
+    const row = pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch');
+    expect(row?.accessibilityState).toMatchObject({ checked: true, disabled: true });
     expect(collectText(renderer.toJSON())).toContain(
-      'Only organization owners and billing managers can enable review memory.'
+      'Only organization owners and billing managers can change review memory.'
     );
-  });
-
-  it('returns to the off state once the settled mutation disables review memory', () => {
-    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
-    permission.canEdit = true;
-    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
-    setEnabled.data = { enabled: false };
-
-    const renderer = renderScreen();
-
-    const texts = collectText(renderer.toJSON());
-    expect(texts).toContain('Review memory is off');
-    expect(texts).not.toContain('Review memory is on');
-    expect(switches.rendered).toHaveLength(0);
-    expect(
-      buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
-    ).toBeDefined();
   });
 });
 

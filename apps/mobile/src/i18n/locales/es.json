@@ -992,7 +992,7 @@
       "off": "La memoria de revisión está desactivada.",
       "on": "La memoria de revisión está activada.",
       "offDescription": "Actívala para que Kilo aprenda de las respuestas de los responsables del mantenimiento y proponga directrices para REVIEW.md.",
-      "readOnlyDescription": "Solo los propietarios de la organización y los administradores de facturación pueden activar la memoria de revisión.",
+      "readOnlyDescription": "Solo los propietarios de la organización y los administradores de facturación pueden cambiar la memoria de revisión.",
       "title": "Memoria de revisiones"
     },
     "scopeList": {

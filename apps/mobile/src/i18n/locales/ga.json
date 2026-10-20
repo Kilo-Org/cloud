@@ -1505,7 +1505,7 @@
       "off": "Tá cuimhne athbhreithnithe múchta.",
       "on": "Tá cuimhne athbhreithnithe las.",
       "offDescription": "Cumasaigh í chun ligean do Kilo foghlaim ó fhreagraí na gcothaitheoirí agus treoir a mholadh do REVIEW.md.",
-      "readOnlyDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála cuimhne athbhreithnithe a chumasú.",
+      "readOnlyDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála cuimhne athbhreithnithe a athrú.",
       "enable": "Cumasaigh cuimhne athbhreithnithe",
       "loadingProposals": "Ag lódáil moltaí",
       "couldNotLoadProposals": "Níorbh fhéidir na moltaí a lódáil.",

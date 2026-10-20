@@ -989,7 +989,7 @@
       "off": "Het reviewgeheugen is uitgeschakeld.",
       "on": "Het reviewgeheugen is ingeschakeld.",
       "offDescription": "Schakel het reviewgeheugen in zodat Kilo leert van antwoorden van beheerders en richtlijnen voor REVIEW.md voorstelt.",
-      "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen reviewgeheugen inschakelen.",
+      "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen reviewgeheugen wijzigen.",
       "title": "Geheugen voor beoordelingen"
     },
     "scopeList": {

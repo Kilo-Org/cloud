@@ -1467,7 +1467,7 @@
       "off": "A memória de revisão está desativada.",
       "on": "A memória de revisão está ativada.",
       "offDescription": "Ativa-a para o Kilo aprender com as respostas dos responsáveis pelo projeto e propor orientações para o ficheiro REVIEW.md.",
-      "readOnlyDescription": "Apenas os proprietários da organização e os gestores de faturação podem ativar a memória de revisão.",
+      "readOnlyDescription": "Apenas os proprietários da organização e os gestores de faturação podem alterar a memória de revisão.",
       "enable": "Ativar memória de revisão",
       "loadingProposals": "A carregar propostas",
       "couldNotLoadProposals": "Não foi possível carregar as propostas.",

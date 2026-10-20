@@ -1512,7 +1512,7 @@
       "off": "Review memory is off",
       "on": "Review memory is on",
       "offDescription": "Turn it on to let Kilo learn from maintainer replies and propose REVIEW.md guidance.",
-      "readOnlyDescription": "Only organization owners and billing managers can enable review memory.",
+      "readOnlyDescription": "Only organization owners and billing managers can change review memory.",
       "enable": "Enable review memory",
       "loadingProposals": "Loading proposals",
       "couldNotLoadProposals": "Could not load proposals",

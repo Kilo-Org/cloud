@@ -1524,7 +1524,7 @@
       "off": "Mae'r cof adolygu wedi'i ddiffodd.",
       "on": "Mae'r cof adolygu wedi'i actifadu.",
       "offDescription": "Trowch ef ymlaen i alluogi Kilo i ddysgu o ymatebion y cynhalwyr ac awgrymu canllawiau ar gyfer REVIEW.md.",
-      "readOnlyDescription": "Dim ond perchnogion y sefydliad a rheolwyr bilio sy'n gallu galluogi'r cof adolygu.",
+      "readOnlyDescription": "Dim ond perchnogion y sefydliad a rheolwyr bilio sy'n gallu newid y cof adolygu.",
       "enable": "Galluogi cof adolygu",
       "loadingProposals": "Llwytho cynigion",
       "couldNotLoadProposals": "Ni ellid llwytho'r cynigion.",

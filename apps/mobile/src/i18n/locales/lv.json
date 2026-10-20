@@ -1467,7 +1467,7 @@
       "off": "Koda pārskatīšanas atmiņa ir izslēgta.",
       "on": "Koda pārskatīšanas atmiņa ir ieslēgta.",
       "offDescription": "Ieslēdz to, lai Kilo mācītos no uzturētāju atbildēm un ieteiktu norādījumus REVIEW.md failam.",
-      "readOnlyDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var iespējot koda pārskatīšanas atmiņu.",
+      "readOnlyDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt koda pārskatīšanas atmiņu.",
       "enable": "Iespējot koda pārskatīšanas atmiņu",
       "loadingProposals": "Tiek ielādēti priekšlikumi",
       "couldNotLoadProposals": "Neizdevās ielādēt priekšlikumus.",

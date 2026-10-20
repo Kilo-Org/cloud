@@ -1505,7 +1505,7 @@
       "off": "Il-memorja tar-reviżjoni hija diżattivata.",
       "on": "Il-memorja tar-reviżjoni hija attivata.",
       "offDescription": "Attivaha biex Kilo jitgħallem mit-tweġibiet tal-manutenturi u jipproponi linji gwida għal REVIEW.md.",
-      "readOnlyDescription": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jattivaw il-memorja tar-reviżjoni.",
+      "readOnlyDescription": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jibdlu l-memorja tar-reviżjoni.",
       "enable": "Attiva l-memorja tar-reviżjoni",
       "loadingProposals": "Qed jitgħabbew il-proposti",
       "couldNotLoadProposals": "Ma setgħux jitgħabbew il-proposti.",

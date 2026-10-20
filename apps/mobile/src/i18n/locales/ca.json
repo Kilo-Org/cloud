@@ -1467,7 +1467,7 @@
       "off": "La memòria de revisió està desactivada.",
       "on": "La memòria de revisió està activada.",
       "offDescription": "Activa-la perquè Kilo aprengui de les respostes dels mantenidors i proposi pautes per al fitxer REVIEW.md.",
-      "readOnlyDescription": "Només els propietaris de l'organització i els gestors de facturació poden activar la memòria de revisió.",
+      "readOnlyDescription": "Només els propietaris de l'organització i els gestors de facturació poden canviar la memòria de revisió.",
       "enable": "Activa la memòria de revisió",
       "loadingProposals": "S'estan carregant les propostes",
       "couldNotLoadProposals": "No s'han pogut carregar les propostes.",

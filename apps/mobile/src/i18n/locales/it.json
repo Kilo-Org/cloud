@@ -961,7 +961,7 @@
       "off": "La memoria di revisione è disattivata.",
       "on": "La memoria di revisione è attivata.",
       "offDescription": "Attivala per consentire a Kilo di imparare dalle risposte dei responsabili del progetto e proporre indicazioni per REVIEW.md.",
-      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono attivare la memoria di revisione.",
+      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare la memoria di revisione.",
       "title": "Memoria delle revisioni"
     },
     "scopeList": {

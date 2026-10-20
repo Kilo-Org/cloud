@@ -1448,7 +1448,7 @@
       "off": "Ülevaatuste mälu on välja lülitatud.",
       "on": "Ülevaatuste mälu on sisse lülitatud.",
       "offDescription": "Lülita see sisse, et Kilo saaks hooldajate vastustest õppida ja pakkuda juhiseid faili REVIEW.md.",
-      "readOnlyDescription": "Ülevaatuste mälu saavad sisse lülitada ainult organisatsiooni omanikud ja arveldushaldurid.",
+      "readOnlyDescription": "Ülevaatuste mälu saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
       "enable": "Luba ülevaatuste mälu",
       "loadingProposals": "Ettepanekute laadimine",
       "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",

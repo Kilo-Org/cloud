@@ -1448,7 +1448,7 @@
       "off": "A memoria de revisión está desactivada.",
       "on": "A memoria de revisión está activada.",
       "offDescription": "Actívaa para que Kilo aprenda das respostas dos responsables do mantemento e propoña pautas para REVIEW.md.",
-      "readOnlyDescription": "Só os propietarios da organización e os xestores de facturación poden activar a memoria de revisión.",
+      "readOnlyDescription": "Só os propietarios da organización e os xestores de facturación poden cambiar a memoria de revisión.",
       "enable": "Activar a memoria de revisión",
       "loadingProposals": "Cargando propostas",
       "couldNotLoadProposals": "Non se puideron cargar as propostas.",

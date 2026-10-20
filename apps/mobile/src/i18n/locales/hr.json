@@ -1467,7 +1467,7 @@
       "off": "Memorija pregleda je isključena.",
       "on": "Memorija pregleda je uključena.",
       "offDescription": "Uključi je kako bi Kilo učio iz odgovora održavatelja i predlagao smjernice za datoteku REVIEW.md.",
-      "readOnlyDescription": "Samo vlasnici organizacije i voditelji naplate mogu omogućiti memoriju pregleda.",
+      "readOnlyDescription": "Samo vlasnici organizacije i voditelji naplate mogu promijeniti memoriju pregleda.",
       "enable": "Omogući memoriju pregleda",
       "loadingProposals": "Učitavanje prijedloga",
       "couldNotLoadProposals": "Nije moguće učitati prijedloge.",

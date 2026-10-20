@@ -989,7 +989,7 @@
       "off": "审查记忆已关闭。",
       "on": "审查记忆已开启。",
       "offDescription": "启用审查记忆后，Kilo 可以从维护者的回复中学习，并为 REVIEW.md 提出审查准则建议。",
-      "readOnlyDescription": "只有组织所有者和账单管理员可以启用审查记忆。",
+      "readOnlyDescription": "只有组织所有者和账单管理员可以更改审查记忆。",
       "title": "审查记忆"
     },
     "scopeList": {

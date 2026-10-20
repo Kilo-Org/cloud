@@ -1448,7 +1448,7 @@
       "off": "Memori semakan dinyahdayakan.",
       "on": "Memori semakan didayakan.",
       "offDescription": "Dayakannya supaya Kilo dapat belajar daripada balasan penyelenggara dan mencadangkan panduan untuk REVIEW.md.",
-      "readOnlyDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh mendayakan memori semakan.",
+      "readOnlyDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh mengubah memori semakan.",
       "enable": "Dayakan memori semakan",
       "loadingProposals": "Memuatkan cadangan",
       "couldNotLoadProposals": "Tidak dapat memuatkan cadangan.",

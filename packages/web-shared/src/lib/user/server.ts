@@ -425,25 +425,20 @@ async function validateUserAuthorization(
   }
 
   // A credential bound to a device session is only valid while that session is
-  // active. The read uses the caller's replica so a gateway request stays
-  // in-region; a replica miss is confirmed on the primary, so a session created
-  // moments ago authenticates its first request.
+  // active. The read uses the primary, as the resource-delegation and widget
+  // checks do, so a sign-out or revocation applies to this request immediately
+  // and a session created moments ago authenticates its first request.
   if (deviceSessionId !== undefined) {
-    const clients = fromDb === db ? [fromDb] : [fromDb, db];
-    let session: { id: string } | undefined;
-    if (uuid.safeParse(deviceSessionId).success) {
-      for (const client of clients) {
-        session = await client.query.device_sessions.findFirst({
+    const session = uuid.safeParse(deviceSessionId).success
+      ? await db.query.device_sessions.findFirst({
           where: and(
             eq(device_sessions.id, deviceSessionId),
             eq(device_sessions.kilo_user_id, kiloUserId),
             isNull(device_sessions.revoked_at)
           ),
           columns: { id: true },
-        });
-        if (session) break;
-      }
-    }
+        })
+      : undefined;
     if (!session) {
       // The caller presented a credential that no longer works, so this must
       // not degrade into an anonymous request.

@@ -22,7 +22,12 @@ const query = vi.hoisted(() => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  ScrollView: 'ScrollView',
+  Pressable: 'Pressable',
+  BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
@@ -42,6 +47,10 @@ vi.mock('@/components/ui/radio-group', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Lock: 'Lock' }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.fn() } }));
 vi.mock('@/lib/analytics/posthog', () => ({

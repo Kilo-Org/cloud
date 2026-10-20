@@ -1,6 +1,55 @@
-import { briefingPrompt } from './summary';
+import type { StoredModel } from '@kilocode/db';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+}));
+
+describe('briefing model pricing', () => {
+  const alias: StoredModel = {
+    id: '~deepseek/deepseek-flash-latest',
+    name: 'DeepSeek Flash Latest',
+    alias_target: { slug: 'deepseek/test-flash' },
+    endpoints: [],
+  };
+  const target: StoredModel = {
+    id: 'deepseek/test-flash',
+    name: 'DeepSeek Flash',
+    endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
+  };
+
+  beforeEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [alias.id]: alias,
+      [target.id]: target,
+    });
+  });
+
+  it('quotes the latest alias using the same spend bound as its priced target', async () => {
+    const quote = await briefingPriceBound(alias.id, 'Overnight activity', 2_000_000);
+    expect(quote).toEqual(await briefingPriceBound(target.id, 'Overnight activity', 2_000_000));
+    expect(quote.inputRate).toBe(0.000001);
+    expect(quote.outputRate).toBe(0.000002);
+    await expect(briefingPriceBound(alias.id, 'Overnight activity', 1)).rejects.toThrow(
+      'spend_limit_too_low'
+    );
+  });
+
+  it.each([undefined, { ...target, endpoints: [] }])(
+    'rejects an alias whose target has no priced routes',
+    async unavailableTarget => {
+      jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+        [alias.id]: alias,
+        ...(unavailableTarget ? { [target.id]: unavailableTarget } : {}),
+      });
+      await expect(briefingPriceBound(alias.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
+        'model_pricing_unavailable'
+      );
+    }
+  );
+});
 it('redacts credentials and retains outcome evidence and source links within the input limit', () => {
   const starts = Array.from({ length: 20 }, (_, index) => ({
     id: `start-${index}`,

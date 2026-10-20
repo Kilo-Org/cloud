@@ -18,6 +18,7 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
+  modelDoesNotExistResponse,
   modelNotAllowedResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
@@ -32,6 +33,7 @@ import {
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
@@ -178,6 +180,11 @@ export async function handleAudioTranscriptionsRequest(
     parsedRequest.kind === 'json' ? parsedRequest.body.model.trim() : parsedRequest.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
+  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
+  if (await isCustomLlm(requestedModelLowerCased)) {
+    return modelDoesNotExistResponse();
+  }
+
   const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
@@ -290,7 +297,7 @@ export async function handleAudioTranscriptionsRequest(
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
-  if (!canSpendPaidUsage(balance) && !isFreeModel(requestedModelLowerCased) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
     return await creditsBlockedResponse({
       user,
       balance,

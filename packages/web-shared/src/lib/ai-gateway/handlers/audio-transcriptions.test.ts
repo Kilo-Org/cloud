@@ -6,6 +6,10 @@ import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 jest.mock('next/server', () => {
@@ -106,6 +110,25 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it('never forwards a custom LLM id to a transcription upstream', async () => {
+    setUserAuth();
+    await insertCustomLlmForTest('acme/transcribe-custom-model');
+    try {
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(
+        makeRequest({
+          model: 'acme/transcribe-custom-model',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+        }) as never
+      );
+
+      expect(response.status).toBe(404);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    } finally {
+      await deleteCustomLlmForTest('acme/transcribe-custom-model');
+    }
   });
 
   it('proxies transcription requests to OpenRouter', async () => {
@@ -294,7 +317,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockReturnValue(true);
+    mockedIsFreeModel.mockResolvedValue(true);
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
@@ -317,7 +340,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockReturnValue(false);
+    mockedIsFreeModel.mockResolvedValue(false);
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
     const response = await handleAudioTranscriptionsRequest(
@@ -338,7 +361,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockReturnValue(false);
+    mockedIsFreeModel.mockResolvedValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(true);
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');

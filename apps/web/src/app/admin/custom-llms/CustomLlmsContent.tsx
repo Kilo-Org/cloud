@@ -471,7 +471,10 @@ export function CustomLlmsContent() {
                       https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1
                     </code>{' '}
                     and use the following. Requests are signed with AWS SigV4. Bedrock API keys use{' '}
-                    <code className="text-foreground">&quot;type&quot;: &quot;api_key&quot;</code>.
+                    <code className="text-foreground">&quot;type&quot;: &quot;api_key&quot;</code>{' '}
+                    on OpenAI-compatible routes and{' '}
+                    <code className="text-foreground">&quot;type&quot;: &quot;x-api-key&quot;</code>{' '}
+                    on Anthropic Messages routes.
                   </p>
                   <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
                     {`{

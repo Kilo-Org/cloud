@@ -36,10 +36,10 @@ describe('rate-limited Kilo-exclusive models', () => {
 });
 
 describe('Glyph Cluster', () => {
-  test('is free, stealth, and requires data collection', () => {
+  test('is free, stealth, and requires data collection', async () => {
     const model = glyph_cluster_stealth_free_model;
     expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
-    expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
+    expect(await hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
     expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(true);
     expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(true);
     expect(getInferenceProviders(model)).toEqual([
@@ -49,10 +49,10 @@ describe('Glyph Cluster', () => {
 });
 
 describe('Reflection Beam (free)', () => {
-  test('is free, not stealth, requires data collection, and routes only to Reflection', () => {
+  test('is free, not stealth, requires data collection, and routes only to Reflection', async () => {
     const model = reflection_beam_free_model;
     expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
-    expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
+    expect(await hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
     expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(false);
     expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(false);
     expect(getInferenceProviders(model)).toEqual([

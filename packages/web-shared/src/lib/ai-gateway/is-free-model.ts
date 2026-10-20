@@ -35,9 +35,10 @@ export function isFreeModelExcludingCustomLlms(model: string): boolean {
   );
 }
 
-export function hasBestEffortGuessDataCollectionRequirement(model: string): boolean {
+/** Free models, custom LLMs included, are assumed to train on prompts. */
+export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
   return (
-    isFreeModelExcludingCustomLlms(model) ||
+    (await isFreeModel(model)) ||
     kiloExclusiveModels.some(
       candidate =>
         candidate.public_id === model && candidate.flags.includes('requires-data-collection')

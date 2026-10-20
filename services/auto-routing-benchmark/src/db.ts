@@ -658,6 +658,7 @@ const PendingDeciderOutputSchema = z.object({
   // From the row's prompt_revision column; absent when the output is about to be saved by
   // this worker, which uses PROMPT_TRANSPORT_REVISION.
   promptRevision: z.number().int().optional(),
+  attemptStartedAt: z.number().int().nonnegative().optional(),
 });
 
 export type PendingDeciderOutput = z.infer<typeof PendingDeciderOutputSchema>;
@@ -692,17 +693,135 @@ export async function getPendingDeciderOutput(
 export async function savePendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey,
-  output: PendingDeciderOutput
-): Promise<void> {
+  output: PendingDeciderOutput,
+  execution?: { token: string; attemptStartedAt?: number }
+): Promise<boolean> {
   const { promptRevision, ...payload } = output;
-  await drizzle(db)
-    .insert(pendingDeciderOutputs)
-    .values({
-      ...key,
-      payload: JSON.stringify(payload),
-      prompt_revision: promptRevision ?? PROMPT_TRANSPORT_REVISION,
-    })
-    .onConflictDoNothing();
+  const inserted = await db
+    .prepare(`
+      INSERT INTO pending_decider_outputs
+        (run_id, model, variant, case_id, rep, payload, prompt_revision)
+      SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+      WHERE NOT EXISTS (
+        SELECT 1 FROM case_results
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      ) AND (?8 IS NULL OR EXISTS (
+        SELECT 1 FROM scheduler_executions
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+          AND token = ?8 AND (?9 IS NULL OR started_at = ?9)
+      ))
+      ON CONFLICT DO NOTHING
+    `)
+    .bind(
+      key.run_id,
+      key.model,
+      key.variant,
+      key.case_id,
+      key.rep,
+      JSON.stringify(payload),
+      promptRevision ?? PROMPT_TRANSPORT_REVISION,
+      execution?.token ?? null,
+      execution?.attemptStartedAt ?? null
+    )
+    .run();
+  return inserted.meta.changes > 0;
+}
+
+export async function claimDeciderGrading(
+  db: D1Database,
+  key: PendingDeciderOutputKey,
+  token: string,
+  now: number
+): Promise<boolean> {
+  const result = await db
+    .prepare(`
+      UPDATE pending_decider_outputs SET grading_token = ?6, grading_lease_until = ?7
+      WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        AND grading_lease_until <= ?8
+        AND NOT EXISTS (
+          SELECT 1 FROM case_results
+          WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        )
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep, token, now + 5 * 60_000, now)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function releaseDeciderGrading(
+  db: D1Database,
+  key: PendingDeciderOutputKey,
+  token: string
+): Promise<void> {
+  await db
+    .prepare(`
+      UPDATE pending_decider_outputs SET grading_token = NULL, grading_lease_until = 0
+      WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        AND grading_token = ?6
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep, token)
+    .run();
+}
+
+export async function deletePendingDeciderOutput(
+  db: D1Database,
+  key: PendingDeciderOutputKey
+): Promise<void> {
+  await drizzle(db).delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(key));
+}
+
+export async function needsPendingOutputRecovery(
+  db: D1Database,
+  key: PendingDeciderOutputKey
+): Promise<boolean> {
+  const row = await db
+    .prepare(`
+      SELECT 1 AS needed FROM benchmark_runs AS run
+      WHERE run.id = ?1 AND (
+        run.status != 'running' OR EXISTS (
+          SELECT 1 FROM run_lane_failures
+          WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?5
+        )
+      ) AND EXISTS (
+        SELECT 1 FROM pending_decider_outputs
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      ) AND NOT EXISTS (
+        SELECT 1 FROM case_results
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      )
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep)
+    .first<{ needed: number }>();
+  return row !== null;
+}
+
+export async function listPendingOutputRecoveries(
+  db: D1Database,
+  router: AutoRouter,
+  engineIdentity: string,
+  limit: number
+): Promise<PendingDeciderOutputKey[]> {
+  const rows = await db
+    .prepare(`
+    SELECT p.run_id, p.model, p.variant, p.rep, p.case_id
+    FROM pending_decider_outputs AS p
+    JOIN benchmark_runs AS run ON run.id = p.run_id
+    WHERE run.router = ?1 AND run.engine_identity = ?2
+      AND p.grading_lease_until <= ?3
+      AND (run.status != 'running' OR EXISTS (
+        SELECT 1 FROM run_lane_failures f WHERE f.run_id = p.run_id
+          AND f.model = p.model AND f.variant = p.variant AND f.rep = p.rep
+      ))
+      AND NOT EXISTS (
+        SELECT 1 FROM case_results r WHERE r.run_id = p.run_id AND r.model = p.model
+          AND r.variant = p.variant AND r.case_id = p.case_id AND r.rep = p.rep
+      )
+    ORDER BY p.run_id, p.model, p.variant, p.case_id, p.rep
+    LIMIT ?4
+  `)
+    .bind(router, engineIdentity, Date.now(), limit)
+    .all<PendingDeciderOutputKey>();
+  return rows.results;
 }
 
 export async function replaceModelSummaries(

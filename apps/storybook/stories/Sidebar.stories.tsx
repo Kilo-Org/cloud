@@ -165,9 +165,9 @@ const cloudItems: SidebarStoryItem[] = [
     url: '/security-agent',
   },
   {
-    title: 'Security Agent',
-    icon: Shield,
-    url: '/security-agent',
+    title: 'Gas Town',
+    icon: Factory,
+    url: '/gastown',
   },
   {
     title: 'Managed Indexing',

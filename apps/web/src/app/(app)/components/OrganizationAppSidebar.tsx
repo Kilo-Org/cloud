@@ -5,6 +5,7 @@ import { useUser } from '@/hooks/useUser';
 import {
   Bot,
   Building,
+  ChartColumnIncreasing,
   Layers,
   Activity,
   Sliders,
@@ -23,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UsersRound,
+  Network,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -115,10 +117,19 @@ export default function OrganizationAppSidebar({
       url: `/organizations/${organizationId}`,
     },
     {
-      title: 'Security Agent',
-      icon: Shield,
-      url: `/organizations/${organizationId}/security-agent`,
+      title: 'Usage',
+      icon: ChartColumnIncreasing,
+      url: `/organizations/${organizationId}/usage-details?view=ai-usage`,
     },
+    ...(hasOwnerLevelAccess && currentOrg?.parent_organization_id === null
+      ? [
+          {
+            title: 'Sub-organizations',
+            icon: Network,
+            url: `/organizations/${organizationId}/sub-organizations`,
+          },
+        ]
+      : []),
   ];
 
   // KiloClaw group

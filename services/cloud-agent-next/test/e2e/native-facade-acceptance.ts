@@ -46,7 +46,7 @@ type RecordValue = Record<string, unknown>;
 type HttpResult = { status: number; body: unknown; cursor: string | null };
 type Result = { name: string; status: 'pass' | 'fail' | 'blocked'; detail?: unknown };
 type NativeEvent = { type: string; properties: RecordValue };
-type MessageEntry = { info: RecordValue; parts: RecordValue[] };
+export type MessageEntry = { info: RecordValue; parts: RecordValue[] };
 type NativeStream = {
   sessionID: string;
   events: NativeEvent[];
@@ -68,6 +68,59 @@ export const nativeBurstFixture = {
 };
 
 class Blocked extends Error {}
+
+/**
+ * Checks that prove a criterion this driver owns. `Blocked` is a legitimate
+ * outcome for environment-dependent extras, but never for these: if one cannot
+ * be observed, the run must report a failure rather than a soft block.
+ */
+/** `Blocked` is never an acceptable outcome for a criterion this driver owns. */
+export function requiredCheckStatus(
+  name: string,
+  blocked: boolean
+): 'pass' | 'fail' | 'blocked' {
+  return blocked && !REQUIRED_CHECKS.has(name) ? 'blocked' : 'fail';
+}
+
+/**
+ * An aborted turn is settled when no assistant reply for it completed and the
+ * session reports idle again. Kilo reverts an aborted turn's user row, so its
+ * presence is not required; the caller proves the turn started by observing the
+ * fake LLM gate engage before the abort.
+ */
+export function interruptedTurnSettled(
+  messages: readonly MessageEntry[],
+  sessionStatus: RecordValue | undefined,
+  messageID: string
+): boolean {
+  const assistant = messages.find(
+    entry => entry.info.role === 'assistant' && entry.info.parentID === messageID
+  );
+  if (assistant !== undefined && typeof record(assistant.info.time).completed === 'number') {
+    return false;
+  }
+  return sessionStatus === undefined || record(sessionStatus).type === 'idle';
+}
+
+const REQUIRED_CHECKS: ReadonlySet<string> = new Set([
+  'setup: funded bearer session bootstrap',
+  'same-key start replay creates one session and rejects changed intent',
+  'session detail/list projection',
+  'warm native status/todo/diff/question/permission reads',
+  'abort interrupts one in-flight turn and the session continues',
+  'native SSE snapshot precedes fence',
+  'prompt_async native live tail after fence',
+  'question list and SSE asked event',
+  'reconnect snapshot retains pending question through fence',
+  'question reply resumes and stale reply fails',
+  'question reject clears pending interaction and dismisses tool',
+  'human-required skill permission reply and sibling isolation',
+  'human-required skill permission rejection prevents shell execution',
+  'cold persisted reads/pagination and native no-wake responses',
+  'cold native SSE replays durable transcript through fence without waking',
+  'public prompt wakes cold owned session',
+  'automatic idle shutdown keeps history readable and ordinary input resumes',
+]);
 
 export function classifyPermissionReply(
   response: HttpResult,
@@ -96,7 +149,10 @@ export function isLiveRuntimeUnavailable(response: HttpResult): boolean {
 function errorDetail(error: unknown): unknown {
   if (error instanceof AggregateError)
     return { message: error.message, errors: error.errors.map(errorDetail) };
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message;
+  // Cleanup aggregates record structured per-operation failures.
+  if (error !== null && typeof error === 'object') return error;
+  return String(error);
 }
 
 function record(value: unknown): RecordValue {
@@ -420,7 +476,7 @@ async function main(): Promise<void> {
       console.log(`PASS ${name}`);
       return true;
     } catch (error) {
-      const status = error instanceof Blocked ? 'blocked' : 'fail';
+      const status = requiredCheckStatus(name, error instanceof Blocked);
       const detail = errorDetail(error);
       results.push({ name, status, detail: sanitize(detail) });
       console.log(
@@ -629,6 +685,10 @@ async function main(): Promise<void> {
   }
 
   try {
+    // The idle leg shortens every control-plane timer (including reconnects), so
+    // the long sequence cannot run under the same divisor. Run it alone.
+    const idleOnly = process.env.NATIVE_E2E_IDLE_LEG === '1';
+    if (!idleOnly) {
     let root: StartSessionResult | undefined;
     const bootstrap = await check('setup: funded bearer session bootstrap', async () => {
       const initialMessageID = createMessageId();
@@ -688,6 +748,68 @@ async function main(): Promise<void> {
     const rootID = root.kiloSessionId;
     const rootCloudSessionID = root.cloudAgentSessionId;
 
+    await check('same-key start replay creates one session and rejects changed intent', async () => {
+      const operationKey = randomUUID();
+      const initialMessageID = createMessageId();
+      const intent = {
+        prompt: `__fake__:echo:native-idempotent-${runID}`,
+        initialMessageId: initialMessageID,
+        mode: 'code',
+        model: config.model,
+        gitUrl: config.gitUrl,
+        createdOnPlatform: 'cloud-agent-web',
+        clientProvenance: 'browser',
+        operationKey,
+        autoInitiate: true,
+        autoCommit: false,
+        shallow: true,
+      };
+      const first = await trpcCall<WorktreeSessionResult>(
+        config,
+        'prepareSession',
+        intent,
+        { internalApiSecret: config.internalApiSecret, signal: AbortSignal.timeout(requestTimeout) }
+      );
+      ownedSessions.push({ ...first, messageId: initialMessageID, delivery: 'queued' });
+
+      // The same key and the same intent is a replay, not a second session.
+      const replay = await trpcCall<WorktreeSessionResult & { replayed?: boolean }>(
+        config,
+        'prepareSession',
+        intent,
+        { internalApiSecret: config.internalApiSecret, signal: AbortSignal.timeout(requestTimeout) }
+      );
+      assert.equal(replay.cloudAgentSessionId, first.cloudAgentSessionId);
+      assert.equal(replay.kiloSessionId, first.kiloSessionId);
+      assert.equal(replay.replayed, true, 'the second call must report a ledger replay');
+
+      // A different intent under the same key must be refused, never applied.
+      await assert.rejects(
+        () =>
+          trpcCall<WorktreeSessionResult>(
+            config,
+            'prepareSession',
+            { ...intent, prompt: `__fake__:echo:native-changed-${runID}` },
+            {
+              internalApiSecret: config.internalApiSecret,
+              signal: AbortSignal.timeout(requestTimeout),
+            }
+          ),
+        /session_create_intent_conflict/
+      );
+
+      // Discovery still exposes exactly one logical session for that key.
+      const listed = successful(await request('/session?limit=100'));
+      assert(Array.isArray(listed));
+      const matches = listed.filter(item => record(item).id === first.kiloSessionId);
+      assert.equal(matches.length, 1, 'same-key replay created a duplicate session');
+      return {
+        cloudAgentSessionId: first.cloudAgentSessionId,
+        kiloSessionId: first.kiloSessionId,
+        replayed: replay.replayed,
+      };
+    });
+
     await check('session detail/list projection', async () => {
       const detail = record(successful(await request(`/session/${rootID}`)));
       assert.equal(detail.id, rootID);
@@ -717,6 +839,50 @@ async function main(): Promise<void> {
         values.push({ route, value });
       }
       return values;
+    });
+    await check('abort interrupts one in-flight turn and the session continues', async () => {
+      const tag = `native-abort-${runID}`;
+      gateTags.add(tag);
+      const messageID = await prompt(rootID, `__fake__:gate:${tag}`, 'code');
+      try {
+        const engaged = await waitForGateEngaged(config, tag, 60_000);
+        assert(engaged, 'the gated turn never reached the fake LLM');
+        const aborted = successful(
+          await request(`/session/${rootID}/abort`, { method: 'POST' })
+        );
+        assert.equal(aborted, true);
+        // Hold the gate until the interruption is observed. Releasing it first
+        // would let the model answer finish and make a failed abort look like a
+        // completed turn.
+
+        // The interrupted turn must not complete with an assistant reply, and
+        // the session must return to idle so ordinary input can continue it.
+        await poll(
+          'interrupted turn settles without an assistant reply',
+          async () => {
+            const messages = await transcript(rootID);
+            const status = await request(`/session/status${selected(rootID)}`);
+            if (status.status === 503) return;
+            const current = record(successful(status))[rootID];
+            return interruptedTurnSettled(
+              messages,
+              current === undefined ? undefined : record(current),
+              messageID
+            )
+              ? true
+              : undefined;
+          },
+          60_000
+        );
+      } finally {
+        await releaseGate(config.fakeLlmUrl, tag, AbortSignal.timeout(requestTimeout)).catch(
+          () => undefined
+        );
+      }
+
+      const followUp = await prompt(rootID, `__fake__:echo:native-after-abort`, 'code');
+      await completed(rootID, followUp, 'native-after-abort', 120_000);
+      return { interruptedMessageID: messageID, followUpMessageID: followUp };
     });
     await check('selectors and unsupported blocking prompt fail closed', async () => {
       assert.equal((await request('/session/status')).status, 400);
@@ -1430,6 +1596,84 @@ async function main(): Promise<void> {
       );
       return { messageID, status };
     });
+    }
+    if (idleOnly) {
+      await check(
+        'automatic idle shutdown keeps history readable and ordinary input resumes',
+        async () => {
+          const idleMessageID = createMessageId();
+          const prepared = await trpcCall<WorktreeSessionResult>(
+            config,
+            'prepareSession',
+            {
+              prompt: `__fake__:echo:native-idle-${runID}`,
+              initialMessageId: idleMessageID,
+              mode: 'code',
+              model: config.model,
+              gitUrl: config.gitUrl,
+              // An interactive IDE origin: `sandboxIdlePolicyForOrigins` keeps
+              // the interactive window rather than the unattended one.
+              createdOnPlatform: 'desktop',
+              clientProvenance: 'browser',
+              autoInitiate: true,
+              autoCommit: false,
+              shallow: true,
+            },
+            {
+              internalApiSecret: config.internalApiSecret,
+              signal: AbortSignal.timeout(requestTimeout),
+            }
+          );
+          ownedSessions.push({ ...prepared, messageId: idleMessageID, delivery: 'queued' });
+          const idleKiloID = prepared.kiloSessionId;
+          await completed(idleKiloID, idleMessageID, 'native-idle', 240_000);
+
+          const runtime = await findControlPlaneKiloRuntime(idleKiloID);
+          assert(runtime, 'the idle leg could not identify its owned runtime');
+          ownedFamilies.set(runtime.container.name, runtime.container);
+          const durable = await transcript(idleKiloID);
+
+          // No explicit stop: Cloud's own idle deadline reclaims compute. Only
+          // the sandbox primary is Cloud's signal; the dev Docker proxy sidecar
+          // outlives it and is not compute for this session.
+          const stopped = await waitForSandboxPrimaryGone(runtime.container, 240_000);
+          assert(stopped, 'the sandbox was never reclaimed by automatic idle shutdown');
+
+          const detail = record(successful(await request(`/session/${idleKiloID}`)));
+          assert.equal(detail.directory, directory(idleKiloID));
+          assert.deepEqual(
+            await transcript(idleKiloID),
+            durable,
+            'idle-stopped transcript changed'
+          );
+          const unavailable = await request(`/session/status${selected(idleKiloID)}`);
+          assert.equal(unavailable.status, 503, JSON.stringify(unavailable));
+          assert.equal(record(unavailable.body).error, 'KILO_LIVE_RUNTIME_UNAVAILABLE');
+
+          const replay = attach(idleKiloID);
+          try {
+            await replay.wait(event => event.type === 'kilo.native.fence', 'idle native fence');
+            assertColdNativeSnapshot(replay.events, idleKiloID, durable);
+          } finally {
+            await replay.close();
+          }
+          // Reading history must not have allocated compute again.
+          assert.equal(await waitForSandboxPrimaryGone(runtime.container, 2_000), true);
+
+          // Ordinary input restores compute and continues the same hosted session.
+          const wakeID = await prompt(idleKiloID, '__fake__:echo:native-idle-resume', 'code');
+          await completed(idleKiloID, wakeID, 'native-idle-resume', 240_000);
+          const restored = await findControlPlaneKiloRuntime(idleKiloID);
+          assert(restored, 'the resumed session has no live runtime');
+          ownedFamilies.set(restored.container.name, restored.container);
+          return {
+            kiloSessionId: idleKiloID,
+            durableMessages: durable.length,
+            resumedMessageID: wakeID,
+          };
+        }
+      );
+    }
   } catch (error) {
     results.push({
       name: 'dependent native coverage',
@@ -1462,9 +1706,14 @@ async function main(): Promise<void> {
         }
       };
       for (const tag of gateTags)
-        await attempt(`release gate ${tag}`, () =>
-          releaseGate(config.fakeLlmUrl, tag, AbortSignal.timeout(requestTimeout))
-        );
+        await attempt(`release gate ${tag}`, async () => {
+          try {
+            await releaseGate(config.fakeLlmUrl, tag, AbortSignal.timeout(requestTimeout));
+          } catch (error) {
+            // A gate the abort already cancelled is gone, not a cleanup failure.
+            if (!/404/.test(error instanceof Error ? error.message : String(error))) throw error;
+          }
+        });
       for (const session of [...ownedSessions].reverse()) {
         await attempt(`discover ${session.kiloSessionId}`, async () => {
           const runtime = await findControlPlaneKiloRuntime(session.kiloSessionId);
@@ -1509,7 +1758,6 @@ async function main(): Promise<void> {
           gaps: [
             'nonempty todo fixture',
             'status map while sibling is active',
-            'large multi-page SSE snapshot and overflow/resnapshot injection',
             'permission always branch',
             'org model allowlist and unfunded command rejection',
           ],

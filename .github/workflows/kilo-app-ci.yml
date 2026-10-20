@@ -105,22 +105,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Inspect declaration resolution
-        run: |
-          node <<'NODE'
-          const ts = require('typescript');
-          const fs = require('node:fs');
-          const { createRequire } = require('node:module');
-          const app = createRequire(process.cwd() + '/apps/mobile/package.json');
-          for (const name of ['expo-widgets', 'react-native-svg', 'react-native']) {
-            const file = app.resolve(name);
-            const resolved = ts.resolveModuleName('react', file, { moduleResolution: ts.ModuleResolutionKind.Bundler }, ts.sys).resolvedModule;
-            console.log(name, resolved);
-            if (resolved) console.log('declaration bytes', fs.statSync(resolved.resolvedFileName).size);
-          }
-          console.log('public declaration target', fs.realpathSync('node_modules/@types/react'));
-          NODE
-
       - name: Cache compiler plugins
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:

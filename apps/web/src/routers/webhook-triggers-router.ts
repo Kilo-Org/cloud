@@ -843,7 +843,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       }
 
       // Verify ownership via PostgreSQL
-      const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+      await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
       // Fetch from worker
       const result = await listWorkerRequests(
@@ -855,8 +855,6 @@ export const webhookTriggersRouter = createTRPCRouter({
 
       if (!result.success) {
         if (result.isNotFound) {
-          // Worker doesn't have this trigger - clean up DB and return NOT_FOUND
-          await cleanupOrphanDbRecord(dbTrigger.id, input.triggerId);
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Trigger not found',

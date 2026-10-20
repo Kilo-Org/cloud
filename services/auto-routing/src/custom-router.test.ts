@@ -522,6 +522,60 @@ describe('public custom router decide', () => {
     });
   });
 
+  const imageMessages = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Fix the layout in this screenshot.' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+      ],
+    },
+  ];
+
+  it('falls back past a default entry that lacks a required modality', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [ollama, sonnet], defaultEntryKey: 'client:ollama/qwen3:32b' })
+    );
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const { decision } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ messages: imageMessages }))
+    );
+    expect(decision).toMatchObject({ model: SONNET, fallback: true });
+  });
+
+  it('fails with custom_router_unavailable when the classifier fails and no entry fits', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [ollama, lmstudio], defaultEntryKey: 'client:ollama/qwen3:32b' })
+    );
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const res = await post(
+      CUSTOM_ROUTER_DECIDE_PATH,
+      decideBody({
+        messages: imageMessages,
+        clientEntries: [
+          { provider: 'ollama', model: 'qwen3:32b' },
+          { provider: 'lmstudio', model: 'gemma' },
+        ],
+      })
+    );
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+  });
+
+  it('accepts a body at the size limit and rejects one byte more', async () => {
+    const limit = 32_000_000;
+    const padded = (bytes: number) => {
+      const unpadded = JSON.stringify({ ...decideBody(), padding: '' }).length;
+      return { ...decideBody(), padding: 'x'.repeat(bytes - unpadded) };
+    };
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, padded(limit)));
+    const tooLarge = await post(CUSTOM_ROUTER_DECIDE_PATH, padded(limit + 1));
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+  });
+
   it('drops gateway entries the organization policy denies the member', async () => {
     gatewayDeniedModelIds = [SONNET];
     const { decision } = await decisionOf(

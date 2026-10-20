@@ -137,7 +137,14 @@ describe('adminGatewayModelListsRouter', () => {
 
     const rows = await db.select().from(ai_gateway_config);
     expect(rows).toEqual([
-      { id: 1, config: {}, auto_free: null, preferred_models: null, unavailable_models: config },
+      {
+        id: 1,
+        config: {},
+        auto_free: null,
+        preferred_models: null,
+        unavailable_models: config,
+        vercel_model_id_overrides: null,
+      },
     ]);
   });
 

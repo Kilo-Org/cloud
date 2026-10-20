@@ -21,8 +21,10 @@ Run only after the full migration scan is clean and migrated model IDs have been
 The default is a dry run: it discovers live contacts and saves hashed targets, without sending.
 Inspect counts and targetStatuses, then rerun with the same arguments plus --send to deliver.
 Reuse the same private state directory for every retry. Sent targets are never implicitly resent.
-Missing or invalid billing contacts fail the entire live preflight; affected owners are not skipped.
-Ordinary dry runs and --send reject live recipients/router metadata that differ from the saved plan.
+Soft-deleted users are never owners or billing contacts. An owner with no live, valid contact is
+not sent; its private hash is saved in the plan and the unreachable count is reported.
+Ordinary dry runs and --send reject live recipients, router metadata, or unreachable owners that
+differ from the saved plan.
 
 --refresh-plan is an explicit dry run that reviews and saves the current live plan:
 new recipients become pending, removed recipients become inactive and are not sent, and all

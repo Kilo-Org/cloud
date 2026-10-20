@@ -4,7 +4,7 @@ import {
   readAiGatewayConfigSnapshot,
 } from '@kilocode/web-shared/lib/ai-gateway/ai-gateway-config-snapshot';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type { AutoFreeModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
@@ -20,11 +20,14 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
 /**
  * `kilo-auto/free` has no OpenCode settings, so clients talk to it with the
  * default AI SDK provider. Candidates must be free, concrete models that use
- * that same provider.
+ * that same provider. It serves anonymous callers, so custom LLMs, which only
+ * granted organizations may call, are never candidates.
  */
 export function isAutoFreeEligibleModelId(model: string): boolean {
   return (
-    isFreeModel(model) && !isKiloAutoModel(model) && getAiSdkProvider(model, null) === undefined
+    isFreeModelExcludingCustomLlms(model) &&
+    !isKiloAutoModel(model) &&
+    getAiSdkProvider(model, null) === undefined
   );
 }
 

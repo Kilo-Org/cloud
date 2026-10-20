@@ -266,6 +266,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
         operationKey: input.operationKey,
+        kiloSessionId: input.kiloSessionId,
       })
     ),
 

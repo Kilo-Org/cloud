@@ -11,16 +11,13 @@ import {
   type EfficientModelPool,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import {
-  BenchmarkProfileQuotaError,
-  fetchBenchmarkProfileStatuses,
-  registerBenchmarkProfiles,
-} from './benchmark-origin';
+import { BenchmarkProfileQuotaError, registerBenchmarkProfiles } from './benchmark-origin';
 import { getSharedOwnerSettings } from './legacy-pool-overlap';
 import type { HonoEnv } from './hono-env';
 import { migrateOwnerPoolForSettings } from './owner-pool-conversion';
 import {
   clearAutoRoutingSettingsCache,
+  getSubscribedAutoRoutingSettings,
   LEGACY_POOL_MIGRATION_WRITE_ERROR,
   setAutoRoutingSettings,
 } from './routing-mode';
@@ -78,13 +75,13 @@ export const getRoutingSettingsHandler: Handler<HonoEnv> = async c => {
   }
 
   try {
-    const statuses = await fetchBenchmarkProfileStatuses(c.env, configured.pool);
+    const { settings, statuses } = await getSubscribedAutoRoutingSettings(c.env, parsed.data);
     return c.json(
       settingsResponse({
         ...parsed.data,
-        configuredMode: configured.mode,
-        configuredPool: configured.pool,
-        poolStatuses: statuses.statuses,
+        configuredMode: settings.mode,
+        configuredPool: settings.pool,
+        poolStatuses: statuses,
       })
     );
   } catch {
@@ -139,8 +136,6 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
       }
       return c.json({ error: 'Failed to register benchmark profiles' }, 502);
     }
-  }
-  if (pool !== null) {
     try {
       const outcome = await migrateOwnerPoolForSettings(c.env, owner, { mode, pool });
       if (outcome !== 'created' && outcome !== 'exists') {
@@ -178,7 +173,11 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
   }
 
   try {
-    await setAutoRoutingSettings(c.env, { ownerType, ownerId }, { mode, pool });
+    const result = await setAutoRoutingSettings(c.env, parsed.data);
+    if ('quota' in result) {
+      return c.json(BenchmarkProfileQuotaErrorSchema.parse(result.quota), 429);
+    }
+    poolStatuses = result.statuses;
   } catch (error) {
     if (error instanceof Error && error.message.includes(LEGACY_POOL_MIGRATION_WRITE_ERROR)) {
       return c.json({ error: LEGACY_POOL_MIGRATION_WRITE_ERROR, retryable: true }, 409);

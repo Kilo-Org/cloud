@@ -103,13 +103,16 @@ export type ProviderLaunchResult = {
   snapshotFailed?: true;
 };
 
+/** The first process that a provider runs in a new or restored sandbox. */
+export type ProviderStartupCommand = { argv: readonly string[] };
+
 export type ProviderAdapter = {
   describeRuntime?(ref: string): CloudAgentRunContainer | undefined;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
     ref: string,
-    env: Record<string, string>,
+    startup: { command: ProviderStartupCommand; env: Record<string, string> },
     options?: ProviderLaunchOptions
   ): Promise<ProviderLaunchResult>;
   observe(

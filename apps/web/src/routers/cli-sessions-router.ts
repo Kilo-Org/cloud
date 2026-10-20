@@ -22,22 +22,23 @@ import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import {
   generateSignedUrls,
   deleteBlobs,
-  copyBlobs,
   getBlobContent,
   type FolderName,
   type FileName,
 } from '@/lib/r2/cli-sessions';
+import {
+  copySessionBlobs,
+  deleteSharedSessionCopies,
+  discardReservedFork,
+  discardReservedShare,
+  reserveForkedSession,
+  reserveSharedSession,
+  sessionBlobRefs,
+} from '@/lib/cli-sessions/session-copies';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-
-export const BLOB_TYPES = [
-  'api_conversation_history',
-  'task_metadata',
-  'ui_messages',
-  'git_state',
-] as const satisfies readonly FileName[];
 
 const PAGE_SIZE = 10;
 
@@ -258,6 +259,73 @@ async function getForkableSession(
 }
 
 /**
+ * Publish one session folder under a share id. A session already shared with
+ * the same state reuses that row and link; a new share is copied in full
+ * before its row claims any blob.
+ */
+async function createSharedSessionCopy(params: {
+  kiloUserId: string;
+  sessionId: string;
+  sharedState: string;
+}): Promise<{ share_id: string; session_id: string }> {
+  const reservation = await reserveSharedSession(params);
+
+  if (!reservation.reused) {
+    try {
+      const blobUrls = await copySessionBlobs(
+        params.sessionId,
+        'sessions',
+        reservation.shareId,
+        'shared-sessions'
+      );
+      await db
+        .update(sharedCliSessions)
+        .set(blobUrls)
+        .where(eq(sharedCliSessions.share_id, reservation.shareId));
+    } catch (error) {
+      await discardReservedShare(reservation.shareId);
+      throw error;
+    }
+  }
+
+  return { share_id: reservation.shareId, session_id: params.sessionId };
+}
+
+/**
+ * Insert a fork row under the account's fork allowance, copy the source folder
+ * into it, then attach the blob urls. A fork that cannot be copied is removed
+ * again, so every forked session resolves to stored blobs.
+ */
+async function createForkedSessionCopy(params: {
+  kiloUserId: string;
+  sourceId: string;
+  sourceFolder: FolderName;
+  values: Omit<typeof cliSessions.$inferInsert, 'session_id'>;
+}) {
+  const sessionId = await reserveForkedSession(params.kiloUserId, params.values);
+
+  try {
+    const blobUrls = await copySessionBlobs(
+      params.sourceId,
+      params.sourceFolder,
+      sessionId,
+      'sessions'
+    );
+
+    const [newSession] = await db
+      .update(cliSessions)
+      .set(blobUrls)
+      .where(eq(cliSessions.session_id, sessionId))
+      .returning(commonSessionFields);
+
+    return newSession;
+  } catch (error) {
+    await discardReservedFork(sessionId);
+    throw error;
+  }
+}
+
+/**
  * Build SQL where conditions for platform and organization scoping.
  * Used by both list and search procedures to ensure consistent filtering.
  */
@@ -465,11 +533,17 @@ export const cliSessionsRouter = createTRPCRouter({
 
     await getSessionWithExistsCheck(session_id, ctx.user.id);
 
-    const blobsToDelete: { folderName: FolderName; filename: FileName }[] = BLOB_TYPES.map(
-      filename => ({ folderName: 'sessions', filename })
-    );
+    const shares = await db
+      .select({ share_id: sharedCliSessions.share_id })
+      .from(sharedCliSessions)
+      .where(eq(sharedCliSessions.session_id, session_id));
 
-    await deleteBlobs(session_id, blobsToDelete);
+    if (shares.length > 0) {
+      await deleteSharedSessionCopies(shares.map(share => share.share_id));
+      await db.delete(sharedCliSessions).where(eq(sharedCliSessions.session_id, session_id));
+    }
+
+    await deleteBlobs(session_id, sessionBlobRefs('sessions'));
 
     const [deletedSession] = await db
       .delete(cliSessions)
@@ -493,70 +567,32 @@ export const cliSessionsRouter = createTRPCRouter({
 
     await getSessionWithExistsCheck(session_id, ctx.user.id);
 
-    const newShareId = crypto.randomUUID();
-
-    const blobsToCopy: FileName[] = [...BLOB_TYPES];
-    const copiedBlobs = await copyBlobs(
-      session_id,
-      'sessions',
-      newShareId,
-      'shared-sessions',
-      blobsToCopy
-    );
-
-    const [newSharedSession] = await db
-      .insert(sharedCliSessions)
-      .values({
-        share_id: newShareId,
-        session_id,
-        kilo_user_id: ctx.user.id,
-        shared_state,
-        api_conversation_history_blob_url: copiedBlobs.api_conversation_history_blob_url,
-        task_metadata_blob_url: copiedBlobs.task_metadata_blob_url,
-        ui_messages_blob_url: copiedBlobs.ui_messages_blob_url,
-        git_state_blob_url: copiedBlobs.git_state_blob_url,
-      })
-      .returning({
-        share_id: sharedCliSessions.share_id,
-        session_id: sharedCliSessions.session_id,
-      });
-
-    return newSharedSession;
+    return createSharedSessionCopy({
+      kiloUserId: ctx.user.id,
+      sessionId: session_id,
+      sharedState: shared_state,
+    });
   }),
 
   fork: baseProcedure.input(ForkSessionInputSchema).mutation(async ({ ctx, input }) => {
     const forkableSession = await getForkableSession(input, ctx.user.id);
 
-    const newSessionId = crypto.randomUUID();
-
-    const blobsToCopy: FileName[] = [...BLOB_TYPES];
-
-    const blobUrls = await copyBlobs(
-      forkableSession.source_id,
-      forkableSession.source_folder,
-      newSessionId,
-      'sessions',
-      blobsToCopy
-    );
-
     const title = forkableSession.title
       ? `Forked from "${forkableSession.title}"`
       : `Forked session`;
 
-    const [newSession] = await db
-      .insert(cliSessions)
-      .values({
-        session_id: newSessionId,
+    return createForkedSessionCopy({
+      kiloUserId: ctx.user.id,
+      sourceId: forkableSession.source_id,
+      sourceFolder: forkableSession.source_folder,
+      values: {
         kilo_user_id: ctx.user.id,
         title,
         forked_from: forkableSession.session_id,
         created_on_platform: input.created_on_platform,
         version: forkableSession.version,
-        ...blobUrls,
-      })
-      .returning(commonSessionFields);
-
-    return newSession;
+      },
+    });
   }),
 
   linkCloudAgent: baseProcedure
@@ -716,23 +752,13 @@ export const cliSessionsRouter = createTRPCRouter({
         });
       }
 
-      const newSessionId = crypto.randomUUID();
-      const blobsToCopy: FileName[] = [...BLOB_TYPES];
-
-      const blobUrls = await copyBlobs(
-        review.cli_session_id,
-        'sessions',
-        newSessionId,
-        'sessions',
-        blobsToCopy
-      );
-
       const title = session.title ? `Fix: ${session.title}` : 'Fix: Code Review';
 
-      const [newSession] = await db
-        .insert(cliSessions)
-        .values({
-          session_id: newSessionId,
+      return createForkedSessionCopy({
+        kiloUserId: ctx.user.id,
+        sourceId: review.cli_session_id,
+        sourceFolder: 'sessions',
+        values: {
           kilo_user_id: ctx.user.id,
           title,
           git_url: `https://github.com/${review.repo_full_name}`,
@@ -742,11 +768,8 @@ export const cliSessionsRouter = createTRPCRouter({
           organization_id: review.owned_by_organization_id,
           last_mode: session.last_mode,
           last_model: session.last_model,
-          ...blobUrls,
-        })
-        .returning(commonSessionFields);
-
-      return newSession;
+        },
+      });
     }),
 
   /**
@@ -783,34 +806,10 @@ export const cliSessionsRouter = createTRPCRouter({
         });
       }
 
-      const newShareId = crypto.randomUUID();
-      const blobsToCopy: FileName[] = [...BLOB_TYPES];
-
-      const copiedBlobs = await copyBlobs(
-        input.kilo_session_id,
-        'sessions',
-        newShareId,
-        'shared-sessions',
-        blobsToCopy
-      );
-
-      const [newSharedSession] = await db
-        .insert(sharedCliSessions)
-        .values({
-          share_id: newShareId,
-          session_id: input.kilo_session_id,
-          kilo_user_id: ctx.user.id,
-          shared_state: CliSessionSharedState.Public,
-          api_conversation_history_blob_url: copiedBlobs.api_conversation_history_blob_url,
-          task_metadata_blob_url: copiedBlobs.task_metadata_blob_url,
-          ui_messages_blob_url: copiedBlobs.ui_messages_blob_url,
-          git_state_blob_url: copiedBlobs.git_state_blob_url,
-        })
-        .returning({
-          share_id: sharedCliSessions.share_id,
-          session_id: sharedCliSessions.session_id,
-        });
-
-      return newSharedSession;
+      return createSharedSessionCopy({
+        kiloUserId: ctx.user.id,
+        sessionId: input.kilo_session_id,
+        sharedState: CliSessionSharedState.Public,
+      });
     }),
 });

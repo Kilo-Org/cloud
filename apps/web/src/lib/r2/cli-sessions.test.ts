@@ -36,6 +36,7 @@ import {
   deleteBlobs,
   getBlobContent,
   copyBlobs,
+  SessionBlobCopyTooLargeError,
 } from './cli-sessions';
 import { r2Client } from '@kilocode/web-shared/lib/r2/client';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -383,6 +384,74 @@ describe('cli-sessions', () => {
       expect(mockSend).toHaveBeenCalledTimes(4);
       expect(result).toEqual({
         api_conversation_history_blob_url: 'sessions/dest-session/api_conversation_history.json',
+        task_metadata_blob_url: 'sessions/dest-session/task_metadata.json',
+      });
+    });
+
+    test('refuses the whole copy before writing when the sources exceed maxBytes', async () => {
+      mockSend
+        .mockResolvedValueOnce({ ContentLength: 6 * 1024 * 1024 })
+        .mockResolvedValueOnce({ ContentLength: 6 * 1024 * 1024 });
+
+      await expect(
+        copyBlobs(
+          'source-session',
+          'sessions',
+          'dest-session',
+          'shared-sessions',
+          ['api_conversation_history', 'task_metadata'],
+          { maxBytes: 10 * 1024 * 1024 }
+        )
+      ).rejects.toThrow(SessionBlobCopyTooLargeError);
+
+      expect(mockSend).toHaveBeenCalledTimes(2);
+      const commandNames = mockSend.mock.calls.map(call => {
+        const command = call[0] as { name: string };
+        return command.name;
+      });
+      expect(commandNames).toEqual(['HeadObjectCommand', 'HeadObjectCommand']);
+    });
+
+    test('copies the whole set when the sources fit under maxBytes', async () => {
+      mockSend
+        .mockResolvedValueOnce({ ContentLength: 5 * 1024 * 1024 })
+        .mockResolvedValueOnce({ ContentLength: 5 * 1024 * 1024 })
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({});
+
+      const result = await copyBlobs(
+        'source-session',
+        'sessions',
+        'dest-session',
+        'shared-sessions',
+        ['api_conversation_history', 'task_metadata'],
+        { maxBytes: 10 * 1024 * 1024 }
+      );
+
+      expect(mockSend).toHaveBeenCalledTimes(4);
+      expect(result).toEqual({
+        api_conversation_history_blob_url:
+          'shared-sessions/dest-session/api_conversation_history.json',
+        task_metadata_blob_url: 'shared-sessions/dest-session/task_metadata.json',
+      });
+    });
+
+    test('counts a missing source as zero bytes', async () => {
+      mockSend
+        .mockRejectedValueOnce(new Error('Not Found'))
+        .mockResolvedValueOnce({ ContentLength: 1024 })
+        .mockResolvedValueOnce({});
+
+      const result = await copyBlobs(
+        'source-session',
+        'sessions',
+        'dest-session',
+        'sessions',
+        ['api_conversation_history', 'task_metadata'],
+        { maxBytes: 1024 }
+      );
+
+      expect(result).toEqual({
         task_metadata_blob_url: 'sessions/dest-session/task_metadata.json',
       });
     });

@@ -14,6 +14,27 @@ export type FolderName = 'sessions' | 'shared-sessions';
 export type BlobUrlKeys = Extract<keyof CliSession, `${string}_blob_url`>;
 export type FileName = BlobUrlKeys extends `${infer Base}_blob_url` ? Base : never;
 
+export type CopyBlobsOptions = {
+  /** Reject the whole copy when the source objects add up to more than this. */
+  maxBytes?: number;
+};
+
+/**
+ * Thrown before any object is written when a copy would exceed its byte
+ * allowance. The caller maps it to its transport error shape.
+ */
+export class SessionBlobCopyTooLargeError extends Error {
+  readonly totalBytes: number;
+  readonly maxBytes: number;
+
+  constructor(totalBytes: number, maxBytes: number) {
+    super(`Session blob copy is ${totalBytes} bytes, over the ${maxBytes} byte limit`);
+    this.name = 'SessionBlobCopyTooLargeError';
+    this.totalBytes = totalBytes;
+    this.maxBytes = maxBytes;
+  }
+}
+
 function getBlobKey(sessionId: string, folderName: FolderName, filename: FileName): string {
   return `${folderName}/${sessionId}/${filename}.json`;
 }
@@ -160,24 +181,41 @@ export async function copyBlobs(
   sourceFolderName: FolderName,
   destinationId: string,
   destinationFolderName: FolderName,
-  blobsToCopy: FileName[]
+  blobsToCopy: FileName[],
+  options: CopyBlobsOptions = {}
 ) {
   const filteredBlobsToCopy = blobsToCopy.filter(blob => blob != null);
 
-  const copyPromises = filteredBlobsToCopy.map(async blobName => {
-    const sourceKey = getBlobKey(sourceId, sourceFolderName, blobName);
-    const destinationKey = getBlobKey(destinationId, destinationFolderName, blobName);
+  // Measure first: a copy is either admitted whole or refused before it writes
+  // anything, so a partial copy can never be left behind by the size check.
+  const sources = await Promise.all(
+    filteredBlobsToCopy.map(async blobName => {
+      const sourceKey = getBlobKey(sourceId, sourceFolderName, blobName);
 
-    try {
-      await r2Client.send(
-        new HeadObjectCommand({
-          Bucket: r2CliSessionsBucketName,
-          Key: sourceKey,
-        })
-      );
-    } catch {
-      return null;
-    }
+      try {
+        const head = await r2Client.send(
+          new HeadObjectCommand({
+            Bucket: r2CliSessionsBucketName,
+            Key: sourceKey,
+          })
+        );
+
+        return { blobName, sourceKey, contentLength: Number(head.ContentLength ?? 0) };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const presentSources = sources.filter(source => source !== null);
+  const totalBytes = presentSources.reduce((sum, source) => sum + source.contentLength, 0);
+
+  if (options.maxBytes !== undefined && totalBytes > options.maxBytes) {
+    throw new SessionBlobCopyTooLargeError(totalBytes, options.maxBytes);
+  }
+
+  const copyPromises = presentSources.map(async ({ blobName, sourceKey }) => {
+    const destinationKey = getBlobKey(destinationId, destinationFolderName, blobName);
 
     await r2Client.send(
       new CopyObjectCommand({
@@ -192,7 +230,5 @@ export async function copyBlobs(
 
   const results = await Promise.all(copyPromises);
 
-  const validResults = results.filter(result => result !== null);
-
-  return mapResultsToBlobUrls(validResults);
+  return mapResultsToBlobUrls(results);
 }

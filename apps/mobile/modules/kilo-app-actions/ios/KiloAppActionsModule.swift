@@ -4,7 +4,7 @@ import ExpoModulesCore
 public final class KiloAppActionsModule: Module {
   @JS
   @JavaScriptActor
-  func registerAppActionDispatcher(dispatcher: borrowing JavaScriptValue) throws -> [[String: String]] {
+  func registerAppActionDispatcher(dispatcher: consuming JavaScriptValue) throws -> [[String: String]] {
     guard let appContext, let runtime = try? appContext.runtime else {
       throw ActionDispatcherNotReadyException()
     }

@@ -73,8 +73,8 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// of an earlier runtime is not released here: that runtime's teardown sweep
   /// owns it, and on reload it already ran, before this runtime started.
   @JavaScriptActor
-  func register(dispatcher: borrowing JavaScriptValue, runtime: JavaScriptRuntime) {
-    let next = DispatcherRegistration(dispatcher: dispatcher.copy(), runtime: runtime)
+  func register(dispatcher: consuming JavaScriptValue, runtime: JavaScriptRuntime) {
+    let next = DispatcherRegistration(dispatcher: dispatcher, runtime: runtime)
     runtime.longLivedObjects.add(next)
     lock.lock()
     let previous = registration

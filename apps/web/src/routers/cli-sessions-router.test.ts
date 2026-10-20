@@ -1495,6 +1495,42 @@ describe('cli-sessions-router', () => {
       expect(share?.share_id).toBe(shareId);
     });
 
+    it('should remove already-cleaned shares when a later share cleanup fails', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      await insertShare(deleteSessionId, regularUser.id);
+      await insertShare(deleteSessionId, otherUser.id);
+      let shareDeletionAttempts = 0;
+
+      jest.mocked(deleteBlobs).mockImplementation(async (_id, blobs) => {
+        if (blobs.some(blob => blob.folderName === 'shared-sessions')) {
+          shareDeletionAttempts += 1;
+          if (shareDeletionAttempts > 1) {
+            throw new Error('Persistent R2 failure');
+          }
+        }
+      });
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).rejects.toThrow(
+        'Persistent R2 failure'
+      );
+
+      expect(shareDeletionAttempts).toBe(4);
+      expect(deleteBlobs).not.toHaveBeenCalledWith(deleteSessionId, expect.any(Array));
+
+      const remainingShares = await db
+        .select({ share_id: sharedCliSessions.share_id })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.session_id, deleteSessionId));
+      expect(remainingShares).toHaveLength(1);
+
+      const [session] = await db
+        .select({ session_id: cliSessions.session_id })
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, deleteSessionId));
+      expect(session?.session_id).toBe(deleteSessionId);
+    });
+
     it('should remove share blobs before the source session blobs', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const { deleteBlobs } = await import('@/lib/r2/cli-sessions');

@@ -492,10 +492,7 @@ export const cliSessionsRouter = createTRPCRouter({
 
     for (const share of shares) {
       await deleteShareBlobsWithRetry(share.share_id);
-    }
-
-    if (shares.length > 0) {
-      await db.delete(sharedCliSessions).where(eq(sharedCliSessions.session_id, session_id));
+      await db.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, share.share_id));
     }
 
     const blobsToDelete: { folderName: FolderName; filename: FileName }[] = BLOB_TYPES.map(

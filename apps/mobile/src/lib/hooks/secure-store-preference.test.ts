@@ -172,7 +172,7 @@ describe('createSecureStorePreference', () => {
     expect(store.get()).toBe(false);
   });
 
-  it('reports a requested null for a nullable store and releases waiters after a failure', async () => {
+  it('reports a requested null for a nullable store', async () => {
     getItemAsync.mockResolvedValue(null);
     const writeGate = Promise.withResolvers<undefined>();
     setItemAsync.mockImplementationOnce(async () => {

@@ -52,13 +52,18 @@ function abnormalToken(
     userId?: string;
     audience?: string;
     expiresIn?: number;
+    secret?: string;
   } = {}
 ): string {
-  return jwt.sign({ version: 3, kiloUserId: options.userId ?? USER_ID }, TEST_SECRET, {
-    algorithm: 'HS256',
-    audience: options.audience ?? GLANCEABLE_SNAPSHOT_AUDIENCE,
-    expiresIn: options.expiresIn ?? 5 * 60,
-  });
+  return jwt.sign(
+    { version: 3, kiloUserId: options.userId ?? USER_ID },
+    options.secret ?? TEST_SECRET,
+    {
+      algorithm: 'HS256',
+      audience: options.audience ?? GLANCEABLE_SNAPSHOT_AUDIENCE,
+      expiresIn: options.expiresIn ?? 5 * 60,
+    }
+  );
 }
 
 async function request(
@@ -134,6 +139,16 @@ describe('POST /api/internal/glanceable-agents-snapshot', () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(mockedAccess).not.toHaveBeenCalled();
+    expect(mockedBuild).not.toHaveBeenCalled();
+  });
+
+  it('rejects a credential signed with the general internal secret', async () => {
+    const response = await POST(
+      await request({ token: abnormalToken({ secret: 'internal-secret' }) })
+    );
+
+    expect(response.status).toBe(401);
     expect(mockedAccess).not.toHaveBeenCalled();
     expect(mockedBuild).not.toHaveBeenCalled();
   });

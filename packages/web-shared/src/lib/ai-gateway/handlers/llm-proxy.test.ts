@@ -1357,23 +1357,24 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
-  it('does not apply free-model rate limiting to custom LLMs', async () => {
-    mockedIsCustomLlm.mockImplementation(async modelId => modelId === 'kilo-internal/custom-model');
-    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+  it.each(['kilo-internal/custom-model', 'acme/custom-model:free'])(
+    'does not apply free-model rate limiting to the custom LLM %s',
+    async customModelId => {
+      mockedIsCustomLlm.mockImplementation(async modelId => modelId === customModelId);
+      mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
-    try {
-      const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(
-        makeRequest(makeBody('kilo-internal/custom-model')) as never
-      );
+      try {
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(customModelId)) as never);
 
-      expect(response.status).toBe(200);
-      expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
-      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-    } finally {
-      mockedIsCustomLlm.mockImplementation(async () => false);
+        expect(response.status).toBe(200);
+        expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      } finally {
+        mockedIsCustomLlm.mockImplementation(async () => false);
+      }
     }
-  });
+  );
 
   it('returns the reconnect error instead of serving another billing path when the ChatGPT connection is dead', async () => {
     mockedGetProvider.mockResolvedValue({

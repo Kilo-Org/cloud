@@ -170,6 +170,54 @@ function fakeDeps(
 }
 
 describe('dispatchInternalPushCore', () => {
+  it('routes briefing dispatch through the user DO with only the local date in its identity', async () => {
+    const { deps, calls } = fakeDeps({ preferencesThrows: true });
+    const result = await dispatchInternalPushCore(
+      {
+        kind: 'agent_briefing',
+        userId: 'oauth/github/123',
+        localDate: '2026-10-15',
+        expiresAt: '2026-10-15T12:00:00.000Z',
+      },
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'oauth/github/123', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toEqual([
+      {
+        userId: 'oauth/github/123',
+        presenceContext: null,
+        idempotencyKey: 'agent-briefing:2026-10-15',
+        agentBriefing: { localDate: '2026-10-15', expiresAt: '2026-10-15T12:00:00.000Z' },
+        badge: null,
+        push: {
+          title: 'Kilo',
+          body: 'Active agents have an update',
+          data: { type: 'agent_briefing', url: '/agent-briefing' },
+          sound: 'default',
+          priority: 'default',
+        },
+      },
+    ]);
+  });
+
+  it.each(['suppressed_preference', 'suppressed_expired', 'suppressed_access'] as const)(
+    'preserves the live briefing gate outcome %s',
+    async kind => {
+      const { deps } = fakeDeps({ dispatchPush: async () => ({ kind }) });
+      const result = await dispatchInternalPushCore(
+        {
+          kind: 'agent_briefing',
+          userId: 'user-a',
+          localDate: '2026-10-15',
+          expiresAt: '2026-10-15T12:00:00.000Z',
+        },
+        deps
+      );
+      expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: kind }]);
+    }
+  );
+
   it('low_balance happy path: dispatches both recipients with exact DispatchPushInput', async () => {
     const { deps, calls } = fakeDeps();
     const result = await dispatchInternalPushCore(lowBalance(), deps);

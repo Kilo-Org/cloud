@@ -56,6 +56,9 @@ export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): stri
     .digest('hex');
 }
 
+// OpenAI rejects longer keys with `string_above_max_length`.
+const MAX_PROMPT_CACHE_KEY_LENGTH = 64;
+
 export function applyTrackingIds(
   request: NonGeminiGatewayRequest,
   provider: Provider,
@@ -66,15 +69,25 @@ export function applyTrackingIds(
   const taskHash = taskId ? generateProviderSpecificSessionHash(userId, taskId, provider) : '';
   if (request.kind === 'messages') {
     request.body.metadata = { ...request.body.metadata, user_id: userHash };
-    if (provider.id === 'openrouter') {
+    if (provider.id === 'openrouter' || provider.id === 'vercel') {
       request.body.user = userHash;
       if (taskHash) {
         request.body.session_id = taskHash;
       }
     }
   } else {
+    const clientCacheKey = request.body.prompt_cache_key;
     if (taskHash) {
       request.body.prompt_cache_key = taskHash;
+    } else if (
+      typeof clientCacheKey === 'string' &&
+      clientCacheKey.length > MAX_PROMPT_CACHE_KEY_LENGTH
+    ) {
+      request.body.prompt_cache_key = generateProviderSpecificSessionHash(
+        userId,
+        clientCacheKey,
+        provider
+      );
     }
     request.body.safety_identifier = userHash;
     request.body.user = userHash; // deprecated, but this is what OpenRouter uses

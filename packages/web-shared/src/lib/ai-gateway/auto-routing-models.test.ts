@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
-import { addAutoRoutingModels } from './auto-routing-models';
+import { addAutoRoutingModels, addCustomRouterModels } from './auto-routing-models';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
@@ -75,18 +71,40 @@ describe('addAutoRoutingModels', () => {
 
   test('annotates the frontier auto model with its visible targets', async () => {
     const frontierModel = makeModel('kilo-auto/frontier');
-    const opusModel = makeModel(CLAUDE_OPUS_CURRENT_MODEL_ID);
-    const sonnetModel = makeModel(CLAUDE_SONNET_CURRENT_MODEL_ID);
+    const opusModel = makeModel('openai/gpt-frontier');
+    const sonnetModel = makeModel('google/gemini-frontier');
+    const efficientOnlyModel = makeModel('google/gemini-efficient');
+    mockedGetCachedRoutingTable.mockImplementation(async (router?: string) =>
+      router === 'frontier'
+        ? routingTable([opusModel.id, sonnetModel.id, 'hidden/model', 'kilo-auto/frontier'])
+        : routingTable([efficientOnlyModel.id])
+    );
 
-    const result = await addAutoRoutingModels([frontierModel, sonnetModel, opusModel]);
+    const result = await addAutoRoutingModels([
+      frontierModel,
+      sonnetModel,
+      opusModel,
+      efficientOnlyModel,
+    ]);
 
     expect(result).toEqual([
       {
         ...frontierModel,
-        autoRouting: { models: [CLAUDE_OPUS_CURRENT_MODEL_ID, CLAUDE_SONNET_CURRENT_MODEL_ID] },
+        autoRouting: { models: [sonnetModel.id, opusModel.id] },
       },
       sonnetModel,
       opusModel,
+      efficientOnlyModel,
+    ]);
+  });
+
+  test('does not advertise static frontier candidates when its table is unavailable', async () => {
+    const frontierModel = makeModel('kilo-auto/frontier');
+    const visibleModel = makeModel('anthropic/claude-sonnet-5');
+
+    expect(await addAutoRoutingModels([frontierModel, visibleModel])).toEqual([
+      frontierModel,
+      visibleModel,
     ]);
   });
 
@@ -208,5 +226,57 @@ describe('addAutoRoutingModels', () => {
     expect(result).toEqual([model]);
     expect(mockedGetCachedRoutingTable).not.toHaveBeenCalled();
     expect(mockedGetAutoFreeCandidates).not.toHaveBeenCalled();
+  });
+});
+
+describe('addCustomRouterModels', () => {
+  const router = {
+    id: '00000000-0000-4000-8000-000000000001',
+    ownerType: 'user' as const,
+    ownerId: 'user-1',
+    slug: 'coding',
+    name: 'Coding',
+    baseRouter: 'frontier' as const,
+    mode: 'best_accuracy' as const,
+    entries: [
+      { kind: 'gateway' as const, model: 'google/gemini-2.5-flash' },
+      { kind: 'gateway' as const, model: 'openai/denied-by-policy' },
+      {
+        kind: 'client' as const,
+        provider: 'ollama',
+        model: 'qwen3:8b',
+        variants: [],
+        capabilities: {
+          contextLength: null,
+          inputModalities: ['text'],
+          toolCall: true,
+          reasoning: false,
+        },
+        pricing: null,
+      },
+    ],
+    defaultEntryKey: 'gateway:google/gemini-2.5-flash',
+  };
+
+  test('lists personal and organization router IDs with their visible gateway models', () => {
+    const visible = makeModel('google/gemini-2.5-flash');
+
+    const result = addCustomRouterModels(
+      [visible],
+      [router, { ...router, ownerType: 'org', ownerId: 'org-1', slug: 'team', name: 'Team' }]
+    );
+
+    expect(result.map(model => [model.id, model.name, model.autoRouting])).toEqual([
+      ['google/gemini-2.5-flash', 'google/gemini-2.5-flash', undefined],
+      ['kilo-auto/custom/coding', 'Coding', { models: ['google/gemini-2.5-flash'] }],
+      ['kilo-auto/custom/org/team', 'Team', { models: ['google/gemini-2.5-flash'] }],
+    ]);
+  });
+
+  test('omits autoRouting when no gateway entry is visible', () => {
+    const [, custom] = addCustomRouterModels([makeModel('other/model')], [router]);
+
+    expect(custom?.id).toBe('kilo-auto/custom/coding');
+    expect(custom?.autoRouting).toBeUndefined();
   });
 });

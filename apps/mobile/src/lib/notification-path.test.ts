@@ -51,6 +51,15 @@ describe('prPathForData', () => {
 });
 
 describe('notificationPathForData', () => {
+  it('opens the available-context briefing list without leaking a report into the lock screen', () => {
+    expect(
+      notificationPathForData({
+        type: 'agent_briefing',
+        url: '/agent-briefing',
+      })
+    ).toBe('/(app)/agent-briefing?via=push');
+  });
+
   it('routes chat message notifications to the conversation screen', () => {
     expect(
       notificationPathForData({

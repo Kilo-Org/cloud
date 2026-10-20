@@ -7,15 +7,13 @@ import {
   findKiloExclusiveModel,
   isKiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { custom_llm2, type User } from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import type {
@@ -32,7 +30,6 @@ import {
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import {
   CustomLlmCredentialsSchema,
-  CustomLlmDefinitionSchema,
   type CustomLlmCredentials,
   type CustomLlmProvider,
 } from '@kilocode/db/schema-types';
@@ -42,6 +39,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
+import {
+  findCustomLlm,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -67,7 +68,9 @@ export type GetProviderProviderResult = {
 
 export type GetProviderResult =
   | GetProviderProviderResult
-  | { kind: 'chatgpt-reconnect'; message: string };
+  | { kind: 'chatgpt-reconnect'; message: string }
+  /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
+  | { kind: 'custom-llm-unavailable' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -135,38 +138,40 @@ async function resolveCustomLlmAuth(
   }
 }
 
-async function checkCustomLlm(
-  requestedModel: string,
-  organizationId: string,
-  kiloUserId: string
-): Promise<GetProviderProviderResult | null> {
-  const [row] = await readDb
-    .select()
-    .from(custom_llm2)
-    .where(eq(custom_llm2.public_id, requestedModel));
-  const parsedCustomLlm = CustomLlmDefinitionSchema.safeParse(row?.definition);
-  if (row && !parsedCustomLlm.success) {
-    console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
-  }
-  const customLlm = parsedCustomLlm.data;
-  if (!customLlm || !(await userHasCustomLlmAccess(customLlm, organizationId, kiloUserId))) {
-    return null;
-  }
-
-  if (!row?.encrypted_api_key) {
-    return null;
+/**
+ * A custom LLM owns its id: a caller without access, or a definition with
+ * unusable credentials, must not fall back to another upstream for the same id.
+ */
+async function resolveCustomLlmProvider(
+  { public_id, definition: customLlm, encrypted_api_key }: CustomLlm,
+  user: User | AnonymousUserContext,
+  organizationId: string | undefined
+): Promise<GetProviderResult> {
+  if (
+    isAnonymousContext(user) ||
+    !organizationId ||
+    !(await userHasCustomLlmAccess(customLlm, organizationId, user.id))
+  ) {
+    return { kind: 'custom-llm-unavailable' };
   }
 
-  const decrypted = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+  if (!encrypted_api_key) {
+    console.error('Custom LLM has no stored credentials', public_id);
+    return { kind: 'custom-llm-unavailable' };
+  }
+
+  const decrypted = decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY);
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(decrypted);
   } catch {
-    return null;
+    console.error('Custom LLM credentials are not valid JSON', public_id);
+    return { kind: 'custom-llm-unavailable' };
   }
   const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
   if (!parsedCredentials.success) {
-    return null;
+    console.error('Custom LLM credentials do not match the schema', public_id);
+    return { kind: 'custom-llm-unavailable' };
   }
 
   return {
@@ -209,15 +214,13 @@ export type GetProviderInput = {
   organizationId: string | undefined;
   /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
   botId?: string | undefined;
-  taskId: string | undefined;
   /** Resolves organization/group provider policy only when selecting a managed
    * gateway. Direct BYOK and custom LLM routes remain exempt. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, botId, taskId, getRoutingProviderConfig } =
-    input;
+  const { requestedModel, request, user, organizationId, botId, getRoutingProviderConfig } = input;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
     const localFakeProvider = getLocalFakeLlmProvider();
@@ -229,6 +232,11 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
         bypassAccessCheck: true,
       };
     }
+  }
+
+  const customLlm = await findCustomLlm(requestedModel);
+  if (customLlm) {
+    return await resolveCustomLlmProvider(customLlm, user, organizationId);
   }
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
@@ -267,13 +275,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
 
-  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId && !isAnonymousContext(user)) {
-    const customLlmResult = await checkCustomLlm(requestedModel, organizationId, user.id);
-    if (customLlmResult) {
-      return customLlmResult;
-    }
-  }
-
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
   const resolveRoutingProviderConfig = async () =>
@@ -281,12 +282,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   if (
     eligibleForVercelRouting &&
-    (await shouldRouteToVercel(
-      requestedModel,
-      request,
-      taskId || user.id,
-      resolveRoutingProviderConfig
-    ))
+    (await shouldRouteToVercel(requestedModel, request, resolveRoutingProviderConfig))
   ) {
     return {
       kind: 'provider',

@@ -245,6 +245,10 @@ export class TriggerDO extends DurableObject<Env> {
     return config?.isActive ?? false;
   }
 
+  async exists(): Promise<boolean> {
+    return (await this.getConfig()) !== null;
+  }
+
   async getConfig(): Promise<TriggerConfig | null> {
     const rows = this.db.select().from(triggerConfigTable).limit(1).all();
 

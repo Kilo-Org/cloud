@@ -7,8 +7,10 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
-  getBYOKforOrganization: jest.fn(),
+  getUserByokProviderIds: jest.fn(),
+  getOrganizationByokProviderIds: jest.fn(),
   getBYOKforUser: jest.fn(),
+  getBYOKforOrganization: jest.fn(),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
@@ -206,10 +208,8 @@ describe('Gemini API for direct BYOK', () => {
 
   test('lists Gemini API models from models.dev or by model ID for personal keys', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValueOnce([{ providerId: 'opencode-go', decryptedAPIKey: 'test-key' }]);
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['opencode-go']);
 
     const models = await getDirectByokModelsForUser('user-id');
 
@@ -222,10 +222,9 @@ describe('Gemini API for direct BYOK', () => {
 
   test('hides Gemini API models from organizations', async () => {
     const { getDirectByokModelsForOrganization } = await loadDirectByokModule();
-    const { getBYOKforOrganization } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    jest
-      .mocked(getBYOKforOrganization)
-      .mockResolvedValueOnce([{ providerId: 'opencode-go', decryptedAPIKey: 'test-key' }]);
+    const { getOrganizationByokProviderIds } =
+      await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getOrganizationByokProviderIds).mockResolvedValueOnce(['opencode-go']);
 
     const models = await getDirectByokModelsForOrganization('organization-id');
 
@@ -263,10 +262,8 @@ describe('getDirectByokModel', () => {
 
   test('advertises only the reasoning parameter for reasoning models', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
 
     const models = await getDirectByokModelsForUser('user-id');
 
@@ -287,12 +284,10 @@ describe('getDirectByokModel', () => {
 
   test('uses the default AI SDK provider unless a model-specific provider applies', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
     const { getAiSdkProvider } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
     jest.mocked(getAiSdkProvider).mockReturnValueOnce('anthropic').mockReturnValueOnce(undefined);
 
     const models = await getDirectByokModelsForUser('user-id');
@@ -302,12 +297,10 @@ describe('getDirectByokModel', () => {
 
   test('does not fall back to model-name variants when reasoning is unsupported', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
     const { getFallbackReasoningOptions } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options');
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
     jest.mocked(getFallbackReasoningOptions).mockReturnValue([{ type: 'toggle' }]);
 
     const models = await getDirectByokModelsForUser('user-id');
@@ -318,5 +311,35 @@ describe('getDirectByokModel', () => {
     expect(models[1].opencode.variants).toBeUndefined();
     expect(models[1].opencode.reasoning_options).toBeUndefined();
     expect(getFallbackReasoningOptions).not.toHaveBeenCalled();
+  });
+
+  test('lists models from enabled provider ids without reading stored key material', async () => {
+    const { getDirectByokModelsForUser, getDirectByokModelsForOrganization } =
+      await loadDirectByokModule();
+    const {
+      getUserByokProviderIds,
+      getOrganizationByokProviderIds,
+      getBYOKforUser,
+      getBYOKforOrganization,
+    } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+    const userModels = await getDirectByokModelsForUser('user-id');
+
+    jest.mocked(getOrganizationByokProviderIds).mockResolvedValueOnce(['orcarouter']);
+    const organizationModels = await getDirectByokModelsForOrganization('organization-id');
+
+    expect(getUserByokProviderIds).toHaveBeenCalledWith(expect.anything(), 'user-id');
+    expect(getOrganizationByokProviderIds).toHaveBeenCalledWith(
+      expect.anything(),
+      'organization-id'
+    );
+    expect(userModels.map(model => model.id)).toEqual([
+      'chutes-byok/supported-model',
+      'chutes-byok/non-reasoning-model',
+    ]);
+    expect(organizationModels.map(model => model.id)).toEqual(['orcarouter/other-model']);
+    expect(getBYOKforUser).not.toHaveBeenCalled();
+    expect(getBYOKforOrganization).not.toHaveBeenCalled();
   });
 });

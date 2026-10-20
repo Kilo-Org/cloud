@@ -18,7 +18,6 @@ function resolveProvider(userId: string, organizationId: string | undefined) {
     },
     user: { id: userId } as User,
     organizationId,
-    taskId: undefined,
   });
 }
 

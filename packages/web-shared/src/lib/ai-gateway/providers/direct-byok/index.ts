@@ -5,9 +5,13 @@ import {
   type DirectByokModel,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import type { OpenRouterProvider } from '@kilocode/db/schema-types';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
-import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  getOrganizationByokProviderIds,
+  getUserByokProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -26,6 +30,16 @@ export function getDirectByokSupportedChatApis(
   return keyOwner === 'user'
     ? provider.supported_chat_apis
     : provider.supported_chat_apis.filter(kind => kind !== 'generate_content');
+}
+
+/** Providers for `/api/v1/providers` that the general provider list lacks. */
+export function getDirectByokProviderListings(): OpenRouterProvider[] {
+  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+  return providers.flatMap(({ id, provider_listing }) => {
+    if (!provider_listing) return [];
+    const name = DIRECT_BYOK_PROVIDERS_META[id];
+    return [{ name, displayName: name, slug: id, ...provider_listing }];
+  });
 }
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
@@ -134,31 +148,15 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
 }
 
 export async function getDirectByokModelsForOrganization(organizationId: string) {
-  const userByok = await getBYOKforOrganization(
-    readDb,
-    organizationId,
-    DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
-  );
-  return userByok
-    ? await getDirectByokModels(
-        userByok.map(ub => ub.providerId),
-        'organization'
-      )
-    : [];
+  const byokProviderIds = await getOrganizationByokProviderIds(readDb, organizationId);
+  return byokProviderIds.length === 0
+    ? []
+    : await getDirectByokModels(byokProviderIds, 'organization');
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
-  const userByok = await getBYOKforUser(
-    readDb,
-    userId,
-    DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
-  );
-  return userByok
-    ? await getDirectByokModels(
-        userByok.map(ub => ub.providerId),
-        'user'
-      )
-    : [];
+  const byokProviderIds = await getUserByokProviderIds(readDb, userId);
+  return byokProviderIds.length === 0 ? [] : await getDirectByokModels(byokProviderIds, 'user');
 }
 
 export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {

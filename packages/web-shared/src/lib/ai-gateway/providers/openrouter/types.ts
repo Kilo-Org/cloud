@@ -35,6 +35,9 @@ export type VercelInferenceProviderConfig =
 export type VercelProviderConfig = {
   gateway?: GatewayProviderOptions & {
     byok?: Record<string, VercelInferenceProviderConfig[]>;
+    // https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
+    sessionId?: string;
+    sessionAffinity?: boolean;
   };
   anthropic?: AnthropicProviderOptions;
 };

@@ -61,6 +61,10 @@ import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import {
+  addReflectionReasoningPlaceholders,
+  isReflectionModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -388,6 +392,10 @@ export async function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
+  }
+
+  if (isReflectionModel(requestedModel)) {
+    addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
   }
 
   if (provider.id === 'vercel') {

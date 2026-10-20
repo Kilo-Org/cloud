@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { custom_llm2, type User } from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
-import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
+import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import {
+  createAnonymousContext,
+  type AnonymousUserContext,
+} from '@kilocode/web-shared/lib/anonymous';
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
-const PUBLIC_ID = 'kilo-internal/secure-proxy-model';
+const PUBLIC_ID = 'acme/secure-proxy-model';
 
 const definition: CustomLlmDefinition = {
   internal_id: 'upstream-model',
@@ -23,23 +28,25 @@ async function insertCustomLlm(
   credentials: CustomLlmCredentials,
   customDefinition: CustomLlmDefinition = definition
 ) {
-  await db.insert(custom_llm2).values({
-    public_id: PUBLIC_ID,
-    definition: customDefinition,
-    encrypted_api_key: encryptApiKey(JSON.stringify(credentials), BYOK_ENCRYPTION_KEY),
-  });
+  await insertCustomLlmForTest(
+    PUBLIC_ID,
+    customDefinition,
+    encryptApiKey(JSON.stringify(credentials), BYOK_ENCRYPTION_KEY)
+  );
 }
 
-function resolveProvider() {
+function resolveProvider(
+  user: User | AnonymousUserContext = { id: 'user-id' } as User,
+  organizationId: string | null = ORG_ID
+) {
   return getProvider({
     requestedModel: PUBLIC_ID,
     request: {
       kind: 'chat_completions',
       body: { model: PUBLIC_ID, messages: [{ role: 'user', content: 'hi' }] },
     },
-    user: { id: 'user-id' } as User,
-    organizationId: ORG_ID,
-    taskId: undefined,
+    user,
+    organizationId: organizationId ?? undefined,
   });
 }
 
@@ -91,6 +98,28 @@ describe('getProvider custom LLM credentials', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected a provider');
     expect(result.provider.secureProxy).toBeUndefined();
+  });
+
+  it.each([
+    ['another organization', { id: 'user-id' } as User, '00000000-0000-4000-8000-000000000002'],
+    ['a personal account', { id: 'user-id' } as User, null],
+    ['an anonymous caller', createAnonymousContext('127.0.0.1'), null],
+  ])(
+    'fails closed for %s instead of falling back to another upstream',
+    async (_caller, user, orgId) => {
+      await insertCustomLlm({ type: 'api_key', api_key: 'upstream-key' });
+
+      await expect(resolveProvider(user, orgId)).resolves.toEqual({
+        kind: 'custom-llm-unavailable',
+      });
+    }
+  );
+
+  it('fails closed when the custom LLM has no usable credentials', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    await insertCustomLlmForTest(PUBLIC_ID, definition, null);
+
+    await expect(resolveProvider()).resolves.toEqual({ kind: 'custom-llm-unavailable' });
   });
 
   it.each([

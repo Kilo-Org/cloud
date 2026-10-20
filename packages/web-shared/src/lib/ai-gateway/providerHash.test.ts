@@ -78,6 +78,74 @@ describe('session tracking identifiers', () => {
         : trackedRequest.body.prompt_cache_key;
     expect(trackedSession).toBeUndefined();
   });
+
+  it.each(requests)('uses the shared session hash for Vercel $kind tracking', request => {
+    const trackedRequest = structuredClone(request);
+    applyTrackingIds(trackedRequest, VERCEL_AI_GATEWAY, userId, sessionId);
+
+    const trackedSession =
+      trackedRequest.kind === 'messages'
+        ? trackedRequest.body.session_id
+        : trackedRequest.body.prompt_cache_key;
+    expect(trackedSession).toBe(
+      generateProviderSpecificSessionHash(userId, sessionId, VERCEL_AI_GATEWAY)
+    );
+  });
+
+  it('sets the Vercel user hash on Vercel messages requests', () => {
+    const request: NonGeminiGatewayRequest = {
+      kind: 'messages',
+      body: { model: 'test-model', messages: [], max_tokens: 100 },
+    };
+    applyTrackingIds(request, VERCEL_AI_GATEWAY, userId, null);
+
+    expect(request.body).toHaveProperty('user', generateVercelDownstreamSafetyIdentifier(userId));
+    expect(request.body).not.toHaveProperty('session_id');
+  });
+
+  const promptCacheKeyRequests = (promptCacheKey: string): NonGeminiGatewayRequest[] => [
+    {
+      kind: 'chat_completions',
+      body: { model: 'test-model', messages: [], prompt_cache_key: promptCacheKey },
+    },
+    {
+      kind: 'responses',
+      body: { model: 'test-model', input: 'Hello', prompt_cache_key: promptCacheKey },
+    },
+  ];
+
+  it.each(promptCacheKeyRequests('k'.repeat(64)))(
+    'keeps a client $kind prompt cache key within the length limit',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, null);
+
+      expect(request.body).toHaveProperty('prompt_cache_key', 'k'.repeat(64));
+    }
+  );
+
+  it.each(promptCacheKeyRequests('k'.repeat(65)))(
+    'hashes a client $kind prompt cache key over the length limit',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, null);
+
+      expect(request.body).toHaveProperty(
+        'prompt_cache_key',
+        generateProviderSpecificSessionHash(userId, 'k'.repeat(65), OPENROUTER)
+      );
+    }
+  );
+
+  it.each(promptCacheKeyRequests('k'.repeat(65)))(
+    'prefers the task session hash over a long client $kind prompt cache key',
+    request => {
+      applyTrackingIds(request, OPENROUTER, userId, sessionId);
+
+      expect(request.body).toHaveProperty(
+        'prompt_cache_key',
+        generateProviderSpecificSessionHash(userId, sessionId, OPENROUTER)
+      );
+    }
+  );
 });
 
 describe('downstream safety identifiers', () => {

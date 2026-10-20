@@ -1,3 +1,4 @@
+import { preinstalledStartup } from '../sandbox-control/preinstalled-startup.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -48,6 +49,7 @@ type StoredRecord = {
   stopOpId?: string | null;
   lastSnapshot?: { id: string; sourceAllocation: string } | null;
   startSource?: 'image' | 'repository';
+  startImage?: string;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: string;
@@ -220,6 +222,7 @@ class FakeContainer {
 
   async monitor(): Promise<void> {
     this.monitorCalls += 1;
+    if (!this.stopAfterStart) await new Promise<void>(() => {});
   }
 
   async inspect(): Promise<ContainerInfo> {
@@ -316,12 +319,75 @@ function launch(
   allocationRef: string,
   env: Record<string, string> = {}
 ) {
-  return instance.launchWrapper({ allocationRef, env, instance: 'standard-2' });
+  return instance.launchWrapper({
+    command: preinstalledStartup(),
+    allocationRef,
+    env,
+    instance: 'standard-2',
+  });
 }
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+describe('supplied startup command', () => {
+  const command = { argv: ['/bin/sh', '-c', 'exec /opt/selected/start "two words"'] };
+
+  it.each(['image', 'repository'] as const)('starts the supplied command from %s', async source => {
+    const key = await indexKeyFor();
+    const { kv } = fakeKv(source === 'repository' ? { [key]: { snapshotId: 'snap-repo' } } : {});
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: kv } });
+    container.cmdlineRaw = `${command.argv.join('\0')}\0`;
+
+    await expect(launchFromRepo(instance, REF_A, { command })).resolves.toEqual({
+      started: true,
+      startSource: source,
+    });
+    expect(container.startCalls[0]?.entrypoint).toEqual(command.argv);
+    if (source === 'repository')
+      expect(container.startCalls[0]?.containerSnapshot).toEqual({ id: 'snap-repo' });
+    expect(container.execCalls.map(call => call.cmd)).toEqual([['cat', '/proc/1/cmdline']]);
+    expect(readRecord().state).toBe('running');
+  });
+
+  it('accepts the stable supervisor after the supplied command execs it', async () => {
+    const { instance, container } = setup();
+    container.cmdlineRaw = `/bin/sh\0${CONTROL_SUPERVISOR_PATH}\0`;
+    await expect(
+      instance.launchWrapper({ allocationRef: REF_A, command, env: {}, instance: 'lite' })
+    ).resolves.toMatchObject({ started: true });
+    expect(container.startCalls[0]?.entrypoint).toEqual(command.argv);
+  });
+
+  it('execs the supplied command when a pre-exec launch still has sleep as PID 1', async () => {
+    const { instance, container, readRecord } = setup({
+      running: true,
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'not_started',
+      },
+    });
+    container.execHandler = cmd =>
+      makeExecProcess({ pid: 42, exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        command,
+        env: { CALLER: 'test' },
+        instance: 'lite',
+      })
+    ).resolves.toMatchObject({ started: true });
+    expect(container.startCalls).toEqual([]);
+    expect(container.execCalls.at(-1)).toMatchObject({
+      cmd: command.argv,
+      options: { env: { CALLER: 'test' } },
+    });
+    expect(readRecord().state).toBe('running');
+  });
 });
 
 type LogLine = { level: string; fields: Record<string, unknown>; message: string };
@@ -387,6 +453,7 @@ describe('SandboxContainers egress enforcement', () => {
       const { instance, container, readRecord } = setup();
       const outbound = attachOutbound(instance);
       await instance.launchWrapper({
+        command: preinstalledStartup(),
         allocationRef: REF_A,
         env: { EGRESS_ALLOWLIST: '*' },
         instance: 'lite',
@@ -427,6 +494,7 @@ describe('SandboxContainers egress enforcement', () => {
       vi.spyOn(container, method).mockRejectedValue(new Error('interceptor unavailable'));
       await expect(
         instance.launchWrapper({
+          command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'lite',
@@ -441,6 +509,7 @@ describe('SandboxContainers egress enforcement', () => {
     const initial = setup();
     attachOutbound(initial.instance);
     await initial.instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'lite',
@@ -449,6 +518,7 @@ describe('SandboxContainers egress enforcement', () => {
     const restored = setup({ record: initial.readRecord(), running: true });
     const outbound = attachOutbound(restored.instance);
     await restored.instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'lite',
@@ -478,7 +548,13 @@ describe('SandboxContainers egress enforcement', () => {
         running: true,
       });
       await expect(
-        instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'lite', egressAllowlist })
+        instance.launchWrapper({
+          command: preinstalledStartup(),
+          allocationRef: REF_A,
+          env: {},
+          instance: 'lite',
+          egressAllowlist,
+        })
       ).rejects.toThrow('egress policy cannot change');
       expect(container.calls).toEqual([]);
       expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
@@ -492,6 +568,7 @@ describe('SandboxContainers egress enforcement', () => {
     });
     await expect(
       instance.launchWrapper({
+        command: preinstalledStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'lite',
@@ -505,6 +582,7 @@ describe('SandboxContainers egress enforcement', () => {
     const { instance, container } = setup({ running: true });
     await expect(
       instance.launchWrapper({
+        command: preinstalledStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'lite',
@@ -520,6 +598,7 @@ describe('SandboxContainers egress enforcement', () => {
     const { instance, container } = setup();
     await expect(
       instance.launchWrapper({
+        command: preinstalledStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'lite',
@@ -548,6 +627,7 @@ describe('SandboxContainers egress enforcement', () => {
     attachOutbound(instance);
     container.startBehavior = 'effect-then-reject';
     const input = {
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'lite' as const,
@@ -576,6 +656,7 @@ describe('SandboxContainers egress enforcement', () => {
     });
     attachOutbound(instance);
     await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'lite',
@@ -596,6 +677,7 @@ describe('SandboxContainers egress enforcement', () => {
     const outbound = attachOutbound(instance);
     container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
     await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'lite',
@@ -614,6 +696,7 @@ describe('SandboxContainers egress enforcement', () => {
     const { instance, container, readRecord } = setup();
     attachOutbound(instance);
     await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'lite',
@@ -628,7 +711,13 @@ describe('SandboxContainers egress enforcement', () => {
   it('rejects policy removal after stop when retrying the same allocation reference', async () => {
     const { instance, container, readRecord } = setup();
     attachOutbound(instance);
-    const input = { allocationRef: REF_A, env: {}, instance: 'lite' as const, egressAllowlist: [] };
+    const input = {
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite' as const,
+      egressAllowlist: [],
+    };
     await instance.launchWrapper(input);
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
     expect(readRecord()).toMatchObject({
@@ -648,6 +737,7 @@ describe('SandboxContainers launch', () => {
     attachOutbound(instance);
 
     const result = await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: { FOO: 'bar' },
       instance: 'standard-2',
@@ -664,7 +754,7 @@ describe('SandboxContainers launch', () => {
     ]);
     // The only exec is the PID 1 identity read; there is no supervisor exec.
     expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat']);
-    expect(container.monitorCalls).toBe(0);
+    expect(container.monitorCalls).toBe(1);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
     expect(readRecord().wrapperAttempt).toBeUndefined();
 
@@ -684,7 +774,12 @@ describe('SandboxContainers launch', () => {
       },
     });
 
-    await instance.launchWrapper({ allocationRef: REF_B, env: {}, instance: 'lite' });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_B,
+      env: {},
+      instance: 'lite',
+    });
 
     const options = container.startCalls[0] as Record<string, unknown>;
     expect(options).toEqual(nativeStartOptions('lite'));
@@ -697,6 +792,7 @@ describe('SandboxContainers launch', () => {
     attachOutbound(instance);
 
     await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: { FOO: 'bar' },
       instance: 'standard-2',
@@ -718,6 +814,7 @@ describe('SandboxContainers launch', () => {
 
     await expect(
       instance.launchWrapper({
+        command: preinstalledStartup(),
         allocationRef: REF_A,
         env: { FOO: 'bar' },
         instance: 'standard-2',
@@ -1226,6 +1323,7 @@ describe('SandboxContainers launch', () => {
     });
 
     const resumed = await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
@@ -1453,6 +1551,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
 
       await expect(
         instance.launchWrapper({
+          command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'standard-2',
@@ -1518,6 +1617,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       attachOutbound(instance);
       await expect(
         instance.launchWrapper({
+          command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'standard-2',
@@ -1547,6 +1647,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
     attachOutbound(instance);
 
     await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-2',
@@ -1870,13 +1971,118 @@ describe('SandboxContainers native start confirmation', () => {
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
+  it('lets the native PID 1 read wait for a start that is still pending', async () => {
+    const { instance, container, readRecord } = setup();
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      start(options);
+      container.running = false;
+    });
+    const exec = container.exec.bind(container);
+    vi.spyOn(container, 'exec').mockImplementation(async (cmd, options) => {
+      // Native exec waits for an issued start. The running flag alone does not
+      // distinguish this pending start from a stopped container.
+      await Promise.resolve();
+      container.running = true;
+      return exec(cmd, options);
+    });
+
+    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true, startSource: 'image' });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat']);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
+  it('keeps the launch deadline while native startup remains pending', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      start(options);
+      container.running = false;
+    });
+    vi.spyOn(container, 'exec').mockImplementation(() => new Promise<ExecProcess>(() => {}));
+
+    const failed = expect(
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-2',
+        deadlineAt: Date.now() + 5_000,
+      })
+    ).rejects.toThrow('wrapper exec timed out');
+    await vi.advanceTimersByTimeAsync(5_000);
+    await failed;
+    expect(container.startCalls).toHaveLength(1);
+    expect(readRecord()).toMatchObject({ state: 'launching', wrapperAttempt: 'exec_pending' });
+  });
+
+  it('retries a not-started read while the native lifecycle remains pending', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      start(options);
+      container.running = false;
+    });
+    const exec = container.exec.bind(container);
+    let reads = 0;
+    vi.spyOn(container, 'exec').mockImplementation((cmd, options) => {
+      if (++reads < 3) return Promise.reject(new Error('The container has not been started'));
+      container.running = true;
+      return exec(cmd, options);
+    });
+
+    const completed = launch(instance, REF_A);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(completed).resolves.toEqual({ started: true, startSource: 'image' });
+    expect(container.startCalls).toHaveLength(1);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat']);
+  });
+
+  it('fails promptly when native monitoring fails during a stalled PID 1 read', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    vi.spyOn(container, 'exec').mockImplementation(() => new Promise<ExecProcess>(() => {}));
+    vi.spyOn(container, 'monitor').mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          setTimeout(() => reject(new Error('native image unavailable')), 100);
+        })
+    );
+
+    const failed = expect(launch(instance, REF_A)).rejects.toThrow(
+      'stopped before the supervisor main process was confirmed'
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    await failed;
+    expect(container.startCalls).toHaveLength(1);
+    expect(readRecord()).toMatchObject({ state: 'launching', wrapperAttempt: 'exec_pending' });
+  });
+
   it('fences the native start when the container stops before PID 1 is confirmed', async () => {
+    const { diagnostics } = captureLogs();
     const { instance, container, readRecord } = setup();
     container.stopAfterStart = true;
+    vi.spyOn(container, 'monitor').mockRejectedValue(new Error('native image unavailable'));
+    vi.spyOn(container, 'exec').mockRejectedValue(new Error('Container is not running'));
 
     await expect(launch(instance, REF_A)).rejects.toThrow(
       'stopped before the supervisor main process was confirmed'
     );
+    expect(diagnostics('supervisor_confirm')).toMatchObject([
+      {
+        level: 'warn',
+        fields: {
+          result: 'stopped',
+          lastSeen: 'error',
+          lastErrorName: 'Error',
+          lastCause: 'native_image_unavailable',
+        },
+      },
+    ]);
 
     expect(container.startCalls).toHaveLength(1);
     expect(container.execCalls).toHaveLength(0);
@@ -2319,6 +2525,7 @@ async function indexKeyFor(repoKey = REPO_KEY, image = IMAGE) {
 
 function launchFromRepo(instance: SandboxContainers, ref: string, extra = {}) {
   return instance.launchWrapper({
+    command: preinstalledStartup(),
     allocationRef: ref,
     env: {},
     instance: 'standard-2',
@@ -2387,6 +2594,29 @@ describe('SandboxContainers repository snapshots', () => {
     await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
       started: false,
       startSource: 'repository',
+    });
+  });
+
+  it('captures under the start image after the configured image changes and the DO reconstructs', async () => {
+    const { kv, data } = fakeKv();
+    const initial = setup({ env: { REPO_SNAPSHOTS: kv } });
+    await launchFromRepo(initial.instance, REF_A);
+    const restored = setup({
+      record: initial.readRecord(),
+      running: true,
+      env: { REPO_SNAPSHOTS: kv },
+    });
+    const newImage = 'registry.example/kilo/app:next';
+    restored.container.images.app = newImage;
+
+    await expect(restored.instance.captureRepository(REF_A, REPO_KEY, 'abc123')).resolves.toBe(
+      true
+    );
+
+    expect(data.has(await indexKeyFor(REPO_KEY, newImage))).toBe(false);
+    expect(JSON.parse(data.get(await indexKeyFor()) ?? 'null')).toMatchObject({
+      snapshotId: 'snap-1',
+      commit: 'abc123',
     });
   });
 
@@ -2936,6 +3166,18 @@ describe('SandboxContainers repository capture', () => {
     container.running = false;
     await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
     expect(container.snapshotCalls).toBe(0);
+  });
+
+  it('skips capture for a legacy running allocation whose start image is unknown', async () => {
+    const store = fakeKv();
+    const { instance, container } = setup({
+      running: true,
+      env: { REPO_SNAPSHOTS: store.kv },
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
+    expect(container.snapshotCalls).toBe(0);
+    expect(store.data.size).toBe(0);
   });
 
   it('reports a failed snapshot or index write as false and publishes nothing', async () => {

@@ -902,6 +902,7 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
+    operationKey: z.string().uuid().optional(),
     message: z
       .object({
         prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
@@ -953,29 +954,9 @@ export const StartSessionOutput = z.object({
   kiloSessionId: z.string(),
   messageId: MessageIdSchema,
   delivery: z.enum(['sent', 'queued']),
+  replayed: z.boolean().optional(),
   wrapperRunId: z.string().optional(),
 });
-
-export const StartHostedSessionInput = StartSessionInput.safeExtend({
-  operationKey: z.string().uuid(),
-  client: z.enum(['vscode', 'jetbrains']),
-  options: z
-    .object({
-      kilocodeOrganizationId: z.string().uuid().optional(),
-    })
-    .strict()
-    .optional(),
-}).strict();
-
-export const StartHostedSessionOutput = z
-  .object({
-    cloudAgentSessionId: z.string(),
-    kiloSessionId: z.string(),
-    messageId: MessageIdSchema,
-    replayed: z.boolean(),
-    delivery: z.enum(['sent', 'queued']),
-  })
-  .strict();
 
 /**
  * Input schema for the unified `send` endpoint.

@@ -13,23 +13,17 @@
 import { protectedProcedure } from '../auth.js';
 import { logger, withLogTags } from '../../logger.js';
 import type * as z from 'zod';
-import {
-  StartHostedSessionInput,
-  StartHostedSessionOutput,
-  StartSessionInput,
-  StartSessionOutput,
-} from '../schemas.js';
+import { StartSessionInput, StartSessionOutput } from '../schemas.js';
 import { createSessionWithLedger, startNewSession } from '../../session/session-registration.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { preflightSessionCreation } from './session-creation-preflight.js';
 
 type SessionStartHandlers = {
   start: typeof startSessionHandler;
-  startHostedSession: typeof startHostedSessionHandler;
 };
 
 export function createSessionStartHandlers(): SessionStartHandlers {
-  return { start: startSessionHandler, startHostedSession: startHostedSessionHandler };
+  return { start: startSessionHandler };
 }
 
 function startInputToSessionCreateRequest(
@@ -93,18 +87,6 @@ function startInputToSessionCreateRequest(
   };
 }
 
-export function hostedStartInputToSessionCreateRequest(
-  input: z.infer<typeof StartHostedSessionInput>
-): SessionCreateRequest {
-  return {
-    ...startInputToSessionCreateRequest(input),
-    options: {
-      kilocodeOrganizationId: input.options?.kilocodeOrganizationId,
-      createdOnPlatform: 'desktop',
-    },
-  };
-}
-
 const startSessionHandler = protectedProcedure
   .input(StartSessionInput)
   .output(StartSessionOutput)
@@ -115,6 +97,35 @@ const startSessionHandler = protectedProcedure
         ctx,
         'start'
       );
+
+      if (input.operationKey !== undefined) {
+        const registration = await createSessionWithLedger(
+          request,
+          {
+            env: ctx.env,
+            userId: ctx.userId,
+            authToken: ctx.authToken,
+            botId: ctx.botId,
+          },
+          {
+            billingOrigin: 'cloud-agent',
+            operationKey: input.operationKey,
+            includeInitialMessage: true,
+            resolveSavedAllocationBeforeAdmission: true,
+            startedAt: Date.now(),
+          }
+        );
+        if (!registration.messageId) {
+          throw new Error('Session create completed without an initial message ID');
+        }
+        return {
+          cloudAgentSessionId: registration.cloudAgentSessionId,
+          kiloSessionId: registration.kiloSessionId,
+          messageId: registration.messageId,
+          replayed: registration.replayed === true,
+          delivery: registration.delivery ?? 'queued',
+        };
+      }
 
       const registration = await startNewSession(
         request,
@@ -142,46 +153,6 @@ const startSessionHandler = protectedProcedure
         kiloSessionId: registration.kiloSessionId,
         messageId: ack.messageId,
         delivery: 'queued',
-      };
-    });
-  });
-
-const startHostedSessionHandler = protectedProcedure
-  .input(StartHostedSessionInput)
-  .output(StartHostedSessionOutput)
-  .mutation(async ({ input, ctx }) => {
-    return withLogTags({ source: 'startHostedSession' }, async () => {
-      const request = await preflightSessionCreation(
-        hostedStartInputToSessionCreateRequest(input),
-        ctx,
-        'startHostedSession'
-      );
-      const registration = await createSessionWithLedger(
-        request,
-        {
-          env: ctx.env,
-          userId: ctx.userId,
-          authToken: ctx.authToken,
-          botId: ctx.botId,
-        },
-        {
-          billingOrigin: 'cloud-agent',
-          operationKey: input.operationKey,
-          includeInitialMessage: true,
-          resolveSavedAllocationBeforeAdmission: true,
-          startedAt: Date.now(),
-        }
-      );
-      if (!registration.messageId) {
-        throw new Error('Hosted session create completed without an initial message ID');
-      }
-
-      return {
-        cloudAgentSessionId: registration.cloudAgentSessionId,
-        kiloSessionId: registration.kiloSessionId,
-        messageId: registration.messageId,
-        replayed: registration.replayed === true,
-        delivery: registration.delivery ?? 'queued',
       };
     });
   });

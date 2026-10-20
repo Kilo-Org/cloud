@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./account-access": "./src/account-access.ts",
     "./bitbucket-workspace-access-token": "./src/bitbucket-workspace-access-token.ts",
     "./gitlab-credential": "./src/gitlab-credential.ts",
     "./slack-credential": "./src/slack-credential.ts",

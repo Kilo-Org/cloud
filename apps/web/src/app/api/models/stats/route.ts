@@ -21,7 +21,7 @@ export async function GET(_request: NextRequest) {
     const snapshot = await getModelStatsSnapshot();
     return NextResponse.json(
       snapshot.entries
-        .filter(({ stat }) => isEnkryptPublicModel(stat))
+        .filter(({ stat }) => isEnkryptPublicModel(stat, snapshot.customLlmIds))
         .map(({ stat, verification }) => publishEnkryptModelStats(stat, snapshot, verification)),
       { headers }
     );

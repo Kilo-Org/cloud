@@ -15,7 +15,6 @@ import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import { blockUser } from '@/lib/user/block';
 
 type Db = typeof defaultDb;
@@ -268,8 +267,6 @@ export async function cancelAndRefundKiloPassForUser({
 
     return balanceReset;
   });
-
-  await revokeGatewayGrantsForBlockedUser(userId);
 
   return {
     status: refundLatestPayment ? 'cancelled_and_refunded' : 'cancelled',

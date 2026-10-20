@@ -59,6 +59,8 @@ Validated content fingerprints determine whether a score changed. Changes use on
 
 A shared, single-flight, five-minute primary-database snapshot serves list, detail, and gateway lookups. Unknown slugs do not create cache entries. Freshness and publication eligibility are checked after asynchronous work, immediately before serialization; responses remain `no-store`.
 
+List serialization passes the snapshot's catalog membership to the shared publication predicate.
+
 Failed refreshes may retain base model metadata, but an expired or invalidated snapshot cannot authorize Enkrypt publication. Provider outages can still expose last-known-good scores as stale when model eligibility remains verifiable. Administrative model changes and completed syncs invalidate the current instance's cache; other instances have the five-minute eligibility bound. Failed refreshes have a short retry cooldown.
 
 ## Results and failures

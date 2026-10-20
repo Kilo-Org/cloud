@@ -705,3 +705,87 @@ describe('getIgnoredProviders', () => {
     expect(getIgnoredProviders(model, allowed)).toEqual(expected);
   });
 });
+
+describe('applyProviderSpecificLogic for Gemini API requests', () => {
+  function makeGeminiRequest(
+    body: Partial<Extract<GatewayRequest, { kind: 'generate_content' }>['body']>
+  ): Extract<GatewayRequest, { kind: 'generate_content' }> {
+    return {
+      kind: 'generate_content',
+      body: { model: 'unused', stream: true, contents: [], ...body },
+    };
+  }
+
+  async function apply(model: string, request: GatewayRequest) {
+    await applyProviderSpecificLogic(
+      { ...makeProvider(null), id: 'direct-byok', supportedChatApis: ['generate_content'] },
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      'session-1',
+      'task-1',
+      false
+    );
+  }
+
+  it('sanitizes tool results without adding tracking fields', async () => {
+    const request = makeGeminiRequest({
+      contents: [
+        { role: 'user', parts: [{ text: 'read it' }] },
+        { role: 'model', parts: [{ functionCall: { id: 'call-1', name: 'read', args: {} } }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call-1',
+                name: 'read',
+                response: { output: 'binary\0data', schema: { $ref: '#/a' } },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    await apply('opencode-go/gemini-4-argon-contributor', request);
+
+    expect(request.body).toEqual(
+      makeGeminiRequest({
+        contents: [
+          { role: 'user', parts: [{ text: 'read it' }] },
+          { role: 'model', parts: [{ functionCall: { id: 'call-1', name: 'read', args: {} } }] },
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  id: 'call-1',
+                  name: 'read',
+                  response: {
+                    output: expect.stringContaining('the file appears to be binary'),
+                    schema: { _ref: '#/a' },
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }).body
+    );
+  });
+
+  it('applies model settings to generationConfig', async () => {
+    const request = makeGeminiRequest({
+      generationConfig: { temperature: 0.7, topP: 0.9, maxOutputTokens: 100 },
+    });
+
+    await apply('opencode-go/kimi-k3', request);
+
+    expect(request.body.generationConfig).toEqual({ maxOutputTokens: 100 });
+  });
+});

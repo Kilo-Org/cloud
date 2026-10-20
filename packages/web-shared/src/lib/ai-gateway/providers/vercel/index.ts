@@ -11,7 +11,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   GatewayRequest,
-  NonGeminiGatewayRequest,
   OpenRouterProviderConfig,
   VercelInferenceProviderConfig,
   VercelProviderConfig,
@@ -122,8 +121,18 @@ export async function shouldRouteToVercel(
   return true;
 }
 
-function getConversationId(request: NonGeminiGatewayRequest): string | undefined {
-  const id = request.kind === 'messages' ? request.body.session_id : request.body.prompt_cache_key;
+function getConversationId(request: GatewayRequest): string | undefined {
+  const id = (() => {
+    switch (request.kind) {
+      case 'messages':
+        return request.body.session_id;
+      case 'chat_completions':
+      case 'responses':
+        return request.body.prompt_cache_key;
+      case 'generate_content':
+        return undefined;
+    }
+  })();
   return typeof id === 'string' && id.length > 0 ? id : undefined;
 }
 
@@ -131,7 +140,7 @@ function getConversationId(request: NonGeminiGatewayRequest): string | undefined
 // session, keeping its prompt cache warm after a fallback.
 // https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
 function getSessionAffinityOptions(
-  request: NonGeminiGatewayRequest
+  request: GatewayRequest
 ): Pick<NonNullable<VercelProviderConfig['gateway']>, 'sessionId' | 'sessionAffinity'> {
   const sessionId = getConversationId(request);
   return sessionId ? { sessionId, sessionAffinity: true } : { sessionAffinity: true };
@@ -153,7 +162,7 @@ function convertProviderSort(
 }
 
 export function convertProviderOptions(
-  requestToMutate: NonGeminiGatewayRequest,
+  requestToMutate: GatewayRequest,
   vercelInferenceProviders: string[] | null
 ): VercelProviderConfig {
   const provider = requestToMutate.body.provider;
@@ -178,7 +187,8 @@ export function convertProviderOptions(
     );
   })();
 
-  const serviceTier = requestToMutate.body.service_tier;
+  const serviceTier =
+    requestToMutate.kind === 'generate_content' ? undefined : requestToMutate.body.service_tier;
   return {
     gateway: {
       only,
@@ -206,7 +216,7 @@ function parseCredentials<T>(
 }
 
 export function getAnthropicProviderOptionsForVercel(
-  request: NonGeminiGatewayRequest
+  request: GatewayRequest
 ): AnthropicProviderOptions | undefined {
   const anthropicOptions: AnthropicProviderOptions = {};
 
@@ -258,7 +268,7 @@ export function getVercelInferenceProviderConfigForUserByok(
 
 export async function applyVercelSettings(
   requestedModel: string,
-  requestToMutate: NonGeminiGatewayRequest,
+  requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
   const vercelModelId = await mapModelIdToVercel(requestedModel);

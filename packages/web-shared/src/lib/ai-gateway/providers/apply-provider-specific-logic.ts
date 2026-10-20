@@ -1,10 +1,7 @@
 import {
   isOpenRouterProviderConfig,
-  type GatewayResponsesRequest,
   type OpenRouterChatCompletionRequest,
   type GatewayRequest,
-  type GatewayMessagesRequest,
-  type NonGeminiGatewayRequest,
   type OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -210,10 +207,7 @@ export function withIgnoredProviders(
 
 export function applyPreferredProvider(
   requestedModel: string,
-  requestToMutate:
-    | OpenRouterChatCompletionRequest
-    | GatewayResponsesRequest
-    | GatewayMessagesRequest,
+  requestToMutate: GatewayRequest['body'],
   isAnthropicProviderAllowed: boolean
 ) {
   const preferredProviderOrder = getPreferredProviderOrder(requestedModel);
@@ -243,7 +237,7 @@ export function removeModelsFallback(requestToMutate: GatewayRequest) {
 
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
-  requestToMutate: NonGeminiGatewayRequest,
+  requestToMutate: GatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel | null
 ) {
   const customPricing = getCustomPricing(requestedModel);
@@ -253,8 +247,11 @@ export function removeUnsupportedRequestServiceTier(
       : kiloExclusiveModel && !kiloExclusiveModel.flags.includes('flex')
         ? 'non-Flex Kilo-exclusive model'
         : null;
+  if (!reason || requestToMutate.kind === 'generate_content') {
+    return;
+  }
   const serviceTier = requestToMutate.body.service_tier;
-  if (!reason || serviceTier === undefined) {
+  if (serviceTier === undefined) {
     return;
   }
 
@@ -306,23 +303,6 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   removeModelsFallback(requestToMutate);
-  const transformContext = {
-    provider,
-    model: requestedModel,
-    request: requestToMutate,
-    originalHeaders,
-    extraHeaders,
-    userByok,
-    kilo_user_id: userId,
-    organization_id: organizationId,
-    session_id: sessionId,
-  };
-
-  if (requestToMutate.kind === 'generate_content') {
-    await provider.transformRequest(transformContext);
-    return;
-  }
-
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
@@ -402,7 +382,17 @@ export async function applyProviderSpecificLogic(
     await applyVercelSettings(requestedModel, requestToMutate, userByok);
   }
 
-  await provider.transformRequest(transformContext);
+  await provider.transformRequest({
+    provider,
+    model: requestedModel,
+    request: requestToMutate,
+    originalHeaders,
+    extraHeaders,
+    userByok,
+    kilo_user_id: userId,
+    organization_id: organizationId,
+    session_id: sessionId,
+  });
 
   applyReasoningDetailsTransform(provider, requestToMutate);
 }

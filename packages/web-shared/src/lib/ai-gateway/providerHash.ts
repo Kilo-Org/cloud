@@ -3,7 +3,7 @@ import { type Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import type { NonGeminiGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
  * Generates a service-specific SHA256 hash.
@@ -60,11 +60,15 @@ export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): stri
 const MAX_PROMPT_CACHE_KEY_LENGTH = 64;
 
 export function applyTrackingIds(
-  request: NonGeminiGatewayRequest,
+  request: GatewayRequest,
   provider: Provider,
   userId: string,
   taskId: string | null
 ) {
+  // The Gemini API has no user or session fields, and rejects unknown ones.
+  if (request.kind === 'generate_content') {
+    return;
+  }
   const userHash = generateProviderSpecificHash(userId, provider);
   const taskHash = taskId ? generateProviderSpecificSessionHash(userId, taskId, provider) : '';
   if (request.kind === 'messages') {

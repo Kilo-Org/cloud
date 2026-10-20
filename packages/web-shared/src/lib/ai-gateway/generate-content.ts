@@ -1,7 +1,23 @@
 import type {
   GatewayGenerateContentRequest,
+  GeminiFunctionDeclaration,
   GeminiGenerateContentRequest,
+  GeminiPart,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+
+export function geminiParts(body: GeminiGenerateContentRequest): GeminiPart[] {
+  return body.contents.flatMap(content =>
+    Array.isArray(content?.parts) ? content.parts.filter(part => part != null) : []
+  );
+}
+
+export function geminiFunctionDeclarations(
+  body: GeminiGenerateContentRequest
+): GeminiFunctionDeclaration[] {
+  return (Array.isArray(body.tools) ? body.tools : []).flatMap(tool =>
+    Array.isArray(tool?.functionDeclarations) ? tool.functionDeclarations : []
+  );
+}
 
 /**
  * `@ai-sdk/google` requests `{baseURL}/models/{model}:{method}`, or

@@ -1,4 +1,5 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { geminiParts } from '@kilocode/web-shared/lib/ai-gateway/generate-content';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -38,6 +39,12 @@ function sanitizeJsonRefContent(content: string): string {
 }
 
 export function sanitizeJsonRefToolResults(request: GatewayRequest) {
+  if (request.kind === 'generate_content') {
+    for (const part of geminiParts(request.body)) {
+      renameJsonRefProperties(part.functionResponse?.response);
+    }
+    return;
+  }
   if (request.kind !== 'chat_completions') {
     return;
   }

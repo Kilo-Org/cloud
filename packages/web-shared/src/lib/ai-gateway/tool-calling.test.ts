@@ -5,6 +5,7 @@ import type {
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
+  normalizeToolCallIds,
   repairChatCompletionsTools,
   repairMessagesTools,
   sanitizeBinaryToolResults,
@@ -1234,5 +1235,30 @@ describe('sanitizeBinaryToolResults', () => {
 
       expect(() => repairMessagesTools(request.body)).not.toThrow();
     });
+  });
+});
+
+describe('normalizeToolCallIds for Gemini API requests', () => {
+  it('normalizes function call and function response IDs alike', () => {
+    const request: GatewayRequest = {
+      kind: 'generate_content',
+      body: {
+        model: 'test-model',
+        stream: false,
+        contents: [
+          { role: 'model', parts: [{ functionCall: { id: 'call.1', name: 'read', args: {} } }] },
+          {
+            role: 'user',
+            parts: [{ functionResponse: { id: 'call.1', name: 'read', response: {} } }],
+          },
+        ],
+      },
+    };
+
+    normalizeToolCallIds(request, id => id.includes('.'), 9);
+
+    const [call, response] = request.body.contents.flatMap(content => content.parts);
+    expect(call?.functionCall?.id).toHaveLength(9);
+    expect(response?.functionResponse?.id).toBe(call?.functionCall?.id);
   });
 });

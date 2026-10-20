@@ -1,4 +1,4 @@
-import type { NonGeminiGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   dropToolStrictProperties,
   normalizeToolCallIds,
@@ -11,7 +11,7 @@ export function isCodestralModel(model: string) {
   return model.includes('codestral');
 }
 
-export function applyMistralModelSettings(requestToMutate: NonGeminiGatewayRequest) {
+export function applyMistralModelSettings(requestToMutate: GatewayRequest) {
   if (requestToMutate.kind !== 'chat_completions') {
     return;
   }

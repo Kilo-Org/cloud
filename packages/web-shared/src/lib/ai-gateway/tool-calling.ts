@@ -1,10 +1,12 @@
 import type {
+  GatewayGenerateContentRequest,
   GatewayMessagesRequest,
-  NonGeminiGatewayRequest,
+  GatewayRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import crypto from 'crypto';
+import { geminiParts } from '@kilocode/web-shared/lib/ai-gateway/generate-content';
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
 
@@ -27,19 +29,36 @@ export function dropToolStrictProperties(requestToMutate: OpenRouterChatCompleti
 }
 
 export function normalizeToolCallIds(
-  requestToMutate: NonGeminiGatewayRequest,
+  requestToMutate: GatewayRequest,
   filter: (toolCallId: string) => boolean,
   maxIdLength: number | undefined
 ) {
   const normalize = (toolCallId: string) =>
     filter(toolCallId) ? normalizeToolCallId(toolCallId, maxIdLength) : toolCallId;
 
-  if (requestToMutate.kind === 'chat_completions') {
-    normalizeChatCompletionsToolCallIds(requestToMutate.body, normalize);
-  } else if (requestToMutate.kind === 'responses') {
-    normalizeResponsesToolCallIds(requestToMutate.body, normalize);
-  } else {
-    normalizeMessagesToolCallIds(requestToMutate.body, normalize);
+  switch (requestToMutate.kind) {
+    case 'chat_completions':
+      return normalizeChatCompletionsToolCallIds(requestToMutate.body, normalize);
+    case 'responses':
+      return normalizeResponsesToolCallIds(requestToMutate.body, normalize);
+    case 'messages':
+      return normalizeMessagesToolCallIds(requestToMutate.body, normalize);
+    case 'generate_content':
+      return normalizeGenerateContentToolCallIds(requestToMutate.body, normalize);
+  }
+}
+
+function normalizeGenerateContentToolCallIds(
+  body: GatewayGenerateContentRequest,
+  normalize: (toolCallId: string) => string
+) {
+  for (const part of geminiParts(body)) {
+    if (part.functionCall?.id) {
+      part.functionCall.id = normalize(part.functionCall.id);
+    }
+    if (part.functionResponse?.id) {
+      part.functionResponse.id = normalize(part.functionResponse.id);
+    }
   }
 }
 
@@ -194,13 +213,29 @@ const SANITIZED_TOOL_NAME = 'read';
  * Limited to the "read" tool to avoid false positives on tools that
  * legitimately return binary-ish content.
  */
-export function sanitizeBinaryToolResults(request: NonGeminiGatewayRequest): void {
-  if (request.kind === 'chat_completions') {
-    sanitizeChatCompletionsToolResults(request.body);
-  } else if (request.kind === 'responses') {
-    sanitizeResponsesToolResults(request.body);
-  } else {
-    sanitizeMessagesToolResults(request.body);
+export function sanitizeBinaryToolResults(request: GatewayRequest): void {
+  switch (request.kind) {
+    case 'chat_completions':
+      return sanitizeChatCompletionsToolResults(request.body);
+    case 'responses':
+      return sanitizeResponsesToolResults(request.body);
+    case 'messages':
+      return sanitizeMessagesToolResults(request.body);
+    case 'generate_content':
+      return sanitizeGenerateContentToolResults(request.body);
+  }
+}
+
+function sanitizeGenerateContentToolResults(body: GatewayGenerateContentRequest): void {
+  for (const part of geminiParts(body)) {
+    const { functionResponse } = part;
+    if (functionResponse?.name !== SANITIZED_TOOL_NAME || !functionResponse.response) continue;
+    for (const [key, value] of Object.entries(functionResponse.response)) {
+      if (typeof value === 'string' && containsNul(value)) {
+        console.warn('[sanitizeBinaryToolResults] replacing generate_content function response');
+        functionResponse.response[key] = BINARY_DATA_REPLACEMENT;
+      }
+    }
   }
 }
 

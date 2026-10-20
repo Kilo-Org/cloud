@@ -3,9 +3,10 @@ import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createParser } from 'eventsource-parser';
 import type {
+  GatewayGenerateContentRequest,
   GatewayRequest,
-  GeminiTool,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { geminiFunctionDeclarations } from '@kilocode/web-shared/lib/ai-gateway/generate-content';
 import type { GenerateContentResponse } from '@kilocode/web-shared/lib/ai-gateway/processUsage.generateContent';
 
 export const toolCallArgumentErrorSchema = z.discriminatedUnion('kind', [
@@ -237,11 +238,11 @@ function detectMessagesSseErrors(
 
 function detectGenerateContentSseErrors(
   lines: string[],
-  tools: GeminiTool[] | undefined
+  body: GatewayGenerateContentRequest
 ): ToolCallError[] {
   const toolSchemaByName = new Map<string, unknown>();
   const knownToolNames = new Set<string>();
-  for (const declaration of tools?.flatMap(tool => tool.functionDeclarations ?? []) ?? []) {
+  for (const declaration of geminiFunctionDeclarations(body)) {
     knownToolNames.add(declaration.name);
     toolSchemaByName.set(declaration.name, declaration.parametersJsonSchema);
   }
@@ -278,7 +279,7 @@ export function detectToolCallArgumentErrors(
     } else if (request.kind === 'responses') {
       errors = detectResponsesSseErrors(lines, request.body.tools);
     } else if (request.kind === 'generate_content') {
-      errors = detectGenerateContentSseErrors(lines, request.body.tools);
+      errors = detectGenerateContentSseErrors(lines, request.body);
     } else {
       errors = detectMessagesSseErrors(lines, request.body.tools);
     }

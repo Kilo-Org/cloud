@@ -1,5 +1,6 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { geminiFunctionDeclarations } from '@kilocode/web-shared/lib/ai-gateway/generate-content';
 
 const COMBINATORS = [
   ['allOf', 'all of'],
@@ -142,6 +143,15 @@ export function removeTopLevelToolSchemaCombinators(request: GatewayRequest): vo
         const constraints = rewrite(tool.name, tool.input_schema, tool.strict);
         if (constraints) {
           tool.description = appendConstraints(tool.description, constraints);
+        }
+      }
+      break;
+    case 'generate_content':
+      for (const declaration of geminiFunctionDeclarations(request.body)) {
+        const schema = declaration.parametersJsonSchema ?? declaration.parameters;
+        const constraints = rewrite(declaration.name, schema, undefined);
+        if (constraints) {
+          declaration.description = appendConstraints(declaration.description, constraints);
         }
       }
       break;

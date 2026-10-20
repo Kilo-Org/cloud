@@ -17,7 +17,6 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
   GeminiGenerateContentRequest,
-  NonGeminiGatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   isServerSentEventsStream,
@@ -125,6 +124,7 @@ import {
   customRouterModelId,
   isCustomRouterModelId,
   type AutoRouter,
+  type ClassifierApiKind,
   type CustomRouterReference,
 } from '@kilocode/auto-routing-contracts';
 import {
@@ -461,7 +461,7 @@ export async function handleLlmProxyRequest(
     return [...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy])];
   };
   const decisionRequest = (
-    autoRoutedRequest: NonGeminiGatewayRequest,
+    autoRoutedRequest: { kind: ClassifierApiKind; body: unknown },
     caller: { userId: string; organizationId: string | null }
   ) => ({
     apiKind: autoRoutedRequest.kind,
@@ -479,9 +479,6 @@ export async function handleLlmProxyRequest(
 
   const autoDecisionToken = request.headers.get(AUTO_DECISION_HEADER);
   if (autoDecisionToken !== null) {
-    if (requestBodyParsed.kind === 'generate_content') {
-      return apiKindNotSupportedResponse(requestBodyParsed.kind, AUTO_MODEL_CHAT_APIS);
-    }
     const caller = await authenticatedRoutingCaller();
     if (caller instanceof NextResponse) return caller;
     if (!AUTO_ROUTING_DECISION_SECRET) {
@@ -500,7 +497,7 @@ export async function handleLlmProxyRequest(
     applyResolvedModel(requestBodyParsed, check.resolved);
     autoModel = check.routerModelId;
   } else if (isKiloAutoModel(requestedModelLowerCased)) {
-    // Auto models route to providers that do not serve the Gemini API.
+    // The Auto classifier does not read Gemini API requests.
     if (requestBodyParsed.kind === 'generate_content') {
       return apiKindNotSupportedResponse(requestBodyParsed.kind, AUTO_MODEL_CHAT_APIS);
     }

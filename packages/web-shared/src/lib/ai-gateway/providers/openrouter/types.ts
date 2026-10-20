@@ -179,12 +179,6 @@ export type GatewayRequest =
   | { kind: 'messages'; body: GatewayMessagesRequest }
   | { kind: 'generate_content'; body: GatewayGenerateContentRequest };
 
-/**
- * Gemini API requests skip the gateway's model-specific request transforms and
- * reach the provider as sent, apart from the provider's own transform.
- */
-export type NonGeminiGatewayRequest = Exclude<GatewayRequest, { kind: 'generate_content' }>;
-
 export type OpenRouterGeneration = {
   data: {
     id: string;

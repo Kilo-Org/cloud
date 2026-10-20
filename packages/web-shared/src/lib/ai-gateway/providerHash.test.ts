@@ -1,6 +1,6 @@
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import type { NonGeminiGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyTrackingIds,
   generateOpenRouterDownstreamSafetyIdentifier,
@@ -8,6 +8,18 @@ import {
   generateProviderSpecificSessionHash,
   generateVercelDownstreamSafetyIdentifier,
 } from './providerHash';
+
+function trackedSessionId(request: GatewayRequest) {
+  switch (request.kind) {
+    case 'messages':
+      return request.body.session_id;
+    case 'chat_completions':
+    case 'responses':
+      return request.body.prompt_cache_key;
+    case 'generate_content':
+      return undefined;
+  }
+}
 
 describe('generateProviderSpecificHash', () => {
   const testUserId = 'test-user-123';
@@ -51,7 +63,7 @@ describe('session tracking identifiers', () => {
     );
   });
 
-  const requests: NonGeminiGatewayRequest[] = [
+  const requests: GatewayRequest[] = [
     { kind: 'chat_completions', body: { model: 'test-model', messages: [] } },
     { kind: 'messages', body: { model: 'test-model', messages: [], max_tokens: 100 } },
     { kind: 'responses', body: { model: 'test-model', input: 'Hello' } },
@@ -61,10 +73,7 @@ describe('session tracking identifiers', () => {
     const trackedRequest = structuredClone(request);
     applyTrackingIds(trackedRequest, OPENROUTER, userId, sessionId);
 
-    const trackedSession =
-      trackedRequest.kind === 'messages'
-        ? trackedRequest.body.session_id
-        : trackedRequest.body.prompt_cache_key;
+    const trackedSession = trackedSessionId(trackedRequest);
     expect(trackedSession).toBe(generateProviderSpecificSessionHash(userId, sessionId, OPENROUTER));
   });
 
@@ -72,10 +81,7 @@ describe('session tracking identifiers', () => {
     const trackedRequest = structuredClone(request);
     applyTrackingIds(trackedRequest, OPENROUTER, userId, null);
 
-    const trackedSession =
-      trackedRequest.kind === 'messages'
-        ? trackedRequest.body.session_id
-        : trackedRequest.body.prompt_cache_key;
+    const trackedSession = trackedSessionId(trackedRequest);
     expect(trackedSession).toBeUndefined();
   });
 
@@ -83,17 +89,14 @@ describe('session tracking identifiers', () => {
     const trackedRequest = structuredClone(request);
     applyTrackingIds(trackedRequest, VERCEL_AI_GATEWAY, userId, sessionId);
 
-    const trackedSession =
-      trackedRequest.kind === 'messages'
-        ? trackedRequest.body.session_id
-        : trackedRequest.body.prompt_cache_key;
+    const trackedSession = trackedSessionId(trackedRequest);
     expect(trackedSession).toBe(
       generateProviderSpecificSessionHash(userId, sessionId, VERCEL_AI_GATEWAY)
     );
   });
 
   it('sets the Vercel user hash on Vercel messages requests', () => {
-    const request: NonGeminiGatewayRequest = {
+    const request: GatewayRequest = {
       kind: 'messages',
       body: { model: 'test-model', messages: [], max_tokens: 100 },
     };
@@ -103,7 +106,7 @@ describe('session tracking identifiers', () => {
     expect(request.body).not.toHaveProperty('session_id');
   });
 
-  const promptCacheKeyRequests = (promptCacheKey: string): NonGeminiGatewayRequest[] => [
+  const promptCacheKeyRequests = (promptCacheKey: string): GatewayRequest[] => [
     {
       kind: 'chat_completions',
       body: { model: 'test-model', messages: [], prompt_cache_key: promptCacheKey },

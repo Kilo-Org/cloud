@@ -1,19 +1,19 @@
 import type {
   GatewayMessagesRequest,
-  NonGeminiGatewayRequest,
+  GatewayRequest,
   GatewayResponsesRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { applyAnthropicModelSettings } from './anthropic';
 
 const VALID_ID = /^[a-zA-Z0-9_-]{1,128}$/;
 
-function apply(request: NonGeminiGatewayRequest) {
+function apply(request: GatewayRequest) {
   applyAnthropicModelSettings(request, {});
 }
 
 describe('applyAnthropicModelSettings tool call ids', () => {
   it('normalizes invalid chat completions tool call ids consistently', () => {
-    const request: NonGeminiGatewayRequest = {
+    const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'anthropic/claude-sonnet-4.5',
@@ -51,7 +51,7 @@ describe('applyAnthropicModelSettings tool call ids', () => {
   it('normalizes tool call ids longer than 128 characters', () => {
     const maxLengthId = 'a'.repeat(128);
     const tooLongId = 'a'.repeat(129);
-    const request: NonGeminiGatewayRequest = {
+    const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'anthropic/claude-sonnet-4.5',
@@ -86,7 +86,7 @@ describe('applyAnthropicModelSettings tool call ids', () => {
   });
 
   it('normalizes invalid responses call ids consistently', () => {
-    const request: NonGeminiGatewayRequest = {
+    const request: GatewayRequest = {
       kind: 'responses',
       body: {
         model: 'anthropic/claude-sonnet-4.5',
@@ -109,7 +109,7 @@ describe('applyAnthropicModelSettings tool call ids', () => {
   });
 
   it('normalizes invalid messages tool use ids consistently', () => {
-    const request: NonGeminiGatewayRequest = {
+    const request: GatewayRequest = {
       kind: 'messages',
       body: {
         model: 'claude-sonnet-4-5',

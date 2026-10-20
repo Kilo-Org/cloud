@@ -1,11 +1,7 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import type OpenAI from 'openai';
-import type {
-  GatewayRequest,
-  NonGeminiGatewayRequest,
-  OpenRouterChatCompletionRequest,
-} from '../openrouter/types';
+import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
@@ -103,7 +99,7 @@ describe('OpenCode Go session headers', () => {
 
   test.each(
     requests.filter(
-      (request): request is Exclude<NonGeminiGatewayRequest, { kind: 'messages' }> =>
+      (request): request is Extract<GatewayRequest, { kind: 'chat_completions' | 'responses' }> =>
         request.kind !== 'messages' && request.kind !== 'generate_content'
     )
   )('matches the existing prompt cache key for $kind', request => {

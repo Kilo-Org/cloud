@@ -3,7 +3,7 @@ import type OpenAI from 'openai';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import type {
   GatewayMessagesRequest,
-  NonGeminiGatewayRequest,
+  GatewayRequest,
   GatewayResponsesRequest,
   MessageWithReasoning,
   OpenRouterChatCompletionRequest,
@@ -157,10 +157,7 @@ function addResponsesReasoningPlaceholders(request: GatewayResponsesRequest) {
  * reasoning. Clients drop reasoning after a model switch, so every assistant
  * turn without reasoning text gets a placeholder.
  */
-export function addReflectionReasoningPlaceholders(
-  model: string,
-  request: NonGeminiGatewayRequest
-) {
+export function addReflectionReasoningPlaceholders(model: string, request: GatewayRequest) {
   const placeholderCount = (() => {
     switch (request.kind) {
       case 'chat_completions':
@@ -169,6 +166,8 @@ export function addReflectionReasoningPlaceholders(
         return addMessagesReasoningPlaceholders(request.body);
       case 'responses':
         return addResponsesReasoningPlaceholders(request.body);
+      case 'generate_content':
+        return 0;
     }
   })();
   if (placeholderCount > 0) {

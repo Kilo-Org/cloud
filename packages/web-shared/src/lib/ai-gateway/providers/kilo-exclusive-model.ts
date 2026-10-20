@@ -2,7 +2,7 @@ import type { OpenRouterInferenceProviderId } from '@kilocode/web-shared/lib/ai-
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   isOpenRouterProviderConfig,
-  type NonGeminiGatewayRequest,
+  type GatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export type KiloExclusiveModelFlag =
@@ -93,9 +93,9 @@ export function isStealthModel(model: KiloExclusiveModel): boolean {
 type TokenLimitMutation = 'removed' | 'clamped';
 
 function logMaxTokenMutation(
-  requestToMutate: NonGeminiGatewayRequest,
+  requestToMutate: GatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel,
-  field: 'max_completion_tokens' | 'max_tokens' | 'max_output_tokens',
+  field: 'max_completion_tokens' | 'max_tokens' | 'max_output_tokens' | 'maxOutputTokens',
   requestedValue: number,
   mutation: TokenLimitMutation
 ) {
@@ -110,7 +110,7 @@ function logMaxTokenMutation(
 }
 
 function removeNonSensicalMaxTokens(
-  requestToMutate: NonGeminiGatewayRequest,
+  requestToMutate: GatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel
 ) {
   // OpenClaw sometimes puts numbers in that are too large and some providers will reject the request.
@@ -161,16 +161,34 @@ function removeNonSensicalMaxTokens(
       requestToMutate.body.max_tokens = kiloExclusiveModel.max_completion_tokens;
     }
   }
+  if (requestToMutate.kind === 'generate_content') {
+    const generationConfig = requestToMutate.body.generationConfig;
+    const maxOutputTokens = generationConfig?.maxOutputTokens;
+    if (
+      generationConfig &&
+      maxOutputTokens !== undefined &&
+      maxOutputTokens > kiloExclusiveModel.max_completion_tokens
+    ) {
+      logMaxTokenMutation(
+        requestToMutate,
+        kiloExclusiveModel,
+        'maxOutputTokens',
+        maxOutputTokens,
+        'removed'
+      );
+      delete generationConfig.maxOutputTokens;
+    }
+  }
 }
 
 /** Rewrites a gateway request to target a Kilo-exclusive model. */
 export function applyKiloExclusiveModelSettings(
-  requestToMutate: NonGeminiGatewayRequest,
+  requestToMutate: GatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel
 ) {
   requestToMutate.body.model = kiloExclusiveModel.internal_id;
   removeNonSensicalMaxTokens(requestToMutate, kiloExclusiveModel);
-  if (kiloExclusiveModel.flags.includes('flex')) {
+  if (kiloExclusiveModel.flags.includes('flex') && requestToMutate.kind !== 'generate_content') {
     requestToMutate.body.service_tier = 'flex';
   }
   const restriction = kiloExclusiveModel.inference_providers;

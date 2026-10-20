@@ -43,6 +43,12 @@ export function PreferenceRow({
   switchAccessibilityLabel,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
+  // Both ways of moving the switch flip the same value: a tap on the row and a
+  // tap on the thumb can arrive in either order, and a burst must not build one
+  // flip from the rendered value and the next from the native thumb state.
+  const flip = () => {
+    onValueChange(!(resolveValue?.() ?? value));
+  };
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       {/* One named control: the title is what a tap names, so it has to move
@@ -53,9 +59,7 @@ export function PreferenceRow({
       <Pressable
         className="min-h-11 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
         disabled={disabled}
-        onPress={() => {
-          onValueChange(!(resolveValue?.() ?? value));
-        }}
+        onPress={flip}
         accessibilityRole="switch"
         accessibilityLabel={switchAccessibilityLabel ?? title}
         accessibilityHint={subtitle}
@@ -92,7 +96,7 @@ export function PreferenceRow({
         accessible={false}
         importantForAccessibility="no"
         accessibilityElementsHidden
-        onValueChange={onValueChange}
+        onValueChange={flip}
       />
     </View>
   );

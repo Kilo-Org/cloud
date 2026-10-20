@@ -71,7 +71,7 @@ export async function setTrustedHosts(next: string[]): Promise<void> {
 }
 
 export function revokeHost(host: string): void {
-  store.set(store.get().filter(item => item !== host));
+  store.set(store.getRequested().filter(item => item !== host));
 }
 
 export function clearTrustedHosts(): void {

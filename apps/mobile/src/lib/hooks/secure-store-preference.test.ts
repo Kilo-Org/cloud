@@ -172,6 +172,57 @@ describe('createSecureStorePreference', () => {
     expect(store.get()).toBe(false);
   });
 
+  it('reports a requested null for a nullable store and releases waiters after a failure', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    setItemAsync.mockImplementationOnce(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<string | null>({
+      key: 'k',
+      defaultValue: null,
+      parse: raw => raw,
+      serialize: value => value ?? '',
+    });
+
+    store.set('chosen');
+    // A null target is a real choice ("auto"), not "nothing pending".
+    store.set(null);
+    expect(store.getRequested()).toBeNull();
+
+    writeGate.resolve(undefined);
+    await store.whenPersisted();
+    expect(store.get()).toBeNull();
+  });
+
+  it('releases whenPersisted() and drops a newer choice when the write fails', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    setItemAsync.mockImplementation(async (_key: string, value: string) => {
+      await writeGate.promise;
+      if (value === 'true') {
+        throw new Error('disk full');
+      }
+    });
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    store.set(true);
+    // A choice made while the failing write is in flight is dropped with it.
+    store.set(false);
+
+    writeGate.resolve(undefined);
+    await store.whenPersisted();
+
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(store.get()).toBe(false);
+    expect(store.getRequested()).toBe(false);
+  });
+
   it('lets a set() before the initial load resolves win over the disk value', async () => {
     getItemAsync.mockResolvedValue('true');
     const store = createSecureStorePreference<boolean>({

@@ -85,8 +85,20 @@ export function createSecureStorePreference<T>(options: {
    * The newest value the app has asked for: the queued target, the target being
    * written, or the durable value. Relative edits (a list add, a switch flip)
    * start from this so two changes in one frame both survive.
+   *
+   * `undefined` is the "nothing pending" marker, compared explicitly: a store
+   * whose value is nullable (`string | null`, the voice-input language "auto")
+   * must report a requested `null` instead of falling through to the old value.
    */
-  const currentRequested = (): T => requested ?? inFlight ?? value;
+  const currentRequested = (): T => {
+    if (requested !== undefined) {
+      return requested;
+    }
+    if (inFlight !== undefined) {
+      return inFlight;
+    }
+    return value;
+  };
 
   const releaseDrainWaiters = () => {
     if (writing || requested !== undefined) {
@@ -130,8 +142,12 @@ export function createSecureStorePreference<T>(options: {
           await setAccountMetadata(key, serialize(target));
         } catch {
           inFlight = undefined;
+          // Drop every pending choice, including one that arrived while this
+          // write was in flight: the disk just refused, so retrying the newest
+          // one here would only repeat the toast and could reorder choices.
           // The stored value stays the last one that landed, so the app keeps
           // showing it: the toast is the only claim the new choice failed.
+          requested = undefined;
           toast.error(i18n.t('common.couldNotSaveSetting'));
           if (!loadSettled && !cleared) {
             // Nothing of the user's is pending any more; let the in-flight

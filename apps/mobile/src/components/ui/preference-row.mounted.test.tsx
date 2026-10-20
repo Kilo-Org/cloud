@@ -35,6 +35,7 @@ function renderRow(props: {
   value: boolean;
   disabled?: boolean;
   onValueChange: (next: boolean) => void;
+  resolveValue?: () => boolean;
 }) {
   act(() => {
     const element = createElement(PreferenceRow, {
@@ -100,6 +101,35 @@ describe('PreferenceRow', () => {
     expect(seen).toEqual([false]);
     expect(toggle.props.accessibilityLabel).toBeUndefined();
     expect(toggle.props.accessible).toBe(false);
+  });
+
+  it('flips the newest requested value, not the rendered one, on either control', () => {
+    // The rendered value lags a store write. Three presses in a row must each
+    // flip what the last one asked for, whichever control receives them.
+    let requested = false;
+    const seen: boolean[] = [];
+    const root = renderRow({
+      value: false,
+      resolveValue: () => requested,
+      onValueChange: next => {
+        seen.push(next);
+        requested = next;
+      },
+    });
+    const label = root.find(
+      node =>
+        Object.is(node.type, 'Pressable') &&
+        node.props.accessibilityLabel === 'Let Kilo change app settings'
+    );
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+
+    act(() => {
+      (label.props.onPress as () => void)();
+      (toggle.props.onValueChange as (next: boolean) => void)(false);
+      (label.props.onPress as () => void)();
+    });
+
+    expect(seen).toEqual([true, false, true]);
   });
 
   it('names only the pressable, so a tap on the title is one control not two', () => {

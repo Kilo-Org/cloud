@@ -1446,6 +1446,7 @@
       "loading": "Inapakia kumbukumbu ya ukaguzi",
       "couldNotLoad": "Imeshindikana kupakia kumbukumbu ya ukaguzi.",
       "off": "Kumbukumbu ya ukaguzi imezimwa.",
+      "on": "Kumbukumbu ya ukaguzi imewashwa.",
       "offDescription": "Iwashe ili Kilo ijifunze kutoka kwa majibu ya watunzaji wa mradi na ipendekeze mwongozo wa REVIEW.md.",
       "readOnlyDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuwasha kumbukumbu ya ukaguzi.",
       "enable": "Washa kumbukumbu ya ukaguzi",

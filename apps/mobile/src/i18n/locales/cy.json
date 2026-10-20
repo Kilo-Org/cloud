@@ -1522,6 +1522,7 @@
       "loading": "Llwytho cof adolygu",
       "couldNotLoad": "Ni ellid llwytho'r cof adolygu.",
       "off": "Mae'r cof adolygu wedi'i ddiffodd.",
+      "on": "Mae'r cof adolygu wedi'i actifadu.",
       "offDescription": "Trowch ef ymlaen i alluogi Kilo i ddysgu o ymatebion y cynhalwyr ac awgrymu canllawiau ar gyfer REVIEW.md.",
       "readOnlyDescription": "Dim ond perchnogion y sefydliad a rheolwyr bilio sy'n gallu galluogi'r cof adolygu.",
       "enable": "Galluogi cof adolygu",

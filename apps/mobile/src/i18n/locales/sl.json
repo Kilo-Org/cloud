@@ -1484,6 +1484,7 @@
       "loading": "Nalaganje pomnjenja pregledov",
       "couldNotLoad": "Pomnjenja pregledov ni bilo mogoče naložiti.",
       "off": "Pomnjenje pregledov je izklopljeno.",
+      "on": "Pomnjenje pregledov je vklopljeno.",
       "offDescription": "Vklopi ga, da se Kilo uči iz odgovorov vzdrževalcev in predlaga smernice za datoteko REVIEW.md.",
       "readOnlyDescription": "Pomnjenje pregledov lahko omogočijo samo lastniki organizacije in upravitelji obračunavanja.",
       "enable": "Omogoči pomnjenje pregledov",

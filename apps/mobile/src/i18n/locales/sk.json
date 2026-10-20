@@ -1484,6 +1484,7 @@
       "loading": "Načítava sa pamäť kontrol",
       "couldNotLoad": "Pamäť kontrol sa nepodarilo načítať.",
       "off": "Pamäť kontrol je vypnutá.",
+      "on": "Pamäť kontrol je zapnutá.",
       "offDescription": "Zapnite ju, aby sa Kilo mohlo učiť z odpovedí správcov a navrhovať pokyny do súboru REVIEW.md.",
       "readOnlyDescription": "Pamäť kontrol môžu zapnúť iba vlastníci organizácie a správcovia fakturácie.",
       "enable": "Zapnúť pamäť kontrol",

@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Switch, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
@@ -20,6 +20,8 @@ import { useTRPC } from '@/lib/trpc';
 
 const PAGE_SIZE = 20;
 
+const listStyle = { flex: 1 } satisfies ViewStyle;
+
 // Review memory only exists for GitHub, so the owner input pins the platform
 // and only varies the scope segment (personal vs. an organization id).
 function reviewMemoryOwnerInput(scope: string) {
@@ -36,7 +38,12 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const permission = useReviewerPermission(scope);
 
   const summaryQuery = useQuery(trpc.reviewMemory.getDashboardSummary.queryOptions(ownerInput));
-  const enabled = summaryQuery.data?.enabled === true;
+  const setEnabled = useSetReviewMemoryEnabled(scope);
+  // `setEnabled` returns the enabled value it stored, so a settled toggle shows
+  // immediately; the hook still invalidates the summary query, whose value
+  // takes over on the next render.
+  const summaryEnabled = summaryQuery.data?.enabled === true;
+  const enabled = setEnabled.data?.enabled ?? summaryEnabled;
 
   const proposalsQuery = useInfiniteQuery(
     trpc.reviewMemory.listProposalsPage.infiniteQueryOptions(
@@ -47,8 +54,6 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
       }
     )
   );
-
-  const setEnabled = useSetReviewMemoryEnabled(scope);
 
   const proposals = useMemo(
     () => (proposalsQuery.data?.pages ?? []).flatMap(page => page.proposals),
@@ -62,7 +67,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
   const summaryLoading = summaryQuery.isPending;
   const summaryError = summaryQuery.isError && !summaryQuery.data;
-  const disabled = summaryQuery.data != null && !summaryQuery.data.enabled;
+  const disabled = summaryQuery.data != null && !enabled;
   const proposalsLoading = enabled && proposalsQuery.isPending;
   const empty = enabled && !proposalsLoading && !firstPageError && proposals.length === 0;
   const happy = enabled && !proposalsLoading && !firstPageError && proposals.length > 0;
@@ -169,6 +174,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     body = (
       <FlashList
         data={proposals}
+        style={listStyle}
         keyExtractor={proposal => proposal.id}
         renderItem={({ item }) => (
           <View className="border-b-[0.5px] border-hair-soft px-6 py-3">
@@ -197,6 +203,30 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         title={t('codeReviewer.reviewMemory.title')}
         eyebrow={t('common.codeReviewer')}
       />
+      {enabled ? (
+        <View className="px-6 pt-4">
+          <View className="rounded-lg bg-secondary p-4">
+            <View className="flex-row items-center justify-between">
+              <Text className="flex-1 pr-3 text-sm font-medium">
+                {t('codeReviewer.reviewMemory.on')}
+              </Text>
+              <Switch
+                accessibilityLabel={t('codeReviewer.reviewMemory.title')}
+                value={enabled}
+                disabled={readOnly || setEnabled.isPending}
+                onValueChange={value => {
+                  setEnabled.mutate(value);
+                }}
+              />
+            </View>
+            {readOnly ? (
+              <Text variant="muted" className="mt-2 text-xs">
+                {t('codeReviewer.reviewMemory.readOnlyDescription')}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
       {body}
     </View>
   );

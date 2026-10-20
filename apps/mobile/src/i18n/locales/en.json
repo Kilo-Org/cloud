@@ -1510,6 +1510,7 @@
       "loading": "Loading review memory",
       "couldNotLoad": "Could not load review memory",
       "off": "Review memory is off",
+      "on": "Review memory is on",
       "offDescription": "Turn it on to let Kilo learn from maintainer replies and propose REVIEW.md guidance.",
       "readOnlyDescription": "Only organization owners and billing managers can enable review memory.",
       "enable": "Enable review memory",

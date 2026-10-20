@@ -1446,6 +1446,7 @@
       "loading": "Ko'rib chiqish xotirasi yuklanmoqda",
       "couldNotLoad": "Ko'rib chiqish xotirasini yuklab bo'lmadi.",
       "off": "Ko'rib chiqish xotirasi o'chiq.",
+      "on": "Ko'rib chiqish xotirasi yoniq.",
       "offDescription": "Kilo loyiha mas'ullarining javoblaridan o'rganishi va REVIEW.md uchun ko'rsatmalar taklif qilishi uchun bu funksiyani yoqing.",
       "readOnlyDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari ko'rib chiqish xotirasini yoqishi mumkin.",
       "enable": "Ko'rib chiqish xotirasini yoqish",

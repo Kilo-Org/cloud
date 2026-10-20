@@ -1446,6 +1446,7 @@
       "loading": "Na-ebudata ebe nchekwa nyocha",
       "couldNotLoad": "Enweghị ike ibudata ebe nchekwa nyocha.",
       "off": "A gbanyụrụ ebe nchekwa nyocha.",
+      "on": "A gbanyere ebe nchekwa nyocha n'ọnụ.",
       "offDescription": "Gbanye ya ka Kilo mụta site na nzaghachi ndị na-elekọta wee tụọ aro nduzi REVIEW.md.",
       "readOnlyDescription": "Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ịgbanye ebe nchekwa nyocha.",
       "enable": "Gbanye ebe nchekwa nyocha",

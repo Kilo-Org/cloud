@@ -987,6 +987,7 @@
       "noProposals": "Keine Vorschläge",
       "noProposalsDescription": "Hier erscheinen Vorschläge aus dem Review-Speicher, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
       "off": "Der Review-Speicher ist deaktiviert.",
+      "on": "Der Review-Speicher ist aktiviert.",
       "offDescription": "Aktiviere ihn, damit Kilo aus Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
       "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können den Review-Speicher aktivieren.",
       "title": "Gespeicherte Prüfhinweise"

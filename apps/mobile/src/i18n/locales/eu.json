@@ -1446,6 +1446,7 @@
       "loading": "Berrikuspen-memoria kargatzen",
       "couldNotLoad": "Ezin izan da berrikuspen-memoria kargatu.",
       "off": "Berrikuspen-memoria desgaituta dago.",
+      "on": "Berrikuspen-memoria gaituta dago.",
       "offDescription": "Gaitu aukera hau Kilok mantentzaileen erantzunetatik ikas dezan eta REVIEW.md fitxategirako jarraibideak proposa ditzan.",
       "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik gaitu dezakete berrikuspen-memoria.",
       "enable": "Gaitu berrikuspen-memoria",

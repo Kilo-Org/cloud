@@ -1446,6 +1446,7 @@
       "loading": "Läser in granskningsminne",
       "couldNotLoad": "Kunde inte läsa in granskningsminnet.",
       "off": "Granskningsminnet är avstängt.",
+      "on": "Granskningsminnet är påslaget.",
       "offDescription": "Aktivera det så att Kilo kan lära sig av de projektansvarigas svar och föreslå riktlinjer för REVIEW.md.",
       "readOnlyDescription": "Endast organisationsägare och faktureringsansvariga kan aktivera granskningsminne.",
       "enable": "Aktivera granskningsminne",

@@ -1446,6 +1446,7 @@
       "loading": "Indlæser hukommelse for gennemgange",
       "couldNotLoad": "Hukommelsen for gennemgange kunne ikke indlæses.",
       "off": "Hukommelsen for gennemgange er slået fra.",
+      "on": "Hukommelsen for gennemgange er slået til.",
       "offDescription": "Slå den til, så Kilo kan lære af svar fra de vedligeholdelsesansvarlige og foreslå retningslinjer til REVIEW.md.",
       "readOnlyDescription": "Kun organisationsejere og faktureringsadministratorer kan aktivere hukommelsen for gennemgange.",
       "enable": "Aktivér hukommelse for gennemgange",

@@ -35,6 +35,7 @@ const proposals = vi.hoisted(() => ({
 
 const setEnabled = vi.hoisted(() => ({
   isPending: false,
+  data: undefined as unknown,
   mutate: vi.fn(),
 }));
 
@@ -49,6 +50,15 @@ const queryErrors = vi.hoisted(() => ({
 
 const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void; accessibilityLabel?: string }[],
+}));
+
+const switches = vi.hoisted(() => ({
+  rendered: [] as {
+    value?: boolean;
+    disabled?: boolean;
+    accessibilityLabel?: string;
+    onValueChange?: (value: boolean) => void;
+  }[],
 }));
 
 const flashList = vi.hoisted(() => ({
@@ -100,6 +110,15 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  Switch: (props: {
+    value?: boolean;
+    disabled?: boolean;
+    accessibilityLabel?: string;
+    onValueChange?: (value: boolean) => void;
+  }) => {
+    switches.rendered.push(props);
+    return 'Switch';
+  },
 }));
 
 vi.mock('@shopify/flash-list', () => ({
@@ -181,11 +200,13 @@ beforeEach(() => {
   proposals.refetch.mockClear();
   proposals.fetchNextPage.mockClear();
   setEnabled.isPending = false;
+  setEnabled.data = undefined;
   setEnabled.mutate.mockClear();
   permission.status = 'ready';
   permission.canEdit = false;
   queryErrors.errors = [];
   buttons.rendered = [];
+  switches.rendered = [];
   flashList.onEndReached = null;
 });
 
@@ -275,6 +296,69 @@ describe('ReviewMemoryScreen feature disabled', () => {
       );
     }
   );
+});
+
+describe('ReviewMemoryScreen enabled state', () => {
+  it('shows the on state with a switch and keeps the empty proposals state below it', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = true;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+
+    const renderer = renderScreen();
+
+    const texts = collectText(renderer.toJSON());
+    expect(texts).toContain('Review memory is on');
+    expect(texts).toContain('EMPTY:No proposals');
+    expect(switches.rendered).toHaveLength(1);
+    expect(switches.rendered[0]?.value).toBe(true);
+    expect(switches.rendered[0]?.disabled).toBe(false);
+    act(() => {
+      switches.rendered[0]?.onValueChange?.(false);
+    });
+    expect(setEnabled.mutate).toHaveBeenCalledWith(false);
+  });
+
+  it('disables the switch while the mutation settles', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = true;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+    setEnabled.isPending = true;
+
+    renderScreen();
+
+    expect(switches.rendered[0]?.disabled).toBe(true);
+  });
+
+  it('keeps the control visible and inert for a reader who cannot edit', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = false;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+
+    const renderer = renderScreen();
+
+    expect(switches.rendered).toHaveLength(1);
+    expect(switches.rendered[0]?.disabled).toBe(true);
+    expect(collectText(renderer.toJSON())).toContain(
+      'Only organization owners and billing managers can enable review memory.'
+    );
+  });
+
+  it('returns to the off state once the settled mutation disables review memory', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = true;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+    setEnabled.data = { enabled: false };
+
+    const renderer = renderScreen();
+
+    const texts = collectText(renderer.toJSON());
+    expect(texts).toContain('Review memory is off');
+    expect(texts).not.toContain('Review memory is on');
+    expect(switches.rendered).toHaveLength(0);
+    expect(
+      buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
+    ).toBeDefined();
+  });
 });
 
 describe('ReviewMemoryScreen proposals', () => {

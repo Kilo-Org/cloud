@@ -1446,6 +1446,7 @@
       "loading": "Ladataan katselmointimuistia",
       "couldNotLoad": "Katselmointimuistia ei voitu ladata.",
       "off": "Katselmointimuisti on pois käytöstä.",
+      "on": "Katselmointimuisti on käytössä.",
       "offDescription": "Ota se käyttöön, jotta Kilo voi oppia ylläpitäjien vastauksista ja ehdottaa REVIEW.md-ohjeita.",
       "readOnlyDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat ottaa katselmointimuistin käyttöön.",
       "enable": "Ota katselmointimuisti käyttöön",

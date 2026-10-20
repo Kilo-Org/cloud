@@ -1446,6 +1446,7 @@
       "loading": "Sæki yfirferðarminni",
       "couldNotLoad": "Ekki tókst að sækja yfirferðarminni.",
       "off": "Slökkt er á yfirferðarminni.",
+      "on": "Kveikt er á yfirferðarminni.",
       "offDescription": "Kveiktu á því svo Kilo geti lært af svörum viðhaldsaðila og lagt til leiðbeiningar fyrir REVIEW.md.",
       "readOnlyDescription": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta virkjað yfirferðarminni.",
       "enable": "Virkja yfirferðarminni",

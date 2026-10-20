@@ -1446,6 +1446,7 @@
       "loading": "Ap chaje memwa revizyon an",
       "couldNotLoad": "Nou pa t ka chaje memwa revizyon an.",
       "off": "Memwa revizyon an dezaktive.",
+      "on": "Memwa revizyon an aktive.",
       "offDescription": "Aktive li pou Kilo aprann nan repons moun ki responsab antretyen kòd la epi pwopoze direktiv pou REVIEW.md.",
       "readOnlyDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka aktive memwa revizyon an.",
       "enable": "Aktive memwa revizyon an",

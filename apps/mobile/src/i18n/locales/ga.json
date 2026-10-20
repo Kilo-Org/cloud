@@ -1503,6 +1503,7 @@
       "loading": "Ag lódáil cuimhne athbhreithnithe",
       "couldNotLoad": "Níorbh fhéidir cuimhne athbhreithnithe a lódáil.",
       "off": "Tá cuimhne athbhreithnithe múchta.",
+      "on": "Tá cuimhne athbhreithnithe las.",
       "offDescription": "Cumasaigh í chun ligean do Kilo foghlaim ó fhreagraí na gcothaitheoirí agus treoir a mholadh do REVIEW.md.",
       "readOnlyDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála cuimhne athbhreithnithe a chumasú.",
       "enable": "Cumasaigh cuimhne athbhreithnithe",

@@ -993,6 +993,7 @@
       "noProposals": "Brak propozycji",
       "noProposalsDescription": "Propozycje z pamięci przeglądów pojawią się tutaj, gdy Kilo przeanalizuje odpowiedzi opiekunów repozytorium.",
       "off": "Pamięć przeglądów jest wyłączona.",
+      "on": "Pamięć przeglądów jest włączona.",
       "offDescription": "Włącz ją, aby Kilo uczyło się na podstawie odpowiedzi opiekunów repozytorium i proponowało wytyczne do pliku REVIEW.md.",
       "readOnlyDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą włączyć pamięć przeglądów.",
       "title": "Pamięć przeglądów"

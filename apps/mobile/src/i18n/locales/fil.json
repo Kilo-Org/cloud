@@ -1446,6 +1446,7 @@
       "loading": "Nilo-load ang memorya ng pagsusuri",
       "couldNotLoad": "Hindi ma-load ang memorya ng pagsusuri.",
       "off": "Hindi pinagana ang memorya ng pagsusuri.",
+      "on": "Pinagana ang memorya ng pagsusuri.",
       "offDescription": "Paganahin ito para matuto ang Kilo mula sa mga tugon ng tagapangalaga ng code at magmungkahi ng mga gabay para sa REVIEW.md.",
       "readOnlyDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magpagana ng memorya ng pagsusuri.",
       "enable": "Paganahin ang memorya ng pagsusuri",

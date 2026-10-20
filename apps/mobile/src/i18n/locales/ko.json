@@ -987,6 +987,7 @@
       "noProposals": "제안 없음",
       "noProposalsDescription": "Kilo가 유지보수 담당자의 답변을 분석하면 리뷰 메모리 제안이 여기에 표시됩니다.",
       "off": "리뷰 메모리가 꺼져 있습니다.",
+      "on": "리뷰 메모리가 켜져 있습니다.",
       "offDescription": "리뷰 메모리를 활성화하면 Kilo가 유지보수 담당자의 답변을 학습하여 REVIEW.md 지침을 제안합니다.",
       "readOnlyDescription": "조직 소유자와 결제 관리자만 리뷰 메모리를 활성화할 수 있습니다.",
       "title": "리뷰 메모리"

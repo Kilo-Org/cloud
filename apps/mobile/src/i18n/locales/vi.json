@@ -987,6 +987,7 @@
       "noProposals": "Không có đề xuất",
       "noProposalsDescription": "Các đề xuất từ bộ nhớ rà soát sẽ xuất hiện tại đây sau khi Kilo phân tích phản hồi của người bảo trì.",
       "off": "Bộ nhớ rà soát đang tắt.",
+      "on": "Bộ nhớ rà soát đang bật.",
       "offDescription": "Bật tính năng này để Kilo học từ phản hồi của người bảo trì và đề xuất hướng dẫn cho tệp REVIEW.md.",
       "readOnlyDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể bật bộ nhớ rà soát.",
       "title": "Bộ nhớ rà soát"

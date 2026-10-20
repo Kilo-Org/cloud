@@ -987,6 +987,7 @@
       "noProposals": "Geen voorstellen",
       "noProposalsDescription": "Hier verschijnen voorstellen uit het reviewgeheugen nadat Kilo antwoorden van beheerders heeft geanalyseerd.",
       "off": "Het reviewgeheugen is uitgeschakeld.",
+      "on": "Het reviewgeheugen is ingeschakeld.",
       "offDescription": "Schakel het reviewgeheugen in zodat Kilo leert van antwoorden van beheerders en richtlijnen voor REVIEW.md voorstelt.",
       "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen reviewgeheugen inschakelen.",
       "title": "Geheugen voor beoordelingen"

@@ -1503,6 +1503,7 @@
       "loading": "Qed titgħabba l-memorja tar-reviżjoni",
       "couldNotLoad": "Ma setgħetx titgħabba l-memorja tar-reviżjoni.",
       "off": "Il-memorja tar-reviżjoni hija diżattivata.",
+      "on": "Il-memorja tar-reviżjoni hija attivata.",
       "offDescription": "Attivaha biex Kilo jitgħallem mit-tweġibiet tal-manutenturi u jipproponi linji gwida għal REVIEW.md.",
       "readOnlyDescription": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jattivaw il-memorja tar-reviżjoni.",
       "enable": "Attiva l-memorja tar-reviżjoni",

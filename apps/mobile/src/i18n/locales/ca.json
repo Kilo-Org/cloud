@@ -1465,6 +1465,7 @@
       "loading": "S'està carregant la memòria de revisió",
       "couldNotLoad": "No s'ha pogut carregar la memòria de revisió.",
       "off": "La memòria de revisió està desactivada.",
+      "on": "La memòria de revisió està activada.",
       "offDescription": "Activa-la perquè Kilo aprengui de les respostes dels mantenidors i proposi pautes per al fitxer REVIEW.md.",
       "readOnlyDescription": "Només els propietaris de l'organització i els gestors de facturació poden activar la memòria de revisió.",
       "enable": "Activa la memòria de revisió",

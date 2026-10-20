@@ -1,4 +1,6 @@
 import type * as DrizzleOrm from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('cloudflare:workers', () => ({
@@ -27,6 +29,7 @@ vi.mock('drizzle-orm', async importOriginal => {
     desc: vi.fn(actual.desc),
     gte: vi.fn(actual.gte),
     isNotNull: vi.fn(actual.isNotNull),
+    lt: vi.fn(actual.lt),
     or: vi.fn(actual.or),
   };
 });
@@ -54,10 +57,13 @@ import {
   cli_sessions_v2,
   cloud_agent_worktrees,
   organization_memberships,
+  organizations,
 } from '@kilocode/db/schema';
 import {
+  decodeCloudAgentRootSessionsCursor,
   decodeKiloSdkMessagesCursor,
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+  encodeCloudAgentRootSessionsCursor,
   encodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   cloudAgentWorktreeIdSchema,
@@ -65,7 +71,7 @@ import {
   partIdSchema,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
-import { desc, gte, isNotNull, or } from 'drizzle-orm';
+import { desc, gte, isNotNull, lt, or } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
@@ -104,17 +110,27 @@ const sdkStoredMessageFixture = { info: sdkUserMessageFixture, parts: [sdkTextPa
 type MappingRow = {
   kiloSessionId?: string;
   cloudAgentSessionId?: string | null;
+  userId?: string;
+  organizationId?: string | null;
   title?: string | null;
+  gitUrl?: string | null;
+  gitBranch?: string | null;
+  profileId?: string | null;
+  createdOnPlatform?: string;
   createdAt?: string;
   updatedAt?: string;
 };
 
 function makeDbFakes(rows: MappingRow[]) {
   const selectResult = vi.fn(async () => rows);
+  let whereCondition: SQL | undefined;
   const select = {
     from: vi.fn(() => select),
     leftJoin: vi.fn(() => select),
-    where: vi.fn(() => select),
+    where: vi.fn((condition: SQL) => {
+      whereCondition = condition;
+      return select;
+    }),
     orderBy: vi.fn(() => select),
     limit: vi.fn(() => select),
     then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
@@ -122,7 +138,7 @@ function makeDbFakes(rows: MappingRow[]) {
   const db = {
     select: vi.fn(() => select),
   };
-  return { db, select, selectResult };
+  return { db, select, selectResult, whereCondition: () => whereCondition };
 }
 
 function makeRpc(db: ReturnType<typeof makeDbFakes>['db']) {
@@ -2698,93 +2714,200 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
     vi.resetAllMocks();
   });
 
-  it('returns mapped root summaries in database order without opening session DOs', async () => {
+  it('returns a stable page for equal timestamps without opening session DOs', async () => {
     const secondSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
     const createdAt = '2026-05-27 20:53:24.190157+00';
     const updatedAt = '2026-05-28 09:13:37.651263+00';
+    const thirdSessionId = 'ses_00000000000000000000000000';
     const { db, select } = makeDbFakes([
       {
         kiloSessionId: secondSessionId,
         cloudAgentSessionId: 'agent_same_time_b',
+        userId: 'usr_owner',
+        organizationId: null,
         title: 'Second',
+        gitUrl: 'https://token:secret@github.com/acme/repo.git?token=secret#readme',
+        gitBranch: 'feature/equal-timestamps',
+        profileId: '11111111-1111-4111-8111-111111111111',
+        createdOnPlatform: 'cloud-agent-web',
         createdAt,
         updatedAt,
       },
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_same_time_a',
+        userId: 'usr_owner',
+        organizationId: '22222222-2222-4222-8222-222222222222',
         title: 'First',
+        gitUrl: null,
+        gitBranch: null,
+        profileId: null,
+        createdOnPlatform: 'cloud-agent-desktop',
+        createdAt,
+        updatedAt,
+      },
+      {
+        kiloSessionId: thirdSessionId,
+        cloudAgentSessionId: 'agent_same_time_0',
+        userId: 'usr_owner',
+        organizationId: null,
+        title: 'Overflow sentinel',
+        gitUrl: null,
+        gitBranch: null,
+        profileId: null,
+        createdOnPlatform: 'cloud-agent-web',
         createdAt,
         updatedAt,
       },
     ]);
     const rpc = makeRpc(db);
 
-    await expect(
-      rpc.listCloudAgentRootSessions({
-        kiloUserId: 'usr_owner',
-        start: 1761000000000,
-        limit: 2,
-      })
-    ).resolves.toEqual([
+    const page = await rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', limit: 2 });
+
+    expect(page.items).toEqual([
       {
         kiloSessionId: secondSessionId,
         cloudAgentSessionId: 'agent_same_time_b',
+        userId: 'usr_owner',
+        organizationId: null,
         title: 'Second',
+        gitUrl: 'https://github.com/acme/repo.git',
+        gitBranch: 'feature/equal-timestamps',
+        profileId: '11111111-1111-4111-8111-111111111111',
+        createdOnPlatform: 'cloud-agent-web',
         created: new Date(createdAt).getTime(),
         updated: new Date(updatedAt).getTime(),
       },
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_same_time_a',
+        userId: 'usr_owner',
+        organizationId: '22222222-2222-4222-8222-222222222222',
         title: 'First',
+        gitUrl: null,
+        gitBranch: null,
+        profileId: null,
+        createdOnPlatform: 'cloud-agent-desktop',
         created: new Date(createdAt).getTime(),
         updated: new Date(updatedAt).getTime(),
       },
     ]);
+    expect(page.nextCursor).not.toBeNull();
+    expect(decodeCloudAgentRootSessionsCursor(page.nextCursor!)).toEqual({
+      version: 1,
+      updatedAt,
+      sessionId: sdkSessionInfoFixture.id,
+    });
     expect(getSessionIngestDO).not.toHaveBeenCalled();
     expect(select.leftJoin).toHaveBeenCalledWith(organization_memberships, expect.anything());
+    expect(select.leftJoin).toHaveBeenCalledWith(organizations, expect.anything());
     expect(or).toHaveBeenCalled();
     expect(isNotNull).toHaveBeenCalledWith(cli_sessions_v2.cloud_agent_session_id);
-    expect(gte).toHaveBeenCalledWith(
-      cli_sessions_v2.updated_at,
-      new Date(1761000000000).toISOString()
-    );
     expect(desc).toHaveBeenNthCalledWith(1, cli_sessions_v2.updated_at);
     expect(desc).toHaveBeenNthCalledWith(2, cli_sessions_v2.session_id);
     expect(select.orderBy).toHaveBeenCalled();
-    expect(select.limit).toHaveBeenCalledWith(2);
+    expect(select.limit).toHaveBeenCalledWith(3);
   });
 
-  it('returns mapped roots without requiring a materialized SDK snapshot and bounds titles', async () => {
+  it('uses the descending timestamp and session ID continuation predicate', async () => {
+    const updatedAt = '2026-05-28 09:13:37.651263+00';
+    const cursor = encodeCloudAgentRootSessionsCursor({
+      updatedAt,
+      sessionId: sdkSessionInfoFixture.id,
+    });
+    const { db, whereCondition } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+
+    await rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', cursor, limit: 10 });
+
+    expect(lt).toHaveBeenCalledWith(cli_sessions_v2.updated_at, updatedAt);
+    expect(lt).toHaveBeenCalledWith(cli_sessions_v2.session_id, sdkSessionInfoFixture.id);
+    const condition = whereCondition();
+    expect(condition).toBeDefined();
+    const query = new PgDialect().sqlToQuery(condition!);
+    expect(query.sql).toContain('"cli_sessions_v2"."updated_at" < $');
+    expect(query.sql).toContain('"cli_sessions_v2"."updated_at" = $');
+    expect(query.sql).toContain('"cli_sessions_v2"."session_id" < $');
+    expect(query.params).toEqual(
+      expect.arrayContaining(['usr_owner', updatedAt, sdkSessionInfoFixture.id])
+    );
+  });
+
+  it('includes personal and current organizations while excluding revoked and deleted organizations', async () => {
+    const { db, whereCondition } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+
+    await rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner' });
+
+    const condition = whereCondition();
+    expect(condition).toBeDefined();
+    const query = new PgDialect().sqlToQuery(condition!);
+    expect(query.sql).toContain('"cli_sessions_v2"."organization_id" is null');
+    expect(query.sql).toContain('"organization_memberships"."id" is not null');
+    expect(query.sql).toContain('"organizations"."deleted_at" is null');
+    expect(query.params).toContain('usr_owner');
+  });
+
+  it('returns mapped roots without requiring a materialized SDK snapshot and bounds fields', async () => {
     const timestamp = '2026-05-28 09:13:37.651263+00';
     const longTitle = 'x'.repeat(600);
     const { db } = makeDbFakes([
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_org_root',
+        userId: 'usr_owner',
+        organizationId: null,
         title: longTitle,
+        gitUrl: 'not a repository URL with token=secret',
+        gitBranch: 'bad\nbranch',
+        profileId: null,
+        createdOnPlatform: 'cloud-agent-web',
         createdAt: timestamp,
         updatedAt: timestamp,
       },
     ]);
     const rpc = makeRpc(db);
 
-    await expect(rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner' })).resolves.toEqual([
-      {
-        kiloSessionId: sdkSessionInfoFixture.id,
-        cloudAgentSessionId: 'agent_org_root',
-        title: longTitle.slice(0, 512),
-        created: new Date(timestamp).getTime(),
-        updated: new Date(timestamp).getTime(),
-      },
-    ]);
+    await expect(rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner' })).resolves.toEqual({
+      items: [
+        {
+          kiloSessionId: sdkSessionInfoFixture.id,
+          cloudAgentSessionId: 'agent_org_root',
+          userId: 'usr_owner',
+          organizationId: null,
+          title: longTitle.slice(0, 512),
+          gitUrl: null,
+          gitBranch: null,
+          profileId: null,
+          createdOnPlatform: 'cloud-agent-web',
+          created: new Date(timestamp).getTime(),
+          updated: new Date(timestamp).getTime(),
+        },
+      ],
+      nextCursor: null,
+    });
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
-  it('rejects unsafe list bounds before querying root mappings', async () => {
+  it('keeps the legacy start lower bound for compatible callers', async () => {
     const { db } = makeDbFakes([]);
     const rpc = makeRpc(db);
+
+    await rpc.listCloudAgentRootSessions({
+      kiloUserId: 'usr_owner',
+      start: 1761000000000,
+    });
+
+    expect(gte).toHaveBeenCalledWith(
+      cli_sessions_v2.updated_at,
+      new Date(1761000000000).toISOString()
+    );
+  });
+
+  it('rejects unsafe list bounds and cursors before querying root mappings', async () => {
+    const { db } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+    vi.mocked(getWorkerDb).mockClear();
 
     await expect(
       rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', limit: 0 })
@@ -2792,7 +2915,24 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
     await expect(
       rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', limit: 101 })
     ).rejects.toThrow();
+    await expect(
+      rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', cursor: 'eyJzcWwiOiJkcm9wIn0' })
+    ).rejects.toThrow();
+    await expect(
+      rpc.listCloudAgentRootSessions({
+        kiloUserId: 'usr_owner',
+        cursor: btoa(
+          JSON.stringify({
+            version: 1,
+            updatedAt: '2026-05-28T09:13:37.651Z',
+            sessionId: sdkSessionInfoFixture.id,
+            sql: 'arbitrary content',
+          })
+        ).replace(/=+$/g, ''),
+      })
+    ).rejects.toThrow();
     expect(db.select).not.toHaveBeenCalled();
+    expect(getWorkerDb).not.toHaveBeenCalled();
   });
 });
 

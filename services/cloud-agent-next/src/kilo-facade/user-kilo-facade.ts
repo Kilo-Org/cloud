@@ -1247,11 +1247,17 @@ async function groupedPendingSessionDetailResponse(params: {
     projectPublicListedSession({
       kiloSessionId: ownership.kiloSessionId,
       cloudAgentSessionId: params.cloudAgentSessionId,
+      userId: ownership.userId,
+      organizationId: ownership.organizationId,
       title:
         (ownership.title ?? publicRepositoryTitle(ownership.repositoryUrl))?.slice(
           0,
           MAX_PUBLIC_SESSION_TITLE_CHARACTERS
         ) ?? null,
+      gitUrl: ownership.repositoryUrl,
+      gitBranch: null,
+      profileId: null,
+      createdOnPlatform: 'unknown',
       created,
       updated,
     })
@@ -1629,7 +1635,7 @@ export async function handleKiloFacadeRequest(params: {
       ...query,
       kiloUserId: userId,
     });
-    return Response.json(sessions.map(projectPublicListedSession));
+    return Response.json(sessions.items.map(projectPublicListedSession));
   }
 
   if (

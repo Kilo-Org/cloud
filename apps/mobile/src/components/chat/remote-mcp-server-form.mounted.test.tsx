@@ -276,4 +276,29 @@ describe('the remote MCP server form', () => {
     await type(2, 'secret2');
     expect(dirty.at(-1)).toBe(true);
   });
+
+  it('drops a bearer token from the dirty check when an OAuth server is left selected', async () => {
+    const dirty: boolean[] = [];
+    await mount({
+      server: {
+        id: 'remote',
+        name: 'Remote',
+        url: 'https://remote.example/mcp',
+        auth: { type: 'oauth' },
+        enabled: true,
+      },
+      onSave,
+      onDirtyChange: value => {
+        dirty.push(value);
+      },
+    });
+
+    // A bearer token typed on the way past must not outlive the bearer method.
+    await choose('bearer');
+    await type(2, 'secret-token');
+    expect(dirty.at(-1)).toBe(true);
+
+    await choose('oauth');
+    expect(dirty.at(-1)).toBe(false);
+  });
 });

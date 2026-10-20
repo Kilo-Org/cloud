@@ -1,5 +1,11 @@
 import { type Ref, useEffect, useRef } from 'react';
-import { Platform, ScrollView, type ScrollViewProps, View } from 'react-native';
+import {
+  Platform,
+  ScrollView,
+  type ScrollViewInstance,
+  type ScrollViewProps,
+  View,
+} from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
@@ -32,7 +38,7 @@ export function TabScreenScrollView({
   ref,
   ...props
 }: ScrollViewProps & {
-  ref?: Ref<ScrollView>;
+  ref?: Ref<ScrollViewInstance>;
   /**
    * Reports the IME occlusion this scroll view reserves, `0` while the keyboard
    * is down. A caller that must reveal its own pinned bottom action once the

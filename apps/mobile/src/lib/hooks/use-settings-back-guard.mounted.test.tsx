@@ -13,14 +13,21 @@ type Action = { type: string };
 
 const usePreventRemoveHolder = vi.hoisted(() => ({
   preventRemove: undefined as boolean | undefined,
-  callback: undefined as ((options: { data: { action: Action } }) => void) | undefined,
+  callback: undefined as
+    | ((options: { data: { action: Action }; repeat: () => void }) => void)
+    | undefined,
 }));
 
 const usePreventRemoveMock = vi.hoisted(() =>
-  vi.fn((preventRemove: boolean, handler: (options: { data: { action: Action } }) => void) => {
-    usePreventRemoveHolder.preventRemove = preventRemove;
-    usePreventRemoveHolder.callback = handler;
-  })
+  vi.fn(
+    (
+      preventRemove: boolean,
+      handler: (options: { data: { action: Action }; repeat: () => void }) => void
+    ) => {
+      usePreventRemoveHolder.preventRemove = preventRemove;
+      usePreventRemoveHolder.callback = handler;
+    }
+  )
 );
 
 // The guard builds its confirmation through the real `useConfirmDialog`, so the
@@ -46,9 +53,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ dispatch: dispatchMock, goBack: goBackMock }),
   useRouter: () => ({}),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: usePreventRemoveMock,
 }));
 
@@ -85,7 +89,12 @@ function mountGuard(dirty: boolean, valid: boolean, onSave: () => Promise<void>)
 function triggerPreventRemove(): Action {
   const action = { type: 'GO_BACK' };
   act(() => {
-    usePreventRemoveHolder.callback?.({ data: { action } });
+    usePreventRemoveHolder.callback?.({
+      data: { action },
+      repeat: () => {
+        dispatchMock(action);
+      },
+    });
   });
   return action;
 }
@@ -116,7 +125,7 @@ describe('useSettingsBackGuard', () => {
     latest = undefined;
   });
 
-  it('passes `dirty` alone as the preventRemove boolean', () => {
+  it('arms removal prevention only for a dirty screen', () => {
     const clean = mountGuard(false, true, noOpSave);
     expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
     expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(false);
@@ -141,6 +150,7 @@ describe('useSettingsBackGuard', () => {
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(dispatchMock).toHaveBeenCalledWith(action);
     expect(currentDialog()).toBeUndefined();
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
     // The bypass is one-shot: consumed on the removal it armed.
     expect(result.skipNextGuardRef.current).toBe(false);
 
@@ -207,6 +217,7 @@ describe('useSettingsBackGuard', () => {
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     // onSave must run before navigation (dispatch).
     expect(order).toEqual(['save', 'dispatch']);
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
     act(() => {
       renderer.unmount();
@@ -231,6 +242,7 @@ describe('useSettingsBackGuard', () => {
     expect(onSave).toHaveBeenCalledTimes(1);
     // The failed save must not navigate: the screen stays for a retry or discard.
     expect(dispatchMock).not.toHaveBeenCalled();
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
 
     act(() => {
       renderer.unmount();
@@ -249,6 +261,7 @@ describe('useSettingsBackGuard', () => {
     });
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(dispatchMock).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
     act(() => {
       renderer.unmount();
@@ -274,6 +287,7 @@ describe('useSettingsBackGuard', () => {
     expect(currentDialog()).toBeUndefined();
     expect(onSave).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
 
     act(() => {
       renderer.unmount();

@@ -10,6 +10,7 @@ import {
 import {
   type LayoutChangeEvent,
   ScrollView,
+  type ScrollViewInstance,
   type ScrollViewProps,
   type ViewProps,
 } from 'react-native';
@@ -24,7 +25,7 @@ import { EmptyState } from './empty-state';
 import { InvalidRouteState } from './invalid-route-state';
 import { QueryError } from './query-error';
 
-type ScrollNode = NonNullable<ReturnType<ScrollView['getNativeScrollRef']>>;
+type ScrollNode = ScrollViewInstance;
 type Measurement = Parameters<ScrollNode['measureInWindow']>[0];
 const native = vi.hoisted(() => {
   const surface: NonNullable<ReturnType<typeof useStateSurface>> = {
@@ -42,7 +43,7 @@ const native = vi.hoisted(() => {
   };
   const measureInWindow = vi.fn<(onMeasure: Measurement) => void>();
   const node: Partial<ScrollNode> = { measureInWindow };
-  const scroll: Partial<ScrollView> = { getNativeScrollRef: () => node as ScrollNode };
+  const scroll: Partial<ScrollViewInstance> = { getNativeScrollRef: () => node as ScrollNode };
   return {
     measurements: [] as Measurement[],
     surface,
@@ -62,7 +63,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
     const { ref, ...rest } = props;
-    useImperativeHandle(ref, () => native.scroll as ScrollView, []);
+    useImperativeHandle(ref, () => native.scroll as ScrollViewInstance, []);
     return createElement('ScrollView', rest);
   },
 }));
@@ -239,6 +240,22 @@ describe('CenteredState measurements', () => {
     }
   );
 
+  it('waits for finite native viewport bounds', async () => {
+    const mounted = await mount();
+    act(() => {
+      for (const onMeasure of native.measurements.splice(0)) {
+        onMeasure(0, Number.NaN, 400, Number.NaN);
+      }
+    });
+    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    act(() => {
+      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
+    });
+    mounted.settle();
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    mounted.unmount();
+  });
+
   it('rejects old viewport results after the surface changes', async () => {
     const mounted = await mount();
     mounted.settle();
@@ -285,7 +302,7 @@ describe('CenteredState measurements', () => {
     });
     expect(mounted.content().accessibilityElementsHidden).toBe(true);
     act(() => {
-      ref(native.scroll as ScrollView);
+      ref(native.scroll as ScrollViewInstance);
     });
     mounted.settle();
     expect(mounted.content().accessibilityElementsHidden).toBe(false);

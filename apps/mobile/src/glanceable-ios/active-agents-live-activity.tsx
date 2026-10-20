@@ -19,7 +19,11 @@ import {
   resizable,
   shapes,
 } from '@expo/ui/swift-ui/modifiers';
-import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
+import {
+  createLiveActivity,
+  type LiveActivityComponent,
+  type LiveActivityFactory,
+} from 'expo-widgets';
 
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
@@ -310,7 +314,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         foregroundStyle(tone.color),
         fixedSize({ horizontal: true, vertical: false }),
         padding({ horizontal: 14 }),
-        frame({ minWidth: width, height: 32 }),
+        frame({ minWidth: width }),
+        frame({ height: 32 }),
         background(tone.fill, shapes.capsule()),
       ]}
     >
@@ -626,17 +631,14 @@ const registerLayout = () =>
     OPEN_AGENTS_URL
   );
 
-export const ActiveAgentsLiveActivity = registerLayout();
+let activityFactory: LiveActivityFactory<ContentState> | null = null;
 
-/**
- * Re-bake the stored layout in the active language.
- *
- * Constructing the factory only writes the layout into the shared app group,
- * and the name identifies the native Live Activity type, so the fresh factory
- * is discarded and `ActiveAgentsLiveActivity` stays the handle. The app boots
- * in English and applies the stored language afterwards, so this runs once the
- * language settles as well as on every later change.
- */
+export function getActiveAgentsLiveActivity(): LiveActivityFactory<ContentState> {
+  activityFactory ??= registerLayout();
+  return activityFactory;
+}
+
+/** Re-bake the stored layout in the active language. */
 export function refreshActiveAgentsLiveActivityCopy(): void {
-  registerLayout();
+  activityFactory = registerLayout();
 }

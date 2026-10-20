@@ -11,6 +11,7 @@ import {
   type LayoutChangeEvent,
   PixelRatio,
   ScrollView,
+  type ScrollViewInstance,
   type ScrollViewProps,
   useWindowDimensions,
   View,
@@ -52,7 +53,7 @@ export function CenteredState({
   const frame = surface?.frame;
   const windowSize = useWindowDimensions();
   const shortBand = isShortViewport(windowSize.width, windowSize.height);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
@@ -89,7 +90,7 @@ export function CenteredState({
   }, [frame]);
 
   const capture = useCallback(
-    (node: ScrollView | null) => {
+    (node: ScrollViewInstance | null) => {
       scrollRef.current = node;
       measure();
     },

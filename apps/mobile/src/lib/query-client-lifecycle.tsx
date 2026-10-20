@@ -6,7 +6,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';
 
 type QueryClientLifecycleSources = {
-  getAppState: () => AppStateStatus;
+  getAppState: () => typeof AppState.currentState;
   onAppStateChange: (listener: (state: AppStateStatus) => void) => () => void;
   onConnectivityChange: (listener: (state: ConnectivityState) => void) => () => void;
 };

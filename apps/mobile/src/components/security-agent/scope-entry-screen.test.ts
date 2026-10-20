@@ -12,7 +12,9 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { ScopeEntryScreen } from './scope-entry-screen';
 import { SettingsOverviewScreen } from './settings-overview-screen';
 
-const transport = vi.hoisted(() => vi.fn<typeof fetch>());
+const transport = vi.hoisted(() =>
+  vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+);
 let permissionData = {
   hasIntegration: true,
   hasPermissions: true,
@@ -83,7 +85,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 function host(root: TestRenderer.ReactTestInstance, type: string) {
   return root.findAll(node => node.type === type);
 }
-function procedureFor(input: Parameters<typeof fetch>[0]) {
+function procedureFor(input: RequestInfo | URL) {
   return new URL(input instanceof Request ? input.url : input).pathname.split('.').at(-1) ?? '';
 }
 async function advanceBy() {

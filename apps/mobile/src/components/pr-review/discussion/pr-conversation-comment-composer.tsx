@@ -12,7 +12,14 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import {
+  BackHandler,
+  Keyboard,
+  ScrollView,
+  type ScrollViewInstance,
+  type TextInput,
+  View,
+} from 'react-native';
 import {
   ComposerInlineError,
   type ComposerInlineErrorKind,
@@ -85,7 +92,7 @@ export function PrConversationCommentComposer({
   // iOS uncontrolled: ref + defaultValue; no value+state.
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // Seed the refs from the settled draft once per identity/destination, during
   // render, before the body field mounts. Re-seeding on a key change (and

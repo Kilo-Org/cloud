@@ -7,9 +7,9 @@ import {
   authState,
   findConfigureRows,
   findNode,
-  flushInteractions,
+  flushIdle,
   getProfileAgentScopeMock,
-  interactionState,
+  idleState,
   keys,
   mountProfile,
   nodeCount,
@@ -20,7 +20,7 @@ import {
   signOutFn,
 } from '@/components/profile-screen.test-helpers';
 import { i18n } from '@/i18n';
-import { AFTER_INTERACTIONS_FALLBACK_MS } from '@/lib/hooks/use-after-interactions';
+import { AFTER_IDLE_FALLBACK_MS } from '@/lib/hooks/use-after-idle';
 import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
@@ -32,8 +32,8 @@ describe('ProfileScreen deferred queries', () => {
     signOutFn.mockReset();
     routerPush.mockReset();
     authState.token = 'token-1';
-    interactionState.storedCallback = undefined;
-    interactionState.cancel.mockReset();
+    idleState.storedCallback = undefined;
+    idleState.cancel.mockReset();
     getProfileAgentScopeMock.mockReset();
     getProfileAgentScopeMock.mockReturnValue('personal');
   });
@@ -52,7 +52,7 @@ describe('ProfileScreen deferred queries', () => {
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(3);
     expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[2]).toBe(true);
 
-    flushInteractions();
+    flushIdle();
 
     await waitFor(
       () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
@@ -84,7 +84,7 @@ describe('ProfileScreen deferred queries', () => {
     expect(providersQueryFn).not.toHaveBeenCalled();
     await advanceUntil(
       () => findConfigureRows(renderer.root, 'GitHub').length === 1,
-      AFTER_INTERACTIONS_FALLBACK_MS * 4
+      AFTER_IDLE_FALLBACK_MS * 4
     );
     vi.useRealTimers();
 
@@ -166,7 +166,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => findConfigureRows(renderer.root, 'GitHub').length === 1);
 
     const row = findConfigureRows(renderer.root, 'GitHub')[0];
@@ -196,7 +196,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
 
     const queryError = findNode(renderer.root, 'QueryError');
@@ -211,7 +211,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await act(async () => {
       await Promise.resolve();
     });
@@ -225,9 +225,9 @@ describe('ProfileScreen deferred queries', () => {
   it('cancels the interaction handle on unmount', async () => {
     const { unmount } = await mountProfile();
 
-    expect(interactionState.cancel).not.toHaveBeenCalled();
+    expect(idleState.cancel).not.toHaveBeenCalled();
     unmount();
-    expect(interactionState.cancel).toHaveBeenCalledTimes(1);
+    expect(idleState.cancel).toHaveBeenCalledTimes(1);
   });
 
   it('renders a cached providers error without the skeleton or a refire before the flush', async () => {
@@ -238,7 +238,7 @@ describe('ProfileScreen deferred queries', () => {
     const first = await mountProfile(queryClient);
 
     // Settle the first mount into the error state so the error is cached.
-    flushInteractions();
+    flushIdle();
     await waitFor(() => nodeCount(first.renderer.root, 'QueryError') > 0);
 
     // Unmount without clearing the cache (the harness `unmount` clears it).
@@ -285,7 +285,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(
       () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
     );

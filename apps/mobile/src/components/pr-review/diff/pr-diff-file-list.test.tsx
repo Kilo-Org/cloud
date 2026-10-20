@@ -224,7 +224,7 @@ describe('PrReviewFileList full-body states', () => {
     expect(listQueryState.query.refetch).toHaveBeenCalled();
   });
 
-  it.each([false, true])('refreshes the waiting body with fetching state %s', isFetching => {
+  it.each([false, true])('refreshes the waiting body with fetching state %s', async isFetching => {
     listQueryState.query.isFetching = isFetching;
     listQueryState.query.refetch.mockClear();
     const renderer = mountList();
@@ -237,8 +237,8 @@ describe('PrReviewFileList full-body states', () => {
         ['FlashList', 'ScrollView', 'CenteredState'].includes(String(node.type))
       )
     ).toHaveLength(0);
-    act(() => {
-      refreshControl.props.onRefresh?.();
+    await act(async () => {
+      await refreshControl.props.onRefresh?.();
     });
     expect(listQueryState.query.refetch).toHaveBeenCalledOnce();
   });

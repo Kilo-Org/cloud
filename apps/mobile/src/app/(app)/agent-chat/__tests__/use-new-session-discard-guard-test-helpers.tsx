@@ -28,14 +28,21 @@ type Action = { type: string };
 
 const usePreventRemoveHolder = vi.hoisted(() => ({
   preventRemove: undefined as boolean | undefined,
-  callback: undefined as ((options: { data: { action: Action } }) => void) | undefined,
+  callback: undefined as
+    | ((options: { data: { action: Action }; repeat: () => void }) => void)
+    | undefined,
 }));
 
 const usePreventRemoveMock = vi.hoisted(() =>
-  vi.fn((preventRemove: boolean, handler: (options: { data: { action: Action } }) => void) => {
-    usePreventRemoveHolder.preventRemove = preventRemove;
-    usePreventRemoveHolder.callback = handler;
-  })
+  vi.fn(
+    (
+      preventRemove: boolean,
+      handler: (options: { data: { action: Action }; repeat: () => void }) => void
+    ) => {
+      usePreventRemoveHolder.preventRemove = preventRemove;
+      usePreventRemoveHolder.callback = handler;
+    }
+  )
 );
 
 // The dialog the hook returns is rendered for real, so its primitives and the
@@ -76,10 +83,6 @@ vi.mock('sonner-native', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ dispatch: dispatchMock }),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: usePreventRemoveMock,
 }));
 
@@ -145,7 +148,12 @@ export function mountGuardWithAttachments() {
 /** Fires the captured leave outside `act`; the hook's handler runs synchronously. */
 export function triggerPreventRemove(): Action {
   const action = { type: 'GO_BACK' };
-  usePreventRemoveHolder.callback?.({ data: { action } });
+  usePreventRemoveHolder.callback?.({
+    data: { action },
+    repeat: () => {
+      dispatchMock(action);
+    },
+  });
   return action;
 }
 

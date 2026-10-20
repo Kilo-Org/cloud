@@ -22,7 +22,7 @@ const i18nManager = vi.hoisted(() => ({
   isRTL: false,
   forceRTL: vi.fn(),
 }));
-const navigation = vi.hoisted(() => ({ dispatch: vi.fn() }));
+const prevention = vi.hoisted(() => ({ enabled: false, disable: vi.fn() }));
 // FlashList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows.
 const flashListMock = vi.hoisted(
@@ -74,7 +74,10 @@ vi.mock('react-native', async () => {
 vi.mock('expo-router', async () => {
   const { useEffect } = await import('react');
   return {
-    useNavigation: () => navigation,
+    usePreventRemove: (enabled: boolean) => {
+      prevention.enabled = enabled;
+      return prevention.disable;
+    },
     // Run the focus effect once on mount, like react-navigation's first focus.
     useFocusEffect: (effect: () => void) => {
       // eslint-disable-next-line react-hooks/exhaustive-deps -- run the focus effect once on mount, like react-navigation's first focus
@@ -87,9 +90,6 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo', () => ({ reloadAppAsync }));
-vi.mock('@/lib/navigation/prevent-remove', () => ({
-  usePreventRemove: () => undefined,
-}));
 vi.mock('@/i18n/apply-language', async importOriginal => {
   const actual = await importOriginal<typeof ApplyLanguageModule>();
   return {
@@ -208,6 +208,8 @@ describe('LanguagePickerSheet apply', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     clearSearch.mockReset();
+    prevention.enabled = false;
+    prevention.disable.mockReset();
     setLanguagePreferenceAsync.mockReset();
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
@@ -309,6 +311,8 @@ describe('LanguagePickerSheet apply', () => {
     // default; the apply must re-register them in the new language.
     expect(registerNeedsInputCategories).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(prevention.enabled).toBe(false);
+    expect(prevention.disable).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -414,6 +418,8 @@ describe('LanguagePickerSheet apply', () => {
     expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
     expect(reloadAppAsync).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
+    expect(prevention.enabled).toBe(true);
+    expect(prevention.disable).not.toHaveBeenCalled();
 
     const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
     if (!failedSheet) {
@@ -427,6 +433,7 @@ describe('LanguagePickerSheet apply', () => {
       await Promise.resolve();
     });
     expect(reloadAppAsync).toHaveBeenCalledTimes(2);
+    expect(prevention.enabled).toBe(true);
 
     renderer.unmount();
   });

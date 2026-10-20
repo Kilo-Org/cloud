@@ -1,13 +1,12 @@
+/* eslint-disable promise/prefer-await-to-callbacks -- controls delivery of the native idle callback */
 import { createElement } from 'react';
 import { type QueryClient } from '@tanstack/react-query';
-import { vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfileScreen } from '@/components/profile-screen';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
-
-// ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const providersQueryFn = vi.hoisted(() => vi.fn());
 const organizationsQueryFn = vi.hoisted(() => vi.fn());
@@ -18,14 +17,13 @@ const keys = vi.hoisted(() => ({
   organizations: ['organizations', 'list'],
 }));
 const authState = vi.hoisted(() => ({ token: 'token-1' as string | null }));
-const interactionState = vi.hoisted(() => ({
+const idleState = vi.hoisted(() => ({
   storedCallback: undefined as (() => void) | undefined,
   cancel: vi.fn(),
 }));
-// eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock must capture the callback so the test can flush it
-const captureInteraction = vi.hoisted(() => (cb: () => void) => {
-  interactionState.storedCallback = cb;
-  return { cancel: interactionState.cancel };
+const captureIdle = vi.hoisted(() => (cb: () => void) => {
+  idleState.storedCallback = cb;
+  return 1;
 });
 const getProfileAgentScopeMock = vi.hoisted(() => vi.fn());
 const openExternalUrlFn = vi.hoisted(() => vi.fn());
@@ -33,7 +31,7 @@ const openExternalUrlFn = vi.hoisted(() => vi.fn());
 export {
   authState,
   getProfileAgentScopeMock,
-  interactionState,
+  idleState,
   keys,
   organizationsQueryFn,
   providersQueryFn,
@@ -44,10 +42,13 @@ export {
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   View: 'View',
-  InteractionManager: {
-    runAfterInteractions: vi.fn(captureInteraction),
-  },
 }));
+
+beforeEach(() => {
+  vi.stubGlobal('requestIdleCallback', captureIdle);
+  vi.stubGlobal('cancelIdleCallback', idleState.cancel);
+});
+afterEach(() => vi.unstubAllGlobals());
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -212,10 +213,10 @@ export async function mountProfile(queryClient?: QueryClient) {
   return result;
 }
 
-export function flushInteractions() {
-  const run = interactionState.storedCallback;
+export function flushIdle() {
+  const run = idleState.storedCallback;
   if (!run) {
-    throw new Error('runAfterInteractions callback was not captured');
+    throw new Error('Idle callback was not captured');
   }
   act(() => {
     run();

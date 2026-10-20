@@ -168,21 +168,22 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', async () => {
   // Keep the real expo-widgets wrapper between the sink and the native handles.
   const { LiveActivityFactory } = await import('expo-widgets/src/Widgets');
   return {
-    ActiveAgentsLiveActivity: new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
-      banner: null,
-    })),
+    getActiveAgentsLiveActivity: () =>
+      new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
+        banner: null,
+      })),
   };
 });
 // The session card layout pulls in @expo/ui's native views. This suite follows
 // no session, so the factory lists no card and never starts one.
 vi.mock('@/glanceable-ios/session-live-activity', () => ({
   SESSION_LIVE_ACTIVITY_NAME: 'SessionLiveActivity',
-  SessionLiveActivity: {
+  getSessionLiveActivity: () => ({
     getInstances: () => [],
     start: () => {
       throw new Error('This suite starts no session card');
     },
-  },
+  }),
   refreshSessionLiveActivityCopy: vi.fn(),
 }));
 vi.mock('@/glanceable-ios/active-agents-widget', () => ({

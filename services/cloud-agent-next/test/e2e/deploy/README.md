@@ -123,9 +123,12 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    the exception: it deletes session resources without the
    `requireCurrentSessionAccess` check the public `deleteSession` applies, so the
    secret plus any valid JWT can trigger cleanup of an **unowned** session id;
-   seed remains the only no-JWT path. The rendered deployment binds only the
-   Hyperdrive and R2 resources named by `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET`,
-   so its session rows, usage rows and logs stay in the e2e data stores.
+   seed remains the only no-JWT path. The rendered deployment writes its own
+   session metadata, usage rows and logs to the Hyperdrive and R2 resources
+   named by `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET`. That is not a complete data
+   boundary: the cloned `SESSION_INGEST` service binding still reaches the
+   production session-ingest service, so the session events forwarded through it
+   are outside the e2e stores.
 
    The deployed driver resolves the e2e secret with the same order as the
    fake-LLM admin token (`E2E_INTERNAL_API_SECRET` → auth-file

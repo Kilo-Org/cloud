@@ -307,8 +307,11 @@ describe('session-start admission', () => {
         createExecutionContext()
       );
       expect(response.status, path).toBe(400);
-      const body = (await response.json()) as { error?: { message?: string } };
-      expect(typeof body.error?.message, path).toBe('string');
+      const body = (await response.json()) as {
+        error?: { data?: { code?: string }; message?: string };
+      };
+      expect(body.error?.data?.code, path).toBe('BAD_REQUEST');
+      expect(body.error?.message, path).not.toBe('Unauthorized');
     }
   });
 
@@ -319,6 +322,7 @@ describe('session-start admission', () => {
       createExecutionContext()
     );
     expect(response.status).toBe(401);
+    expect(response.headers.get('content-type')).toContain('application/json');
     const body = (await response.json()) as { error?: { message?: string } };
     expect(body.error?.message).not.toBe('Unauthorized');
   });

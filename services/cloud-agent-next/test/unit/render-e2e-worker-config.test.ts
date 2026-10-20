@@ -364,6 +364,20 @@ describe('buildE2eWorkerConfig', () => {
     );
   });
 
+  it('refuses a store value that any section of the source config binds', () => {
+    const source = readSourceConfig();
+    const devHyperdriveId = source.env.dev.hyperdrive[0].id;
+    const devR2Bucket = source.env.dev.r2_buckets[0].bucket_name;
+    expect(devHyperdriveId).toBe(source.hyperdrive[0].id);
+    expect(devR2Bucket).not.toBe(source.r2_buckets[0].bucket_name);
+    expect(() =>
+      buildE2eWorkerConfig(source, { ...overrides, hyperdriveId: devHyperdriveId })
+    ).toThrow(/must name a dedicated e2e data store/);
+    expect(() => buildE2eWorkerConfig(source, { ...overrides, r2Bucket: devR2Bucket })).toThrow(
+      /must name a dedicated e2e data store/
+    );
+  });
+
   it('renders no surface allowlist: the deployed secret is a Worker secret, not a var', () => {
     const { config } = render();
     expect(config.vars).not.toHaveProperty('E2E_SURFACE_USER_IDS');

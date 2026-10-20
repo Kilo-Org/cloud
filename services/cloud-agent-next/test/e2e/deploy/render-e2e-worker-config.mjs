@@ -100,13 +100,20 @@ function requireE2eDataStore(name, value, sourceConfig) {
       `${name} is required: point it at the dedicated e2e data store (see the provisioning steps in test/e2e/deploy/README.md).`
     );
   }
-  const sourceValue =
-    name === 'E2E_HYPERDRIVE_ID'
-      ? (sourceConfig.hyperdrive ?? []).find(entry => entry.binding === 'HYPERDRIVE')?.id
-      : (sourceConfig.r2_buckets ?? []).find(entry => entry.binding === 'R2_BUCKET')?.bucket_name;
-  if (candidate === sourceValue) {
+  // The render drops `dev` and `env`, so every section of the source config
+  // contributes the values compared here.
+  const sections = [sourceConfig, sourceConfig.dev, ...Object.values(sourceConfig.env ?? {})];
+  const sourceValues = sections
+    .flatMap(section =>
+      section === undefined || section === null
+        ? []
+        : ((name === 'E2E_HYPERDRIVE_ID' ? section.hyperdrive : section.r2_buckets) ?? [])
+    )
+    .map(entry => (name === 'E2E_HYPERDRIVE_ID' ? entry.id : entry.bucket_name))
+    .filter(sourceValue => typeof sourceValue === 'string' && sourceValue.length > 0);
+  if (sourceValues.includes(candidate)) {
     throw new Error(
-      `${name} must name a dedicated e2e data store, not the source config's ${sourceValue}; refusing to render shared data stores.`
+      `${name} must name a dedicated e2e data store, not one the source config binds (${candidate}); refusing to render shared data stores.`
     );
   }
   return candidate;

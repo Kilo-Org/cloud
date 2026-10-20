@@ -10,7 +10,6 @@ import {
   Check,
   Circle,
   Cloud,
-  Rocket,
   Shield,
 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -28,7 +27,6 @@ export const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
   'security-agent': Shield,
   'team-integration': Cable,
   'cloud-agent-used': Cloud,
-  'project-deployed': Rocket,
 };
 
 export function FeatureAdoptionView({

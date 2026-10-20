@@ -8,7 +8,7 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { APPLE_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import { AppleJwtClientError, verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
-import { closeDeviceSessionRealtimeConnections } from '@/lib/auth/device-session-realtime';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 
 type AppleEvent = {
   type: 'consent-revoked' | 'account-delete' | 'email-disabled' | 'email-enabled';
@@ -77,7 +77,7 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
       }
     });
     for (const kiloUserId of revokedUserIds) {
-      void closeDeviceSessionRealtimeConnections({ kiloUserId });
+      await scheduleDeviceSessionRealtimeClose({ kiloUserId });
     }
     logExceptInTest(`Removed apple auth provider for sub=${sub} (${type})`);
   }

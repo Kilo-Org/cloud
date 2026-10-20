@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { beforeEach, describe, expect, test } from '@jest/globals';
+
+jest.mock('@/lib/auth/device-session-realtime');
 
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import {

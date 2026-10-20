@@ -1,3 +1,5 @@
+jest.mock('@/lib/auth/device-session-realtime');
+
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {

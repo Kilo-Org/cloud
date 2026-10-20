@@ -1137,6 +1137,21 @@ describe('UserConnectionDO', () => {
       expect(msgs).toContainEqual({ type: 'heartbeat_ack' });
     });
 
+    it('keeps the device session binding across heartbeats so revocation can close the CLI', async () => {
+      const { doInstance, mockCtx } = setup();
+      const deviceSessionId = '11111111-1111-4111-8111-111111111111';
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1', deviceSessionId);
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', sessions: [makeSession('s1')] })
+      );
+
+      expect(cliWs.deserializeAttachment()).toMatchObject({ deviceSessionId });
+      expect(doInstance.closeDeviceSockets(deviceSessionId)).toBe(1);
+      expect(cliWs.close).toHaveBeenCalledWith(1000, 'device session revoked');
+    });
+
     it('broadcasts a heartbeat session prLink to web sockets', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');

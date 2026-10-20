@@ -8,13 +8,17 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { closeDeviceSessionRealtimeConnections } from '@/lib/auth/device-session-realtime';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 
 export type BlockUserParams = {
   kiloUserId: string;
   reason: string;
   blockedByKiloUserId?: string | null;
-  /** Run inside an existing transaction; defaults to the shared `db`. */
+  /**
+   * Run inside an existing transaction; defaults to the shared `db`.
+   * A caller that supplies a transaction owns the commit boundary and must
+   * schedule the realtime close after commit when this returns `true`.
+   */
   dbOrTx?: typeof db | DrizzleTransaction;
 };
 
@@ -107,7 +111,7 @@ export async function blockUser(params: BlockUserParams): Promise<boolean> {
 
   const blocked = await db.transaction(tx => run(tx));
   if (blocked) {
-    void closeDeviceSessionRealtimeConnections({ kiloUserId: params.kiloUserId });
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId: params.kiloUserId });
   }
   return blocked;
 }

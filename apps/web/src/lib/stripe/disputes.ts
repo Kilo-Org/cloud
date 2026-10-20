@@ -42,6 +42,7 @@ import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 import { blockUser } from '@/lib/user/block';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 
 type StripeReference = string | { id: string } | null | undefined;
 
@@ -531,6 +532,9 @@ async function blockUserForAcceptedDispute(params: {
     });
   });
 
+  if (didBlock) {
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId: userId });
+  }
   await revokeWebSessions(userId);
 
   return {

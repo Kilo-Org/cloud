@@ -23,6 +23,8 @@ import {
 import { runDeletionPreflight } from '@/lib/user/deletion-queue/deletion-preflight';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
+jest.mock('@/lib/auth/device-session-realtime');
+
 describe('persistHandlerOutcome progress', () => {
   beforeEach(async () => {
     await cleanupDbForTest();

@@ -6,7 +6,7 @@ import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
-import { closeDeviceSessionRealtimeConnections } from './device-session-realtime';
+import { scheduleDeviceSessionRealtimeClose } from './device-session-realtime';
 
 const REFRESH_TOKEN_BYTES = 32;
 
@@ -34,7 +34,7 @@ async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promi
   });
   const kiloUserId = revoked[0]?.kiloUserId;
   if (kiloUserId) {
-    void closeDeviceSessionRealtimeConnections({ kiloUserId, deviceSessionId });
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId, deviceSessionId });
   }
 }
 
@@ -416,6 +416,6 @@ export async function revokeDeviceSession(sessionId: string, reason: string): Pr
 
   const kiloUserId = revoked[0]?.kiloUserId;
   if (kiloUserId) {
-    void closeDeviceSessionRealtimeConnections({ kiloUserId, deviceSessionId: sessionId });
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId, deviceSessionId: sessionId });
   }
 }

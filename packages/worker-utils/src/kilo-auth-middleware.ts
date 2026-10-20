@@ -1,7 +1,7 @@
 import { decodeJwt, type JWTPayload } from 'jose';
 import { createMiddleware } from 'hono/factory';
 import type { MiddlewareHandler } from 'hono';
-import { deviceSessionIdSchema } from './device-session-auth.js';
+import { deviceSessionIdSchema } from './device-session-claims.js';
 import { extractBearerToken } from './extract-bearer-token.js';
 import type { KiloTokenPayload } from './kilo-token.js';
 import type { KiloResourceAudiencePolicy } from './kilo-token-policy.js';

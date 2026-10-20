@@ -50,7 +50,7 @@ import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
-import { closeDeviceSessionRealtimeConnections } from '@/lib/auth/device-session-realtime';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
@@ -145,7 +145,7 @@ async function revokeOwnedDeviceSession(
     .returning({ id: device_sessions.id });
 
   if (revoked.length > 0) {
-    void closeDeviceSessionRealtimeConnections({ kiloUserId: userId, deviceSessionId: sessionId });
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId: userId, deviceSessionId: sessionId });
   }
 }
 

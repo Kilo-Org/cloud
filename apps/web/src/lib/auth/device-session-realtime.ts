@@ -6,8 +6,24 @@ import {
   SESSION_INGEST_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import { runAfterResponse } from '@/lib/after-response';
 
 type Target = { name: string; url: string; body: Record<string, string> };
+
+function httpBaseUrl(value: string): string {
+  const fallback = value.replace(/\/$/, '');
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'ws:') {
+      url.protocol = 'http:';
+    } else if (url.protocol === 'wss:') {
+      url.protocol = 'https:';
+    }
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return fallback;
+  }
+}
 
 function targets(params: { kiloUserId: string; deviceSessionId?: string }): Target[] {
   const eventServiceUrl = getEnvVariable('NEXT_PUBLIC_EVENT_SERVICE_URL') || '';
@@ -19,7 +35,7 @@ function targets(params: { kiloUserId: string; deviceSessionId?: string }): Targ
       ? [
           {
             name: 'session-ingest',
-            url: `${SESSION_INGEST_WORKER_URL}/internal/device-session/revoke`,
+            url: `${SESSION_INGEST_WORKER_URL.replace(/\/$/, '')}/internal/device-session/revoke`,
             body: { kiloUserId: params.kiloUserId, ...shared },
           },
         ]
@@ -28,7 +44,7 @@ function targets(params: { kiloUserId: string; deviceSessionId?: string }): Targ
       ? [
           {
             name: 'event-service',
-            url: `${eventServiceUrl}/internal/device-session/revoke`,
+            url: `${httpBaseUrl(eventServiceUrl)}/internal/device-session/revoke`,
             body: { userId: params.kiloUserId, ...shared },
           },
         ]
@@ -75,4 +91,15 @@ export async function closeDeviceSessionRealtimeConnections(params: {
       }
     })
   );
+}
+
+/**
+ * Run the close after the current response so a serverless invocation stays
+ * alive for it. Callers must invoke this only once the revocation is committed.
+ */
+export async function scheduleDeviceSessionRealtimeClose(params: {
+  kiloUserId: string;
+  deviceSessionId?: string;
+}): Promise<void> {
+  await runAfterResponse(() => closeDeviceSessionRealtimeConnections(params));
 }

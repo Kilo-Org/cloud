@@ -3,9 +3,10 @@ import type * as schema from '@kilocode/db/schema';
 import { device_sessions } from '@kilocode/db/schema';
 import { getWorkerDb } from '@kilocode/db/client';
 import { and, eq, isNull } from 'drizzle-orm';
-import { z } from 'zod';
 
-export const deviceSessionIdSchema = z.uuid();
+import { deviceSessionIdSchema } from './device-session-claims.js';
+
+export { deviceSessionIdSchema } from './device-session-claims.js';
 
 export type DeviceSessionDb = Pick<NodePgDatabase<typeof schema>, 'select'>;
 

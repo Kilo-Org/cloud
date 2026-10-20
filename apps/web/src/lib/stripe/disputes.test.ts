@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
+jest.mock('@/lib/auth/device-session-realtime');
+
 import type * as StripeDisputesModule from '@/lib/stripe/disputes';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';

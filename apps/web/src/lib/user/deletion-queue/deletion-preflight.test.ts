@@ -13,6 +13,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 jest.mock('@/lib/user/deletion-queue/deletion-ticket-resolve', () => ({
   resolveTicketEmail: jest.fn(),
 }));
+jest.mock('@/lib/auth/device-session-realtime');
 
 const resolveTicketEmailMock = jest.mocked(resolveTicketEmail);
 

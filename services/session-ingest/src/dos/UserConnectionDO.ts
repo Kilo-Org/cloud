@@ -770,6 +770,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       protocolVersion,
       capabilities,
       kiloUserId: attachment.kiloUserId,
+      ...(attachment.deviceSessionId ? { deviceSessionId: attachment.deviceSessionId } : {}),
       ...(instance ? { instance } : {}),
     };
     try {

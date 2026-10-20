@@ -1,3 +1,5 @@
+jest.mock('@/lib/auth/device-session-realtime');
+
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/auth/apple-jwks', () => ({
   ...jest.requireActual('@/lib/auth/apple-jwks'),

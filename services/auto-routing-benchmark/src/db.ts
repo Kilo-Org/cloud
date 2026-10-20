@@ -816,6 +816,10 @@ export async function listPendingOutputRecoveries(
         SELECT 1 FROM case_results r WHERE r.run_id = p.run_id AND r.model = p.model
           AND r.variant = p.variant AND r.case_id = p.case_id AND r.rep = p.rep
       )
+      AND (
+        json_extract(p.payload, '$.result.unavailableModelId') IS NULL
+        OR lower(json_extract(p.payload, '$.result.stderrTail')) LIKE '%failed to load%model catalog%'
+      )
     ORDER BY p.run_id, p.model, p.variant, p.case_id, p.rep
     LIMIT ?4
   `)

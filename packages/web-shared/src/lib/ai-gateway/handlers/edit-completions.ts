@@ -222,7 +222,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     readDb
   );
 
-  if (!canSpendPaidUsage(balance) && !isFreeModel(requestBody.model) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !(await isFreeModel(requestBody.model)) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

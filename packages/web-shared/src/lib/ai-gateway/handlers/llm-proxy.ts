@@ -584,6 +584,8 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Custom LLMs count as free; `getProvider` still refuses callers without access.
+  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -650,7 +652,7 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeModel(effectiveModelIdLowerCased)) {
+    if (!isFreeRequestedModel) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -897,7 +899,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeModel(effectiveModelIdLowerCased) &&
+      !isFreeRequestedModel &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -973,7 +975,7 @@ export async function handleLlmProxyRequest(
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
-    hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased) &&
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();

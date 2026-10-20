@@ -2147,6 +2147,9 @@ importers:
 
   packages/worker-utils:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../app-shared
       '@kilocode/db':
         specifier: workspace:*
         version: link:../db

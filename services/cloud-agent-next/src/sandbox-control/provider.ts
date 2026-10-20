@@ -5,6 +5,7 @@ import {
   CLOUDFLARE_CONTAINERS_INSTANCES,
   vercelSandboxResourcesSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { z } from 'zod';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
@@ -51,7 +52,9 @@ export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider
   z
     .object({
       provider: z.literal('cloudflare-containers'),
-      instance: z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).optional(),
+      instance: z
+        .enum([...CLOUDFLARE_CONTAINERS_INSTANCES, CODE_REVIEW_CONTAINERS_INSTANCE] as const)
+        .optional(),
     })
     .strict(),
 ]);

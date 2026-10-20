@@ -28,5 +28,7 @@ functions run in `sfo1` only (`vercel.json`), via the manually triggered
   other than the contracts package and `@kilocode/upstream-url-policy`, which is
   plain Node code (no database, Redis, or Sentry) that gives the relay the same
   upstream URL rules the gateway uses.
+  Gateway-specific response formatting and logging stay in the gateway's
+  `upstream-request.ts` consumer.
 - Tests use Vitest (`pnpm --filter ai-gateway-secure-proxy test`) and run in
   CI's per-workspace test job, independent of the `apps/web` Jest suite.

@@ -44,10 +44,7 @@ import {
   workspaceMcpAnchorSessionId,
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
-import {
-  assertContainerCapacity,
-  getContainerCapacityFailureReason,
-} from '../../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -4401,16 +4398,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 'Runtime preflight timed out'
               );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
-        if (pin.billing) {
-          await assertContainerCapacity(this.env, {
-            subject: pin.billing.subject,
-            actor: pin.billing.actor,
-            instanceId: pin.billing.sandboxId,
-            checkpoint: 'control-plane-create',
-            billingOrigin: pin.billing.metadata?.origin,
-          });
-        }
-
         const intent: ProviderCreateIntent = {
           intentId: allocationId,
           createdAt: Date.now(),

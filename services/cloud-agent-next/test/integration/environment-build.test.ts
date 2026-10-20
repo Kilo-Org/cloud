@@ -146,7 +146,6 @@ async function setup(): Promise<Harness> {
                   platform: 'github',
                 },
               },
-        capacity: async () => 'ok',
       },
       provider,
       runnerUrl: (environment, build) =>

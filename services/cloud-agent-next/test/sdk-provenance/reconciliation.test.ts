@@ -70,6 +70,7 @@ it('reconciled stopped container does not establish an observed clean exit', asy
           await Promise.all(pending);
           pending.length = 0;
           const lifecycle = new MeteredBillingLifecycle({
+            enforceContainerCapacity: true,
             storage: ctx.storage,
             usageClient: {} as ContainerUsageClient,
             schedule: async () => {

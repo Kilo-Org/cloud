@@ -30,6 +30,7 @@ export type ContainersBillingHost = {
   container: BillingContainer;
   storage: BillingContextStorage;
   meter: ContainerUsageRpcMethods;
+  enforceContainerCapacity: boolean;
   heartbeatSeconds: number;
   isContainerRunning: () => boolean;
   stopContainer: () => Promise<void>;
@@ -240,6 +241,7 @@ export class ContainersBilling {
     this.lifecycle = new MeteredBillingLifecycle({
       storage: host.storage,
       usageClient,
+      enforceContainerCapacity: host.enforceContainerCapacity,
       schedule: async (delaySeconds, callback, payload) => {
         await host.container.schedule(delaySeconds, callback, payload);
       },

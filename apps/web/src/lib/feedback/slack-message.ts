@@ -27,7 +27,8 @@ export type FeedbackSlackMessage = {
 };
 
 function metadataValue(value: string): string {
-  return escapeSlackLabel(truncateSlackText(value, METADATA_LIMIT));
+  // Escape first, then cap, so the escaped value stays inside the section limit.
+  return truncateSlackText(escapeSlackLabel(value), METADATA_LIMIT);
 }
 
 function bodySection(label: string, value: string, limit: number): AnyBlock {

@@ -64,6 +64,21 @@ describe('buildUserFeedbackSlackMessage', () => {
     expect(metadata.text).not.toContain('<!channel>');
   });
 
+  it('keeps the metadata section inside the Slack section limit', () => {
+    const message = buildUserFeedbackSlackMessage({
+      userId: '&'.repeat(2_000),
+      feedbackFor: '<'.repeat(2_000),
+      source: '>'.repeat(2_000),
+      feedbackBatch: 'x'.repeat(2_000),
+    });
+
+    const metadata = sectionTexts(message).find(section => section.text.includes('• user:'))!;
+    expect(metadata.text.length).toBeLessThan(3_000);
+    for (const line of metadata.text.split('\n')) {
+      expect(line.length).toBeLessThanOrEqual(220);
+    }
+  });
+
   it('marks an empty submission', () => {
     const message = buildUserFeedbackSlackMessage({ userId: 'user_1', feedbackText: '   ' });
     expect(blocksContaining(message, '<empty>')).toHaveLength(1);

@@ -9,12 +9,21 @@ const BRIEFING_DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: 'medium', ti
  * device's: a 22:00-08:00 schedule reads as that window on every device.
  * An unknown zone (preferences not loaded or offline with no snapshot) keeps
  * the device zone, which is what the screen rendered before the zone was read.
+ * A zone the runtime cannot resolve falls back the same way, so a report still
+ * renders.
  */
 export function formatBriefingTimestamp(
   value: string,
   locale: string,
   timeZone: string | undefined
 ): string {
-  const options = timeZone ? { ...BRIEFING_DATE_TIME, timeZone } : BRIEFING_DATE_TIME;
-  return formatDate(parseTimestamp(value), locale, options);
+  const date = parseTimestamp(value);
+  if (timeZone) {
+    try {
+      return formatDate(date, locale, { ...BRIEFING_DATE_TIME, timeZone });
+    } catch {
+      // `Intl` rejects a zone name it does not know; the device zone is the fallback.
+    }
+  }
+  return formatDate(date, locale, BRIEFING_DATE_TIME);
 }

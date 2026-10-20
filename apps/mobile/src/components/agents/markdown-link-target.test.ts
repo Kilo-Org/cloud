@@ -33,12 +33,39 @@ describe('parseMarkdownLinkTarget web links', () => {
     });
   });
 
+  it('keeps path separators as written', () => {
+    expect(parseMarkdownLinkTarget('https://example.com//a//b')).toMatchObject({
+      href: 'https://example.com//a//b',
+    });
+    expect(parseMarkdownLinkTarget('https:///example.com//x')).toMatchObject({
+      href: 'https://example.com//x',
+    });
+  });
+
   it('lowercases the scheme and hostname', () => {
     expect(parseMarkdownLinkTarget('HTTPS://Example.COM/Path')).toEqual({
       kind: 'web',
       scheme: 'https',
       host: 'example.com',
       href: 'https://example.com/Path',
+    });
+  });
+
+  it('normalizes a port to its numeric value', () => {
+    expect(parseMarkdownLinkTarget('https://example.com:00443/x')).toMatchObject({
+      host: 'example.com',
+      href: 'https://example.com/x',
+    });
+    expect(parseMarkdownLinkTarget('https://example.com:008080/x')).toMatchObject({
+      host: 'example.com:8080',
+      href: 'https://example.com:8080/x',
+    });
+  });
+
+  it('accepts an internationalized hostname', () => {
+    expect(parseMarkdownLinkTarget('https://exämple.com/p')).toMatchObject({
+      host: 'exämple.com',
+      href: 'https://exämple.com/p',
     });
   });
 
@@ -91,6 +118,9 @@ describe('parseMarkdownLinkTarget web links', () => {
     'https:///',
     'https://exa mple.com/',
     'https://exa\tmple.com/',
+    'https://exa%6Dple.invalid/p',
+    'https://[not-ipv6]/x',
+    'https://[abc:zz]/x',
     'https://example.com:abc/',
     'https://example.com:99999/',
     'https://[2001:db8::1',

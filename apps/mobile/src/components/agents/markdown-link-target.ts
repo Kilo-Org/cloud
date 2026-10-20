@@ -18,7 +18,10 @@ export type MarkdownLinkTarget = WebLinkTarget | SchemeLinkTarget;
 const SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const LEADING_SLASHES = /^[/\\]+/;
 const AUTHORITY_END = /[/\\?#]/;
-const HOST_PATTERN = /^[a-z0-9[\]~!$&'()*+,;=._:%-]+$/i;
+// Hostnames are matched as written; percent-encoding is outside the accepted
+// set.
+const HOST_PATTERN = /^[\p{L}\p{N}~!$&'()*+,;=._:-]+$/u;
+const IPV6_PATTERN = /^[0-9a-f:.]+$/;
 const PORT_PATTERN = /^\d{1,5}$/;
 const CONTROL_CHARS = /[\p{Cc}]/u;
 
@@ -58,11 +61,18 @@ function parseWebTarget(remainder: string, scheme: 'http' | 'https'): WebLinkTar
   }
 
   const hostname = parts.host.toLowerCase().replace(/\.$/, '');
-  if (!HOST_PATTERN.test(hostname)) {
+  if (hostname.startsWith('[')) {
+    const inner = hostname.slice(1, -1);
+    if (!IPV6_PATTERN.test(inner) || !inner.includes(':')) {
+      return null;
+    }
+  } else if (!HOST_PATTERN.test(hostname)) {
     return null;
   }
 
-  const port = parts.port;
+  // A port is a number, so the comparison and the opened URL both use its
+  // numeric value.
+  const port = parts.port === '' ? '' : String(Number(parts.port));
   if (port !== '' && (!PORT_PATTERN.test(port) || Number(port) > 65_535)) {
     return null;
   }
@@ -74,10 +84,12 @@ function parseWebTarget(remainder: string, scheme: 'http' | 'https'): WebLinkTar
   // the host the user confirms is always the host the browser receives.
   const authorityOut = `${hostname}${keepPort ? `:${port}` : ''}`;
   let path = '/';
-  if (tail !== '' && (tail.startsWith('?') || tail.startsWith('#'))) {
+  if (tail.startsWith('?') || tail.startsWith('#')) {
     path = `/${tail}`;
   } else if (tail !== '') {
-    path = `/${tail.replace(LEADING_SLASHES, '')}`;
+    // Keep the path exactly as written; only the authority separator is
+    // normalized.
+    path = tail.startsWith('\\') ? `/${tail.slice(1)}` : tail;
   }
 
   return {

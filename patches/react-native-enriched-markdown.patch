@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..c0b47bba637493aa4caa30b7ef5824934fcb3801 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37e0c750ce 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 @@ -50,6 +50,13 @@ import kotlin.math.ceil
@@ -123,11 +123,11 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..c0b47bba637493aa4caa30b7ef582493
 +              } else {
 +                minOf(widthPx, ceil(segmentMaxLineWidth).toInt() + WIDEN_SLACK_PX)
 +              }
-+            if (!exactWidth && contentWidthPx == widthPx &&
-+              ceil(segmentMaxLineWidth).toInt() > widthPx - WIDEN_SLACK_PX
-+            ) {
++            val fillsReportedWidth = segmentMaxLineWidth > contentWidthPx - WIDEN_SLACK_PX
++            val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
++            if (fillsReportedWidth) {
 +              val reserveLayout =
-+                createStaticLayout(segment.styledText, fontSize, widthPx - WIDEN_SLACK_PX, id)
++                createStaticLayout(segment.styledText, fontSize, reserveWidth, id)
 +              if (reserveLayout.height > layout.height) {
 +                segmentHeightPx = reserveLayout.height.toFloat()
 +              }
@@ -191,10 +191,10 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..c0b47bba637493aa4caa30b7ef582493
 +    // height only if that layout actually comes out taller.
 +    val contentWidthPx =
 +      if (exactWidth) safeWidth else minOf(safeWidth, ceil(measuredWidth).toInt() + WIDEN_SLACK_PX)
-+    if (!exactWidth && contentWidthPx == safeWidth &&
-+      ceil(measuredWidth).toInt() > safeWidth - WIDEN_SLACK_PX
-+    ) {
-+      val reserveLayout = buildLayout(text = content, paint = paint, widthPx = safeWidth - WIDEN_SLACK_PX, viewId = viewId)
++    val fillsReportedWidth = measuredWidth > contentWidthPx - WIDEN_SLACK_PX
++    val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
++    if (fillsReportedWidth) {
++      val reserveLayout = buildLayout(text = content, paint = paint, widthPx = reserveWidth, viewId = viewId)
 +      val reserveHeight = truncatedHeight(reserveLayout, visibleLineCount(reserveLayout, viewId), content)
 +      if (reserveHeight > measuredHeight) {
 +        measuredHeight = reserveHeight
@@ -256,11 +256,11 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..c0b47bba637493aa4caa30b7ef582493
 +    // taller height only if that layout actually comes out taller.
 +    val contentWidthPx =
 +      if (exactWidth) widthPx else minOf(widthPx, ceil(maxLineWidth).toInt() + WIDEN_SLACK_PX)
++    val fillsReportedWidth = maxLineWidth > contentWidthPx - WIDEN_SLACK_PX
++    val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
 +    var height = truncatedHeight(layout, visibleLineCount, content)
-+    if (!exactWidth && contentWidthPx == widthPx &&
-+      ceil(maxLineWidth).toInt() > widthPx - WIDEN_SLACK_PX
-+    ) {
-+      val reserveLayout = buildLayout(content, paint, widthPx - WIDEN_SLACK_PX, viewId)
++    if (fillsReportedWidth) {
++      val reserveLayout = buildLayout(content, paint, reserveWidth, viewId)
 +      val reserveHeight = truncatedHeight(reserveLayout, visibleLineCount(reserveLayout, viewId), content)
 +      if (reserveHeight > height) {
 +        height = reserveHeight

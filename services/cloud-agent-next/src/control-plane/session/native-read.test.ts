@@ -23,6 +23,7 @@ import {
   type NativeSnapshotCursor,
 } from './session-do.js';
 import type { EventQueryFilters } from '../../session/queries/events.js';
+import { formatStreamEvent } from '../../websocket/stream.js';
 import { createNativeEventOutbox } from './native-outbox.js';
 import {
   NATIVE_DELIVERY_LIMITS,
@@ -153,6 +154,7 @@ describe('native durable attachment', () => {
       eventQueries: unknown;
       sessionId: string;
       deriveSessionStatus: () => unknown;
+      pendingInteractions?: { questions: unknown[]; permissions: unknown[] };
       clearSessionInMemoryState: () => void;
       preparationRecorders: Map<string, unknown>;
     };
@@ -414,4 +416,116 @@ describe('native durable attachment', () => {
     expect(filtersSeen.some(filter => filter.materialized === 'updates')).toBe(true);
     expect(filtersSeen.some(filter => filter.materialized === 'removals')).toBe(true);
   });
+
+  it('sizes thousands of small events with linear serialization work across pages', async () => {
+    const session = attachmentUnit();
+    const rows = Array.from({ length: 3000 }, (_, index) => ({
+      id: index + 1,
+      session_id: SESSION_ID,
+      execution_id: 'execution',
+      stream_event_type: 'kilocode',
+      timestamp: 1700000000000,
+      payload: JSON.stringify({ event: 'message.updated', properties: { text: 'small' } }),
+    }));
+    session.eventQueries = {
+      getLatestEventId: () => rows.length,
+      *iterateByFilters(filters: EventQueryFilters) {
+        if (filters.materialized === undefined)
+          yield* rows.filter(row => row.id > (filters.fromId ?? 0));
+      },
+    };
+    const stringify = JSON.stringify;
+    let serializedPageEvents = 0;
+    const serialization = vi.spyOn(JSON, 'stringify').mockImplementation(value => {
+      if (typeof value === 'object' && value !== null && 'events' in value) {
+        const events = value.events;
+        if (Array.isArray(events)) serializedPageEvents += events.length;
+        if (serializedPageEvents > rows.length * 2)
+          throw new Error('Snapshot sizing repeatedly serializes accumulated events');
+      }
+      return stringify(value);
+    });
+    const ids: number[] = [];
+    let continuation: NativeSnapshotCursor | undefined;
+    let pages = 0;
+    try {
+      do {
+        const page = await session.nativeSnapshot({ continuation });
+        expect(page.oversized).toBe(false);
+        expect(new TextEncoder().encode(stringify(page)).byteLength).toBeLessThanOrEqual(
+          CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES
+        );
+        ids.push(...page.events.map(event => event.eventId));
+        continuation = page.continuation;
+        expect(++pages).toBeLessThan(10);
+      } while (continuation !== undefined);
+    } finally {
+      serialization.mockRestore();
+    }
+    expect(pages).toBeGreaterThan(1);
+    expect(ids).toEqual(rows.map(row => row.id));
+    expect(serializedPageEvents).toBeLessThanOrEqual(rows.length);
+  });
+
+  it.each(['details', 'continuation'] as const)(
+    'accounts for commas and the %s envelope at the exact UTF-8 page boundary',
+    async envelope => {
+      const session = attachmentUnit();
+      const details = {
+        sessionStatus: { type: 'idle' },
+        questions: envelope === 'details' ? [{ text: '\u00e9'.repeat(256) }] : [],
+        permissions: [],
+      };
+      session.pendingInteractions = details;
+      const rows = Array.from({ length: 3 }, (_, index) => ({
+        id: Number.MAX_SAFE_INTEGER - 2 + index,
+        session_id: SESSION_ID,
+        execution_id: 'execution',
+        stream_event_type: 'kilocode',
+        timestamp: 1700000000000,
+        payload: JSON.stringify({ event: 'message.updated', properties: { text: '' } }),
+      }));
+      const boundary = {
+        oversized: false,
+        fence: Number.MAX_SAFE_INTEGER,
+        events: rows.slice(0, 2).map(row => formatStreamEvent(row, SESSION_ID)),
+        ...(envelope === 'details'
+          ? details
+          : {
+              continuation: {
+                fence: Number.MAX_SAFE_INTEGER,
+                phase: 'removals',
+                fromId: Number.MAX_SAFE_INTEGER,
+              },
+            }),
+      };
+      rows[1].payload = JSON.stringify({
+        event: 'message.updated',
+        properties: {
+          text: 'x'.repeat(
+            CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES -
+              new TextEncoder().encode(JSON.stringify(boundary)).byteLength
+          ),
+        },
+      });
+      session.eventQueries = {
+        getLatestEventId: () => Number.MAX_SAFE_INTEGER,
+        *iterateByFilters(filters: EventQueryFilters) {
+          if (filters.materialized === undefined)
+            yield* rows.filter(row => row.id > (filters.fromId ?? 0));
+        },
+      };
+      const page = await session.nativeSnapshot({});
+      expect(page.oversized).toBe(false);
+      expect(page.events.map(event => event.eventId)).toEqual(rows.slice(0, 2).map(row => row.id));
+      expect(page.continuation).toMatchObject({ fromId: rows[1].id });
+      expect(
+        new TextEncoder().encode(JSON.stringify({ ...boundary, events: page.events })).byteLength
+      ).toBe(CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES);
+      rows[1].payload = rows[1].payload.replace('"text":"', '"text":"x');
+      expect((await session.nativeSnapshot({})).events.map(event => event.eventId)).toEqual([
+        rows[0].id,
+      ]);
+    }
+  );
 });

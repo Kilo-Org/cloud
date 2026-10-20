@@ -1496,6 +1496,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       questions: this.pendingInteractions?.questions ?? [],
       permissions: this.pendingInteractions?.permissions ?? [],
     };
+    const snapshot = { oversized: false, fence, events, ...details };
+    const detailsBytes = encoder.encode(JSON.stringify(snapshot)).byteLength;
+    const envelopeBytes = Math.max(
+      detailsBytes,
+      encoder.encode(
+        JSON.stringify({
+          oversized: false,
+          fence,
+          events,
+          continuation: { fence, phase: 'removals', fromId: Number.MAX_SAFE_INTEGER },
+        })
+      ).byteLength
+    );
+    let eventsBytes = 0;
     const push = (event: StreamEvent): boolean => {
       const native = toNativePublicEvent(event, kiloSessionId);
       if (
@@ -1503,22 +1517,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         encoder.encode(JSON.stringify(native)).byteLength > NATIVE_DELIVERY_LIMITS.eventBytes
       )
         return false;
-      const candidate = { oversized: false, fence, events: [...events, event] };
-      const size = Math.max(
-        encoder.encode(JSON.stringify({ ...candidate, ...details })).byteLength,
-        encoder.encode(
-          JSON.stringify({
-            ...candidate,
-            continuation: { fence, phase: 'removals', fromId: Number.MAX_SAFE_INTEGER },
-          })
-        ).byteLength
-      );
+      const eventBytes =
+        encoder.encode(JSON.stringify(event)).byteLength + (events.length > 0 ? 1 : 0);
+      const size = envelopeBytes + eventsBytes + eventBytes;
       if (
         size > CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES &&
         (events.length > 0 || size > NATIVE_DELIVERY_LIMITS.batchBytes)
       )
         return false;
       events.push(event);
+      eventsBytes += eventBytes;
       return true;
     };
     const phases = ['log', 'updates', 'removals'] as const;
@@ -1538,8 +1546,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         fromId = event.id;
       }
     }
-    const snapshot = { oversized: false, fence, events, ...details };
-    return encoder.encode(JSON.stringify(snapshot)).byteLength > NATIVE_DELIVERY_LIMITS.batchBytes
+    return detailsBytes + eventsBytes > NATIVE_DELIVERY_LIMITS.batchBytes
       ? { oversized: true, fence, events: [] }
       : snapshot;
   }

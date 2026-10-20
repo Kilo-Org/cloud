@@ -45,9 +45,9 @@ git diff --check
   type because its `read` options still require `setSelf`, which 3.x removed
   (mobile alone reports 153 such errors). `apps/web` cannot move first while
   `jotai-minidb@0.0.8` (the latest release) imports `atomFamily` from
-  `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit when
-  `jotai-minidb` publishes a 3.x release; 3.0.1 already clears
-  `minimumReleaseAge`.
+  `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
+  soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
+  clears `minimumReleaseAge`.
 - `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
 
   ```bash

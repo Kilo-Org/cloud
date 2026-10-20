@@ -80,15 +80,19 @@ describe('balanceMiddleware', () => {
 
   function createTrpcApp() {
     const calls: string[] = [];
+    const sendInputs: unknown[] = [];
     const testRouter = router({
       start: protectedProcedure.mutation(({ ctx }) => {
         calls.push('start');
         return { ok: true, validatedSessionAccess: ctx.validatedSessionAccess };
       }),
-      send: protectedProcedure.mutation(({ ctx }) => {
-        calls.push('send');
-        return { ok: true, validatedSessionAccess: ctx.validatedSessionAccess };
-      }),
+      send: protectedProcedure
+        .input(value => value)
+        .mutation(({ ctx, input }) => {
+          calls.push('send');
+          sendInputs.push(input);
+          return { ok: true, validatedSessionAccess: ctx.validatedSessionAccess };
+        }),
       deleteSession: protectedProcedure.mutation(() => {
         calls.push('deleteSession');
         return { ok: true };
@@ -118,7 +122,7 @@ describe('balanceMiddleware', () => {
         }),
       })
     );
-    return { app, calls };
+    return { app, calls, sendInputs };
   }
 
   async function postTrpcApp(
@@ -252,6 +256,94 @@ describe('balanceMiddleware', () => {
     expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-funded', env);
     expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env);
     expect(calls).toEqual([]);
+  });
+
+  it('checks the input at the deferred position when empty segments precede a call', async () => {
+    vi.mocked(validateBalanceOnly).mockImplementation(async (_token, orgId) =>
+      orgId === 'org-funded'
+        ? { success: true }
+        : { success: false, status: 402, message: 'Insufficient credits' }
+    );
+    requireCurrentSessionAccessMock.mockImplementation(async ({ cloudAgentSessionId }) => ({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: cloudAgentSessionId === 'agent-funded' ? 'org-funded' : 'org-unfunded',
+    }));
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/,,send?batch=1', {
+      0: { cloudAgentSessionId: 'agent-funded' },
+      2: { cloudAgentSessionId: 'agent-unfunded' },
+    });
+
+    expect(response.status).toBe(402);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-unfunded' })
+    );
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env);
+    expect(validateBalanceOnly).not.toHaveBeenCalledWith('token-123', 'org-funded', env);
+    expect(calls).toEqual([]);
+  });
+
+  it('checks the input at the deferred position when empty segments separate calls', async () => {
+    vi.mocked(validateBalanceOnly).mockImplementation(async (_token, orgId) =>
+      orgId === 'org-funded'
+        ? { success: true }
+        : { success: false, status: 402, message: 'Insufficient credits' }
+    );
+    requireCurrentSessionAccessMock.mockImplementation(async ({ cloudAgentSessionId }) => ({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: cloudAgentSessionId === 'agent-funded' ? 'org-funded' : 'org-unfunded',
+    }));
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/send,,send?batch=1', {
+      0: { cloudAgentSessionId: 'agent-funded' },
+      2: { cloudAgentSessionId: 'agent-unfunded' },
+    });
+
+    expect(response.status).toBe(402);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-funded' })
+    );
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-unfunded' })
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it('executes a deferred call with the input its balance validation checked', async () => {
+    const { app, calls, sendInputs } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/,,send?batch=1', {
+      0: { cloudAgentSessionId: 'agent-funded' },
+      2: { cloudAgentSessionId: 'agent-executed' },
+    });
+
+    expect(response.status).toBe(207);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-executed' })
+    );
+    expect(calls).toEqual(['send']);
+    expect(sendInputs).toEqual([{ cloudAgentSessionId: 'agent-executed' }]);
+  });
+
+  it('keeps a trailing empty segment from shifting an earlier call', async () => {
+    const { app, calls, sendInputs } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/send,?batch=1', {
+      0: { cloudAgentSessionId: 'agent-executed' },
+    });
+
+    expect(response.status).toBe(207);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-executed' })
+    );
+    expect(calls).toEqual(['send']);
+    expect(sendInputs).toEqual([{ cloudAgentSessionId: 'agent-executed' }]);
   });
 
   it('does not let a funded personal input authorize an unfunded organization input', async () => {

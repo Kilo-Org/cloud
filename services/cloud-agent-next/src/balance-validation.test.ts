@@ -362,9 +362,15 @@ describe('balance-validation', () => {
       expect(extractProcedureNames('/trpc/start,send/', true)).toEqual(['start', 'send']);
     });
 
-    it('decodes URL-encoded batch separators before splitting', () => {
+    it('keeps empty batch segments so call positions match their inputs', () => {
+      expect(extractProcedureNames('/trpc/,,send', true)).toEqual(['', '', 'send']);
+      expect(extractProcedureNames('/trpc/send,,send', true)).toEqual(['send', '', 'send']);
+      expect(extractProcedureNames('/trpc/send,', true)).toEqual(['send', '']);
+    });
+
+    it('decodes encoded batch separators before splitting', () => {
       expect(extractProcedureNames('/trpc/start%2Csend', true)).toEqual(['start', 'send']);
-      expect(extractProcedureNames('/trpc/start%2csend', true)).toEqual(['start', 'send']);
+      expect(extractProcedureNames('/trpc/,,%73end', true)).toEqual(['', '', 'send']);
     });
 
     it('returns an empty list for non-tRPC or empty paths', () => {
@@ -395,6 +401,47 @@ describe('balance-validation', () => {
         calls: [
           { procedure: 'start', input: { options: { kilocodeOrganizationId: 'org-a' } } },
           { procedure: 'send', input: { id: 'b' } },
+        ],
+      });
+    });
+
+    it('keeps inputs attached to their original position around empty segments', async () => {
+      const request = new Request('https://worker.test/trpc/,,send?batch=1', {
+        method: 'POST',
+        body: JSON.stringify({
+          0: { options: { kilocodeOrganizationId: 'org-a' } },
+          2: { id: 'c' },
+        }),
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: true,
+        calls: [
+          { procedure: '', input: { options: { kilocodeOrganizationId: 'org-a' } } },
+          { procedure: '', input: undefined },
+          { procedure: 'send', input: { id: 'c' } },
+        ],
+      });
+    });
+
+    it('keeps empty positions when an encoded comma adds a procedure', async () => {
+      const request = new Request('https://worker.test/trpc/,start%2Csend?batch=1', {
+        method: 'POST',
+        body: JSON.stringify({
+          0: { id: 'a' },
+          1: { id: 'b' },
+          2: { id: 'c' },
+        }),
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: true,
+        calls: [
+          { procedure: '', input: { id: 'a' } },
+          { procedure: 'start', input: { id: 'b' } },
+          { procedure: 'send', input: { id: 'c' } },
         ],
       });
     });

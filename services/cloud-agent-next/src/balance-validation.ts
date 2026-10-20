@@ -103,9 +103,9 @@ function trimSlashes(path: string): string {
 /**
  * Extracts every procedure name from a tRPC request path.
  *
- * tRPC identifies a batch with `?batch=1` and splits the decoded path on
- * commas. The URL pathname itself is still percent-encoded here, so a batch
- * sent as `/trpc/start%2Csend?batch=1` must be decoded before splitting.
+ * tRPC identifies a batch with `?batch=1`, percent-decodes the path, then
+ * splits it on commas. Empty segments stay in place because tRPC pairs each
+ * segment with the input at the same index.
  *
  * Returns `null` when the path cannot be decoded, matching the request tRPC
  * itself would reject rather than silently treating it as unbillable.
@@ -125,9 +125,7 @@ export function extractProcedureNames(pathname: string, isBatch: boolean): strin
     return null;
   }
 
-  if (!isBatch) return path.length > 0 ? [path] : [];
-
-  return path.split(',').filter(procedure => procedure.length > 0);
+  return isBatch ? path.split(',') : [path];
 }
 
 export type TrpcCallInput = {

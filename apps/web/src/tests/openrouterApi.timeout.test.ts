@@ -19,15 +19,19 @@ jest.mock('next/server', () => ({
 
 const mockCaptureException = jest.mocked(captureException);
 const originalFetch = global.fetch;
+const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
 
 describe('upstreamRequest timeout', () => {
   beforeEach(() => {
+    process.env.VERCEL_TARGET_ENV = 'development';
     mockCaptureException.mockReset();
     global.fetch = originalFetch;
   });
 
   afterAll(() => {
     global.fetch = originalFetch;
+    if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+    else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
   });
 
   test.each([

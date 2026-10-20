@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import {
   ensureOrganizationAccess,
   ensureOrganizationAccessAndFetchOrg,
+  ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
 } from './utils';
 import {
@@ -111,6 +112,18 @@ describe('organization access kilo_admin_elevation telemetry', () => {
 
       expect(roles.size).toBe(0);
       expect(events).toHaveLength(0);
+    });
+
+    test('the batched guard rejects a request that names a deleted organization', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const active = await orgOwnedByAnotherUser();
+      const deleted = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(deleted.id);
+
+      await expect(
+        ensureOrganizationsAccess(ctxFor(admin), [active.id, deleted.id])
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(ensureOrganizationsAccess(ctxFor(admin), [active.id])).resolves.toBeUndefined();
     });
   });
 

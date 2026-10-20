@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Tehirizo ny fiovana",
       "unsavedTitle": "Fiovana tsy voatahiry",
-      "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?"
+      "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?",
+      "unsavedInvalidMessage": "Tsy afaka tehirizina ireo fiovana ireo aloha. Amboary izy ireo raha hotehirizina, na ario raha hialana."
     },
     "auditReportButton": {
       "viewA11y": "Jereo ny tatitra fanaraha-maso"

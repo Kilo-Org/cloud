@@ -1879,7 +1879,8 @@
     "settingsSave": {
       "saveChanges": "Sačuvaj promene",
       "unsavedTitle": "Nesačuvane promene",
-      "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?"
+      "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?",
+      "unsavedInvalidMessage": "Ove promene još ne mogu da se sačuvaju. Ispravi ih da bi ih sačuvao ili ih odbaci da bi otišao."
     },
     "auditReportButton": {
       "viewA11y": "Prikaži izveštaj o reviziji"

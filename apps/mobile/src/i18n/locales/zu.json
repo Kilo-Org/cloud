@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Londoloza izinguquko",
       "unsavedTitle": "Izinguquko ezingalondoloziwe",
-      "unsavedMessage": "Ulondoloze izinguquko zakho ngaphambi kokuphuma kulesi sikrini?"
+      "unsavedMessage": "Ulondoloze izinguquko zakho ngaphambi kokuphuma kulesi sikrini?",
+      "unsavedInvalidMessage": "Lezi zinguquko azikakwazi ukulondolozwa. Zilungise ukuze zilondolozwe, noma uzilahe ukuze uphume."
     },
     "auditReportButton": {
       "viewA11y": "Buka umbiko wokuhlola"

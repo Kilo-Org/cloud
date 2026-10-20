@@ -1374,6 +1374,7 @@
     "settingsSave": {
       "saveChanges": "Wijzigingen opslaan",
       "unsavedMessage": "Je wijzigingen opslaan voordat je dit scherm verlaat?",
+      "unsavedInvalidMessage": "Deze wijzigingen kunnen nog niet worden opgeslagen. Corrigeer ze om op te slaan, of verwerp ze om te vertrekken.",
       "unsavedTitle": "Niet-opgeslagen wijzigingen"
     },
     "setup": {

@@ -1879,7 +1879,8 @@
     "settingsSave": {
       "saveChanges": "Desa els canvis",
       "unsavedTitle": "Canvis sense desar",
-      "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?"
+      "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?",
+      "unsavedInvalidMessage": "Aquests canvis encara no es poden desar. Corregeix-los per desar-los o descarta'ls per sortir."
     },
     "auditReportButton": {
       "viewA11y": "Consulta l'informe d'auditoria"

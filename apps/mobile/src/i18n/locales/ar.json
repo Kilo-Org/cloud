@@ -1402,6 +1402,7 @@
     "settingsSave": {
       "saveChanges": "حفظ التغييرات",
       "unsavedMessage": "هل تريد حفظ تغييراتك قبل مغادرة هذه الشاشة؟",
+      "unsavedInvalidMessage": "لا يمكن حفظ هذه التغييرات بعد. أصلحها للحفظ، أو تجاهلها للمغادرة.",
       "unsavedTitle": "تغييرات غير محفوظة"
     },
     "setup": {

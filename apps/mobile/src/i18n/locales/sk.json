@@ -1902,7 +1902,8 @@
     "settingsSave": {
       "saveChanges": "Uložiť zmeny",
       "unsavedTitle": "Neuložené zmeny",
-      "unsavedMessage": "Uložiť zmeny pred opustením tejto obrazovky?"
+      "unsavedMessage": "Uložiť zmeny pred opustením tejto obrazovky?",
+      "unsavedInvalidMessage": "Tieto zmeny zatiaľ nemožno uložiť. Oprav ich, aby si ich mohol uložiť, alebo ich zahoď, aby si mohol odísť."
     },
     "auditReportButton": {
       "viewA11y": "Zobraziť správu o audite"

@@ -1879,7 +1879,8 @@
     "settingsSave": {
       "saveChanges": "Salvează modificările",
       "unsavedTitle": "Modificări nesalvate",
-      "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?"
+      "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?",
+      "unsavedInvalidMessage": "Aceste modificări nu pot fi încă salvate. Corectează-le pentru a salva sau renunță la ele pentru a pleca."
     },
     "auditReportButton": {
       "viewA11y": "Vezi raportul de audit"

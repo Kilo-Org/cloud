@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Anrejistre chanjman yo",
       "unsavedTitle": "Chanjman ki pa anrejistre",
-      "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?"
+      "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?",
+      "unsavedInvalidMessage": "Chanjman sa yo poko ka anrejistre. Korije yo pou anrejistre, oswa jete yo pou kite."
     },
     "auditReportButton": {
       "viewA11y": "Gade rapò odit la"

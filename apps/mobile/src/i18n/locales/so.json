@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Kaydi isbeddellada",
       "unsavedTitle": "Isbeddello aan la kaydin",
-      "unsavedMessage": "Ma kaydinaysaa isbeddelladaada ka hor intaadan ka bixin shaashaddan?"
+      "unsavedMessage": "Ma kaydinaysaa isbeddelladaada ka hor intaadan ka bixin shaashaddan?",
+      "unsavedInvalidMessage": "Isbeddelladan weli lama kaydin karo. Saxi si aad u kaydiso, ama tuur si aad uga baxdo."
     },
     "auditReportButton": {
       "viewA11y": "Eeg warbixinta hanti-dhawrka"

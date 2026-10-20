@@ -1879,7 +1879,8 @@
     "settingsSave": {
       "saveChanges": "Guardar alterações",
       "unsavedTitle": "Alterações não guardadas",
-      "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?"
+      "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?",
+      "unsavedInvalidMessage": "Estas alterações ainda não podem ser guardadas. Corrija-as para guardar ou descarte-as para sair."
     },
     "auditReportButton": {
       "viewA11y": "Ver relatório de auditoria"

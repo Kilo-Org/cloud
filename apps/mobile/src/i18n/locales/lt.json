@@ -1902,7 +1902,8 @@
     "settingsSave": {
       "saveChanges": "Išsaugoti pakeitimus",
       "unsavedTitle": "Neišsaugoti pakeitimai",
-      "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?"
+      "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?",
+      "unsavedInvalidMessage": "Šių pakeitimų dar negalima išsaugoti. Ištaisykite juos, kad išsaugotumėte, arba atmeskite juos, kad išeitumėte."
     },
     "auditReportButton": {
       "viewA11y": "Peržiūrėti audito ataskaitą"

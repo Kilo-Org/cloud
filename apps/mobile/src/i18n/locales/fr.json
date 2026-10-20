@@ -1350,6 +1350,7 @@
     "settingsSave": {
       "saveChanges": "Enregistrer les modifications",
       "unsavedMessage": "Enregistrer vos modifications avant de quitter cet écran ?",
+      "unsavedInvalidMessage": "Ces modifications ne peuvent pas encore être enregistrées. Corrigez-les pour enregistrer ou abandonnez-les pour quitter.",
       "unsavedTitle": "Modifications non enregistrées"
     },
     "setup": {

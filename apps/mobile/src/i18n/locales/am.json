@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "ለውጦችን ያስቀምጡ",
       "unsavedTitle": "ያልተቀመጡ ለውጦች",
-      "unsavedMessage": "ከዚህ ማያ ገጽ ከመውጣትዎ በፊት ለውጦችዎ ይቀመጡ?"
+      "unsavedMessage": "ከዚህ ማያ ገጽ ከመውጣትዎ በፊት ለውጦችዎ ይቀመጡ?",
+      "unsavedInvalidMessage": "እነዚህ ለውጦች እስካሁን ሊቀመጡ አይችሉም። ለመቀመጥ ያስተካክሏቸው፣ ወይም ለመውጣት አስወግዷቸው።"
     },
     "auditReportButton": {
       "viewA11y": "የኦዲት ሪፖርት ይመልከቱ"

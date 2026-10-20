@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Tiakina ngā huringa",
       "unsavedTitle": "Ngā huringa kāore i tiakina",
-      "unsavedMessage": "Me tiaki ō huringa i mua i te wehe atu i tēnei mata?"
+      "unsavedMessage": "Me tiaki ō huringa i mua i te wehe atu i tēnei mata?",
+      "unsavedInvalidMessage": "Kāore anō ēnei huringa e taea te tiaki. Whakatikahia kia tiakina ai, whakarere rānei kia wehe atu ai."
     },
     "auditReportButton": {
       "viewA11y": "Tirohia te pūrongo arotake"

@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Ruaj ndryshimet",
       "unsavedTitle": "Ndryshime të paruajtura",
-      "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?"
+      "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?",
+      "unsavedInvalidMessage": "Këto ndryshime ende nuk mund të ruhen. Rregulloji që t'i ruash, ose mos i ruaj që të dalësh."
     },
     "auditReportButton": {
       "viewA11y": "Shiko raportin e auditimit"

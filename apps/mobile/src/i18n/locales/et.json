@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Salvesta muudatused",
       "unsavedTitle": "Salvestamata muudatused",
-      "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?"
+      "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?",
+      "unsavedInvalidMessage": "Neid muudatusi ei saa veel salvestada. Paranda need salvestamiseks või loobu neist lahkumiseks."
     },
     "auditReportButton": {
       "viewA11y": "Vaata auditiaruannet"

@@ -1381,6 +1381,7 @@
     "settingsSave": {
       "saveChanges": "Guardar cambios",
       "unsavedMessage": "¿Guardar los cambios antes de salir de esta pantalla?",
+      "unsavedInvalidMessage": "Estos cambios aún no se pueden guardar. Corrígelos para guardarlos o descártalos para salir.",
       "unsavedTitle": "Cambios sin guardar"
     },
     "setup": {

@@ -1388,6 +1388,7 @@
     "settingsSave": {
       "saveChanges": "Zapisz zmiany",
       "unsavedMessage": "Zapisać zmiany przed opuszczeniem tego ekranu?",
+      "unsavedInvalidMessage": "Tych zmian nie można jeszcze zapisać. Popraw je, aby zapisać, lub odrzuć je, aby wyjść.",
       "unsavedTitle": "Niezapisane zmiany"
     },
     "setup": {

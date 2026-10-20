@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Lagre endringer",
       "unsavedTitle": "Ulagrede endringer",
-      "unsavedMessage": "Vil du lagre endringene før du går ut av dette skjermbildet?"
+      "unsavedMessage": "Vil du lagre endringene før du går ut av dette skjermbildet?",
+      "unsavedInvalidMessage": "Disse endringene kan ikke lagres ennå. Rett dem for å lagre, eller forkast dem for å gå ut."
     },
     "auditReportButton": {
       "viewA11y": "Vis revisjonsrapport"

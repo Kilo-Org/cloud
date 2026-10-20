@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "I-save ang mga pagbabago",
       "unsavedTitle": "Mga hindi na-save na pagbabago",
-      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?"
+      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?",
+      "unsavedInvalidMessage": "Hindi pa ma-save ang mga pagbabagong ito. Ayusin ang mga ito para ma-save, o itapon ang mga ito para umalis."
     },
     "auditReportButton": {
       "viewA11y": "Tingnan ang ulat ng audit"

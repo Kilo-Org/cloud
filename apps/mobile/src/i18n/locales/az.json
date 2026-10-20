@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Dəyişiklikləri yadda saxla",
       "unsavedTitle": "Yadda saxlanılmamış dəyişikliklər",
-      "unsavedMessage": "Bu ekrandan çıxmazdan əvvəl dəyişikliklər yadda saxlanılsın?"
+      "unsavedMessage": "Bu ekrandan çıxmazdan əvvəl dəyişikliklər yadda saxlanılsın?",
+      "unsavedInvalidMessage": "Bu dəyişiklikləri hələ yadda saxlamaq olmaz. Yadda saxlamaq üçün onları düzəlt və ya çıxmaq üçün ləğv et."
     },
     "auditReportButton": {
       "viewA11y": "Audit hesabatına bax"

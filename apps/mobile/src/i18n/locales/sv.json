@@ -1856,7 +1856,8 @@
     "settingsSave": {
       "saveChanges": "Spara ändringar",
       "unsavedTitle": "Osparade ändringar",
-      "unsavedMessage": "Vill du spara ändringarna innan du lämnar den här vyn?"
+      "unsavedMessage": "Vill du spara ändringarna innan du lämnar den här vyn?",
+      "unsavedInvalidMessage": "De här ändringarna kan inte sparas än. Åtgärda dem för att spara, eller kassera dem för att lämna."
     },
     "auditReportButton": {
       "viewA11y": "Visa revisionsrapport"

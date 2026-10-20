@@ -1374,6 +1374,7 @@
     "settingsSave": {
       "saveChanges": "Değişiklikleri kaydet",
       "unsavedMessage": "Bu ekrandan ayrılmadan önce değişikliklerini kaydetmek ister misin?",
+      "unsavedInvalidMessage": "Bu değişiklikler henüz kaydedilemez. Kaydetmek için bunları düzelt veya ayrılmak için vazgeç.",
       "unsavedTitle": "Kaydedilmemiş değişiklikler"
     },
     "setup": {

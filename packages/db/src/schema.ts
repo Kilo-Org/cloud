@@ -6204,6 +6204,9 @@ export const cliSessions = pgTable(
     forked_from: uuid().references((): AnyPgColumn => cliSessions.session_id, {
       onDelete: 'set null',
     }),
+    // Durable fork marker: `forked_from` is cleared when the source session is
+    // deleted, so per-account fork accounting reads this column instead.
+    is_fork: boolean().notNull().default(false),
     parent_session_id: uuid().references((): AnyPgColumn => cliSessions.session_id, {
       onDelete: 'set null',
     }),
@@ -6257,6 +6260,7 @@ export const sharedCliSessions = pgTable(
   },
   table => [
     index('IDX_shared_cli_sessions_session_id').on(table.session_id),
+    index('IDX_shared_cli_sessions_kilo_user_id').on(table.kilo_user_id),
     index('IDX_shared_cli_sessions_created_at').on(table.created_at),
     enumCheck('shared_cli_sessions_shared_state_check', table.shared_state, CliSessionSharedState),
   ]

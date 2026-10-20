@@ -8,6 +8,7 @@ import {
   SessionBlobCopyTooLargeError,
   copyBlobs,
   deleteBlobs,
+  type BlobUrlKeys,
   type FileName,
   type FolderName,
 } from '@/lib/r2/cli-sessions';
@@ -59,21 +60,39 @@ export type ReserveSharedSessionParams = {
   sharedState: string;
 };
 
+/** One row per blob type; a missing copy is stored as NULL rather than left out. */
+export function blobUrlColumns(copiedBlobs: Partial<Record<BlobUrlKeys, string>>) {
+  return {
+    api_conversation_history_blob_url: copiedBlobs.api_conversation_history_blob_url ?? null,
+    task_metadata_blob_url: copiedBlobs.task_metadata_blob_url ?? null,
+    ui_messages_blob_url: copiedBlobs.ui_messages_blob_url ?? null,
+    git_state_blob_url: copiedBlobs.git_state_blob_url ?? null,
+  };
+}
+
+const SHARED_SESSION_URL_COLUMNS = {
+  share_id: sharedCliSessions.share_id,
+  api_conversation_history_blob_url: sharedCliSessions.api_conversation_history_blob_url,
+  task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
+  ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
+  git_state_blob_url: sharedCliSessions.git_state_blob_url,
+} as const;
+
 /**
  * Reserve the share row for a session and state, or hand back the one that
- * already exists. A caller that gets `reused` must not copy anything: the
- * existing link keeps the snapshot it was published with.
+ * already exists. `needsCopy` is false only for a row that carries a copied
+ * blob: the existing link keeps the snapshot it was published with.
  */
 export async function reserveSharedSession({
   kiloUserId,
   sessionId,
   sharedState,
-}: ReserveSharedSessionParams): Promise<{ shareId: string; reused: boolean }> {
+}: ReserveSharedSessionParams): Promise<{ shareId: string; needsCopy: boolean }> {
   return db.transaction(async tx => {
     await lockOwnerCopies(tx, kiloUserId);
 
     const [existing] = await tx
-      .select({ share_id: sharedCliSessions.share_id })
+      .select(SHARED_SESSION_URL_COLUMNS)
       .from(sharedCliSessions)
       .where(
         and(
@@ -84,12 +103,17 @@ export async function reserveSharedSession({
       )
       .limit(1);
 
-    if (existing) return { shareId: existing.share_id, reused: true };
+    if (existing) {
+      const hasCopiedBlob = BLOB_TYPES.some(filename => existing[`${filename}_blob_url`] != null);
+      return { shareId: existing.share_id, needsCopy: !hasCopiedBlob };
+    }
 
     const [totals] = await tx
       .select({ shareCount: count() })
       .from(sharedCliSessions)
-      .where(eq(sharedCliSessions.kilo_user_id, kiloUserId));
+      .where(
+        and(eq(sharedCliSessions.kilo_user_id, kiloUserId), isNotNull(sharedCliSessions.session_id))
+      );
 
     if (totals.shareCount >= CLI_SESSION_SHARE_MAX_PER_OWNER) {
       throw new TRPCError({
@@ -108,7 +132,7 @@ export async function reserveSharedSession({
       })
       .returning({ share_id: sharedCliSessions.share_id });
 
-    return { shareId: row.share_id, reused: false };
+    return { shareId: row.share_id, needsCopy: true };
   });
 }
 
@@ -120,7 +144,7 @@ export async function reserveSharedSession({
  */
 export async function reserveForkedSession(
   kiloUserId: string,
-  values: Omit<typeof cliSessions.$inferInsert, 'session_id'>
+  values: Omit<typeof cliSessions.$inferInsert, 'session_id' | 'is_fork'>
 ): Promise<string> {
   return db.transaction(async tx => {
     await lockOwnerCopies(tx, kiloUserId);
@@ -128,7 +152,7 @@ export async function reserveForkedSession(
     const [totals] = await tx
       .select({ forkCount: count() })
       .from(cliSessions)
-      .where(and(eq(cliSessions.kilo_user_id, kiloUserId), isNotNull(cliSessions.forked_from)));
+      .where(and(eq(cliSessions.kilo_user_id, kiloUserId), eq(cliSessions.is_fork, true)));
 
     if (totals.forkCount >= CLI_SESSION_FORK_MAX_PER_OWNER) {
       throw new TRPCError({
@@ -138,7 +162,7 @@ export async function reserveForkedSession(
     }
 
     const sessionId = crypto.randomUUID();
-    await tx.insert(cliSessions).values({ session_id: sessionId, ...values });
+    await tx.insert(cliSessions).values({ session_id: sessionId, is_fork: true, ...values });
     return sessionId;
   });
 }

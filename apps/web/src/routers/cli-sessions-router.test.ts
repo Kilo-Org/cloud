@@ -1499,6 +1499,59 @@ describe('cli-sessions-router', () => {
       expect(shares).toHaveLength(1);
     });
 
+    it('completes a share whose copy never finished', async () => {
+      const [pendingShare] = await db
+        .insert(sharedCliSessions)
+        .values({
+          session_id: shareSessionId,
+          kilo_user_id: regularUser.id,
+          shared_state: CliSessionSharedState.Public,
+        })
+        .returning({ share_id: sharedCliSessions.share_id });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(copyBlobs).mockClear();
+
+      const result = await caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Public,
+      });
+
+      expect(result.share_id).toBe(pendingShare.share_id);
+      expect(copyBlobs).toHaveBeenCalledTimes(1);
+
+      const [stored] = await db
+        .select({ ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, pendingShare.share_id));
+
+      expect(stored.ui_messages_blob_url).toBe('sessions/new-id/ui_messages.json');
+    });
+
+    it('stores a share of a session that has no blobs', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(copyBlobs).mockResolvedValueOnce({});
+
+      const result = await caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Organization,
+      });
+
+      const [stored] = await db
+        .select()
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, result.share_id));
+
+      expect(stored).toMatchObject({
+        api_conversation_history_blob_url: null,
+        task_metadata_blob_url: null,
+        ui_messages_blob_url: null,
+        git_state_blob_url: null,
+      });
+    });
+
     it('keeps one share per shared state for the same session', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const { copyBlobs } = await import('@/lib/r2/cli-sessions');
@@ -1537,11 +1590,19 @@ describe('cli-sessions-router', () => {
           created_on_platform: 'vscode',
         })
         .returning({ session_id: cliSessions.session_id });
+      const [heldSession] = await db
+        .insert(cliSessions)
+        .values({
+          kilo_user_id: shareOwner.id,
+          title: 'Session Holding Shares',
+          created_on_platform: 'vscode',
+        })
+        .returning({ session_id: cliSessions.session_id });
 
       try {
         await db.insert(sharedCliSessions).values(
           Array.from({ length: CLI_SESSION_SHARE_MAX_PER_OWNER }, () => ({
-            session_id: null,
+            session_id: heldSession.session_id,
             kilo_user_id: shareOwner.id,
             shared_state: CliSessionSharedState.Public,
           }))
@@ -1569,6 +1630,7 @@ describe('cli-sessions-router', () => {
       } finally {
         await db.delete(sharedCliSessions).where(eq(sharedCliSessions.kilo_user_id, shareOwner.id));
         await db.delete(cliSessions).where(eq(cliSessions.session_id, session.session_id));
+        await db.delete(cliSessions).where(eq(cliSessions.session_id, heldSession.session_id));
       }
     });
 
@@ -1665,10 +1727,32 @@ describe('cli-sessions-router', () => {
         title: 'Forked from "Original Session for Fork"',
         forked_from: originalSessionId,
         version: 7,
+        is_fork: true,
       });
       expect(forkedSession.api_conversation_history_blob_url).toBe(
         'sessions/new-id/api_conversation_history.json'
       );
+    });
+
+    it('creates a fork of a session that has no blobs', async () => {
+      const caller = await createCallerForUser(otherUser.id);
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(copyBlobs).mockResolvedValueOnce({});
+
+      const result = await caller.cliSessions.fork({
+        share_or_session_id: sharedSessionId,
+        created_on_platform: 'vscode',
+      });
+
+      const [forkedSession] = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, result.session_id));
+
+      expect(forkedSession).toMatchObject({
+        is_fork: true,
+        ui_messages_blob_url: null,
+      });
     });
 
     it('refuses a fork when the account already holds its fork allowance', async () => {
@@ -1680,7 +1764,7 @@ describe('cli-sessions-router', () => {
             kilo_user_id: forkOwner.id,
             title: 'Existing fork',
             created_on_platform: 'vscode',
-            forked_from: originalSessionId,
+            is_fork: true,
           }))
         );
 

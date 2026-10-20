@@ -1,0 +1,2 @@
+ALTER TABLE "cli_sessions" ADD COLUMN "is_fork" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE INDEX "IDX_shared_cli_sessions_kilo_user_id" ON "shared_cli_sessions" USING btree ("kilo_user_id");

@@ -90,7 +90,7 @@ const config: KnipConfig = {
     },
     '../../services/db-proxy': {
       entry: ['src/index.ts'],
-      ignoreDependencies: ['cloudflare', '@cloudflare/vitest-pool-workers'],
+      ignoreDependencies: ['cloudflare'],
     },
     '../../services/deploy-infra/builder': {
       entry: ['src/index.ts'],

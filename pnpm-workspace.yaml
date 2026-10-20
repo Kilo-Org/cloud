@@ -53,6 +53,16 @@ catalog:
   wrangler: 4.135.0
   zod: 4.4.3
 
+catalogs:
+  # Active test stack: vitest 5 plus its companions at the same version. Every
+  # workspace uses `catalog:vitest5` except the ones that run their tests through
+  # `@cloudflare/vitest-pool-workers`, whose only peer range is `^4.1.0`; those
+  # keep the default `catalog:` entries above on vitest 4.
+  vitest5:
+    '@vitest/coverage-v8': 5.0.4
+    '@vitest/ui': 5.0.4
+    vitest: 5.0.4
+
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx

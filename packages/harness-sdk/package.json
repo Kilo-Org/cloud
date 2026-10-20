@@ -71,7 +71,7 @@
     "openai": "6.49.0",
     "ttsc": "0.28.3",
     "typescript": "7.0.2",
-    "vitest": "catalog:"
+    "vitest": "catalog:vitest5"
   },
   "files": [
     "dist",

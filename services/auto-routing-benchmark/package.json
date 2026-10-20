@@ -35,7 +35,7 @@
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
+    "vitest": "catalog:vitest5",
     "wrangler": "catalog:"
   }
 }

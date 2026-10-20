@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,7 +46,8 @@ import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/sch
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { toast } from 'sonner';
-import { Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
+import { Copy as CopyIcon, Globe, Lock, Plus, Pencil } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import Editor from '@monaco-editor/react';
 
 const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
@@ -102,9 +103,14 @@ type CopyInput = {
   internal_id: string | undefined;
 };
 
-type PendingPublicChange =
+/** A save that needs confirmation because it affects users beyond the editor. */
+type PendingChange = (
   | { kind: 'upsert'; input: UpsertInput }
-  | { kind: 'copy'; input: CopyInput };
+  | { kind: 'copy'; input: CopyInput }
+) & {
+  makesPublic: boolean;
+  replacesKiloExclusiveModel: boolean;
+};
 
 const initialEditorState: EditorState = {
   open: false,
@@ -123,7 +129,11 @@ export function CustomLlmsContent() {
   const deleteMutation = useDeleteCustomLlm();
   const [editor, setEditor] = useState<EditorState>(initialEditorState);
   const [copy, setCopy] = useState<CopyState | null>(null);
-  const [pendingPublicChange, setPendingPublicChange] = useState<PendingPublicChange | null>(null);
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
+  const kiloExclusiveModelIds = useMemo(
+    () => new Set(data?.kiloExclusiveModelIds),
+    [data?.kiloExclusiveModelIds]
+  );
 
   const openCreate = useCallback(() => {
     setEditor({
@@ -251,12 +261,14 @@ export function CustomLlmsContent() {
       display_name: displayName,
       internal_id: internalId || undefined,
     };
-    if (copy.sourceIsPublic) {
-      setPendingPublicChange({ kind: 'copy', input });
+    const makesPublic = copy.sourceIsPublic;
+    const replacesKiloExclusiveModel = kiloExclusiveModelIds.has(publicId);
+    if (makesPublic || replacesKiloExclusiveModel) {
+      setPendingChange({ kind: 'copy', input, makesPublic, replacesKiloExclusiveModel });
       return;
     }
     await submitCopy(input);
-  }, [copy, submitCopy]);
+  }, [copy, submitCopy, kiloExclusiveModelIds]);
 
   const handleSave = useCallback(async () => {
     const trimmedPublicId = editor.publicId.trim();
@@ -327,19 +339,22 @@ export function CustomLlmsContent() {
       definition: defResult.data,
       credentials: parsedCredentials,
     };
-    if (input.definition.public !== undefined && !editor.wasPublic) {
-      setPendingPublicChange({ kind: 'upsert', input });
+    const makesPublic = input.definition.public !== undefined && !editor.wasPublic;
+    const replacesKiloExclusiveModel =
+      editor.mode === 'create' && kiloExclusiveModelIds.has(trimmedPublicId);
+    if (makesPublic || replacesKiloExclusiveModel) {
+      setPendingChange({ kind: 'upsert', input, makesPublic, replacesKiloExclusiveModel });
       return;
     }
     await submitUpsert(input);
-  }, [editor, submitUpsert]);
+  }, [editor, submitUpsert, kiloExclusiveModelIds]);
 
-  const confirmPublicChange = useCallback(async () => {
-    const change = pendingPublicChange;
-    setPendingPublicChange(null);
+  const confirmPendingChange = useCallback(async () => {
+    const change = pendingChange;
+    setPendingChange(null);
     if (change?.kind === 'upsert') await submitUpsert(change.input);
     if (change?.kind === 'copy') await submitCopy(change.input);
-  }, [pendingPublicChange, submitUpsert, submitCopy]);
+  }, [pendingChange, submitUpsert, submitCopy]);
 
   const handleDelete = useCallback(
     async (publicId: string) => {
@@ -395,7 +410,24 @@ export function CustomLlmsContent() {
               <TableRow key={item.public_id}>
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
-                <TableCell>{item.definition.public ? 'Public' : 'Private'}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {item.definition.public ? (
+                      <Badge variant="new">
+                        <Globe />
+                        Public
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        <Lock />
+                        Private
+                      </Badge>
+                    )}
+                    {kiloExclusiveModelIds.has(item.public_id) && (
+                      <Badge variant="beta">Replaces Kilo-exclusive</Badge>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="font-mono text-sm">
                   {item.definition.internal_id ?? 'Not set'}
                 </TableCell>
@@ -602,31 +634,46 @@ export function CustomLlmsContent() {
       </Dialog>
 
       <AlertDialog
-        open={pendingPublicChange !== null}
+        open={pendingChange !== null}
         onOpenChange={open => {
-          if (!open) setPendingPublicChange(null);
+          if (!open) setPendingChange(null);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Make this custom LLM public?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {pendingChange?.makesPublic
+                ? 'Make this custom LLM public?'
+                : 'Replace a Kilo-exclusive model?'}
+            </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="flex flex-col gap-2">
+                {pendingChange?.makesPublic && (
+                  <p>
+                    Every Kilo user, including signed-out users, will be able to use{' '}
+                    <code className="font-mono">{pendingChange.input.public_id}</code> for free.
+                    Kilo pays for all usage.
+                  </p>
+                )}
+                {pendingChange?.replacesKiloExclusiveModel && (
+                  <p>
+                    <code className="font-mono">{pendingChange.input.public_id}</code> is a
+                    Kilo-exclusive model. This custom LLM replaces it for every user: anyone it is
+                    not available to gets a model-not-found error instead.
+                  </p>
+                )}
                 <p>
-                  Every Kilo user, including signed-out users, will be able to use{' '}
-                  <code className="font-mono">{pendingPublicChange?.input.public_id}</code> for
-                  free. Kilo pays for all usage.
-                </p>
-                <p>
-                  Test this definition with a local web app before publishing it. A broken
-                  definition fails requests for everyone.
+                  Test this definition with a local web app before saving it. A broken definition
+                  fails requests for everyone who can use it.
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPublicChange}>Make public</AlertDialogAction>
+            <AlertDialogAction onClick={confirmPendingChange}>
+              {pendingChange?.makesPublic ? 'Make public' : 'Replace model'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

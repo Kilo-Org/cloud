@@ -14,7 +14,10 @@ import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encrypti
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  isKiloExclusiveModel,
+  kiloExclusiveModels,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
 const publicIdSchema = z.string().trim().min(1, 'public_id is required');
 
@@ -87,7 +90,11 @@ export const adminCustomLlmRouter = createTRPCRouter({
       })
       .from(custom_llm2)
       .orderBy(asc(custom_llm2.public_id));
-    return { items: rows };
+    // The editor warns before a new custom LLM replaces one of these models.
+    return {
+      items: rows,
+      kiloExclusiveModelIds: kiloExclusiveModels.map(model => model.public_id),
+    };
   }),
 
   upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {

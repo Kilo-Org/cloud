@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/gl
 import { custom_llm2 } from '@kilocode/db/schema';
 import {
   findCustomLlm,
-  getPublicCustomLlmInferenceProviders,
+  getCustomLlmInferenceProviderRestriction,
   isCustomLlm,
   lookupCustomLlm,
   requireCustomLlmsById,
@@ -18,7 +18,10 @@ import {
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
-const exclusiveId = kiloExclusiveModels[0].public_id;
+const exclusiveId =
+  kiloExclusiveModels.find(model => !/[:~]/.test(model.public_id))?.public_id ?? '';
+const unclaimableExclusiveId =
+  kiloExclusiveModels.find(model => model.public_id.includes(':'))?.public_id ?? '';
 
 describe('custom LLM catalog', () => {
   beforeAll(async () => {
@@ -73,7 +76,9 @@ describe('custom LLM catalog', () => {
     });
 
     await expect(lookupCustomLlm(exclusiveId)).resolves.toEqual({ kind: 'unknown' });
+    await expect(lookupCustomLlm(unclaimableExclusiveId)).resolves.toEqual({ kind: 'none' });
     await expect(lookupCustomLlm('acme/public-model')).resolves.toEqual({ kind: 'none' });
+    await expect(getCustomLlmInferenceProviderRestriction(exclusiveId)).resolves.toEqual(new Set());
     await expect(findCustomLlm(exclusiveId)).resolves.toBeNull();
     await expect(requireCustomLlmsById()).rejects.toThrow('custom LLM catalog could not be read');
     expect(select).toHaveBeenCalledTimes(1);
@@ -92,11 +97,14 @@ describe('custom LLM catalog', () => {
     await expect(isFreeModel(exclusiveId)).resolves.toBe(true);
   });
 
-  test('returns inference providers only for public custom LLMs', async () => {
-    await expect(getPublicCustomLlmInferenceProviders('acme/public-model')).resolves.toEqual(
+  test('pins public custom LLMs to their providers and private ones to none', async () => {
+    await expect(getCustomLlmInferenceProviderRestriction('acme/public-model')).resolves.toEqual(
       new Set(['acme'])
     );
-    await expect(getPublicCustomLlmInferenceProviders('acme/private-model')).resolves.toBeNull();
-    await expect(getPublicCustomLlmInferenceProviders('openai/gpt-4o')).resolves.toBeNull();
+    await expect(getCustomLlmInferenceProviderRestriction('acme/private-model')).resolves.toEqual(
+      new Set()
+    );
+    await expect(getCustomLlmInferenceProviderRestriction(exclusiveId)).resolves.toEqual(new Set());
+    await expect(getCustomLlmInferenceProviderRestriction('openai/gpt-4o')).resolves.toBeNull();
   });
 });

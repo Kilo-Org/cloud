@@ -272,6 +272,16 @@ describe('adminCustomLlmRouter', () => {
       expect(item!.public_id).toBe(publicId);
       expect((item as Record<string, unknown>).encrypted_api_key).toBeUndefined();
     });
+
+    it('lists the Kilo-exclusive model ids a new custom LLM would replace', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const listResult = await caller.admin.customLlm.list();
+
+      expect(listResult.kiloExclusiveModelIds).toEqual(
+        kiloExclusiveModels.map(model => model.public_id)
+      );
+    });
   });
 
   describe('copy', () => {

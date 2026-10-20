@@ -1,6 +1,10 @@
 import 'server-only';
 import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
-import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
+import {
+  CustomLlmDefinitionSchema,
+  CustomLlmPublicIdSchema,
+  type CustomLlmDefinition,
+} from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { captureException } from '@sentry/nextjs';
@@ -140,9 +144,10 @@ export type CustomLlmLookup =
 
 /**
  * Resolves a model id for routing. While the catalog is unavailable, an id is
- * `unknown` only if it is a Kilo-exclusive id: a custom LLM may shadow it, and
- * routing must not fall back to the exclusive model. Any other custom LLM id
- * matches no built-in model, so treating it as built-in fails on its own.
+ * `unknown` only if it is a Kilo-exclusive id that a custom LLM could claim:
+ * a custom LLM may shadow it, and routing must not fall back to the exclusive
+ * model. Any other custom LLM id matches no built-in model, so treating it as
+ * built-in fails on its own.
  */
 export async function lookupCustomLlm(modelId: string): Promise<CustomLlmLookup> {
   const normalizedModelId = modelId.trim().toLowerCase();
@@ -151,6 +156,7 @@ export async function lookupCustomLlm(modelId: string): Promise<CustomLlmLookup>
   if (customLlm) return { kind: 'custom-llm', customLlm };
   if (
     !catalog.available &&
+    CustomLlmPublicIdSchema.safeParse(normalizedModelId).success &&
     kiloExclusiveModels.some(model => model.public_id === normalizedModelId)
   ) {
     return { kind: 'unknown' };
@@ -168,14 +174,18 @@ export async function isCustomLlm(modelId: string): Promise<boolean> {
 }
 
 /**
- * Inference providers a model id is restricted to by a public custom LLM, or
- * null when the id is not a public custom LLM.
+ * Inference providers a custom LLM pins its id to, or null when the id is not
+ * a custom LLM. A private custom LLM pins no providers: callers it is granted
+ * to are exempt from model policy, and nobody else may use it, even when it
+ * reuses a Kilo-exclusive id. The same holds while the catalog is unavailable
+ * for an id a custom LLM could shadow.
  */
-export async function getPublicCustomLlmInferenceProviders(
+export async function getCustomLlmInferenceProviderRestriction(
   modelId: string
 ): Promise<ReadonlySet<string> | null> {
-  const customLlm = await findCustomLlm(modelId);
-  return customLlm && isPublicCustomLlm(customLlm.definition)
-    ? new Set(customLlm.definition.public.inference_providers)
-    : null;
+  const lookup = await lookupCustomLlm(modelId);
+  if (lookup.kind === 'none') return null;
+  if (lookup.kind === 'unknown') return new Set();
+  const { definition } = lookup.customLlm;
+  return new Set(isPublicCustomLlm(definition) ? definition.public.inference_providers : []);
 }

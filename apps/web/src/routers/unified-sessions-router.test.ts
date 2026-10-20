@@ -119,6 +119,6 @@ describe('unifiedSessionsRouter organization scope', () => {
 
     await expect(
       caller.unifiedSessions.list({ organizationId: deletedOrganization.id })
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

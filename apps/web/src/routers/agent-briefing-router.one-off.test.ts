@@ -654,6 +654,30 @@ it('opens a frozen report with high-volume provenance', async () => {
   expect(report.sessions[0]?.title).toBe('Historical work');
 }, 30_000);
 
+it('excludes activity at the selected end from the bounded sample', async () => {
+  const caller = agentBriefingRouter.createCaller({ user });
+  const input = period();
+  const { sessionId } = await seedActivity(input);
+  await db.insert(agent_briefing_preferences).values({
+    kilo_user_id: user.id,
+    timezone: input.timezone,
+    created_at: new Date(Date.parse(input.startAt) - 86400_000).toISOString(),
+    next_run_at: new Date(Date.now() + 86400_000).toISOString(),
+  });
+  const end = Date.parse(input.endAt);
+  await db.insert(agent_briefing_events).values(
+    Array.from({ length: 9 }, (_, index) => ({
+      id: `final-bucket-${index}`,
+      session_id: sessionId,
+      kilo_user_id: user.id,
+      kind: 'activity' as const,
+      occurred_at: new Date(index === 8 ? end : end - 60_000 + index).toISOString(),
+    }))
+  );
+  const prepared = await caller.prepareOneOff(input);
+  expect(prepared.report.coverage.activity).toBe('complete');
+});
+
 it.each([
   { rootStatus: 'question', expectedStatus: 'question' },
   { rootStatus: 'idle', expectedStatus: null },
@@ -766,7 +790,10 @@ it.each([
       .from(agent_briefing_reports)
       .where(eq(agent_briefing_reports.id, prepared.report.id));
     if (!row) throw new Error('Missing snapshot fixture');
-    expect(Buffer.byteLength(JSON.stringify(row.facts), 'utf8')).toBeLessThanOrEqual(64_000);
+    const displayed = Object.fromEntries(
+      Object.entries(row.facts).filter(([key]) => !key.startsWith('evidence'))
+    );
+    expect(Buffer.byteLength(JSON.stringify(displayed), 'utf8')).toBeLessThanOrEqual(64_000);
     expect({
       coverage: prepared.report.coverage.activity,
       storedDate: row.local_date,

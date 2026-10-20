@@ -364,9 +364,7 @@ export async function collectBriefingEvidence(
               and(
                 eventScope,
                 gte(agent_briefing_events.occurred_at, range.startAt),
-                range.slice === sliceCount - 1
-                  ? lte(agent_briefing_events.occurred_at, range.endAt)
-                  : lt(agent_briefing_events.occurred_at, range.endAt)
+                lt(agent_briefing_events.occurred_at, range.endAt)
               )
             )
             .orderBy(order(agent_briefing_events.occurred_at), order(agent_briefing_events.id));

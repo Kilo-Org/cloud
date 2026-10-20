@@ -213,7 +213,7 @@ describe('processDiscordBotMessage session start authorization', () => {
     expect(runInput.systemPrompt).not.toContain('/connected-accounts');
 
     const toolResult = await runInput.toolExecutor(spawnToolCall(CONNECTED_REPOSITORY));
-    expect(toolResult.content).toContain('does not have access to this workspace');
+    expect(toolResult.content).toContain('connected to a different Kilo account');
     expect(mockRunSessionToCompletion).not.toHaveBeenCalled();
     expect(result.cloudAgentSessionId).toBeUndefined();
   });

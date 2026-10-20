@@ -36,8 +36,10 @@ export type DiscordSessionAuthorization =
   | { authorized: false; reason: DiscordSessionDenialReason; discordUserId?: string };
 
 const LINK_ACCOUNT_MESSAGE = `Starting a Cloud Agent session from Discord needs a linked Kilo account with access to this workspace. Connect your Discord account at ${APP_URL}/connected-accounts and mention the bot again.`;
-const WORKSPACE_ACCESS_MESSAGE =
-  'Your linked Kilo account does not have access to this workspace. Ask the workspace owner or an organization admin to grant access, then mention the bot again.';
+const INSTALLATION_OWNER_MESSAGE =
+  'This Discord server is connected to a different Kilo account, and only its owner can start sessions from it. Use the Kilo account that owns the installation, or ask the owner to connect the installation to an organization you belong to.';
+const ORGANIZATION_MEMBER_MESSAGE =
+  'Your linked Kilo account is not a member of this organization. Ask an organization owner or admin to add you, then mention the bot again.';
 
 const LINK_ACCOUNT_PROMPT_NOTICE = `
 
@@ -50,14 +52,21 @@ const ACCOUNT_UNAVAILABLE_PROMPT_NOTICE = `
 
 ## Session starts are unavailable to this Kilo account
 The Kilo account linked to this Discord account cannot start Cloud Agent sessions, so no tools are available.
-- If the request needs code changes, repository inspection, or a Cloud Agent session, reply that this Kilo account cannot start sessions and that a Kilo workspace administrator can review it.
+- If the request needs code changes, repository inspection, or a Cloud Agent session, reply that this Kilo account cannot start sessions and that Kilo support can review the account.
 - Never claim a session started, code changed, or a pull request was opened.`;
 
-const WORKSPACE_ACCESS_PROMPT_NOTICE = `
+const INSTALLATION_OWNER_PROMPT_NOTICE = `
 
 ## Session starts are unavailable to this Discord account
-This Discord account is linked to a Kilo account without access to this workspace, so you cannot start Cloud Agent sessions and no tools are available.
-- If the request needs code changes, repository inspection, or a Cloud Agent session, reply that the linked Kilo account needs workspace owner or organization member access, and that a workspace administrator can grant it.
+This Discord server is connected to a different Kilo account, and only its owner can start sessions from it, so no tools are available.
+- If the request needs code changes, repository inspection, or a Cloud Agent session, reply that the installation belongs to another Kilo account and that the owner can either use it from their own Discord account or connect the installation to an organization the user belongs to.
+- Never claim a session started, code changed, or a pull request was opened.`;
+
+const ORGANIZATION_MEMBER_PROMPT_NOTICE = `
+
+## Session starts are unavailable to this Discord account
+This Discord account is linked to a Kilo account that is not a member of the organization that owns this installation, so no tools are available.
+- If the request needs code changes, repository inspection, or a Cloud Agent session, reply that the linked Kilo account needs membership in the organization and that an organization owner or admin can add it.
 - Never claim a session started, code changed, or a pull request was opened.`;
 
 /** Reply text for each denial reason, so the guidance matches what can unblock it. */
@@ -65,9 +74,9 @@ export const DISCORD_SESSION_DENIAL_MESSAGES: Record<DiscordSessionDenialReason,
   unknown_requester: LINK_ACCOUNT_MESSAGE,
   unlinked_account: LINK_ACCOUNT_MESSAGE,
   account_unavailable:
-    'This Kilo account cannot start Cloud Agent sessions. Ask a Kilo workspace administrator to review the account.',
-  not_installation_owner: WORKSPACE_ACCESS_MESSAGE,
-  not_organization_member: WORKSPACE_ACCESS_MESSAGE,
+    'This Kilo account cannot start Cloud Agent sessions. Contact Kilo support if you believe this is a mistake.',
+  not_installation_owner: INSTALLATION_OWNER_MESSAGE,
+  not_organization_member: ORGANIZATION_MEMBER_MESSAGE,
 };
 
 /** System-prompt instructions for each denial reason. */
@@ -75,8 +84,8 @@ export const DISCORD_SESSION_DENIAL_PROMPT_NOTICES: Record<DiscordSessionDenialR
   unknown_requester: LINK_ACCOUNT_PROMPT_NOTICE,
   unlinked_account: LINK_ACCOUNT_PROMPT_NOTICE,
   account_unavailable: ACCOUNT_UNAVAILABLE_PROMPT_NOTICE,
-  not_installation_owner: WORKSPACE_ACCESS_PROMPT_NOTICE,
-  not_organization_member: WORKSPACE_ACCESS_PROMPT_NOTICE,
+  not_installation_owner: INSTALLATION_OWNER_PROMPT_NOTICE,
+  not_organization_member: ORGANIZATION_MEMBER_PROMPT_NOTICE,
 };
 
 /**

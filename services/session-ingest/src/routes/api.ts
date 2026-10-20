@@ -777,6 +777,14 @@ api.post('/session/:sessionId/share', async c => {
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
+  const accessibleSession = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!accessibleSession) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+
   const publicId = crypto.randomUUID();
   const removeSnapshot = () =>
     withDORetry(
@@ -787,11 +795,19 @@ api.post('/session/:sessionId/share', async c => {
 
   // Freeze the public info and mint the capability before mutating the row so
   // a snapshot or signing failure leaves the previous generation untouched.
-  await withDORetry(
-    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-    stub => stub.captureShareInfo(publicId),
-    'SessionIngestDO.captureShareInfo'
-  );
+  try {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.captureShareInfo(publicId),
+      'SessionIngestDO.captureShareInfo'
+    );
+  } catch (error) {
+    await removeSnapshot();
+    if (error instanceof Error && error.message === 'Session deleted') {
+      return c.json({ success: false, error: 'session_not_found' }, 404);
+    }
+    throw error;
+  }
 
   let shareToken: string;
   try {

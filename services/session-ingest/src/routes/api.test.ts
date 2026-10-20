@@ -2667,11 +2667,52 @@ describe('api routes', () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ success: false, error: 'session_not_found' });
-    expect(resolveAccessibleKiloSession).not.toHaveBeenCalled();
     expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
     expect(ingestStub.deleteShareInfo).toHaveBeenCalledWith(
       expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     );
+  });
+
+  it('POST /session/:sessionId/share returns 404 before capture when the session is not accessible', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue(null);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+    expect(fns.executeResult).not.toHaveBeenCalled();
+  });
+
+  it('POST /session/:sessionId/share maps a deleted DO to session_not_found', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const ingestStub = shareIngestStub();
+    ingestStub.captureShareInfo.mockRejectedValue(new Error('Session deleted'));
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(fns.executeResult).not.toHaveBeenCalled();
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it('POST /session/:sessionId/share does not rotate when signing fails', async () => {

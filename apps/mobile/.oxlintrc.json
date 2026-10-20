@@ -45,6 +45,12 @@
   },
   "ignorePatterns": ["dist/*", "node_modules/**"],
   "rules": {
+    "new-cap": [
+      "error",
+      {
+        "capIsNewExceptions": ["Reference"]
+      }
+    ],
     "no-restricted-globals": [
       "error",
       {

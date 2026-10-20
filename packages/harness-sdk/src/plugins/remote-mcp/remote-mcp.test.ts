@@ -104,7 +104,7 @@ describe('a remote server that says no', () => {
 describe('a call', () => {
   it('keeps its default deadline past the time it is waited on inline', async () => {
     const offered = await run(remoteMcpTools(serverFor('work', fixture.url, token), deps()));
-    const inline = Duration.toMillis(Duration.decode(only(offered).inlineFor ?? 0));
+    const inline = Duration.toMillis(Duration.fromInputUnsafe(only(offered).inlineFor ?? 0));
     expect(inline).toBeGreaterThan(0);
     expect(defaultCallTimeoutMs).toBeGreaterThan(inline);
   });

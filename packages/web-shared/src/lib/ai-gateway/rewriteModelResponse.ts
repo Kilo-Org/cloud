@@ -13,6 +13,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { getUpstreamBodyTermination } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type {
   ChatCompletionChunk,
   OpenRouterUsage,
@@ -274,7 +275,9 @@ function getResponseReadError(
     return null;
   }
 
-  if (error.name === 'ResponseAborted') {
+  const upstreamBodyTermination = getUpstreamBodyTermination(error);
+
+  if (error.name === 'ResponseAborted' || upstreamBodyTermination === 'disconnect') {
     return {
       errorType: 'upstream_disconnect',
       message: withRequestId(
@@ -298,7 +301,7 @@ function getResponseReadError(
     };
   }
 
-  if (error.name === 'TimeoutError') {
+  if (error.name === 'TimeoutError' || upstreamBodyTermination === 'timeout') {
     return {
       errorType: 'timeout',
       message: withRequestId(

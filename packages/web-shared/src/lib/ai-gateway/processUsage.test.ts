@@ -277,9 +277,16 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     ['responses', 'TimeoutError'],
     ['messages', 'ResponseAborted'],
     ['messages', 'TimeoutError'],
+    ['chat_completions', 'undici terminated'],
+    ['responses', 'undici terminated'],
+    ['messages', 'undici terminated'],
   ] as const)('handles %s response.text() %s errors', async (apiKind, errorName) => {
-    const streamError = new Error('Response interrupted');
-    streamError.name = errorName;
+    const streamError =
+      errorName === 'undici terminated'
+        ? new TypeError('terminated', {
+            cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }),
+          })
+        : Object.assign(new Error('Response interrupted'), { name: errorName });
     const response = new Response(
       new ReadableStream({
         start(controller) {

@@ -8,10 +8,8 @@ import { logger, withLogTags } from './logger.js';
 import {
   resolveSecret,
   validateStreamTicket,
-  validateWrapperDispatchTicket,
   STREAM_TICKET_AUDIENCE,
   TERMINAL_TICKET_AUDIENCE,
-  type WrapperAuthClaims,
 } from './auth.js';
 import { validateKiloToken } from './validate-kilo-token.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
@@ -27,9 +25,7 @@ import { runCloudAgentOutcomeCollection } from './telemetry/outcome-aggregate.js
 import { runCloudAgentOpenStockCollection } from './telemetry/open-stock.js';
 import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
-import { resolveTerminalWrapperClient } from './terminal/access.js';
 import { requestMethodAllowsBody } from './shared/http-proxy.js';
-import { hasDuplicateQueryParameters } from './shared/http-query.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from './session-access.js';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { and, eq, isNotNull } from 'drizzle-orm';
@@ -37,15 +33,10 @@ import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { getPgDb } from './db/pg.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
-  KILO_FACADE_GLOBAL_FEED_PATH,
   KILO_FACADE_USER_ID_HEADER,
 } from './kilo-facade/user-kilo-facade.js';
-import {
-  getSandboxSessionStub,
-  resolveLegacySessionStub,
-  resolveSessionStub,
-} from './sandbox-session/session-stub.js';
-import { isControlSession, isLegacySession, sessionFor } from './session-plane.js';
+import { getSandboxSessionStub } from './sandbox-session/session-stub.js';
+import { isControlSession } from './session-plane.js';
 import { PREVIEW_OPEN_PATH, handlePreviewOpen, handlePreviewRequest } from './preview/route.js';
 import { matchPreviewHost } from './preview/host.js';
 import { withoutPreviewMarkers } from './shared/preview-headers.js';
@@ -189,6 +180,11 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('PTY mismatch', { status: 403 });
   }
 
+  if (!isControlSession(cloudAgentSessionId)) {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Legacy session rejected');
+    return new Response('Not found', { status: 404 });
+  }
+
   try {
     await requireCurrentSessionAccess({
       env,
@@ -218,28 +214,8 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
 
-  return sessionFor(
-    cloudAgentSessionId,
-    () =>
-      getSandboxSessionStub(env, userId, cloudAgentSessionId).fetch(
-        createTerminalForwardRequest(request, '/terminal/browser', ptyId)
-      ),
-    async () => {
-      const stub = resolveLegacySessionStub(env, userId, cloudAgentSessionId);
-      if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
-        return new Response('Runtime authorization recovery is in progress', { status: 503 });
-      }
-      const metadata = await stub.getMetadata();
-      const terminal = await resolveTerminalWrapperClient({
-        env,
-        metadata,
-        sessionId: cloudAgentSessionId,
-      });
-      if (!terminal.success || !terminal.data) {
-        return new Response(terminal.error ?? 'Terminal unavailable', { status: 503 });
-      }
-      return terminal.data.client.connectTerminal(ptyId, request);
-    }
+  return getSandboxSessionStub(env, userId, cloudAgentSessionId).fetch(
+    createTerminalForwardRequest(request, '/terminal/browser', ptyId)
   );
 }
 
@@ -501,7 +477,7 @@ async function forwardRuntimeCredentialProxy(
   } | null;
   try {
     credential = await withDORetry(
-      () => resolveSessionStub(c.env, claims.userId, claims.sessionId),
+      () => getSandboxSessionStub(c.env, claims.userId, claims.sessionId),
       session => session.resolveRuntimeCredentialProxyGrant(handle),
       'resolveRuntimeCredentialProxyGrant'
     );
@@ -611,52 +587,6 @@ async function forwardRuntimeCredentialProxy(
   }
 }
 
-function parseOptionalWrapperGeneration(raw: string | null): number | undefined {
-  if (raw === null) return undefined;
-  const parsed = Number(raw);
-  return Number.isInteger(parsed) ? parsed : undefined;
-}
-
-/**
- * Defense-in-depth on top of the DO's own fencing checks: reject a wrapper
- * dispatch ticket whose claims disagree with the fence tuple carried on the
- * request itself. Only compares fields the caller supplies — a route that
- * doesn't parse a given fence field yet is not forced to require it.
- *
- * A legacy raw Kilo JWT (see auth.ts) carries no fence claims to compare, so
- * it is exempt — wrapper processes bound before ticket support shipped rely
- * on requireCurrentSessionAccess/the DO's own checks until their next dispatch.
- */
-function ticketClaimsMismatchRequestFence(
-  claims: WrapperAuthClaims,
-  expected: {
-    cloudAgentSessionId: string;
-    kiloSessionId?: string | null;
-    wrapperRunId?: string | null;
-    wrapperGeneration?: number;
-    wrapperConnectionId?: string | null;
-  }
-): boolean {
-  if (claims.type !== 'wrapper_dispatch_ticket') return false;
-  if (claims.cloudAgentSessionId !== expected.cloudAgentSessionId) return true;
-  if (expected.kiloSessionId != null && claims.kiloSessionId !== expected.kiloSessionId)
-    return true;
-  if (expected.wrapperRunId != null && claims.wrapperRunId !== expected.wrapperRunId) return true;
-  if (
-    expected.wrapperGeneration !== undefined &&
-    claims.wrapperGeneration !== expected.wrapperGeneration
-  ) {
-    return true;
-  }
-  if (
-    expected.wrapperConnectionId != null &&
-    claims.wrapperConnectionId !== expected.wrapperConnectionId
-  ) {
-    return true;
-  }
-  return false;
-}
-
 function stripPublicCredentialHeaders(headers: Headers): Headers {
   const sanitized = new Headers(headers);
   sanitized.delete('Authorization');
@@ -664,57 +594,6 @@ function stripPublicCredentialHeaders(headers: Headers): Headers {
   sanitized.delete(KILO_FACADE_USER_ID_HEADER);
   sanitized.delete(KILO_FACADE_AUTH_TOKEN_HEADER);
   return sanitized;
-}
-
-async function rejectLegacyWrapperTokenForRuntimeGrant(
-  env: Env,
-  claims: WrapperAuthClaims,
-  userId: string,
-  sessionId: string
-): Promise<Response | null> {
-  if (claims.type !== 'legacy_kilo_token') return null;
-  // The legacy wrapper grant check only applies to the legacy plane. A control
-  // session returns not-found before any authorization read, because its
-  // wrapper never presents a legacy Kilo token.
-  if (!isLegacySession(sessionId)) {
-    return new Response('Session not found', { status: 404 });
-  }
-  const status = await withDORetry(
-    () => resolveLegacySessionStub(env, userId, sessionId),
-    stub => stub.getRuntimeAuthorizationStatus(),
-    'getRuntimeAuthorizationStatus'
-  );
-  return status === 'legacy'
-    ? null
-    : new Response('Legacy wrapper token is not authorized', { status: 401 });
-}
-
-type WrapperTicketAuthorization =
-  | { ok: true; claims: WrapperAuthClaims }
-  | { ok: false; response: Response };
-
-async function authorizeWrapperTicketForSession(
-  c: Context<HonoContext>,
-  userId: string,
-  sessionId: string
-): Promise<WrapperTicketAuthorization> {
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateWrapperDispatchTicket(
-    c.req.header('Authorization') ?? null,
-    nextAuthSecret
-  );
-  if (!authResult.success) return { ok: false, response: c.text(authResult.error, 401) };
-  if (authResult.claims.userId !== userId) {
-    return { ok: false, response: c.text('Token does not match session user', 403) };
-  }
-  const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
-    c.env,
-    authResult.claims,
-    userId,
-    sessionId
-  );
-  if (legacyRejection) return { ok: false, response: legacyRejection };
-  return { ok: true, claims: authResult.claims };
 }
 
 async function routeToUserKiloFacade(
@@ -795,6 +674,11 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Session mismatch', 403);
   }
 
+  if (!isControlSession(cloudAgentSessionId)) {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Legacy session rejected');
+    return c.text('Not found', 404);
+  }
+
   try {
     await requireCurrentSessionAccess({
       env: c.env,
@@ -824,281 +708,12 @@ app.get('/stream', async (c: Context<HonoContext>) => {
 
   logger.withFields({ cloudAgentSessionId, userId }).info('/stream: WebSocket upgrade authorized');
 
-  return resolveSessionStub(c.env, userId, cloudAgentSessionId).fetch(c.req.raw);
+  return getSandboxSessionStub(c.env, userId, cloudAgentSessionId).fetch(c.req.raw);
 });
 
 app.get('/terminal', async (c: Context<HonoContext>) => {
   return handleTerminalWebSocket(c.req.raw, c.env);
 });
-
-app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<HonoContext>) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.text('Expected WebSocket upgrade', 426);
-  }
-
-  const rawUserId = c.req.param('userId');
-  const cloudAgentSessionId = c.req.param('sessionId');
-  if (!rawUserId || !cloudAgentSessionId) {
-    return c.text('Missing route params', 400);
-  }
-  if (!isLegacySession(cloudAgentSessionId)) {
-    return c.text('Not found', 404);
-  }
-
-  let userId: string;
-  try {
-    userId = decodeURIComponent(rawUserId);
-  } catch {
-    return c.text('Invalid userId encoding', 400);
-  }
-
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateWrapperDispatchTicket(
-    c.req.header('Authorization') ?? null,
-    nextAuthSecret
-  );
-  if (!authResult.success) {
-    return c.text(authResult.error, 401);
-  }
-  if (authResult.claims.userId !== userId) {
-    return c.text('Token does not match session user', 403);
-  }
-
-  const url = new URL(c.req.url);
-  if (hasDuplicateQueryParameters(url.searchParams)) {
-    return c.text('Invalid global feed producer identity', 400);
-  }
-  const kiloSessionId = url.searchParams.get('kiloSessionId');
-  const wrapperRunId = url.searchParams.get('wrapperRunId');
-  const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
-  const wrapperConnectionId = url.searchParams.get('wrapperConnectionId');
-  const wrapperGeneration = wrapperGenerationParam ? Number(wrapperGenerationParam) : NaN;
-
-  if (
-    !kiloSessionId ||
-    !wrapperRunId ||
-    !Number.isInteger(wrapperGeneration) ||
-    wrapperGeneration < 0 ||
-    !wrapperConnectionId
-  ) {
-    return c.text('Invalid global feed producer identity', 400);
-  }
-
-  if (
-    ticketClaimsMismatchRequestFence(authResult.claims, {
-      cloudAgentSessionId,
-      kiloSessionId,
-      wrapperRunId,
-      wrapperGeneration,
-      wrapperConnectionId,
-    })
-  ) {
-    return c.text('Ticket does not match dispatch fence', 403);
-  }
-
-  try {
-    await requireCurrentSessionAccess({
-      env: c.env,
-      kiloUserId: userId,
-      cloudAgentSessionId,
-      expectedKiloSessionId: kiloSessionId,
-    });
-  } catch (error) {
-    return projectSessionAccessHttpError(error);
-  }
-
-  // The Kilo global feed is a legacy-plane producer route; the control wrapper
-  // publishes through the control-plane ingest instead. The guard above already
-  // failed a control session closed, so this always validates a legacy session.
-  const validation = await resolveLegacySessionStub(
-    c.env,
-    userId,
-    cloudAgentSessionId
-  ).validateKiloGlobalFeedProducer({
-    kiloSessionId,
-    wrapperRunId,
-    wrapperGeneration,
-    wrapperConnectionId,
-  });
-  if (!validation.success) {
-    return new Response(validation.message, { status: validation.status });
-  }
-
-  const facadeId = c.env.USER_KILO_FACADE.idFromName(userId);
-  const facadeStub = c.env.USER_KILO_FACADE.get(facadeId);
-  const facadeUrl = new URL(c.req.url);
-  facadeUrl.pathname = KILO_FACADE_GLOBAL_FEED_PATH;
-  facadeUrl.search = '';
-  facadeUrl.searchParams.set('userId', userId);
-  facadeUrl.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
-  facadeUrl.searchParams.set('kiloSessionId', kiloSessionId);
-  facadeUrl.searchParams.set('wrapperRunId', wrapperRunId);
-  facadeUrl.searchParams.set('wrapperGeneration', String(wrapperGeneration));
-  facadeUrl.searchParams.set('wrapperConnectionId', wrapperConnectionId);
-
-  const headers = stripPublicCredentialHeaders(c.req.raw.headers);
-  const request = createSanitizedForwardRequest(c.req.raw, facadeUrl, headers);
-  return facadeStub.fetch(request);
-});
-
-app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.text('Expected WebSocket upgrade', 426);
-  }
-
-  const rawUserId = c.req.param('userId');
-  const sessionId = c.req.param('sessionId');
-  if (!rawUserId || !sessionId) {
-    return c.text('Missing route params', 400);
-  }
-
-  let userId: string;
-  try {
-    userId = decodeURIComponent(rawUserId);
-  } catch {
-    return c.text('Invalid userId encoding', 400);
-  }
-
-  const ticketAuth = await authorizeWrapperTicketForSession(c, userId, sessionId);
-  if (!ticketAuth.ok) return ticketAuth.response;
-  const { claims } = ticketAuth;
-
-  const url = new URL(c.req.url);
-  const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
-  const wrapperGeneration = parseOptionalWrapperGeneration(wrapperGenerationParam);
-  if (wrapperGenerationParam !== null && wrapperGeneration === undefined) {
-    return c.text('Invalid wrapperGeneration parameter', 400);
-  }
-  if (
-    ticketClaimsMismatchRequestFence(claims, {
-      cloudAgentSessionId: sessionId,
-      kiloSessionId: url.searchParams.get('kiloSessionId'),
-      wrapperRunId: url.searchParams.get('wrapperRunId'),
-      wrapperGeneration,
-      wrapperConnectionId: url.searchParams.get('wrapperConnectionId'),
-    })
-  ) {
-    return c.text('Ticket does not match dispatch fence', 403);
-  }
-
-  try {
-    await requireCurrentSessionAccess({
-      env: c.env,
-      kiloUserId: userId,
-      cloudAgentSessionId: sessionId,
-    });
-  } catch (error) {
-    return projectSessionAccessHttpError(error);
-  }
-
-  if (!isLegacySession(sessionId)) {
-    return c.text('Not found', 404);
-  }
-
-  const stub = resolveSessionStub(c.env, userId, sessionId);
-  const doUrl = new URL(c.req.url);
-  doUrl.pathname = '/ingest';
-  const doRequest = new Request(doUrl.toString(), c.req.raw);
-  return stub.fetch(doRequest);
-});
-
-const ALLOWED_LOG_FILENAMES = new Set(['logs.tar.gz']);
-const MAX_LOG_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
-
-app.put(
-  '/sessions/:userId/:sessionId/logs/:executionId/:filename',
-  async (c: Context<HonoContext>) => {
-    const rawUserId = c.req.param('userId');
-    const filename = c.req.param('filename');
-    const sessionId = c.req.param('sessionId');
-    const executionId = c.req.param('executionId');
-    if (!rawUserId || !filename || !sessionId || !executionId) {
-      return c.text('Missing route params', 400);
-    }
-    if (!isLegacySession(sessionId)) {
-      return c.text('Not found', 404);
-    }
-
-    let userId: string;
-    try {
-      userId = decodeURIComponent(rawUserId);
-    } catch {
-      return c.text('Invalid userId encoding', 400);
-    }
-
-    if (!ALLOWED_LOG_FILENAMES.has(filename)) {
-      return c.text('Invalid filename', 400);
-    }
-
-    const ticketAuth = await authorizeWrapperTicketForSession(c, userId, sessionId);
-    if (!ticketAuth.ok) return ticketAuth.response;
-    const { claims } = ticketAuth;
-
-    const kiloSessionId = new URL(c.req.url).searchParams.get('kiloSessionId');
-    if (!kiloSessionId && claims.type === 'wrapper_dispatch_ticket') {
-      return c.text('Missing kiloSessionId parameter', 400);
-    }
-
-    if (
-      ticketClaimsMismatchRequestFence(claims, {
-        cloudAgentSessionId: sessionId,
-        kiloSessionId,
-      })
-    ) {
-      return c.text('Ticket does not match dispatch fence', 403);
-    }
-
-    try {
-      const sessionAccess = await requireCurrentSessionAccess({
-        env: c.env,
-        kiloUserId: userId,
-        cloudAgentSessionId: sessionId,
-        expectedKiloSessionId: kiloSessionId ?? undefined,
-      });
-      const authoritativeKiloSessionId = kiloSessionId ?? sessionAccess.kiloSessionId;
-      if (!authoritativeKiloSessionId) {
-        return c.text('Missing kiloSessionId parameter', 400);
-      }
-    } catch (error) {
-      return projectSessionAccessHttpError(error);
-    }
-
-    const contentLength = parseInt(c.req.header('Content-Length') ?? '', 10);
-    if (contentLength > MAX_LOG_UPLOAD_BYTES) {
-      return c.text('Request body too large', 413);
-    }
-
-    // Buffer the body — R2 requires a known-length value (ArrayBuffer, string, etc.)
-    const body = await c.req.arrayBuffer();
-    if (body.byteLength === 0) {
-      return c.text('Missing request body', 400);
-    }
-    if (body.byteLength > MAX_LOG_UPLOAD_BYTES) {
-      return c.text('Request body too large', 413);
-    }
-
-    const safeUserId = encodeURIComponent(userId);
-    const safeSessionId = encodeURIComponent(sessionId);
-    const safeExecutionId = encodeURIComponent(executionId);
-
-    try {
-      await c.env.R2_BUCKET.put(
-        `logs/${safeUserId}/${safeSessionId}/${safeExecutionId}/${filename}`,
-        body,
-        { httpMetadata: { contentType: 'application/gzip' } }
-      );
-    } catch (err) {
-      logger
-        .withFields({ error: err instanceof Error ? err.message : String(err) })
-        .error('R2 put failed for log upload');
-      return c.text('R2 write failed', 500);
-    }
-
-    return c.body(null, 204);
-  }
-);
 
 app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);
@@ -1133,8 +748,8 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
 
   for (const row of rows) {
     const sessionId = row.cloudAgentSessionId;
-    if (!sessionId) continue;
-    await resolveSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+    if (!sessionId || !isControlSession(sessionId)) continue;
+    await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
   }
 
   return c.body(null, 204);

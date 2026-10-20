@@ -509,32 +509,77 @@ describe('applyReasoningDetailsTransform', () => {
 
 describe('removeModelsFallback', () => {
   it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5', 'openai/gpt-4o'])(
-    'removes caller-provided fallbacks for %s',
+    'removes and logs caller-provided fallbacks for %s',
     requestedModel => {
       const request = makeRequest(requestedModel, ['caller/fallback']);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeModelsFallback(request);
+      removeModelsFallback(requestedModel, request, 'user-1');
 
       expect(request.body.models).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+        {
+          userId: 'user-1',
+          model: requestedModel,
+          requestKind: 'chat_completions',
+          models: ['caller/fallback'],
+          fallbacks: undefined,
+        }
+      );
+      warn.mockRestore();
     }
   );
 
   it.each([[[{ model: 'anthropic/claude-opus-4.6' }]], ['default']])(
-    'removes caller-provided Messages API fallbacks %j',
+    'removes and logs caller-provided Messages API fallbacks %j',
     fallbacks => {
-      const request = makeMessagesRequest('thinkingmachines/inkling-small:free');
+      const model = 'thinkingmachines/inkling-small:free';
+      const request = makeMessagesRequest(model);
       request.body.fallbacks = fallbacks;
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeModelsFallback(request);
+      removeModelsFallback(model, request, 'user-1');
 
       expect(request.body).not.toHaveProperty('fallbacks');
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+        {
+          userId: 'user-1',
+          model,
+          requestKind: 'messages',
+          models: undefined,
+          fallbacks,
+        }
+      );
+      warn.mockRestore();
     }
   );
+
+  it.each([
+    ['no fallback fields', {}],
+    ['empty models', { models: [] }],
+    ['null fallbacks', { fallbacks: null }],
+    ['empty fallbacks', { fallbacks: [] }],
+  ])('does not log when there is nothing to remove (%s)', (_, fields) => {
+    const model = 'anthropic/claude-opus-5';
+    const request = makeMessagesRequest(model);
+    Object.assign(request.body, fields);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    removeModelsFallback(model, request, 'user-1');
+
+    expect(request.body).not.toHaveProperty('models');
+    expect(request.body).not.toHaveProperty('fallbacks');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 
   it('removes Messages API fallbacks before a free model request is sent upstream', async () => {
     const model = 'thinkingmachines/inkling-small:free';
     const request = makeMessagesRequest(model);
     request.body.fallbacks = [{ model: 'anthropic/claude-opus-4.6' }];
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     await applyProviderSpecificLogic(
       makeProvider(null),
@@ -551,6 +596,11 @@ describe('removeModelsFallback', () => {
     );
 
     expect(request.body).not.toHaveProperty('fallbacks');
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+      expect.objectContaining({ userId: 'user-1', model, requestKind: 'messages' })
+    );
+    warn.mockRestore();
   });
 });
 

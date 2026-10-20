@@ -237,9 +237,29 @@ export function applyPreferredProvider(
  * back to a paid model and be served without being charged. OpenRouter accepts
  * them as `models` on every API and as `fallbacks` on the Messages API.
  */
-export function removeModelsFallback(requestToMutate: GatewayRequest) {
+export function removeModelsFallback(
+  requestedModel: string,
+  requestToMutate: GatewayRequest,
+  userId: string
+) {
+  const { models, fallbacks } = requestToMutate.body;
   delete requestToMutate.body.models;
   delete requestToMutate.body.fallbacks;
+
+  if (!hasFallbackModels(models) && !hasFallbackModels(fallbacks)) {
+    return;
+  }
+  console.warn('[applyProviderSpecificLogic] Removed caller-provided fallback models', {
+    userId,
+    model: requestedModel,
+    requestKind: requestToMutate.kind,
+    models,
+    fallbacks,
+  });
+}
+
+function hasFallbackModels(value: unknown) {
+  return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
 }
 
 export function removeUnsupportedRequestServiceTier(
@@ -306,7 +326,7 @@ export async function applyProviderSpecificLogic(
   taskId: string | null,
   isNonTrialEnterprise: boolean
 ) {
-  removeModelsFallback(requestToMutate);
+  removeModelsFallback(requestedModel, requestToMutate, userId);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

@@ -2062,7 +2062,7 @@ describe('createSessionWithLedger admission ladder', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'code-review',
+          createdOnPlatform: 'cli',
           kilocodeOrganizationId: orgId,
         },
       })
@@ -2077,7 +2077,7 @@ describe('createSessionWithLedger admission ladder', () => {
     );
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
-        identity: expect.objectContaining({ orgId, createdOnPlatform: 'code-review' }),
+        identity: expect.objectContaining({ orgId, createdOnPlatform: 'cli' }),
         workspace: expect.objectContaining({
           sandboxId: expect.any(String),
           sandboxAllocation: 'isolated-standard',
@@ -2094,7 +2094,7 @@ describe('createSessionWithLedger admission ladder', () => {
       runtime: { sandboxAllocation: 'isolated-standard' },
       options: {
         operationKey: OPERATION_KEY,
-        createdOnPlatform: 'code-review',
+        createdOnPlatform: 'cli',
         kilocodeOrganizationId: orgId,
       },
     });
@@ -5073,7 +5073,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'code-review',
+          createdOnPlatform: 'cli',
           kilocodeOrganizationId: orgId,
         },
       })

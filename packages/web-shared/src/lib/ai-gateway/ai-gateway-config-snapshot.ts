@@ -1,4 +1,5 @@
 import { ai_gateway_config } from '@kilocode/db/schema';
+import { waitUntil } from '@vercel/functions';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
@@ -41,17 +42,46 @@ export async function readAiGatewayConfigSnapshot(
   return row ?? null;
 }
 
-async function readRedisSnapshot(): Promise<AiGatewayConfigSnapshot | null> {
+const DELETE_IF_UNCHANGED_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
+
+function parseRedisSnapshot(cached: string): AiGatewayConfigSnapshot | null {
   try {
-    const cached = await redisClient.get<string>(AI_GATEWAY_CONFIG_REDIS_KEY);
-    if (cached === null) return null;
     const parsed = AiGatewayConfigSnapshotSchema.safeParse(JSON.parse(cached));
     if (parsed.success) return parsed.data;
     warnExceptInTest('[ai-gateway-config] ignoring invalid Redis snapshot', parsed.error.message);
   } catch (error) {
-    warnExceptInTest('[ai-gateway-config] Redis read failed', error);
+    warnExceptInTest('[ai-gateway-config] ignoring unparseable Redis snapshot', error);
   }
   return null;
+}
+
+// Removes an invalid value so the NX populate can replace it, without deleting a valid
+// snapshot a writer stored after it was read.
+async function deleteInvalidRedisSnapshot(invalid: string): Promise<void> {
+  try {
+    await redisClient.eval(DELETE_IF_UNCHANGED_SCRIPT, [AI_GATEWAY_CONFIG_REDIS_KEY], [invalid]);
+  } catch (error) {
+    warnExceptInTest('[ai-gateway-config] Redis delete of an invalid snapshot failed', error);
+  }
+}
+
+async function readRedisSnapshot(): Promise<AiGatewayConfigSnapshot | null> {
+  let cached: string | null;
+  try {
+    cached = await redisClient.get<string>(AI_GATEWAY_CONFIG_REDIS_KEY);
+  } catch (error) {
+    warnExceptInTest('[ai-gateway-config] Redis read failed', error);
+    return null;
+  }
+  if (cached === null) return null;
+  const snapshot = parseRedisSnapshot(cached);
+  if (!snapshot) await deleteInvalidRedisSnapshot(cached);
+  return snapshot;
 }
 
 async function populateRedisSnapshot(snapshot: AiGatewayConfigSnapshot): Promise<void> {
@@ -71,7 +101,7 @@ async function loadAiGatewayConfigSnapshot(): Promise<AiGatewayConfigSnapshot | 
   if (cached) return cached;
 
   const snapshot = await readAiGatewayConfigSnapshot(readDb);
-  if (snapshot) void populateRedisSnapshot(snapshot);
+  if (snapshot) waitUntil(populateRedisSnapshot(snapshot));
   return snapshot;
 }
 
@@ -113,14 +143,25 @@ export function createAiGatewayConfigSelector<T>(
 
 /**
  * Call after committing a write to `ai_gateway_config`. Stores the row read back from the
- * primary, overwriting whatever a reader populated from a possibly lagging replica. On failure
- * it deletes the key so the next reader repopulates; the Redis TTL bounds staleness if that
- * fails too. Never throws.
+ * primary, overwriting whatever a reader populated from a possibly lagging replica. If the
+ * read-back fails, Redis is left untouched: deleting the key would let a lagging replica
+ * repopulate it. If the write fails, the key is deleted so the next reader repopulates; the
+ * Redis TTL bounds staleness if that fails too. Never throws.
  */
 export async function publishAiGatewayConfigSnapshot(): Promise<void> {
+  let snapshot: AiGatewayConfigSnapshot | null;
   try {
-    const snapshot = await readAiGatewayConfigSnapshot(db);
-    if (!snapshot) throw new Error('ai_gateway_config row is missing after a write');
+    snapshot = await readAiGatewayConfigSnapshot(db);
+  } catch (error) {
+    console.error('[ai-gateway-config] primary read-back failed; Redis left unchanged', error);
+    return;
+  }
+  if (!snapshot) {
+    console.error('[ai-gateway-config] row is missing after a write; Redis left unchanged');
+    return;
+  }
+
+  try {
     await redisClient.set(AI_GATEWAY_CONFIG_REDIS_KEY, JSON.stringify(snapshot), {
       ex: REDIS_TTL_SECONDS,
     });

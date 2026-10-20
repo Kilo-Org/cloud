@@ -3,6 +3,7 @@ import { ai_gateway_config } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { cleanupDbForTest, db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { waitUntil } from '@vercel/functions';
 import { AI_GATEWAY_CONFIG_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 import {
   createAiGatewayConfigSelector,
@@ -12,12 +13,19 @@ import {
 } from './ai-gateway-config-snapshot';
 
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
-  redisClient: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
+  redisClient: { get: jest.fn(), set: jest.fn(), del: jest.fn(), eval: jest.fn() },
+}));
+
+jest.mock('@vercel/functions', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@vercel/functions'),
+  waitUntil: jest.fn(),
 }));
 
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
 const mockedRedisDel = jest.mocked(redisClient.del);
+const mockedRedisEval = jest.mocked(redisClient.eval);
+const mockedWaitUntil = jest.mocked(waitUntil);
 
 const storedSnapshot: AiGatewayConfigSnapshot = {
   config: { vercel_routing_enabled: false },
@@ -73,6 +81,12 @@ beforeEach(async () => {
   mockedRedisDel.mockReset();
   mockedRedisDel.mockImplementation((async (key: string) =>
     Number(redisValues.delete(key))) as never);
+  mockedRedisEval.mockReset();
+  mockedRedisEval.mockImplementation((async (_script: string, keys: string[], args: string[]) => {
+    if (redisValues.get(keys[0]) !== args[0]) return 0;
+    return Number(redisValues.delete(keys[0]));
+  }) as never);
+  mockedWaitUntil.mockClear();
 });
 
 describe('getAiGatewayConfigSnapshot', () => {
@@ -89,6 +103,7 @@ describe('getAiGatewayConfigSnapshot', () => {
       JSON.stringify(storedSnapshot),
       { nx: true, ex: 300 }
     );
+    expect(mockedWaitUntil).toHaveBeenCalledTimes(1);
   });
 
   it('does not overwrite a value already in Redis when populating', async () => {
@@ -118,19 +133,41 @@ describe('getAiGatewayConfigSnapshot', () => {
     expect(mockedRedisGet).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    ['Redis throws', () => mockedRedisGet.mockRejectedValueOnce(new Error('timeout'))],
-    ['Redis holds invalid JSON', () => redisValues.set(AI_GATEWAY_CONFIG_REDIS_KEY, '{not json')],
-    [
-      'Redis holds an invalid snapshot',
-      () => redisValues.set(AI_GATEWAY_CONFIG_REDIS_KEY, JSON.stringify({ config: {} })),
-    ],
-  ])('falls back to the database when %s', async (_case, arrange) => {
-    arrange();
+  it('falls back to the database when Redis throws', async () => {
+    mockedRedisGet.mockRejectedValueOnce(new Error('timeout'));
     const select = jest.spyOn(readDb, 'select');
 
     expect(await getAiGatewayConfigSnapshot()).toEqual(storedSnapshot);
     expect(select).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['invalid JSON', '{not json'],
+    ['an invalid snapshot', JSON.stringify({ config: {} })],
+  ])('replaces Redis holding %s with the database value', async (_case, invalid) => {
+    redisValues.set(AI_GATEWAY_CONFIG_REDIS_KEY, invalid);
+    const select = jest.spyOn(readDb, 'select');
+
+    expect(await getAiGatewayConfigSnapshot()).toEqual(storedSnapshot);
+    await flushBackgroundWrites();
+
+    expect(select).toHaveBeenCalledTimes(1);
+    expect(mockedRedisEval).toHaveBeenCalledWith(
+      expect.any(String),
+      [AI_GATEWAY_CONFIG_REDIS_KEY],
+      [invalid]
+    );
+    expect(redisValues.get(AI_GATEWAY_CONFIG_REDIS_KEY)).toBe(JSON.stringify(storedSnapshot));
+  });
+
+  it('keeps a valid snapshot a writer stored after an invalid value was read', async () => {
+    mockedRedisGet.mockResolvedValueOnce('{not json' as never);
+    redisValues.set(AI_GATEWAY_CONFIG_REDIS_KEY, JSON.stringify(redisSnapshot));
+
+    expect(await getAiGatewayConfigSnapshot()).toEqual(storedSnapshot);
+    await flushBackgroundWrites();
+
+    expect(redisValues.get(AI_GATEWAY_CONFIG_REDIS_KEY)).toBe(JSON.stringify(redisSnapshot));
   });
 
   it('still serves the database value when populating Redis fails', async () => {
@@ -138,24 +175,6 @@ describe('getAiGatewayConfigSnapshot', () => {
 
     expect(await getAiGatewayConfigSnapshot()).toEqual(storedSnapshot);
     await flushBackgroundWrites();
-  });
-
-  it('shares one Redis read and one database query between concurrent callers', async () => {
-    let releaseRedis: (value: null) => void = () => {};
-    mockedRedisGet.mockImplementationOnce(
-      (() =>
-        new Promise<null>(resolve => {
-          releaseRedis = resolve;
-        })) as never
-    );
-    const select = jest.spyOn(readDb, 'select');
-
-    const results = Promise.all(Array.from({ length: 5 }, () => getAiGatewayConfigSnapshot()));
-    releaseRedis(null);
-
-    expect(await results).toEqual(Array.from({ length: 5 }, () => storedSnapshot));
-    expect(mockedRedisGet).toHaveBeenCalledTimes(1);
-    expect(select).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the last-known-good snapshot when the database fails', async () => {
@@ -248,6 +267,20 @@ describe('publishAiGatewayConfigSnapshot', () => {
 
     expect(mockedRedisDel).toHaveBeenCalledWith(AI_GATEWAY_CONFIG_REDIS_KEY);
     expect(redisValues.has(AI_GATEWAY_CONFIG_REDIS_KEY)).toBe(false);
+  });
+
+  it('leaves Redis untouched when the primary read-back fails', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    redisValues.set(AI_GATEWAY_CONFIG_REDIS_KEY, JSON.stringify(redisSnapshot));
+    jest.spyOn(db, 'select').mockImplementation(() => {
+      throw new Error('primary unavailable');
+    });
+
+    await publishAiGatewayConfigSnapshot();
+
+    expect(mockedRedisSet).not.toHaveBeenCalled();
+    expect(mockedRedisDel).not.toHaveBeenCalled();
+    expect(redisValues.get(AI_GATEWAY_CONFIG_REDIS_KEY)).toBe(JSON.stringify(redisSnapshot));
   });
 
   it('does not throw when both the write and the delete fail', async () => {

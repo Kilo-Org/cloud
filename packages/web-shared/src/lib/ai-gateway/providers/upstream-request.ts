@@ -19,6 +19,7 @@ import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
+import type { CustomLlmAwsBedrockCredentials } from '@kilocode/db/schema-types';
 import {
   isUpstreamUrlPolicyEnforced,
   rejectDisallowedUpstreamUrls,
@@ -259,23 +260,20 @@ function upstreamFetchFailureResponse(
   );
 }
 
-async function buildDirectRequest({
+async function buildSignedBedrockRequest({
   url,
   method,
   headers,
   body,
-  provider,
+  credentials,
 }: {
   url: string;
   method: string;
   headers: Headers;
   body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
-  provider: Provider;
+  credentials: CustomLlmAwsBedrockCredentials;
 }) {
   const serializedBody = JSON.stringify(body);
-  if (!provider.awsBedrock) {
-    return { url, headers, body: serializedBody };
-  }
   return {
     url,
     headers: await signBedrockRequest({
@@ -283,7 +281,7 @@ async function buildDirectRequest({
       method,
       headers,
       body: serializedBody,
-      credentials: provider.awsBedrock,
+      credentials,
     }),
     body: serializedBody,
   };
@@ -368,7 +366,15 @@ export async function upstreamRequest({
           upstreamHeaders: headers,
           body,
         })
-      : await buildDirectRequest({ url: targetUrl, method, headers, body, provider });
+      : provider.awsBedrock
+        ? await buildSignedBedrockRequest({
+            url: targetUrl,
+            method,
+            headers,
+            body,
+            credentials: provider.awsBedrock,
+          })
+        : { url: targetUrl, headers, body: JSON.stringify(body) };
 
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.

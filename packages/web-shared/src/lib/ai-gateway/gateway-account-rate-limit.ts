@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getAnonymousUserId } from '@kilocode/web-shared/lib/anonymous';
 import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
-import { isFirewallRateLimited } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
+import { checkFirewallRateLimit } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
 
 /**
  * Vercel Firewall rate limit that caps how much inference one account can ask
@@ -43,6 +43,15 @@ export function gatewayRateLimitKey(headers: Headers, ipAddress: string | undefi
 }
 
 /**
+ * Result of the account inference cap.
+ *
+ * `unavailable` is separate from `rate-limited` because the two mean different
+ * things to the caller: a limited account asked for too much, while an
+ * unavailable cap means the gateway cannot enforce the limit at all.
+ */
+export type GatewayRateLimitOutcome = 'admitted' | 'rate-limited' | 'unavailable';
+
+/**
  * Caps the inference request rate of one account across every source address.
  *
  * The WAF rules in front of this route count per IP, so an actor holding a
@@ -50,14 +59,24 @@ export function gatewayRateLimitKey(headers: Headers, ipAddress: string | undefi
  * through. That is how a flood reached the usage writes behind this route and
  * exhausted the connection pool. Keying on the account instead of the address
  * is what makes address rotation stop paying.
+ *
+ * This is an admission control, so it fails closed. When the rule is absent the
+ * cap cannot be enforced, and the caller refuses the request rather than
+ * serving traffic without it. The throttled missing-rule report asks an
+ * operator to restore the rule.
  */
-export async function isGatewayAccountRateLimited(
+export async function checkGatewayAccountRateLimit(
   request: NextRequest,
   accountKey: string
-): Promise<boolean> {
-  return isFirewallRateLimited(request, {
+): Promise<GatewayRateLimitOutcome> {
+  const verdict = await checkFirewallRateLimit(request, {
     id: GATEWAY_INFERENCE_RATE_LIMIT_ID,
     key: accountKey,
     sentrySource: 'gateway_inference',
   });
+
+  if (verdict === 'rule-missing') {
+    return 'unavailable';
+  }
+  return verdict === 'limited' ? 'rate-limited' : 'admitted';
 }

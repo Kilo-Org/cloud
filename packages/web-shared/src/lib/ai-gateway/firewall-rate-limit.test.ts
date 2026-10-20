@@ -6,7 +6,7 @@ jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { NextRequest } from 'next/server';
-import { isFirewallRateLimited } from './firewall-rate-limit';
+import { checkFirewallRateLimit } from './firewall-rate-limit';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
@@ -19,7 +19,7 @@ const request = new NextRequest('https://gateway.example.com/api/gateway/chat/co
   },
 });
 
-describe('isFirewallRateLimited', () => {
+describe('checkFirewallRateLimit', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -28,8 +28,8 @@ describe('isFirewallRateLimited', () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
 
     await expect(
-      isFirewallRateLimited(request, { id: 'rule-a', key: 'ip:192.0.2.1', sentrySource: 'a' })
-    ).resolves.toBe(true);
+      checkFirewallRateLimit(request, { id: 'rule-a', key: 'ip:192.0.2.1', sentrySource: 'a' })
+    ).resolves.toBe('limited');
 
     expect(mockCheckRateLimit).toHaveBeenCalledWith('rule-a', {
       headers: {
@@ -41,12 +41,29 @@ describe('isFirewallRateLimited', () => {
     });
   });
 
+  it('reports a passing request as allowed', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+
+    await expect(
+      checkFirewallRateLimit(request, { id: 'rule-a', key: 'k1', sentrySource: 'a' })
+    ).resolves.toBe('allowed');
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports an absent rule as rule-missing', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+
+    await expect(
+      checkFirewallRateLimit(request, { id: 'rule-d', key: 'k1', sentrySource: 'd' })
+    ).resolves.toBe('rule-missing');
+  });
+
   it('throttles missing-rule reports per rule, so one missing rule cannot hide another', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
 
-    await isFirewallRateLimited(request, { id: 'rule-b', key: 'k1', sentrySource: 'b' });
-    await isFirewallRateLimited(request, { id: 'rule-b', key: 'k2', sentrySource: 'b' });
-    await isFirewallRateLimited(request, { id: 'rule-c', key: 'k1', sentrySource: 'c' });
+    await checkFirewallRateLimit(request, { id: 'rule-b', key: 'k1', sentrySource: 'b' });
+    await checkFirewallRateLimit(request, { id: 'rule-b', key: 'k2', sentrySource: 'b' });
+    await checkFirewallRateLimit(request, { id: 'rule-c', key: 'k1', sentrySource: 'c' });
 
     expect(mockCaptureMessage).toHaveBeenCalledTimes(2);
     expect(mockCaptureMessage).toHaveBeenCalledWith(

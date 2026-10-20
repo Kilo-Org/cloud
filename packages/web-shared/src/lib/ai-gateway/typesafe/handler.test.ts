@@ -12,7 +12,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
-  isGatewayAccountRateLimited,
+  checkGatewayAccountRateLimit,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   creditsBlockedResponse,
@@ -73,9 +73,10 @@ jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server'
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
-  isGatewayAccountRateLimited: jest.fn(),
+  checkGatewayAccountRateLimit: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'),
   creditsBlockedResponse: jest.fn(),
   extractFraudAndProjectHeaders: jest.fn(),
   extractHeaderAndLimitLength: jest.fn(),
@@ -201,7 +202,7 @@ describe('handleSystemOneRequest', () => {
     setAuth();
     mockVerdict(null);
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });
-    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
+    jest.mocked(checkGatewayAccountRateLimit).mockResolvedValue('admitted');
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
@@ -512,7 +513,7 @@ describe('handleSystemOneRequest', () => {
   });
 
   it('rate limits before authentication or upstream work', async () => {
-    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(true);
+    jest.mocked(checkGatewayAccountRateLimit).mockResolvedValue('rate-limited');
     const request = makeRequest(requestBody, { 'x-forwarded-for': ' 192.0.2.1, 192.0.2.2' });
 
     const response = await handleSystemOneRequest(request);
@@ -520,7 +521,19 @@ describe('handleSystemOneRequest', () => {
     expect(response.status).toBe(429);
     expect(await response.json()).toMatchObject({ error_type: 'rate_limit_exceeded' });
     expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '192.0.2.1');
-    expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'test-rate-limit-key');
+    expect(checkGatewayAccountRateLimit).toHaveBeenCalledWith(request, 'test-rate-limit-key');
+    expect(getUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses the request when the cap cannot be enforced, before authentication', async () => {
+    jest.mocked(checkGatewayAccountRateLimit).mockResolvedValue('unavailable');
+    const request = makeRequest();
+
+    const response = await handleSystemOneRequest(request);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error_type: 'temporarily_unavailable' });
     expect(getUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });

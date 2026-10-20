@@ -1,6 +1,6 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
-import { isFirewallRateLimited } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
+import { checkFirewallRateLimit } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
 
 /**
  * Vercel Firewall rate limit for the free models flagged `rate-limited`, which
@@ -10,10 +10,17 @@ import { isFirewallRateLimited } from '@kilocode/web-shared/lib/ai-gateway/firew
  */
 const FREE_MODEL_RATE_LIMIT_ID = 'free-model-inference';
 
-export function isFreeModelRateLimited(request: NextRequest, key: string): Promise<boolean> {
-  return isFirewallRateLimited(request, {
+/**
+ * A missing rule keeps this cap open on purpose. It is a fairness cap on free
+ * models, not an admission control: refusing free-model traffic because the
+ * rule is absent would take a working route down, and the volume it guards is
+ * small. The account inference cap, which does guard admission, fails closed.
+ */
+export async function isFreeModelRateLimited(request: NextRequest, key: string): Promise<boolean> {
+  const verdict = await checkFirewallRateLimit(request, {
     id: FREE_MODEL_RATE_LIMIT_ID,
     key,
     sentrySource: 'free_model_inference',
   });
+  return verdict === 'limited';
 }

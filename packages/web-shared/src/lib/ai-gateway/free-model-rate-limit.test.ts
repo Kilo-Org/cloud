@@ -21,4 +21,11 @@ describe('isFreeModelRateLimited', () => {
       expect.objectContaining({ rateLimitKey: 'free-model-inference:user:user-123' })
     );
   });
+
+  it('keeps admitting free models when the rule is missing, since it is not an admission cap', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+    const request = new NextRequest('https://gateway.example.com/api/gateway/chat/completions');
+
+    await expect(isFreeModelRateLimited(request, 'user:user-123')).resolves.toBe(false);
+  });
 });

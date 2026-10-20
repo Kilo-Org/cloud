@@ -8,7 +8,7 @@ import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import { NextRequest } from 'next/server';
-import { gatewayRateLimitKey, isGatewayAccountRateLimited } from './gateway-account-rate-limit';
+import { gatewayRateLimitKey, checkGatewayAccountRateLimit } from './gateway-account-rate-limit';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
@@ -70,7 +70,7 @@ describe('gatewayRateLimitKey', () => {
   });
 });
 
-describe('isGatewayAccountRateLimited', () => {
+describe('checkGatewayAccountRateLimit', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -78,7 +78,7 @@ describe('isGatewayAccountRateLimited', () => {
   it('counts the account, not the address', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
 
-    await isGatewayAccountRateLimited(request, 'user-123');
+    await checkGatewayAccountRateLimit(request, 'user-123');
 
     expect(mockCheckRateLimit).toHaveBeenCalledWith('gateway-inference', {
       headers: {
@@ -97,7 +97,7 @@ describe('isGatewayAccountRateLimited', () => {
       { headers: { host: 'gateway.example.com' } }
     );
 
-    await isGatewayAccountRateLimited(requestWithoutIp, 'user-123');
+    await checkGatewayAccountRateLimit(requestWithoutIp, 'user-123');
 
     expect(mockCheckRateLimit).toHaveBeenCalledWith(
       'gateway-inference',
@@ -117,7 +117,7 @@ describe('isGatewayAccountRateLimited', () => {
       'https://gateway.example.com/api/gateway/chat/completions'
     );
 
-    await isGatewayAccountRateLimited(requestWithoutHost, 'user-123');
+    await checkGatewayAccountRateLimit(requestWithoutHost, 'user-123');
 
     expect(mockCheckRateLimit).toHaveBeenCalledWith(
       'gateway-inference',
@@ -127,18 +127,24 @@ describe('isGatewayAccountRateLimited', () => {
     );
   });
 
-  it('reports the verdict', async () => {
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+  it('admits a request under the cap', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
 
-    await expect(isGatewayAccountRateLimited(request, 'user-123')).resolves.toBe(true);
+    await expect(checkGatewayAccountRateLimit(request, 'user-123')).resolves.toBe('admitted');
   });
 
-  it('reports a missing rule to Sentry, but not once per request', async () => {
+  it('reports a capped account as rate limited', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+
+    await expect(checkGatewayAccountRateLimit(request, 'user-123')).resolves.toBe('rate-limited');
+  });
+
+  it('answers unavailable when the rule is absent, and reports it once per rule', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
 
-    await expect(isGatewayAccountRateLimited(request, 'user-123')).resolves.toBe(false);
-    await isGatewayAccountRateLimited(request, 'user-123');
-    await isGatewayAccountRateLimited(request, 'user-456');
+    await expect(checkGatewayAccountRateLimit(request, 'user-123')).resolves.toBe('unavailable');
+    await checkGatewayAccountRateLimit(request, 'user-123');
+    await checkGatewayAccountRateLimit(request, 'user-456');
 
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       expect.stringContaining('gateway-inference'),

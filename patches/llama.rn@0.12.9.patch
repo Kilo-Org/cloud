@@ -27,20 +27,26 @@ diff --git a/ios/RNLlama.mm b/ios/RNLlama.mm
  
  #if RNLLAMA_BUILD_FROM_SOURCE
  #import "../cpp/llama-impl.h"
-@@ -74,53 +75,29 @@
+@@ -74,53 +75,37 @@
  } // namespace rnllama_jsi
  
  @implementation RNLlama {
 -    __unsafe_unretained RCTBridge *_bridge;
-+    std::atomic<bool> _bindingsInstalled{false};
++    std::atomic<bool> _bindingsInstalled;
  }
  
  RCT_EXPORT_MODULE()
  
 -- (RCTBridge *)bridge {
 -    return _bridge;
--}
--
++- (instancetype)init {
++    self = [super init];
++    if (self) {
++        _bindingsInstalled.store(false, std::memory_order_relaxed);
++    }
++    return self;
+ }
+ 
 -- (void)setBridge:(RCTBridge *)bridge {
 -    _bridge = bridge;
 +- (void)installJSIBindingsWithRuntime:(facebook::jsi::Runtime &)runtime

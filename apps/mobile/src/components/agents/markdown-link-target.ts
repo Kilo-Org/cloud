@@ -1,4 +1,4 @@
-export type WebLinkTarget = {
+type WebLinkTarget = {
   kind: 'web';
   scheme: 'http' | 'https';
   /** Trust key: lowercased hostname plus a non-default port. */
@@ -7,7 +7,7 @@ export type WebLinkTarget = {
   href: string;
 };
 
-export type SchemeLinkTarget = {
+type SchemeLinkTarget = {
   kind: 'scheme';
   scheme: string;
   href: string;

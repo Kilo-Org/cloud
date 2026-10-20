@@ -331,7 +331,7 @@ export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
-/** Longest single `preparing` step-output delta the client accepts, in characters. */
+/** Longest preparation step-output string the client accepts, in characters. */
 export const PREPARATION_OUTPUT_MAX_LENGTH = 65_536;
 /**
  * Most recent step-output bytes the client retains per step. Mirrors the

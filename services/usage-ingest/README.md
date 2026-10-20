@@ -38,7 +38,9 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 Production commits `USAGE_INGEST_MODE=receipt`; staging commits `processing` with
 `https://staging-app.kilo.ai/api/internal/usage/record` as its Frankfurt writer URL.
 An absent mode also uses receipt behavior. Processing validates and writes events
-sequentially, preserving the supplied usage ID and validated fields.
+sequentially within each consumer invocation, preserving the supplied usage ID
+and validated fields. Concurrent invocations are capped by each environment's
+`max_concurrency` setting in the queue policy below.
 
 Processing uses `@kilocode/worker-utils/usage-writer-client` for the existing
 Frankfurt `/api/internal/usage/record` endpoint. Only a matching `recorded` or
@@ -148,13 +150,13 @@ reconcile against persisted usage rows when exact completeness matters.
 
 ## Queue policy
 
-Both environments use the same consumer settings:
+Both environments use the following consumer settings:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
 | `max_batch_size` | `1` | One message per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `1` | One active consumer invocation per environment's source queue. |
+| `max_concurrency` | Production: `1`; staging: `10` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
 | `max_retries` | `3` | Initial delivery plus up to three retries. |
 | `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |

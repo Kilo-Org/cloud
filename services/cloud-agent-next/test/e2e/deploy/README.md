@@ -255,7 +255,7 @@ semantics.
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
 | Only the `Sandbox` container class kept, `max_instances = 40`, `ssh.enabled = true` | The stack only runs normal non-contained `ses-` sessions, which route to `Sandbox`; `40` is a cap rather than a reservation and leaves parallelism headroom for later parallel runs. Enables SSH inspection. |
 | `HYPERDRIVE` replaced by `E2E_HYPERDRIVE_ID`, `R2_BUCKET` replaced by `E2E_R2_BUCKET` | The deployment keeps its own database and bucket; the renderer refuses a missing value and the `wrangler.jsonc` value. |
-| `E2E_SESSION_ADMISSION=internal-key` | `src/e2e-entry.ts` admits `POST /trpc/start` and `POST /trpc/createWorktreeChat` only with `x-internal-api-key`. The local render does not set it. |
+| `E2E_SESSION_ADMISSION=internal-key` | `src/e2e-entry.ts` admits `start`, `createWorktreeChat`, `send`, `sendMessageV2` and `initiateFromKilocodeSessionV2` only with `x-internal-api-key`. The local render does not set it. |
 | The other container classes removed from `containers`, `durable_objects.bindings` and `migrations` | A container class is all three entries; keeping a binding or migration without its class fails the deploy. Removing them removes unused capacity and deploy cost. |
 | Billing flags off (`CLOUD_AGENT_CONTAINER_BILLING_*`) | Matches the dev profile. |
 | `CREDENTIAL_CONTAINMENT_ENABLED=false` | Non-contained dispatch; see plan sections 5 and 11.6. |

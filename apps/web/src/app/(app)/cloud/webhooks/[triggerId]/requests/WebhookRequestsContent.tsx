@@ -24,7 +24,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import {
   ArrowLeft,
   Shell,
@@ -494,24 +500,28 @@ export function WebhookRequestsContent({
                       )}
                     </TableCell>
                     <TableCell>
-                        <Dialog
+                      <Dialog
                         open={selectedRequestId === request.id}
                         onOpenChange={open => setSelectedRequestId(open ? request.id : null)}
                       >
-                          <DialogTrigger asChild>
+                        <DialogTrigger asChild>
                           <Button variant="outline" size="sm" className="min-h-11 gap-2 sm:min-h-8">
                             <ScrollText className="h-4 w-4" />
                             View logs
                           </Button>
-                          </DialogTrigger>
-                          <DialogContent
-                            showCloseButton={false}
-                            className="flex h-[min(85dvh,800px)] w-[calc(100vw-2rem)] max-w-4xl flex-col gap-3 overflow-hidden p-4"
+                        </DialogTrigger>
+                        <DialogContent
+                          showCloseButton={false}
+                          className="flex h-[min(85dvh,800px)] w-[calc(100vw-2rem)] max-w-4xl flex-col gap-3 overflow-hidden p-4"
                         >
                           <div className="flex shrink-0 items-start justify-between gap-3">
                             <div className="min-w-0">
-                                <DialogTitle className="text-base font-semibold">Execution logs</DialogTitle>
-                                <DialogDescription className="sr-only">Read-only conversation for request {shortId(request.id)}</DialogDescription>
+                              <DialogTitle className="text-base font-semibold">
+                                Execution logs
+                              </DialogTitle>
+                              <DialogDescription className="sr-only">
+                                Read-only conversation for request {shortId(request.id)}
+                              </DialogDescription>
                               <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
                                 <span className="font-mono">{shortId(request.id)}</span>
                                 <span>{timestamp.absolute}</span>
@@ -567,7 +577,10 @@ export function WebhookRequestsContent({
                                   {/* Headers */}
                                   <div>
                                     <p className="mb-2 text-sm font-medium">Headers</p>
-                                        <pre tabIndex={0} className="bg-muted max-h-48 overflow-auto rounded-md p-3 text-xs">
+                                    <pre
+                                      tabIndex={0}
+                                      className="bg-muted max-h-48 overflow-auto rounded-md p-3 text-xs"
+                                    >
                                       <code>
                                         {JSON.stringify(
                                           isAdminView
@@ -589,7 +602,10 @@ export function WebhookRequestsContent({
                                         {new TextEncoder().encode(request.body).byteLength} bytes
                                       </p>
                                     ) : (
-                                          <pre tabIndex={0} className="bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs">
+                                      <pre
+                                        tabIndex={0}
+                                        className="bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs"
+                                      >
                                         <code>
                                           {(() => {
                                             try {
@@ -607,8 +623,8 @@ export function WebhookRequestsContent({
                               )}
                             </div>
                           </details>
-                          </DialogContent>
-                        </Dialog>
+                        </DialogContent>
+                      </Dialog>
                     </TableCell>
                   </TableRow>
                 );

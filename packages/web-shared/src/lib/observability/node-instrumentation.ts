@@ -26,5 +26,8 @@ import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-
 export function registerNodeInstrumentation(serviceName: string): void {
   initServerSentry();
 
-  registerOTel({ serviceName });
+  // Sentry traces are off, and the OTel spans used to be sampled by Sentry's sampler with
+  // the same zero rate. Keep that rate explicit so this pipeline never starts recording
+  // and exporting spans just because Sentry no longer supplies a sampler.
+  registerOTel({ serviceName, traceSampler: 'always_off' });
 }

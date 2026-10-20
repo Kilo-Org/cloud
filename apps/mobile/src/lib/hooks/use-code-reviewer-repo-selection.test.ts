@@ -7,11 +7,8 @@ import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 
-import {
-  clearRepoSelectionSenders,
-  REPO_SELECTION_DEBOUNCE_MS,
-  useRepoSelectionToggle,
-} from './use-code-reviewer-repo-selection';
+import { clearRepoSelectionSenders, REPO_SELECTION_DEBOUNCE_MS } from './repo-selection-senders';
+import { useRepoSelectionToggle } from './use-code-reviewer-repo-selection';
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
@@ -329,7 +326,7 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
 });
 
 describe('account boundary', () => {
-  it('sends nothing for a toggle left pending when the auth epoch advances', () => {
+  it('drops a pending toggle when the auth epoch advances', () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);
     const { toggleRepo } = getToggleRepo(PERSONAL_SCOPE, 'github');
@@ -342,7 +339,7 @@ describe('account boundary', () => {
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
-  it('cancels the armed timer when the session-scoped state is cleared', () => {
+  it('drops the armed timer when the session-scoped state is cleared', () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);
     const { toggleRepo } = getToggleRepo(PERSONAL_SCOPE, 'github');
@@ -355,7 +352,7 @@ describe('account boundary', () => {
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
-  it('does not send while a sign-out is in flight', () => {
+  it('holds the send while sign-out is active', () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);
     const { toggleRepo } = getToggleRepo(PERSONAL_SCOPE, 'github');
@@ -368,7 +365,7 @@ describe('account boundary', () => {
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
-  it('does not re-apply a pending selection to the cache when a refetch outlives its account', () => {
+  it('keeps the fetched selection when a refetch arrives under a later epoch', () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);
     const { toggleRepo } = getToggleRepo(PERSONAL_SCOPE, 'github');
@@ -384,7 +381,7 @@ describe('account boundary', () => {
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
-  it('does not seed the baseline from a save that settles after the boundary', () => {
+  it('diffs the next toggle against the refetched selection after an epoch change', () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);
     const first = getToggleRepo(PERSONAL_SCOPE, 'github');
@@ -393,7 +390,7 @@ describe('account boundary', () => {
     vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
     const staleVars = mutateMock.mock.calls[0]?.[0];
 
-    // The account leaves and the next account's screen mounts and refetches.
+    // A later mount under a new epoch refetches its own selection.
     bumpAuthEpoch();
     const second = getToggleRepo(PERSONAL_SCOPE, 'github');
     seedReviewConfigCache([1, 2]);
@@ -415,7 +412,7 @@ describe('account boundary', () => {
     });
   });
 
-  it('shows no rollback or error toast for a failed save that outlives its account', () => {
+  it('leaves the cache and toast untouched for a failed save under a later epoch', () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);
     const { toggleRepo, deltaOptions } = getToggleRepo(PERSONAL_SCOPE, 'github');

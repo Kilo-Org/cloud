@@ -3,9 +3,15 @@ import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { type ReviewConfigData, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import {
+  getRepoSelectionSender,
+  isRepoSelectionEpochCurrent,
+  type RepoSelectionSaveVars,
+  sameSelection,
+  scheduleSend,
+} from '@/lib/hooks/repo-selection-senders';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient } from '@/lib/trpc';
 
@@ -17,127 +23,6 @@ import {
   useReviewConfigCacheReader,
   useReviewConfigQueryKey,
 } from './use-code-reviewer';
-
-export const REPO_SELECTION_DEBOUNCE_MS = 500;
-
-type RepoSelectionDelta = {
-  add: (number | string)[];
-  remove: (number | string)[];
-};
-
-type RepoSelectionSaveVars = RepoSelectionDelta & {
-  optimisticSelection: (number | string)[];
-  // The auth epoch that armed this send. A save that settles after a sign-out
-  // or an account change belongs to the account that left, so its callbacks
-  // must not write the next account's baseline, cache, or toast.
-  authEpoch: number;
-};
-
-type RepoSelectionSender = {
-  timer: ReturnType<typeof setTimeout> | null;
-  // The latest user-intended selection. Null means no toggle is pending.
-  pendingSelection: (number | string)[] | null;
-  // The last server-confirmed selection. Null means the server state is not
-  // yet known (no toggle and no refetch have synced it).
-  serverSelection: (number | string)[] | null;
-  // The mutation trigger of the hook instance that currently owns this key.
-  mutate: ((vars: RepoSelectionSaveVars) => void) | null;
-  // The auth epoch this sender's selections belong to.
-  epoch: number;
-};
-
-// One pending debounced send per scope+platform, owned by the auth epoch that
-// created it. The timer closes over the sender state, so a remount never
-// retargets an older timer. `serverSelection` is the last server-confirmed
-// selection; `pendingSelection` is the latest user-intended selection and is
-// null while nothing is pending. An entry from an earlier epoch is dropped
-// before it is read, so the previous account's selections can never become the
-// next account's baseline.
-const repoSelectionSenders = new Map<string, RepoSelectionSender>();
-
-/**
- * True while `epoch` still owns the debounce state: the auth epoch is current
- * and no sign-out teardown is in flight. Every read of the module-level sender
- * state passes this fence, so a fire, a refetch resync, or a save completion
- * from the previous account cannot write the next one's state.
- */
-function isEpochCurrent(epoch: number): boolean {
-  return isCurrentAuthEpoch(epoch) && !isSignOutActive();
-}
-
-function getRepoSelectionSender(key: string, epoch: number): RepoSelectionSender {
-  const existing = repoSelectionSenders.get(key);
-  if (existing?.epoch === epoch) {
-    return existing;
-  }
-  clearTimeout(existing?.timer ?? undefined);
-  const sender: RepoSelectionSender = {
-    timer: null,
-    pendingSelection: null,
-    serverSelection: null,
-    mutate: null,
-    epoch,
-  };
-  repoSelectionSenders.set(key, sender);
-  return sender;
-}
-
-/**
- * Drops every pending debounced send together with its armed timer.
- * `clearSessionScopedState` calls this at both account boundaries, so a toggle
- * left inside the debounce window dies with the account that made it instead of
- * reaching the next one.
- */
-export function clearRepoSelectionSenders(): void {
-  for (const sender of repoSelectionSenders.values()) {
-    clearTimeout(sender.timer ?? undefined);
-  }
-  repoSelectionSenders.clear();
-}
-
-function sameSelection(a: (number | string)[] | null, b: (number | string)[] | null): boolean {
-  if (a === null || b === null) {
-    return a === b;
-  }
-  if (a.length !== b.length) {
-    return false;
-  }
-  return a.every(id => b.includes(id));
-}
-
-// Schedules the trailing-edge 500ms send. The delta is computed at fire time
-// from the module-level pending/server selections, so no intermediate rapid
-// toggle is lost and a refetch that clobbers the optimistic cache cannot
-// collapse the send to an empty delta.
-function scheduleSend(sender: RepoSelectionSender): void {
-  if (sender.timer) {
-    clearTimeout(sender.timer);
-  }
-  sender.timer = setTimeout(() => {
-    sender.timer = null;
-    // A fire that lands after a sign-out or an account change belongs to the
-    // account that left: drop the intent instead of submitting a delta under
-    // whoever is signed in now.
-    if (!isEpochCurrent(sender.epoch)) {
-      sender.pendingSelection = null;
-      return;
-    }
-    const pending = sender.pendingSelection;
-    const server = sender.serverSelection ?? [];
-    if (pending === null) {
-      return;
-    }
-    const add = pending.filter(id => !server.includes(id));
-    const remove = server.filter(id => !pending.includes(id));
-    if (add.length === 0 && remove.length === 0) {
-      // The intent now equals the server state, so nothing is left to send.
-      // Clear it so a later refetch does not mistake it for live user intent.
-      sender.pendingSelection = null;
-      return;
-    }
-    sender.mutate?.({ add, remove, optimisticSelection: pending, authEpoch: sender.epoch });
-  }, REPO_SELECTION_DEBOUNCE_MS);
-}
 
 /**
  * Sends a `selectedRepositoryDelta` patch without touching the optimistic
@@ -186,7 +71,7 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
         return result;
       }),
     onError: (error, vars) => {
-      if (!isEpochCurrent(vars.authEpoch)) {
+      if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {
         return;
       }
       const sender = getRepoSelectionSender(saveChainKey, vars.authEpoch);
@@ -208,7 +93,7 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
       announcingToast.error(error.message);
     },
     onSuccess: (_result, vars) => {
-      if (!isEpochCurrent(vars.authEpoch)) {
+      if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {
         return;
       }
       const sender = getRepoSelectionSender(saveChainKey, vars.authEpoch);
@@ -223,9 +108,8 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
       }
     },
     onSettled: async (_data, _error, vars) => {
-      // A save owned by an account that left must not refetch, or it would
-      // pull the next account's config through a stale save's completion.
-      if (!isEpochCurrent(vars.authEpoch)) {
+      // The invalidation runs only while the save's epoch is current.
+      if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {
         return;
       }
       await queryClient.invalidateQueries({ queryKey });
@@ -247,10 +131,8 @@ export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform
   const deltaSave = useSaveReviewConfigDelta(scope, platform);
   const epoch = currentAuthEpoch();
 
-  // Only the account that owns the current epoch may publish its trigger into
-  // the sender: a mount that outlived its account must not retarget the entry
-  // the next account is using.
-  if (isEpochCurrent(epoch)) {
+  // The mutate trigger is published only while the mount's epoch is current.
+  if (isRepoSelectionEpochCurrent(epoch)) {
     getRepoSelectionSender(senderKey, epoch).mutate = deltaSave.mutate;
   }
   const queryKeyHash = hashKey(queryKey);
@@ -273,10 +155,8 @@ export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform
       if (fetched === undefined) {
         return;
       }
-      // A refetch that lands after a sign-out or account change answers for
-      // the account that left: it must not seed this epoch's baseline nor
-      // re-apply its pending selection to the next account's cache.
-      if (!isEpochCurrent(epoch)) {
+      // The resync runs only while the mount's epoch is current.
+      if (!isRepoSelectionEpochCurrent(epoch)) {
         return;
       }
       // Resync the baseline with the refetched server selection. If a user
@@ -297,9 +177,8 @@ export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform
   }, [queryClient, queryKeyHash, senderKey, epoch]);
 
   return (id: number | string) => {
-    // A toggle that reaches a mount whose account already left writes to no
-    // account at all: the entry belongs to the current epoch only.
-    if (!isEpochCurrent(epoch)) {
+    // The toggle writes only while its epoch is current.
+    if (!isRepoSelectionEpochCurrent(epoch)) {
       return;
     }
     const current = readConfig()?.selectedRepositoryIds ?? [];

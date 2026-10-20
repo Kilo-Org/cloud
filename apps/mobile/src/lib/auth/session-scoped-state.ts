@@ -12,7 +12,7 @@ import { clearChatBackends } from '@/lib/chat/backend-store';
 import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
-import { clearRepoSelectionSenders } from '@/lib/hooks/use-code-reviewer-repo-selection';
+import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
@@ -115,10 +115,9 @@ export function clearSessionScopedState(): void {
   runClear(clearRemoteMcpServers);
   runClear(clearChatBackends);
   runClear(clearSettingsToolsEnabled);
-  // The debounced repository selection is account-scoped state: a toggle left
-  // inside its window, its timer, and the server baseline it diffs against
-  // belong to the account that made it, so the account boundary drops them
-  // before the next account mounts the same screen.
+  // The debounced repository selection keeps a pending toggle, its timer, and
+  // the server baseline it diffs against, so the account boundary drops them
+  // with the other account-scoped members.
   runClear(clearRepoSelectionSenders);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);

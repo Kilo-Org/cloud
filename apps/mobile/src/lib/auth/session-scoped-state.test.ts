@@ -133,10 +133,9 @@ vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: mocks.clearChatB
 vi.mock('@/lib/chat/settings-tools-switch', () => ({
   clearSettingsToolsEnabled: mocks.clearSettingsToolsEnabled,
 }));
-// The debounced repository-selection send state lives in a hooks module that
-// reaches the tRPC client and expo-router on import, so the boundary suite
-// observes the clear through this spy.
-vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
+// The debounced repository-selection send state is a separate module, so the
+// boundary suite observes the clear through this spy.
+vi.mock('@/lib/hooks/repo-selection-senders', () => ({
   clearRepoSelectionSenders: mocks.clearRepoSelectionSenders,
 }));
 // The platform provider bridge: sign-out has to tell an open Files app the tree

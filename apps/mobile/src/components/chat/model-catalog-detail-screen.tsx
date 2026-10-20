@@ -21,6 +21,7 @@ import { Text } from '@/components/ui/text';
 import { type DeviceBudget, deviceFit, estimatedMemoryBytes } from '@/lib/chat/device-fit';
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfModelDetail, hfModelName, type HfQuant, isHfRepoId } from '@/lib/chat/hf-catalog';
+import { useModelCatalogBack, useModelCatalogHardwareBack } from '@/lib/chat/model-catalog-back';
 import { HfRequestError, useDeviceBudget, useHfModelDetail } from '@/lib/chat/use-hf-catalog';
 import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -224,12 +225,17 @@ function DetailBody({ id }: Readonly<{ id: string }>) {
 /** One Hugging Face repository: what it is, and every file this device can download. */
 export function ModelCatalogDetailScreen({ id }: Readonly<{ id: string }>) {
   const valid = isHfRepoId(id);
+  // Both exits land on the catalog list, also when this route was opened
+  // without the list beneath it (a deep link); see `model-catalog-back`.
+  const backToCatalog = useModelCatalogBack();
+  useModelCatalogHardwareBack();
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={valid ? hfModelName(id) : undefined}
         eyebrow={valid ? id.split('/')[0] : undefined}
-        backFallback="/model-catalog"
+        showBackButton
+        onBack={backToCatalog}
       />
       {valid ? <DetailBody id={id} /> : <QueryError variant="not-found" />}
     </View>

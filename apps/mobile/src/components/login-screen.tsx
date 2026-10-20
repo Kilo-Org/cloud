@@ -69,7 +69,6 @@ export function LoginScreen() {
       setPersistError(undefined);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
-        clearLoginDrafts();
       } catch {
         setPersistError(t('login.couldNotCompleteSignIn'));
       }
@@ -79,12 +78,13 @@ export function LoginScreen() {
 
   // Every provider's completed sign-in — device code, email code, Apple,
   // Google, passkey — publishes its token through the auth context, so this
-  // one watch covers them all: the unmount persistence must not write a
-  // typed email from the abandoned attempt into SecureStore once a session
-  // took over, or the next login mount would pre-fill the previous account's
-  // address.
+  // one watch covers them all: the module drafts are dropped (a later
+  // sign-out must not re-persist the previous account's address) and the
+  // unmount persistence stays off, or the next login mount would pre-fill
+  // the previous account's address.
   useEffect(() => {
     if (publishedToken !== undefined) {
+      clearLoginDrafts();
       signedInRef.current = true;
     }
   }, [publishedToken]);

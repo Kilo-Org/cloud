@@ -24,6 +24,22 @@ function createKilocode(type: string, properties: unknown, sessionId = 'ses-1'):
 }
 
 describe('normalize', () => {
+  it('normalizes string-encoded assistant errors in live native updates', () => {
+    expect(
+      normalizeCliEvent('message.updated', {
+        info: {
+          id: 'msg_assistant',
+          sessionID: 'ses_root',
+          role: 'assistant',
+          error: 'Interrupted',
+        },
+      })
+    ).toMatchObject({
+      type: 'message.updated',
+      info: { error: { name: 'UnknownError', data: { message: 'Interrupted' } } },
+    });
+  });
+
   describe('envelope unwrapping', () => {
     it('unwraps kilocode-wrapped events', () => {
       const raw = createKilocode('session.idle', { sessionID: 'sid-1' });
@@ -590,7 +606,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'session.created',
-        info: { id: 'ses-1', parentID: undefined },
+        info: { id: 'ses-1', parentID: undefined, title: 'Test Session' },
       });
     });
 
@@ -659,7 +675,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'session.updated',
-        info: { id: 'ses-1', parentID: undefined },
+        info: { id: 'ses-1', parentID: undefined, title: 'Updated Session' },
       });
     });
 
@@ -1916,6 +1932,33 @@ describe('normalize', () => {
   });
 
   describe('connected', () => {
+    it('preserves bounded ancillary bootstrap omissions beside the authoritative retry snapshot', () => {
+      const sessionStatus = { type: 'retry', attempt: 2, message: 'Retrying', next: 42 };
+      expect(
+        normalize(createRaw('connected', { sessionStatus, ancillaryOmittedItemCount: 7 }))
+      ).toEqual({
+        type: 'connected',
+        cloudSessionId: 'ses-1',
+        sessionStatus,
+        ancillaryOmittedItemCount: 7,
+      });
+    });
+
+    it.each([-1, '7', Infinity])(
+      'ignores a malformed ancillary omission count %p',
+      ancillaryOmittedItemCount => {
+        expect(
+          normalize(
+            createRaw('connected', { sessionStatus: { type: 'busy' }, ancillaryOmittedItemCount })
+          )
+        ).toEqual({
+          type: 'connected',
+          cloudSessionId: 'ses-1',
+          sessionStatus: { type: 'busy' },
+        });
+      }
+    );
+
     it('uses only the Cloud envelope session ID for refresh routing', () => {
       expect(
         normalize(createRaw('connected', { cloudSessionId: 'agent-other' }, 'agent-1'))
@@ -2583,7 +2626,7 @@ describe('normalizeCliEvent', () => {
         normalizeCliEvent('session.created', { info: { id: 'ses-1', title: 'CLI Session' } })
       ).toEqual({
         type: 'session.created',
-        info: { id: 'ses-1', parentID: undefined },
+        info: { id: 'ses-1', parentID: undefined, title: 'CLI Session' },
       });
     });
 

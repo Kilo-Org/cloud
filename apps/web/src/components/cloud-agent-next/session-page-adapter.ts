@@ -2,10 +2,13 @@ import {
   type KiloSdkMessageHistory,
   type KiloSdkMessageHistoryPage,
   type KiloSessionId,
+  type CloudAgentSessionId,
+  type CloudSessionSnapshotPage,
   type PreparationAttempt,
   type SessionSnapshotPage,
   type SessionSnapshotPageOutcome,
 } from '@kilocode/cloud-agent-sdk';
+import { cloudSessionMessagesPageSchema } from '@kilocode/cloud-agent-sdk/schemas';
 
 type SessionMessagesPageResult = {
   kiloSessionId: string;
@@ -21,6 +24,42 @@ export type SessionPageTrpcClient = {
     };
   };
 };
+
+type CloudSessionPageInput = {
+  sessionId: string;
+  kiloSessionId?: string;
+  cursor?: string;
+  limit?: number;
+};
+
+export type CloudSessionPageTrpcClient = {
+  cloudAgentNext: {
+    getSessionMessagesPage: { query: (input: CloudSessionPageInput) => Promise<unknown> };
+  };
+  organizations: {
+    cloudAgentNext: {
+      getSessionMessagesPage: {
+        query: (input: CloudSessionPageInput & { organizationId: string }) => Promise<unknown>;
+      };
+    };
+  };
+};
+
+export async function fetchWebCloudSessionSnapshotPage(
+  trpcClient: CloudSessionPageTrpcClient,
+  sessionId: CloudAgentSessionId,
+  options: { organizationId?: string; kiloSessionId?: string; cursor?: string; limit?: number }
+): Promise<CloudSessionSnapshotPage | null> {
+  const { organizationId, ...pageOptions } = options;
+  const input = { sessionId, ...pageOptions };
+  const result = organizationId
+    ? await trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query({
+        ...input,
+        organizationId,
+      })
+    : await trpcClient.cloudAgentNext.getSessionMessagesPage.query(input);
+  return cloudSessionMessagesPageSchema.parse(result);
+}
 
 function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessageHistoryPage {
   return 'messages' in history && Array.isArray(history.messages);

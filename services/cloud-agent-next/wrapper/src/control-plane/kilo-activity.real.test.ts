@@ -179,7 +179,7 @@ suite('pinned Kilo native activity contract', () => {
       const activity = createRuntimeActivity({
         nativeRuntimeId: 'child-permission-contract',
         directory: f.directory,
-        client: f.wrapper,
+        client: f.harness,
         timers: CONTROL_PLANE_TIMERS.wrapper,
         now: Date.now,
         onDeadline: (_identity, reason) => faults.push(reason),
@@ -672,7 +672,7 @@ suite('pinned Kilo native activity contract', () => {
       const recoveredActivity = createRuntimeActivity({
         nativeRuntimeId: 'recovered',
         directory: f.directory,
-        client: f.wrapper,
+        client: f.harness,
         timers: CONTROL_PLANE_TIMERS.wrapper,
         now: Date.now,
         onDeadline: () => {

@@ -16,7 +16,16 @@ import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
+import {
+  parseCustomerBillingFailure,
+  type CloudSessionMetadata,
+  type CloudSessionSnapshotPage,
+  type PreparationAttempt,
+} from '@kilocode/cloud-agent-sdk';
+import {
+  cloudSessionMessagesPageInputSchema,
+  cloudSessionMessagesPageSchema,
+} from '@kilocode/cloud-agent-sdk/schemas';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
@@ -309,6 +318,8 @@ export type GetSessionInput = {
   cloudAgentSessionId: string;
 };
 
+export type GetSessionMessagesPageInput = z.input<typeof cloudSessionMessagesPageInputSchema>;
+
 /** Interactions a cloud-agent session currently waits on. */
 export type GetPendingInteractionsOutput = {
   questions: unknown[];
@@ -356,6 +367,7 @@ export type GetSessionOutput = {
   prompt?: string;
   mode?: AgentMode;
   model?: string;
+  variant?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
   branchName?: string;
@@ -373,6 +385,7 @@ export type GetSessionOutput = {
   // Lifecycle timestamps (critical for idempotency)
   preparedAt?: number;
   initiatedAt?: number;
+  routeReady?: boolean;
 
   // Callback configuration is intentionally NOT exposed: the stored target
   // may carry service-to-service auth headers (e.g. X-Internal-Secret used
@@ -388,7 +401,10 @@ export type GetSessionOutput = {
   // present after at least one event has been persisted. Null when no events
   // exist, and absent when the DO cannot be reached (fails open).
   latestEventId?: number | null;
-};
+} & Pick<
+  CloudSessionMetadata,
+  'title' | 'associatedPr' | 'totalCostMicrodollars' | 'createdOnPlatform' | 'profileId'
+>;
 
 /**
  * Input for updateSession procedure.
@@ -596,6 +612,9 @@ type CloudAgentNextTRPCClient = {
   };
   getSession: {
     query: (input: GetSessionInput) => Promise<GetSessionOutput>;
+  };
+  getSessionMessagesPage: {
+    query: (input: GetSessionMessagesPageInput) => Promise<unknown>;
   };
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
@@ -836,6 +855,15 @@ export class CloudAgentNextClient {
       });
       throw error;
     }
+  }
+
+  async getSessionMessagesPage(
+    input: GetSessionMessagesPageInput
+  ): Promise<CloudSessionSnapshotPage | null> {
+    const request = cloudSessionMessagesPageInputSchema.parse(input);
+    return cloudSessionMessagesPageSchema.parse(
+      await this.client.getSessionMessagesPage.query(request)
+    );
   }
 
   /** The session's preparation attempts, as its stream replays them. */

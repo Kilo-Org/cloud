@@ -40,10 +40,10 @@ git diff --check
 - After dependency changes, run `pnpx expo-doctor` and fix every issue.
 - `jotai` stays on 2.x for now, and the four pins move together: `apps/mobile`,
   `apps/web`, `apps/extension` and `packages/cloud-agent-sdk`. The SDK creates
-  the session atoms and this app reads them through its own jotai hooks, so a
-  mixed major fails `typecheck` at every shared atom: a 2.x `Atom` is not
-  assignable to the 3.x type because its `read` options still require `setSelf`,
-  which 3.x removed. `apps/web` cannot move first while
+  the session atoms and each app reads them through its own jotai hooks, so a
+  partial bump fails `typecheck`: a 2.x `Atom` is not assignable to the 3.x
+  type because its `read` options still require `setSelf`, which 3.x removed
+  (mobile alone reports 153 such errors). `apps/web` cannot move first while
   `jotai-minidb@0.0.8` (the latest release) imports `atomFamily` from
   `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit when
   `jotai-minidb` publishes a 3.x release; 3.0.1 already clears

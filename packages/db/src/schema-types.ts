@@ -2228,17 +2228,6 @@ export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
 
 export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
 
-// All price fields are in dollars per token (e.g. "0.000001" = $1 per million tokens),
-// matching the OpenRouter pricing convention.
-export const CustomLlmPricingSchema = z.object({
-  prompt: z.string(),
-  completion: z.string(),
-  input_cache_read: z.string().optional(),
-  input_cache_write: z.string().optional(),
-});
-
-export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
-
 export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
@@ -2332,15 +2321,25 @@ export const CustomLlmDefinitionSchema = z.object({
   display_name: z.string(),
   organization_ids: z.array(z.uuid()),
   group_ids: z.array(z.uuid()).optional(),
-  pricing: CustomLlmPricingSchema.optional(),
 });
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
-const GatewayModelIdSchema = z
+export const GatewayModelIdSchema = z
   .string()
   .trim()
   .regex(/^[a-z0-9./:~-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / : ~ -');
+
+/** Kilo-owned model namespaces; mirrors the prefixes in web-shared `model-utils.ts`. */
+const RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES = ['kilo/', 'kilo-auto/', 'kilocode/'];
+
+/** `:` selects a gateway variant and `~` an OpenRouter alias, so neither may appear. */
+export const CustomLlmPublicIdSchema = GatewayModelIdSchema.refine(
+  id => !id.includes(':') && !id.includes('~'),
+  { message: 'public_id must not contain ":" or "~"' }
+).refine(id => !RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.some(prefix => id.startsWith(prefix)), {
+  message: `public_id must not start with ${RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.join(', ')}`,
+});
 
 export const AutoFreeModelSchema = z.object({
   model: GatewayModelIdSchema,

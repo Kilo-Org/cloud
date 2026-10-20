@@ -49,6 +49,10 @@ import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detecti
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { extractReasoningSetting } from './llm-proxy-helpers';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -1408,6 +1412,34 @@ describe('logMicrodollarUsage', () => {
       processTokenData({ ...BASE_USAGE_STATS, messageId: null }, usageContext)
     ).resolves.not.toBeNull();
     expect(mockedReportUsageEvent).not.toHaveBeenCalled();
+  });
+
+  test('records custom LLM usage as free regardless of upstream cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-custom-llm-free-user',
+      microdollars_used: 1000,
+      google_user_email: 'custom-llm-free@example.com',
+    });
+
+    await insertCustomLlmForTest('acme/free-custom-model');
+    try {
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: 'test-custom-llm-free', cost_mUsd: 700 },
+        {
+          ...createBaseUsageContext(user),
+          provider: 'custom',
+          requested_model: 'acme/free-custom-model',
+        }
+      );
+    } finally {
+      await deleteCustomLlmForTest('acme/free-custom-model');
+    }
+
+    expect((await findUserById('test-custom-llm-free-user'))?.microdollars_used).toBe(1000);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-custom-llm-free'),
+    });
+    expect(metadataRecord?.is_free).toBe(true);
   });
 
   test('does not report a bouncer usage event without the bouncer context', async () => {

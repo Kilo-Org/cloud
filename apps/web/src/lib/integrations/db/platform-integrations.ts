@@ -1041,6 +1041,24 @@ export async function autoCompleteInstallation(
  */
 
 /**
+ * Selection order for a personal owner's GitHub associations, shared by the
+ * installation badge and operational lookups so both resolve the same row.
+ * Reinstalling keeps the deleted installation's association for history, so a
+ * healthy workflow association must outrank it. Unhealthy rows stay selectable
+ * only as a fallback for status and recovery messaging.
+ */
+export function personalGitHubIntegrationOrder() {
+  const healthy = sql`(${platformIntegrationHealthSql()}) IS TRUE`;
+  const healthyWorkflow = sql`(${platform_integrations.github_connection_role} = 'workflow' AND ${healthy}) IS TRUE`;
+  return [
+    desc(healthyWorkflow),
+    desc(healthy),
+    desc(platform_integrations.updated_at),
+    asc(platform_integrations.id),
+  ];
+}
+
+/**
  * Gets platform integration for an owner (user or organization).
  * Optionally filters by integration status (e.g. 'active').
  */
@@ -1068,6 +1086,7 @@ export async function getIntegrationForOwner(
     .select()
     .from(platform_integrations)
     .where(and(...conditions))
+    .orderBy(...(platform === PLATFORM.GITHUB ? personalGitHubIntegrationOrder() : []))
     .limit(1);
 
   return integration || null;

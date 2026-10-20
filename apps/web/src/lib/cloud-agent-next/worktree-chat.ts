@@ -16,6 +16,7 @@ type CreateWorktreeChatOptions = {
   headersList?: Headers;
   sourceKiloSessionId: string;
   operationKey: string;
+  kiloSessionId?: string;
   organizationId?: string;
 };
 
@@ -90,11 +91,31 @@ function getWorktreeErrorCode(error: WorktreeUpstreamErrorShape): WorktreeErrorC
   return typeof status === 'number' ? worktreeErrorCodesByHttpStatus.get(status) : undefined;
 }
 
+function rejectsProposedSessionId(error: unknown): boolean {
+  if (!(error instanceof TRPCClientError) || getWorktreeErrorCode(error) !== 'BAD_REQUEST') {
+    return false;
+  }
+  try {
+    return z
+      .tuple([
+        z.object({
+          code: z.literal('unrecognized_keys'),
+          keys: z.tuple([z.literal('kiloSessionId')]),
+          path: z.tuple([]),
+        }),
+      ])
+      .safeParse(JSON.parse(error.message)).success;
+  } catch {
+    return false;
+  }
+}
+
 export async function createWorktreeChat({
   user,
   headersList,
   sourceKiloSessionId,
   operationKey,
+  kiloSessionId,
   organizationId,
 }: CreateWorktreeChatOptions): Promise<CreateWorktreeChatOutput> {
   if (isMobileClient(headersList)) {
@@ -157,13 +178,23 @@ export async function createWorktreeChat({
     tokenSource: 'cloud-agent',
   });
   try {
-    return await createCloudAgentNextClient(token).createWorktreeChat({
+    const client = createCloudAgentNextClient(token);
+    const input = {
       sourceKiloSessionId,
       sourceCloudAgentSessionId: source.cloudAgentSessionId,
       operationKey,
       ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),
-      clientProvenance: 'browser',
-    });
+      clientProvenance: 'browser' as const,
+    };
+    return await client
+      .createWorktreeChat({ ...input, ...(kiloSessionId ? { kiloSessionId } : {}) })
+      .catch(error => {
+        // Older Workers reject the field before admission, so this retry cannot duplicate a chat.
+        if (kiloSessionId && rejectsProposedSessionId(error)) {
+          return client.createWorktreeChat(input);
+        }
+        throw error;
+      });
   } catch (error) {
     if (error instanceof TRPCClientError) {
       const code = getWorktreeErrorCode(error);

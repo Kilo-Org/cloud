@@ -2475,6 +2475,9 @@ importers:
       '@vitest/ui':
         specifier: 'catalog:'
         version: 4.1.11(vitest@4.1.11)
+      aws4fetch:
+        specifier: 'catalog:'
+        version: 1.0.20
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.10

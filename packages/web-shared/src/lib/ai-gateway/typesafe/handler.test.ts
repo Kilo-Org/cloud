@@ -143,6 +143,7 @@ const memberDecision = {
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' as const },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
   },
   decision: { allowed: true },
 };

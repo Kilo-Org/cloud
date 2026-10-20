@@ -1,10 +1,12 @@
 import 'server-only';
 
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { user_feedback } from '@kilocode/db/schema';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
+import { enforceFeedbackRateLimit } from '@/lib/feedback/rate-limit';
+import { buildUserFeedbackSlackMessage } from '@/lib/feedback/slack-message';
 
 /**
  * Shared feedback submission service.
@@ -22,36 +24,6 @@ import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config
  * user feedback.
  */
 
-/** Rolling window in which a single user may submit at most one piece of feedback. */
-export const FEEDBACK_RATE_LIMIT_WINDOW_MS = 60_000;
-
-/**
- * Message returned to a limited caller. It states the limit and asks the caller
- * to batch, so an agent can self-correct instead of retrying blindly.
- */
-export const FEEDBACK_RATE_LIMIT_MESSAGE =
-  'Feedback is limited to 1 submission per minute per user. Please batch your feedback into one submission and try again.';
-
-/**
- * Thrown when a user already submitted feedback within the rolling window.
- * Callers map this to their transport error shape (tRPC `TOO_MANY_REQUESTS`,
- * HTTP 429) while preserving {@link FeedbackRateLimitError.message}.
- */
-export class FeedbackRateLimitError extends Error {
-  /** Milliseconds until the next submission is allowed. */
-  readonly retryAfterMs: number;
-
-  constructor(retryAfterMs: number) {
-    super(FEEDBACK_RATE_LIMIT_MESSAGE);
-    this.name = 'FeedbackRateLimitError';
-    this.retryAfterMs = retryAfterMs;
-  }
-}
-
-export function isFeedbackRateLimitError(error: unknown): error is FeedbackRateLimitError {
-  return error instanceof FeedbackRateLimitError;
-}
-
 export type SubmitUserFeedbackInput = {
   /** Resolved authenticated user id. */
   userId: string;
@@ -67,46 +39,10 @@ export type SubmitUserFeedbackResult = {
 };
 
 /**
- * Parse the PostgreSQL `timestamptz` text Drizzle returns with `mode: 'string'`
- * (for example `2026-04-29 01:16:12.945+00`). Returns null for unparseable text
- * so a malformed legacy row cannot block all future submissions.
+ * Advisory-lock namespace for this surface. `cloudAgentNextFeedback.create`
+ * uses its own, so the two feedback surfaces keep independent windows.
  */
-function parseCreatedAt(value: string): number | null {
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-/**
- * Enforce the per-user rolling limit by reading the user's most recent
- * `user_feedback` row. `IDX_user_feedback_kilo_user_id` backs the lookup and
- * `IDX_user_feedback_created_at` backs the ordering.
- *
- * Runs inside the same transaction as the insert and under the per-user
- * advisory lock taken by {@link submitUserFeedback}, so a concurrent
- * submission cannot slip between this read and the write.
- */
-async function enforceFeedbackRateLimit(
-  tx: DrizzleTransaction,
-  userId: string,
-  now: number
-): Promise<void> {
-  const [mostRecent] = await tx
-    .select({ created_at: user_feedback.created_at })
-    .from(user_feedback)
-    .where(eq(user_feedback.kilo_user_id, userId))
-    .orderBy(desc(user_feedback.created_at))
-    .limit(1);
-
-  if (!mostRecent) return;
-
-  const submittedAt = parseCreatedAt(mostRecent.created_at);
-  if (submittedAt === null) return;
-
-  const elapsedMs = now - submittedAt;
-  if (elapsedMs < FEEDBACK_RATE_LIMIT_WINDOW_MS) {
-    throw new FeedbackRateLimitError(FEEDBACK_RATE_LIMIT_WINDOW_MS - Math.max(elapsedMs, 0));
-  }
-}
+const RATE_LIMIT_NAMESPACE = 'user_feedback_rate_limit';
 
 /**
  * Best-effort notification to the Kilo Slack workspace. Uses an Incoming Webhook
@@ -116,23 +52,10 @@ async function enforceFeedbackRateLimit(
 function notifySlack(input: SubmitUserFeedbackInput): void {
   if (!SLACK_USER_FEEDBACK_WEBHOOK_URL) return;
 
-  const textLines = [
-    '*New user feedback:* :old_man_yells_at_kilo:',
-    `• user: \`${input.userId}\``,
-    `• for: \`${input.feedbackFor ?? FeedbackFor.Unknown}\``,
-    `• source: \`${input.source ?? FeedbackSource.Unknown}\``,
-    input.feedbackBatch ? `• batch: \`${input.feedbackBatch}\`` : null,
-    '',
-    '• raw feedback:',
-    '```',
-    input.feedbackText?.trim() ? input.feedbackText.trim() : '_<empty>_',
-    '```',
-  ].filter((line): line is string => !!line);
-
   fetch(SLACK_USER_FEEDBACK_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: textLines.join('\n') }),
+    body: JSON.stringify(buildUserFeedbackSlackMessage(input)),
   }).catch(error => {
     console.error('[UserFeedback] Failed to post to Slack webhook', error);
   });
@@ -141,12 +64,9 @@ function notifySlack(input: SubmitUserFeedbackInput): void {
 /**
  * Persist one feedback submission for an authenticated user.
  *
- * The rate-limit read and the insert run in one transaction that first takes a
- * transaction-scoped Postgres advisory lock keyed on the user id. Two concurrent
- * submissions from the same user therefore serialize: the second waits for the
- * first to commit, then observes its row and is refused. Without the lock the
- * read and the insert are separate statements, and both callers could observe an
- * empty window and both insert, breaking the one-per-minute guarantee.
+ * The rate-limit read and the insert run in one transaction under the advisory
+ * lock taken by {@link enforceFeedbackRateLimit}, so a concurrent submission
+ * cannot slip between the read and the write.
  *
  * Throws {@link FeedbackRateLimitError} when the user submitted feedback within
  * the last {@link FEEDBACK_RATE_LIMIT_WINDOW_MS}.
@@ -154,18 +74,20 @@ function notifySlack(input: SubmitUserFeedbackInput): void {
 export async function submitUserFeedback(
   input: SubmitUserFeedbackInput
 ): Promise<SubmitUserFeedbackResult> {
-  const inserted = await db.transaction(async tx => {
-    // `pg_advisory_xact_lock` releases automatically on commit/rollback, so the
-    // lock never outlives the transaction it guards. The first key namespaces
-    // this feature (so it cannot contend with another feature's advisory locks);
-    // `hashtext` maps the arbitrary user id (which is not always a UUID) to the
-    // second key. A hash collision only serializes two users, never grants a
-    // second submission.
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext('user_feedback_rate_limit'), hashtext(${input.userId}))`
-    );
-
-    await enforceFeedbackRateLimit(tx, input.userId, Date.now());
+  const inserted = await db.transaction(async (tx: DrizzleTransaction) => {
+    await enforceFeedbackRateLimit(tx, {
+      namespace: RATE_LIMIT_NAMESPACE,
+      userId: input.userId,
+      readMostRecentCreatedAt: async () => {
+        const [mostRecent] = await tx
+          .select({ created_at: user_feedback.created_at })
+          .from(user_feedback)
+          .where(eq(user_feedback.kilo_user_id, input.userId))
+          .orderBy(desc(user_feedback.created_at))
+          .limit(1);
+        return mostRecent?.created_at;
+      },
+    });
 
     const [row] = await tx
       .insert(user_feedback)

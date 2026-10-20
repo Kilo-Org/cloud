@@ -47,7 +47,7 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
       if (sessionId == null) {
         return
       }
-      // A dismissal is an Unfollow (spec "Android: actions" rule 3). Drop the
+      // A dismissal is an Unfollow (spec "Android: actions" rule 4). Drop the
       // stored card now, so no later update re-posts it; then the headless JS
       // stops following the session and deletes its server row. Each session
       // has its own unique work: a clear-all dismisses several cards at once,

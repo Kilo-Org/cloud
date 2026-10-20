@@ -253,7 +253,7 @@ export function unfollowSession(sessionId: string): void {
 
 /**
  * The user dismissed the notification: that is an Unfollow (spec "Android:
- * actions" rule 3). The native receiver already cancelled the card; this stops
+ * actions" rule 4). The native receiver already cancelled the card; this stops
  * following the session in this runtime and deletes its server row, so no later
  * update re-posts it. Runs headless, so it resolves only once the delete settled.
  */

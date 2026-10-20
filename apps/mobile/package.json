@@ -151,9 +151,9 @@
     "babel-preset-expo": "~57.0.13",
     "drizzle-kit": "catalog:",
     "eslint-plugin-sonarjs": "4.2.2",
-    "knip": "6.39.0",
-    "postcss": "8.5.28",
-    "test-renderer": "1.3.0",
+    "knip": "6.41.0",
+    "postcss": "8.5.30",
+    "test-renderer": "1.3.1",
     "typescript": "~7.0.2",
     "vitest": "catalog:"
   },

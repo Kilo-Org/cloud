@@ -26,6 +26,7 @@ import { isKiloReviewBotAuthor, normalizeGitHubLogin } from '@/lib/code-reviews/
 
 export const FIX_REVIEW_COMMENT_BODY_MAX_LENGTH = 4_000;
 export const FIX_REVIEW_MAX_COMMENTS = 20;
+export const FIX_REVIEW_TOTAL_BODY_MAX_LENGTH = 40_000;
 const COMMENTS_PAGE_SIZE = 100;
 const REVIEW_THREADS_MAX_PAGES = 20;
 const THREAD_COMMENTS_MAX_PAGES = 20;
@@ -454,8 +455,26 @@ export async function selectFixReviewCommentsForReview(input: {
     lookupPermission: login => client.lookupPermission(login),
   });
 
-  return {
-    comments: selected.slice(0, FIX_REVIEW_MAX_COMMENTS),
-    omittedCount: Math.max(0, selected.length - FIX_REVIEW_MAX_COMMENTS),
-  };
+  return selectWithinPromptBudget(selected);
+}
+
+/**
+ * The newest comments are the ones a run was started for, so they are kept
+ * first; the oldest are reported as omitted instead of crowding the prompt.
+ */
+function selectWithinPromptBudget(selected: readonly FixReviewComment[]): FixReviewSelection {
+  const kept: FixReviewComment[] = [];
+  let budget = FIX_REVIEW_TOTAL_BODY_MAX_LENGTH;
+  for (
+    let index = selected.length - 1;
+    index >= 0 && kept.length < FIX_REVIEW_MAX_COMMENTS;
+    index -= 1
+  ) {
+    const comment = selected[index];
+    if (kept.length > 0 && comment.body.length > budget) break;
+    kept.push(comment);
+    budget -= comment.body.length;
+  }
+  kept.reverse();
+  return { comments: kept, omittedCount: selected.length - kept.length };
 }

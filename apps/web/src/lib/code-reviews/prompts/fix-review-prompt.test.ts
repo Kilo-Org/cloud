@@ -117,7 +117,7 @@ describe('buildFixReviewPrompt', () => {
   it('reports comments that did not fit the prompt budget', () => {
     const prompt = build([comment()], 7);
 
-    expect(prompt).toContain('7 more comments matched the selection rules but were left out');
+    expect(prompt).toContain('7 earlier comments matched the selection rules but were left out');
     expect(prompt).toContain('another fix run is needed for them');
   });
 });

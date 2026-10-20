@@ -65,7 +65,7 @@ export function buildFixReviewPrompt(input: {
   if (input.omittedCommentCount > 0) {
     commentBlocks.push(
       '',
-      `${input.omittedCommentCount} more comments matched the selection rules but were left out to keep this prompt small. Do not fetch them yourself. Say in the summary that another fix run is needed for them.`
+      `${input.omittedCommentCount} earlier comments matched the selection rules but were left out to keep this prompt small; this run covers the most recent ones. Do not fetch the others yourself. Say in the summary that another fix run is needed for them.`
     );
   }
 

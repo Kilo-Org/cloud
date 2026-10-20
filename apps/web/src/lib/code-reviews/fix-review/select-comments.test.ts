@@ -3,6 +3,7 @@ import type { CollaboratorPermission } from '@/lib/integrations/platforms/github
 import {
   FIX_REVIEW_COMMENT_BODY_MAX_LENGTH,
   FIX_REVIEW_MAX_COMMENTS,
+  FIX_REVIEW_TOTAL_BODY_MAX_LENGTH,
   selectFixReviewComments,
   selectFixReviewCommentsForReview,
   type FixReviewComment,
@@ -320,7 +321,7 @@ describe('selectFixReviewCommentsForReview', () => {
     ).rejects.toThrow('GitHub unavailable');
   });
 
-  it('keeps the prompt within its comment budget and reports the rest', async () => {
+  it('keeps the most recent comments within the prompt budget and reports the rest', async () => {
     const client = clientFixture({
       listComments: async () =>
         Array.from({ length: FIX_REVIEW_MAX_COMMENTS + 2 }, (_, index) =>
@@ -335,6 +336,27 @@ describe('selectFixReviewCommentsForReview', () => {
     });
 
     expect(selection.comments).toHaveLength(FIX_REVIEW_MAX_COMMENTS);
+    expect(selection.comments[0].id).toBe(3);
+    expect(selection.comments.at(-1)?.id).toBe(FIX_REVIEW_MAX_COMMENTS + 2);
+    expect(selection.omittedCount).toBe(2);
+  });
+
+  it('also bounds the total comment text in the prompt', async () => {
+    const body = 'x'.repeat(4_000);
+    const client = clientFixture({
+      listComments: async () =>
+        Array.from({ length: 12 }, (_, index) =>
+          comment({ id: index + 1, authorLogin: 'initiator', body })
+        ),
+    });
+
+    const selection = await selectFixReviewCommentsForReview({
+      ...baseInput,
+      integration: { platform_installation_id: '42', github_app_type: 'standard' },
+      deps: depsFixture(client),
+    });
+
+    expect(selection.comments).toHaveLength(FIX_REVIEW_TOTAL_BODY_MAX_LENGTH / body.length);
     expect(selection.omittedCount).toBe(2);
   });
 });

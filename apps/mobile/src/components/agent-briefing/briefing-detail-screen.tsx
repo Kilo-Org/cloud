@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { briefingMoney, BriefingScorecard } from './briefing-card';
+import { BriefingScorecard } from './briefing-card';
 import { BriefingSummary } from './briefing-summary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -18,9 +18,10 @@ import {
   useBriefingDismissals,
   useBriefingInvalidation,
 } from '@/lib/agent-briefing';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatDate } from '@/lib/format';
+import { formatCalendarDate, formatDate } from '@/lib/format';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
@@ -112,7 +113,9 @@ export function BriefingDetailScreen() {
             <Text className="text-lg font-semibold">
               {report.context.organizationId === null ? t('common.personal') : report.context.name}
             </Text>
-            <Text className="text-sm text-muted-foreground">{report.localDate}</Text>
+            <Text className="text-sm text-muted-foreground">
+              {formatCalendarDate(report.localDate, i18n.language)}
+            </Text>
             <Text className="text-xs text-muted-foreground">
               {t('agentBriefing.window', {
                 start: formatDate(

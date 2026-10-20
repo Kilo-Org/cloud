@@ -16,17 +16,9 @@ import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { briefingSummaryStatusKey, visibleHomeBriefing } from '@/lib/agent-briefing-state';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import { cn } from '@/lib/utils';
-import { formatNumber } from '@/lib/format';
-import { numberFormat } from '@/lib/intl-cache';
-
-export function briefingMoney(microdollars: number, language: string): string {
-  return numberFormat(language, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 4,
-  }).format(microdollars / 1_000_000);
-}
+import { formatCalendarDate, formatNumber } from '@/lib/format';
 
 export function BriefingScorecard({ report }: { readonly report: BriefingReport }) {
   const { t, i18n } = useTranslation();
@@ -103,7 +95,7 @@ export function BriefingCard({
   readonly report: BriefingReport;
   readonly embedded?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const offline = useOfflineBannerState();
   const dismissals = useBriefingDismissals();
@@ -117,7 +109,7 @@ export function BriefingCard({
     offline ? t('agentBriefing.offline') : null,
     report.revised ? t('agentBriefing.revised', { revision: report.revision }) : null,
     hasAiPreview ? aiPreview : t('agentBriefing.view'),
-    hasAiPreview ? null : report.localDate,
+    hasAiPreview ? null : formatCalendarDate(report.localDate, i18n.language),
   ]
     .filter(Boolean)
     .join(' · ');

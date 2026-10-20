@@ -17,6 +17,7 @@ import {
   useBriefingInvalidation,
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied } from '@/lib/agent-briefing-state';
+import { formatCalendarDate } from '@/lib/format';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
@@ -25,7 +26,7 @@ import { useTRPC } from '@/lib/trpc';
 export function BriefingListScreen() {
   const trpc = useTRPC();
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const access = useBriefingAccess();
   const offline = useOfflineBannerState();
   const { history, setHistory, organizationId, setOrganizationId } = useBriefingListFilters();
@@ -201,7 +202,7 @@ export function BriefingListScreen() {
                   {item.context.organizationId === null ? t('common.personal') : item.context.name}
                 </Text>
                 <Text className="text-xs text-muted-foreground">
-                  {item.localDate}
+                  {formatCalendarDate(item.localDate, i18n.language)}
                   {item.revised
                     ? ` · ${t('agentBriefing.revised', { revision: item.revision })}`
                     : ''}

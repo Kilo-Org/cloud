@@ -128,6 +128,35 @@ it('converts v1 persisted UI messages into logs and a structured transcript', as
   expect(fetchSessionSnapshot).not.toHaveBeenCalled();
 });
 
+it('labels v1 say:tool entries so legacy bubbles have a tool summary', async () => {
+  mockLimit.mockResolvedValueOnce([{ blobUrl: 'blob-key' }]);
+  jest.mocked(getBlobContent).mockResolvedValue([
+    {
+      ts: 1,
+      type: 'say',
+      say: 'tool',
+      text: JSON.stringify({ tool: 'readFile', path: 'src/app.ts' }),
+    },
+  ]);
+
+  const result = await getWebhookRequestLogs(undefined, 'org-id', 'trigger', requestId);
+
+  expect(result.transcript).toEqual({
+    version: 'v1',
+    messages: [
+      expect.objectContaining({
+        ts: 1,
+        type: 'assistant',
+        say: 'tool',
+        ask: 'tool',
+        text: '',
+        content: '',
+        metadata: { tool: 'readFile', path: 'src/app.ts' },
+      }),
+    ],
+  });
+});
+
 it('ignores non-record v1 blob entries in the structured transcript', async () => {
   mockLimit.mockResolvedValueOnce([{ blobUrl: 'blob-key' }]);
   jest

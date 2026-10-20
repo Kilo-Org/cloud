@@ -92,7 +92,7 @@ function sanitizeV1Message(message: CloudMessage): CloudMessage | null {
       ts: message.ts,
       type: 'assistant',
       say: message.say,
-      ask: message.ask,
+      ask: message.ask ?? 'tool',
       text: '',
       content: '',
       partial: message.partial,

@@ -139,6 +139,20 @@ it('keeps agent failures visible when the assistant has no parts', () => {
   expect(html).toContain('Error: Provider quota exceeded');
 });
 
+it('shows logged errors when no transcript messages render', () => {
+  mockUseQuery.mockReturnValue({
+    data: {
+      processStatus: 'failed',
+      transcript: { version: 'v2', messages: [] },
+      logs: [{ timestamp: '', eventType: 'error', message: 'Error: Provider quota exceeded' }],
+    },
+  });
+  const html = render();
+  expect(html).toContain('role="alert"');
+  expect(html).toContain('Error: Provider quota exceeded');
+  expect(html).not.toContain('No execution logs available for this run');
+});
+
 it('recovers from a rendering failure on updated data without resetting healthy conversations', () => {
   const boundary = new MessageErrorBoundary({ children: null, resetKey: 2 });
   const setState = jest.spyOn(boundary, 'setState').mockImplementation(() => {});

@@ -68,6 +68,8 @@ export function WebhookRequestLogs({
   }, [data]);
 
   const isActive = data?.processStatus === 'captured' || data?.processStatus === 'inprogress';
+  const errorLogs = data?.logs?.filter(entry => entry.eventType === 'error') ?? [];
+  const hasTranscript = Boolean(data?.transcript?.messages.length);
 
   return (
     <section aria-label="Execution logs" className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
@@ -111,26 +113,39 @@ export function WebhookRequestLogs({
           <p role="status" className="text-muted-foreground flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading execution logs...
           </p>
-        ) : !isAccessError(error) && data?.transcript?.messages.length ? (
-          <div className="mx-auto max-w-3xl break-words">
-            <MessageErrorBoundary resetKey={dataUpdatedAt}>
-              {data.transcript.version === 'v2' ? (
-                <SharedSessionTranscript messages={data.transcript.messages} />
-              ) : (
-                data.transcript.messages.map((message, index) => (
-                  <LegacyMessageBubble key={`${message.ts}-${index}`} message={message} />
-                ))
-              )}
-            </MessageErrorBoundary>
-            {data.logs
-              ?.filter(entry => entry.eventType === 'error')
-              .map((entry, index) => (
-                <p key={index} role="alert" className="text-destructive mt-3 whitespace-pre-wrap">
-                  {entry.message}
-                  {entry.content ? `: ${entry.content}` : ''}
-                </p>
-              ))}
-          </div>
+        ) : !isAccessError(error) && data ? (
+          <>
+            {hasTranscript && data.transcript ? (
+              <div className="mx-auto max-w-3xl break-words">
+                <MessageErrorBoundary resetKey={dataUpdatedAt}>
+                  {data.transcript.version === 'v2' ? (
+                    <SharedSessionTranscript messages={data.transcript.messages} />
+                  ) : (
+                    data.transcript.messages.map((message, index) => (
+                      <LegacyMessageBubble key={`${message.ts}-${index}`} message={message} />
+                    ))
+                  )}
+                </MessageErrorBoundary>
+              </div>
+            ) : null}
+            {errorLogs.length > 0 ? (
+              <div className="mx-auto max-w-3xl break-words">
+                {errorLogs.map((entry, index) => (
+                  <p key={index} role="alert" className="text-destructive mt-3 whitespace-pre-wrap">
+                    {entry.message}
+                    {entry.content ? `: ${entry.content}` : ''}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+            {!hasTranscript && errorLogs.length === 0 ? (
+              <p role="status" className="text-muted-foreground">
+                {isActive
+                  ? 'Waiting for cloud agent logs...'
+                  : 'No execution logs available for this run.'}
+              </p>
+            ) : null}
+          </>
         ) : !error ? (
           <p role="status" className="text-muted-foreground">
             {isActive

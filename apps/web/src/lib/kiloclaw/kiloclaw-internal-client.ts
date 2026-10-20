@@ -73,6 +73,7 @@ import type {
   ProviderRolloutConfig,
 } from './types';
 import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
+import type { WorkerDestroyResponse } from './admin-bulk-destroy';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
 export type FileNode = {
@@ -429,7 +430,7 @@ export class KiloClawInternalClient {
     userId: string,
     instanceId?: string,
     options?: { reason?: KiloclawDestroyReason; signal?: AbortSignal }
-  ): Promise<{ ok: true }> {
+  ): Promise<WorkerDestroyResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/destroy${params}`,

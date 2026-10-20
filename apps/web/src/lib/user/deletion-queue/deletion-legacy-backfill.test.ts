@@ -288,7 +288,17 @@ describe('historical GDPR user-ID backfill', () => {
         message_id: 'backfill-message',
         user_prompt_prefix: 'private user prompt',
       });
-      jest.spyOn(KiloClawInternalClient.prototype, 'destroy').mockResolvedValue({ ok: true });
+      jest.spyOn(KiloClawInternalClient.prototype, 'destroy').mockResolvedValue({
+        ok: true,
+        finalized: true,
+        destroyedUserId: user.id,
+        destroyedSandboxId: null,
+        pendingMachineId: null,
+        pendingVolumeId: null,
+        lastDestroyErrorOp: null,
+        lastDestroyErrorStatus: null,
+        lastDestroyErrorAt: null,
+      });
       const posthogBase = 'https://posthog.test/api/environments/backfill-test';
       const posthogLookupUrl = `${posthogBase}/persons/?distinct_id=${encodeURIComponent(user.id)}`;
       const posthogStatusUrl = `${posthogBase}/persons/deletion_status/?person_uuid=posthog-person&status=all`;

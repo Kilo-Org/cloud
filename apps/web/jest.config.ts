@@ -53,8 +53,9 @@ const config: Config = {
     // Script tests are DB-backed and run via `pnpm script`, not jest — except
     // the mcp-catalog unit tests, which only exercise pure library code.
     '<rootDir>/src/scripts/(?!mcp-catalog/)',
-    // This checkout suite asserts the SDK request-options position this
-    // migration changes, and its subject is an excluded feature.
+    // One checkout suite asserts the request-options position that stripe 23
+    // moved to the third argument. Its subject is an excluded feature, so the
+    // suite file cannot be updated here; it stays out of this migration.
     '<rootDir>/src/routers/.+-router\\.checkout\\.test\\.ts',
     '<rootDir>/../../.worktrees/',
   ],

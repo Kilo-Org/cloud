@@ -611,7 +611,7 @@
       "notAvailable": "Tarkistukset eivät ole vielä käytettävissä. Uusinta muutostallennusta ei ehkä ole käsitelty tai Kilo GitHub -sovellusta ei ole asennettu lähdetietovarastoon.",
       "noAccess": "Sinulla ei ole oikeutta tarkastella tämän tietovaraston tarkistuksia.",
       "couldNotLoad": "Tarkistuksia ei voitu ladata.",
-      "retryChecks": "Yritä ladata tarkistukset uudelleen",
+      "retryChecks": "Yritä uudelleen tarkistusten lataamista",
       "viewOnGitHub": "Katso PR GitHubissa",
       "noChecksReported": "Ei raportoituja tarkistuksia",
       "passed": "{{displayCount}} onnistui",

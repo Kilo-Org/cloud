@@ -28,8 +28,8 @@ import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
  * through `expo-widgets` (a Live Activity press rides an in-process
  * `LiveActivityUserInteraction`, `src/glanceable-ios/interaction.ts`) and has
  * no promoted ongoing notification; Android has the Live Update notification
- * whose Approve broadcast boots WorkManager headless JS
- * (`modules/active-agents-live-update/android/`, `src/glanceable-android/`)
+ * whose Approve action starts a gate activity that boots WorkManager headless
+ * JS (`modules/active-agents-live-update/android/`, `src/glanceable-android/`)
  * and has no ActivityKit. The answer body, the failure classification, and the
  * republish stay here so the two surfaces cannot disagree.
  */

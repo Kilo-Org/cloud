@@ -91,7 +91,9 @@ describe('consent storage', () => {
     await acceptConsent('user-1');
     // Hex of "user-1"
     const storedRaw = store.get('consent-accepted-757365722d31');
-    expect(storedRaw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true }));
+    expect(storedRaw).toBe(
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true })
+    );
     expect(await hasAcceptedConsent('user-1')).toBe(true);
   });
 
@@ -201,7 +203,9 @@ describe('consent storage', () => {
 
     // Hex of "user-1"
     const raw = store.get('consent-accepted-757365722d31');
-    expect(raw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true }));
+    expect(raw).toBe(
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true })
+    );
   });
 
   it('reads a record without the confirmation marker as optional off', async () => {
@@ -218,8 +222,7 @@ describe('consent storage', () => {
   });
 
   it('keeps an explicit toggle on an unmarked record', async () => {
-    const { CURRENT_CONSENT_VERSION, readConsent, setOptionalConsent } =
-      await import('./consent');
+    const { CURRENT_CONSENT_VERSION, readConsent, setOptionalConsent } = await import('./consent');
 
     store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: true }));
     await setOptionalConsent('user-1', true);
@@ -247,7 +250,9 @@ describe('consent storage', () => {
     });
 
     const raw = store.get('consent-accepted-757365722d31');
-    expect(raw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true }));
+    expect(raw).toBe(
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true })
+    );
   });
 
   it('setOptionalConsent does nothing when no accepted record exists', async () => {

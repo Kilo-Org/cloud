@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { briefingMoney, BriefingScorecard } from './briefing-card';
+import { briefingSessionHref, briefingSourceHref } from './briefing-session-href';
 import { BriefingSummary } from './briefing-summary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -162,9 +163,7 @@ export function BriefingDetailScreen() {
                   className="gap-1 rounded-xl border border-border bg-card p-4 active:opacity-70"
                   onPress={() => {
                     setOrganizationId(report.context.organizationId);
-                    router.push(
-                      `/(app)/agent-chat/${encodeURIComponent(session.sessionId)}` as Href
-                    );
+                    router.push(briefingSessionHref(report, session.sessionId));
                   }}
                 >
                   <Text>{session.title || t('agents.sessionRow.untitled')}</Text>
@@ -181,20 +180,13 @@ export function BriefingDetailScreen() {
                 accessibilityRole="link"
                 className="gap-1 rounded-xl border border-border bg-card p-4 active:opacity-70"
                 onPress={() => {
-                  if (
-                    source.kind === 'activity' ||
-                    source.kind === 'cost' ||
-                    source.kind === 'blocker'
-                  ) {
-                    const rootId =
-                      report.sessions.find(session =>
-                        session.sources.some(entry => entry.id === source.id)
-                      )?.sessionId ?? source.sessionId;
-                    setOrganizationId(report.context.organizationId);
-                    router.push(`/(app)/agent-chat/${encodeURIComponent(rootId)}` as Href);
-                  } else {
+                  const href = briefingSourceHref(report, source);
+                  if (href === null) {
                     void openExternalUrl(source.url, { label: source.title });
+                    return;
                   }
+                  setOrganizationId(report.context.organizationId);
+                  router.push(href);
                 }}
               >
                 <Text className="text-sm">{source.title}</Text>

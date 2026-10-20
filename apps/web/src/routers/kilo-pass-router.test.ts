@@ -5560,11 +5560,9 @@ describe('kiloPassRouter', () => {
           cadence: KiloPassCadence.Yearly,
         })
       ).resolves.toEqual({ url: 'https://stripe.example.test/checkout/tier-49' });
-      expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith(
-        'cs_tier_19',
-        {},
-        { timeout: 10_000 }
-      );
+      expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith('cs_tier_19', {
+        timeout: 10_000,
+      });
       expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
     });
 
@@ -5600,11 +5598,9 @@ describe('kiloPassRouter', () => {
           cadence: KiloPassCadence.Monthly,
         })
       ).resolves.toEqual({ url: 'https://stripe.example.test/checkout/replacement' });
-      expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith(
-        'cs_null_url',
-        {},
-        { timeout: 10_000 }
-      );
+      expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith('cs_null_url', {
+        timeout: 10_000,
+      });
     });
 
     it('finds an open Kilo Pass session on a later Stripe page', async () => {

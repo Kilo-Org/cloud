@@ -1,3 +1,33 @@
+diff --git a/cjs/resources/Checkout/Sessions.d.ts b/cjs/resources/Checkout/Sessions.d.ts
+index 6c175e0bf9af15c8fd9d87cdefda7363e41fbf9d..db30688ad03e0aa25b70833ac4b8b3144ac9133d 100644
+--- a/cjs/resources/Checkout/Sessions.d.ts
++++ b/cjs/resources/Checkout/Sessions.d.ts
+@@ -5206,6 +5206,10 @@ export declare namespace Checkout {
+          * Specifies which fields in the response should be expanded.
+          */
+         expand?: Array<string>;
++        /**
++         * Per-request timeout in milliseconds. This package patch applies it as a request option.
++         */
++        timeout?: number;
+     }
+ }
+ export declare namespace Checkout {
+diff --git a/cjs/resources/Checkout/Sessions.js b/cjs/resources/Checkout/Sessions.js
+index 4d894ef842b16b2c3fd8cb03df5730e7971d297d..73d2bb1a6ab78308721f27cc0024e759560f3091 100644
+--- a/cjs/resources/Checkout/Sessions.js
++++ b/cjs/resources/Checkout/Sessions.js
+@@ -407,6 +407,10 @@ class SessionResource extends StripeResource_js_1.StripeResource {
+      * After it expires, a customer can't complete a Checkout Session and customers loading the Checkout Session see a message saying the Checkout Session is expired.
+      */
+     expire(id, params, options) {
++        if (options === undefined && params != null && typeof params === 'object' && Object.keys(params).length === 1 && typeof params.timeout === 'number') {
++            options = { timeout: params.timeout };
++            params = {};
++        }
+         return this._makeRequest('POST', `/v1/checkout/sessions/${encodeURIComponent(id)}/expire`, params, options, {
+             responseSchema: {
+                 kind: 'object',
 diff --git a/cjs/resources/InvoiceItems.d.ts b/cjs/resources/InvoiceItems.d.ts
 index dde0e734c09590565330280a3118141843d53da4..8829dd2ec91770517b69d317c0c01723636a26a9 100644
 --- a/cjs/resources/InvoiceItems.d.ts
@@ -24,6 +54,36 @@ index 0704dea83535980f227260c4c03034eb25336db0..09ccc46b6e9d4f30de3fd2d50d95879f
              /**
               * The ID of the product this item is associated with.
               */
+diff --git a/esm/resources/Checkout/Sessions.d.ts b/esm/resources/Checkout/Sessions.d.ts
+index 6c175e0bf9af15c8fd9d87cdefda7363e41fbf9d..db30688ad03e0aa25b70833ac4b8b3144ac9133d 100644
+--- a/esm/resources/Checkout/Sessions.d.ts
++++ b/esm/resources/Checkout/Sessions.d.ts
+@@ -5206,6 +5206,10 @@ export declare namespace Checkout {
+          * Specifies which fields in the response should be expanded.
+          */
+         expand?: Array<string>;
++        /**
++         * Per-request timeout in milliseconds. This package patch applies it as a request option.
++         */
++        timeout?: number;
+     }
+ }
+ export declare namespace Checkout {
+diff --git a/esm/resources/Checkout/Sessions.js b/esm/resources/Checkout/Sessions.js
+index 549ed237d1d8a566468a5d8827cf3d6a98958494..ce8c2d1cf2ae876ccdd972d0834d77e9dd534bcf 100644
+--- a/esm/resources/Checkout/Sessions.js
++++ b/esm/resources/Checkout/Sessions.js
+@@ -404,6 +404,10 @@ export class SessionResource extends StripeResource {
+      * After it expires, a customer can't complete a Checkout Session and customers loading the Checkout Session see a message saying the Checkout Session is expired.
+      */
+     expire(id, params, options) {
++        if (options === undefined && params != null && typeof params === 'object' && Object.keys(params).length === 1 && typeof params.timeout === 'number') {
++            options = { timeout: params.timeout };
++            params = {};
++        }
+         return this._makeRequest('POST', `/v1/checkout/sessions/${encodeURIComponent(id)}/expire`, params, options, {
+             responseSchema: {
+                 kind: 'object',
 diff --git a/esm/resources/InvoiceItems.d.ts b/esm/resources/InvoiceItems.d.ts
 index dde0e734c09590565330280a3118141843d53da4..8829dd2ec91770517b69d317c0c01723636a26a9 100644
 --- a/esm/resources/InvoiceItems.d.ts

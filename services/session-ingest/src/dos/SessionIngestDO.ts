@@ -5,7 +5,21 @@ import {
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
-import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
+import {
+  desc,
+  eq,
+  ne,
+  gt,
+  gte,
+  lt,
+  and,
+  or,
+  inArray,
+  isNull,
+  isNotNull,
+  like,
+  sql,
+} from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -97,7 +111,39 @@ type IngestMetaKey =
   | 'lastLiveSummaryPersisted'
   | 'briefingEvidencePending'
   | LiveThrottleMetaKey
-  | AlarmMetaKey;
+  | AlarmMetaKey
+  | ShareInfoMetaKey;
+
+const SHARE_INFO_KEY_PREFIX = 'shareInfo:';
+const SHARE_INFO_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+type ShareInfoMetaKey = `${typeof SHARE_INFO_KEY_PREFIX}${string}`;
+
+function shareInfoKey(publicId: string): ShareInfoMetaKey {
+  return `${SHARE_INFO_KEY_PREFIX}${publicId}`;
+}
+
+/**
+ * Freeze the session info a public share exposes. The cumulative diff is not
+ * part of the public share, so drop it from the snapshot while keeping the
+ * bounded summary counts and every field the import path reads.
+ */
+function projectSharedSessionInfo(raw: string): string {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return '{}';
+
+    const info = { ...(parsed as Record<string, unknown>) };
+    if (typeof info.summary === 'object' && info.summary !== null && !Array.isArray(info.summary)) {
+      const summary = { ...(info.summary as Record<string, unknown>) };
+      delete summary.diffs;
+      info.summary = summary;
+    }
+    return JSON.stringify(info);
+  } catch {
+    return '{}';
+  }
+}
 
 type ExtractableMetaKey =
   | 'title'
@@ -1200,22 +1246,124 @@ export class SessionIngestDO extends DurableObject<Env> {
   }
 
   /**
-   * Stream the frozen boundary of a public share. Only items persisted strictly
-   * before `ingestedBeforeMs` are included, and the cumulative whole-session
-   * diff is never exposed. Message-summary diffs remain part of the transcript
-   * so `kilo import` can still restore intentional file changes.
+   * Freeze the session info a public share exposes. Snapshots are keyed by the
+   * public generation so a later share cannot replace an earlier snapshot while
+   * its capability is still valid. Snapshots older than the maximum accepted
+   * token lifetime are removed.
    */
-  async getSharedSessionStream(ingestedBeforeMs: number): Promise<ReadableStream<Uint8Array>> {
+  async captureShareInfo(publicId: string): Promise<void> {
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const sessionRow = this.db
+      .select({
+        item_data: ingestItems.item_data,
+        item_data_r2_key: ingestItems.item_data_r2_key,
+      })
+      .from(ingestItems)
+      .where(eq(ingestItems.item_type, 'session'))
+      .limit(1)
+      .get();
+    const info = sessionRow ? projectSharedSessionInfo(await this.readItemData(sessionRow)) : '{}';
+    const now = Date.now();
+    const value = JSON.stringify({ capturedAt: now, info });
+
+    this.db
+      .insert(ingestMeta)
+      .values({ key: shareInfoKey(publicId), value })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
+      .run();
+    this.pruneShareInfo(now);
+  }
+
+  async deleteShareInfo(publicId: string): Promise<void> {
+    this.db
+      .delete(ingestMeta)
+      .where(eq(ingestMeta.key, shareInfoKey(publicId)))
+      .run();
+  }
+
+  async clearShareInfo(): Promise<void> {
+    this.db
+      .delete(ingestMeta)
+      .where(like(ingestMeta.key, `${SHARE_INFO_KEY_PREFIX}%`))
+      .run();
+  }
+
+  private pruneShareInfo(now: number): void {
+    const cutoff = now - SHARE_INFO_RETENTION_MS;
+    const rows = this.db
+      .select({ key: ingestMeta.key, value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(like(ingestMeta.key, `${SHARE_INFO_KEY_PREFIX}%`))
+      .all();
+    for (const row of rows) {
+      let capturedAt: unknown;
+      try {
+        capturedAt = (JSON.parse(row.value ?? '') as { capturedAt?: unknown }).capturedAt;
+      } catch {
+        capturedAt = undefined;
+      }
+      if (typeof capturedAt !== 'number' || capturedAt < cutoff) {
+        this.db.delete(ingestMeta).where(eq(ingestMeta.key, row.key)).run();
+      }
+    }
+  }
+
+  /**
+   * Stream the frozen boundary of a public share. Only items persisted strictly
+   * before `ingestedBeforeMs` are included, the session info is the snapshot
+   * captured when the share was created, and the cumulative whole-session diff
+   * is never exposed. Message-summary diffs remain part of the transcript so
+   * `kilo import` can still restore intentional file changes.
+   */
+  async getSharedSessionStream(params: {
+    publicId: string;
+    ingestedBeforeMs: number;
+  }): Promise<ReadableStream<Uint8Array>> {
     return this.buildSessionExportStream({
-      ingestedBeforeMs,
+      ingestedBeforeMs: params.ingestedBeforeMs,
       includeSessionDiff: false,
+      shareInfo: this.readShareInfo(params.publicId),
     });
+  }
+
+  private readShareInfo(publicId: string): string | null {
+    const row = this.db
+      .select({ value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(eq(ingestMeta.key, shareInfoKey(publicId)))
+      .get();
+    if (!row?.value) return null;
+    try {
+      const parsed = JSON.parse(row.value) as { capturedAt?: unknown; info?: unknown };
+      if (
+        typeof parsed.capturedAt !== 'number' ||
+        parsed.capturedAt < Date.now() - SHARE_INFO_RETENTION_MS
+      ) {
+        return null;
+      }
+      return typeof parsed.info === 'string' ? parsed.info : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async readItemData(ref: ItemDataRef): Promise<string> {
+    if (!ref.item_data_r2_key) return ref.item_data;
+    const object = await this.env.SESSION_INGEST_R2.get(ref.item_data_r2_key);
+    if (!object) {
+      console.error('R2 blob missing while freezing share info', {
+        r2Key: ref.item_data_r2_key,
+      });
+      return '{}';
+    }
+    return object.text();
   }
 
   private buildSessionExportStream(options: {
     upToMessageId?: string;
     ingestedBeforeMs?: number;
     includeSessionDiff?: boolean;
+    shareInfo?: string | null;
   }): ReadableStream<Uint8Array> {
     const db = this.db;
     const r2 = this.env.SESSION_INGEST_R2;
@@ -1230,19 +1378,23 @@ export class SessionIngestDO extends DurableObject<Env> {
       async start(controller) {
         try {
           controller.enqueue(encoder.encode('{"info":'));
-          const sessionRow = db
-            .select({
-              item_data: ingestItems.item_data,
-              item_data_r2_key: ingestItems.item_data_r2_key,
-            })
-            .from(ingestItems)
-            .where(eq(ingestItems.item_type, 'session'))
-            .limit(1)
-            .get();
-          if (sessionRow) {
-            await enqueueItemData(controller, sessionRow, r2, encoder);
+          if (options.shareInfo !== undefined) {
+            controller.enqueue(encoder.encode(options.shareInfo ?? '{}'));
           } else {
-            controller.enqueue(encoder.encode('{}'));
+            const sessionRow = db
+              .select({
+                item_data: ingestItems.item_data,
+                item_data_r2_key: ingestItems.item_data_r2_key,
+              })
+              .from(ingestItems)
+              .where(eq(ingestItems.item_type, 'session'))
+              .limit(1)
+              .get();
+            if (sessionRow) {
+              await enqueueItemData(controller, sessionRow, r2, encoder);
+            } else {
+              controller.enqueue(encoder.encode('{}'));
+            }
           }
 
           const CURSOR_BATCH = 10;

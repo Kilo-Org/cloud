@@ -252,6 +252,7 @@ describe('session share tokens', () => {
 
     await expect(resolveSessionShareToken(makeEnv(), token, FIXED_CLOCK)).resolves.toEqual({
       sessionId: SESSION_ID,
+      publicId: PUBLIC_ID,
       kiloUserId: 'usr_123',
       title: 'Shared title',
       ownerName: 'Shared owner',

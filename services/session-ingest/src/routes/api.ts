@@ -778,13 +778,8 @@ api.post('/session/:sessionId/share', async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
   const publicId = crypto.randomUUID();
-  // Mint the capability before mutating the row so a signing failure leaves the
-  // previous generation untouched. Every share rotates `public_id`, which
-  // invalidates the predecessor even while its signature is still valid.
-  const shareToken = await signSessionShareToken(c.env, {
-    sessionId: parsed.data,
-    publicId,
-  });
+  // Every share rotates `public_id`, which invalidates the predecessor even
+  // while its signature is still valid.
   const shareResult = await db.execute<{ public_id: string }>(sql`
     UPDATE ${cli_sessions_v2}
     SET public_id = ${publicId}
@@ -826,6 +821,27 @@ api.post('/session/:sessionId/share', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
+  // Freeze the public info before minting the capability. The capability's
+  // `shared_at` is captured after this snapshot, so the info cannot include
+  // session updates that happen after the share boundary.
+  await withDORetry(
+    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+    stub => stub.captureShareInfo(publicId),
+    'SessionIngestDO.captureShareInfo'
+  );
+
+  const shareToken = await signSessionShareToken(c.env, {
+    sessionId: parsed.data,
+    publicId,
+  }).catch(async error => {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(publicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
+    throw error;
+  });
+
   return c.json({ success: true, share_token: shareToken }, 200);
 });
 
@@ -865,6 +881,19 @@ api.post('/session/:sessionId/unshare', async c => {
     .where(
       and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
     );
+
+  try {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.clearShareInfo(),
+      'SessionIngestDO.clearShareInfo'
+    );
+  } catch (error) {
+    console.warn('Failed to clear share snapshot after unshare', {
+      sessionId: parsed.data,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return c.json({ success: true }, 200);
 });

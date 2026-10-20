@@ -223,6 +223,7 @@ describe('SessionIngestDO integration', () => {
 
     it('exports only content persisted before the shared boundary and drops the session diff', async () => {
       const sessionId = 'ses_roundtrip_shared_0000000006';
+      const publicId = '11111111-1111-4111-8111-111111111111';
       const stub = getStub(kiloUserId, sessionId);
 
       await stub.ingest(
@@ -245,6 +246,7 @@ describe('SessionIngestDO integration', () => {
         1,
         1000
       );
+      await stub.captureShareInfo(publicId);
       // Private content appended after the share boundary.
       await stub.ingest(
         [
@@ -259,7 +261,9 @@ describe('SessionIngestDO integration', () => {
       );
 
       const shared = JSON.parse(
-        await stub.getSharedSessionStream(2000).then(s => new Response(s).text())
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
       );
 
       expect(shared.info).toEqual({ title: 'Shared Session' });
@@ -278,6 +282,7 @@ describe('SessionIngestDO integration', () => {
 
     it('does not expose later updates to an item that existed at the boundary', async () => {
       const sessionId = 'ses_roundtrip_shared_update_000007';
+      const publicId = '22222222-2222-4222-8222-222222222222';
       const stub = getStub(kiloUserId, sessionId);
 
       await stub.ingest(
@@ -291,6 +296,7 @@ describe('SessionIngestDO integration', () => {
         1,
         1000
       );
+      await stub.captureShareInfo(publicId);
       await stub.ingest(
         [{ type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'B' } }],
         kiloUserId,
@@ -300,13 +306,123 @@ describe('SessionIngestDO integration', () => {
       );
 
       const shared = JSON.parse(
-        await stub.getSharedSessionStream(2000).then(s => new Response(s).text())
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
       );
 
       expect(shared.messages).toHaveLength(1);
       expect(shared.messages[0].info.id).toBe('msg_1');
       expect(shared.messages[0].parts).toEqual([]);
       expect(JSON.stringify(shared)).not.toContain('B');
+    });
+
+    it('freezes the shared session info and drops its cumulative diff', async () => {
+      const sessionId = 'ses_roundtrip_shared_info_000008';
+      const publicId = '33333333-3333-4333-8333-333333333333';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          {
+            type: 'session',
+            data: {
+              title: 'Public title',
+              metadata: { goal: 'public goal' },
+              summary: {
+                additions: 1,
+                deletions: 0,
+                files: 1,
+                diffs: [{ file: 'public.ts', after: 'public' }],
+              },
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await stub.captureShareInfo(publicId);
+      await stub.ingest(
+        [
+          {
+            type: 'session',
+            data: {
+              title: 'Private title',
+              metadata: { goal: 'private goal' },
+              summary: { additions: 9, deletions: 9, files: 9 },
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+
+      expect(shared.info).toEqual({
+        title: 'Public title',
+        metadata: { goal: 'public goal' },
+        summary: { additions: 1, deletions: 0, files: 1 },
+      });
+      expect(JSON.stringify(shared)).not.toContain('Private');
+      expect(JSON.stringify(shared)).not.toContain('public.ts');
+
+      await stub.clearShareInfo();
+      const cleared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+      expect(cleared.info).toEqual({});
+      expect(cleared.messages).toEqual([]);
+    });
+
+    it('prunes expired share info snapshots when a new share is captured', async () => {
+      const sessionId = 'ses_roundtrip_shared_retention_000009';
+      const publicId = '44444444-4444-4444-8444-444444444444';
+      const stalePublicId = '55555555-5555-4555-8555-555555555555';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [{ type: 'session', data: { title: 'Retained title' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_meta (key, value) VALUES (?, ?)',
+          `shareInfo:${stalePublicId}`,
+          JSON.stringify({
+            capturedAt: Date.now() - 31 * 24 * 60 * 60 * 1000,
+            info: JSON.stringify({ title: 'Stale title' }),
+          })
+        );
+      });
+      await stub.captureShareInfo(publicId);
+
+      const current = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+      expect(current.info).toEqual({ title: 'Retained title' });
+
+      const stale = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId: stalePublicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+      expect(stale.info).toEqual({});
     });
 
     it('exports only the transcript up to an inclusive message cut and drops the session diff', async () => {

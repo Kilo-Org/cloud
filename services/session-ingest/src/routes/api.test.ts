@@ -133,6 +133,14 @@ function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
   };
 }
 
+function shareIngestStub() {
+  return {
+    captureShareInfo: vi.fn(async (_publicId: string) => undefined),
+    clearShareInfo: vi.fn(async () => undefined),
+    deleteShareInfo: vi.fn(async (_publicId: string) => undefined),
+  };
+}
+
 function prepareIngestRoute(
   ingest: ReturnType<typeof vi.fn> = vi.fn(async () => ({ accepted: true, changes: [] }))
 ) {
@@ -2497,6 +2505,10 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share rotates the generation and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
     let sharedPublicId: string | undefined;
     fns.executeResult.mockImplementationOnce(async query => {
       if (!(query instanceof SQL)) {
@@ -2524,6 +2536,7 @@ describe('api routes', () => {
     expect(sharedPublicId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(sharedPublicId);
     await expect(verifySessionShareToken(makeTestEnv(), body.share_token)).resolves.toMatchObject({
       sub: 'ses_12345678901234567890123456',
       jti: sharedPublicId,
@@ -2535,6 +2548,10 @@ describe('api routes', () => {
     try {
       const { db, fns } = makeDbFakes();
       vi.mocked(getWorkerDb).mockReturnValue(db);
+      const ingestStub = shareIngestStub();
+      vi.mocked(getSessionIngestDO).mockReturnValue(
+        ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+      );
       const issuedPublicIds: string[] = [];
       fns.executeResult.mockImplementation(async query => {
         if (!(query instanceof SQL)) {
@@ -2568,6 +2585,8 @@ describe('api routes', () => {
 
       expect(issuedPublicIds).toHaveLength(2);
       expect(issuedPublicIds[0]).not.toBe(issuedPublicIds[1]);
+      expect(ingestStub.captureShareInfo).toHaveBeenNthCalledWith(1, issuedPublicIds[0]);
+      expect(ingestStub.captureShareInfo).toHaveBeenNthCalledWith(2, issuedPublicIds[1]);
       await expect(
         verifySessionShareToken(makeTestEnv(), first.share_token)
       ).resolves.toMatchObject({
@@ -2593,6 +2612,10 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share sets a fresh public_id and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
     fns.executeResult.mockImplementationOnce(async query => {
       if (!(query instanceof SQL)) {
         throw new Error('Expected share query');
@@ -2619,6 +2642,10 @@ describe('api routes', () => {
     expect(json).toMatchObject({ success: true });
     expect(json).toHaveProperty('share_token', expect.any(String));
     expect(json).not.toHaveProperty('public_id');
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    );
   });
 
   it('POST /session/:sessionId/share rejects an authoritative access failure', async () => {
@@ -2637,11 +2664,16 @@ describe('api routes', () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ success: false, error: 'session_not_found' });
     expect(resolveAccessibleKiloSession).not.toHaveBeenCalled();
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
   it('POST /session/:sessionId/unshare clears public_id when session exists', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
     fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
 
     const app = makeApiApp();
@@ -2654,6 +2686,7 @@ describe('api routes', () => {
 
     expect(res.status).toBe(200);
     expect(fns.updateSet).toHaveBeenCalled();
+    expect(ingestStub.clearShareInfo).toHaveBeenCalledTimes(1);
   });
 
   it('GET /sessions/active returns sessions from UserConnectionDO', async () => {

@@ -75,6 +75,7 @@ export type SessionShareTokenOptions = {
 
 export type ResolvedSessionShare = {
   sessionId: string;
+  publicId: string;
   kiloUserId: string;
   title: string | null;
   ownerName: string | null;
@@ -217,5 +218,5 @@ export async function resolveSessionShareToken(
     .limit(1);
 
   const row = rows[0];
-  return row ? { ...row, contentCutoffMs: payload.shared_at } : null;
+  return row ? { ...row, publicId: payload.jti, contentCutoffMs: payload.shared_at } : null;
 }

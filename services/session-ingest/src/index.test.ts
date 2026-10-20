@@ -337,7 +337,10 @@ describe('public session route', () => {
       expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
       expect(res.headers.get('cache-control')).toBe('no-store');
       expect(await res.text()).toBe('{"ok":true}');
-      expect(stub.getSharedSessionStream).toHaveBeenCalledWith(now.getTime());
+      expect(stub.getSharedSessionStream).toHaveBeenCalledWith({
+        publicId: '11111111-1111-4111-8111-111111111111',
+        ingestedBeforeMs: now.getTime(),
+      });
     } finally {
       vi.useRealTimers();
     }

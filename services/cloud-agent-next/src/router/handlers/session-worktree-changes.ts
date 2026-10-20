@@ -1,8 +1,8 @@
-import { TRPCError } from '@trpc/server';
 import { withLogTags } from '../../logger.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
-import { sessionFor } from '../../session-plane.js';
+import { assertControlSessionId } from '../../session/session-id-guard.js';
+import type { SessionId } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure } from '../auth.js';
 import {
@@ -17,26 +17,16 @@ type ControlPlaneSessionStub = ReturnType<typeof getSandboxSessionStub>;
 
 /**
  * Runs a worktree-changes operation against the control-plane Session DO (with
- * a fresh stub per retry). Worktree changes only exist on the control plane, so
- * a legacy (`agent_*`) session reports the normal precondition error. The plane
- * decision itself lives in `session-plane.ts`.
+ * a fresh stub per retry).
  */
 function worktreeChangesFor<T>(
   env: Parameters<typeof getSandboxSessionStub>[0],
   userId: string,
-  sessionId: string,
+  sessionId: SessionId,
   operation: (getStub: () => ControlPlaneSessionStub) => Promise<T>
 ): Promise<T> {
-  return sessionFor(
-    sessionId,
-    () => operation(() => getSandboxSessionStub(env, userId, sessionId)),
-    () => {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: 'Worktree changes are not available for this session',
-      });
-    }
-  );
+  assertControlSessionId(sessionId);
+  return operation(() => getSandboxSessionStub(env, userId, sessionId));
 }
 
 export function createSessionWorktreeChangesHandlers() {
@@ -51,8 +41,12 @@ export function createSessionWorktreeChangesHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: input.cloudAgentSessionId,
           });
-          return worktreeChangesFor(ctx.env, ctx.userId, input.cloudAgentSessionId, getStub =>
-            withDORetry(getStub, session => session.getWorktreeChanges(), 'getWorktreeChanges')
+          return worktreeChangesFor(
+            ctx.env,
+            ctx.userId,
+            input.cloudAgentSessionId as SessionId,
+            getStub =>
+              withDORetry(getStub, session => session.getWorktreeChanges(), 'getWorktreeChanges')
           );
         })
       ),
@@ -67,16 +61,20 @@ export function createSessionWorktreeChangesHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: input.cloudAgentSessionId,
           });
-          return worktreeChangesFor(ctx.env, ctx.userId, input.cloudAgentSessionId, getStub =>
-            withDORetry(
-              getStub,
-              async session =>
-                await session.getWorktreeFile({
-                  path: input.path,
-                  expectedRevision: input.expectedRevision,
-                }),
-              'getWorktreeFile'
-            )
+          return worktreeChangesFor(
+            ctx.env,
+            ctx.userId,
+            input.cloudAgentSessionId as SessionId,
+            getStub =>
+              withDORetry(
+                getStub,
+                async session =>
+                  await session.getWorktreeFile({
+                    path: input.path,
+                    expectedRevision: input.expectedRevision,
+                  }),
+                'getWorktreeFile'
+              )
           );
         })
       ),
@@ -91,12 +89,16 @@ export function createSessionWorktreeChangesHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: input.cloudAgentSessionId,
           });
-          return worktreeChangesFor(ctx.env, ctx.userId, input.cloudAgentSessionId, getStub =>
-            withDORetry(
-              getStub,
-              async session => await session.refreshWorktreeChanges(),
-              'refreshWorktreeChanges'
-            )
+          return worktreeChangesFor(
+            ctx.env,
+            ctx.userId,
+            input.cloudAgentSessionId as SessionId,
+            getStub =>
+              withDORetry(
+                getStub,
+                async session => await session.refreshWorktreeChanges(),
+                'refreshWorktreeChanges'
+              )
           );
         })
       ),

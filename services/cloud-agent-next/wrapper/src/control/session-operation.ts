@@ -27,7 +27,6 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { IngestEvent } from '../../../src/shared/protocol.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
-import { STABLE_ROOT_IDLE_MS } from '../lifecycle.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import { runAutoCommit, type AutoCommitResult } from '../auto-commit.js';
 import { withTimeoutAndAbort } from '../utils.js';
@@ -576,7 +575,7 @@ export class SessionOperation {
     if (this.local || this.stableIdleTimer) return;
     if (!this.rootIdle || this.admissionInFlight > 0) return;
     if (this.sealedRevision >= this.batchRevision) return;
-    this.stableIdleTimer = setTimeout(() => this.trySeal(), STABLE_ROOT_IDLE_MS);
+    this.stableIdleTimer = setTimeout(() => this.trySeal(), 3_000);
     this.stableIdleTimer.unref?.();
   }
 

@@ -1,4 +1,18 @@
 import { TRPCError } from '@trpc/server';
+
+vi.mock('./session-id-guard.js', async () => {
+  const { TRPCError } = await import('@trpc/server');
+  return {
+    assertControlSessionId: (sessionId: string): void => {
+      if (!sessionId.startsWith('workspace_')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only workspace sessions are supported',
+        });
+      }
+    },
+  };
+});
 import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,14 +24,9 @@ vi.mock('../sandbox-session/session-stub.js', () => ({
     getRuntimeAuthorizationStatus,
     recoverExpiredRuntimeAuthorization,
   }),
-  resolveLegacySessionStub: () => ({
-    getRuntimeAuthorizationRecoveryState: getRuntimeAuthorizationStatus,
-    recoverExpiredRuntimeAuthorization,
-  }),
-  resolveSessionStub: () => ({}),
 }));
 
-vi.mock('../session-service.js', () => ({
+vi.mock('./metadata.js', () => ({
   fetchSessionMetadata: vi.fn(async () => ({
     identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
   })),
@@ -64,6 +73,12 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
     expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
   });
 
+  it('does nothing for the legacy credential-compatibility status', async () => {
+    getRuntimeAuthorizationStatus.mockResolvedValue({ state: 'legacy' });
+    await preflightRuntimeAuthorizationRecovery('workspace_a', ctx);
+    expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
+  });
+
   it('rejects a revoked authorization with FORBIDDEN', async () => {
     getRuntimeAuthorizationStatus.mockResolvedValue({ state: 'revoked' });
     await expect(preflightRuntimeAuthorizationRecovery('workspace_a', ctx)).rejects.toMatchObject({
@@ -94,5 +109,12 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
     await expect(preflightRuntimeAuthorizationRecovery('workspace_a', ctx)).rejects.toBeInstanceOf(
       TRPCError
     );
+  });
+
+  it('rejects a non-workspace ID before reading runtime authorization', async () => {
+    await expect(preflightRuntimeAuthorizationRecovery('agent_a', ctx)).rejects.toBeInstanceOf(
+      TRPCError
+    );
+    expect(getRuntimeAuthorizationStatus).not.toHaveBeenCalled();
   });
 });

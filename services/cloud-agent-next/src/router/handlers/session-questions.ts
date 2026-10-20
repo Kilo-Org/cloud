@@ -1,16 +1,12 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { createAgentSandbox } from '../../agent-sandbox/factory.js';
-import { AgentSandboxUnavailableError } from '../../agent-sandbox/protocol.js';
 import { logger, withLogTags } from '../../logger.js';
 import type { SessionId, Env } from '../../types.js';
-import { fetchSessionMetadata } from '../../session-service.js';
+import { fetchSessionMetadata } from '../../session/metadata.js';
+import { assertControlSessionId } from '../../session/session-id-guard.js';
 import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
-import type { WrapperClient } from '../../kilo/wrapper-client.js';
-import { WrapperError } from '../../kilo/wrapper-client.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
-import { sessionFor } from '../../session-plane.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import type { ControlPlaneAnswerReply } from '../../shared/control-plane-protocol.js';
 import { withDORetry } from '../../utils/do-retry.js';
@@ -39,76 +35,6 @@ async function answerControlPlane(
   return { success: dispatch === 'sent' };
 }
 
-/**
- * Resolves the live wrapper a legacy (`agent_*`) session's questions flow
- * through: that plane keeps no pending set in a Durable Object, so the
- * wrapper's live Kilo state is the only read there is.
- */
-async function resolveLegacyWrapper(opts: {
-  sessionId: SessionId;
-  userId: string;
-  env: Env;
-}): Promise<WrapperClient> {
-  const { sessionId, userId, env } = opts;
-  const metadata = await fetchSessionMetadata(env, userId, sessionId);
-  if (!metadata) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
-  }
-
-  let wrapperClient: WrapperClient | null;
-  try {
-    wrapperClient = await createAgentSandbox(env, metadata).getRunningWrapper();
-  } catch (error) {
-    if (error instanceof AgentSandboxUnavailableError) {
-      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
-    }
-    throw error;
-  }
-  if (!wrapperClient) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'No wrapper found for session' });
-  }
-  return wrapperClient;
-}
-
-/**
- * A legacy (`agent_*`) session's pending set, read from its wrapper. Returns
- * null when the wrapper cannot answer — it is not running, it has no session
- * bound yet, or it predates the read route — which the caller reports as
- * nothing pending: the answer this query gave for a legacy session before the
- * wrapper could be read at all, so the press still hands the user to the app
- * instead of dead-ending on an error.
- */
-async function readLegacyPendingInteractions(opts: {
-  sessionId: SessionId;
-  userId: string;
-  env: Env;
-}): Promise<{ questions: unknown[]; permissions: unknown[] } | null> {
-  try {
-    const wrapper = await resolveLegacyWrapper(opts);
-    return await wrapper.getPendingInteractions();
-  } catch (error) {
-    // Ownership still fails the read. An absent or unreachable wrapper, and a
-    // wrapper too old to have the read route, have nothing to report: the
-    // answer they leave is "nothing pending", not an error.
-    if (
-      error instanceof TRPCError &&
-      (error.code === 'NOT_FOUND' || error.code === 'PRECONDITION_FAILED')
-    ) {
-      return null;
-    }
-    // A wrapper that is running but has no Kilo session bound yet answers
-    // `NO_SESSION` (400). It has nothing to report for the same reason an old
-    // wrapper without the route does, so it folds into the empty set too.
-    if (
-      error instanceof WrapperError &&
-      (error.code === 'NO_SESSION' || error.statusCode === 404 || error.statusCode === 405)
-    ) {
-      return null;
-    }
-    throw error;
-  }
-}
-
 export function createSessionQuestionHandlers() {
   return {
     answerQuestion: protectedProcedure
@@ -131,22 +57,15 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await sessionFor(
-              sessionId,
-              () =>
-                answerControlPlane(env, userId, sessionId, {
-                  action: 'answer',
-                  questionId: input.questionId,
-                  answers: input.answers,
-                }),
-              async () => {
-                const wrapper = await resolveLegacyWrapper({ sessionId, userId, env });
-                return wrapper.answerQuestion(input.questionId, input.answers);
-              }
-            );
+            assertControlSessionId(sessionId);
+            const result = await answerControlPlane(env, userId, sessionId, {
+              action: 'answer',
+              questionId: input.questionId,
+              answers: input.answers,
+            });
             logger
               .withFields({ questionId: input.questionId, success: result.success })
-              .info('Question answer forwarded to wrapper');
+              .info('Question answer forwarded to session');
             return { success: result.success };
           } catch (error) {
             if (error instanceof TRPCError) throw error;
@@ -179,21 +98,14 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await sessionFor(
-              sessionId,
-              () =>
-                answerControlPlane(env, userId, sessionId, {
-                  action: 'reject',
-                  questionId: input.questionId,
-                }),
-              async () => {
-                const wrapper = await resolveLegacyWrapper({ sessionId, userId, env });
-                return wrapper.rejectQuestion(input.questionId);
-              }
-            );
+            assertControlSessionId(sessionId);
+            const result = await answerControlPlane(env, userId, sessionId, {
+              action: 'reject',
+              questionId: input.questionId,
+            });
             logger
               .withFields({ questionId: input.questionId, success: result.success })
-              .info('Question rejection forwarded to wrapper');
+              .info('Question rejection forwarded to session');
             return { success: result.success };
           } catch (error) {
             if (error instanceof TRPCError) throw error;
@@ -228,22 +140,15 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await sessionFor(
-              sessionId,
-              () =>
-                answerControlPlane(env, userId, sessionId, {
-                  action: 'permission',
-                  permissionId: input.permissionId,
-                  response: input.response,
-                }),
-              async () => {
-                const wrapper = await resolveLegacyWrapper({ sessionId, userId, env });
-                return wrapper.answerPermission(input.permissionId, input.response);
-              }
-            );
+            assertControlSessionId(sessionId);
+            const result = await answerControlPlane(env, userId, sessionId, {
+              action: 'permission',
+              permissionId: input.permissionId,
+              response: input.response,
+            });
             logger
               .withFields({ permissionId: input.permissionId, success: result.success })
-              .info('Permission answer forwarded to wrapper');
+              .info('Permission answer forwarded to session');
             return { success: result.success };
           } catch (error) {
             if (error instanceof TRPCError) throw error;
@@ -260,8 +165,7 @@ export function createSessionQuestionHandlers() {
     /**
      * Read the interactions a session currently waits on. A caller must own the
      * session: an unauthorized read fails rather than reporting an empty pending
-     * set. A control-plane session keeps its pending set in its Durable Object;
-     * a legacy `agent_*` session keeps none, so its read comes from the wrapper.
+     * set.
      */
     getPendingInteractions: protectedProcedure
       .input(z.object({ cloudAgentSessionId: sessionIdSchema }))
@@ -279,18 +183,11 @@ export function createSessionQuestionHandlers() {
           kiloUserId: userId,
           cloudAgentSessionId: sessionId,
         });
-        return await sessionFor(
-          sessionId,
-          () =>
-            withDORetry(
-              () => getSandboxSessionStub(env, userId, sessionId),
-              session => session.getPendingInteractions(),
-              'getPendingInteractions'
-            ),
-          async () => {
-            const pending = await readLegacyPendingInteractions({ sessionId, userId, env });
-            return pending ?? { questions: [], permissions: [] };
-          }
+        assertControlSessionId(sessionId);
+        return await withDORetry(
+          () => getSandboxSessionStub(env, userId, sessionId),
+          session => session.getPendingInteractions(),
+          'getPendingInteractions'
         );
       }),
   };

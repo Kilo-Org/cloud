@@ -36,6 +36,7 @@ import type {
 } from '../../execution/types.js';
 import type { QueueAckResponse } from '../schemas.js';
 import { preflightPreparedInitialPromptModel } from '../../session/model-preflight.js';
+import { assertControlSessionId } from '../../session/session-id-guard.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 
 function withLegacyExecutionId(ack: QueueAckResponse): LegacyExecutionResponse {
@@ -61,6 +62,7 @@ export function createSessionExecutionV2Handlers() {
             cloudAgentSessionId: input.cloudAgentSessionId,
             validatedSessionAccess: ctx.validatedSessionAccess,
           });
+          assertControlSessionId(sessionId);
           const admissionInput = { cloudAgentSessionId: input.cloudAgentSessionId };
           const admissionContext = {
             env: ctx.env,
@@ -102,6 +104,7 @@ export function createSessionExecutionV2Handlers() {
             cloudAgentSessionId: input.cloudAgentSessionId,
             validatedSessionAccess: ctx.validatedSessionAccess,
           });
+          assertControlSessionId(sessionId);
 
           const commandPayload =
             'payload' in input && input.payload.type === 'command' ? input.payload : undefined;

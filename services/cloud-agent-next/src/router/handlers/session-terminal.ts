@@ -3,12 +3,8 @@ import { logger, withLogTags } from '../../logger.js';
 import type { OperationResult } from '../../persistence/types.js';
 import type { SessionId } from '../../types/ids.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import {
-  resolveLegacySessionStub,
-  getSandboxSessionStub,
-} from '../../sandbox-session/session-stub.js';
-import { sessionHasTerminal } from '../../agent-sandbox/capabilities.js';
-import { sessionFor } from '../../session-plane.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { assertControlSessionId } from '../../session/session-id-guard.js';
 import { protectedProcedure } from '../auth.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { SANDBOX_STATUS_DETAIL_MESSAGES } from '../../shared/sandbox-status.js';
@@ -37,15 +33,6 @@ function throwTerminalError(result: OperationResult<unknown>): never {
   throw new TRPCError({ code, message });
 }
 
-function rejectUnsupportedTerminal(sessionId: string): void {
-  if (!sessionHasTerminal(sessionId)) {
-    throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Terminal is not available for this session',
-    });
-  }
-}
-
 export function createSessionTerminalHandlers() {
   return {
     createTerminal: protectedProcedure
@@ -61,29 +48,19 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
-          rejectUnsupportedTerminal(sessionId);
+          assertControlSessionId(sessionId);
 
           // Generate once so a retry reuses the same creation identity.
           const operationId = crypto.randomUUID();
-          const result = await sessionFor(
-            sessionId,
-            () =>
-              withDORetry(
-                () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
-                stub =>
-                  stub.terminalCreate({
-                    operationId,
-                    cols: input.cols,
-                    rows: input.rows,
-                  }),
-                'terminalCreate'
-              ),
-            () =>
-              withDORetry(
-                () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
-                stub => stub.createTerminal({ cols: input.cols, rows: input.rows }),
-                'createTerminal'
-              )
+          const result = await withDORetry(
+            () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+            stub =>
+              stub.terminalCreate({
+                operationId,
+                cols: input.cols,
+                rows: input.rows,
+              }),
+            'terminalCreate'
           );
 
           if (!result.success || !result.data) {
@@ -107,31 +84,16 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
-          rejectUnsupportedTerminal(sessionId);
-          const result = await sessionFor(
-            sessionId,
-            () =>
-              withDORetry(
-                () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
-                stub =>
-                  stub.terminalResize({
-                    ptyId: input.ptyId,
-                    cols: input.cols,
-                    rows: input.rows,
-                  }),
-                'terminalResize'
-              ),
-            () =>
-              withDORetry(
-                () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
-                stub =>
-                  stub.resizeTerminal({
-                    ptyId: input.ptyId,
-                    cols: input.cols,
-                    rows: input.rows,
-                  }),
-                'resizeTerminal'
-              )
+          assertControlSessionId(sessionId);
+          const result = await withDORetry(
+            () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+            stub =>
+              stub.terminalResize({
+                ptyId: input.ptyId,
+                cols: input.cols,
+                rows: input.rows,
+              }),
+            'terminalResize'
           );
 
           if (!result.success || !result.data) {
@@ -155,22 +117,12 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
-          rejectUnsupportedTerminal(sessionId);
+          assertControlSessionId(sessionId);
 
-          const result = await sessionFor(
-            sessionId,
-            () =>
-              withDORetry(
-                () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
-                stub => stub.terminalClose({ ptyId: input.ptyId }),
-                'terminalClose'
-              ),
-            () =>
-              withDORetry(
-                () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
-                stub => stub.closeTerminal({ ptyId: input.ptyId }),
-                'closeTerminal'
-              )
+          const result = await withDORetry(
+            () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+            stub => stub.terminalClose({ ptyId: input.ptyId }),
+            'terminalClose'
           );
 
           if (!result.success || !result.data) {

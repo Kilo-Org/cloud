@@ -3,8 +3,11 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
-import { Loader2, RefreshCw, Terminal } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SharedSessionTranscript } from '@/app/s/[sessionId]/shared-session-transcript';
+import { LegacyMessageBubble } from '@/components/cloud-agent-next/LegacyMessageBubble';
+import { MessageErrorBoundary } from '@/components/cloud-agent-next/MessageErrorBoundary';
 import { useTRPC } from '@/lib/trpc/utils';
 
 type WebhookRequestLogsProps = {
@@ -33,7 +36,7 @@ export function WebhookRequestLogs({
   const reconcileUntil = useRef(Date.now() + 30_000);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef(true);
-  const { data, error, isLoading, isFetching, refetch } = useQuery({
+  const { data, dataUpdatedAt, error, isLoading, isFetching, refetch } = useQuery({
     ...(adminScope
       ? trpc.admin.webhookTriggers.getRequestLogs.queryOptions({
           ...adminScope,
@@ -67,11 +70,10 @@ export function WebhookRequestLogs({
   const isActive = data?.processStatus === 'captured' || data?.processStatus === 'inprogress';
 
   return (
-    <section aria-label="Execution logs" className="min-w-0 space-y-2">
+    <section aria-label="Execution logs" className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-sm font-medium">
-          <Terminal className="h-4 w-4" />
-          Execution Logs
+          Conversation
           {isActive && <span className="text-muted-foreground text-xs">Auto-refreshing</span>}
         </h3>
         <Button
@@ -90,8 +92,9 @@ export function WebhookRequestLogs({
       <div
         ref={scrollRef}
         tabIndex={0}
+        role="region"
         aria-label="Cloud agent execution output"
-        className="bg-background max-h-[500px] overflow-auto rounded-md border p-3 font-mono text-xs"
+        className="bg-background min-h-0 flex-1 overflow-auto overscroll-contain rounded-md border px-4 py-3 text-sm max-sm:[&_pre]:break-all max-sm:[&_pre]:whitespace-pre-wrap sm:px-6"
         onScroll={event => {
           const element = event.currentTarget;
           autoScroll.current = element.scrollHeight - element.scrollTop - element.clientHeight < 20;
@@ -108,29 +111,25 @@ export function WebhookRequestLogs({
           <p role="status" className="text-muted-foreground flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading execution logs...
           </p>
-        ) : !isAccessError(error) && data?.logs.length ? (
-          <div className="space-y-1">
-            {data.logs.map((entry, index) => (
-              <div key={index} className="rounded px-2 py-1">
-                <div className="flex gap-3">
-                  <span className="text-muted-foreground shrink-0 tabular-nums">
-                    {entry.timestamp
-                      ? new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false })
-                      : '--:--:--'}
-                  </span>
-                  <span
-                    className={`min-w-0 break-all whitespace-pre-wrap ${entry.eventType === 'error' ? 'text-destructive' : ''}`}
-                  >
-                    {entry.message}
-                  </span>
-                </div>
-                {entry.content && (
-                  <div className="text-muted-foreground mt-1 pl-2 break-all whitespace-pre-wrap sm:pl-[84px]">
-                    {entry.content}
-                  </div>
-                )}
-              </div>
-            ))}
+        ) : !isAccessError(error) && data?.transcript?.messages.length ? (
+          <div className="mx-auto max-w-3xl break-words">
+            <MessageErrorBoundary resetKey={dataUpdatedAt}>
+              {data.transcript.version === 'v2' ? (
+                <SharedSessionTranscript messages={data.transcript.messages} />
+              ) : (
+                data.transcript.messages.map((message, index) => (
+                  <LegacyMessageBubble key={`${message.ts}-${index}`} message={message} />
+                ))
+              )}
+            </MessageErrorBoundary>
+            {data.logs
+              ?.filter(entry => entry.eventType === 'error')
+              .map((entry, index) => (
+                <p key={index} role="alert" className="text-destructive mt-3 whitespace-pre-wrap">
+                  {entry.message}
+                  {entry.content ? `: ${entry.content}` : ''}
+                </p>
+              ))}
           </div>
         ) : !error ? (
           <p role="status" className="text-muted-foreground">

@@ -453,7 +453,7 @@ export function PrReviewDiscussionTab({
   if (view.kind === 'reconnect') {
     return (
       <>
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           <PrReviewReconnectNotice />
         </CenteredState>
         {dialog}

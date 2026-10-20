@@ -99,7 +99,7 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           {canEdit ? (
             <BitbucketConnectForm scope={scope} />
           ) : (

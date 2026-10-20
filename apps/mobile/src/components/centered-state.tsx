@@ -28,7 +28,14 @@ import { cn } from '@/lib/utils';
 
 type CenteredStateProps = {
   children: ReactNode;
+  /** Classes for the scroller itself: background, width. */
   className?: string;
+  /**
+   * Classes for the scroll content container. A horizontal inset belongs here:
+   * the scroller's own padding does not narrow the scroll content, so an inset
+   * set through `className` leaves the end side flush in a right-to-left layout.
+   */
+  contentContainerClassName?: string;
   testID?: string;
   refreshControl?: ScrollViewProps['refreshControl'];
 };
@@ -45,6 +52,7 @@ export const STATE_SURFACE_FALLBACK_MS = 400;
 export function CenteredState({
   children,
   className,
+  contentContainerClassName,
   testID = 'centered-state',
   refreshControl,
 }: CenteredStateProps) {
@@ -166,6 +174,7 @@ export function CenteredState({
       <ScrollView
         ref={capture}
         className={cn('flex-1', className)}
+        contentContainerClassName={contentContainerClassName}
         testID={testID}
         onLayout={measure}
         contentContainerStyle={contentStyle}

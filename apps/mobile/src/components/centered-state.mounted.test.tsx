@@ -87,14 +87,18 @@ const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },
 };
 
-async function mount() {
+async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>> = {}) {
   let rerender: (() => void) | undefined = undefined;
   function Harness() {
     const [, setVersion] = useState(0);
     rerender = () => {
       setVersion(version => version + 1);
     };
-    return <CenteredState testID="state">{null}</CenteredState>;
+    return (
+      <CenteredState testID="state" {...props}>
+        {null}
+      </CenteredState>
+    );
   }
   const mounted = await renderWithProviders(
     createElement(StrictMode, null, createElement(Harness))
@@ -221,6 +225,18 @@ describe('Shared state placement', () => {
 });
 
 describe('CenteredState measurements', () => {
+  it('keeps a horizontal inset on the content container, not the scroller', async () => {
+    // The scroller's own padding does not narrow the scroll content, so an inset
+    // set through `className` leaves the end side flush in a right-to-left layout.
+    const mounted = await mount({
+      className: 'bg-background',
+      contentContainerClassName: 'px-6',
+    });
+    expect(mounted.scroll().className).toBe('flex-1 bg-background');
+    expect(mounted.scroll().contentContainerClassName).toBe('px-6');
+    mounted.unmount();
+  });
+
   it.each([false, true])(
     'applies the provider native fill policy %s',
     async nativeViewportFillsSurface => {

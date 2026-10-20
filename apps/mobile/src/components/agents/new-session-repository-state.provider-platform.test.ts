@@ -10,6 +10,7 @@ describe('detectRepositoryPlatform', () => {
     ['https://github.com/owner/repo.git', 'github'],
     ['https://gitlab.com/owner/repo.git', 'gitlab'],
     ['https://bitbucket.org/owner/repo.git', 'bitbucket'],
+    ['ssh://git@github.com/owner/repo.git', 'github'],
   ] as const)('resolves %s', (gitUrl, platform) => {
     expect(detectRepositoryPlatform(gitUrl)).toBe(platform);
   });
@@ -23,6 +24,8 @@ describe('detectRepositoryPlatform', () => {
     ['https://GitHub.com/owner/repo.git', 'github'],
     ['https://GitLab.com/owner/repo.git', 'gitlab'],
     ['https://Bitbucket.org/owner/repo.git', 'bitbucket'],
+    ['ssh://git@GitHub.com/owner/repo.git', 'github'],
+    ['ssh://git@GitLab.com/owner/repo.git', 'gitlab'],
   ] as const)('resolves %s regardless of host letter case', (gitUrl, platform) => {
     expect(detectRepositoryPlatform(gitUrl)).toBe(platform);
   });

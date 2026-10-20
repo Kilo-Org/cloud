@@ -81,6 +81,8 @@ function makeAttachment(overrides?: Partial<IngestAttachment>): IngestAttachment
     kiloSessionState: { captured: false },
     lastHeartbeatUpdate: now,
     lastEventAtUpdate: now,
+    billingCheckedAt: now,
+    billingBlocked: false,
     ...overrides,
   };
 }
@@ -651,6 +653,123 @@ describe('createIngestHandler', () => {
       expect(broadcastFn).toHaveBeenCalledWith(
         expect.objectContaining({ id: 0, stream_event_type: 'kilo_snapshot' })
       );
+    });
+  });
+
+  describe('handleIngestMessage — container billing state', () => {
+    function staleAttachment(overrides?: Partial<IngestAttachment>) {
+      return makeAttachment({ billingCheckedAt: Date.now() - 30_000, ...overrides });
+    }
+
+    it('persists while the cached state is clear and does not read again inside the cadence', async () => {
+      const eventQueries = createFakeEventQueries();
+      const doContext = createFakeDOContext();
+      doContext.readContainerBillingBlock = vi.fn().mockResolvedValue(false);
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('complete'));
+      await handler.handleIngestMessage(ws, makeStreamMessage('complete'));
+
+      expect(eventQueries.insert).toHaveBeenCalledTimes(2);
+      expect(doContext.readContainerBillingBlock).not.toHaveBeenCalled();
+      expect(ws.close).not.toHaveBeenCalled();
+    });
+
+    it('keeps serving after the cadence when the billing state cannot be read', async () => {
+      const eventQueries = createFakeEventQueries();
+      const doContext = createFakeDOContext();
+      doContext.readContainerBillingBlock = vi.fn().mockRejectedValue(new Error('RPC unavailable'));
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(staleAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('complete'));
+
+      expect(doContext.readContainerBillingBlock).toHaveBeenCalledOnce();
+      expect(eventQueries.insert).toHaveBeenCalledOnce();
+      expect(ws.close).not.toHaveBeenCalled();
+    });
+
+    it('closes the socket and stops accepted work when the refreshed state reports a block', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
+      doContext.readContainerBillingBlock = vi.fn().mockResolvedValue(true);
+      doContext.stopContainerForBillingBlock = vi.fn();
+      doContext.keepContainerAlive = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(staleAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('complete'));
+
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(broadcastFn).not.toHaveBeenCalled();
+      expect(ws.close).toHaveBeenCalledWith(4402, 'Container billing blocked');
+      expect(doContext.stopContainerForBillingBlock).toHaveBeenCalledOnce();
+      expect(doContext.keepContainerAlive).not.toHaveBeenCalled();
+    });
+
+    it('does not renew the sandbox timer on a heartbeat while the cached state is blocked', async () => {
+      const eventQueries = createFakeEventQueries();
+      const doContext = createFakeDOContext();
+      doContext.readContainerBillingBlock = vi.fn().mockResolvedValue(false);
+      doContext.stopContainerForBillingBlock = vi.fn();
+      doContext.keepContainerAlive = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment({ billingBlocked: true }));
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('heartbeat'));
+
+      expect(doContext.readContainerBillingBlock).not.toHaveBeenCalled();
+      expect(doContext.keepContainerAlive).not.toHaveBeenCalled();
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(ws.close).toHaveBeenCalledWith(4402, 'Container billing blocked');
+    });
+
+    it('checks a hibernated attachment that predates the cached state', async () => {
+      const eventQueries = createFakeEventQueries();
+      const doContext = createFakeDOContext();
+      doContext.readContainerBillingBlock = vi.fn().mockResolvedValue(false);
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(
+        makeAttachment({ billingCheckedAt: undefined, billingBlocked: undefined })
+      );
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('complete'));
+
+      expect(doContext.readContainerBillingBlock).toHaveBeenCalledOnce();
+      expect(eventQueries.insert).toHaveBeenCalledOnce();
+      expect(ws.close).not.toHaveBeenCalled();
     });
   });
 

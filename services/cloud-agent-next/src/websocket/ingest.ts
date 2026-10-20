@@ -55,6 +55,9 @@ import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
 /** Debounce interval for heartbeat updates (30 seconds) */
 const HEARTBEAT_DEBOUNCE_MS = 30_000;
 
+/** Close code for an ingest socket closed because container billing is blocked. */
+const INGEST_BILLING_BLOCKED_CLOSE_CODE = 4402;
+
 const completeEventSchema = z.object({
   exitCode: z.number(),
   currentBranch: z.string().optional(),
@@ -214,6 +217,8 @@ const ingestAttachmentSchema = z.object({
   lastEventAtUpdate: z.number(),
   wrapperGeneration: z.number().int().nonnegative(),
   wrapperConnectionId: z.string(),
+  billingCheckedAt: z.number().optional(),
+  billingBlocked: z.boolean().optional(),
 });
 
 export type IngestAttachment = z.infer<typeof ingestAttachmentSchema>;
@@ -233,6 +238,14 @@ export type IngestDOContext = {
   handleWrapperTerminalEvent: (params: WrapperTerminalEvent) => Promise<void>;
   keepContainerAlive?: () => void;
   isBillingBlocked?: () => Promise<boolean>;
+  /**
+   * Read-only container billing state for an open socket. `undefined` means the
+   * state could not be read; ingest keeps serving in that case and relies on the
+   * admission path to fail closed for new work.
+   */
+  readContainerBillingBlock?: () => Promise<boolean | undefined>;
+  /** Best-effort sandbox stop after a confirmed billing block; may be called repeatedly. */
+  stopContainerForBillingBlock?: () => void;
   observeCorrelatedAgentActivity?: (messageId: string) => Promise<void>;
   terminalizeSessionMessageOnce: (
     messageId: string,
@@ -291,6 +304,39 @@ export function createIngestHandler(
       // Ignore close errors while quarantining obsolete hibernated sockets.
     }
     return null;
+  }
+
+  /**
+   * Refresh the attachment's cached container billing state on the heartbeat
+   * cadence and answer whether ingest work must stop.
+   */
+  async function resolveBillingBlocked(
+    ws: WebSocket,
+    attachment: IngestAttachment
+  ): Promise<boolean> {
+    const now = Date.now();
+    if (
+      attachment.billingCheckedAt !== undefined &&
+      now - attachment.billingCheckedAt < HEARTBEAT_DEBOUNCE_MS
+    ) {
+      return attachment.billingBlocked === true;
+    }
+
+    let blocked = false;
+    try {
+      blocked = (await doContext.readContainerBillingBlock?.()) === true;
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Wrapper ingest could not read container billing state');
+    }
+    attachment.billingCheckedAt = now;
+    attachment.billingBlocked = blocked;
+    ws.serializeAttachment(attachment);
+    return blocked;
   }
 
   return {
@@ -459,6 +505,8 @@ export function createIngestHandler(
         lastEventAtUpdate: 0,
         wrapperGeneration,
         wrapperConnectionId,
+        billingCheckedAt: now,
+        billingBlocked: false,
       };
 
       state.acceptWebSocket(server, [ingestTag]);
@@ -522,6 +570,19 @@ export function createIngestHandler(
         } catch {
           // ignore - socket may already be closing
         }
+        return;
+      }
+
+      if (await resolveBillingBlocked(ws, attachment)) {
+        logger
+          .withFields({ sessionId, wrapperRunId, wrapperGeneration, wrapperConnectionId })
+          .warn('Closing wrapper ingest socket: container billing is blocked');
+        try {
+          ws.close(INGEST_BILLING_BLOCKED_CLOSE_CODE, 'Container billing blocked');
+        } catch {
+          // ignore - socket may already be closing
+        }
+        doContext.stopContainerForBillingBlock?.();
         return;
       }
 

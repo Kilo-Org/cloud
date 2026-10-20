@@ -702,6 +702,11 @@ export class VercelAgentSandbox implements AgentSandbox {
     );
   }
 
+  async stopContainerForBillingBlock(): Promise<void> {
+    // The Vercel billing runtime owns host teardown for this plane; the session
+    // adapter has no container of its own to stop.
+  }
+
   async delete(reason: SandboxDeleteReason): Promise<void> {
     // VM teardown is reconciled by the session deletion tombstone
     // (VercelSandboxLifecycle); the adapter has nothing to tear down here.

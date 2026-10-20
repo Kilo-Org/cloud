@@ -193,6 +193,12 @@ export type AgentSandbox = {
   getRunningTerminalClient(): Promise<TerminalClientResult>;
   readWrapperLogs(): Promise<WrapperLogs | null>;
   keepAlive(): Promise<void>;
+  /**
+   * Stop the sandbox container after a confirmed billing block. Best effort and
+   * idempotent: the billing lifecycle already requests a stop when it stores the
+   * block, so this is a second enforcement point for that request.
+   */
+  stopContainerForBillingBlock(): Promise<void>;
   delete(reason: SandboxDeleteReason): Promise<void>;
 };
 

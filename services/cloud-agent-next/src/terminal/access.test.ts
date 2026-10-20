@@ -111,6 +111,7 @@ function sandboxWithTerminalResult(
     getRunningTerminalClient,
     readWrapperLogs: vi.fn(),
     keepAlive: vi.fn(),
+    stopContainerForBillingBlock: vi.fn(),
     delete: vi.fn(),
   };
 }

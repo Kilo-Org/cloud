@@ -552,6 +552,11 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     await Promise.resolve(sandbox.renewActivityTimeout());
   }
 
+  async stopContainerForBillingBlock(): Promise<void> {
+    const sandbox = await this.getSandbox({ bypassBilling: true });
+    await sandbox.stop();
+  }
+
   async delete(reason: SandboxDeleteReason): Promise<void> {
     const sandbox = await this.getSandbox({ bypassBilling: true });
     if (reason === 'recovery') {

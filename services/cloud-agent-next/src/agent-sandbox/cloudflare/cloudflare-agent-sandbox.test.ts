@@ -459,6 +459,31 @@ describe('CloudflareAgentSandbox', () => {
     await expect(sandbox.isBillingBlocked()).resolves.toBe(false);
   });
 
+  it('stops the resolved sandbox for a confirmed billing block without requesting admission', async () => {
+    const stop = vi.fn().mockResolvedValue(undefined);
+    const configureBilling = vi.fn();
+    const ensureBillingAdmission = vi.fn();
+    const sandbox = new CloudflareAgentSandbox(
+      {
+        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+        CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
+        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_cloudflare',
+      } as Env,
+      metadata({ sandboxId: 'usr-shared' }),
+      {
+        resolveSandbox: () => ({ stop }) as unknown as SandboxInstance,
+        configureBilling,
+        ensureBillingAdmission,
+      }
+    );
+
+    await sandbox.stopContainerForBillingBlock();
+
+    expect(stop).toHaveBeenCalledOnce();
+    expect(configureBilling).not.toHaveBeenCalled();
+    expect(ensureBillingAdmission).not.toHaveBeenCalled();
+  });
+
   it('types ENOSPC during the cold bootstrap probe as sandbox unusable', async () => {
     const createSession = vi.fn();
     const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {

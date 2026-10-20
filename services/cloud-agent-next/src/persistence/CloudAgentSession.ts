@@ -788,6 +788,45 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return createAgentSandbox(this.env, metadata).isBillingBlocked(true);
   }
 
+  /**
+   * Read-only container billing state for work already accepted. Unlike
+   * `isContainerBillingBlocked`, an unreadable state stays `undefined` so a
+   * transient RPC failure neither blocks serving nor stops a healthy sandbox;
+   * admission keeps failing closed for new work.
+   */
+  private async readContainerBillingBlock(): Promise<boolean | undefined> {
+    const metadata = await this.getMetadata();
+    if (!metadata || !isCloudAgentContainerBillingEnabled(this.env, metadata.identity))
+      return false;
+    try {
+      const status = await createAgentSandbox(this.env, metadata).getBillingRuntimeStatus();
+      return status?.blocked === true;
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Cloud agent could not read container billing state');
+      return undefined;
+    }
+  }
+
+  private async stopContainerForBillingBlock(): Promise<void> {
+    try {
+      const metadata = await this.getMetadata();
+      if (!metadata || !isCloudAgentContainerBillingEnabled(this.env, metadata.identity)) return;
+      await createAgentSandbox(this.env, metadata).stopContainerForBillingBlock();
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Cloud agent could not stop a billing-blocked sandbox');
+    }
+  }
+
   private getSandboxLifecycle(): AgentSandboxLifecycle {
     if (!this.sandboxLifecycle) {
       this.sandboxLifecycle = createAgentSandboxLifecycle(this.env, {
@@ -1183,6 +1222,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           void this.keepContainerAliveIfBillingAllowed();
         },
         isBillingBlocked: () => this.isContainerBillingBlocked(),
+        readContainerBillingBlock: () => this.readContainerBillingBlock(),
+        stopContainerForBillingBlock: () => {
+          this.ctx.waitUntil(this.stopContainerForBillingBlock());
+        },
         observeCorrelatedAgentActivity: messageId => this.recordCorrelatedAgentActivity(messageId),
         terminalizeSessionMessageOnce: async (messageId, params, wrapperRunId) => {
           await this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId);

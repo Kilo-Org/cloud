@@ -12,16 +12,17 @@
 import 'server-only';
 
 import { z } from 'zod';
-import type {
-  ProviderPrChecksResult,
-  ProviderPrFile,
-  ProviderPrFilesPage,
-  ProviderPrInboxItem,
-  ProviderPrInboxPage,
-  ProviderPrMergeBlockedReason,
-  ProviderPrMergeState,
-  ProviderPrSummary,
-  ProviderPrThread,
+import {
+  providerPrRefKey,
+  type ProviderPrChecksResult,
+  type ProviderPrFile,
+  type ProviderPrFilesPage,
+  type ProviderPrInboxItem,
+  type ProviderPrInboxPage,
+  type ProviderPrMergeBlockedReason,
+  type ProviderPrMergeState,
+  type ProviderPrSummary,
+  type ProviderPrThread,
 } from '@kilocode/app-shared/provider-review';
 import {
   authorizeRepository,
@@ -33,6 +34,7 @@ import {
   type BitbucketReviewOwner,
 } from './bitbucket-authorization';
 import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import { createSignedToken, verifySignedToken } from '@/lib/signed-token';
 
 const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
 const BITBUCKET_PAGE_SIZE = 50;
@@ -50,15 +52,18 @@ const MAX_BUILD_PAGES = 3;
 /** The inbox enumerates at most this many pages of this size of workspace repositories. */
 const INBOX_REPOSITORY_PAGE_SIZE = 100;
 const INBOX_REPOSITORY_PAGES = 3;
+/** The repositories one inbox load enumerates: the enumeration cap. */
+const INBOX_MAX_REPOSITORIES = INBOX_REPOSITORY_PAGE_SIZE * INBOX_REPOSITORY_PAGES;
 /** How many repository PR collections the inbox fetches at once. */
 const INBOX_REPOSITORY_CONCURRENCY = 8;
 /**
- * The provider pages one inbox page may walk per repository: inbox page N
- * refetches provider pages 1..N so the sorted windows continue each other,
- * and this bound keeps that fan-out capped (a bounded inbox beats an
- * unbounded crawl).
+ * The provider-request budget of one inbox load: the repository enumeration
+ * plus one PR page per repository. An inbox load continues from a signed
+ * `updated_on` boundary, so this aggregate bound holds for every inbox page.
  */
-const MAX_INBOX_PROVIDER_PAGES = 10;
+const MAX_INBOX_PROVIDER_REQUESTS = INBOX_REPOSITORY_PAGES + INBOX_MAX_REPOSITORIES;
+/** How long a server-issued inbox cursor stays usable. */
+const INBOX_CURSOR_TTL_SECONDS = 60 * 60;
 /**
  * The task-collection page bound for the discussion task walk: the same
  * bounded walk the write layer's thread resolution uses, so one discussion
@@ -951,12 +956,13 @@ export async function listChecks(
  * PR of the workspace's repositories, newest first.
  *
  * The fan-out sorts across repositories, so one inbox page cannot map onto a
- * single provider page: page N refetches provider pages 1..N of every
- * repository (each listing is pinned to `sort=-updated_on`, the inbox's own
- * sort key) and serves the sorted window [(N-1)·size, N·size). Refetching
- * the earlier provider pages is what keeps the windows from drifting: a
- * plain provider-page-N fan-out plus sort-and-trim would silently drop the
- * rows page 1's trim left over, and they would never be re-served.
+ * single provider page. A later page continues from a signed `updated_on`
+ * boundary — the timestamp of the last row already served — and every
+ * repository answers with one page of its rows at or below that boundary. The
+ * newest BITBUCKET_PAGE_SIZE rows of those per-repository pages are exactly
+ * the next slice of the merged order (the global top-K of a union is
+ * contained in the union of the per-repository top-K), so one inbox load
+ * reads one provider page per repository.
  */
 export async function listInbox(
   owner: BitbucketReviewOwner,
@@ -965,73 +971,67 @@ export async function listInbox(
   const access = await authorizeWorkspace(owner);
   try {
     const identity = `bitbucket-inbox:${access.workspace.slug}`;
-    const page = decodeInboxPageCursor(cursor, identity);
-    if (page > MAX_INBOX_PROVIDER_PAGES) {
-      // Past the walk bound the pagination ends instead of crawling.
-      return { items: [], nextCursor: null };
-    }
-    const slugs = await listWorkspaceRepositorySlugs(access, access.workspace.slug);
-    const values: unknown[] = [];
-    let deeperProviderPage = false;
-    for (let providerPage = 1; providerPage <= page; providerPage += 1) {
-      let lastRequestedPageFull = false;
-      for (let offset = 0; offset < slugs.length; offset += INBOX_REPOSITORY_CONCURRENCY) {
-        const batch = slugs.slice(offset, offset + INBOX_REPOSITORY_CONCURRENCY);
-        const pages = await Promise.all(
-          batch.map(slug =>
-            requestBitbucketJson<unknown>(
-              access,
-              `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(slug)}/pullrequests`,
-              {
-                query: {
-                  pagelen: BITBUCKET_PAGE_SIZE,
-                  page: providerPage,
-                  q: 'state="OPEN"',
-                  sort: '-updated_on',
-                },
-              }
-            )
+    const position = decodeInboxCursor(cursor, identity);
+    // The enumeration counts toward the same per-load budget as the fan-out.
+    const repositoryBudget = MAX_INBOX_PROVIDER_REQUESTS - INBOX_REPOSITORY_PAGES;
+    const slugs = (await listWorkspaceRepositorySlugs(access, access.workspace.slug)).slice(
+      0,
+      repositoryBudget
+    );
+    const providerQuery = position
+      ? `state="OPEN" AND updated_on <= ${position.boundary}`
+      : 'state="OPEN"';
+    let repositoryPageFull = false;
+    let window: ProviderPrInboxItem[] = [];
+    let beyondWindow = false;
+    for (let offset = 0; offset < slugs.length; offset += INBOX_REPOSITORY_CONCURRENCY) {
+      const batch = slugs.slice(offset, offset + INBOX_REPOSITORY_CONCURRENCY);
+      const pages = await Promise.all(
+        batch.map(slug =>
+          requestBitbucketJson<unknown>(
+            access,
+            `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(slug)}/pullrequests`,
+            {
+              query: {
+                pagelen: BITBUCKET_PAGE_SIZE,
+                page: 1,
+                q: providerQuery,
+                sort: '-updated_on',
+              },
+            }
           )
-        );
-        for (const payload of pages) {
-          const parsedPage = BitbucketPageSchema.safeParse(payload);
-          if (!parsedPage.success) {
-            throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');
-          }
-          values.push(...parsedPage.data.values);
-          if (parsedPage.data.values.length >= BITBUCKET_PAGE_SIZE) lastRequestedPageFull = true;
+        )
+      );
+      for (const payload of pages) {
+        const parsedPage = BitbucketPageSchema.safeParse(payload);
+        if (!parsedPage.success) {
+          throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');
         }
+        if (parsedPage.data.next) repositoryPageFull = true;
+        const pageItems = inboxItemsFrom(parsedPage.data.values, access.workspace.slug, position);
+        const merged = [...window, ...pageItems].sort(
+          (left, right) => inboxUpdatedMs(right) - inboxUpdatedMs(left)
+        );
+        if (merged.length > BITBUCKET_PAGE_SIZE) beyondWindow = true;
+        window = merged.slice(0, BITBUCKET_PAGE_SIZE);
       }
-      if (providerPage === page) deeperProviderPage = lastRequestedPageFull;
     }
-    const items: ProviderPrInboxItem[] = [];
-    for (const value of values) {
-      const parsed = BitbucketInboxPullRequestSchema.safeParse(value);
-      if (!parsed.success) continue;
-      const ref = inboxRefFrom(parsed.data, access.workspace.slug);
-      if (!ref) continue;
-      items.push({
-        ref,
-        title: parsed.data.title,
-        author: mapUser(parsed.data.author ?? null),
-        state: mapPullRequestState(parsed.data.state),
-        draft: parsed.data.draft === true,
-        updatedAt: parsed.data.updated_on ?? '',
-      });
-    }
-    items.sort((left, right) => inboxUpdatedMs(right) - inboxUpdatedMs(left));
-    const skip = (page - 1) * BITBUCKET_PAGE_SIZE;
-    const window = items.slice(skip, skip + BITBUCKET_PAGE_SIZE);
-    // More follows when a repository still holds a page after the deepest
-    // one read, or when the sorted aggregate itself already reaches past
-    // this window.
-    const hasMore = deeperProviderPage || items.length > skip + window.length;
+    // More follows when a repository page came back full — its collection
+    // continues below the boundary — or when the merged order already reaches
+    // past this window.
+    const hasMore = repositoryPageFull || beyondWindow;
+    const boundary = window.length > 0 ? inboxBoundaryValue(window[window.length - 1]) : null;
+    // The rows at the boundary value are recorded by ref alongside it.
+    const servedRefs =
+      boundary === null
+        ? []
+        : window
+            .filter(item => inboxBoundaryValue(item) === boundary)
+            .map(item => providerPrRefKey(item.ref));
     return {
       items: window,
       nextCursor:
-        hasMore && page < MAX_INBOX_PROVIDER_PAGES
-          ? encodeInboxPageCursor(identity, page + 1)
-          : null,
+        hasMore && boundary !== null ? encodeInboxCursor(identity, boundary, servedRefs) : null,
     };
   } catch (error) {
     throw classifyBitbucketError(error);
@@ -1044,29 +1044,82 @@ function inboxUpdatedMs(item: ProviderPrInboxItem): number {
 }
 
 /**
- * The inbox cursor is a plain page counter, not a provider `next` URL: one
- * inbox page fans out over the workspace's repositories, so no single next
- * link can represent it. The page number is the sorted window index — page N
- * serves rows [(N-1)·size, N·size) of the merged newest-first order. A
- * cursor minted for another workspace, or in the old next-URL shape, decodes
- * to page 1 — a cursor can never switch the workspace a request reads.
+ * The provider filter value of a row's `updated_on`: millisecond ISO-8601 in
+ * UTC, the form the provider's query language documents. A row without a
+ * parseable timestamp has no boundary and can only be served last.
  */
-function encodeInboxPageCursor(identity: string, page: number): string {
-  return Buffer.from(JSON.stringify({ identity, page })).toString('base64url');
+function inboxBoundaryValue(item: ProviderPrInboxItem): string | null {
+  const ms = Date.parse(item.updatedAt);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms).toISOString().replace('Z', '+00:00');
 }
 
-function decodeInboxPageCursor(cursor: string | undefined, identity: string): number {
-  if (!cursor) return 1;
-  try {
-    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
-      identity?: unknown;
-      page?: unknown;
-    };
-    if (parsed.identity !== identity || !Number.isInteger(parsed.page)) return 1;
-    return Math.max(1, parsed.page as number);
-  } catch {
-    return 1;
+/** The inbox rows of one provider page, minus the rows an earlier page served. */
+function inboxItemsFrom(
+  values: unknown[],
+  workspaceSlug: string,
+  position: InboxCursorPosition | null
+): ProviderPrInboxItem[] {
+  const items: ProviderPrInboxItem[] = [];
+  for (const value of values) {
+    const parsed = BitbucketInboxPullRequestSchema.safeParse(value);
+    if (!parsed.success) continue;
+    const ref = inboxRefFrom(parsed.data, workspaceSlug);
+    if (!ref) continue;
+    if (position?.servedRefs.has(providerPrRefKey(ref))) continue;
+    items.push({
+      ref,
+      title: parsed.data.title,
+      author: mapUser(parsed.data.author ?? null),
+      state: mapPullRequestState(parsed.data.state),
+      draft: parsed.data.draft === true,
+      updatedAt: parsed.data.updated_on ?? '',
+    });
   }
+  return items;
+}
+
+const INBOX_CURSOR_KIND = 'bitbucket-inbox-cursor';
+
+const inboxCursorPayloadSchema = z.object({
+  kind: z.literal(INBOX_CURSOR_KIND),
+  identity: z.string().min(1),
+  boundary: z.string().min(1),
+  servedRefs: z.array(z.string().min(1)).max(BITBUCKET_PAGE_SIZE),
+});
+
+type InboxCursorPosition = { boundary: string; servedRefs: ReadonlySet<string> };
+
+/**
+ * The inbox cursor is a signed continuation token: it carries the identity it
+ * was minted for and the `updated_on` boundary of the last row served, and it
+ * stays usable for INBOX_CURSOR_TTL_SECONDS. A load without usable
+ * continuation state starts from the first page.
+ */
+function encodeInboxCursor(identity: string, boundary: string, servedRefs: string[]): string {
+  return createSignedToken({
+    kind: INBOX_CURSOR_KIND,
+    identity,
+    boundary,
+    servedRefs: servedRefs.slice(0, BITBUCKET_PAGE_SIZE),
+  });
+}
+
+function decodeInboxCursor(
+  cursor: string | undefined,
+  identity: string
+): InboxCursorPosition | null {
+  if (!cursor) return null;
+  const payload = verifySignedToken(cursor, {
+    ttlSeconds: INBOX_CURSOR_TTL_SECONDS,
+    parse: value => {
+      const parsed = inboxCursorPayloadSchema.safeParse(value);
+      if (!parsed.success || parsed.data.identity !== identity) return null;
+      return { boundary: parsed.data.boundary, servedRefs: parsed.data.servedRefs };
+    },
+  });
+  if (payload === null) return null;
+  return { boundary: payload.boundary, servedRefs: new Set(payload.servedRefs) };
 }
 
 /**

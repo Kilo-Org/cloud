@@ -1,4 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from '@jest/globals';
+import crypto from 'node:crypto';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { createSignedToken } from '@/lib/signed-token';
 import {
   getMergeRestrictions,
   getPullRequest,
@@ -24,6 +27,7 @@ jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-reposit
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GIT_TOKEN_SERVICE_API_URL: 'https://token-service.example.com',
+  NEXTAUTH_SECRET: 'bitbucket-inbox-test-secret',
 }));
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => ({
@@ -943,6 +947,50 @@ describe('listInbox', () => {
     destination: { branch: { name: 'main' }, repository: { full_name: fullName } },
   });
 
+  type InboxRow = { updated_on: string };
+  type InboxRequest = { slug: string; query: string | null; page: string | null };
+
+  /**
+   * The workspace inbox as the provider serves it: each repository answers
+   * with its rows at or below the requested boundary, newest first, one page.
+   */
+  const serveInbox = (rowsBySlug: Record<string, InboxRow[]>, requests: InboxRequest[]) => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname === '/2.0/repositories/acme') {
+        return jsonResponse({
+          pagelen: 100,
+          values: Object.keys(rowsBySlug).map(slug => ({ slug })),
+          next: null,
+        });
+      }
+      const match = parsed.pathname.match(/^\/2\.0\/repositories\/acme\/([^/]+)\/pullrequests$/);
+      const rows = match ? rowsBySlug[match[1]] : undefined;
+      if (!match || !rows) return jsonResponse({ pagelen: 50, values: [], next: null });
+      const query = parsed.searchParams.get('q');
+      requests.push({ slug: match[1], query, page: parsed.searchParams.get('page') });
+      const boundary = query?.match(/^state="OPEN" AND updated_on <= (.+)$/);
+      const boundaryMs = boundary ? Date.parse(boundary[1]) : null;
+      const eligible = rows
+        .filter(row => boundaryMs === null || Date.parse(row.updated_on) <= boundaryMs)
+        .sort((left, right) => Date.parse(right.updated_on) - Date.parse(left.updated_on));
+      return jsonResponse({
+        pagelen: 50,
+        values: eligible.slice(0, 50),
+        next: eligible.length > 50 ? 'https://api.bitbucket.org/2.0/next?page=2' : null,
+      });
+    });
+  };
+
+  const minutesFixture = (firstId: number, count: number) =>
+    Array.from({ length: count }, (_, index) =>
+      inboxPr(firstId + index, `2026-09-02T00:${String(index).padStart(2, '0')}:00+00:00`)
+    );
+
   it('fans out over the workspace repositories and carries full identity', async () => {
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
@@ -1004,143 +1052,51 @@ describe('listInbox', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('merges pages across repositories newest first and continues with a page cursor', async () => {
-    fetchMock.mockImplementation(async (url: string | URL) => {
-      const full = url.toString();
-      if (full.includes('token-service.example.com')) {
-        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
-      }
-      const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({ pagelen: 100, values: [{ slug: 'repo' }], next: null });
-      }
-      if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
-        // The provider listing is sorted newest first (the inbox request pins
-        // sort=-updated_on): page 2 holds only older rows.
-        const page = parsed.searchParams.get('page');
-        if (page === '2') {
-          return jsonResponse({
-            pagelen: 50,
-            values: [inboxPr(99, '2026-09-01T00:00:00.000000+00:00')],
-            next: null,
-          });
-        }
-        return jsonResponse({
-          pagelen: 50,
-          values: Array.from({ length: 50 }, (_, index) =>
-            inboxPr(100 + index, `2026-09-02T00:00:${String(index).padStart(2, '0')}+00:00`)
-          ),
-          next: null,
-        });
-      }
-      return jsonResponse({ pagelen: 50, values: [], next: null });
-    });
+  it('continues one repository from the signed boundary', async () => {
+    // 60 open PRs: the first load serves the newest 50 and hands back a signed
+    // boundary; the next load asks only for rows at or below that boundary.
+    const requests: InboxRequest[] = [];
+    serveInbox({ repo: minutesFixture(100, 60) }, requests);
 
     const first = await listInbox(ORG_OWNER);
     expect(first.items).toHaveLength(50);
-    expect(first.items[0]?.ref).toMatchObject({ prId: 149 });
+    expect(first.items[0]?.ref).toMatchObject({ prId: 159 });
     expect(first.nextCursor).toBeTruthy();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ slug: 'repo', query: 'state="OPEN"', page: '1' });
 
     const second = await listInbox(ORG_OWNER, first.nextCursor!);
-    // The second page continues the sorted sequence with the rows the first
-    // page's trim could not serve, instead of re-sorting a fresh fan-out.
-    expect(second.items.map(item => item.ref)).toEqual([expect.objectContaining({ prId: 99 })]);
-    expect(second.nextCursor).toBeNull();
-  });
-
-  it('serves every row across pages: the sorted window refetches earlier provider pages', async () => {
-    // 60 PRs in one repository: a full first provider page (50) plus a
-    // 10-row older tail. Page 1 serves the newest 50; page 2 must serve the
-    // remaining 10 — none dropped, none duplicated.
-    fetchMock.mockImplementation(async (url: string | URL) => {
-      const full = url.toString();
-      if (full.includes('token-service.example.com')) {
-        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
-      }
-      const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({ pagelen: 100, values: [{ slug: 'repo' }], next: null });
-      }
-      if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
-        const page = parsed.searchParams.get('page');
-        if (page === '2') {
-          return jsonResponse({
-            pagelen: 50,
-            values: Array.from({ length: 10 }, (_, index) =>
-              inboxPr(150 + index, `2026-09-01T00:00:${String(index).padStart(2, '0')}+00:00`)
-            ),
-            next: null,
-          });
-        }
-        return jsonResponse({
-          pagelen: 50,
-          values: Array.from({ length: 50 }, (_, index) =>
-            inboxPr(100 + index, `2026-09-02T00:00:${String(index).padStart(2, '0')}+00:00`)
-          ),
-          next: null,
-        });
-      }
-      return jsonResponse({ pagelen: 50, values: [], next: null });
+    // One provider page for the continuation too, carrying the boundary of
+    // the last row already served.
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toMatchObject({
+      slug: 'repo',
+      query: 'state="OPEN" AND updated_on <= 2026-09-02T00:10:00.000+00:00',
+      page: '1',
     });
-
-    const first = await listInbox(ORG_OWNER);
-    expect(first.items).toHaveLength(50);
-    expect(first.items[0]?.ref).toMatchObject({ prId: 149 });
-
-    const second = await listInbox(ORG_OWNER, first.nextCursor!);
     expect(second.items).toHaveLength(10);
-    expect(second.items[0]?.ref).toMatchObject({ prId: 159 });
+    expect(second.items[0]?.ref).toMatchObject({ prId: 109 });
     expect(second.nextCursor).toBeNull();
 
-    const servedIds = new Set(
-      [...first.items, ...second.items].map(item =>
-        item.ref && 'prId' in item.ref ? item.ref.prId : null
-      )
+    const served = [...first.items, ...second.items].flatMap(item =>
+      item.ref && 'prId' in item.ref ? [item.ref.prId] : []
     );
-    expect(servedIds.size).toBe(60);
-    for (let id = 100; id <= 159; id += 1) {
-      expect(servedIds.has(id)).toBe(true);
-    }
+    expect(new Set(served).size).toBe(60);
   });
 
-  it('serves every row of several repositories across pages without drops', async () => {
-    // Two repositories with 50 open PRs each: page 1 serves the newest 50 of
-    // the 100 aggregated rows, page 2 the remaining 50 — the old page-N
-    // fan-out re-fetched provider page 2 (empty here) and dropped 50 rows.
-    fetchMock.mockImplementation(async (url: string | URL) => {
-      const full = url.toString();
-      if (full.includes('token-service.example.com')) {
-        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
-      }
-      const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({
-          pagelen: 100,
-          values: [{ slug: 'repo-a' }, { slug: 'repo-b' }],
-          next: null,
-        });
-      }
-      const match = parsed.pathname.match(
-        /^\/2\.0\/repositories\/acme\/(repo-[ab])\/pullrequests$/
-      );
-      if (match && parsed.searchParams.get('page') === '1') {
-        // repo-a rows are older than repo-b rows, so the first inbox page is
-        // exactly repo-b's page; the single provider page holds all 50 rows.
-        const base = match[1] === 'repo-a' ? 100 : 200;
-        const hour = match[1] === 'repo-a' ? '00' : '01';
-        return jsonResponse({
-          pagelen: 50,
-          values: Array.from({ length: 50 }, (_, index) =>
-            inboxPr(
-              base + index,
-              `2026-09-02T${hour}:00:${String(index).padStart(2, '0')}.000000+00:00`
-            )
-          ),
-          next: null,
-        });
-      }
-      return jsonResponse({ pagelen: 50, values: [], next: null });
-    });
+  it('continues several repositories across pages', async () => {
+    // repo-a's rows are all older than repo-b's, so the first load serves
+    // exactly repo-b's page and the continuation serves repo-a's.
+    const requests: InboxRequest[] = [];
+    serveInbox(
+      {
+        'repo-a': minutesFixture(100, 50),
+        'repo-b': Array.from({ length: 50 }, (_, index) =>
+          inboxPr(200 + index, `2026-09-02T01:${String(index).padStart(2, '0')}:00+00:00`)
+        ),
+      },
+      requests
+    );
 
     const first = await listInbox(ORG_OWNER);
     expect(first.items).toHaveLength(50);
@@ -1151,46 +1107,127 @@ describe('listInbox', () => {
     expect(second.items).toHaveLength(50);
     expect(second.items[0]?.ref).toMatchObject({ prId: 149 });
     expect(second.nextCursor).toBeNull();
+    expect(requests).toHaveLength(4);
 
-    const servedIds = new Set(
-      [...first.items, ...second.items].map(item =>
-        item.ref && 'prId' in item.ref ? item.ref.prId : null
-      )
+    const served = [...first.items, ...second.items].flatMap(item =>
+      item.ref && 'prId' in item.ref ? [item.ref.prId] : []
     );
-    expect(servedIds.size).toBe(100);
-    for (let id = 100; id <= 249; id += 1) {
-      if ((id >= 100 && id <= 149) || (id >= 200 && id <= 249)) {
-        expect(servedIds.has(id)).toBe(true);
-      }
-    }
+    expect(new Set(served).size).toBe(100);
   });
 
-  it('ignores a cursor minted for another workspace', async () => {
-    fetchMock.mockImplementation(async (url: string | URL) => {
-      const full = url.toString();
-      if (full.includes('token-service.example.com')) {
-        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
-      }
-      const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({ pagelen: 100, values: [{ slug: 'repo' }], next: null });
-      }
-      if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
-        expect(parsed.searchParams.get('page')).toBe('1');
-        return jsonResponse({
-          pagelen: 50,
-          values: [inboxPr(12, '2026-09-02T00:00:00.000000+00:00')],
-          next: null,
-        });
-      }
-      return jsonResponse({ pagelen: 50, values: [], next: null });
-    });
+  it('reads one provider page per repository on every inbox page', async () => {
+    // 12 repositories × 5 open PRs: every load reads one page per repository.
+    const rowsBySlug: Record<string, InboxRow[]> = {};
+    for (let repo = 0; repo < 12; repo += 1) {
+      rowsBySlug[`repo-${repo}`] = Array.from({ length: 5 }, (_, index) =>
+        inboxPr(
+          1000 + repo * 10 + index,
+          `2026-09-02T00:${String(repo * 5 + index).padStart(2, '0')}:00+00:00`
+        )
+      );
+    }
+    const requests: InboxRequest[] = [];
+    serveInbox(rowsBySlug, requests);
 
-    const foreign = Buffer.from(
-      JSON.stringify({ identity: 'bitbucket-inbox:evil', page: 7 })
+    const first = await listInbox(ORG_OWNER);
+    expect(first.items).toHaveLength(50);
+    expect(first.nextCursor).toBeTruthy();
+    expect(requests).toHaveLength(12);
+
+    const second = await listInbox(ORG_OWNER, first.nextCursor!);
+    expect(requests).toHaveLength(24);
+    expect(second.items).toHaveLength(10);
+    expect(second.nextCursor).toBeNull();
+    expect(requests.every(request => request.page === '1')).toBe(true);
+    expect(requests.filter(request => request.query === 'state="OPEN"')).toHaveLength(12);
+  });
+
+  it('reads one provider page per enumerated repository', async () => {
+    // The enumeration cap is 300 repositories; a load reads at most one page
+    // from each of them.
+    const rowsBySlug: Record<string, InboxRow[]> = {};
+    for (let repo = 0; repo < 300; repo += 1) {
+      rowsBySlug[`repo-${repo}`] = [
+        inboxPr(repo, `2026-09-02T00:${String(repo % 60).padStart(2, '0')}:00+00:00`),
+      ];
+    }
+    const requests: InboxRequest[] = [];
+    serveInbox(rowsBySlug, requests);
+
+    const page = await listInbox(ORG_OWNER);
+    expect(requests).toHaveLength(300);
+    expect(page.items).toHaveLength(50);
+    expect(page.nextCursor).toBeTruthy();
+  });
+
+  it('starts again at the first page when continuation state is not valid', async () => {
+    const requests: InboxRequest[] = [];
+    serveInbox({ repo: minutesFixture(100, 60) }, requests);
+
+    const clientValue = Buffer.from(
+      JSON.stringify({ identity: 'bitbucket-inbox:acme', page: 10 })
     ).toString('base64url');
-    const result = await listInbox(ORG_OWNER, foreign);
-    expect(result.items).toHaveLength(1);
+    const page = await listInbox(ORG_OWNER, clientValue);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ query: 'state="OPEN"', page: '1' });
+    expect(page.items).toHaveLength(50);
+  });
+
+  it('scopes continuation state to the workspace it was issued for', async () => {
+    const requests: InboxRequest[] = [];
+    serveInbox({ repo: minutesFixture(100, 60) }, requests);
+
+    const foreign = createSignedToken({
+      kind: 'bitbucket-inbox-cursor',
+      identity: 'bitbucket-inbox:evil',
+      boundary: '2026-09-02T00:10:00.000+00:00',
+      servedRefs: [],
+    });
+    const page = await listInbox(ORG_OWNER, foreign);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ query: 'state="OPEN"' });
+    expect(page.items).toHaveLength(50);
+  });
+
+  it('accepts continuation state only with a matching signature', async () => {
+    const requests: InboxRequest[] = [];
+    serveInbox({ repo: minutesFixture(100, 60) }, requests);
+    const first = await listInbox(ORG_OWNER);
+    const cursor = first.nextCursor!;
+    requests.length = 0;
+
+    const invalidSignature = `${cursor.slice(0, -1)}${cursor.endsWith('A') ? 'B' : 'A'}`;
+    await listInbox(ORG_OWNER, invalidSignature);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ query: 'state="OPEN"', page: '1' });
+  });
+
+  it('keeps continuation state usable for one hour', async () => {
+    const requests: InboxRequest[] = [];
+    serveInbox({ repo: minutesFixture(100, 60) }, requests);
+
+    const encoded = Buffer.from(
+      JSON.stringify({
+        kind: 'bitbucket-inbox-cursor',
+        identity: 'bitbucket-inbox:acme',
+        boundary: '2026-09-02T00:10:00.000+00:00',
+        servedRefs: [],
+        iat: Math.floor(Date.now() / 1000) - 2 * 60 * 60,
+        nonce: 'expired-nonce',
+      })
+    ).toString('base64url');
+    const signature = crypto
+      .createHmac('sha256', NEXTAUTH_SECRET)
+      .update(encoded)
+      .digest('base64url');
+    const page = await listInbox(ORG_OWNER, `${encoded}.${signature}`);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ query: 'state="OPEN"' });
+    expect(page.items).toHaveLength(50);
   });
 });
 

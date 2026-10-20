@@ -1480,6 +1480,7 @@ describe('cli-sessions-router', () => {
       );
 
       expect(shareDeletionAttempts).toBe(3);
+      expect(deleteBlobs).not.toHaveBeenCalledWith(deleteSessionId, expect.any(Array));
 
       const [session] = await db
         .select({ session_id: cliSessions.session_id })
@@ -1492,6 +1493,20 @@ describe('cli-sessions-router', () => {
         .from(sharedCliSessions)
         .where(eq(sharedCliSessions.share_id, shareId));
       expect(share?.share_id).toBe(shareId);
+    });
+
+    it('should remove share blobs before the source session blobs', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      const shareId = await insertShare(deleteSessionId, otherUser.id);
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).resolves.toEqual({
+        success: true,
+        session_id: deleteSessionId,
+      });
+
+      const calls = jest.mocked(deleteBlobs).mock.calls.map(([id]) => id);
+      expect(calls).toEqual([shareId, deleteSessionId]);
     });
 
     it('should keep shares when a non-owner attempts deletion', async () => {

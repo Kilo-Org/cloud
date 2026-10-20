@@ -9,6 +9,7 @@ import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-d
 import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
 import { events } from '../../src/db/sqlite-schema.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { appRouter } from '../../src/router.js';
 import { sessionRuntimeLocator } from '../../src/sandbox-control/worktree-ownership.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
@@ -167,6 +168,62 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
+  it('exposes interrupt and send without explicit hosted lifecycle operations', () => {
+    const procedures = appRouter._def.procedures;
+    expect(procedures).not.toHaveProperty('getHostedSessionLifecycle');
+    expect(procedures).not.toHaveProperty('stopHostedSession');
+    expect(procedures).not.toHaveProperty('resumeHostedSession');
+    expect(procedures.interruptSession._def.type).toBe('mutation');
+    expect(procedures.send._def.type).toBe('mutation');
+  });
+
+  it('interrupts a turn without releasing its route and accepts the next message', async () => {
+    const sessionId = newSessionId();
+    const nativeSessionId = kiloSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const stub = sessions.getByName(sessionId);
+    const peer = new FakeSandboxPeer();
+    peer.prepareView = peer.view('ready');
+    let releaseCalls = 0;
+    peer.release = async () => {
+      releaseCalls += 1;
+    };
+    await installPeer(stub, peer);
+    await installCapturedQueues(stub);
+    const initialMessageId = messageId();
+    const nextMessageId = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: metadata({ sessionId, kiloSessionId: nativeSessionId, sandboxId }),
+      message: promptPayload(initialMessageId),
+      sandboxSelection: { provider: 'cloudflare' },
+    });
+    await expect(stub.getSession()).resolves.toMatchObject({
+      messages: [{ messageId: initialMessageId, state: 'accepted' }],
+    });
+
+    await stub.stop();
+    await expect(stub.send(promptPayload(nextMessageId))).resolves.toEqual({ type: 'ok' });
+
+    expect(peer.abortCalls).toEqual([sessionId]);
+    expect(releaseCalls).toBe(0);
+    expect(peer.prepareCalls).toHaveLength(1);
+    expect(
+      peer.deliverCalls.flatMap(payload => payload.messages.map(message => message.messageId))
+    ).toEqual([initialMessageId, nextMessageId]);
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'ready' },
+      messages: [
+        { messageId: initialMessageId, state: 'cancelled' },
+        { messageId: nextMessageId, state: 'accepted' },
+      ],
+    });
+    await expect(stub.getMetadata()).resolves.toMatchObject({
+      identity: { sessionId },
+      auth: { kiloSessionId: nativeSessionId },
+    });
+  });
+
   it('forwards a real status websocket through the Session DO to the Sandbox DO', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
@@ -497,89 +554,6 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     // A second delete is a no-op and does not release again.
     await stub.deleteSession();
     expect(releaseCalls).toEqual([sessionId]);
-  });
-
-  it('stops and resumes a hosted session without deleting its durable identity', async () => {
-    const sessionId = newSessionId();
-    const nativeSessionId = kiloSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
-    const stub = sessions.getByName(sessionId);
-    const peer = new FakeSandboxPeer();
-    peer.prepareView = peer.view('ready');
-    const releaseCalls: string[] = [];
-    peer.release = async payload => {
-      releaseCalls.push(payload.sessionId);
-    };
-    await installPeer(stub, peer);
-    await stub.createSessionWithInitialAdmission({
-      metadata: metadata({ sessionId, kiloSessionId: nativeSessionId, sandboxId }),
-      message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
-    });
-
-    const stopped = await stub.stopHostedSession();
-    expect(stopped).toMatchObject({ type: 'found', lifecycle: { state: 'stopped' } });
-    expect(releaseCalls).toEqual([sessionId]);
-    await expect(stub.send(promptPayload(messageId()))).resolves.toEqual({
-      type: 'session-stopped',
-    });
-    await expect(stub.getMetadata()).resolves.toMatchObject({
-      identity: { sessionId },
-      auth: { kiloSessionId: nativeSessionId },
-    });
-    await expect(stub.stopHostedSession()).resolves.toEqual(stopped);
-    expect(releaseCalls).toEqual([sessionId]);
-
-    const resumed = await stub.resumeHostedSession();
-    expect(resumed).toMatchObject({ type: 'found', lifecycle: { state: 'active' } });
-    expect(peer.prepareCalls).toHaveLength(2);
-    await expect(stub.send(promptPayload(messageId()))).resolves.toEqual({ type: 'ok' });
-    await expect(stub.resumeHostedSession()).resolves.toEqual(resumed);
-    expect(peer.prepareCalls).toHaveLength(2);
-  });
-
-  it('fences a send queued behind hosted stop', async () => {
-    const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
-    const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
-
-    await runInDurableObject(stub, async instance => {
-      const stopped = instance.stopHostedSession();
-      const sent = instance.send(promptPayload(messageId()));
-      await expect(stopped).resolves.toMatchObject({
-        type: 'found',
-        lifecycle: { state: 'stopped' },
-      });
-      await expect(sent).resolves.toEqual({ type: 'session-stopped' });
-    });
-  });
-
-  it('keeps a hosted session stopped when resume preparation fails', async () => {
-    const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
-    const stub = sessions.getByName(sessionId);
-    const peer = new FakeSandboxPeer();
-    peer.prepareView = peer.view('ready');
-    await installPeer(stub, peer);
-    await stub.createSessionWithInitialAdmission({
-      metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
-      message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
-    });
-    await stub.stopHostedSession();
-    peer.prepareView = {
-      state: 'failed',
-      attemptId: 'resume_attempt',
-      reason: 'billing_blocked',
-    };
-
-    await expect(stub.resumeHostedSession()).resolves.toMatchObject({
-      type: 'found',
-      lifecycle: { state: 'stopped' },
-    });
-    await expect(stub.send(promptPayload(messageId()))).resolves.toEqual({
-      type: 'session-stopped',
-    });
   });
 
   it('returns the worktree runtime location and rejects a foreign worktree', async () => {

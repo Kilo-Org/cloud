@@ -834,9 +834,6 @@ async function defaultAdmitPrompt(params: {
     if (result.type === 'queue-full') {
       return pendingQueueFullAdmissionFailure();
     }
-    if (result.type === 'session-stopped') {
-      return { success: false, code: 'BAD_REQUEST', error: 'Session is stopped' };
-    }
     return {
       success: true,
       outcome: 'queued',

@@ -176,11 +176,6 @@ import type {
 } from '../sandbox/sandbox-do.js';
 import type { ScopeGrantView } from '../sandbox/scope-view.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
-import {
-  hostedSessionLifecycleSchema,
-  type HostedSessionLifecycle,
-  type HostedSessionLifecycleResult,
-} from '../../shared/hosted-session-lifecycle.js';
 
 /** Where a committed message transition came from (legacy diagnostic field). */
 type ControlPlaneMessageSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
@@ -190,7 +185,6 @@ const GENERATION = 2;
 const REGISTRATION_KEY = 'control_plane_session';
 const SESSION_METADATA_KEY = 'session_metadata';
 const ROUTE_KEY = 'control_plane_route';
-const HOSTED_LIFECYCLE_KEY = 'hosted_session_lifecycle';
 const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
@@ -290,8 +284,7 @@ export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSession
 export type ControlPlaneSendResult =
   | { type: 'ok' }
   | { type: 'session-not-found' }
-  | { type: 'queue-full' }
-  | { type: 'session-stopped' };
+  | { type: 'queue-full' };
 
 /**
  * Create/register failure in the legacy `AdmissionFailure` shape (M2): the
@@ -320,7 +313,6 @@ export type ControlPlaneSessionSnapshot =
   | {
       type: 'found';
       sessionId: string;
-      lifecycle: HostedSessionLifecycle;
       route: ControlPlaneRouteView;
       messages: Array<{
         messageId: string;
@@ -345,7 +337,6 @@ export type ControlPlaneSandboxPeer = {
   abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
   release(payload: ControlPlaneSessionRefPayload): Promise<void>;
-  detach(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneControlResult>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;
@@ -513,7 +504,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private runtimeAuthorization: RuntimeAuthorization | undefined;
   private messages: SessionMessage[] = [];
   private route: ControlPlaneRouteView = { state: 'unknown' };
-  private hostedLifecycle: HostedSessionLifecycle = { state: 'active', generation: 0 };
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
@@ -690,7 +680,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.rootStatus = rootStatus.success ? rootStatus.data : undefined;
     this.messages = await this.loadMessages();
     this.route = await this.loadRoute();
-    this.hostedLifecycle = await this.loadHostedLifecycle();
     const recoveryAt = z
       .number()
       .int()
@@ -749,7 +738,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // cannot refuse it; if it somehow did, fail as a transport error the
       // caller retries rather than inventing a create failure code.
       if (sent.type === 'queue-full') throw new Error('Pending message queue is full');
-      if (sent.type === 'session-stopped') throw new Error('Session is stopped');
       return sent.type === 'session-not-found'
         ? createFailure('NOT_FOUND', 'Session not found')
         : this.admissionAck(message.messageId);
@@ -793,7 +781,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // message; a refusal is a transport error the caller retries, not a create
     // failure code.
     if (sent.type === 'queue-full') throw new Error('Pending message queue is full');
-    if (sent.type === 'session-stopped') throw new Error('Session is stopped');
     if (sent.type === 'session-not-found') {
       return createFailure('INTERNAL', 'Session registration failed');
     }
@@ -1236,7 +1223,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A delete queued ahead of this task made the session not-found; do not
       // persist a queued row against wiped storage.
       if (this.registration === null) return { type: 'session-not-found' };
-      if (this.hostedLifecycle.state !== 'active') return { type: 'session-stopped' };
       const admitted = await this.admitMessage(parsed);
       return admitted === 'queue-full' ? { type: 'queue-full' } : { type: 'ok' };
     });
@@ -1310,86 +1296,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async stopHostedSession(): Promise<HostedSessionLifecycleResult> {
-    await this.initialized;
-    if (this.registration === null) return { type: 'session-not-found' };
-    return this.enqueue(async () => {
-      if (this.registration === null) return { type: 'session-not-found' };
-      if (this.hostedLifecycle.state === 'stopped') {
-        return { type: 'found', lifecycle: this.hostedLifecycle };
-      }
-      const generation = this.hostedLifecycle.generation + 1;
-      await this.persistHostedLifecycle({ state: 'stopping', generation, requestedAt: Date.now() });
-      const open = openMessages(this.messages).map(message => message.messageId);
-      this.worktreeChanges.markInterrupted();
-      await this.settleMessages(open, 'cancelled', 'interrupted');
-      // A question or permission from the stopped turn must not survive the
-      // fence: answering it would admit a new turn and wake compute again.
-      await this.clearPendingInteractions();
-      const peer = this.sandboxPeer();
-      if (peer !== null) {
-        const detached = await withDORetry(
-          () => this.sandboxPeer() ?? peer,
-          current => current.detach({ sessionId: this.sessionId }),
-          'session.detach'
-        );
-        if (!detached.ok) throw new Error(detached.error.message);
-      }
-      await this.applyView({ state: 'unknown' });
-      await this.clearTransportRecovery();
-      await this.armAlarm();
-      await this.persistHostedLifecycle({
-        state: 'stopped',
-        generation,
-        stoppedAt: Date.now(),
-        latestEventId: this.eventQueries.getLatestEventId(),
-      });
-      return { type: 'found', lifecycle: this.hostedLifecycle };
-    });
-  }
-
-  async resumeHostedSession(): Promise<HostedSessionLifecycleResult> {
-    await this.initialized;
-    if (this.registration === null) return { type: 'session-not-found' };
-    return this.enqueue(async () => {
-      if (this.registration === null) return { type: 'session-not-found' };
-      if (this.hostedLifecycle.state === 'active') {
-        return { type: 'found', lifecycle: this.hostedLifecycle };
-      }
-      const generation = this.hostedLifecycle.generation + 1;
-      await this.persistHostedLifecycle({ state: 'resuming', generation, requestedAt: Date.now() });
-      const view = await this.prepareSandbox();
-      if (view === null) {
-        await this.persistHostedLifecycle({
-          state: 'stopped',
-          generation,
-          stoppedAt: Date.now(),
-          latestEventId: this.eventQueries.getLatestEventId(),
-        });
-        return { type: 'found', lifecycle: this.hostedLifecycle };
-      }
-      await this.applyView(view);
-      if (view.state === 'failed') {
-        await this.persistHostedLifecycle({
-          state: 'stopped',
-          generation,
-          stoppedAt: Date.now(),
-          latestEventId: this.eventQueries.getLatestEventId(),
-        });
-        return { type: 'found', lifecycle: this.hostedLifecycle };
-      }
-      await this.persistHostedLifecycle({ state: 'active', generation });
-      return { type: 'found', lifecycle: this.hostedLifecycle };
-    });
-  }
-
-  async getHostedLifecycle(): Promise<HostedSessionLifecycleResult> {
-    await this.initialized;
-    return this.registration === null
-      ? { type: 'session-not-found' }
-      : { type: 'found', lifecycle: this.hostedLifecycle };
-  }
-
   async cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
     await this.initialized;
     if (this.registration === null) return { dropped: false };
@@ -1406,9 +1312,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.registration === null) return 'not_connected';
     const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
     return this.enqueue(async () => {
-      // Answering a pending interaction or a settled turn admits work, so a
-      // session that is stopping or stopped must refuse it like `send` does.
-      if (this.hostedLifecycle.state !== 'active') return 'not_connected';
       // A live turn takes the answer directly (spec §5). The route is named by
       // this DO, never by the caller, so a wrong id cannot reach a sibling.
       if (this.messages.some(message => message.state === 'accepted')) {
@@ -1463,12 +1366,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.pendingInteractions = next;
       await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
     }
-  }
-
-  private async clearPendingInteractions(): Promise<void> {
-    if (this.pendingInteractions === undefined) return;
-    this.pendingInteractions = undefined;
-    await this.ctx.storage.delete(PENDING_INTERACTIONS_KEY);
   }
 
   async onRoute(update: ControlPlaneRouteUpdate): Promise<void> {
@@ -1680,7 +1577,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return {
       type: 'found',
       sessionId: this.sessionId,
-      lifecycle: this.hostedLifecycle,
       route: this.route,
       messages: this.messages.map(message => ({
         messageId: message.messageId,
@@ -2096,7 +1992,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.runtimeAuthorization = undefined;
     this.messages = [];
     this.route = { state: 'unknown' };
-    this.hostedLifecycle = { state: 'active', generation: 0 };
     this.transportRecoveryAt = null;
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
@@ -3063,18 +2958,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private async loadRoute(): Promise<ControlPlaneRouteView> {
     const parsed = controlPlaneRouteViewSchema.safeParse(await this.ctx.storage.get(ROUTE_KEY));
     return parsed.success ? parsed.data : { state: 'unknown' };
-  }
-
-  private async persistHostedLifecycle(lifecycle: HostedSessionLifecycle): Promise<void> {
-    await this.ctx.storage.put(HOSTED_LIFECYCLE_KEY, lifecycle);
-    this.hostedLifecycle = lifecycle;
-  }
-
-  private async loadHostedLifecycle(): Promise<HostedSessionLifecycle> {
-    const parsed = hostedSessionLifecycleSchema.safeParse(
-      await this.ctx.storage.get(HOSTED_LIFECYCLE_KEY)
-    );
-    return parsed.success ? parsed.data : { state: 'active', generation: 0 };
   }
 
   private async persistMessages(messages: readonly SessionMessage[]): Promise<void> {

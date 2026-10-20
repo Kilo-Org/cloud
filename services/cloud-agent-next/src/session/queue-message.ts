@@ -353,9 +353,6 @@ async function queueControlPlaneMessage(
   if (result.type === 'queue-full') {
     throwAdmissionError(pendingQueueFullAdmissionFailure());
   }
-  if (result.type === 'session-stopped') {
-    throw new TRPCError({ code: 'CONFLICT', message: 'session_stopped' });
-  }
   return {
     cloudAgentSessionId: sessionId,
     status: 'started',

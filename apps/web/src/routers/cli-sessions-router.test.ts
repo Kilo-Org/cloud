@@ -1566,6 +1566,24 @@ describe('cli-sessions-router', () => {
       expect(completed.ui_messages_blob_url).toBe('sessions/new-id/ui_messages.json');
     });
 
+    it('fails when the share row disappears before its copy finishes', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(copyBlobs).mockImplementationOnce(async () => {
+        await db.delete(sharedCliSessions).where(eq(sharedCliSessions.session_id, shareSessionId));
+        return {
+          api_conversation_history_blob_url: 'sessions/new-id/api_conversation_history.json',
+        };
+      });
+
+      await expect(
+        caller.cliSessions.share({
+          session_id: shareSessionId,
+          shared_state: CliSessionSharedState.Public,
+        })
+      ).rejects.toThrow(/removed before its copy finished/);
+    });
+
     it('stores a share of a session that has no blobs', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const { copyBlobs } = await import('@/lib/r2/cli-sessions');

@@ -279,10 +279,18 @@ async function createSharedSessionCopy(params: {
       reservation.shareId,
       'shared-sessions'
     );
-    await db
+    const [completed] = await db
       .update(sharedCliSessions)
       .set(blobUrlColumns(blobUrls))
-      .where(eq(sharedCliSessions.share_id, reservation.shareId));
+      .where(eq(sharedCliSessions.share_id, reservation.shareId))
+      .returning({ share_id: sharedCliSessions.share_id });
+
+    if (!completed) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'The share was removed before its copy finished. Share the session again.',
+      });
+    }
   }
 
   return { share_id: reservation.shareId, session_id: params.sessionId };
@@ -314,6 +322,13 @@ async function createForkedSessionCopy(params: {
       .set(blobUrlColumns(blobUrls))
       .where(eq(cliSessions.session_id, sessionId))
       .returning(commonSessionFields);
+
+    if (!newSession) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Session not found',
+      });
+    }
 
     return newSession;
   } catch (error) {

@@ -196,12 +196,17 @@ export async function copySessionBlobs(
   }
 }
 
-/** Undo a fork reservation whose copy did not complete. */
+/**
+ * Undo a fork reservation whose copy did not complete. The row belongs to the
+ * request that inserted it, so removing it together with whatever the copy
+ * wrote leaves nothing behind.
+ */
 export async function discardReservedFork(sessionId: string): Promise<void> {
   try {
     await deleteBlobs(sessionId, sessionBlobRefs('sessions'));
   } catch {
-    // Same reasoning as {@link discardReservedShare}.
+    // The row delete below still runs; a cleanup failure must not replace the
+    // error that caused the discard.
   }
   await db.delete(cliSessions).where(eq(cliSessions.session_id, sessionId));
 }

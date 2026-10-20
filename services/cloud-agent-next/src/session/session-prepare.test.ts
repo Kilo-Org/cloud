@@ -3526,20 +3526,18 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const [winner, loser] = await Promise.all([
-      runCreate(ctx),
-      runCreate(ctx).then(
-        () => null,
-        (error: unknown) => error
-      ),
-    ]);
+    const results = await Promise.allSettled([runCreate(ctx), runCreate(ctx)]);
+    const winners = results.filter(result => result.status === 'fulfilled');
+    const losers = results.filter(result => result.status === 'rejected');
 
-    expect(winner).toEqual({
+    expect(winners).toHaveLength(1);
+    expect(losers).toHaveLength(1);
+    expect(winners[0]?.value).toEqual({
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
-    expect(loser).toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    expect(losers[0]?.reason).toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
     // Exactly one retry reconciled: the ladder read the DO state once.
     expect(doStub.getMessageResult).toHaveBeenCalledTimes(1);
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();

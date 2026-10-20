@@ -334,7 +334,8 @@ export function SlackIntegrationDetails({
         <Alert>
           <AlertDescription>
             Only organization owners and admins can connect, re-install, or disconnect this Slack
-            integration. You can still test the connection.
+            integration.
+            {installation && !isSuspended && ' You can still test the connection.'}
           </AlertDescription>
         </Alert>
       )}

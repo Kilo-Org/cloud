@@ -258,6 +258,8 @@ export async function upsertSlackInstallation({
 }): Promise<PlatformIntegration> {
   const existing = await getInstallation(owner);
   const teamName = installation.teamName || 'Unknown Team';
+  // Legacy rows can carry the workspace id only in `platform_account_id`.
+  const boundTeamId = existing?.platform_installation_id ?? existing?.platform_account_id ?? null;
 
   const conflicting = await getConflictingSlackInstallation(owner, teamId);
   if (conflicting) {
@@ -268,8 +270,8 @@ export async function upsertSlackInstallation({
     existing &&
     !allowWorkspaceRebind &&
     owner.type === 'org' &&
-    existing.platform_installation_id &&
-    existing.platform_installation_id !== teamId
+    boundTeamId &&
+    boundTeamId !== teamId
   ) {
     throw new SlackWorkspaceRebindNotAllowedError();
   }

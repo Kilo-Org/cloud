@@ -445,11 +445,15 @@ describe('upsertSlackInstallation organization workspace binding', () => {
     teamName: 'Kilo Team',
   } satisfies SlackInstallation;
 
-  function organizationIntegration(platformInstallationId: string | null) {
+  function organizationIntegration(
+    platformInstallationId: string | null,
+    platformAccountId: string | null = platformInstallationId
+  ) {
     return buildSlackIntegration({
       owned_by_user_id: null,
       owned_by_organization_id: organizationOwner.id,
       platform_installation_id: platformInstallationId,
+      platform_account_id: platformAccountId,
     });
   }
 
@@ -503,13 +507,27 @@ describe('upsertSlackInstallation organization workspace binding', () => {
   });
 
   it('binds an organization row that has no workspace yet', async () => {
-    mockLimit.mockResolvedValueOnce([organizationIntegration(null)]).mockResolvedValueOnce([]);
+    mockLimit
+      .mockResolvedValueOnce([organizationIntegration(null, null)])
+      .mockResolvedValueOnce([]);
 
     await upsertSlackInstallation({ owner: organizationOwner, teamId: 'T123', installation });
 
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({ platform_installation_id: 'T123' })
     );
+  });
+
+  it('refuses a legacy organization row bound only by its account id', async () => {
+    mockLimit
+      .mockResolvedValueOnce([organizationIntegration(null, 'T_OLD')])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      upsertSlackInstallation({ owner: organizationOwner, teamId: 'T_NEW', installation })
+    ).rejects.toThrow(SlackWorkspaceRebindNotAllowedError);
+
+    expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
   it('keeps personal workspace changes allowed', async () => {

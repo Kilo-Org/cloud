@@ -3131,11 +3131,11 @@
   },
   "models": {
     "auto": {
-      "frontier": "Automaattinen Huippuluokan",
-      "balanced": "Automaattinen Tasapainoinen",
-      "efficient": "Automaattinen Tehokas",
-      "small": "Automaattinen Pieni",
-      "free": "Automaattinen Ilmainen",
+      "frontier": "Automaattinen huippuluokan",
+      "balanced": "Automaattinen tasapainoinen",
+      "efficient": "Automaattinen tehokas",
+      "small": "Automaattinen pieni",
+      "free": "Automaattinen ilmainen",
       "organization": "Organisaation automaattinen"
     },
     "dataCollected": "Tietoja kerätään",
@@ -3365,7 +3365,7 @@
       "discoverySucceeded": "Malleja löytyi. Valitse alta lisättävät mallit.",
       "discoveryFailed": "Mallien etsiminen epäonnistui tai sitä ei tueta. Käsin lisäämäsi mallit pysyvät ennallaan.",
       "checkConnection": "Testaa yhteys malliin",
-      "checkHelp": "$t(modelChat.backends.checkConnection) lähettää tähän päätepisteeseen lyhyen päättelypyynnön käyttäen valittua protokollaa ja mallia. Palveluntarjoaja saattaa veloittaa siitä.",
+      "checkHelp": "Painike ”$t(modelChat.backends.checkConnection)” lähettää tähän päätepisteeseen lyhyen päättelypyynnön valittua protokollaa ja mallia käyttäen. Palveluntarjoaja saattaa veloittaa siitä.",
       "connectionSucceeded": "Malli suoritti pyynnön tällä protokollalla.",
       "connectionFailed": "Malli ei voinut suorittaa pyyntöä. Tarkista API:n juuriosoite, protokolla, tunnistetiedot ja mallin tunniste.",
       "invalidInput": "Anna taustapalvelun nimi, kelvolliset otsakkeet ja vähintään yksi malli, jolla on yksilöllinen tunniste ja nimi. Tokenrajojen on oltava positiivisia kokonaislukuja.",

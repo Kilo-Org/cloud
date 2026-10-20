@@ -316,3 +316,4 @@ allowBuilds:
   tree-sitter-bash: false
   geckodriver: true
   '@scarf/scarf': false
+  '@parcel/watcher': false

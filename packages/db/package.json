@@ -33,17 +33,17 @@
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "drizzle-orm": "catalog:",
-    "pg": "8.20.0",
+    "pg": "8.23.1",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@jest/globals": "30.3.0",
+    "@jest/globals": "30.5.2",
     "@swc/jest": "0.2.39",
-    "@types/pg": "8.18.0",
+    "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",
     "dotenv": "17.3.1",
     "drizzle-kit": "catalog:",
-    "jest": "30.3.0",
+    "jest": "30.5.2",
     "typescript": "catalog:"
   }
 }

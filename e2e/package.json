@@ -1,0 +1,31 @@
+{
+  "name": "kilo-cloud-e2e",
+  "private": true,
+  "description": "Kilo Cloud UI tests on @anaconda/playwright-utils (isolated from the pnpm workspace)",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test -g '@smoke' --pass-with-no-tests",
+    "test:reg": "playwright test -g '@reg'",
+    "report": "playwright show-report playwright-report",
+    "validate": "tsc --noEmit",
+    "lint": "eslint 'tests/**/*.ts' 'ci/*.mjs' 'playwright.config.ts'",
+    "lint:fix": "eslint 'tests/**/*.ts' 'ci/*.mjs' 'playwright.config.ts' --fix",
+    "format": "prettier --write --no-error-on-unmatched-pattern 'tests/**/*.ts' 'ci/*.mjs' 'playwright.config.ts'",
+    "check:code-quality": "playwright-utils-check-code-quality",
+    "quality:full": "playwright-utils-quality-full"
+  },
+  "devDependencies": {
+    "@anaconda/playwright-utils": "2.1.0",
+    "@playwright/test": "1.61.1",
+    "@types/node": "24.13.2",
+    "@types/pg": "8.23.1",
+    "eslint": "9.39.4",
+    "globals": "17.13.0",
+    "pg": "8.23.1",
+    "prettier": "3.9.4",
+    "typescript": "5.9.3"
+  }
+}

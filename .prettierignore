@@ -47,3 +47,5 @@ pnpm-lock.yaml
 !.env.example
 *.sql
 
+# Isolated QA package with its own Prettier config (see e2e/README.md)
+e2e/

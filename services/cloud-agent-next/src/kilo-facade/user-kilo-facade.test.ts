@@ -1,4 +1,5 @@
 import {
+  type CloudAgentRootSessionsPage,
   type CloudAgentRootSessionSummary,
   encodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
@@ -3844,16 +3845,26 @@ describe('hosted global native events', () => {
     return {
       kiloSessionId: id,
       cloudAgentSessionId,
+      userId: groupedOwnerId,
+      organizationId: null,
       title: 'Owned root',
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      createdOnPlatform: 'unknown',
       created: 100,
       updated: 200,
     };
   }
 
+  function rootPage(roots: CloudAgentRootSessionSummary[]): CloudAgentRootSessionsPage {
+    return { items: roots, nextCursor: null };
+  }
+
   function globalFixture(roots = [rootSummary()]) {
     const env = envStub();
     const listCloudAgentRootSessions = vi.mocked(env.SESSION_INGEST.listCloudAgentRootSessions);
-    listCloudAgentRootSessions.mockResolvedValue(roots);
+    listCloudAgentRootSessions.mockResolvedValue(rootPage(roots));
     const resolveRoot = vi.mocked(env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession);
     resolveRoot.mockImplementation(async ({ kiloUserId, kiloSessionId: requestedId }) => {
       if (kiloUserId !== groupedOwnerId) return null;
@@ -4597,7 +4608,7 @@ describe('hosted global native events', () => {
   it('discovers roots added after global connection on the next heartbeat', async () => {
     vi.useFakeTimers();
     const fixture = globalFixture();
-    fixture.listCloudAgentRootSessions.mockResolvedValueOnce([]);
+    fixture.listCloudAgentRootSessions.mockResolvedValueOnce(rootPage([]));
     const reader = globalReader(fixture.facade);
     try {
       await expectGlobalConnected(reader);
@@ -4658,7 +4669,7 @@ describe('hosted global native events', () => {
       await expectGlobalConnected(reader);
       const attachment = fixture.subscribeNativeEvents.mock.calls[0]?.[0];
       expect(attachment).toBeDefined();
-      fixture.listCloudAgentRootSessions.mockResolvedValue([]);
+      fixture.listCloudAgentRootSessions.mockResolvedValue(rootPage([]));
       await vi.advanceTimersByTimeAsync(10_000);
       expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
       await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));

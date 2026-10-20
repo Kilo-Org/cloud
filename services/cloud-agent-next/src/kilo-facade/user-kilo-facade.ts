@@ -2720,7 +2720,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     if (!this.subscribers.has(subscriberId)) return;
     const sessionIngest = this.env.SESSION_INGEST;
     if (!sessionIngest) return;
-    const roots = await sessionIngest.listCloudAgentRootSessions({
+    const { items: roots } = await sessionIngest.listCloudAgentRootSessions({
       kiloUserId: userId,
       limit: 100,
     });

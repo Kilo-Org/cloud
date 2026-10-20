@@ -30,7 +30,8 @@ import {
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import assert from 'node:assert/strict';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   bouncer_usage_event_outbox,
   microdollar_usage,
@@ -53,6 +54,7 @@ import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { extractReasoningSetting } from './llm-proxy-helpers';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -1440,6 +1442,93 @@ describe('logMicrodollarUsage', () => {
       where: eq(microdollar_usage_metadata.message_id, 'test-custom-llm-free'),
     });
     expect(metadataRecord?.is_free).toBe(true);
+  });
+
+  test.each(['deleted', 'unavailable'] as const)(
+    'keeps a selected custom LLM free when its catalog entry is %s',
+    async catalogState => {
+      const user = await insertTestUser({
+        id: `test-${catalogState}-custom-llm-user`,
+        microdollars_used: 1000,
+        google_user_email: `${catalogState}-custom-llm@example.com`,
+      });
+      const organization = await createTestOrganization('Deleted custom LLM', user.id, 10_000);
+      const modelId = `acme/${catalogState}-custom-model`;
+      await insertCustomLlmForTest(modelId);
+      const catalogReadSpy = jest.spyOn(readDb, 'select');
+      try {
+        expect(await isCustomLlm(modelId)).toBe(true);
+        const usageContext: MicrodollarUsageContext = {
+          ...createBaseUsageContext(user),
+          organizationId: organization.id,
+          provider: 'custom',
+          requested_model: modelId,
+        };
+
+        await deleteCustomLlmForTest(modelId);
+        if (catalogState === 'unavailable') {
+          catalogReadSpy.mockImplementation(() => {
+            throw new Error('Custom LLM catalog unavailable');
+          });
+        }
+        expect(await isCustomLlm(modelId)).toBe(false);
+
+        const result = await processTokenData(
+          { ...BASE_USAGE_STATS, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+          usageContext
+        );
+        assert(result);
+        const usageRecord = await db.query.microdollar_usage.findFirst({
+          where: eq(microdollar_usage.id, result.usageId),
+        });
+        expect(usageRecord).toMatchObject({ provider: 'custom', cost: 0, cache_discount: 0 });
+        const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+          where: eq(microdollar_usage_metadata.id, result.usageId),
+        });
+        expect(metadataRecord).toMatchObject({ is_free: true, market_cost: 700 });
+        expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
+        const updatedOrganization = await db.query.organizations.findFirst({
+          where: eq(organizations.id, organization.id),
+        });
+        expect(updatedOrganization).toMatchObject({
+          microdollars_used: 0,
+          microdollars_balance: 10_000,
+        });
+      } finally {
+        catalogReadSpy.mockRestore();
+        await deleteCustomLlmForTest(modelId);
+      }
+    }
+  );
+
+  test.each([false, true])('preserves paid model accounting with user BYOK=%s', async userByok => {
+    const user = await insertTestUser({
+      id: `test-paid-model-byok-${userByok}`,
+      microdollars_used: 1000,
+      google_user_email: `paid-model-byok-${userByok}@example.com`,
+    });
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+      { ...createBaseUsageContext(user), user_byok: userByok }
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({
+      cost: userByok ? 0 : 700,
+      cache_discount: userByok ? 0 : 50,
+    });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({
+      is_free: false,
+      is_user_byok: userByok,
+      market_cost: 700,
+    });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 1700);
   });
 
   test('does not report a bouncer usage event without the bouncer context', async () => {

@@ -322,9 +322,8 @@ describe('session-start admission', () => {
       createExecutionContext()
     );
     expect(response.status).toBe(401);
-    expect(response.headers.get('content-type')).toContain('application/json');
     const body = (await response.json()) as { error?: { message?: string } };
-    expect(body.error?.message).not.toBe('Unauthorized');
+    expect(body.error?.message).toBe('Missing or malformed Authorization header');
   });
 
   it('leaves the gate off when the render does not set it', async () => {

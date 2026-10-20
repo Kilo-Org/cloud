@@ -34,7 +34,7 @@ import { useOptionalSessionManager } from './session-manager-context';
 
 const MAX_NESTING_DEPTH = 5;
 
-type ChildSessionStatus = 'pending' | 'running' | 'completed' | 'error';
+type ChildSessionStatus = ToolPart['state']['status'];
 
 /** The card's visible and announced state, in the reader's language. */
 const STATUS_LABEL_KEY = {

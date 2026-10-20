@@ -304,7 +304,12 @@ describe('ChildSessionMessage completion', () => {
         await Promise.resolve();
       });
 
-      expect(texts()).toEqual(['General', 'child task', 'Test Model', i18nInstance.t('common.completed')]);
+      expect(texts()).toEqual([
+        'General',
+        'child task',
+        'Test Model',
+        i18nInstance.t('common.completed'),
+      ]);
       expect(button().props.accessibilityLabel).toContain(i18nInstance.t('common.completed'));
       expect(button().props.accessibilityLabel).not.toContain('Considering next steps');
       expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(0);

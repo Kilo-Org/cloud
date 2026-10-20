@@ -6988,6 +6988,29 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('forwards the caller create identity and clone fields to the transport', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_eeeeeeeeeeeeeeeeeeeeeeeeee'));
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      await mgr.createRemoteSession({
+        mutationId: 'intent-42',
+        cloneFromKiloSessionId: 'ses_source_12345678901234567890',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      });
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mutationId: 'intent-42',
+          cloneFromKiloSessionId: 'ses_source_12345678901234567890',
+          cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        })
+      );
+    });
+
     it('prefers override.selection over observedModel and omits variant when absent', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

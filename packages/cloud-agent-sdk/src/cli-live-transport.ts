@@ -5,8 +5,12 @@
 import { normalizeCliEvent, isChatEvent } from './normalizer';
 import { partSettledAt } from './part-utils';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
-import { parseCreateSessionResponse } from './create-session';
-import { cloudAgentSdkRuntime } from './runtime';
+import {
+  buildCreateSessionWireData,
+  createSessionWireMutationIds,
+  hasExtendedCreateSessionFields,
+  parseCreateSessionResponse,
+} from './create-session';
 import { parseExitSessionResponse } from './exit-session';
 import {
   cliConnectionDataSchema,
@@ -37,30 +41,6 @@ import {
 
 /** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
 const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
-
-/**
- * Build `create_session` wire data: always `protocolVersion: 1`, plus any
- * defined inheritance fields (Decision 5 shape).
- */
-function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
-  protocolVersion: 1;
-  agent?: string;
-  model?: { providerID: string; modelID: string; variant?: string };
-  orgId?: string;
-  directory?: string;
-  cloneFromKiloSessionId?: string;
-} {
-  return {
-    protocolVersion: 1,
-    ...(input?.agent !== undefined ? { agent: input.agent } : {}),
-    ...(input?.model !== undefined ? { model: input.model } : {}),
-    ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
-    ...(input?.directory !== undefined ? { directory: input.directory } : {}),
-    ...(input?.cloneFromKiloSessionId !== undefined
-      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
-      : {}),
-  };
-}
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
@@ -979,17 +959,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // snapshotted before the await and SESSION_OWNER_CHANGED is handled.
         // Extended fields degrade via a single bare retry on the exact
         // old-CLI delivered error; other failures are hard rejects.
-        const mutationId = input?.mutationId ?? cloudAgentSdkRuntime.randomUUID();
         const wireData = buildCreateSessionWireData(input);
-        const hasExtendedFields =
-          wireData.agent !== undefined ||
-          wireData.model !== undefined ||
-          wireData.orgId !== undefined ||
-          wireData.directory !== undefined;
+        const wireMutationIds = createSessionWireMutationIds(input?.mutationId);
+        const hasExtendedFields = hasExtendedCreateSessionFields(wireData);
         const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
         let result: unknown;
         try {
-          result = await sendCommand('create_session', wireData, mutationId);
+          result = await sendCommand('create_session', wireData, wireMutationIds.extended);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
@@ -1005,7 +981,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             result = await sendCommand(
               'create_session',
               { protocolVersion: 1 },
-              cloudAgentSdkRuntime.randomUUID()
+              wireMutationIds.bare
             );
           } else {
             throw error;

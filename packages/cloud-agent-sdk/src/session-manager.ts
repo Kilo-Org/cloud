@@ -3285,16 +3285,26 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const model = input?.model ?? inherited.model;
     const orgId = input?.orgId ?? inherited.orgId;
     const merged: CreateRemoteSessionInput = {
+      ...(input?.mutationId !== undefined ? { mutationId: input.mutationId } : {}),
       ...(agent !== undefined ? { agent } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(orgId !== undefined ? { orgId } : {}),
       ...(input?.directory !== undefined ? { directory: input.directory } : {}),
+      ...(input?.cloneFromKiloSessionId !== undefined
+        ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+        : {}),
+      ...(input?.cloneUpToMessageId !== undefined
+        ? { cloneUpToMessageId: input.cloneUpToMessageId }
+        : {}),
     };
     const hasFields =
+      merged.mutationId !== undefined ||
       merged.agent !== undefined ||
       merged.model !== undefined ||
       merged.orgId !== undefined ||
-      merged.directory !== undefined;
+      merged.directory !== undefined ||
+      merged.cloneFromKiloSessionId !== undefined ||
+      merged.cloneUpToMessageId !== undefined;
     return currentSession.createRemoteSession(hasFields ? merged : undefined);
   }
 

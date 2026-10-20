@@ -24,6 +24,76 @@ export type { CreateRemoteSessionInput } from './transport';
 /** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
 const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
 
+/** `create_session` wire data: protocol v1 plus any defined inheritance fields. */
+export type CreateSessionWireData = {
+  protocolVersion: 1;
+  agent?: string;
+  model?: { providerID: string; modelID: string; variant?: string };
+  orgId?: string;
+  directory?: string;
+  cloneFromKiloSessionId?: string;
+  cloneUpToMessageId?: string;
+};
+
+/**
+ * Build `create_session` wire data for both create paths (session-scoped and
+ * connection-scoped). Every defined inheritance field is forwarded; the clone
+ * cut travels only beside its clone source.
+ */
+export function buildCreateSessionWireData(
+  input?: CreateRemoteSessionInput
+): CreateSessionWireData {
+  return {
+    protocolVersion: 1,
+    ...(input?.agent !== undefined ? { agent: input.agent } : {}),
+    ...(input?.model !== undefined ? { model: input.model } : {}),
+    ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
+    ...(input?.directory !== undefined ? { directory: input.directory } : {}),
+    ...(input?.cloneFromKiloSessionId !== undefined
+      ? {
+          cloneFromKiloSessionId: input.cloneFromKiloSessionId,
+          ...(input.cloneUpToMessageId !== undefined
+            ? { cloneUpToMessageId: input.cloneUpToMessageId }
+            : {}),
+        }
+      : {}),
+  };
+}
+
+/**
+ * True when the wire data differs from the bare `{ protocolVersion: 1 }` form
+ * that every supported CLI accepts.
+ */
+export function hasExtendedCreateSessionFields(data: CreateSessionWireData): boolean {
+  return (
+    data.agent !== undefined ||
+    data.model !== undefined ||
+    data.orgId !== undefined ||
+    data.directory !== undefined
+  );
+}
+
+/**
+ * Derive the durable wire identities of one create intent.
+ *
+ * The extended attempt and the old-CLI bare retry MUST NOT share an identity:
+ * the relay dedupes by mutationId and would replay the extended attempt's
+ * stored `invalid create_session command` error to the bare retry. A caller
+ * retry of the same intent reuses these identities, so the relay replays its
+ * stored terminal result instead of dispatching a second command.
+ *
+ * Without a caller key both fields are `undefined` and the wire carries no
+ * mutationId; the relay then falls back to a per-wire random correlation id.
+ */
+export function createSessionWireMutationIds(mutationId: string | undefined): {
+  extended: string | undefined;
+  bare: string | undefined;
+} {
+  return mutationId === undefined
+    ? { extended: undefined, bare: undefined }
+    : { extended: `${mutationId}:ext`, bare: `${mutationId}:bare` };
+}
+
 export type CreateSessionParseResult =
   | { ok: true; kiloSessionId: KiloSessionId }
   | { ok: false; reason: 'invalid' };
@@ -79,32 +149,14 @@ export async function createRemoteSessionOnConnection(
   connectionId: string,
   input?: CreateRemoteSessionInput
 ): Promise<CreateRemoteSessionRawResult> {
-  const data = {
-    protocolVersion: 1 as const,
-    ...(input?.agent !== undefined ? { agent: input.agent } : {}),
-    ...(input?.model !== undefined ? { model: input.model } : {}),
-    ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
-    ...(input?.directory !== undefined ? { directory: input.directory } : {}),
-    ...(input?.cloneFromKiloSessionId !== undefined
-      ? {
-          cloneFromKiloSessionId: input.cloneFromKiloSessionId,
-          ...(input.cloneUpToMessageId !== undefined
-            ? { cloneUpToMessageId: input.cloneUpToMessageId }
-            : {}),
-        }
-      : {}),
-  };
+  const data = buildCreateSessionWireData(input);
   // `directory` is an extended field; the `:bare` retry omits it for old CLIs.
   // Remove `:bare` when every supported CLI accepts it.
-  const hasExtendedFields =
-    data.agent !== undefined ||
-    data.model !== undefined ||
-    data.orgId !== undefined ||
-    data.directory !== undefined;
+  const hasExtendedFields = hasExtendedCreateSessionFields(data);
   const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
-  const logicalKey = input?.mutationId;
-  const extendedMutationId = logicalKey === undefined ? undefined : `${logicalKey}:ext`;
-  const bareMutationId = logicalKey === undefined ? undefined : `${logicalKey}:bare`;
+  const { extended: extendedMutationId, bare: bareMutationId } = createSessionWireMutationIds(
+    input?.mutationId
+  );
   try {
     return await connection.sendCommandToConnection({
       command: 'create_session',

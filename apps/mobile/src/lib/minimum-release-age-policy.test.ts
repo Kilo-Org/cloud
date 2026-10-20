@@ -50,17 +50,12 @@ const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
   '@cloudflare/workerd-windows-64@1.20260918.1',
 ] as const;
 
-// Four mobile pins must move without waiting out the gate: FlashList 2.3.3
+// Two mobile pins must move without waiting out the gate: FlashList 2.3.3
 // carries the EngagedIndicesTracker scroll-window fix the agent transcript list
-// depends on, react-native-keyboard-controller 1.22.6 carries the
-// KeyboardChatScrollView fixes the keyboard phase depends on (SDK 57 pins
-// 1.21.9), react-native-enriched-markdown 1.1.0 adds the image and code block
-// press events the transcript markdown wires, and react-native-reanimated 4.7.1
-// carries the stability fixes the app needs. One exact package@version each.
+// depends on, and react-native-reanimated 4.7.1 carries the stability fixes the
+// app needs. One exact package@version each.
 const MOBILE_EXACT_EXCLUDE_ENTRIES = [
   '@shopify/flash-list@2.3.3',
-  'react-native-keyboard-controller@1.22.6',
-  'react-native-enriched-markdown@1.1.0',
   'react-native-reanimated@4.7.1',
 ] as const;
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then

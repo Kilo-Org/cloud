@@ -5,6 +5,7 @@ import {
   SESSION_INGEST_USER_DELETION_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
+import { findActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
 import {
   CloudAgentNextRuntimeAuthorizationClaimSchema,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -49,6 +50,24 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
 
     c.set('user_id', consumed.userId);
     if (consumed.deviceSessionId !== undefined) {
+      let active: boolean;
+      try {
+        active = await findActiveDeviceSession(
+          c.env.HYPERDRIVE.connectionString,
+          consumed.deviceSessionId,
+          consumed.userId
+        );
+      } catch (error) {
+        console.error('Auth infrastructure failure', {
+          operation: 'ticket-device-session-lookup',
+          errorClass: error instanceof Error ? error.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+        return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+      }
+      if (!active) {
+        return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
+      }
       c.set('device_session_id', consumed.deviceSessionId);
     }
     return next();

@@ -10,6 +10,7 @@ import {
   withDeadline,
 } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
+import { findActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
 import { z } from 'zod';
 import { authenticateToken } from './auth';
 import { TICKET_MINT_BUDGET_MS } from './ticket-mint-budget';
@@ -232,6 +233,25 @@ app.get('/connect', async c => {
     return c.json({ error: 'Unauthorized' }, 401);
   }
   const { userId, deviceSessionId } = consumed;
+  if (deviceSessionId) {
+    let active: boolean;
+    try {
+      active = await findActiveDeviceSession(
+        c.env.HYPERDRIVE.connectionString,
+        deviceSessionId,
+        userId
+      );
+    } catch (error) {
+      logger.warn('connect: device session lookup failed', {
+        errorClass: error instanceof Error ? error.name : typeof error,
+      });
+      return c.json({ error: 'Service temporarily unavailable' }, 503);
+    }
+    if (!active) {
+      logger.debug('connect: device session revoked');
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+  }
   logger.setTags({ userId });
   logger.debug('connect: websocket upgrade', { userId });
 

@@ -317,7 +317,20 @@ async function resolveUserFromAuth(
       });
     }
     const fromDb = scope ? db : readDb;
-    const user = await findUserById(authorizationValidationResult.kiloUserId, fromDb);
+    // Device access tokens carry a session id. A revoked session must stop
+    // authorizing normal web and API routes immediately, not at JWT expiry.
+    // Use the primary connection: revocation is a primary write, and a replica
+    // read could keep accepting the token until replication catches up.
+    const [user, deviceSessionActive] = await Promise.all([
+      findUserById(authorizationValidationResult.kiloUserId, fromDb),
+      authorizationValidationResult.deviceSessionId === undefined
+        ? true
+        : isActiveDeviceSession(
+            db,
+            authorizationValidationResult.deviceSessionId,
+            authorizationValidationResult.kiloUserId
+          ),
+    ]);
 
     if (
       user &&
@@ -331,14 +344,10 @@ async function resolveUserFromAuth(
       return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
     }
 
-    // Device access tokens carry a session id. A revoked session must stop
-    // authorizing normal web and API routes immediately, not at JWT expiry.
-    // Use the primary connection: revocation is a primary write, and a replica
-    // read could keep accepting the token until replication catches up.
     if (
       user &&
       authorizationValidationResult.deviceSessionId !== undefined &&
-      !(await isActiveDeviceSession(db, authorizationValidationResult.deviceSessionId, user.id))
+      !deviceSessionActive
     ) {
       return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
     }

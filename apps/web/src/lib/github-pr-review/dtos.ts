@@ -230,3 +230,16 @@ export const REVIEW_THREAD_COMMENTS_PAGE_SIZE = 50;
 // dropped and whatever was collected is returned (silent truncation).
 export const CONVERSATION_COMMENTS_PAGE_SIZE = 100;
 export const CONVERSATION_COMMENTS_MAX_PAGES = 5;
+// Per-thread review comments beyond the first page: at most 5 follow-up pages
+// of 50, so one thread shows its initial 50 plus at most 250 follow-up comments.
+// Past the ceiling the thread keeps what was collected (silent truncation),
+// matching the conversation-comment scan above.
+export const REVIEW_THREAD_COMMENTS_MAX_PAGES = 5;
+// One review-threads request shares this follow-up comment budget across every
+// thread on the page, so a pull request with many long threads cannot multiply
+// the retained response. Threads reached after the budget is spent keep their
+// initial page only.
+export const REVIEW_THREAD_COMMENTS_MAX_PER_REQUEST = 500;
+// Threads on one page are enriched with at most this many concurrent GitHub
+// requests.
+export const REVIEW_THREADS_ENRICHMENT_CONCURRENCY = 5;

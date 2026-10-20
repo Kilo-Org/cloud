@@ -1,8 +1,10 @@
 import 'server-only';
 
 import * as z from 'zod';
+import pLimit from 'p-limit';
 import { createHash } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
+import type { Octokit } from '@octokit/rest';
 import { and, eq } from 'drizzle-orm';
 
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
@@ -37,6 +39,10 @@ import {
   FILES_PAGE_SIZE,
   INBOX_PAGE_SIZE,
   REVIEW_THREADS_PAGE_SIZE,
+  REVIEW_THREAD_COMMENTS_MAX_PAGES,
+  REVIEW_THREAD_COMMENTS_MAX_PER_REQUEST,
+  REVIEW_THREAD_COMMENTS_PAGE_SIZE,
+  REVIEW_THREADS_ENRICHMENT_CONCURRENCY,
 } from '@/lib/github-pr-review/dtos';
 import { throwTrpcFromGraphQlErrors, withGitHubUserTokenRetry } from '@/lib/github-pr-review/retry';
 import { classifyGitHubHttpError } from '@/lib/github-pr-review/errors';
@@ -576,7 +582,16 @@ function normalizeReactions(groups: GraphQlReactionGroup[]) {
     .filter(r => r.count > 0);
 }
 
-function normalizeComment(node: GraphQlCommentNode) {
+type ReviewCommentDto = {
+  databaseId: number;
+  id: string;
+  body: string;
+  createdAt: string;
+  author: { login: string; avatarUrl: string } | null;
+  reactions: Array<{ content: string; count: number; viewerHasReacted: boolean }>;
+};
+
+function normalizeComment(node: GraphQlCommentNode): ReviewCommentDto {
   return {
     databaseId: node.databaseId,
     id: node.id,
@@ -617,22 +632,36 @@ export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
 export const normalizeReactions_FOR_TEST = normalizeReactions;
 export const normalizeComment_FOR_TEST = normalizeComment;
 
+// Follow-up comment budget for one review-threads request. `listReviewThreads`
+// creates one and hands it to every thread on the page, so the total number of
+// extra comments retained by a single call is fixed regardless of how many
+// threads the pull request carries.
+export type ThreadCommentBudget = { remainingFollowUpComments: number };
+
 export async function fetchAllThreadComments(args: {
   octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
   threadId: string;
   initialConnection: GraphQlCommentConnection;
-}): Promise<ReturnType<typeof normalizeComment>[]> {
-  const { octokit, threadId, initialConnection } = args;
-  const collected: ReturnType<typeof normalizeComment>[] =
-    initialConnection.nodes.map(normalizeComment);
+  budget: ThreadCommentBudget;
+}): Promise<ReviewCommentDto[]> {
+  const { octokit, threadId, initialConnection, budget } = args;
+  const collected: ReviewCommentDto[] = initialConnection.nodes.map(normalizeComment);
   let cursor: string | null = initialConnection.pageInfo.endCursor;
   let hasNext = initialConnection.pageInfo.hasNextPage;
-  // Follow the comment cursor until GitHub reports no next page, so DTO
-  // threads always carry the complete comment list (no silent truncation).
-  while (hasNext && cursor) {
+  // Follow the comment cursor page by page, bounded per thread (page count) and
+  // per request (the shared budget), so a long thread or a pull request full of
+  // long threads keeps the work and the response bounded. Past either ceiling
+  // the thread keeps what was collected.
+  for (let page = 1; page <= REVIEW_THREAD_COMMENTS_MAX_PAGES; page += 1) {
+    if (!hasNext || !cursor) break;
+    // Reserve the page's share before requesting it, so concurrent threads
+    // never fetch a page whose comments the budget can no longer hold.
+    const reserved = Math.min(REVIEW_THREAD_COMMENTS_PAGE_SIZE, budget.remainingFollowUpComments);
+    if (reserved <= 0) break;
+    budget.remainingFollowUpComments -= reserved;
     const response = (await octokit.request('POST /graphql', {
       query: REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
-      variables: { threadId, first: 50, after: cursor },
+      variables: { threadId, first: REVIEW_THREAD_COMMENTS_PAGE_SIZE, after: cursor },
     })) as {
       data: {
         data: { node: { comments: GraphQlCommentConnection } | null } | null;
@@ -641,12 +670,78 @@ export async function fetchAllThreadComments(args: {
     };
     throwTrpcFromGraphQlErrors(response.data.errors as never);
     const node = response.data.data?.node;
-    if (!node) break;
-    collected.push(...node.comments.nodes.map(normalizeComment));
+    if (!node) {
+      budget.remainingFollowUpComments += reserved;
+      break;
+    }
+    const nodes = node.comments.nodes.slice(0, reserved);
+    // A short page frees the unused part of the reservation.
+    budget.remainingFollowUpComments += reserved - nodes.length;
+    collected.push(...nodes.map(normalizeComment));
     hasNext = node.comments.pageInfo.hasNextPage;
     cursor = node.comments.pageInfo.endCursor;
   }
   return collected;
+}
+
+export type ReviewThreadEnrichment = {
+  id: string;
+  isResolved: boolean;
+  isOutdated: boolean;
+  subjectType: GraphQlReviewThreadNode['subjectType'];
+  path: string | null;
+  line: number | null;
+  startLine: number | null;
+  originalLine: number | null;
+  originalStartLine: number | null;
+  diffSide: GraphQlReviewThreadNode['diffSide'];
+  diffHunk: string | null;
+  comments: ReviewCommentDto[];
+};
+
+/**
+ * Attach every thread's comments to its node for one review-threads page.
+ * The threads share one follow-up comment budget, and at most
+ * `REVIEW_THREADS_ENRICHMENT_CONCURRENCY` GitHub requests are in flight, so a
+ * pull request with many long threads keeps both provider work and the
+ * response bounded. A thread reached after the budget is spent keeps its
+ * initial-page comments.
+ */
+export async function enrichReviewThreads(args: {
+  octokit: Octokit;
+  nodes: GraphQlReviewThreadNode[];
+}): Promise<ReviewThreadEnrichment[]> {
+  const { octokit, nodes } = args;
+  const budget: ThreadCommentBudget = {
+    remainingFollowUpComments: REVIEW_THREAD_COMMENTS_MAX_PER_REQUEST,
+  };
+  const limit = pLimit(REVIEW_THREADS_ENRICHMENT_CONCURRENCY);
+  return Promise.all(
+    nodes.map(node =>
+      limit(async () => {
+        const comments = await fetchAllThreadComments({
+          octokit,
+          threadId: node.id,
+          initialConnection: node.comments,
+          budget,
+        });
+        return {
+          id: node.id,
+          isResolved: node.isResolved,
+          isOutdated: node.isOutdated,
+          subjectType: node.subjectType,
+          path: node.path,
+          line: node.line,
+          startLine: node.startLine,
+          originalLine: node.originalLine,
+          originalStartLine: node.originalStartLine,
+          diffSide: node.diffSide,
+          diffHunk: node.comments.nodes[0]?.diffHunk ?? null,
+          comments,
+        };
+      })
+    )
+  );
 }
 
 async function fetchConversationCommentsPage(args: {
@@ -1771,29 +1866,7 @@ export const githubPrReviewRouter = createTRPCRouter({
             endCursor: null,
           });
         }
-        const threads = await Promise.all(
-          connection.nodes.map(async node => {
-            const comments = await fetchAllThreadComments({
-              octokit,
-              threadId: node.id,
-              initialConnection: node.comments,
-            });
-            return {
-              id: node.id,
-              isResolved: node.isResolved,
-              isOutdated: node.isOutdated,
-              subjectType: node.subjectType,
-              path: node.path,
-              line: node.line,
-              startLine: node.startLine,
-              originalLine: node.originalLine,
-              originalStartLine: node.originalStartLine,
-              diffSide: node.diffSide,
-              diffHunk: node.comments.nodes[0]?.diffHunk ?? null,
-              comments,
-            };
-          })
-        );
+        const threads = await enrichReviewThreads({ octokit, nodes: connection.nodes });
         return buildReviewThreadsResult({
           threads: threads as never,
           conversation,

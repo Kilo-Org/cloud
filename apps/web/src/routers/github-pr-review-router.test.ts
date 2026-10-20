@@ -807,6 +807,116 @@ describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction f
   });
 });
 
+describe('githubPrReviewRouter.listReviewThreads comment pagination bounds', () => {
+  const PAGE_SIZE = 50;
+
+  function reviewComment(databaseId: number) {
+    return {
+      databaseId,
+      id: `PRRC_${databaseId}`,
+      body: `comment ${databaseId}`,
+      createdAt: '2024-01-01T00:00:00Z',
+      author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
+      reactionGroups: [],
+    };
+  }
+
+  it('caps follow-up pages and total follow-up comments for one request', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    let followUpRequests = 0;
+
+    buildOctokit('t1').request.mockImplementation(
+      async (_path: string, body: { query: string; variables?: Record<string, unknown> }) => {
+        if (body.query.includes('PrReviewConversationComments')) {
+          return {
+            data: {
+              data: {
+                repository: {
+                  pullRequest: {
+                    comments: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                  },
+                },
+              },
+            },
+          };
+        }
+        if (body.query.includes('PrReviewThreadComments')) {
+          followUpRequests += 1;
+          const threadId = String(body.variables?.threadId ?? 'thread');
+          return {
+            data: {
+              data: {
+                node: {
+                  comments: {
+                    // The provider always reports another full page.
+                    pageInfo: { hasNextPage: true, endCursor: `${threadId}-${followUpRequests}` },
+                    nodes: Array.from({ length: PAGE_SIZE }, (_, index) =>
+                      reviewComment(100000 + followUpRequests * PAGE_SIZE + index)
+                    ),
+                  },
+                },
+              },
+            },
+          };
+        }
+        return {
+          data: {
+            data: {
+              repository: {
+                pullRequest: {
+                  reviewThreads: {
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    nodes: Array.from({ length: PAGE_SIZE }, (_, threadIndex) => ({
+                      id: `PRRT_${threadIndex}`,
+                      isResolved: false,
+                      isOutdated: false,
+                      subjectType: 'LINE',
+                      path: `src/file-${threadIndex}.ts`,
+                      line: threadIndex + 1,
+                      startLine: null,
+                      originalLine: null,
+                      originalStartLine: null,
+                      diffSide: 'RIGHT',
+                      comments: {
+                        pageInfo: { hasNextPage: true, endCursor: `initial-${threadIndex}` },
+                        nodes: Array.from({ length: PAGE_SIZE }, (_, index) =>
+                          reviewComment(threadIndex * 1000 + index + 1)
+                        ),
+                      },
+                    })),
+                  },
+                },
+              },
+            },
+          },
+        };
+      }
+    );
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      direction: 'forward',
+    });
+
+    const threads = result.threads as Array<{ comments: unknown[] }>;
+    expect(threads).toHaveLength(PAGE_SIZE);
+    // 500 follow-up comments per request at 50 per page.
+    expect(followUpRequests).toBe(10);
+    const followUpComments = threads.reduce(
+      (total: number, thread) => total + thread.comments.length - PAGE_SIZE,
+      0
+    );
+    expect(followUpComments).toBe(500);
+    // Every thread keeps its initial page; threads reached after the shared
+    // budget is spent carry no follow-up comments.
+    expect(threads.every(thread => thread.comments.length >= PAGE_SIZE)).toBe(true);
+    expect(threads.some(thread => thread.comments.length === PAGE_SIZE)).toBe(true);
+  });
+});
+
 describe('githubPrReviewRouter.listReviewThreads conversation comments', () => {
   const emptyThreads = {
     nodes: [] as unknown[],

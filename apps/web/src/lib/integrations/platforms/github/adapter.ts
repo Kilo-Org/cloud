@@ -180,6 +180,31 @@ type GitHubBranch = {
   isDefault: boolean;
 };
 
+const LISTING_PAGE_SIZE = 100;
+// One listing call performs at most this many provider page requests and keeps
+// at most `pages × LISTING_PAGE_SIZE` rows. Past the ceiling the remainder is
+// dropped and the call logs a warning, the same bounded-scan convention the
+// capped review scans use.
+const MAX_REPOSITORY_PAGES = 50; // 5,000 repositories
+const MAX_BRANCH_PAGES = 10; // 1,000 branches
+
+async function collectListingPages<T>(params: {
+  maxPages: number;
+  scope: string;
+  fetchPage: (page: number) => Promise<T[]>;
+}): Promise<T[]> {
+  const collected: T[] = [];
+  for (let page = 1; page <= params.maxPages; page += 1) {
+    const items = await params.fetchPage(page);
+    collected.push(...items);
+    if (items.length < LISTING_PAGE_SIZE) return collected;
+  }
+  warnExceptInTest(
+    `GitHub ${params.scope} reached the ${params.maxPages}-page ceiling; returning the first ${collected.length} entries`
+  );
+  return collected;
+}
+
 export async function fetchGitHubRepositories(
   installationId: string,
   appType: GitHubAppType = 'standard',
@@ -194,33 +219,23 @@ export async function fetchGitHubRepositories(
   );
   const octokit = new Octokit({ auth: tokenData.token });
 
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  const perPage = 100;
+  const repositories = await collectListingPages({
+    maxPages: MAX_REPOSITORY_PAGES,
+    scope: 'repository listing',
+    fetchPage: async page =>
+      (await octokit.apps.listReposAccessibleToInstallation({ per_page: LISTING_PAGE_SIZE, page }))
+        .data.repositories,
+  });
 
-  while (true) {
-    const { data } = await octokit.apps.listReposAccessibleToInstallation({
-      per_page: 100,
-      page,
-    });
-
-    repositories.push(
-      ...data.repositories
-        .filter(repo => !repo.archived)
-        .map(repo => ({
-          id: repo.id,
-          name: repo.name,
-          full_name: repo.full_name,
-          private: repo.private,
-          created_at: repo.created_at ?? new Date().toISOString(),
-        }))
-    );
-
-    if (data.repositories.length < perPage) break;
-    page++;
-  }
-
-  return repositories;
+  return repositories
+    .filter(repository => !repository.archived)
+    .map(repository => ({
+      id: repository.id,
+      name: repository.name,
+      full_name: repository.full_name,
+      private: repository.private,
+      created_at: repository.created_at ?? new Date().toISOString(),
+    }));
 }
 
 export async function fetchGitHubRepositoriesForMaintenance(
@@ -229,25 +244,23 @@ export async function fetchGitHubRepositoriesForMaintenance(
 ): Promise<GitHubRepository[]> {
   const tokenData = await generateGitHubInstallationTokenForMaintenance(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  while (true) {
-    const response = await octokit.apps.listReposAccessibleToInstallation({ per_page: 100, page });
-    repositories.push(
-      ...response.data.repositories
-        .filter(repository => !repository.archived)
-        .map(repository => ({
-          id: repository.id,
-          name: repository.name,
-          full_name: repository.full_name,
-          private: repository.private,
-          created_at: repository.created_at ?? new Date().toISOString(),
-        }))
-    );
-    if (response.data.repositories.length < 100) break;
-    page += 1;
-  }
-  return repositories;
+  const repositories = await collectListingPages({
+    maxPages: MAX_REPOSITORY_PAGES,
+    scope: 'maintenance repository listing',
+    fetchPage: async page =>
+      (await octokit.apps.listReposAccessibleToInstallation({ per_page: LISTING_PAGE_SIZE, page }))
+        .data.repositories,
+  });
+
+  return repositories
+    .filter(repository => !repository.archived)
+    .map(repository => ({
+      id: repository.id,
+      name: repository.name,
+      full_name: repository.full_name,
+      private: repository.private,
+      created_at: repository.created_at ?? new Date().toISOString(),
+    }));
 }
 
 export async function fetchGitHubBranches(
@@ -273,30 +286,17 @@ export async function fetchGitHubBranches(
   });
   const defaultBranch = repoData.default_branch;
 
-  const branches: GitHubBranch[] = [];
-  let page = 1;
-  const perPage = 100;
+  const branches = await collectListingPages({
+    maxPages: MAX_BRANCH_PAGES,
+    scope: `branch listing for ${repositoryFullName}`,
+    fetchPage: async page =>
+      (await octokit.repos.listBranches({ owner, repo, per_page: LISTING_PAGE_SIZE, page })).data,
+  });
 
-  while (true) {
-    const { data } = await octokit.repos.listBranches({
-      owner,
-      repo,
-      per_page: perPage,
-      page,
-    });
-
-    branches.push(
-      ...data.map(branch => ({
-        name: branch.name,
-        isDefault: branch.name === defaultBranch,
-      }))
-    );
-
-    if (data.length < perPage) break;
-    page++;
-  }
-
-  return branches;
+  return branches.map(branch => ({
+    name: branch.name,
+    isDefault: branch.name === defaultBranch,
+  }));
 }
 
 export async function fetchGitHubInstallationDetails(

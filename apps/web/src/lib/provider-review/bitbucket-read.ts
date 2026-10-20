@@ -1020,7 +1020,11 @@ export async function listInbox(
     // continues below the boundary — or when the merged order already reaches
     // past this window.
     const hasMore = repositoryPageFull || beyondWindow;
-    const boundary = window.length > 0 ? inboxBoundaryValue(window[window.length - 1]) : null;
+    let boundary: string | null = null;
+    for (let index = window.length - 1; index >= 0; index -= 1) {
+      boundary = inboxBoundaryValue(window[index]);
+      if (boundary !== null) break;
+    }
     // The rows at the boundary value are recorded by ref alongside it.
     const servedRefs =
       boundary === null
@@ -1038,20 +1042,22 @@ export async function listInbox(
   }
 }
 
+/** The row's `updated_on` in milliseconds, including any sub-millisecond digits. */
 function inboxUpdatedMs(item: ProviderPrInboxItem): number {
   const ms = Date.parse(item.updatedAt);
-  return Number.isNaN(ms) ? 0 : ms;
+  if (Number.isNaN(ms)) return 0;
+  const fraction = /\.(\d+)/.exec(item.updatedAt)?.[1] ?? '';
+  return fraction.length > 3 ? ms + Number(fraction.slice(3)) / 10 ** (fraction.length - 3) : ms;
 }
 
 /**
- * The provider filter value of a row's `updated_on`: millisecond ISO-8601 in
- * UTC, the form the provider's query language documents. A row without a
- * parseable timestamp has no boundary and can only be served last.
+ * The provider filter value of a row's `updated_on`: the provider's own
+ * timestamp string, so its full precision carries into the continuation. A
+ * row without a parseable timestamp has no boundary.
  */
 function inboxBoundaryValue(item: ProviderPrInboxItem): string | null {
-  const ms = Date.parse(item.updatedAt);
-  if (Number.isNaN(ms)) return null;
-  return new Date(ms).toISOString().replace('Z', '+00:00');
+  if (Number.isNaN(Date.parse(item.updatedAt))) return null;
+  return item.updatedAt;
 }
 
 /** The inbox rows of one provider page, minus the rows an earlier page served. */

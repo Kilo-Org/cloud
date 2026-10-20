@@ -950,6 +950,13 @@ describe('listInbox', () => {
   type InboxRow = { updated_on: string };
   type InboxRequest = { slug: string; query: string | null; page: string | null };
 
+  /** A provider timestamp in milliseconds, including sub-millisecond digits. */
+  const inboxTime = (value: string) => {
+    const ms = Date.parse(value);
+    const fraction = /\.(\d+)/.exec(value)?.[1] ?? '';
+    return fraction.length > 3 ? ms + Number(fraction.slice(3)) / 10 ** (fraction.length - 3) : ms;
+  };
+
   /**
    * The workspace inbox as the provider serves it: each repository answers
    * with its rows at or below the requested boundary, newest first, one page.
@@ -974,10 +981,10 @@ describe('listInbox', () => {
       const query = parsed.searchParams.get('q');
       requests.push({ slug: match[1], query, page: parsed.searchParams.get('page') });
       const boundary = query?.match(/^state="OPEN" AND updated_on <= (.+)$/);
-      const boundaryMs = boundary ? Date.parse(boundary[1]) : null;
+      const boundaryMs = boundary ? inboxTime(boundary[1]) : null;
       const eligible = rows
-        .filter(row => boundaryMs === null || Date.parse(row.updated_on) <= boundaryMs)
-        .sort((left, right) => Date.parse(right.updated_on) - Date.parse(left.updated_on));
+        .filter(row => boundaryMs === null || inboxTime(row.updated_on) <= boundaryMs)
+        .sort((left, right) => inboxTime(right.updated_on) - inboxTime(left.updated_on));
       return jsonResponse({
         pagelen: 50,
         values: eligible.slice(0, 50),
@@ -1071,7 +1078,7 @@ describe('listInbox', () => {
     expect(requests).toHaveLength(2);
     expect(requests[1]).toMatchObject({
       slug: 'repo',
-      query: 'state="OPEN" AND updated_on <= 2026-09-02T00:10:00.000+00:00',
+      query: 'state="OPEN" AND updated_on <= 2026-09-02T00:10:00+00:00',
       page: '1',
     });
     expect(second.items).toHaveLength(10);
@@ -1082,6 +1089,41 @@ describe('listInbox', () => {
       item.ref && 'prId' in item.ref ? [item.ref.prId] : []
     );
     expect(new Set(served).size).toBe(60);
+  });
+
+  it('continues past a boundary that carries microseconds', async () => {
+    // The window ends on a timestamp inside the second's millisecond group; the
+    // row in the same millisecond from another repository still follows.
+    const requests: InboxRequest[] = [];
+    serveInbox(
+      {
+        'repo-a': [
+          inboxPr(300, '2026-09-02T00:00:02.400902+00:00', 'acme/repo-a'),
+          inboxPr(301, '2026-09-02T00:00:02.400500+00:00', 'acme/repo-a'),
+        ],
+        'repo-b': Array.from({ length: 49 }, (_, index) =>
+          inboxPr(400 + index, `2026-09-02T00:02:${String(index).padStart(2, '0')}.900100+00:00`)
+        ),
+      },
+      requests
+    );
+
+    const first = await listInbox(ORG_OWNER);
+    expect(first.items).toHaveLength(50);
+    expect(first.items[49]?.ref).toMatchObject({ prId: 300 });
+
+    const second = await listInbox(ORG_OWNER, first.nextCursor!);
+    expect(requests).toHaveLength(4);
+    expect(
+      requests.filter(
+        request =>
+          request.query === 'state="OPEN" AND updated_on <= 2026-09-02T00:00:02.400902+00:00'
+      )
+    ).toHaveLength(2);
+    expect(
+      second.items.map(item => (item.ref && 'prId' in item.ref ? item.ref.prId : null))
+    ).toEqual([301]);
+    expect(second.nextCursor).toBeNull();
   });
 
   it('continues several repositories across pages', async () => {

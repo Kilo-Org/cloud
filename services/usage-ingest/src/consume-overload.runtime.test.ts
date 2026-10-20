@@ -74,7 +74,8 @@ it('reports writer overload as a workerd queue exception while retaining individ
         structuredLogsHandler: (log: unknown) => logs.push(log),
       },
     });
-    await worker.ready;
+    // ready only waits for Wrangler's proxy, so observe the production Worker before using its runtime.
+    expect((await worker.fetch('http://usage-ingest.test/')).status).toBe(404);
     // Wrangler's direct queue helper targets its HTTP proxy rather than the local runtime.
     const runtime = worker.raw.runtimes.find(runtime => runtime.mf)?.mf;
     if (!runtime) throw new Error('Expected local workerd runtime');

@@ -820,16 +820,16 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         observedActivity.observationFailureSince() !== unhealthySince
       )
         return;
-      if (!answered) {
-        await restartHung('health_probe_false', decisionResolution);
-        return;
-      }
       const now = scheduler.now();
       if (
         now - unhealthySince < 2 * timers.sseReconnectWindowMs &&
         observedActivity.hasRecentProgress(timers.sseSilenceMs)
       )
         return;
+      if (!answered) {
+        await restartHung('health_probe_false', decisionResolution);
+        return;
+      }
       await restartHung('activity_observation');
     });
   }

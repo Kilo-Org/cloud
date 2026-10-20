@@ -739,18 +739,22 @@ covers owned and discovered directories, status, in-flight parts and pending int
 newer stream observations fence older snapshots. Reconnecting to the same process preserves
 execution clocks. Failed/partial observations preserve known activity briefly and suspend
 inactivity decisions. If observations cannot be recovered within the existing 2-minute
-window, the runtime sends the existing bounded health request. A failed health probe uses
-the genuine-hang recovery path. A healthy probe and meaningful assistant/tool progress
-within the last 30 seconds permit continued snapshot retries, with health and progress
-rechecked on each 5-second watchdog tick. This extension ends no later than 4 minutes
-from the original observation failure; progress and heartbeats never move that deadline.
-A healthy runtime without recent meaningful progress, or with observations still failed
-at that bound, restarts with an activity-observation trigger, not proof of unresponsiveness.
-A successful snapshot ends the observation episode. The existing memory hold takes precedence,
-including its bounded expiry and out-of-memory outcome. Snapshot and abort requests,
-late events and callbacks are fenced by process/feed identity and cancelled on retirement.
-Credential replacement uses the same native activity plus the existing Cloud-work and PTY
-protections.
+window, the runtime sends the existing bounded health request. A failed, timed-out or aborted
+health probe must not restart a runtime that has meaningful assistant/tool progress within the
+last 30 seconds while the original observation failure is younger than 4 minutes. Without that
+recent meaningful progress, a failed probe keeps the genuine-hang path (`health_probe_false`,
+`agent_unresponsive`). A healthy probe and meaningful assistant/tool progress within the last
+30 seconds permit continued snapshot retries, with health and progress rechecked on each
+5-second watchdog tick. This bounded recovery ends no later than 4 minutes from the original
+observation failure; progress and heartbeats never move that deadline. A healthy runtime
+without recent meaningful progress, or observations still failed at that bound, restarts with
+an activity-observation trigger. That bound keeps the same activity-observation restart even
+when a bounded health probe timed out, and it is not proof that health answered or that Kilo
+was unresponsive. A successful snapshot ends the observation episode. The existing memory hold
+takes precedence, including its bounded expiry and out-of-memory outcome. Snapshot and abort
+requests, late events and callbacks are fenced by process/feed identity and cancelled on
+retirement. Credential replacement uses the same native activity plus the existing Cloud-work
+and PTY protections.
 
 
 - SSE silence for 30 s: send one health request (`GET /global/health`, 5 s timeout). No answer:
@@ -792,8 +796,9 @@ protections.
   (Kilo stores messages by ID). No real progress means no tool events, so no tool work repeats. A
   turn with real progress, or one already submitted again, gets `failed`: `sandbox_out_of_memory`
   after a hang restart that ends an expired memory hold, `agent_unresponsive` after any other hang
-  restart except one for exhausted activity capacity or healthy failed activity observation,
-  otherwise `agent_restarted`.
+  restart except one for exhausted activity capacity or bounded activity-observation recovery,
+  otherwise `agent_restarted`. Activity-observation recovery does not claim that health answered,
+  even when a bounded probe timed out.
 - That recovery selection occurs only in the restart-completion turn transition. It invalidates
   the retired submission chain and rebuilds the existing inbox in original message order, without
   waiting for held retired HTTP results. Restart-caused transport rejection is recognized by the

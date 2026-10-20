@@ -122,13 +122,16 @@ repository.
    hang restart that ends an expired hold MUST say that the sandbox ran out of
    memory. A turn failed by another hang restart MUST say that Kilo was not
    responding, unless the restart was for exhausted activity-tracking capacity
-   or failed activity observation while Kilo still answered. After two minutes
-   of failed observation, a healthy probe plus real progress within 30 seconds
-   MUST permit continued recovery for at most two more minutes. Health and
-   progress MUST be rechecked during recovery; heartbeats MUST NOT extend it.
-   A healthy runtime that still cannot be observed at that bound, or no longer
-   has recent real progress, MUST use bounded restart recovery without claiming
-   that Kilo was unresponsive. The existing memory hold MUST retain precedence.
+   or bounded activity-observation recovery. After two minutes of failed
+   observation, real progress within 30 seconds MUST permit continued recovery
+   for at most two more minutes, even when a bounded health probe failed, timed
+   out or was aborted. A failed probe without that recent real progress MUST
+   retain the not-responding failure. Health and progress MUST be rechecked
+   during recovery; heartbeats MUST NOT extend it. A healthy probe without
+   recent real progress MUST use bounded activity-observation recovery without
+   claiming that Kilo was unresponsive. The original four-minute bound MUST also
+   use that activity-observation recovery, even when a bounded probe timed out.
+   The existing memory hold MUST retain precedence.
    The separate 120-minute execution cap MUST include user waits. Native
    cancellation MUST be bounded and confirmed; unconfirmed cancellation MUST
    use bounded runtime recovery. Accepted Cloud messages MUST settle once;

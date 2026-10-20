@@ -1619,6 +1619,121 @@ describe('Kilo observation recovery', () => {
     }
   });
 
+  it('keeps a progressing turn through a bounded health timeout inside the original ceiling', async () => {
+    const h = await fixture(20);
+    try {
+      h.probe.set(() => new Promise(() => undefined));
+      h.event('message.part.updated', {
+        part: {
+          id: 'tool',
+          sessionID: 'ses_observation',
+          messageID: 'assistant',
+          type: 'tool',
+          state: { status: 'running', output: '' },
+        },
+      });
+      h.scheduler.advance(120_000);
+      h.event('message.part.updated', {
+        part: {
+          id: 'tool',
+          sessionID: 'ses_observation',
+          messageID: 'assistant',
+          type: 'tool',
+          state: { status: 'completed', output: 'done' },
+        },
+      });
+      h.scheduler.fire();
+      await Bun.sleep(30);
+      expect(h.probe.calls.count).toBe(1);
+      expect(h.spawner.processes[0]!.stopped).toBe(0);
+      expect(h.spawner.spawnCount()).toBe(1);
+      expect(h.outcomes()).toEqual([]);
+
+      for (let index = 0; index < 23; index++) {
+        h.scheduler.advance(5_000);
+        h.event('message.part.updated', {
+          part: {
+            id: `tool-${index}`,
+            sessionID: 'ses_observation',
+            messageID: 'assistant',
+            type: 'tool',
+            state: { status: 'running', output: `step ${index}` },
+          },
+        });
+        h.scheduler.fire();
+        await waitFor(() => h.probe.calls.count === index + 2);
+        await Bun.sleep(30);
+        expect(h.spawner.processes[0]!.stopped).toBe(0);
+      }
+      expect(h.outcomes()).toEqual([]);
+
+      h.scheduler.advance(5_000);
+      h.event('message.part.updated', {
+        part: {
+          id: 'tool-final',
+          sessionID: 'ses_observation',
+          messageID: 'assistant',
+          type: 'tool',
+          state: { status: 'running', output: 'final' },
+        },
+      });
+      h.scheduler.fire();
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.spawner.processes[0]!.stopped).toBe(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_restarted' });
+      expect(h.logs.some(message => message.includes('"trigger":"activity_observation"'))).toBe(
+        true
+      );
+      expect(h.logs.some(message => message.includes('"trigger":"health_probe_false"'))).toBe(
+        false
+      );
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it('fails a stale progressing turn on a failed probe inside the original ceiling', async () => {
+    const h = await fixture(20);
+    try {
+      h.probe.set(() => new Promise(() => undefined));
+      h.event('message.part.updated', {
+        part: {
+          id: 'tool',
+          sessionID: 'ses_observation',
+          messageID: 'assistant',
+          type: 'tool',
+          state: { status: 'running', output: '' },
+        },
+      });
+      h.scheduler.advance(120_000);
+      h.event('message.part.updated', {
+        part: {
+          id: 'tool',
+          sessionID: 'ses_observation',
+          messageID: 'assistant',
+          type: 'tool',
+          state: { status: 'completed', output: 'done' },
+        },
+      });
+      h.scheduler.fire();
+      await waitFor(() => h.probe.calls.count === 1);
+      await Bun.sleep(30);
+      expect(h.spawner.processes[0]!.stopped).toBe(0);
+      expect(h.outcomes()).toEqual([]);
+
+      await h.tick(30_001, false);
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.probe.calls.count).toBe(2);
+      expect(h.spawner.processes[0]!.stopped).toBe(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_unresponsive' });
+      expect(h.logs.some(message => message.includes('"trigger":"health_probe_false"'))).toBe(true);
+    } finally {
+      await h.dispose();
+    }
+  });
+
   it('bounds permanent observation failure at four minutes despite healthy progress', async () => {
     const h = await fixture();
     try {
@@ -1736,14 +1851,14 @@ describe('Kilo observation recovery', () => {
   });
 
   it.each([false, 'reject'] as const)(
-    'retains genuine-hang handling when the observation health probe returns %s',
+    'retains genuine-hang handling when the observation health probe returns %s without recent progress',
     async answer => {
       const h = await fixture();
       try {
         h.probe.set(
           answer === 'reject' ? () => Promise.reject(new Error('Synthetic probe failure')) : answer
         );
-        await h.tick(120_000, answer !== false);
+        await h.tick(120_000, false);
         await waitFor(() => h.outcomes().length === 1);
         expect(h.probe.calls.count).toBe(1);
         expect(h.spawner.processes[0].stopped).toBe(1);
@@ -1758,32 +1873,33 @@ describe('Kilo observation recovery', () => {
     }
   );
 
-  it('rechecks runtime health during the extension even while progress events arrive', async () => {
+  it('rechecks runtime health during the extension without failing a progressing turn', async () => {
     const h = await fixture();
     try {
       await h.tick(120_000);
       expect(h.outcomes()).toEqual([]);
       h.probe.set(false);
       await h.tick();
-      await waitFor(() => h.outcomes().length === 1);
-      expect(h.probe.calls.count).toBe(2);
-      expect(h.spawner.processes[0].stopped).toBe(1);
-      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_unresponsive' });
+      await waitFor(() => h.probe.calls.count === 2);
+      await Bun.sleep(1);
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      expect(h.outcomes()).toEqual([]);
     } finally {
       await h.dispose();
     }
   });
 
-  it('bounds a hung observation health probe and emits one genuine-hang outcome', async () => {
+  it('bounds a hung observation health probe without recent progress', async () => {
     const h = await fixture(20);
     try {
       h.probe.set(() => new Promise(() => undefined));
-      await h.tick(120_000);
+      await h.tick(120_000, false);
       await waitFor(() => h.outcomes().length === 1);
       expect(h.probe.calls.count).toBe(1);
       expect(h.spawner.processes[0].stopped).toBe(1);
       expect(h.spawner.spawnCount()).toBe(2);
       expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_unresponsive' });
+      expect(h.logs.some(message => message.includes('"trigger":"health_probe_false"'))).toBe(true);
     } finally {
       await h.dispose();
     }

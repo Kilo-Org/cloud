@@ -1,10 +1,9 @@
 import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage, StoredSession } from '../types';
 import { getChatDisplayTitle } from '../utils/session-title';
-import type { LocalSessionRequest } from './local-session-request';
+import type { LocalSessionAttempt, LocalSessionRequest } from './local-session-request';
 
-/** The ids one create request sends; a retry of the same request reuses both. */
-export type LocalSessionAttempt = { kiloSessionId: string; operationKey: string };
+export type { LocalSessionAttempt } from './local-session-request';
 
 export type LocalSessionSync =
   | { state: 'syncing' }

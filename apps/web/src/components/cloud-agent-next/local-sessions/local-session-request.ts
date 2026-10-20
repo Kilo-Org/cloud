@@ -1,7 +1,9 @@
 import type { TRPCClient } from '@trpc/client';
 import type { inferRouterInputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
-import type { LocalSessionAttempt } from './local-session';
+
+/** The ids one create request sends; a retry of the same request reuses both. */
+export type LocalSessionAttempt = { kiloSessionId: string; operationKey: string };
 
 type RouterInputs = inferRouterInputs<RootRouter>;
 type WithoutAttempt<Input> = Input extends unknown ? Omit<Input, keyof LocalSessionAttempt> : never;

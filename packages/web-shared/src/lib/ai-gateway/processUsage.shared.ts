@@ -134,10 +134,17 @@ export function extractVercelGenerationTime(
  * apart from a closed or reset socket.
  */
 export function getUpstreamBodyTermination(error: unknown): 'timeout' | 'disconnect' | null {
-  if (!(error instanceof Error) || error.name !== 'TypeError' || error.message !== 'terminated') {
+  if (
+    typeof error !== 'object' ||
+    error === null ||
+    !('name' in error) ||
+    !('message' in error) ||
+    error.name !== 'TypeError' ||
+    error.message !== 'terminated'
+  ) {
     return null;
   }
-  const cause: unknown = error.cause;
+  const cause = 'cause' in error ? error.cause : undefined;
   const causeCode =
     typeof cause === 'object' && cause !== null && 'code' in cause ? cause.code : undefined;
   return causeCode === 'UND_ERR_BODY_TIMEOUT' ? 'timeout' : 'disconnect';

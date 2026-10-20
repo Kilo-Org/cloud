@@ -18,6 +18,7 @@ jest.mock('next/server', () => ({
 
 const originalFetch = global.fetch;
 const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+const originalNodeEnv = process.env.NODE_ENV;
 
 const PUBLIC_IP_URL = 'https://104.18.2.115/v1';
 
@@ -82,11 +83,12 @@ describe('upstreamRequest upstream URL policy', () => {
   afterEach(() => {
     global.fetch = originalFetch;
     restoreEnvironmentVariable('VERCEL_TARGET_ENV', originalTargetEnv);
+    restoreEnvironmentVariable('NODE_ENV', originalNodeEnv);
   });
 
-  describe('in staging', () => {
+  describe.each(['production', 'staging', 'preview'])('deployment selection: %s', targetEnv => {
     beforeEach(() => {
-      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_TARGET_ENV = targetEnv;
     });
 
     it('sends to a public HTTPS upstream without following redirects', async () => {
@@ -184,19 +186,17 @@ describe('upstreamRequest upstream URL policy', () => {
     });
   });
 
-  it.each(['production', 'preview', 'development', undefined])(
-    'preserves the rollout: %s',
-    async targetEnv => {
-      restoreEnvironmentVariable('VERCEL_TARGET_ENV', targetEnv);
-      const fetchMock = mockFetch();
+  it.each(['development', undefined])('preserves the rollout: %s', async targetEnv => {
+    restoreEnvironmentVariable('VERCEL_TARGET_ENV', targetEnv);
+    restoreEnvironmentVariable('NODE_ENV', 'development');
+    const fetchMock = mockFetch();
 
-      const result = await send(directProvider('http://localhost:8080/v1'));
+    const result = await send(directProvider('http://localhost:8080/v1'));
 
-      expect(result.type).toBe('success');
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toBe('http://localhost:8080/v1/chat/completions');
-      expect(init?.redirect).toBe('follow');
-      expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
-    }
-  );
+    expect(result.type).toBe('success');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/chat/completions');
+    expect(init?.redirect).toBe('follow');
+    expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
+  });
 });

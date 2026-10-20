@@ -35,11 +35,11 @@ const DNS_LOOKUP_TIMEOUT_MS = 2_000;
 const approvedHostnames = new Map<string, { addresses: string[]; expiresAt: number }>();
 
 /**
- * The staging deployment exercises this policy before a broader rollout.
- * Activation is controlled by `VERCEL_TARGET_ENV`, independently of build mode.
+ * Active in deployed environments. Local development uses the development
+ * target, or the development runtime when no deployment target is supplied.
  */
 export function isUpstreamUrlPolicyEnforced(): boolean {
-  return process.env.VERCEL_TARGET_ENV === 'staging';
+  return (process.env.VERCEL_TARGET_ENV ?? process.env.NODE_ENV) !== 'development';
 }
 
 async function resolveWithSystemResolver(hostname: string): Promise<string[]> {

@@ -43,6 +43,7 @@ function onlyFetchCall(fetchMock: Mock<typeof fetch>) {
 describe('handleSecureProxyRequest', () => {
   beforeEach(() => {
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
+    vi.stubEnv('VERCEL_TARGET_ENV', 'development');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -52,6 +53,7 @@ describe('handleSecureProxyRequest', () => {
     global.fetch = originalFetch;
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it.each([
@@ -212,11 +214,11 @@ function setTargetEnvironment(value: string | undefined): void {
   else process.env.VERCEL_TARGET_ENV = value;
 }
 
-describe('handleSecureProxyRequest with the URL policy enforced', () => {
+describe.each(['production', 'staging', 'preview'])('deployment selection: %s', targetEnv => {
   const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
 
   beforeEach(() => {
-    process.env.VERCEL_TARGET_ENV = 'staging';
+    process.env.VERCEL_TARGET_ENV = targetEnv;
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -228,6 +230,7 @@ describe('handleSecureProxyRequest with the URL policy enforced', () => {
     global.fetch = originalFetch;
     setTargetEnvironment(originalTargetEnv);
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -263,19 +266,17 @@ describe('handleSecureProxyRequest with the URL policy enforced', () => {
     expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBe(upstreamDispatcher());
   });
 
-  it.each(['production', 'preview', 'development', undefined])(
-    'preserves the rollout: %s',
-    async targetEnv => {
-      setTargetEnvironment(targetEnv);
-      const fetchMock = mockUpstream(new Response('{"ok":true}'));
+  it.each(['development', undefined])('preserves the rollout: %s', async targetEnv => {
+    setTargetEnvironment(targetEnv);
+    vi.stubEnv('NODE_ENV', 'development');
+    const fetchMock = mockUpstream(new Response('{"ok":true}'));
 
-      const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));
+    const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));
 
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ ok: true });
-      expect(policyCheck).not.toHaveBeenCalled();
-      const { init } = onlyFetchCall(fetchMock);
-      expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
-    }
-  );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(policyCheck).not.toHaveBeenCalled();
+    const { init } = onlyFetchCall(fetchMock);
+    expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
+  });
 });

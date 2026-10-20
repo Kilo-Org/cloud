@@ -228,15 +228,18 @@ describe('isUpstreamUrlPolicyEnforced', () => {
   });
 
   test.each([
-    ['production', false],
-    ['staging', true],
-    ['preview', false],
-    [undefined, false],
-    ['development', false],
-    ['test', false],
-  ])('applies the rollout selection: %s', (targetEnv, enforced) => {
-    if (targetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
-    else process.env.VERCEL_TARGET_ENV = targetEnv;
+    ['production', 'production', true],
+    ['staging', 'production', true],
+    ['preview', 'production', true],
+    ['preview', 'development', true],
+    ['development', 'production', false],
+    [undefined, 'development', false],
+    [undefined, 'production', true],
+    [undefined, 'test', true],
+    [undefined, undefined, true],
+  ] as const)('applies environment selection: %s / %s', (targetEnv, nodeEnv, enforced) => {
+    vi.stubEnv('VERCEL_TARGET_ENV', targetEnv);
+    vi.stubEnv('NODE_ENV', nodeEnv);
 
     expect(isUpstreamUrlPolicyEnforced()).toBe(enforced);
   });

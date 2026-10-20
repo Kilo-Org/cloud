@@ -187,7 +187,7 @@ patchedDependencies:
   expo-server-sdk: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
   expo-task-manager@58.0.11: 05751bac2af36f12610d6f5ac31c99cacf897d842d26a3f14f48d4ee36ad7866
   expo-widgets@58.0.17: 460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42
-  llama.rn@0.12.9: a1e6f733db40822a9a08d6eb4d543807e2432d7c1444d94658036309fc5c7847
+  llama.rn@0.12.9: 62dce8190ea1c3bfe58fe2ab460927672af84bea3a32dcf566e92015ad13bd67
   react-native-appsflyer@7.0.2-v2: 7affcf3da23038fe6874ab68124824cb9e56d5ea8336611869b97d30fb1716b7
   react-native-css@3.0.7: 5da5211f36064faa7a2637adbac34046be8c01413d8b897396076f950f164561
   react-native@0.88.0: 669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c
@@ -537,7 +537,7 @@ importers:
         version: 1.5.2(@types/react@19.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@sentry/react-native':
         specifier: ~8.29.0
-        version: 8.29.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
+        version: 8.29.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(@babel/runtime@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -714,7 +714,7 @@ importers:
         version: 2.20.3(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.3.0)(react@19.3.0)
       llama.rn:
         specifier: 0.12.9
-        version: 0.12.9(patch_hash=a1e6f733db40822a9a08d6eb4d543807e2432d7c1444d94658036309fc5c7847)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        version: 0.12.9(patch_hash=62dce8190ea1c3bfe58fe2ab460927672af84bea3a32dcf566e92015ad13bd67)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       lowlight:
         specifier: 3.3.0
         version: 3.3.0
@@ -27997,7 +27997,7 @@ snapshots:
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.69.0
 
-  '@sentry/react-native@8.29.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
+  '@sentry/react-native@8.29.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 57.0.9(typescript@7.0.2)
       '@sentry/browser': 10.75.2
@@ -35835,7 +35835,7 @@ snapshots:
       rfdc: 1.4.1
       wrap-ansi: 10.0.0
 
-  llama.rn@0.12.9(patch_hash=a1e6f733db40822a9a08d6eb4d543807e2432d7c1444d94658036309fc5c7847)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
+  llama.rn@0.12.9(patch_hash=62dce8190ea1c3bfe58fe2ab460927672af84bea3a32dcf566e92015ad13bd67)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
     dependencies:
       react: 19.3.0
       react-native: 0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)

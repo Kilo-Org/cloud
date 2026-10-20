@@ -14,7 +14,7 @@ diff --git a/ios/RNLlama.h b/ios/RNLlama.h
  #endif
  
 -@interface RNLlama : NSObject <RCTBridgeModule>
-+@interface RNLlama : NSObject <RCTBridgeModule, RCTTurboModuleWithJSIBindings>
++@interface RNLlama : NSObject <RCTBridgeModule, RCTTurboModule, RCTTurboModuleWithJSIBindings>
  
  @end
 diff --git a/ios/RNLlama.mm b/ios/RNLlama.mm
@@ -27,7 +27,16 @@ diff --git a/ios/RNLlama.mm b/ios/RNLlama.mm
  
  #if RNLLAMA_BUILD_FROM_SOURCE
  #import "../cpp/llama-impl.h"
-@@ -74,53 +75,37 @@
+@@ -16,6 +17,8 @@
+ 
+ #ifdef RCT_NEW_ARCH_ENABLED
+ #import "RNLlamaSpec.h"
++@interface RNLlama () <NativeRNLlamaSpec>
++@end
+ #endif
+ 
+ namespace rnllama_jsi {
+@@ -74,53 +77,37 @@
  } // namespace rnllama_jsi
  
  @implementation RNLlama {
@@ -60,7 +69,8 @@ diff --git a/ios/RNLlama.mm b/ios/RNLlama.mm
  }
  
  RCT_EXPORT_METHOD(install:(RCTPromiseResolveBlock)resolve
-                  withRejecter:(RCTPromiseRejectBlock)reject)
+-                 withRejecter:(RCTPromiseRejectBlock)reject)
++                 reject:(RCTPromiseRejectBlock)reject)
  {
 -    RCTBridge *bridge = self.bridge ?: [RCTBridge currentBridge];
 -    if (!bridge) {

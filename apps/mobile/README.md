@@ -30,6 +30,10 @@ Native compatibility requirements:
   purchase connector, which share a namespace. AGP 9 otherwise rejects that vendor pair.
 - The supported Gesture Handler builder API remains explicitly allowed by the
   deprecation lint rule; other deprecated APIs remain checked.
+- The `react-native-css` patch forwards React Native's native component registry
+  through its CommonJS facade for Router's native screen host.
+- The `llama.rn` iOS patch installs JSI bindings through React Native's TurboModule
+  runtime hook and conforms to the generated native spec.
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.

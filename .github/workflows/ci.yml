@@ -697,6 +697,7 @@ jobs:
       - harness-sdk
       - build-ai-gateway
       - build-ai-gateway-secure-proxy
+      - cloud-agent-next-admission
     if: ${{ !cancelled() }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
@@ -837,6 +838,54 @@ jobs:
         env:
           NODE_ENV: production
         run: pnpm --filter ai-gateway-secure-proxy run build
+
+  cloud-agent-next-admission:
+    needs: changes
+    if: >-
+      needs.changes.outputs.cloud_agent_next == 'true' ||
+      (github.event_name == 'pull_request' &&
+      needs.changes.outputs.cloud_agent_next_parts != '[]')
+    name: cloud-agent-next (admission)
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 25
+        ports:
+          - 5432:5432
+    env:
+      NODE_ENV: development
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Migrate admission test database
+        run: pnpm drizzle migrate
+
+      - name: Run cloud-agent-next admission tests
+        run: pnpm --filter cloud-agent-next test:admission
 
   cloud-agent-next:
     needs: changes

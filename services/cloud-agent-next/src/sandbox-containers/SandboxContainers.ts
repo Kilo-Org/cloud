@@ -2,6 +2,8 @@ import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { billingHeartbeatSeconds } from '../container-usage.js';
+import { assertContainerCapacity } from '../container-concurrency.js';
+import { parseSandboxBillingInput } from '../container-usage-context.js';
 import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import { logger } from '../logger.js';
 import {
@@ -643,14 +645,26 @@ export class SandboxContainers extends DurableObject<Env> {
       };
     }
     const billing = this.billingForRecord(prepared.record);
-    return billing
-      ? billing.ensureBillingAdmission(input)
-      : unavailableContainersBillingAdmission(input);
+    if (billing) return billing.ensureBillingAdmission(input);
+    const attribution = parseSandboxBillingInput(input);
+    await assertContainerCapacity(this.env, {
+      subject: attribution.subject,
+      actor: attribution.actor,
+      instanceId: attribution.sandboxId,
+      billingOrigin: attribution.metadata?.origin,
+      checkpoint: 'control-plane-create',
+    });
+    return unavailableContainersBillingAdmission(input);
   }
 
   async isBillingBlocked(): Promise<boolean> {
     const billing = this.billingForRecord(await this.readRecord());
     return billing ? billing.isBillingBlocked() : false;
+  }
+
+  async releaseBillingAdmission(allocationId: string): Promise<void> {
+    const billing = await this.ensureBillingForPersistedRecord();
+    await billing?.releaseBillingAdmission(allocationId);
   }
 
   async isContainerRunning(): Promise<boolean> {
@@ -1456,10 +1470,17 @@ export class SandboxContainers extends DurableObject<Env> {
     options: ContainerStartupOptions
   ): Promise<void> {
     if (!container.running) {
+      await this.billingForRecord(record)?.reserveBeforeStart();
       try {
         container.start(options);
       } catch (error) {
         await this.activateBillingIfRunning(container, record);
+        if (!container.running) {
+          const context = await getBillingContext(this.ctx.storage);
+          await this.billingForRecord(record)?.releaseBillingAdmission(
+            context?.metadata?.allocation_id
+          );
+        }
         throw error;
       }
     }
@@ -1492,6 +1513,7 @@ export class SandboxContainers extends DurableObject<Env> {
       storage: this.ctx.storage,
       meter: this.env.CONTAINER_USAGE_METER,
       heartbeatSeconds: billingHeartbeatSeconds(this.env.CONTAINER_BILLING_HEARTBEAT_SECONDS),
+      containerConcurrencyDisabled: this.env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true',
       isContainerRunning: () => this.ctx.container?.running === true,
       stopContainer: () => this.stopBillingContainer(),
       destroyContainer: () => this.destroyBillingContainer(),

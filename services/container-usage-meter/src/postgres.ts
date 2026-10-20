@@ -8,15 +8,24 @@ import {
   organizations,
   type WorkerDb,
 } from '@kilocode/db';
-import { and, eq, gt, lt, ne, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, gt, lt, ne, sql } from 'drizzle-orm';
 import type {
   RecordHeartbeatInput,
-  RecordStartFailureCode,
   RecordStartInput,
+  RecordStartResult,
   RecordStopInput,
   UsageContext,
 } from '@kilocode/container-usage';
-import { heartbeatIdempotencyKey } from '@kilocode/container-usage';
+import {
+  ContainerConcurrencyLimitError,
+  heartbeatIdempotencyKey,
+  isContainerConcurrencyExempt,
+} from '@kilocode/container-usage';
+import {
+  LIVE_INTERVAL_WINDOW,
+  lockContainerCapacity,
+  readContainerCapacity,
+} from '@kilocode/container-usage/capacity';
 import {
   billingModeFor,
   MINIMUM_REMAINING_MICRODOLLARS,
@@ -52,18 +61,7 @@ export function getContainerUsageDb(env: Cloudflare.Env): WorkerDb {
 export type StartSkuAdmission =
   | { kind: 'applied'; dedup: boolean; billingMode: 'shadow' }
   | { kind: 'applied'; dedup: boolean; billingMode: 'paid'; remainingMicrodollars: number }
-  | {
-      kind: 'rejected';
-      code: Exclude<RecordStartFailureCode, 'insufficient_credits'>;
-      message: string;
-    }
-  | {
-      kind: 'rejected';
-      code: 'insufficient_credits';
-      message: string;
-      remainingMicrodollars: number;
-      minimumRequiredMicrodollars: number;
-    };
+  | ({ kind: 'rejected' } & Extract<RecordStartResult, { success: false }>['error']);
 
 export type ApplyResult = {
   kind: 'applied';
@@ -369,138 +367,189 @@ export async function applyStartWithDb(
   receivedAtMs: number,
   billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<StartSkuAdmission> {
-  const operation: Promise<StartSkuAdmission> = db.transaction(async tx => {
-    const [existing] = await tx
-      .select()
-      .from(container_usage_interval)
-      .where(eq(container_usage_interval.id, intervalId))
-      .limit(1);
-    if (existing) {
-      assertMatchingContext(existing, input, contextFingerprint);
-      if (existing.billing_mode === 'paid') {
-        return {
-          kind: 'applied',
-          dedup: true,
-          billingMode: 'paid',
-          remainingMicrodollars: await balanceForSubject(tx, input.subject, true),
-        };
+  const capacityRequest = input.admission
+    ? {
+        subject: input.subject,
+        actor: input.actor,
+        instanceId: input.instanceId,
+        checkpoint: input.admission.checkpoint,
+        billingOrigin: input.metadata?.origin,
       }
-      return { kind: 'applied', dedup: true, billingMode: 'shadow' };
-    }
-
-    const [sku] = await tx
-      .select({
-        unit: cloud_billing_sku.unit,
-        acceptsNewUsage: cloud_billing_sku.accepts_new_usage,
-        rateCentsPerUnit: cloud_billing_sku.rate_cents_per_unit,
-      })
-      .from(cloud_billing_sku)
-      .where(eq(cloud_billing_sku.id, input.sku))
-      .limit(1);
-    if (!sku) return { kind: 'rejected', code: 'sku_not_found', message: 'Billing SKU not found' };
-    if (sku.unit !== 'second') {
-      return {
-        kind: 'rejected',
-        code: 'sku_unit_mismatch',
-        message: 'Billing SKU is not measured in seconds',
-      };
-    }
-    if (!sku.acceptsNewUsage) {
-      return {
-        kind: 'rejected',
-        code: 'sku_not_accepting_new_usage',
-        message: 'Billing SKU is not accepting new usage',
-      };
-    }
-
-    const billingMode = billingModeFor(billingConfig, input.service, input.subject);
-    const [open] = await tx
-      .select()
-      .from(container_usage_interval)
-      .where(
-        and(
-          eq(container_usage_interval.service, input.service),
-          eq(container_usage_interval.instance_id, input.instanceId),
-          eq(container_usage_interval.status, 'open'),
-          ne(container_usage_interval.id, intervalId)
-        )
-      )
-      .for('update')
-      .limit(1);
-    if (open) {
-      if (open.start_epoch_ms > input.startEpochMs) {
-        throw new UsageMutationConflictError('Cannot supersede a newer usage interval');
+    : undefined;
+  const operation: Promise<StartSkuAdmission> = db.transaction(
+    async tx => {
+      if (capacityRequest && !isContainerConcurrencyExempt(capacityRequest)) {
+        await lockContainerCapacity(tx, capacityRequest);
       }
-    }
-
-    if (billingMode === 'paid') {
-      const remaining = await balanceForSubject(tx, input.subject, true);
-      if (remaining <= MINIMUM_REMAINING_MICRODOLLARS) {
+      const getCapacityRejection = async () => {
+        if (!capacityRequest || isContainerConcurrencyExempt(capacityRequest)) return undefined;
+        const exceeded = (await readContainerCapacity(tx, capacityRequest)).find(
+          check => check.live >= check.limit
+        );
+        if (!exceeded) return undefined;
+        const error = new ContainerConcurrencyLimitError(
+          exceeded.subject.type === 'org' ? 'organization' : 'personal',
+          exceeded.limit
+        );
         return {
           kind: 'rejected',
-          code: 'insufficient_credits',
-          message: 'Container billing requires at least $5.00 in remaining credits',
-          remainingMicrodollars: remaining,
-          minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+          code: error.code,
+          message: error.message,
+          accountType: error.accountType,
+          limit: error.limit,
+        } satisfies StartSkuAdmission;
+      };
+      const replayExistingStart = async (): Promise<StartSkuAdmission | undefined> => {
+        const [existing] = await tx
+          .select({
+            ...getTableColumns(container_usage_interval),
+            capacityLive: sql<boolean>`${gt(container_usage_interval.last_seen_at, LIVE_INTERVAL_WINDOW)}`,
+          })
+          .from(container_usage_interval)
+          .where(eq(container_usage_interval.id, intervalId))
+          .for('update')
+          .limit(1);
+        if (!existing) return undefined;
+        assertMatchingContext(existing, input, contextFingerprint);
+        if (input.admission) {
+          if (existing.status !== 'open') {
+            return {
+              kind: 'rejected',
+              code: 'interval_closed',
+              message:
+                'interval_closed: The container reservation has ended. Try starting the container again.',
+            };
+          }
+          if (!existing.capacityLive) {
+            const rejection = await getCapacityRejection();
+            if (rejection) return rejection;
+          }
+          await tx
+            .update(container_usage_interval)
+            .set({
+              last_seen_at: sql`GREATEST(${container_usage_interval.last_seen_at}, ${timestamp(receivedAtMs)})`,
+            })
+            .where(eq(container_usage_interval.id, intervalId));
+        }
+        if (existing.billing_mode === 'paid') {
+          return {
+            kind: 'applied',
+            dedup: true,
+            billingMode: 'paid',
+            remainingMicrodollars: await balanceForSubject(tx, input.subject, true),
+          };
+        }
+        return { kind: 'applied', dedup: true, billingMode: 'shadow' };
+      };
+      const existing = await replayExistingStart();
+      if (existing) return existing;
+
+      const [sku] = await tx
+        .select({
+          unit: cloud_billing_sku.unit,
+          acceptsNewUsage: cloud_billing_sku.accepts_new_usage,
+          rateCentsPerUnit: cloud_billing_sku.rate_cents_per_unit,
+        })
+        .from(cloud_billing_sku)
+        .where(eq(cloud_billing_sku.id, input.sku))
+        .limit(1);
+      if (!sku)
+        return { kind: 'rejected', code: 'sku_not_found', message: 'Billing SKU not found' };
+      if (sku.unit !== 'second') {
+        return {
+          kind: 'rejected',
+          code: 'sku_unit_mismatch',
+          message: 'Billing SKU is not measured in seconds',
         };
       }
-    }
+      if (!sku.acceptsNewUsage) {
+        return {
+          kind: 'rejected',
+          code: 'sku_not_accepting_new_usage',
+          message: 'Billing SKU is not accepting new usage',
+        };
+      }
 
-    if (open) {
-      await tx
-        .update(container_usage_interval)
-        .set({
-          status: 'closed',
-          close_reason: 'superseded',
-          stopped_at: open.last_seen_at,
-        })
-        .where(eq(container_usage_interval.id, open.id));
-    }
-
-    const receivedAt = timestamp(receivedAtMs);
-    const [inserted] = await tx
-      .insert(container_usage_interval)
-      .values(
-        intervalValues(
-          intervalId,
-          input.startEpochMs,
-          input,
-          contextFingerprint,
-          receivedAt,
-          billingMode,
-          billingMode === 'paid' ? sku.rateCentsPerUnit : undefined
-        )
-      )
-      .onConflictDoNothing({ target: container_usage_interval.id })
-      .returning({ id: container_usage_interval.id });
-    if (!inserted) {
-      const [winner] = await tx
+      const billingMode = billingModeFor(billingConfig, input.service, input.subject);
+      const [open] = await tx
         .select()
         .from(container_usage_interval)
-        .where(eq(container_usage_interval.id, intervalId))
+        .where(
+          and(
+            eq(container_usage_interval.service, input.service),
+            eq(container_usage_interval.instance_id, input.instanceId),
+            eq(container_usage_interval.status, 'open'),
+            ne(container_usage_interval.id, intervalId)
+          )
+        )
+        .for('update')
         .limit(1);
-      if (!winner) throw new Error('Container usage interval insert lost without a winner');
-      assertMatchingContext(winner, input, contextFingerprint);
-      if (winner.billing_mode === 'paid') {
+      if (open) {
+        if (open.start_epoch_ms > input.startEpochMs) {
+          throw new UsageMutationConflictError('Cannot supersede a newer usage interval');
+        }
+      }
+
+      const rejection = await getCapacityRejection();
+      if (rejection) return rejection;
+
+      if (billingMode === 'paid') {
+        const remaining = await balanceForSubject(tx, input.subject, true);
+        if (remaining <= MINIMUM_REMAINING_MICRODOLLARS) {
+          return {
+            kind: 'rejected',
+            code: 'insufficient_credits',
+            message: 'Container billing requires at least $5.00 in remaining credits',
+            remainingMicrodollars: remaining,
+            minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+          };
+        }
+      }
+
+      if (open) {
+        await tx
+          .update(container_usage_interval)
+          .set({
+            status: 'closed',
+            close_reason: 'superseded',
+            stopped_at: open.last_seen_at,
+          })
+          .where(eq(container_usage_interval.id, open.id));
+      }
+
+      const receivedAt = timestamp(receivedAtMs);
+      const [inserted] = await tx
+        .insert(container_usage_interval)
+        .values(
+          intervalValues(
+            intervalId,
+            input.startEpochMs,
+            input,
+            contextFingerprint,
+            receivedAt,
+            billingMode,
+            billingMode === 'paid' ? sku.rateCentsPerUnit : undefined
+          )
+        )
+        .onConflictDoNothing({ target: container_usage_interval.id })
+        .returning({ id: container_usage_interval.id });
+      if (!inserted) {
+        const winner = await replayExistingStart();
+        if (!winner) throw new Error('Container usage interval insert lost without a winner');
+        return winner;
+      }
+      if (billingMode === 'paid') {
         return {
           kind: 'applied',
-          dedup: true,
+          dedup: false,
           billingMode: 'paid',
-          remainingMicrodollars: await balanceForSubject(tx, input.subject, true),
+          remainingMicrodollars: await balanceForSubject(tx, input.subject),
         };
       }
-      return { kind: 'applied', dedup: true, billingMode: 'shadow' };
-    }
-    if (billingMode === 'paid') {
-      return {
-        kind: 'applied',
-        dedup: false,
-        billingMode: 'paid',
-        remainingMicrodollars: await balanceForSubject(tx, input.subject),
-      };
-    }
-    return { kind: 'applied', dedup: false, billingMode: 'shadow' };
-  });
+      return { kind: 'applied', dedup: false, billingMode: 'shadow' };
+    },
+    { isolationLevel: 'read committed' }
+  );
   return operation.catch(mapSingleOpenIntervalConflict);
 }
 

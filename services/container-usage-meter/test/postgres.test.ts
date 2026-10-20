@@ -11,12 +11,23 @@ import {
 } from '@kilocode/db/schema';
 import {
   heartbeatIdempotencyKey,
+  intervalId as usageIntervalId,
+  FUNDED_CONTAINER_MINIMUM_MICRODOLLARS,
+  LOW_BALANCE_CONTAINER_LIMIT,
+  ORGANIZATION_CONTAINER_LIMIT,
   startIdempotencyKey,
   stopIdempotencyKey,
+  USER_CONTAINER_LIMIT,
   usageContextFingerprint,
+  type UsageContext,
 } from '@kilocode/container-usage';
-import { eq } from 'drizzle-orm';
-import { MINIMUM_REMAINING_MICRODOLLARS, type BillingConfig } from '../src/billing-config';
+import { lockContainerCapacity, readContainerCapacity } from '@kilocode/container-usage/capacity';
+import { and, eq, sql } from 'drizzle-orm';
+import {
+  MINIMUM_REMAINING_MICRODOLLARS,
+  SHADOW_ONLY_BILLING_CONFIG,
+  type BillingConfig,
+} from '../src/billing-config';
 import {
   applyHeartbeatWithDb,
   applyStartWithDb,
@@ -722,7 +733,7 @@ describe('container usage PostgreSQL application', () => {
     await client.db.insert(cloud_billing_sku).values({
       id: nonSecondSkuId,
       name: 'Non-container meter integration test',
-      unit: 'request',
+      unit: sql`'request'`,
       rate_cents_per_unit: '0.000001',
     });
     const nonSecondContext = { ...recoveryContext, sku: nonSecondSkuId };
@@ -1263,7 +1274,618 @@ describe('container usage PostgreSQL application', () => {
       .delete(container_usage_interval)
       .where(eq(container_usage_interval.id, targetId));
   });
+
+  it.each([
+    ['low', LOW_BALANCE_CONTAINER_LIMIT],
+    ['funded', USER_CONTAINER_LIMIT],
+    ['organization', ORGANIZATION_CONTAINER_LIMIT],
+  ] as const)(
+    'atomically admits only the final %s slot across concurrent starts',
+    async (scenario, limit) => {
+      const service = `cloud-agent-next-cap-${scenario}`;
+      const now = Date.now();
+      const balance = scenario === 'low' ? FUNDED_CONTAINER_MINIMUM_MICRODOLLARS - 1 : 20_000_000;
+      await client.db
+        .update(kilocode_users)
+        .set({ total_microdollars_acquired: balance, microdollars_used: 0 })
+        .where(eq(kilocode_users.id, userId));
+      await client.db
+        .update(organizations)
+        .set({ total_microdollars_acquired: balance, microdollars_used: 0 })
+        .where(eq(organizations.id, organizationId));
+      await client.db
+        .update(cloud_billing_sku)
+        .set({ accepts_new_usage: true })
+        .where(eq(cloud_billing_sku.id, skuId));
+
+      const usage = (index: number): UsageContext => {
+        const subject =
+          scenario === 'organization' || index % 2 === 1
+            ? { type: 'org' as const, id: organizationId }
+            : context.subject;
+        const actor =
+          scenario === 'organization' && index % 2 === 0
+            ? { type: 'bot' as const, id: `bot-${suffix}-${index}` }
+            : {
+                type: 'user' as const,
+                id: scenario === 'organization' ? `oauth/test:${suffix}:${index}` : userId,
+              };
+        return {
+          ...context,
+          service,
+          instanceId: `${scenario}-${suffix}-${index}`,
+          subject,
+          actor,
+          ...(actor.type === 'bot' ? { onBehalfOf: subject } : {}),
+        };
+      };
+
+      try {
+        const seed = await Promise.all(
+          Array.from({ length: limit - 1 }, async (_, index) => {
+            const seedContext = usage(index);
+            return {
+              id: usageIntervalId(service, seedContext.instanceId, now),
+              service,
+              instance_id: seedContext.instanceId,
+              start_epoch_ms: now,
+              cloud_billing_sku_id: skuId,
+              context_fingerprint: await usageContextFingerprint(seedContext),
+              subject_type: seedContext.subject.type,
+              subject_id: seedContext.subject.id,
+              actor_type: seedContext.actor.type,
+              actor_id: seedContext.actor.id,
+              started_at: timestamp(now),
+              last_seen_at: timestamp(now),
+            };
+          })
+        );
+        await client.db.insert(container_usage_interval).values(seed);
+        const contenders = await Promise.all(
+          Array.from({ length: 6 }, async (_, index) => {
+            const contenderContext = usage(limit + index);
+            return {
+              context: contenderContext,
+              input: {
+                ...contenderContext,
+                startEpochMs: now,
+                idempotencyKey: startIdempotencyKey(service, contenderContext.instanceId, now),
+                admission: { checkpoint: 'sandbox-start' as const },
+              },
+              id: usageIntervalId(service, contenderContext.instanceId, now),
+              fingerprint: await usageContextFingerprint(contenderContext),
+            };
+          })
+        );
+        const results = await Promise.all(
+          contenders.map(contender =>
+            applyStartWithDb(client.db, contender.input, contender.id, contender.fingerprint, now)
+          )
+        );
+        const winnerIndex = results.findIndex(result => result.kind === 'applied');
+        const loserIndex = results.findIndex(result => result.kind === 'rejected');
+        expect(results.filter(result => result.kind === 'applied')).toHaveLength(1);
+        for (const result of results.filter(result => result.kind === 'rejected')) {
+          expect(result).toMatchObject({
+            code: 'container_limit_reached',
+            accountType: scenario === 'organization' ? 'organization' : 'personal',
+            limit,
+            message: expect.stringMatching(/^container_limit_reached:/),
+          });
+        }
+        const open = await client.db
+          .select()
+          .from(container_usage_interval)
+          .where(
+            and(
+              eq(container_usage_interval.service, service),
+              eq(container_usage_interval.cloud_billing_sku_id, skuId),
+              eq(container_usage_interval.status, 'open')
+            )
+          );
+        expect(open).toHaveLength(limit);
+        const winner = contenders[winnerIndex];
+        const beforeRetry = open.find(row => row.id === winner.id);
+        await client.db
+          .update(cloud_billing_sku)
+          .set({ accepts_new_usage: false })
+          .where(eq(cloud_billing_sku.id, skuId));
+        await expect(
+          applyStartWithDb(
+            client.db,
+            winner.input,
+            winner.id,
+            winner.fingerprint,
+            now + 60_000,
+            paidBillingConfig
+          )
+        ).resolves.toEqual({
+          kind: 'applied',
+          dedup: true,
+          billingMode: 'shadow',
+        });
+        const [afterRetry] = await client.db
+          .select()
+          .from(container_usage_interval)
+          .where(eq(container_usage_interval.id, winner.id));
+        expect(afterRetry).toEqual({ ...beforeRetry, last_seen_at: afterRetry.last_seen_at });
+        expect(new Date(afterRetry.last_seen_at).getTime()).toBe(now + 60_000);
+
+        await client.db
+          .update(cloud_billing_sku)
+          .set({ accepts_new_usage: true })
+          .where(eq(cloud_billing_sku.id, skuId));
+        await applyStopWithDb(
+          client.db,
+          {
+            service,
+            instanceId: winner.context.instanceId,
+            startEpochMs: now,
+            idempotencyKey: stopIdempotencyKey(service, winner.context.instanceId, now),
+            seq: 1,
+            usageSinceLast: 0,
+            reason: 'runtime_signal',
+            context: winner.context,
+          },
+          winner.id,
+          winner.fingerprint,
+          now + 60_000
+        );
+        const loser = contenders[loserIndex];
+        await expect(
+          applyStartWithDb(client.db, loser.input, loser.id, loser.fingerprint, now + 60_001)
+        ).resolves.toMatchObject({
+          kind: 'applied',
+          dedup: false,
+        });
+        const [closed] = await client.db
+          .select()
+          .from(container_usage_interval)
+          .where(eq(container_usage_interval.id, winner.id));
+        expect(closed).toMatchObject({ status: 'closed', confirmed_seconds: 0 });
+      } finally {
+        await client.db
+          .delete(container_usage_interval)
+          .where(
+            and(
+              eq(container_usage_interval.service, service),
+              eq(container_usage_interval.cloud_billing_sku_id, skuId)
+            )
+          );
+        await client.db
+          .update(cloud_billing_sku)
+          .set({ accepts_new_usage: true })
+          .where(eq(cloud_billing_sku.id, skuId));
+      }
+    }
+  );
+
+  it('reads a committed final slot after waiting for the transaction advisory lock', async () => {
+    const service = 'cloud-agent-next-lock-visibility';
+    const now = Date.now();
+    const lockedContext = { ...context, service, instanceId: `locked-${suffix}` };
+    const capacityRequest = { ...lockedContext, checkpoint: 'sandbox-start' as const };
+    const lockedId = usageIntervalId(service, lockedContext.instanceId, now);
+    const gate = Promise.withResolvers<void>();
+    const ready = Promise.withResolvers<void>();
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 0, microdollars_used: 0 })
+      .where(eq(kilocode_users.id, userId));
+    const blocker = client.db.transaction(async tx => {
+      await lockContainerCapacity(tx, capacityRequest);
+      await tx.insert(container_usage_interval).values(
+        await Promise.all(
+          Array.from({ length: LOW_BALANCE_CONTAINER_LIMIT }, async (_, index) => {
+            const seedContext = {
+              ...lockedContext,
+              instanceId: `${lockedContext.instanceId}-${index}`,
+            };
+            return {
+              id: usageIntervalId(service, seedContext.instanceId, now),
+              service,
+              instance_id: seedContext.instanceId,
+              start_epoch_ms: now,
+              cloud_billing_sku_id: skuId,
+              context_fingerprint: await usageContextFingerprint(seedContext),
+              subject_type: seedContext.subject.type,
+              subject_id: seedContext.subject.id,
+              actor_type: seedContext.actor.type,
+              actor_id: seedContext.actor.id,
+              started_at: timestamp(now),
+              last_seen_at: timestamp(now),
+            };
+          })
+        )
+      );
+      ready.resolve();
+      await gate.promise;
+    });
+    void blocker.catch(ready.reject);
+    await ready.promise;
+    const contender = applyStartWithDb(
+      client.db,
+      {
+        ...lockedContext,
+        startEpochMs: now,
+        idempotencyKey: startIdempotencyKey(service, lockedContext.instanceId, now),
+        admission: { checkpoint: 'sandbox-start' },
+      },
+      lockedId,
+      await usageContextFingerprint(lockedContext),
+      now
+    ).then(
+      result => ({ result }),
+      (error: unknown) => ({ error })
+    );
+    try {
+      try {
+        await expect
+          .poll(async () => {
+            const result = await client.pool.query<{ count: string }>(
+              `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%pg_advisory_xact_lock%'`
+            );
+            return Number(result.rows[0]?.count ?? 0);
+          })
+          .toBeGreaterThan(0);
+      } finally {
+        gate.resolve();
+        await blocker;
+      }
+      const outcome = await contender;
+      if ('error' in outcome) throw outcome.error;
+      expect(outcome.result).toMatchObject({
+        kind: 'rejected',
+        code: 'container_limit_reached',
+        limit: LOW_BALANCE_CONTAINER_LIMIT,
+      });
+      await expect(readContainerCapacity(client.db, capacityRequest)).resolves.toEqual([
+        {
+          subject: lockedContext.subject,
+          live: LOW_BALANCE_CONTAINER_LIMIT,
+          limit: LOW_BALANCE_CONTAINER_LIMIT,
+        },
+      ]);
+    } finally {
+      await contender;
+      await client.db
+        .delete(container_usage_interval)
+        .where(
+          and(
+            eq(container_usage_interval.service, service),
+            eq(container_usage_interval.cloud_billing_sku_id, skuId)
+          )
+        );
+    }
+  });
+
+  it('releases a paid admission with a zero-usage stop and rejects another admission on the closed interval', async () => {
+    const now = Date.now();
+    const usage = {
+      ...context,
+      service: 'cloud-agent-next-no-provision',
+      instanceId: `no-provision-${suffix}`,
+      sku: paidSkuId,
+    };
+    const id = usageIntervalId(usage.service, usage.instanceId, now);
+    const usageFingerprint = await usageContextFingerprint(usage);
+    await client.db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 20_000_000, microdollars_used: 0 })
+      .where(eq(kilocode_users.id, userId));
+    const start = {
+      ...usage,
+      startEpochMs: now,
+      idempotencyKey: startIdempotencyKey(usage.service, usage.instanceId, now),
+      admission: { checkpoint: 'sandbox-start' as const },
+    };
+    await applyStartWithDb(client.db, start, id, usageFingerprint, now, paidBillingConfig);
+    try {
+      const stop = {
+        service: usage.service,
+        instanceId: usage.instanceId,
+        startEpochMs: now,
+        idempotencyKey: stopIdempotencyKey(usage.service, usage.instanceId, now),
+        seq: 1,
+        usageSinceLast: 0,
+        reason: 'runtime_signal' as const,
+        context: usage,
+      };
+      await expect(
+        applyStopWithDb(client.db, stop, id, usageFingerprint, now + 60_000, paidBillingConfig)
+      ).resolves.toMatchObject({ billingMode: 'paid', dedup: false });
+      await expect(
+        applyStopWithDb(client.db, stop, id, usageFingerprint, now + 60_001, paidBillingConfig)
+      ).resolves.toMatchObject({ billingMode: 'paid', dedup: true });
+      const [closed] = await client.db
+        .select()
+        .from(container_usage_interval)
+        .where(eq(container_usage_interval.id, id));
+      expect(closed).toMatchObject({
+        status: 'closed',
+        confirmed_seconds: 0,
+        settled_billable_seconds: 0,
+      });
+      await expect(
+        applyStartWithDb(client.db, start, id, usageFingerprint, now + 120_000, paidBillingConfig)
+      ).resolves.toMatchObject({
+        kind: 'rejected',
+        code: 'interval_closed',
+      });
+      await expect(
+        applyStartWithDb(
+          client.db,
+          { ...start, admission: undefined },
+          id,
+          usageFingerprint,
+          now + 120_001,
+          paidBillingConfig
+        )
+      ).resolves.toMatchObject({
+        kind: 'applied',
+        dedup: true,
+        billingMode: 'paid',
+      });
+      const [replayed] = await client.db
+        .select()
+        .from(container_usage_interval)
+        .where(eq(container_usage_interval.id, id));
+      expect(replayed).toEqual(closed);
+      const charges = await client.db
+        .select()
+        .from(compute_usage_charge)
+        .where(
+          eq(
+            compute_usage_charge.usage_source_id,
+            heartbeatIdempotencyKey(usage.service, usage.instanceId, now, 1)
+          )
+        );
+      expect(charges).toEqual([]);
+      const [user] = await client.db
+        .select({ used: kilocode_users.microdollars_used })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, userId));
+      expect(user?.used).toBe(0);
+      await expect(
+        readContainerCapacity(client.db, { ...usage, checkpoint: 'sandbox-start' })
+      ).resolves.toEqual([{ subject: usage.subject, live: 0, limit: USER_CONTAINER_LIMIT }]);
+    } finally {
+      await client.db.delete(container_usage_interval).where(eq(container_usage_interval.id, id));
+    }
+  });
+
+  it.each(['personal', 'organization'] as const)(
+    'rejects a stale reservation when another start has consumed its %s slot',
+    async accountType => {
+      const now = Date.now();
+      const startedAt = now - 12 * 60_000;
+      const service = `cloud-agent-next-replay-full-${accountType}`;
+      const usage: UsageContext =
+        accountType === 'organization'
+          ? {
+              ...context,
+              service,
+              sku: paidSkuId,
+              instanceId: `stale-org-${suffix}`,
+              subject: { type: 'org', id: organizationId },
+              actor: { type: 'bot', id: `stale-bot-${suffix}` },
+              onBehalfOf: { type: 'org', id: organizationId },
+            }
+          : { ...context, service, sku: paidSkuId, instanceId: `stale-user-${suffix}` };
+      const id = usageIntervalId(service, usage.instanceId, startedAt);
+      const usageFingerprint = await usageContextFingerprint(usage);
+      const start = {
+        ...usage,
+        startEpochMs: startedAt,
+        idempotencyKey: startIdempotencyKey(service, usage.instanceId, startedAt),
+        admission: { checkpoint: 'sandbox-start' as const },
+      };
+      await client.db
+        .update(kilocode_users)
+        .set({ total_microdollars_acquired: 20_000_000, microdollars_used: 0 })
+        .where(eq(kilocode_users.id, userId));
+      await client.db
+        .update(organizations)
+        .set({ total_microdollars_acquired: 20_000_000, microdollars_used: 0 })
+        .where(eq(organizations.id, organizationId));
+      try {
+        await expect(
+          applyStartWithDb(client.db, start, id, usageFingerprint, startedAt, paidBillingConfig)
+        ).resolves.toMatchObject({ kind: 'applied', billingMode: 'paid' });
+        const [before] = await client.db
+          .select()
+          .from(container_usage_interval)
+          .where(eq(container_usage_interval.id, id));
+        const limit =
+          accountType === 'organization'
+            ? ORGANIZATION_CONTAINER_LIMIT
+            : LOW_BALANCE_CONTAINER_LIMIT;
+        await client.db
+          .insert(container_usage_interval)
+          .values(
+            await Promise.all(
+              Array.from({ length: limit }, (_, index) =>
+                capacityIntervalValues(
+                  { ...usage, instanceId: `${usage.instanceId}-other-${index}` },
+                  now
+                )
+              )
+            )
+          );
+        if (accountType === 'personal') {
+          await client.db
+            .update(kilocode_users)
+            .set({ total_microdollars_acquired: 0 })
+            .where(eq(kilocode_users.id, userId));
+        }
+        await expect(
+          applyStartWithDb(client.db, start, id, usageFingerprint, now, paidBillingConfig)
+        ).resolves.toMatchObject({
+          kind: 'rejected',
+          code: 'container_limit_reached',
+          accountType,
+          limit,
+        });
+        const [after] = await client.db
+          .select()
+          .from(container_usage_interval)
+          .where(eq(container_usage_interval.id, id));
+        expect(after).toEqual(before);
+        await expect(
+          readContainerCapacity(client.db, {
+            ...usage,
+            instanceId: `observer-${suffix}`,
+            checkpoint: 'sandbox-start',
+          })
+        ).resolves.toEqual([{ subject: usage.subject, live: limit, limit }]);
+      } finally {
+        await client.db
+          .delete(container_usage_interval)
+          .where(
+            and(
+              eq(container_usage_interval.service, service),
+              eq(container_usage_interval.cloud_billing_sku_id, paidSkuId)
+            )
+          );
+      }
+    }
+  );
+
+  it.each(['shadow', 'paid'] as const)(
+    'renews a stale %s interval in place, then keeps its live slot despite a lower balance',
+    async billingMode => {
+      const now = Date.now();
+      const startedAt = now - 12 * 60_000;
+      const service = `cloud-agent-next-replay-free-${billingMode}`;
+      const usage = {
+        ...context,
+        service,
+        sku: paidSkuId,
+        instanceId: `renew-${billingMode}-${suffix}`,
+      };
+      const id = usageIntervalId(service, usage.instanceId, startedAt);
+      const usageFingerprint = await usageContextFingerprint(usage);
+      const start = {
+        ...usage,
+        startEpochMs: startedAt,
+        idempotencyKey: startIdempotencyKey(service, usage.instanceId, startedAt),
+        admission: { checkpoint: 'sandbox-start' as const },
+      };
+      const config = billingMode === 'paid' ? paidBillingConfig : SHADOW_ONLY_BILLING_CONFIG;
+      const changedConfig = billingMode === 'paid' ? SHADOW_ONLY_BILLING_CONFIG : paidBillingConfig;
+      await client.db
+        .update(kilocode_users)
+        .set({ total_microdollars_acquired: 20_000_000, microdollars_used: 0 })
+        .where(eq(kilocode_users.id, userId));
+      try {
+        await applyStartWithDb(client.db, start, id, usageFingerprint, startedAt, config);
+        await client.db
+          .update(container_usage_interval)
+          .set({
+            confirmed_seconds: 7,
+            settled_billable_seconds: billingMode === 'paid' ? 7 : 0,
+            last_heartbeat_seq: 2,
+          })
+          .where(eq(container_usage_interval.id, id));
+        await client.db
+          .update(cloud_billing_sku)
+          .set({ accepts_new_usage: false })
+          .where(eq(cloud_billing_sku.id, paidSkuId));
+        const [before] = await client.db
+          .select()
+          .from(container_usage_interval)
+          .where(eq(container_usage_interval.id, id));
+        for (const receivedAt of [now, now + 60_000]) {
+          await expect(
+            applyStartWithDb(client.db, start, id, usageFingerprint, receivedAt, changedConfig)
+          ).resolves.toMatchObject({
+            kind: 'applied',
+            dedup: true,
+            billingMode,
+          });
+          const [after] = await client.db
+            .select()
+            .from(container_usage_interval)
+            .where(eq(container_usage_interval.id, id));
+          expect(after).toEqual({ ...before, last_seen_at: after.last_seen_at });
+          expect(new Date(after.last_seen_at).getTime()).toBe(receivedAt);
+          await expect(
+            readContainerCapacity(client.db, {
+              ...usage,
+              instanceId: `observer-${suffix}`,
+              checkpoint: 'sandbox-start',
+            })
+          ).resolves.toEqual([
+            {
+              subject: usage.subject,
+              live: receivedAt === now ? 1 : 4,
+              limit: receivedAt === now ? USER_CONTAINER_LIMIT : LOW_BALANCE_CONTAINER_LIMIT,
+            },
+          ]);
+          if (receivedAt === now) {
+            await client.db
+              .insert(container_usage_interval)
+              .values(
+                await Promise.all(
+                  Array.from({ length: LOW_BALANCE_CONTAINER_LIMIT }, (_, index) =>
+                    capacityIntervalValues(
+                      { ...usage, instanceId: `${usage.instanceId}-other-${index}` },
+                      now
+                    )
+                  )
+                )
+              );
+            await client.db
+              .update(kilocode_users)
+              .set({ total_microdollars_acquired: 0 })
+              .where(eq(kilocode_users.id, userId));
+          }
+        }
+        const rows = await client.db
+          .select()
+          .from(container_usage_interval)
+          .where(
+            and(
+              eq(container_usage_interval.service, service),
+              eq(container_usage_interval.cloud_billing_sku_id, paidSkuId)
+            )
+          );
+        expect(rows.filter(row => row.id === id)).toHaveLength(1);
+        expect(rows).toHaveLength(4);
+      } finally {
+        await client.db
+          .delete(container_usage_interval)
+          .where(
+            and(
+              eq(container_usage_interval.service, service),
+              eq(container_usage_interval.cloud_billing_sku_id, paidSkuId)
+            )
+          );
+        await client.db
+          .update(cloud_billing_sku)
+          .set({ accepts_new_usage: true })
+          .where(eq(cloud_billing_sku.id, paidSkuId));
+      }
+    }
+  );
 });
+
+async function capacityIntervalValues(usage: UsageContext, startEpochMs: number) {
+  return {
+    id: usageIntervalId(usage.service, usage.instanceId, startEpochMs),
+    service: usage.service,
+    instance_id: usage.instanceId,
+    start_epoch_ms: startEpochMs,
+    cloud_billing_sku_id: usage.sku,
+    context_fingerprint: await usageContextFingerprint(usage),
+    subject_type: usage.subject.type,
+    subject_id: usage.subject.id,
+    actor_type: usage.actor.type,
+    actor_id: usage.actor.id,
+    started_at: timestamp(startEpochMs),
+    last_seen_at: timestamp(startEpochMs),
+  };
+}
 
 function timestamp(milliseconds: number): string {
   return new Date(milliseconds).toISOString();

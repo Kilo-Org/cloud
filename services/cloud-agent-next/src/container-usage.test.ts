@@ -5,9 +5,6 @@ import {
   updateBillingContext,
   type ContainerUsageRpcMethods,
 } from '@kilocode/container-usage';
-import type * as ContainerConcurrencyExports from './container-concurrency.js';
-
-type ContainerConcurrencyModule = typeof ContainerConcurrencyExports;
 
 // oxlint-disable-next-line no-empty-object-type -- Matches the mocked Sandbox constructor.
 type SandboxDurableObjectState = DurableObjectState<{}>;
@@ -103,17 +100,6 @@ const sdk = vi.hoisted(() => {
 
 vi.mock('@cloudflare/sandbox', () => ({ Sandbox: sdk.StockSandbox }));
 
-const capacity = vi.hoisted(() => ({
-  assertContainerCapacity: vi.fn<(env: unknown, request: unknown) => Promise<void>>(
-    async () => undefined
-  ),
-}));
-
-vi.mock('./container-concurrency.js', async importOriginal => ({
-  ...(await importOriginal<ContainerConcurrencyModule>()),
-  assertContainerCapacity: capacity.assertContainerCapacity,
-}));
-
 import { billingHeartbeatSeconds, MeteredSandbox } from './container-usage.js';
 import {
   ContainerCapacityUnavailableError,
@@ -202,7 +188,8 @@ function createSandbox(
     | 'SandboxSmallContainment'
     | 'SandboxCodeReview'
     | 'SandboxDIND' = 'SandboxSmallContainment',
-  heartbeatSeconds?: string
+  heartbeatSeconds?: string,
+  containerConcurrencyDisabled = false
 ) {
   const storage = new MemoryStorage();
   const shadowTasks: Promise<unknown>[] = [];
@@ -241,6 +228,7 @@ function createSandbox(
     sandbox: new TestSandbox(ctx, {
       CONTAINER_USAGE_METER: rpc,
       CONTAINER_BILLING_HEARTBEAT_SECONDS: heartbeatSeconds,
+      CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: containerConcurrencyDisabled ? 'true' : undefined,
     } as never) as unknown as TestRuntime,
   };
 }
@@ -524,7 +512,7 @@ describe('MeteredSandbox', () => {
     expect(rpc.recordStart).toHaveBeenCalledOnce();
     expect(sandbox.schedules).toHaveLength(0);
     await sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true });
-    expect(rpc.recordStart).toHaveBeenCalledOnce();
+    expect(rpc.recordStart).toHaveBeenCalledTimes(2);
 
     await sandbox.onStart();
     await flushShadowTasks();
@@ -569,7 +557,7 @@ describe('MeteredSandbox', () => {
 
     await expect(
       sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
-    ).resolves.toMatchObject({ success: false, code: 'meter_unavailable' });
+    ).rejects.toBeInstanceOf(ContainerCapacityUnavailableError);
 
     const context = await getBillingContext(storage);
     expect(context).toBeDefined();
@@ -1549,26 +1537,177 @@ describe('MeteredSandbox', () => {
 });
 
 describe('MeteredSandbox container capacity', () => {
-  beforeEach(() => {
-    capacity.assertContainerCapacity.mockReset();
-    capacity.assertContainerCapacity.mockResolvedValue(undefined);
+  it.each([
+    { disabled: true, origin: 'cloud-agent' },
+    { disabled: false, origin: 'code-review' },
+  ])(
+    'starts without a synchronous shadow meter dependency when disabled=$disabled and origin=$origin',
+    async ({ disabled, origin }) => {
+      const rpc = createRpc();
+      vi.mocked(rpc.recordStart).mockRejectedValue(new Error('Meter unavailable'));
+      const { sandbox } = createSandbox(rpc, false, 'SandboxSmallContainment', undefined, disabled);
+      await sandbox.configureBilling({
+        ...billingInput,
+        allocationId: 'allocation-1',
+        metadata: { origin },
+      });
+
+      await expect(sandbox.start()).resolves.toBeUndefined();
+
+      expect(sandbox.startCalls).toBe(1);
+      expect(rpc.recordStart).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not start until the interval reservation is durably acknowledged', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+    const entered = Promise.withResolvers<void>();
+    const visibility = Promise.withResolvers<void>();
+    vi.mocked(rpc.recordStart).mockImplementation(async () => {
+      entered.resolve();
+      await visibility.promise;
+      return { success: true, ack: ack() };
+    });
+    await sandbox.configureBilling({ ...billingInput, allocationId: 'allocation-1' });
+
+    const starting = sandbox.start();
+    await entered.promise;
+    expect(sandbox.startCalls).toBe(0);
+    expect((await getBillingContext(storage))?.metadata?.allocation_id).toBe('allocation-1');
+    visibility.resolve();
+    await starting;
+
+    expect(sandbox.startCalls).toBe(1);
+    expect(await getBillingContext(storage)).toBeDefined();
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+  });
+
+  it('reuses the same allocation reservation before a successful start', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    const input = { ...billingInput, allocationId: 'allocation-1' };
+    await sandbox.ensureBillingAdmission(input);
+    const reserved = await getBillingContext(storage);
+
+    await sandbox.ensureBillingAdmission(input);
+    await sandbox.startAndWaitForPorts();
+    expect(rpc.recordStart).toHaveBeenCalledTimes(3);
+    expect(
+      new Set(vi.mocked(rpc.recordStart).mock.calls.map(([input]) => input.startEpochMs)).size
+    ).toBe(1);
+    expect(await getBillingContext(storage)).toEqual(reserved);
+    await sandbox.onStart();
+    await flushShadowTasks();
+    await sandbox.releaseBillingAdmission('allocation-1');
+
+    expect((await getBillingContext(storage))?.generation).toBe(reserved?.generation);
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+  });
+
+  it('replaces an acknowledged unmeasured allocation without billing its reservation wait', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+    const input = { ...billingInput, enforcementRequested: true };
+    await sandbox.ensureBillingAdmission({ ...input, allocationId: 'allocation-a' });
+    const first = await getBillingContext(storage);
+    if (!first) throw new Error('Expected first reservation');
+    vi.spyOn(Date, 'now').mockReturnValue(first.startEpochMs + 60_000);
+
+    await sandbox.ensureBillingAdmission({ ...input, allocationId: 'allocation-b' });
+
+    expect(sandbox.startCalls).toBe(0);
+    expect(rpc.recordStop).toHaveBeenCalledOnce();
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startEpochMs: first.startEpochMs,
+        usageSinceLast: 0,
+      })
+    );
+    const next = await getBillingContext(storage);
+    expect(next?.generation).not.toBe(first.generation);
+    expect(next?.metadata?.allocation_id).toBe('allocation-b');
+    expect(next?.measurementStarted).toBe(false);
+  });
+
+  it('releases only the failed allocation with a zero-usage stop', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+    await sandbox.ensureBillingAdmission({ ...billingInput, allocationId: 'allocation-1' });
+    const reserved = await getBillingContext(storage);
+    if (!reserved) throw new Error('Expected reservation');
+    vi.spyOn(Date, 'now').mockReturnValue(reserved.startEpochMs + 60_000);
+
+    await sandbox.releaseBillingAdmission('another-allocation');
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+    await sandbox.releaseBillingAdmission('allocation-1');
+    await sandbox.releaseBillingAdmission('allocation-1');
+
+    expect(rpc.recordStop).toHaveBeenCalledOnce();
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startEpochMs: reserved.startEpochMs,
+        usageSinceLast: 0,
+      })
+    );
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(sandbox.startCalls).toBe(0);
+  });
+
+  it('does not trust a previous ACK when the meter reservation has closed', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+    await sandbox.ensureBillingAdmission({ ...billingInput, allocationId: 'allocation-1' });
+    vi.mocked(rpc.recordStart).mockResolvedValue({
+      success: false,
+      error: { code: 'interval_closed', message: 'Reservation is closed' },
+    });
+
+    await expect(sandbox.start()).rejects.toBeInstanceOf(ContainerCapacityUnavailableError);
+
+    expect(sandbox.startCalls).toBe(0);
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(await storage.get('container-usage:start-ack-generation:v1')).toBeUndefined();
+  });
+
+  it('revalidates an acknowledged cold start when other allocations fill its stale slot', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+    await sandbox.ensureBillingAdmission({ ...billingInput, allocationId: 'allocation-1' });
+    const reserved = await getBillingContext(storage);
+    vi.mocked(rpc.recordStart).mockResolvedValue({
+      success: false,
+      error: {
+        code: 'container_limit_reached',
+        accountType: 'personal',
+        limit: 3,
+        message: 'container_limit_reached: Personal account container limit reached',
+      },
+    });
+
+    await expect(sandbox.start()).rejects.toBeInstanceOf(ContainerConcurrencyLimitError);
+
+    expect(sandbox.startCalls).toBe(0);
+    expect((await getBillingContext(storage))?.generation).toBe(reserved?.generation);
   });
 
   it.each(['start', 'startAndWaitForPorts'] as const)(
-    'checks the attributed account before a cold %s',
+    'reserves the attributed account before a cold %s',
     async method => {
-      const { sandbox } = createSandbox();
+      const rpc = createRpc();
+      const { sandbox } = createSandbox(rpc);
       await sandbox.configureBilling(billingInput);
 
       await sandbox[method]();
 
-      expect(capacity.assertContainerCapacity).toHaveBeenCalledWith(expect.anything(), {
-        subject: billingInput.subject,
-        actor: billingInput.actor,
-        instanceId: billingInput.sandboxId,
-        checkpoint: 'sandbox-start',
-        billingOrigin: billingInput.metadata.origin,
-      });
+      expect(rpc.recordStart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: billingInput.subject,
+          actor: billingInput.actor,
+          instanceId: billingInput.sandboxId,
+          admission: { checkpoint: 'sandbox-start' },
+        })
+      );
       expect(sandbox.startCalls).toBe(1);
     }
   );
@@ -1577,38 +1716,44 @@ describe('MeteredSandbox container capacity', () => {
     new ContainerConcurrencyLimitError('organization', 50),
     new ContainerCapacityUnavailableError(),
   ])('refuses the physical start after capacity denial: %s', async denial => {
-    const { sandbox } = createSandbox();
+    const rpc = createRpc();
+    const { sandbox } = createSandbox(rpc);
     await sandbox.configureBilling(billingInput);
-    capacity.assertContainerCapacity.mockRejectedValue(denial);
+    vi.mocked(rpc.recordStart).mockRejectedValue(denial);
 
-    await expect(sandbox.start()).rejects.toBe(denial);
+    await expect(sandbox.start()).rejects.toBeInstanceOf(denial.constructor);
     expect(sandbox.startCalls).toBe(0);
   });
 
   it('does not check a container that is already running', async () => {
-    const { sandbox } = createSandbox(createRpc(), true);
+    const rpc = createRpc();
+    const { sandbox, flushShadowTasks } = createSandbox(rpc, true);
     await sandbox.configureBilling(billingInput);
+    await flushShadowTasks();
+    vi.mocked(rpc.recordStart).mockClear();
 
     await sandbox.startAndWaitForPorts();
 
-    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+    expect(rpc.recordStart).not.toHaveBeenCalled();
     expect(sandbox.startCalls).toBe(1);
   });
 
   it('does not check code review sandboxes', async () => {
-    const { sandbox } = createSandbox(createRpc(), false, 'SandboxCodeReview');
+    const rpc = createRpc();
+    const { sandbox } = createSandbox(rpc, false, 'SandboxCodeReview');
 
     await sandbox.start();
 
-    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+    expect(rpc.recordStart).not.toHaveBeenCalled();
   });
 
   it('admits a start without attribution', async () => {
-    const { sandbox } = createSandbox();
+    const rpc = createRpc();
+    const { sandbox } = createSandbox(rpc);
 
     await sandbox.start();
 
-    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+    expect(rpc.recordStart).not.toHaveBeenCalled();
     expect(sandbox.startCalls).toBe(1);
   });
 });

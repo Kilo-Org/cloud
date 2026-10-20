@@ -17,6 +17,8 @@ vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 
 import type {
   BudgetVerdict,
+  ContainerCapacityCheck,
+  ContainerCapacityRequest,
   ContainerUsageRpcMethods,
   HeartbeatAck,
   RecordAck,
@@ -26,6 +28,26 @@ import type { Env } from '../types.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
+import { createCloudflareContainersProviderAdapter } from '../sandbox-control/cloudflare-containers-provider.js';
+import type * as ContainerConcurrency from '../container-concurrency.js';
+
+type CapacityModule = typeof ContainerConcurrency;
+const capacity = vi.hoisted(() => ({
+  readCapacity: vi.fn<(request: ContainerCapacityRequest) => Promise<ContainerCapacityCheck[]>>(),
+}));
+vi.mock('../container-concurrency.js', async importOriginal => {
+  const original = await importOriginal<CapacityModule>();
+  const assertContainerCapacity: CapacityModule['assertContainerCapacity'] = (
+    env,
+    request,
+    dependencies
+  ) =>
+    original.assertContainerCapacity(env, request, {
+      readCapacity: capacity.readCapacity,
+      ...dependencies,
+    });
+  return { ...original, assertContainerCapacity };
+});
 
 const RECORD_KEY = 'containers:record:v1';
 const BILLING_CONTEXT_KEY = 'container-usage:billing-context:v1';
@@ -36,7 +58,7 @@ const REF_A = 'ref-a';
 const T0 = Date.UTC(2026, 0, 1, 0, 0, 0);
 
 const BILLING_INPUT = {
-  sandboxId: 'ses-0123456789abcdef',
+  sandboxId: 'ses-0123456789abcdef' as const,
   subject: { type: 'user' as const, id: 'user-1' },
   actor: { type: 'user' as const, id: 'user-1' },
   sessionId: 'agent_session_1',
@@ -258,6 +280,7 @@ function setup(
     storage?: FakeStorage;
     container?: FakeContainer;
     meter?: FakeMeter;
+    containerConcurrencyDisabled?: boolean;
   } = {}
 ) {
   const container = options.container ?? new FakeContainer();
@@ -281,7 +304,12 @@ function setup(
     },
   } as unknown as DurableObjectState;
   const meter = options.meter ?? new FakeMeter();
-  const instance = new SandboxContainers(ctx, { CONTAINER_USAGE_METER: meter } as unknown as Env);
+  const instance = new SandboxContainers(ctx, {
+    CONTAINER_USAGE_METER: meter,
+    CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: options.containerConcurrencyDisabled
+      ? 'true'
+      : undefined,
+  } as unknown as Env);
   return { storage, container, meter, instance, pendingTasks };
 }
 
@@ -330,6 +358,7 @@ async function launch(
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(T0);
+  capacity.readCapacity.mockReset().mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -337,6 +366,152 @@ afterEach(() => {
 });
 
 describe('ContainersBilling identity and admission', () => {
+  it.each([
+    { instanceSize: 'standard-2', live: 2 },
+    { instanceSize: 'standard-2', live: 3 },
+    { instanceSize: 'lite', live: 2 },
+    { instanceSize: 'lite', live: 3 },
+  ] as const)(
+    'preflights identity-less $instanceSize before provider create completes: live=$live',
+    async ({ instanceSize, live }) => {
+      const { instance, container, meter } = setup();
+      const provider = createCloudflareContainersProviderAdapter({
+        logicalSandboxId: BILLING_INPUT.sandboxId,
+        allocationName: BILLING_INPUT.sandboxId,
+        instance: instanceSize,
+        getContainer: () => instance as unknown as DurableObjectStub<SandboxContainers>,
+      });
+      capacity.readCapacity.mockImplementation(async () => {
+        expect(container.startCalls).toHaveLength(0);
+        expect(container.running).toBe(false);
+        return [{ subject: BILLING_INPUT.subject, live, limit: 3 }];
+      });
+      const admission = provider.create({
+        intentId: 'identity-less-allocation',
+        createdAt: T0,
+        billing: { ...BILLING_INPUT, enforcementRequested: false },
+      });
+
+      if (live === 3) {
+        await expect(admission).rejects.toMatchObject({ code: 'container_limit_reached' });
+        expect(container.startCalls).toHaveLength(0);
+      } else {
+        const created = await admission;
+        if ('unresolved' in created) throw new Error('Expected native allocation ref');
+        expect(container.startCalls).toHaveLength(0);
+        await expect(
+          provider.launch(created.providerRef, { CONTROL_WORKLOAD_LIMIT_MB: '1024' })
+        ).resolves.toBeDefined();
+        expect(container.startCalls).toHaveLength(1);
+      }
+      expect(capacity.readCapacity).toHaveBeenCalledOnce();
+      expect(capacity.readCapacity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: BILLING_INPUT.subject,
+          actor: BILLING_INPUT.actor,
+          checkpoint: 'control-plane-create',
+        })
+      );
+      expect(meter.recordStartInputs).toEqual([]);
+    }
+  );
+
+  it('keeps the meter reservation path for an identity-carrying native size', async () => {
+    const { instance, meter } = setup();
+    capacity.readCapacity.mockRejectedValue(new Error('Legacy preflight must not run'));
+
+    await expect(admit(instance, 'standard-3')).resolves.toEqual({ success: true });
+
+    expect(capacity.readCapacity).not.toHaveBeenCalled();
+    expect(meter.recordStartInputs[0]).toMatchObject({
+      admission: { checkpoint: 'control-plane-create' },
+    });
+  });
+
+  it.each([
+    { disabled: true, origin: 'cloud-agent' },
+    { disabled: false, origin: 'code-review' },
+  ])(
+    'keeps a shadow native start available during a meter outage when disabled=$disabled and origin=$origin',
+    async ({ disabled, origin }) => {
+      const { instance, container, meter, pendingTasks } = setup({
+        containerConcurrencyDisabled: disabled,
+      });
+      const recordStart = vi
+        .spyOn(meter, 'recordStart')
+        .mockRejectedValue(new Error('Meter unavailable'));
+      await instance.ensureBillingAdmission(
+        {
+          ...BILLING_INPUT,
+          allocationId: 'allocation-1',
+          enforcementRequested: false,
+          metadata: { origin },
+        },
+        'standard-4'
+      );
+      expect(meter.recordStartInputs).toEqual([]);
+      expect(recordStart).not.toHaveBeenCalled();
+
+      await expect(launch(instance, REF_A, 'standard-4')).resolves.toBeDefined();
+      await vi.runAllTimersAsync();
+      await flushPending(pendingTasks);
+
+      expect(container.startCalls).toHaveLength(1);
+      expect(container.running).toBe(true);
+    }
+  );
+
+  it('releases a failed native launch before the container starts with zero usage', async () => {
+    const { instance, container, storage, meter } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    container.startBehavior = 'reject';
+    vi.setSystemTime(T0 + 60_000);
+
+    await expect(launch(instance, REF_A, 'standard-4')).rejects.toThrow('container start failed');
+
+    expect(container.running).toBe(false);
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(0);
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+  });
+
+  it('keeps an unmeasured reservation while the physical container runs', async () => {
+    const { instance, container, storage, meter } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    const generation = readGeneration(storage);
+    container.running = true;
+
+    await instance.releaseBillingAdmission('allocation-1');
+
+    expect(readGeneration(storage)).toBe(generation);
+    expect(readMeasurementStarted(storage)).toBe(false);
+    expect(meter.recordStopInputs).toEqual([]);
+  });
+
+  it('does not void a measured generation after the physical container stops', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await instance.ensureBillingAdmission(
+      { ...BILLING_INPUT, allocationId: 'allocation-1' },
+      'standard-4'
+    );
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const generation = readGeneration(storage);
+    container.running = false;
+
+    await instance.releaseBillingAdmission('allocation-1');
+
+    expect(readGeneration(storage)).toBe(generation);
+    expect(readMeasurementStarted(storage)).toBe(true);
+    expect(meter.recordStopInputs).toEqual([]);
+  });
+
   it('admits on a real continue meter and rejects on a real insufficient_credits admission', async () => {
     const admitted = setup();
 
@@ -386,8 +561,11 @@ describe('ContainersBilling identity and admission', () => {
     meter.startBehavior = 'reject';
 
     const admission = admit(instance, 'standard-4');
+    const rejected = expect(admission).rejects.toMatchObject({
+      code: 'container_capacity_unavailable',
+    });
     await vi.runAllTimersAsync();
-    await expect(admission).resolves.toMatchObject({ success: false, code: 'meter_unavailable' });
+    await rejected;
 
     const context = storage.map.get(BILLING_CONTEXT_KEY) as
       | { generation?: string; measurementStarted?: boolean }
@@ -480,8 +658,6 @@ describe('ContainersBilling physical lifecycle', () => {
       measurementStarted: boolean;
       usageMeasuredAtMs: number;
     };
-    // Containers never use the Vercel pin or `openIntervalBeforeCreate` path:
-    // their first schedule stamps `Date.now()` at launch, not at admission.
     expect(context.measurementStarted).toBe(true);
     expect(context.usageMeasuredAtMs).toBe(launchedAt);
     expect(context.usageMeasuredAtMs).not.toBe(admittedAt);
@@ -524,7 +700,8 @@ describe('ContainersBilling physical lifecycle', () => {
     meter.heartbeatBudget = { verdict: 'continue' };
     await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
     expect(storage.map.get(BLOCK_KEY)).toBeUndefined();
-    expect(meter.recordStartInputs).toHaveLength(2);
+    expect(meter.recordStartInputs).toHaveLength(3);
+    expect(new Set(meter.recordStartInputs.map(input => input.startEpochMs)).size).toBe(2);
   });
 
   it('keeps the block and re-arms billingForceStop when destroy stays retryable', async () => {

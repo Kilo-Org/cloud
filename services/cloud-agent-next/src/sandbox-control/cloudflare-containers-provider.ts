@@ -1,5 +1,8 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
-import { getContainerCapacityFailureReason } from '../container-concurrency.js';
+import {
+  getContainerCapacityFailureReason,
+  isContainerConcurrencyExempt,
+} from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -48,6 +51,7 @@ function mapObservation(
 
 export function createCloudflareContainersProviderAdapter(deps: {
   logicalSandboxId: string;
+  containerConcurrencyDisabled?: boolean;
   allocationName: string;
   instance?: ContainerInstanceSize;
   egressAllowlist?: string[];
@@ -91,10 +95,25 @@ export function createCloudflareContainersProviderAdapter(deps: {
     } catch {
       blocked = input.enforcementRequested === true;
     }
-    if (input.enforcementRequested || blocked) {
+    const reserveCapacity =
+      !deps.containerConcurrencyDisabled &&
+      !isContainerConcurrencyExempt({
+        instanceId: input.sandboxId,
+        billingOrigin: input.metadata?.origin,
+      });
+    if (
+      input.enforcementRequested ||
+      blocked ||
+      (reserveCapacity && input.allocationId !== undefined)
+    ) {
       let admission: SandboxBillingAdmissionResult;
       try {
-        admission = await container.ensureBillingAdmission(input, instance);
+        admission = await withDORetry(
+          () => deps.getContainer(deps.logicalSandboxId),
+          async (container): Promise<SandboxBillingAdmissionResult> =>
+            await container.ensureBillingAdmission(input, instance),
+          'ensureSandboxContainersBillingAdmission'
+        );
       } catch (error) {
         if (getContainerCapacityFailureReason(error)) throw error;
         admission = {
@@ -129,8 +148,21 @@ export function createCloudflareContainersProviderAdapter(deps: {
     },
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeIntentProviderRef(intent);
-      await ensureBillingAdmission(providerRef, intent.billing);
+      await ensureBillingAdmission(
+        providerRef,
+        intent.billing === undefined
+          ? undefined
+          : { ...intent.billing, allocationId: intent.intentId }
+      );
       return { providerRef };
+    },
+    async releaseBillingAdmission(intent) {
+      if (intent.billing === undefined) return;
+      await withDORetry(
+        () => deps.getContainer(deps.logicalSandboxId),
+        container => container.releaseBillingAdmission(intent.intentId),
+        'releaseSandboxContainersBillingAdmission'
+      );
     },
     async launch(ref, env, options) {
       const owned = decodeOwnedProviderRef(ref);

@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cloud-agent-admission-test",
+  "main": "test/admission-workers/worker.ts",
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "NEXTAUTH_SECRET": "cloud-agent-admission-test-secret",
+    "CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED": "false",
+  },
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "durable_objects": {
+    "bindings": [{ "name": "SANDBOX_CONTROL", "class_name": "SandboxControlV2" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SandboxControlV2"] }],
+  "services": [
+    {
+      "binding": "CONTAINER_USAGE_METER",
+      "service": "cloud-agent-admission-test",
+      "entrypoint": "ContainerUsageMeter",
+    },
+  ],
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "00000000000000000000000000000000" }],
+}

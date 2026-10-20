@@ -175,6 +175,7 @@ export function vercelBillingIdentity(resources: VercelSandboxResources): Vercel
 
 export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
   sandboxId: SandboxId;
+  allocationId?: string;
   enforcementRequested?: boolean;
   /** Present for a placed key, whose prefix does not say which pool may bill it. */
   sandboxKind?: SandboxKind;
@@ -191,6 +192,7 @@ export type SandboxBillingAdmissionResult =
 export type MeteredSandboxInstance = SandboxInstance & {
   configureBilling(input: unknown): Promise<void>;
   ensureBillingAdmission(input: unknown): Promise<SandboxBillingAdmissionResult>;
+  releaseBillingAdmission(allocationId: string): Promise<void>;
   isBillingBlocked(): Promise<boolean>;
   isContainerRunning(): Promise<boolean>;
   forceDestroyForControlPlane(): Promise<void>;
@@ -226,6 +228,7 @@ export const sandboxBillingInputEnvelopeSchema = z
       })
       .optional(),
     enforcementRequested: z.boolean().default(false),
+    allocationId: z.string().min(1).max(256).optional(),
     sandboxKind: sandboxKindSchema.optional(),
   })
   .strict();
@@ -280,7 +283,7 @@ export function buildSandboxBillingInput(
 
 export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const parsed = sandboxBillingInputEnvelopeSchema.parse(input);
-  const { sandboxId, enforcementRequested, sandboxKind, ...usageInput } = parsed;
+  const { sandboxId, allocationId, enforcementRequested, sandboxKind, ...usageInput } = parsed;
   const validated = usageContextSchema.parse({
     service: USAGE_SERVICE_ROOT,
     instanceId: 'validation',
@@ -290,6 +293,7 @@ export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const { service: _service, instanceId: _instanceId, sku: _sku, ...billingInput } = validated;
   return {
     sandboxId,
+    ...(allocationId === undefined ? {} : { allocationId }),
     enforcementRequested,
     ...(sandboxKind ? { sandboxKind } : {}),
     ...billingInput,
@@ -375,7 +379,7 @@ export async function ensureSandboxBillingAdmissionInput(
   const ensureBillingAdmission = (sandbox as Partial<MeteredSandboxInstance>)
     .ensureBillingAdmission;
   if (typeof ensureBillingAdmission !== 'function') {
-    return input.enforcementRequested
+    return input.enforcementRequested || input.allocationId !== undefined
       ? {
           success: false,
           code: 'meter_unavailable',
@@ -386,7 +390,7 @@ export async function ensureSandboxBillingAdmissionInput(
   try {
     return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
   } catch (error) {
-    if (getContainerCapacityFailureReason(error)) throw error;
+    if (getContainerCapacityFailureReason(error) || input.allocationId !== undefined) throw error;
     return {
       success: false,
       code: 'meter_unavailable',
@@ -501,4 +505,15 @@ export async function configureSandboxBillingInput(
     return;
   }
   await (sandbox as MeteredSandboxInstance).configureBilling(input);
+}
+
+export async function releaseSandboxBillingAdmission(
+  sandbox: SandboxInstance,
+  allocationId: string
+): Promise<void> {
+  const capability = sandbox as Partial<MeteredSandboxInstance>;
+  if (typeof capability.releaseBillingAdmission !== 'function') {
+    throw new Error('Sandbox billing reservation cleanup is unavailable');
+  }
+  await capability.releaseBillingAdmission(allocationId);
 }

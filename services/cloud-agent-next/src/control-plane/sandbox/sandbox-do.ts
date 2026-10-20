@@ -27,10 +27,7 @@ import {
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
-import {
-  assertContainerCapacity,
-  getContainerCapacityFailureReason,
-} from '../../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
 import { createVercelBillingRuntime, type VercelBillingRuntime } from './vercel-billing-runtime.js';
 import {
@@ -3910,20 +3907,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const state = await this.readAllocation();
       if (state.kind !== 'creating' || state.allocationId !== allocationId) return;
       let createdRef: string | null = null;
+      const pin = this.providerPin ?? this.defaultPin('cloudflare');
+      const intent: ProviderCreateIntent = {
+        intentId: allocationId,
+        createdAt: Date.now(),
+        allocationName: pin.allocationName ?? this.sandboxId,
+        containment: this.resolvedContainment(),
+        ...(pin.billing === null ? {} : { billing: { ...pin.billing, allocationId } }),
+      };
       try {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
-        const pin = this.providerPin ?? this.defaultPin('cloudflare');
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
-        if (pin.billing) {
-          await assertContainerCapacity(this.env, {
-            subject: pin.billing.subject,
-            actor: pin.billing.actor,
-            instanceId: pin.billing.sandboxId,
-            checkpoint: 'control-plane-create',
-            billingOrigin: pin.billing.metadata?.origin,
-          });
-        }
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
         if (pin.provider === 'vercel') {
@@ -3935,14 +3930,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
             priorGeneration = (await getBillingContext(this.ctx.storage))?.generation;
             admissionStarted = true;
             admission = await withTimeout(
-              this.admitVercelCreate(pin).catch((error: unknown) => {
+              this.admitVercelCreate({
+                ...pin,
+                billing: intent.billing ?? null,
+              }).catch((error: unknown) => {
                 admissionRejected = true;
                 throw error;
               }),
               Math.min(remainingMs(createDeadline), this.sandboxTimers().providerStopAttemptMs),
               'Vercel billing admission timed out'
             );
-          } catch {
+          } catch (error) {
+            if (getContainerCapacityFailureReason(error)) throw error;
             let safeShadow = false;
             if (priorGeneration === undefined) {
               try {
@@ -3969,13 +3968,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
             return;
           }
         }
-        const intent: ProviderCreateIntent = {
-          intentId: allocationId,
-          createdAt: Date.now(),
-          allocationName: pin.allocationName ?? this.sandboxId,
-          containment: this.resolvedContainment(),
-          ...(pin.billing === null ? {} : { billing: pin.billing }),
-        };
         // N2: create and launch share one bound (the create deadline).
         const created = await withTimeout(
           this.provider.create(intent),
@@ -4120,6 +4112,29 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
+        const releaseAdmission = async () => {
+          try {
+            if (pin.provider === 'vercel') {
+              await this.billingRuntime.releaseAdmission(allocationId);
+            } else {
+              await this.provider.releaseBillingAdmission?.(intent);
+            }
+          } catch (cleanupError) {
+            logger
+              .withFields({
+                sandboxId: this.sandboxId,
+                allocationId,
+                errorName: cleanupError instanceof Error ? cleanupError.name : 'unknown',
+              })
+              .warn('Failed create billing reservation cleanup deferred');
+          }
+        };
+        if (
+          createdRef === null &&
+          (error instanceof ProviderCreationError || this.provider.isDefiniteCreateFailure?.(error))
+        ) {
+          await releaseAdmission();
+        }
         logControlDiagnostic(
           'create_failed',
           {
@@ -4135,21 +4150,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const capacityFailure = getContainerCapacityFailureReason(error);
         if (capacityFailure) {
           await this.failCreationRoutes(allocationId, false, capacityFailure);
+          if (createdRef !== null) await releaseAdmission();
           return;
         }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
+          if (createdRef !== null) await releaseAdmission();
           return;
         }
-        // N5: only clean up a container the reducer still owns. If a `hello`
-        // was accepted during a slow launch, the sandbox has an owner and must
-        // not be destroyed here.
         if (createdRef !== null) {
           const latest = await this.readAllocation();
           if (latest.kind === 'creating' && latest.allocationId === allocationId) {
             const confirmed = await this.stopRef(createdRef, allocationId);
-            if (this.currentProvider() === 'vercel')
+            if (pin.provider === 'vercel') {
               await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
+            }
+            await releaseAdmission();
           }
         }
         await this.dispatchCreateFailed(allocationId);
@@ -4964,6 +4980,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
             : undefined;
         return createCloudflareContainersProviderAdapter({
           logicalSandboxId: this.sandboxId,
+          containerConcurrencyDisabled:
+            this.env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true',
           allocationName,
           ...(instance === undefined ? {} : { instance }),
           ...(pin.egressAllowlist === undefined ? {} : { egressAllowlist: pin.egressAllowlist }),
@@ -4973,6 +4991,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'cloudflare':
         return createCloudflareProviderAdapter({
           sandboxId: allocationName,
+          containerConcurrencyDisabled:
+            this.env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true',
           getSandbox: (id, options) =>
             getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
           destroy: (id, options) =>

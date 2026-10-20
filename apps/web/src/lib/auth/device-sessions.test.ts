@@ -5,7 +5,9 @@ import {
   device_refresh_tokens,
   kilocode_users,
   organizations,
+  user_auth_provider,
 } from '@kilocode/db/schema';
+import type { Organization } from '@workos-inc/node';
 import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
@@ -553,7 +555,7 @@ describe('device-sessions', () => {
       expect(tokens[0]!.consumed_at).toBeNull();
     });
 
-    test('refresh for a domain that requires SSO is refused and revokes the session', async () => {
+    test('refresh for a domain that requires SSO without an SSO link is refused and revokes the session', async () => {
       const ssoDomain = `sso-${Date.now()}.example`;
       const ssoEmail = `member@${ssoDomain}`;
       await db
@@ -573,7 +575,9 @@ describe('device-sessions', () => {
         .returning({ id: organizations.id });
 
       try {
-        mockGetWorkOSOrganization.mockResolvedValueOnce(null);
+        mockGetWorkOSOrganization.mockResolvedValueOnce({
+          id: 'org_rotation_sso_test',
+        } as unknown as Organization);
 
         const result = await rotateRefreshToken(refreshToken);
         expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
@@ -585,8 +589,105 @@ describe('device-sessions', () => {
           .where(eq(device_sessions.id, sessionId));
         expect(session!.revoked_at).not.toBeNull();
         expect(session!.revoked_reason).toBe('domain_ineligible');
+
+        const tokens = await db
+          .select()
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, sessionId));
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0]!.consumed_at).toBeNull();
       } finally {
         await db.delete(organizations).where(eq(organizations.id, organization!.id));
+      }
+    });
+
+    test('refresh for a domain that requires SSO keeps rotating when the account is linked to that SSO authority', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: testUserId,
+        provider: 'workos',
+        provider_account_id: `workos-${testUserId}`,
+        email: ssoEmail,
+        avatar_url: 'https://example.com/avatar.jpg',
+        hosted_domain: ssoDomain,
+      });
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Rotation Linked SSO Organization', sso_domain: ssoDomain })
+        .returning({ id: organizations.id });
+
+      try {
+        mockGetWorkOSOrganization.mockResolvedValueOnce({
+          id: 'org_rotation_sso_linked',
+        } as unknown as Organization);
+
+        const result = await rotateRefreshToken(refreshToken);
+        expect(result.ok).toBe(true);
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).toBeNull();
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization!.id));
+        await db.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, testUserId));
+      }
+    });
+
+    test('refresh fails without revoking when the SSO authority is misconfigured', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const organizationIds = await db
+        .insert(organizations)
+        .values([
+          { name: 'Rotation Ambiguous One', sso_domain: ssoDomain },
+          { name: 'Rotation Ambiguous Two', sso_domain: ssoDomain },
+        ])
+        .returning({ id: organizations.id });
+
+      try {
+        await expect(rotateRefreshToken(refreshToken)).rejects.toThrow();
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).toBeNull();
+
+        const tokens = await db
+          .select()
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, sessionId));
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0]!.consumed_at).toBeNull();
+      } finally {
+        for (const organizationId of organizationIds) {
+          await db.delete(organizations).where(eq(organizations.id, organizationId.id));
+        }
       }
     });
 

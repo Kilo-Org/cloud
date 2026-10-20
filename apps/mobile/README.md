@@ -34,6 +34,8 @@ Native compatibility requirements:
   through its CommonJS facade for Router's native screen host.
 - The `llama.rn` iOS patch installs JSI bindings through React Native's TurboModule
   runtime hook and conforms to the generated native spec.
+- The iOS App Actions bridge uses `@JS` for Expo's noncopyable JavaScript values.
+  Its runtime-owned reference releases the dispatcher on the JavaScript thread.
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.

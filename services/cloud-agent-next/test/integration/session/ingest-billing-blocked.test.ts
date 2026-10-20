@@ -72,8 +72,8 @@ describe('ingest container billing state', () => {
     const stub = sessionStub(userId, sessionId);
 
     const readContainerBillingBlock = vi.fn().mockResolvedValue(false);
-    const stopContainerForBillingBlock = vi.fn();
-    const keepContainerAlive = vi.fn();
+    const stopContainerForBillingBlock = vi.fn().mockResolvedValue(undefined);
+    const keepContainerAlive = vi.fn().mockResolvedValue(undefined);
 
     await runInDurableObject(stub, async (instance, state) => {
       const now = Date.now();

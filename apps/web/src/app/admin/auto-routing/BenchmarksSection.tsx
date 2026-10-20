@@ -235,18 +235,18 @@ type BenchmarkCatalogModel = Parameters<typeof toEligibleModelOptions>[0][number
   opencode?: { variants?: Parameters<typeof getReasoningVariantKeys>[0] } | null;
 };
 
-/** Resolves each alias to its catalog target, the model whose efforts the registry measures. */
+/** Mirrors `platformRegistryEntries`: an alias counts only through a concrete catalog target. */
 export function toBenchmarkModelOptions(models: BenchmarkCatalogModel[]): BenchmarkModelOption[] {
   const byId = new Map(models.map(model => [model.id, model]));
   return toEligibleModelOptions(models).map(option => {
-    const target = option.id.startsWith('~')
+    const measured = option.id.startsWith('~')
       ? byId.get(byId.get(option.id)?.alias_target ?? '')
-      : undefined;
-    const measured = target ?? byId.get(option.id);
+      : byId.get(option.id);
+    if (measured === undefined || measured.id.startsWith('~')) return option;
     return {
       ...option,
-      measuredModelId: measured?.id,
-      reasoningVariants: measured && getReasoningVariantKeys(measured.opencode?.variants),
+      measuredModelId: measured.id,
+      reasoningVariants: getReasoningVariantKeys(measured.opencode?.variants),
     };
   });
 }

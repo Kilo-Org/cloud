@@ -176,7 +176,7 @@ describe('platform model selection', () => {
       );
     expect(coverage('~vendor/model-latest')).toBe('All 1 efforts: low · 1 of 1 measured');
     expect(coverage('vendor/model-1')).toContain('0 of 2 measured');
-    expect(coverage('~vendor/dangling-latest')).toContain('0 of 1 measured');
+    expect(coverage('~vendor/dangling-latest')).toBe('Effort coverage unavailable');
   });
 });
 

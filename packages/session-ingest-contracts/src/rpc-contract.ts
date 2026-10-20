@@ -836,14 +836,18 @@ export const persistedKiloSdkMessageHistorySchema = z.preprocess(
 );
 export type KiloSdkMessageHistory = z.infer<typeof kiloSdkMessageHistorySchema>;
 
-/** Longest message identity an opaque history cursor may carry. */
-export const MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH = 64;
+/**
+ * Longest message identity, in UTF-8 bytes, that an opaque history cursor may
+ * carry. The encoder serializes the id as UTF-8, so the cursor bound below is
+ * derived from this byte length.
+ */
+export const MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES = 64;
 
 /**
  * Worst-case JSON envelope of a valid cursor: the empty id plus the longest
  * decimal a non-negative finite double serializes to (`1.7976931348623157e+308`).
  */
-const MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_LENGTH = '{"id":"","time":1.7976931348623157e+308}'
+const MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_BYTES = '{"id":"","time":1.7976931348623157e+308}'
   .length;
 
 /**
@@ -854,15 +858,20 @@ const MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_LENGTH = '{"id":"","time":1.79769313
 export const MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH =
   4 *
   Math.ceil(
-    (MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_LENGTH + MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH) / 3
+    (MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_BYTES + MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES) / 3
   );
 
 /** Base64 and base64url alphabets, plus the optional trailing padding. */
 const KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
+const utf8Encoder = new TextEncoder();
+
 export const kiloSdkMessagesLegacyCursorSchema = z
   .object({
-    id: messageIdSchema.max(MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH),
+    id: messageIdSchema.refine(
+      id => utf8Encoder.encode(id).length <= MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
+      { message: 'message cursor ids must fit the cursor id byte limit' }
+    ),
     time: z.number().nonnegative(),
   })
   .strict();

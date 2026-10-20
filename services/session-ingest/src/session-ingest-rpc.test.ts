@@ -62,7 +62,7 @@ import {
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH,
+  MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
   MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
   messageIdSchema,
@@ -1968,7 +1968,7 @@ describe('Kilo SDK message cursor codec', () => {
 
   it('round-trips the longest cursor the schemas accept', () => {
     const cursor = {
-      id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH - 3)}`,
+      id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 3)}`,
       time: 1761000000100,
     };
     const encoded = encodeKiloSdkMessagesCursor(cursor);
@@ -1976,6 +1976,16 @@ describe('Kilo SDK message cursor codec', () => {
     expect(encoded.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
     expect(decodeKiloSdkMessagesCursor(encoded)).toEqual(cursor);
     expect(validateKiloSdkMessagesCursor(encoded)).toBe(true);
+  });
+
+  it('round-trips a multi-byte id at the cursor id byte limit', () => {
+    const id = `msg${'😀'.repeat(15)}a`;
+    const cursor = { id, time: 1761000000100 };
+    const encoded = encodeKiloSdkMessagesCursor(cursor);
+
+    expect(new TextEncoder().encode(id).length).toBe(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES);
+    expect(encoded.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(decodeKiloSdkMessagesCursor(encoded)).toEqual(cursor);
   });
 
   it('rejects an encoded cursor longer than the wire cap without decoding it', () => {
@@ -1989,7 +1999,7 @@ describe('Kilo SDK message cursor codec', () => {
   it('rejects a cursor whose decoded message id is longer than the id cap', () => {
     const oversized = btoa(
       JSON.stringify({
-        id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_LENGTH - 2)}`,
+        id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 2)}`,
         time: 1,
       })
     )
@@ -2000,6 +2010,20 @@ describe('Kilo SDK message cursor codec', () => {
     expect(oversized.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
     expect(validateKiloSdkMessagesCursor(oversized)).toBe(false);
     expect(() => decodeKiloSdkMessagesCursor(oversized)).toThrow();
+  });
+
+  it('counts UTF-8 bytes rather than UTF-16 code units for the id cap', () => {
+    const overByteCap = `msg${'😀'.repeat(16)}`;
+    const payload = btoa(
+      String.fromCharCode(...new TextEncoder().encode(JSON.stringify({ id: overByteCap, time: 1 })))
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    expect(overByteCap.length).toBeLessThan(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES);
+    expect(validateKiloSdkMessagesCursor(payload)).toBe(false);
+    expect(() => encodeKiloSdkMessagesCursor({ id: overByteCap, time: 1 })).toThrow();
   });
 
   it('rejects characters outside the base64 cursor alphabet', () => {

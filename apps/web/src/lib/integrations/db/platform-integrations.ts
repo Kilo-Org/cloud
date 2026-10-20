@@ -927,14 +927,30 @@ function buildGitHubAuthorizationProvenance(
   };
 }
 
+export type AutoCompleteInstallationOutcome =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: 'not_pending' | 'requester_mismatch' | 'account_mismatch' | 'installation_claimed';
+    };
+
 /**
- * Auto-complete a pending installation
+ * Auto-complete a pending installation.
+ *
+ * Completion is gated on the delivery's GitHub identities, not just on the
+ * installation account: the pending row records the GitHub identity that
+ * requested the connection (`platform_requester_account_id`), and only a
+ * delivery attributed to that identity may activate it. A row whose recorded
+ * target account is set must also target the account this installation
+ * belongs to. Anything else leaves the row pending for the verified connect
+ * flow, which proves installation administration through OAuth.
  */
 export async function autoCompleteInstallation(
   {
     integrationId,
     installationData,
     existingMetadata,
+    authorizedRequesterAccountIds,
   }: {
     integrationId: string;
     installationData: {
@@ -947,12 +963,15 @@ export async function autoCompleteInstallation(
       created_at: string;
     };
     existingMetadata: Record<string, unknown>;
+    /** GitHub identities attributed to the installation delivery (the
+     *  delivery's requester and the actor that triggered it). */
+    authorizedRequesterAccountIds: readonly string[];
   },
   /** Run the completion inside a caller-owned transaction (for example
    *  alongside the installation exclusivity check and canonical binding, so
    *  the whole decision is serialized under the installation lock). */
   transaction?: DrizzleTransaction
-) {
+): Promise<AutoCompleteInstallationOutcome> {
   // Keep requester info for historical purposes, but clear pending_approval since it's complete
   // Use Zod to safely parse the existing metadata
   const parseResult = PendingInstallationMetadataWrapperSchema.safeParse(existingMetadata);
@@ -967,19 +986,16 @@ export async function autoCompleteInstallation(
   };
 
   // The webhook that completes a pending request carries no live OAuth
-  // session, so there is no independently verified identity for whoever
-  // clicked "Install" on GitHub. The original requester's identity was
-  // already verified via OAuth when the request was created (see
-  // createPendingIntegration), so record it as the authorizing identity
-  // rather than leaving provenance null. This can misattribute completion
-  // if a different GitHub org admin approves someone else's request; there
-  // is no stronger identity available on this path to resolve that.
+  // session. The recorded requester's identity was verified via OAuth when
+  // the request was created (see createPendingIntegration), and the caller
+  // only reaches this write when GitHub attributes the delivery to that same
+  // identity. Record the recorded requester as the authorizing identity.
   const authorizationProvenance = buildGitHubAuthorizationProvenance(
     pendingApproval?.requester?.kilo_user_id,
     pendingApproval?.github_requester?.id
   );
 
-  const execute = async (tx: DrizzleTransaction) => {
+  const execute = async (tx: DrizzleTransaction): Promise<AutoCompleteInstallationOutcome> => {
     const [pending] = await tx
       .select()
       .from(platform_integrations)
@@ -989,12 +1005,26 @@ export async function autoCompleteInstallation(
       !pending ||
       pending.platform !== PLATFORM.GITHUB ||
       pending.integration_status !== INTEGRATION_STATUS.PENDING
-    )
-      throw new Error('Pending GitHub connection not found');
+    ) {
+      return { ok: false, reason: 'not_pending' };
+    }
     const appType = pending.github_app_type ?? 'standard';
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${installationData.installation_id}`}))`
     );
+    const recordedRequesterAccountId = pending.platform_requester_account_id;
+    if (
+      !recordedRequesterAccountId ||
+      !authorizedRequesterAccountIds.includes(recordedRequesterAccountId)
+    ) {
+      return { ok: false, reason: 'requester_mismatch' };
+    }
+    if (
+      pending.platform_account_id &&
+      pending.platform_account_id !== installationData.account_id
+    ) {
+      return { ok: false, reason: 'account_mismatch' };
+    }
     const [peer] = await tx
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
@@ -1007,7 +1037,7 @@ export async function autoCompleteInstallation(
         )
       )
       .limit(1);
-    if (peer) throw new Error('GitHub installation is already connected');
+    if (peer) return { ok: false, reason: 'installation_claimed' };
     await tx
       .update(platform_integrations)
       .set({
@@ -1032,8 +1062,9 @@ export async function autoCompleteInstallation(
           eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING)
         )
       );
+    return { ok: true };
   };
-  await (transaction ? execute(transaction) : db.transaction(execute));
+  return await (transaction ? execute(transaction) : db.transaction(execute));
 }
 
 /**

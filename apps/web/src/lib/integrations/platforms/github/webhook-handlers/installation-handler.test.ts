@@ -91,7 +91,8 @@ const mockCaptureException = jest.fn<(...args: unknown[]) => void>();
 const mockLogExceptInTest = jest.fn<(...args: unknown[]) => void>();
 const mockObserveGitHubInstallationLifecycle = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockUpdateGitHubInstallationRepositories = jest.fn<(...args: unknown[]) => Promise<void>>();
-const mockAutoCompleteInstallation = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockAutoCompleteInstallation =
+  jest.fn<(...args: unknown[]) => Promise<{ ok: true } | { ok: false; reason: string }>>();
 const mockBindCanonical = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockFetchGitHubRepositories = jest.fn<() => Promise<PlatformRepository[]>>();
 let connectionManagementEnabled = false;
@@ -255,6 +256,7 @@ describe('handleInstallationCreated', () => {
     connectionManagementEnabled = true;
     selectResults = [[], [{ ...orgIntegration, metadata: {} }]];
     mockFetchGitHubRepositories.mockResolvedValue([]);
+    mockAutoCompleteInstallation.mockResolvedValue({ ok: true });
   });
 
   it.each([false, true])(
@@ -273,13 +275,16 @@ describe('handleInstallationCreated', () => {
             permissions: {},
           },
           requester: { id: 22, login: 'owner' },
-          sender: { login: 'owner' },
+          sender: { id: 22, login: 'owner' },
         },
         'standard'
       );
       expect(response.status).toBe(200);
       expect(mockAutoCompleteInstallation).toHaveBeenCalledWith(
-        expect.objectContaining({ integrationId: 'pi_org' }),
+        expect.objectContaining({
+          integrationId: 'pi_org',
+          authorizedRequesterAccountIds: ['22'],
+        }),
         expect.anything()
       );
       expect(mockBindCanonical).toHaveBeenCalledWith(
@@ -307,7 +312,7 @@ describe('handleInstallationCreated', () => {
           permissions: {},
         },
         requester: { id: 22, login: 'owner' },
-        sender: { login: 'owner' },
+        sender: { id: 22, login: 'owner' },
       },
       'standard'
     );
@@ -333,7 +338,7 @@ describe('handleInstallationCreated', () => {
           permissions: {},
         },
         requester: { id: 22, login: 'owner' },
-        sender: { login: 'owner' },
+        sender: { id: 22, login: 'owner' },
       },
       'standard'
     );
@@ -341,6 +346,97 @@ describe('handleInstallationCreated', () => {
     expect(await response.json()).toEqual({
       message: 'Installation association requires verified connection confirmation',
     });
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+    expect(mockBindCanonical).not.toHaveBeenCalled();
+  });
+
+  it('completes when the delivery sender is the recorded requester', async () => {
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: null,
+        sender: { id: 22, login: 'owner' },
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockAutoCompleteInstallation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        integrationId: 'pi_org',
+        authorizedRequesterAccountIds: ['22'],
+      }),
+      expect.anything()
+    );
+    expect(mockBindCanonical).toHaveBeenCalledWith(
+      { integrationId: 'pi_org', installationId: '98765', appType: 'standard' },
+      expect.anything()
+    );
+  });
+
+  it('declines completion and leaves the pending request pending when the delivery identity does not match', async () => {
+    mockAutoCompleteInstallation.mockResolvedValue({
+      ok: false,
+      reason: 'requester_mismatch',
+    });
+
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 23, login: 'other' },
+        sender: { id: 23, login: 'other' },
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      message: 'Installation association requires verified connection confirmation',
+    });
+    expect(mockAutoCompleteInstallation).toHaveBeenCalledWith(
+      expect.objectContaining({ authorizedRequesterAccountIds: ['23'] }),
+      expect.anything()
+    );
+    expect(mockBindCanonical).not.toHaveBeenCalled();
+  });
+
+  it('leaves the pending request pending when the delivery carries no GitHub identity', async () => {
+    selectResults = [[]];
+
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: null,
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Installation recorded' });
     expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
     expect(mockBindCanonical).not.toHaveBeenCalled();
   });

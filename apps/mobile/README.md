@@ -26,6 +26,11 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 2. `pnpm exec eas login -b`
 3. obtain Apple access (developer)
 
+Run these commands from `apps/mobile` after `pnpm install --frozen-lockfile`.
+When updating EAS CLI, keep the `eas-cli` development dependency and `eas.json`'s
+`cli.version` aligned, regenerate the workspace dependency graph, and verify with
+`pnpm exec eas --version`.
+
 ### Android
 
 1. install latest dev build from [here](https://expo.dev/accounts/kilocode/projects/kilo-app/builds?profile=development&platform=ANDROID) - if needed, rebuild with `pnpm build:android`

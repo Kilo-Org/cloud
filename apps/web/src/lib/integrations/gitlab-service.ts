@@ -259,7 +259,6 @@ export async function listGitLabRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  // If forceRefresh, no cached repos, or never synced before, fetch from GitLab and update cache
   if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
     const accessToken = await getValidGitLabToken(integration, actor);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
@@ -274,7 +273,6 @@ export async function listGitLabRepositories(
     };
   }
 
-  // Return cached repos
   return {
     repositories: cachedRepositories,
     syncedAt: integration.repositories_synced_at,

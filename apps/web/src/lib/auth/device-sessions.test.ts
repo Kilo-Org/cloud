@@ -1,6 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
+import {
+  device_sessions,
+  device_refresh_tokens,
+  kilocode_users,
+  organizations,
+} from '@kilocode/db/schema';
 import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
@@ -10,6 +15,25 @@ import {
   revokeDeviceSession,
 } from './device-sessions';
 import type { User } from '@kilocode/db/schema';
+import {
+  isEmailBlacklistedByDomainAsync,
+  isBlockedTLD,
+} from '@kilocode/web-shared/lib/user/server';
+import { getWorkOSOrganization } from '@/lib/user';
+
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+  isEmailBlacklistedByDomainAsync: jest.fn(),
+  isBlockedTLD: jest.fn(),
+}));
+
+jest.mock('@/lib/user', () => ({
+  ...(jest.requireActual('@/lib/user') as object),
+  getWorkOSOrganization: jest.fn(),
+}));
+
+const mockIsEmailBlacklistedByDomainAsync = jest.mocked(isEmailBlacklistedByDomainAsync);
+const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
+const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
 
 describe('device-sessions', () => {
   const testUserId = 'test-user-ds-' + Date.now();
@@ -18,6 +42,10 @@ describe('device-sessions', () => {
   let fakeUser: User;
 
   beforeEach(async () => {
+    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsBlockedTLD.mockReturnValue(false);
+    mockGetWorkOSOrganization.mockResolvedValue(null);
+
     await db.insert(kilocode_users).values({
       id: testUserId,
       google_user_email: testUserEmail,
@@ -494,6 +522,81 @@ describe('device-sessions', () => {
       }
 
       // Verify session is NOT revoked (no false reuse detection)
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).toBeNull();
+    });
+
+    test('refresh for a domain that is not allowed to sign in is refused and revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      mockIsEmailBlacklistedByDomainAsync.mockResolvedValueOnce(true);
+
+      const result = await rotateRefreshToken(refreshToken);
+      expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).not.toBeNull();
+      expect(session!.revoked_reason).toBe('domain_ineligible');
+
+      const tokens = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0]!.consumed_at).toBeNull();
+    });
+
+    test('refresh for a domain that requires SSO is refused and revokes the session', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Rotation SSO Organization', sso_domain: ssoDomain })
+        .returning({ id: organizations.id });
+
+      try {
+        mockGetWorkOSOrganization.mockResolvedValueOnce(null);
+
+        const result = await rotateRefreshToken(refreshToken);
+        expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+        expect(mockGetWorkOSOrganization).toHaveBeenCalledWith(ssoDomain);
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).not.toBeNull();
+        expect(session!.revoked_reason).toBe('domain_ineligible');
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization!.id));
+      }
+    });
+
+    test('refresh with an eligible domain rotates and keeps the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const result = await rotateRefreshToken(refreshToken);
+
+      expect(result.ok).toBe(true);
       const [session] = await db
         .select()
         .from(device_sessions)

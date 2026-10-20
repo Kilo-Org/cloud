@@ -6,6 +6,7 @@ import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
+import { checkDomainSignInEligibility } from './email-signin-eligibility';
 
 const REFRESH_TOKEN_BYTES = 32;
 
@@ -100,9 +101,11 @@ export async function issueSessionCredentials(
  * Rotate a refresh token. On success, returns a new token pair.
  * On failure, returns null with an error code.
  *
- * Precondition checks (session validity, user blocked_reason) happen BEFORE
- * the atomic consume, so a blocked refusal does not consume the token.
- * An unknown or expired token is refused without revocation.
+ * Precondition checks (session validity, user blocked_reason, and the domain
+ * sign-in policy of the account's current email) happen BEFORE the atomic
+ * consume, so a refusal does not consume the token. A session whose domain may
+ * no longer sign in is revoked and refused. An unknown or expired token is
+ * refused without revocation.
  *
  * Reuse detection: a consumed token is a replay, and the session is revoked,
  * when the session chain has advanced past it (a later token was consumed) or
@@ -186,7 +189,11 @@ export async function rotateRefreshToken(
 
   // Step 3: Check user blocked_reason BEFORE consuming.
   const [user] = await db
-    .select({ id: kilocode_users.id, blocked_reason: kilocode_users.blocked_reason })
+    .select({
+      id: kilocode_users.id,
+      blocked_reason: kilocode_users.blocked_reason,
+      google_user_email: kilocode_users.google_user_email,
+    })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, session.kilo_user_id))
     .limit(1);
@@ -196,6 +203,19 @@ export async function rotateRefreshToken(
   }
 
   if (user.blocked_reason) {
+    return { ok: false, error: 'USER_BLOCKED' };
+  }
+
+  // Step 3b: Re-apply the domain-level sign-in policy, so a session renews only
+  // while its account's current email domain may sign in. Checked BEFORE the
+  // consume, so a refusal leaves the token untouched. A lookup failure throws:
+  // renewal stops rather than proceeding unverified.
+  const domainEligibility = await checkDomainSignInEligibility(user.google_user_email);
+  if (!domainEligibility.ok) {
+    await revokeDeviceSession(session.id, 'domain_ineligible');
+    console.warn('[native-refresh] domain not eligible; session revoked', {
+      deviceSessionId: session.id,
+    });
     return { ok: false, error: 'USER_BLOCKED' };
   }
 

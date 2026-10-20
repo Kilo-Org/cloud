@@ -2,6 +2,7 @@ import 'server-only';
 import type { ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
+import { TRPCError } from '@trpc/server';
 import { sessionConfigFromFetchedSession, type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
@@ -36,10 +37,18 @@ export async function PrefetchedCloudChat({
       new Promise(resolve => setTimeout(resolve, CHAT_PREFETCH_TIMEOUT_MS)),
     ]);
   } catch (error) {
-    // The client opens the chat as usual; still report real server failures.
-    Sentry.captureException(error);
+    // The client opens the chat as usual; a chat the server does not know yet
+    // or refuses is expected, so only unexpected failures go to Sentry.
+    if (!isExpectedSessionReadError(error)) Sentry.captureException(error);
   }
   return <HydrationBoundary state={dehydrate(queryClient)}>{children}</HydrationBoundary>;
+}
+
+function isExpectedSessionReadError(error: unknown): boolean {
+  return (
+    error instanceof TRPCError &&
+    (error.code === 'NOT_FOUND' || error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN')
+  );
 }
 
 async function seedCachedTranscript(

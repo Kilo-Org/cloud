@@ -117,7 +117,7 @@ type SidebarLayoutContextValue = WorktreeChatTabs & {
   createWorktreeChat: (
     sourceKiloSessionId: string,
     options?: { placement?: 'append' | 'replace'; composer?: LocalComposerSettings | null }
-  ) => void;
+  ) => boolean;
 };
 
 const SidebarLayoutContext = createContext<SidebarLayoutContextValue>({
@@ -134,7 +134,7 @@ const SidebarLayoutContext = createContext<SidebarLayoutContextValue>({
   retryLocalChat: () => {},
   discardLocalChat: () => {},
   toggleMobileSidebar: () => {},
-  createWorktreeChat: () => {},
+  createWorktreeChat: () => false,
 });
 
 export function useSidebarToggle() {
@@ -668,7 +668,12 @@ function CloudSidebarLayoutContent({
         ? knownChats.find(session => session.worktreeId === worktreeId && !session.localSync)
             ?.sessionId
         : sourceKiloSessionId;
-      if (!worktreeId || !serverSourceId) return;
+      if (!worktreeId || !serverSourceId) {
+        toast.error('Cannot start a new chat yet', {
+          description: 'Wait for this worktree to finish syncing, then try again.',
+        });
+        return false;
+      }
 
       const kiloSessionId = createLocalSession({
         organizationId: organizationId ?? null,
@@ -692,6 +697,7 @@ function CloudSidebarLayoutContent({
         );
       }
       openSessionInternal(kiloSessionId);
+      return true;
     },
     [
       cachedSessions,

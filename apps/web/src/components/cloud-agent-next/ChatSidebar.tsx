@@ -331,7 +331,8 @@ function WorktreeGroupRow({
   const savingRenameRef = useRef(false);
   const restoreFocusRef = useRef(false);
   const renameErrorId = useId();
-  const label = isLoadingDetails ? 'Loading worktree…' : getSidebarWorktreeLabel(group);
+  const worktreeLabel = getSidebarWorktreeLabel(group);
+  const label = isLoadingDetails ? 'Loading worktree…' : worktreeLabel;
   const prSession = getSidebarWorktreePrSession(group);
   const activity = getSidebarWorktreeActivity(
     group.sessions,
@@ -372,7 +373,7 @@ function WorktreeGroupRow({
   const saveRename = async () => {
     if (!editingRef.current || !onRenameWorktree || savingRenameRef.current || isDeleting) return;
     const name = editName.trim();
-    if (!name || name === label) {
+    if (isLoadingDetails || !name || name === worktreeLabel) {
       finishRename();
       return;
     }
@@ -529,9 +530,10 @@ function WorktreeGroupRow({
                       )}
                       {onRenameWorktree && (
                         <DropdownMenuItem
+                          disabled={isLoadingDetails}
                           onSelect={() => {
                             editingRef.current = true;
-                            setEditName(label);
+                            setEditName(worktreeLabel);
                             setRenameError(null);
                             setIsEditing(true);
                             setMenuOpen(false);

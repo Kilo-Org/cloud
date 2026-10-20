@@ -17,7 +17,11 @@ export function readCachedPage<Page extends object>(
     // A miss.
   }
   if (cached === null || !('then' in cached)) {
-    apply(cached);
+    try {
+      apply(cached);
+    } catch {
+      // A miss.
+    }
     return null;
   }
   return cached.then(apply).catch(() => {

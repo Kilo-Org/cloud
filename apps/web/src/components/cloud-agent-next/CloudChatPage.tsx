@@ -868,8 +868,10 @@ export default function CloudChatPage({
   }, [createWorktreeChat, newChatComposer, worktreeChatSourceSessionId]);
   const handleReplaceWorktreeChat = useCallback(() => {
     if (!canCreateWorktreeChat || !sessionIdFromParams) return false;
-    createWorktreeChat(sessionIdFromParams, { placement: 'replace', composer: newChatComposer });
-    return true;
+    return createWorktreeChat(sessionIdFromParams, {
+      placement: 'replace',
+      composer: newChatComposer,
+    });
   }, [canCreateWorktreeChat, createWorktreeChat, newChatComposer, sessionIdFromParams]);
 
   const handleSendMessage = useCallback(

@@ -25,6 +25,15 @@ export class SlackWorkspaceAlreadyConnectedError extends Error {
   }
 }
 
+export class SlackWorkspaceRebindNotAllowedError extends Error {
+  constructor() {
+    super(
+      'This organization is already connected to a different Slack workspace. Disconnect it before connecting another workspace.'
+    );
+    this.name = 'SlackWorkspaceRebindNotAllowedError';
+  }
+}
+
 // Slack OAuth scopes for the integration
 // These should be kept in sync with the scopes requested in the Slack app configuration
 export const SLACK_SCOPES = [
@@ -231,15 +240,21 @@ async function mirrorSlackCredential({
 
 /**
  * Create or update Slack installation from the Chat SDK OAuth callback result.
+ *
+ * An organization connection holds a shared bot token and model policy, so moving
+ * it to another Slack workspace is refused unless the caller passes
+ * `allowWorkspaceRebind` after verifying organization-management authority.
  */
 export async function upsertSlackInstallation({
   owner,
   teamId,
   installation,
+  allowWorkspaceRebind = false,
 }: {
   owner: Owner;
   teamId: string;
   installation: SlackInstallation;
+  allowWorkspaceRebind?: boolean;
 }): Promise<PlatformIntegration> {
   const existing = await getInstallation(owner);
   const teamName = installation.teamName || 'Unknown Team';
@@ -247,6 +262,16 @@ export async function upsertSlackInstallation({
   const conflicting = await getConflictingSlackInstallation(owner, teamId);
   if (conflicting) {
     throw new SlackWorkspaceAlreadyConnectedError(teamName);
+  }
+
+  if (
+    existing &&
+    !allowWorkspaceRebind &&
+    owner.type === 'org' &&
+    existing.platform_installation_id &&
+    existing.platform_installation_id !== teamId
+  ) {
+    throw new SlackWorkspaceRebindNotAllowedError();
   }
 
   // For org integrations, get a model that respects org access policy.

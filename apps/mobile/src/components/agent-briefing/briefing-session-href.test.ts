@@ -5,11 +5,28 @@ import { briefingSessionHref, briefingSourceHref } from './briefing-session-href
 const ORG_ID = '11111111-2222-4333-8444-555555555555';
 
 const REPORT = {
-  context: { organizationId: ORG_ID },
+  context: { id: 'context-org', organizationId: ORG_ID, name: 'Drain Test Org' },
   sessions: [
     {
       sessionId: 'ses_root',
-      sources: [{ id: 'status:one' }, { id: 'usage:charge' }],
+      sources: [
+        {
+          id: 'status:one',
+          sessionId: 'ses_root',
+          kind: 'activity' as const,
+          title: 'Session status changed',
+          occurredAt: '2026-10-20T02:59:00.000Z',
+          url: '/cloud/sessions/ses_root',
+        },
+        {
+          id: 'usage:charge',
+          sessionId: 'ses_root',
+          kind: 'cost' as const,
+          title: 'Recorded usage charge',
+          occurredAt: '2026-10-20T03:32:00.000Z',
+          url: '/cloud/sessions/ses_root',
+        },
+      ],
     },
   ],
 };
@@ -23,7 +40,10 @@ describe('briefingSessionHref', () => {
 
   it('keeps a Personal report on the unscoped route', () => {
     expect(
-      briefingSessionHref({ ...REPORT, context: { organizationId: null } }, 'ses_personal')
+      briefingSessionHref(
+        { ...REPORT, context: { id: 'context-personal', organizationId: null, name: 'Personal' } },
+        'ses_personal'
+      )
     ).toBe('/(app)/agent-chat/ses_personal');
   });
 });

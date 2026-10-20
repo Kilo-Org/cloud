@@ -1,26 +1,15 @@
+import { type BriefingSource } from '@kilocode/app-shared/agent-briefing';
 import { type Href } from 'expo-router';
 
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { type BriefingReport } from '@/lib/agent-briefing';
 
-type BriefingSessionRef = {
-  sessionId: string;
-  sources: readonly { id: string }[];
+/** The report fields a link reads: its scope and the session groups it names. */
+type BriefingLinkReport = Pick<BriefingReport, 'context'> & {
+  sessions: readonly Pick<BriefingReport['sessions'][number], 'sessionId' | 'sources'>[];
 };
 
-type BriefingSourceRef = {
-  id: string;
-  sessionId: string;
-  kind: string;
-};
-
-/**
- * The report fields a session link needs. Structural rather than the router
- * output type so the link rule can be exercised without the app graph.
- */
-type BriefingLinkReport = {
-  context: { organizationId: string | null };
-  sessions: readonly BriefingSessionRef[];
-};
+type BriefingLinkSource = Pick<BriefingSource, 'id' | 'sessionId' | 'kind'>;
 
 /** Evidence kinds that were recorded by a session and open its transcript. */
 function isSessionSourceKind(kind: string): kind is 'activity' | 'cost' | 'blocker' {
@@ -46,7 +35,7 @@ export function briefingSessionHref(report: BriefingLinkReport, kiloSessionId: s
  */
 export function briefingSourceHref(
   report: BriefingLinkReport,
-  source: BriefingSourceRef
+  source: BriefingLinkSource
 ): Href | null {
   if (!isSessionSourceKind(source.kind)) {
     return null;

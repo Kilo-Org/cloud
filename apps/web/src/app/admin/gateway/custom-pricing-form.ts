@@ -72,3 +72,26 @@ export function upsertCustomPricing(
   if (index === -1) return [...models, config];
   return models.map((model, i) => (i === index ? config : model));
 }
+
+/** Compares field values in a fixed order, since stored jsonb does not keep key order. */
+function customPricingKey(config: CustomPricingModelConfig): string {
+  return JSON.stringify([
+    config.model,
+    config.pricing.prompt_per_million,
+    config.pricing.completion_per_million,
+    config.pricing.input_cache_read_per_million,
+    config.pricing.input_cache_write_per_million,
+    config.discountPercentage ?? null,
+    config.fallbackOnly,
+  ]);
+}
+
+export function sameCustomPricing(
+  a: readonly CustomPricingModelConfig[],
+  b: readonly CustomPricingModelConfig[]
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((config, index) => customPricingKey(config) === customPricingKey(b[index]))
+  );
+}

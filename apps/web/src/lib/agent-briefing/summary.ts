@@ -113,7 +113,7 @@ export async function briefingPriceBound(
   if (Buffer.byteLength(prompt, 'utf8') > MAX_INPUT_BYTES) throw new Error('input_too_large');
   let price;
   try {
-    price = textRequestPriceCeiling(metadata, configuredCustomPricing);
+    price = textRequestPriceCeiling(metadata, model, configuredCustomPricing);
   } catch {
     throw new Error('invalid_model_pricing');
   }

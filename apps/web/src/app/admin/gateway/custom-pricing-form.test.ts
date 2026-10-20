@@ -4,6 +4,7 @@ import {
   customPricingToForm,
   EMPTY_CUSTOM_PRICING_FORM,
   parseCustomPricingForm,
+  sameCustomPricing,
   upsertCustomPricing,
 } from '@/app/admin/gateway/custom-pricing-form';
 
@@ -64,5 +65,38 @@ describe('custom pricing form', () => {
 
     expect(upsertCustomPricing([modelA, modelB], updatedA)).toEqual([updatedA, modelB]);
     expect(upsertCustomPricing([modelA], modelB)).toEqual([modelA, modelB]);
+  });
+
+  test('treats pricing with reordered keys as unchanged', () => {
+    const storedOrder = {
+      fallbackOnly: modelA.fallbackOnly,
+      model: modelA.model,
+      discountPercentage: modelA.discountPercentage,
+      pricing: {
+        input_cache_write_per_million: modelA.pricing.input_cache_write_per_million,
+        input_cache_read_per_million: modelA.pricing.input_cache_read_per_million,
+        completion_per_million: modelA.pricing.completion_per_million,
+        prompt_per_million: modelA.pricing.prompt_per_million,
+      },
+    };
+
+    expect(sameCustomPricing([storedOrder], [modelA])).toBe(true);
+  });
+
+  test.each([
+    [
+      'a changed price',
+      [modelA],
+      [{ ...modelA, pricing: { ...modelA.pricing, prompt_per_million: 3 } }],
+    ],
+    ['a removed discount', [modelA], [{ ...modelA, discountPercentage: undefined }]],
+    ['an added model', [modelA], [modelA, { ...modelA, model: 'provider/model-b' }]],
+    [
+      'a reordered list',
+      [modelA, { ...modelA, model: 'provider/model-b' }],
+      [{ ...modelA, model: 'provider/model-b' }, modelA],
+    ],
+  ])('detects %s', (_name, saved, edited) => {
+    expect(sameCustomPricing(edited, saved)).toBe(false);
   });
 });

@@ -88,7 +88,7 @@ export function freezeBriefingEvidence(
     const omittedCollectedSessions = allSessions.length - selectedSessions.length;
     const omittedCollectedSources = allSources.length - sources.length;
     truncated ||= omittedCollectedSessions > 0 || omittedCollectedSources > 0;
-    const snapshot: FrozenFacts = {
+    const display = {
       ...facts,
       sessions: selectedSessions.map(session => ({
         ...session,
@@ -100,21 +100,26 @@ export function freezeBriefingEvidence(
       sources,
       coverage: truncated
         ? {
-            activity: 'partial',
+            activity: 'partial' as const,
             spend: facts.coverage.spend === 'unavailable' ? 'unavailable' : 'partial',
-            blockers: 'partial',
-            pullRequests: 'partial',
+            blockers: 'partial' as const,
+            pullRequests: 'partial' as const,
           }
         : facts.coverage,
-      evidenceEventIds: provenance.eventIds,
-      evidenceSessionIds: provenance.sessionIds,
-      evidenceUsage,
       collectionTruncated: truncated,
       omittedCollectedSessions,
       omittedCollectedSources,
-    };
-    const bytes = Buffer.byteLength(JSON.stringify(snapshot), 'utf8');
-    if (bytes <= ONE_OFF_SNAPSHOT_BYTES) return snapshot;
+    } satisfies Omit<FrozenFacts, 'evidenceEventIds' | 'evidenceSessionIds' | 'evidenceUsage'>;
+    // Provenance is count-bounded by the collection caps and must stay complete for access invalidation.
+    const bytes = Buffer.byteLength(JSON.stringify(display), 'utf8');
+    if (bytes <= ONE_OFF_SNAPSHOT_BYTES) {
+      return {
+        ...display,
+        evidenceEventIds: provenance.eventIds,
+        evidenceSessionIds: provenance.sessionIds,
+        evidenceUsage,
+      };
+    }
     truncated = true;
     if (sourceLimit > 0) {
       sourceLimit = Math.floor((sourceLimit * ONE_OFF_SNAPSHOT_BYTES) / bytes);

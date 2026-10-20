@@ -93,6 +93,154 @@ export function extractProcedureName(pathname: string): string | null {
   return match ? match[1] : null;
 }
 
+const TRPC_ENDPOINT = 'trpc';
+
+function trimSlashes(path: string): string {
+  const withoutLeading = path.startsWith('/') ? path.slice(1) : path;
+  return withoutLeading.endsWith('/') ? withoutLeading.slice(0, -1) : withoutLeading;
+}
+
+/**
+ * Extracts every procedure name from a tRPC request path.
+ *
+ * tRPC identifies a batch with `?batch=1`, percent-decodes the path, then
+ * splits it on commas. Empty segments stay in place because tRPC pairs each
+ * segment with the input at the same index.
+ *
+ * Returns `null` when the path cannot be decoded, matching the request tRPC
+ * itself would reject rather than silently treating it as unbillable.
+ */
+export function extractProcedureNames(pathname: string, isBatch: boolean): string[] | null {
+  const trimmed = trimSlashes(pathname);
+  if (trimmed !== TRPC_ENDPOINT && !trimmed.startsWith(`${TRPC_ENDPOINT}/`)) return [];
+
+  const remainder = trimmed.slice(TRPC_ENDPOINT.length);
+  const encodedPath = trimSlashes(remainder);
+  if (encodedPath === '') return [];
+
+  let path: string;
+  try {
+    path = decodeURIComponent(encodedPath);
+  } catch {
+    return null;
+  }
+
+  return isBatch ? path.split(',') : [path];
+}
+
+export type TrpcCallInput = {
+  procedure: string;
+  input: unknown;
+};
+
+export type TrpcCallsReadResult =
+  | { success: true; isBatch: boolean; calls: TrpcCallInput[] }
+  | { success: false; message: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function readRawInputs(
+  request: Request,
+  url: URL
+): Promise<{ success: true; value: unknown } | { success: false }> {
+  if (request.method === 'GET') {
+    const inputParam = url.searchParams.get('input');
+    if (!inputParam) return { success: true, value: undefined };
+    try {
+      return { success: true, value: JSON.parse(inputParam) };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  try {
+    const text = await request.clone().text();
+    if (text.length === 0) return { success: true, value: undefined };
+    return { success: true, value: JSON.parse(text) };
+  } catch {
+    return { success: false };
+  }
+}
+
+/**
+ * Reads the procedure names and the raw input for each call in a tRPC request.
+ *
+ * Batch inputs are keyed by call index (`{"0": ..., "1": ...}`). Non-batch
+ * requests use the body (or the `input` query parameter for GET) directly.
+ * The middleware must inspect the same raw inputs tRPC will hand to each
+ * procedure so it can enforce balance per scope instead of once per request.
+ */
+export async function readTrpcCalls(request: Request, url: URL): Promise<TrpcCallsReadResult> {
+  const isBatch = url.searchParams.get('batch') === '1';
+  const procedures = extractProcedureNames(url.pathname, isBatch);
+  if (procedures === null) {
+    return { success: false, message: 'Invalid request path' };
+  }
+
+  const rawInputs = await readRawInputs(request, url);
+  if (!rawInputs.success) {
+    return {
+      success: false,
+      message: request.method === 'GET' ? 'Invalid request input' : 'Invalid request body',
+    };
+  }
+
+  if (isBatch && rawInputs.value !== undefined && !isRecord(rawInputs.value)) {
+    return { success: false, message: 'Invalid request body' };
+  }
+
+  const inputs = isBatch ? (rawInputs.value as Record<string, unknown> | undefined) : undefined;
+  return {
+    success: true,
+    isBatch,
+    calls: procedures.map((procedure, index) => ({
+      procedure,
+      input: isBatch ? inputs?.[String(index)] : rawInputs.value,
+    })),
+  };
+}
+
+export type BalanceRequestScope = {
+  orgId?: string;
+  sessionId?: string;
+};
+
+/**
+ * Reads the organization and session identifiers a balance-required procedure
+ * will actually use.
+ *
+ * `start` creates a new scope from `options.kilocodeOrganizationId`; a
+ * top-level field is not part of that schema and must not select a different
+ * payer. Session procedures take the authorized scope from the session itself
+ * after access validation; a caller-supplied organization can only narrow that
+ * check.
+ */
+export function extractBalanceRequestScope(procedure: string, input: unknown): BalanceRequestScope {
+  if (!isRecord(input)) return {};
+
+  let orgId: string | undefined;
+  if (procedure === 'start') {
+    const options = input.options;
+    if (isRecord(options) && typeof options.kilocodeOrganizationId === 'string') {
+      orgId = options.kilocodeOrganizationId;
+    }
+  } else if (typeof input.kilocodeOrganizationId === 'string') {
+    orgId = input.kilocodeOrganizationId;
+  } else {
+    const options = input.options;
+    if (isRecord(options) && typeof options.kilocodeOrganizationId === 'string') {
+      orgId = options.kilocodeOrganizationId;
+    }
+  }
+
+  const sessionId =
+    typeof input.cloudAgentSessionId === 'string' ? input.cloudAgentSessionId : undefined;
+
+  return { orgId, sessionId };
+}
+
 /**
  * Extracts organization ID from tRPC input in URL query params.
  * For GET requests (subscriptions), input is JSON-encoded in the 'input' query param.

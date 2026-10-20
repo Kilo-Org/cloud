@@ -60,7 +60,9 @@ jest.mock('./kilo-exclusive-models', () => ({
   findKiloExclusiveModel: () => undefined,
   shouldRedactModelNameInMicrodollarUsage: () => false,
 }));
-jest.mock('./is-free-model', () => ({ isFreeModel: (model: string) => model.endsWith(':free') }));
+jest.mock('./is-free-model', () => ({
+  isFreeModel: async (model: string) => model.endsWith(':free'),
+}));
 jest.mock('./custom-pricing', () => ({ calculateCustomCost_mUsd: () => undefined }));
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   normalizeJa4: () => null,

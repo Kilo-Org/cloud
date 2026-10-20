@@ -223,7 +223,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   // slight replication lag, and provides lower latency for US users
   const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  if (!canSpendPaidUsage(balance) && !isFreeModel(requestBody.model) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !(await isFreeModel(requestBody.model)) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

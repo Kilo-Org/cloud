@@ -37,10 +37,27 @@ import {
 } from '@/lib/cli-sessions/session-copies';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
-import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 
 const PAGE_SIZE = 10;
+const SHARE_BLOB_DELETE_ATTEMPTS = 3;
+
+async function deleteShareBlobsWithRetry(shareId: string): Promise<void> {
+  const blobsToDelete = sessionBlobRefs('shared-sessions');
+
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < SHARE_BLOB_DELETE_ATTEMPTS; attempt += 1) {
+    try {
+      await deleteBlobs(shareId, blobsToDelete);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
 
 const commonSessionFields = {
   session_id: cliSessions.session_id,
@@ -554,10 +571,9 @@ export const cliSessionsRouter = createTRPCRouter({
       .select({ share_id: sharedCliSessions.share_id })
       .from(sharedCliSessions)
       .where(eq(sharedCliSessions.session_id, session_id));
-
-    if (shares.length > 0) {
-      await deleteSharedSessionCopies(shares.map(share => share.share_id));
-      await db.delete(sharedCliSessions).where(eq(sharedCliSessions.session_id, session_id));
+    for (const share of shares) {
+      await deleteShareBlobsWithRetry(share.share_id);
+      await db.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, share.share_id));
     }
 
     await deleteBlobs(session_id, sessionBlobRefs('sessions'));
@@ -786,47 +802,6 @@ export const cliSessionsRouter = createTRPCRouter({
           last_mode: session.last_mode,
           last_model: session.last_model,
         },
-      });
-    }),
-
-  /**
-   * Share a legacy v1 CLI session (UUID) from a webhook trigger request.
-   * For v2 sessions (ses_*), use cliSessionsV2.shareForWebhookTrigger instead.
-   */
-  shareForWebhookTrigger: baseProcedure
-    .input(
-      z.object({
-        kilo_session_id: z.string().uuid(),
-        trigger_id: z.string().min(1),
-        organization_id: z.string().uuid().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      await verifyWebhookTriggerAccess(ctx, input.trigger_id, input.organization_id);
-
-      // For org triggers, verify the session belongs to the same org.
-      // For personal triggers, verify the session belongs to the requesting user.
-      const ownerCondition = input.organization_id
-        ? eq(cliSessions.organization_id, input.organization_id)
-        : eq(cliSessions.kilo_user_id, ctx.user.id);
-
-      const [session] = await db
-        .select({ session_id: cliSessions.session_id })
-        .from(cliSessions)
-        .where(and(eq(cliSessions.session_id, input.kilo_session_id), ownerCondition))
-        .limit(1);
-
-      if (!session) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Session not found',
-        });
-      }
-
-      return createSharedSessionCopy({
-        kiloUserId: ctx.user.id,
-        sessionId: input.kilo_session_id,
-        sharedState: CliSessionSharedState.Public,
       });
     }),
 });

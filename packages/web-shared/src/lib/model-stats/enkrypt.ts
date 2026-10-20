@@ -29,7 +29,7 @@ export function enkryptFor(
   const entry =
     snapshot.entries.find(({ stat }) => stat.openrouterId === id) ??
     (unprefixed && snapshot.entries.find(({ stat }) => stat.openrouterId === unprefixed));
-  return entry && isEnkryptPublicModel(entry.stat)
+  return entry && isEnkryptPublicModel(entry.stat, snapshot.customLlmIds)
     ? publishEnkryptBenchmark(entry.stat.benchmarks?.enkrypt, Date.now(), entry.verification)
     : undefined;
 }

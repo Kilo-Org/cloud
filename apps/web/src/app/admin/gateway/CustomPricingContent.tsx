@@ -28,6 +28,7 @@ import {
   customPricingToForm,
   EMPTY_CUSTOM_PRICING_FORM,
   parseCustomPricingForm,
+  sameCustomPricing,
   upsertCustomPricing,
   type CustomPricingForm,
 } from '@/app/admin/gateway/custom-pricing-form';
@@ -36,13 +37,6 @@ const NO_MODELS: CustomPricingModelConfig[] = [];
 
 function formatPrice(pricePerMillion: number | null): string {
   return pricePerMillion === null ? 'Prompt price' : `$${pricePerMillion}`;
-}
-
-function samePricing(
-  a: readonly CustomPricingModelConfig[],
-  b: readonly CustomPricingModelConfig[]
-): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function PricingRows({
@@ -154,7 +148,9 @@ const priceFields = [
 export function CustomPricingContent() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery(trpc.admin.gatewayCustomPricing.get.queryOptions());
+  const { data, isLoading, error, refetch } = useQuery(
+    trpc.admin.gatewayCustomPricing.get.queryOptions()
+  );
 
   const savedModels = useMemo(() => data?.config?.models ?? NO_MODELS, [data]);
   const builtInModels = data?.builtIn ?? NO_MODELS;
@@ -213,8 +209,23 @@ export function CustomPricingContent() {
     return <div className="text-muted-foreground py-8 text-sm">Loading...</div>;
   }
 
-  const hasStoredConfig = Boolean(data?.config);
-  const hasChanges = !samePricing(models, savedModels);
+  // Without the stored pricing, saving would replace it with whatever the form shows.
+  if (!data) {
+    return (
+      <div className="flex flex-col items-start gap-3 py-8 text-sm" role="alert">
+        <p className="text-destructive">
+          Could not load custom pricing{error ? `: ${error.message}` : '.'} Editing is disabled
+          until it loads.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => void refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const hasStoredConfig = Boolean(data.config);
+  const hasChanges = !sameCustomPricing(models, savedModels);
   const isUpdate = configuredModelIds.has(form.model.trim());
 
   return (

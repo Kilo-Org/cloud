@@ -272,6 +272,24 @@ describe('request cost admission', () => {
     });
     expect(decision.providerConfig?.max_price).toMatchObject({ prompt: 20, completion: 20 });
   });
+  it('bounds custom pricing configured for a requested alias, which billing uses', async () => {
+    const alias: StoredModel = {
+      id: '~test/bounded-latest',
+      name: 'Bounded latest',
+      endpoints: [],
+      alias_target: { slug: model.id },
+    };
+    mockModels([alias, model]);
+    jest.mocked(getConfiguredCustomPricing).mockResolvedValue({ [alias.id]: configuredPricing });
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      alias.id,
+      { ...body, model: alias.id },
+      2_000_000,
+      { id: 'openrouter', userFunded: false }
+    );
+    expect(decision.providerConfig?.max_price).toMatchObject({ prompt: 20, completion: 20 });
+  });
   it('rejects before upstream spend for an insufficient ceiling or balance', async () => {
     await expect(enforceRequestCostLimit('1', model.id, body, 2_000_000)).resolves.toMatch(
       /spend safeguard/

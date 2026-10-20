@@ -199,6 +199,19 @@ describe('the approved address window', () => {
 
     expect(validatedUpstreamAddresses('LLM.example.com.')).toEqual(['104.18.2.115']);
   });
+
+  it('drops only the oldest approval when the table is full', async () => {
+    const resolve = resolvesTo('104.18.2.115');
+    for (let index = 0; index < 1000; index += 1) {
+      await check(`https://host-${index}.example.com/v1`, resolve);
+    }
+
+    await check('https://overflow.example.com/v1', resolve);
+
+    expect(validatedUpstreamAddresses('overflow.example.com')).toEqual(['104.18.2.115']);
+    expect(validatedUpstreamAddresses('host-0.example.com')).toBeNull();
+    expect(validatedUpstreamAddresses('host-1.example.com')).toEqual(['104.18.2.115']);
+  });
 });
 
 describe('isUpstreamUrlPolicyEnforced', () => {

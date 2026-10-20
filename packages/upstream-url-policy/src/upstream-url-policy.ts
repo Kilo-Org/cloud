@@ -59,7 +59,11 @@ function approvedAddresses(hostname: string, now: number): string[] | null {
 
 function approveHostname(hostname: string, addresses: string[], now: number): void {
   if (approvedHostnames.size >= PUBLIC_HOSTNAME_CACHE_MAX_ENTRIES) {
-    approvedHostnames.clear();
+    // Map iteration follows insertion order, so this drops the oldest approval.
+    // Evicting one entry at a time keeps approvals that in-flight requests are
+    // about to connect with.
+    const oldest = approvedHostnames.keys().next();
+    if (!oldest.done) approvedHostnames.delete(oldest.value);
   }
   approvedHostnames.set(hostname, { addresses, expiresAt: now + PUBLIC_HOSTNAME_CACHE_TTL_MS });
 }

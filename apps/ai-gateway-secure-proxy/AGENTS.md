@@ -16,10 +16,14 @@ functions run in `sfo1` only (`vercel.json`), via the manually triggered
   the remaining body to `url` with exactly `headers`. Incoming request headers
   are never forwarded; response headers pass through the same allowlist as the
   gateway's `wrapInSafeNextResponse`. Upstream redirects are not followed and
-  become 502 errors.
+  become 502 errors. The URL goes through `@kilocode/upstream-url-policy` first
+  (HTTPS, a public address), and the connection uses the addresses that check
+  approved.
 - The body contract lives in `@kilocode/ai-gateway-secure-proxy-contracts`,
   shared with the gateway (`packages/web-shared/src/lib/ai-gateway/providers/secure-proxy.ts`).
 - Keep it dependency-free: no database, Redis, Sentry, or workspace packages
-  other than the contracts package.
+  other than the contracts package and `@kilocode/upstream-url-policy`, which is
+  plain Node code (no database, Redis, or Sentry) that gives the relay the same
+  upstream URL rules the gateway uses.
 - Tests use Vitest (`pnpm --filter ai-gateway-secure-proxy test`) and run in
   CI's per-workspace test job, independent of the `apps/web` Jest suite.

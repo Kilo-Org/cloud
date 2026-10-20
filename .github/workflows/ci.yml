@@ -183,6 +183,7 @@ jobs:
             ai_gateway_secure_proxy:
               - 'apps/ai-gateway-secure-proxy/**'
               - 'packages/ai-gateway-secure-proxy-contracts/**'
+              - 'packages/upstream-url-policy/**'
               - '.github/workflows/ci.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -195,6 +196,7 @@ jobs:
             ai_gateway_secure_proxy:
               - 'apps/ai-gateway-secure-proxy/**'
               - 'packages/ai-gateway-secure-proxy-contracts/**'
+              - 'packages/upstream-url-policy/**'
               - '.github/workflows/ci.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'

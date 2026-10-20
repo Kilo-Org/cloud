@@ -102,7 +102,13 @@ async function findOwnedSandboxes(
   sessionId: string,
   kiloSessionId: string | undefined,
   knownIds: Set<string>
-) {
+): Promise<SandboxContainer[]> {
+  if (sessionId.startsWith('workspace_') && kiloSessionId !== undefined) {
+    // One discovery already probes every primary; probing it again per candidate
+    // made each poll cost N² docker execs and outlast the allocation budget.
+    const runtime = await findControlPlaneKiloRuntime(kiloSessionId).catch(() => null);
+    return runtime && !knownIds.has(runtime.container.id) ? [runtime.container] : [];
+  }
   const candidates = sessionId.startsWith('workspace_')
     ? await listSandboxContainers()
     : await listSandboxesForAgentSession(sessionId);

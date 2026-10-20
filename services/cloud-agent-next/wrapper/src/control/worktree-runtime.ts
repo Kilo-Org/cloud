@@ -415,7 +415,6 @@ export function buildWorktreeKiloEnvironment(
       : {}),
     KILO_DISABLE_AUTOUPDATE: 'true',
     KILO_DISABLE_CODEBASE_INDEXING: 'vscode-no-workspace',
-    KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
     KILO_DEBUG_SESSION_INGEST: '1',
     KILOCODE_TOKEN: kilo.token,
     ...(kilo.organizationId ? { KILOCODE_ORGANIZATION_ID: kilo.organizationId } : {}),

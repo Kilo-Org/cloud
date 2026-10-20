@@ -122,8 +122,9 @@ export type ExclusiveLayoutInput = {
 
 /**
  * Decide whether a control-plane Kilo root is the only worktree under its
- * parent. `sessions/<sessionId>` is the control-plane session workspace and
- * `worktrees/<worktreeId>` the worktree-sibling layout; both are legitimate.
+ * parent. `/workspace/app` is the isolated control-plane workspace,
+ * `sessions/<sessionId>` the shared-sandbox session workspace and
+ * `worktrees/<worktreeId>` the worktree-sibling layout; all are legitimate.
  * The guard is the directory count plus the allowlist plus the listener set,
  * not the parent name: every sibling directory and every Kilo listener must be
  * the target directory or a harness-supplied `allowedDirectories` entry, so an
@@ -146,13 +147,13 @@ export function computeExclusiveLayout(input: ExclusiveLayoutInput): {
     .readdirSync(parent)
     .filter(name => fs.statSync(path.join(parent, name)).isDirectory())
     .map(name => path.join(parent, name));
-  const sessionParent =
+  const knownLayout =
+    directory === '/workspace/app' ||
     path.basename(parent) === 'worktrees' ||
-    path.basename(parent) === 'sessions' ||
-    directory === '/workspace/app';
+    path.basename(parent) === 'sessions';
   return {
     exclusive:
-      sessionParent &&
+      knownLayout &&
       directories.includes(directory) &&
       directories.every(candidate => allowed.has(candidate)) &&
       listeners.every(listener => allowed.has(listener.directory)),
@@ -798,6 +799,43 @@ export async function stopOwnedControlPlaneSandbox(
   executeDocker: DockerCommandExecutor = executeDockerCommand,
   allowedDirectories: readonly string[] = []
 ): Promise<string[]> {
+  if (
+    !(await proveOwnedControlPlaneSandbox(
+      sandbox,
+      kiloSessionId,
+      executeDocker,
+      allowedDirectories
+    ))
+  )
+    return [];
+  return killSandboxFamily(sandbox, executeDocker);
+}
+
+/**
+ * Fault injection: kill only the proven primary. workerd caches the warm proxy
+ * across primary restarts; killing it breaks later starts of that container
+ * (see `injectColdPrimaryFault`).
+ */
+export async function killOwnedControlPlanePrimary(
+  sandbox: SandboxContainer,
+  kiloSessionId: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<string[]> {
+  if (!(await proveOwnedControlPlaneSandbox(sandbox, kiloSessionId, executeDocker, []))) return [];
+  await killContainer(sandbox.id, executeDocker);
+  return [sandbox.name];
+}
+
+/**
+ * Prove that a running primary still exclusively owns `kiloSessionId`'s root.
+ * Returns false when the container is already gone, so there is nothing to stop.
+ */
+async function proveOwnedControlPlaneSandbox(
+  sandbox: SandboxContainer,
+  kiloSessionId: string,
+  executeDocker: DockerCommandExecutor,
+  allowedDirectories: readonly string[]
+): Promise<boolean> {
   if (!(await isSandboxContainerRunning(sandbox.id, executeDocker))) {
     // The named container is absent or not running: there is nothing left to
     // stop. After a scenario kills or the wrapper retires the runtime this is
@@ -805,7 +843,7 @@ export async function stopOwnedControlPlaneSandbox(
     console.warn(
       `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} is already gone; no stop issued`
     );
-    return [];
+    return false;
   }
   const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
   if (!runtime || runtime.container.id !== sandbox.id || runtime.container.name !== sandbox.name) {
@@ -816,7 +854,7 @@ export async function stopOwnedControlPlaneSandbox(
       console.warn(
         `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} vanished before ownership proof; no stop issued`
       );
-      return [];
+      return false;
     }
     throw new Error('Cannot prove the original sandbox still owns the requested root');
   }
@@ -832,11 +870,11 @@ export async function stopOwnedControlPlaneSandbox(
       console.warn(
         `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} vanished during exclusive proof; no stop issued`
       );
-      return [];
+      return false;
     }
     throw error;
   }
-  return killSandboxFamily(sandbox, executeDocker);
+  return true;
 }
 
 /**

@@ -580,11 +580,20 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
         else endPause(record.execution, 'heldSince', options.now());
       }
     },
+    /** The feed still delivers every event, so a failed read leaves the observed state current. */
     snapshotFailed(token: number) {
       if (token !== snapshot?.id) return;
       snapshot = undefined;
       tombstones.clear();
-      observed = false;
+    },
+    /** The live execution ids in `root`'s tree, or undefined until a reconcile follows a feed loss. */
+    liveTreeExecutions(root: string): number[] | undefined {
+      if (disposed || !observed) return undefined;
+      return [...sessions.values()].flatMap(record =>
+        record.execution && (record.id === root || descendsFrom(record, root))
+          ? [record.execution.id]
+          : []
+      );
     },
     needsCompute: () =>
       [...sessions.values()].some(

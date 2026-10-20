@@ -374,7 +374,8 @@ The wrapper heartbeat (every 5 s) carries `active`. Each Kilo process owns a nat
 session supervisor that observes every session before Cloud route filtering, including
 unrouted sessions, subagents and autonomous continuations. Its running or stopping
 executions keep compute active independently of accepted Cloud messages and UI selection.
-Preparation, bounded prompt delivery and finalization also contribute.
+Preparation, bounded prompt delivery, actual optional finalization, and finite completion-transport
+waits also contribute. A native drain waiting only for user-blocked work adds no wrapper compute activity.
 The 2-minute delivery budget excludes legitimate serialized command/summarization waits
 described below. A follow-up waiting behind a serialized command adds no compute activity of
 its own; the command's live native execution decides it. An accepted UI turn alone is not activity.
@@ -687,12 +688,31 @@ the key names the setup commands too: a snapshot is reused only by a route with 
   While the summary's native execution is live, its supervisor bounds the wait. After that, the
   2-minute delivery deadline bounds it, paused and refreshed by a memory hold like any delivery
   wait. A close that does not arrive in time fails `prompt_failed`.
-- The wrapper tracks each Kilo root session through Kilo's status, idle, turn-close and error events,
-  and remembers the last submitted `messageId`.
+- A root completed close triggers one completion request only when all received prompts have already
+  dispatched. It captures the prompt tail, submission promises, client, and native process identity.
+  It first awaits those submissions. An observed prompt whose HTTP response remains pending gets a
+  continuous 2-minute delivery allowance after root execution ends. Live execution and memory holds
+  pause that allowance; duplicate closes do not reset it. This finite HTTP wait adds compute activity.
+- Native completion requires both HTTP `true` from drain and the processed `session.drained` event
+  with the same session, token, runtime key, and process identity. Each retry registers a fresh token
+  before dispatch. Root errors remain authoritative during this wait. Interrupted and error closes
+  settle a turn only after the supervisor reports no live root execution. `session.drain.interrupted`
+  has no drain token and cannot settle a Cloud turn; the captured drain request owns its HTTP result.
+  A retired client's response cannot complete work through a replacement process.
+- One 10-second transport grace bounds a missing half of the pair. Before either half arrives, it
+  also runs when healthy observations show no live execution anywhere in the root's tree. Waiting
+  descendants count as live; unknown observations do not mean an empty tree. Reappearing work or
+  unknown observations cancel only that pre-half grace. The first half never extends an armed
+  deadline. Three transient attempts, with 1-second and 2-second backoff, exhaust as `no_outcome`
+  with an unconfirmed-completion warning. Native work retains the supervisor's execution bounds.
+- The wrapper names the last received Cloud `messageId` in its outcome. It does not reconstruct
+  successful outcomes from idle snapshots. Compact's own close reconciliation only releases its
+  delivery barrier; an ineligible close cannot later become completion for a queued follower.
 - Outcome frame: `sessionId`, `status`, optional `reason`, `lastMessageId`.
-  - `completed`: Kilo emitted `session.turn.close` with reason `completed`, finalization is done,
-    and no later prompt remains unfinished. `session.idle` and a `superseded` turn-close are not
-    completion signals. The wrapper does not keep a copy of Kilo's native prompt queue.
+  - `completed`: an eligible completed close received paired native confirmation, publication policy
+    finished, optional finalization settled, and the captured received-prompt boundary is still current.
+    `session.idle` and a `superseded` turn-close are not completion signals. Native drain proves
+    tracked work ended, not that it succeeded. The wrapper does not copy Kilo's native prompt queue.
   - `failed`: Kilo reports a final error; native execution exceeds 20 minutes without real
     progress or the separate 120-minute wall-clock cap; Kilo restarts after real progress or
     a second time; prompt delivery fails. The native supervisor chooses `no_progress` or
@@ -718,20 +738,55 @@ the key names the setup commands too: a snapshot is reused only by a route with 
     Without a current Cloud turn, a routed native deadline emits an existing `session.error` event
     for replay/UI without inventing a message ID or rewriting the prior outcome.
   - `cancelled`: the turn was aborted.
-- Finalization (auto-commit, condense) runs after Kilo's completed turn-close. The wrapper sends a `finalizing`
-  event when it starts. Its failures are warning events; the outcome stays `completed`. A prompt
-  that arrives during finalization follows the same submission rules, including an accepted wait
-  behind a pending command/summary response; finalization itself does not block submission. The
-  wrapper does not send `completed` for that earlier close. Each finalization step has one timeout that
-  covers the whole step. A finalization timeout or failure never aborts the Kilo session, so it
-  cannot cancel a newer prompt.
+- One completion runner performs paired native confirmation, publication checks, auto-commit, then
+  condense. It keeps only the latest eligible replacement request. Receiving a prompt invalidates
+  old success before attachment materialization, but does not overlap finalizers. After each await,
+  the runner checks its captured admission boundary. An old auto-commit cannot start condense after
+  that boundary changes. The wrapper emits `finalizing` only after native proof. Each optional
+  operation has its own 3-minute budget. Its failures warn; its timeout never aborts the Kilo session.
+  Optional errors remain warning-only while newer intake is undispatched. After newer work dispatches,
+  native errors retain their fatal precedence. A restart cannot replay already-confirmed user work.
+- Publication recovery retains its internal HTTP promise and 15-second submission deadline through
+  native closes. It uses one recovery allowance without changing the Cloud message identity. Abandoned
+  recovery skips a whole-session abort if newer intake already exists. Otherwise it reserves a barrier
+  in the existing submission chain before aborting the captured client. New intake remains accepted,
+  but dispatch waits until cleanup confirms abort and a fresh HTTP/marker pair. Abort gets 10 seconds;
+  three post-cancel confirmations get 10 seconds each, with 1-second and 2-second backoff (43 seconds
+  maximum). Unconfirmed cleanup warns and fails `no_outcome`; it never releases dispatch through an
+  uncertain abort. Only known cleanup interruption signals are suppressed. Successful cleanup releases
+  the barrier and re-arms confirmation from the original eligible close when no newer intake exists.
 
 ### Kilo supervision
 
 `session-supervisor.ts` owns native execution state and deadlines, independently of
-`turn.ts`, which owns Cloud admission, ordered delivery, finalization and outcomes.
+`turn.ts`, which owns Cloud admission, ordered delivery and outcome emission.
+`turn-completion.ts` owns the single completion runner, native proof, optional operations and cleanup.
 `kilo-runtime.ts` owns one supervisor per actual process lifetime through
 `runtime-activity.ts`. `main.ts` composes their aggregate heartbeat.
+
+An established feed ending or being replaced in the same process is a feed gap. Before the runtime
+marks observation lost, each turn records its root's live execution and the live execution ids in
+the root's tree. The gap makes no decision: native proof waits, and Cloud prompts park while the
+runtime is suspected. A publication recovery submission does not park; the decision below treats
+it as dispatched work. The first reconcile of the same process after the loss decides the gap:
+
+- The root's execution at the loss is still live: nothing can be hidden, and the turn continues.
+- The root was idle at the loss: the gap is benign if every execution in its tree is still live,
+  because nothing ended that could wake the root, if every observed prompt was covered by a seen
+  `completed` root close, and if any dispatch that no observation or close showed is still running
+  at the root. An idle root with observed work and no seen close lost that close.
+- Otherwise, or if observation was already lost when the gap began, dispatched work that no native
+  proof covers fails as `no_outcome`, with a history-incomplete warning. Snapshots and new tokens
+  cannot recover missed final errors.
+
+A snapshot that began before the loss does not decide the gap. A restart decides instead of the
+gap, so a crash that ends the feed first still gets restart resubmission and its specific reason.
+Opening failures and intentional retirement do not issue the notification. Queued-only intake and
+already-confirmed work during optional finalization are not failed. A newer dispatched prompt after
+an accepted proof is unconfirmed work again. Three edges remain. A missed root error followed by a
+queued follow-up under the same execution id completes the turn. A `completed` close that arrives
+after a later prompt was dispatched also covers that prompt. A root or child execution that ends on
+the new feed before its first reconcile finishes fails the turn as `no_outcome`.
 
 The global feed is subscribed before a bounded initial snapshot. Reconciliation repeats
 on reconnect and every 30 seconds, single-flight with a 10-second request budget. It
@@ -758,8 +813,11 @@ protections.
   minutes, restart Kilo. A reconnected stream gets 12 s to deliver a real event, because Kilo's
   first heartbeat comes 10 s after connect; a stream that stays silent is replaced at the next
   check, 15 s after the reconnect. Kilo sends heartbeats every 10–15 s, so silence means a real
-  fault. Local runs on Kilo 7.6.2 and 7.8.1 show an intermittent hang after a prompt is accepted:
-  Kilo stops emitting, never calls the model and does not answer HTTP.
+  fault. After a crash, refused reopens can use all 6 reconnects before the process exit
+  arrives. When the 6 reconnects took less than the health timeout, the wrapper waits up to that
+  timeout for the exit, so a crash restarts as a crash (`agent_restarted`). Local runs on Kilo
+  7.6.2 and 7.8.1 show an intermittent hang after a prompt is accepted: Kilo stops emitting, never
+  calls the model and does not answer HTTP.
 - Tool memory isolation: the workload reserves 1 GiB for the wrapper and keeps the tool cap
   1.5 GiB below the shared workload cap. Kilo has OOM protection. Its tool descendants inherit
   that protection, so the process sweep removes it before attempting tool cgroup migration.

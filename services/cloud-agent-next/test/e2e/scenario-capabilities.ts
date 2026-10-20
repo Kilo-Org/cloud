@@ -309,6 +309,7 @@ export type SandboxFaultObservation = {
   captureWrapperIdentity(
     allocation: SandboxFaultAllocation
   ): Promise<{ instanceId: string; pid: number }>;
+  /** Kill the proven primary only; its `-proxy` sidecar stays, as after a real loss. */
   killOwnedContainer(
     target: SandboxFaultTarget
   ): Promise<{ killed: boolean; observedRef: string; detail: string }>;

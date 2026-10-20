@@ -1239,6 +1239,151 @@ describe('fake-llm-server HTTP', () => {
     });
   });
 
+  it('issues a task tool call that parks the child on a gate, then finishes after the result', async () => {
+    const h = await start();
+    const prompt = '__fake__:task:drainparent:drainchild';
+    const call = extractToolCall(
+      await parseSse(
+        await postToolChat(
+          h.url,
+          prompt,
+          [],
+          [
+            {
+              type: 'function',
+              function: {
+                name: 'task',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    description: { type: 'string' },
+                    prompt: { type: 'string' },
+                    subagent_type: { type: 'string' },
+                  },
+                  required: ['description', 'prompt', 'subagent_type'],
+                },
+              },
+            },
+          ]
+        )
+      )
+    );
+    expect(call).toMatchObject({
+      name: 'task',
+      arguments: {
+        description: 'Drain child drainchild',
+        prompt: '__fake__:gate:drainchild:waiting',
+        subagent_type: 'explore',
+      },
+    });
+    expect(call.arguments).not.toHaveProperty('background');
+
+    const completed = await parseSse(
+      await postToolChat(
+        h.url,
+        prompt,
+        [
+          { role: 'assistant', tool_calls: [{ id: call.id }] },
+          { role: 'tool', tool_call_id: call.id, content: 'waiting' },
+        ],
+        [
+          {
+            type: 'function',
+            function: {
+              name: 'task',
+              parameters: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  prompt: { type: 'string' },
+                  subagent_type: { type: 'string' },
+                },
+                required: ['description', 'prompt', 'subagent_type'],
+              },
+            },
+          },
+        ]
+      )
+    );
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-drainparent' } }),
+    ]);
+  });
+
+  it('refuses a background task when the advertised schema has no background property', async () => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:background-task:drainbg:drainheld',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'task',
+            parameters: {
+              type: 'object',
+              properties: {
+                description: { type: 'string' },
+                prompt: { type: 'string' },
+                subagent_type: { type: 'string' },
+              },
+              required: ['description', 'prompt', 'subagent_type'],
+            },
+          },
+        },
+      ]
+    );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: 'background subagents are not advertised',
+        type: 'unsupported_tool_schema',
+      },
+    });
+  });
+
+  it('issues cron_create and schedule_wakeup, and rejects them when not advertised', async () => {
+    const h = await start();
+    const cronTools = [
+      {
+        type: 'function',
+        function: {
+          name: 'cron_create',
+          parameters: {
+            type: 'object',
+            properties: {
+              prompt: { type: 'string' },
+              delay: { type: 'string' },
+              reason: { type: 'string' },
+            },
+            required: ['prompt'],
+          },
+        },
+      },
+    ];
+    const cron = extractToolCall(
+      await parseSse(await postToolChat(h.url, '__fake__:cron:draincron:20s', [], cronTools))
+    );
+    expect(cron).toMatchObject({
+      name: 'cron_create',
+      arguments: {
+        prompt: '__fake__:echo:fired-draincron',
+        delay: '20s',
+        reason: 'drain-draincron',
+      },
+    });
+
+    const missing = await postToolChat(h.url, '__fake__:wakeup:drainwake:20s', [], cronTools);
+    expect(missing.status).toBe(422);
+    await expect(missing.json()).resolves.toMatchObject({
+      error: {
+        message: 'unsupported schedule_wakeup tool schema',
+        type: 'unsupported_tool_schema',
+      },
+    });
+  });
+
   it('finishes title-model requests without advertising or inventing a tool schema', async () => {
     const h = await start();
     const chunks = await parseSse(

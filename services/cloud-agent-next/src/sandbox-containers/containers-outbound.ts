@@ -1,10 +1,14 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
+import { getSentryConfig } from '../shared/sentry.js';
 import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
 
 export type ContainersOutboundProps = { containerId: string; egressAllowlist?: string[] };
 
-export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, ContainersOutboundProps> {
+export class ContainersOutbound extends WorkerEntrypoint<
+  Cloudflare.Env & Parameters<typeof getSentryConfig>[0],
+  ContainersOutboundProps
+> {
   fetch(request: Request): Promise<Response> {
     const { containerId, egressAllowlist } = this.ctx.props;
     if (!containerId) {
@@ -17,7 +21,18 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       }
       const url = new URL(request.url);
       if (!isAllowedEgressUrl(url, policy.data)) {
-        return Promise.resolve(new Response('Egress destination disallowed', { status: 403 }));
+        const sentry = getSentryConfig(this.env);
+        const dsn = sentry ? new URL(sentry.dsn) : undefined;
+        if (
+          !dsn ||
+          request.method !== 'POST' ||
+          url.origin !== dsn.origin ||
+          url.username ||
+          url.password ||
+          url.pathname !== `/api${dsn.pathname}/envelope/`
+        ) {
+          return Promise.resolve(new Response('Egress destination disallowed', { status: 403 }));
+        }
       }
       const headers = new Headers(request.headers);
       headers.set('Host', url.host);

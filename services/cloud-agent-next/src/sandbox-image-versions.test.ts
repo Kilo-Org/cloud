@@ -3,11 +3,14 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { runtimeDistributionSourceFiles } from '../scripts/runtime-manifest.js';
 import { DEFAULT_SLASH_COMMANDS_SOURCE } from './shared/default-slash-commands.generated.js';
 import { KILO_CLI_VERSION } from './shared/kilo-cli-version.js';
 import {
+  CONTROL_PLANE_SUPERVISOR,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
+  RUNTIME_INSTALL_DIR,
   WRAPPER_BUNDLES,
   runtimeInstallPath,
 } from './shared/runtime-distribution.js';
@@ -73,30 +76,65 @@ describe('runtime distribution packaging', () => {
     expect(RUNTIME_DISTRIBUTION.glab).toBe('1.93.0');
     expect(RUNTIME_DISTRIBUTION.gh).toBe('2.82.1');
     expect(RUNTIME_DISTRIBUTION.nodeMajor).toBe('24');
+    const e2eWorkflow = readServiceFile('../../../.github/workflows/cloud-agent-e2e-deploy.yml');
+    const bunSetup = 'uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6';
+    expect(e2eWorkflow).toContain(bunSetup);
+    expect(e2eWorkflow).toContain(`bun-version: ${RUNTIME_DISTRIBUTION.bun}`);
+    expect(e2eWorkflow.indexOf(bunSetup)).toBeLessThan(
+      e2eWorkflow.indexOf('name: Deploy Cloud Agent e2e Worker')
+    );
   });
 
-  it('builds wrapper bundles from the shared entrypoint list instead of duplicate commands', () => {
+  it('copies the prebuilt shared runtime inventory without rebuilding wrappers in any image', () => {
+    const inventory = runtimeDistributionSourceFiles('/package');
+    expect(inventory.map(artifact => artifact.installName)).toEqual([
+      ...WRAPPER_BUNDLES.map(bundle => bundle.installName),
+      CONTROL_PLANE_SUPERVISOR.installName,
+      GIT_CREDENTIAL_HELPER.installName,
+    ]);
+    for (const bundle of WRAPPER_BUNDLES) {
+      expect(inventory).toContainEqual({
+        installName: bundle.installName,
+        installPath: runtimeInstallPath(bundle.installName),
+        executable: bundle.executable,
+        localPath: `/package/wrapper/dist/${bundle.distName}`,
+      });
+    }
+    expect(inventory).toContainEqual({
+      installName: CONTROL_PLANE_SUPERVISOR.installName,
+      installPath: runtimeInstallPath(CONTROL_PLANE_SUPERVISOR.installName),
+      executable: true,
+      localPath: `/package/wrapper/${CONTROL_PLANE_SUPERVISOR.wrapperPath}`,
+    });
+    const builder = readServiceFile('../wrapper/build.ts');
+    expect(builder).toContain("const runtimeDir = resolve('dist/runtime')");
+    expect(builder).toContain(
+      'copyFile(resolve(artifactDir, bundle.installName), resolve(runtimeDir, bundle.installName))'
+    );
+    expect(builder).toContain('resolve(runtimeDir, CONTROL_PLANE_SUPERVISOR.installName)');
     for (const file of dockerfiles) {
       const dockerfile = readServiceFile(`../${file}`);
-      expect(dockerfile).toContain('bun run build.ts --install-dir');
-      expect(dockerfile).not.toContain('bun build');
-      for (const bundle of WRAPPER_BUNDLES) {
-        expect(dockerfile).not.toContain(`outfile=/usr/local/bin/${bundle.installName}`);
-      }
+      const installDir = file === 'Dockerfile.dind' ? '/opt/kilo-cloud' : RUNTIME_INSTALL_DIR;
+      expect(dockerfile.match(/^COPY wrapper\S* .*$/gm)).toEqual([
+        `COPY wrapper/dist/runtime/ ${installDir}/`,
+      ]);
+      expect(dockerfile).not.toMatch(/\bbun (?:build|install|run build\.ts)\b/);
+      expect(dockerfile).not.toContain('COPY src/shared');
+      expect(dockerfile).not.toContain('SENTRY_AUTH_TOKEN');
     }
   });
 
   it('keeps Docker bootstrap ARG pins aligned with the contract', () => {
+    for (const file of dockerfiles) {
+      const dockerfile = readServiceFile(`../${file}`);
+      expect(dockerfile).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
+      expect(dockerfile).toContain(`ARG PNPM_VERSION="${RUNTIME_DISTRIBUTION.pnpm}"`);
+      expect(dockerfile).toContain(`ARG GLAB_VERSION="${RUNTIME_DISTRIBUTION.glab}"`);
+    }
     const containers = readServiceFile('../Dockerfile.containers');
-    expect(containers).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
-    expect(containers).toContain(`ARG PNPM_VERSION="${RUNTIME_DISTRIBUTION.pnpm}"`);
-    expect(containers).toContain(`ARG GLAB_VERSION="${RUNTIME_DISTRIBUTION.glab}"`);
     expect(containers).toContain(`ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`);
 
     const dind = readServiceFile('../Dockerfile.dind');
-    expect(dind).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
-    expect(dind).toContain(`ARG PNPM_VERSION="${RUNTIME_DISTRIBUTION.pnpm}"`);
-    expect(dind).toContain(`ARG GLAB_VERSION="${RUNTIME_DISTRIBUTION.glab}"`);
     expect(dind).toContain(`ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`);
   });
 
@@ -134,11 +172,11 @@ describe('runtime distribution packaging', () => {
     }
   });
 
-  it('links the shared install inventory through the builder in DinD', () => {
+  it('links the copied shared runtime inventory in DinD without rebuilding it', () => {
     const dind = readServiceFile('../Dockerfile.dind');
-    expect(dind).toContain(
-      'bun run build.ts --install-dir /opt/kilo-cloud --link-dir /usr/local/bin'
-    );
+    expect(dind).toContain('COPY wrapper/dist/runtime/ /opt/kilo-cloud/');
+    expect(dind).toContain('for artifact in /opt/kilo-cloud/*; do ln -sf "$artifact"');
+    expect(dind).toContain(`"${RUNTIME_INSTALL_DIR}/$(basename "$artifact")"; done`);
     for (const bundle of WRAPPER_BUNDLES) {
       expect(dind).not.toContain(`ln -sf /opt/kilo-cloud/${bundle.installName}`);
     }

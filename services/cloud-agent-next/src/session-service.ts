@@ -94,6 +94,7 @@ import {
 } from './shared/wrapper-bootstrap.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
 import {
+  CONTROL_RUNTIME_RESERVED_ENV_VARS,
   isStrippedGitConfigEnvVar,
   PNPM_STORE_DIR,
   PNPM_STORE_ENV_VAR,
@@ -1230,6 +1231,9 @@ export class SessionService {
     }
 
     for (const key of BITBUCKET_REVIEW_ENV_KEYS) {
+      delete baseEnvVars[key];
+    }
+    for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {
       delete baseEnvVars[key];
     }
 

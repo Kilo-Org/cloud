@@ -80,6 +80,11 @@ const server = http.createServer(async (request, response) => {
 
 before(async () => {
   if (!process.env.RUNTIME_INSTALLER_TEST_IMAGE) {
+    const wrapper = spawnSync('pnpm', ['run', 'build:wrapper'], {
+      cwd: serviceRoot,
+      stdio: 'inherit',
+    });
+    assert.equal(wrapper.status, 0, 'wrapper build');
     const build = spawnSync(
       'docker',
       ['build', '--platform', 'linux/amd64', '-t', image, '-f', 'Dockerfile.containers', '.'],

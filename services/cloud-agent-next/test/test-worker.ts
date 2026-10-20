@@ -76,6 +76,13 @@ export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
 // names to the control-plane V2 classes, matching production after the C1c flip.
 export { SandboxControlV2, SandboxSessionV2 };
 export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js';
+export {
+  SentrySessionProbe,
+  SentryLegacySessionProbe,
+  SentrySandboxControlProbe,
+  SentrySandboxContainerProbe,
+  SentryDisabledProbe,
+} from './integration/helpers/sentry-durable-object.js';
 
 type TestEnv = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;

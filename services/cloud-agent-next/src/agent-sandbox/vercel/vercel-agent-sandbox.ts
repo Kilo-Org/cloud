@@ -28,6 +28,7 @@ import {
   type VercelSandboxCommand,
 } from './vercel-sandbox-rest-client.js';
 import { VercelWrapperTransport } from './vercel-wrapper-transport.js';
+import { getSentryConfig } from '../../shared/sentry.js';
 
 export const VERCEL_SANDBOX_UNAVAILABLE_MESSAGE =
   'Terminal access is unavailable for Vercel sandbox sessions';
@@ -54,6 +55,7 @@ export type VercelAgentSandboxDependencies = {
   restClient?: VercelSandboxRestClient;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
+  sentry?: Parameters<typeof getSentryConfig>[0];
 };
 
 function observedWrapper(command: VercelSandboxCommand, instance?: WrapperInstanceLease) {
@@ -74,6 +76,7 @@ export class VercelAgentSandbox implements AgentSandbox {
   private readonly injectedRestClient?: VercelSandboxRestClient;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
+  private readonly sentry: ReturnType<typeof getSentryConfig>;
   private runtimeSessionId?: string;
   private wrapperProcess?: NonNullable<
     NonNullable<SessionMetadata['workspace']>['providerRuntime']
@@ -96,6 +99,7 @@ export class VercelAgentSandbox implements AgentSandbox {
       });
     this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.now = dependencies.now ?? Date.now;
+    this.sentry = getSentryConfig(dependencies.sentry ?? {});
     this.runtimeSessionId = metadata.workspace?.providerRuntime?.sessionId;
     this.wrapperProcess = metadata.workspace?.providerRuntime?.wrapper;
   }
@@ -373,6 +377,12 @@ export class VercelAgentSandbox implements AgentSandbox {
           ],
           cwd: '/',
           env: {
+            ...(this.sentry
+              ? {
+                  CLOUD_AGENT_SENTRY_DSN: this.sentry.dsn,
+                  CLOUD_AGENT_SENTRY_ENVIRONMENT: this.sentry.environment,
+                }
+              : {}),
             WRAPPER_PORT: String(WRAPPER_PORT),
             WRAPPER_LOG_PATH: `/tmp/kilocode-wrapper-${this.metadata.identity.sessionId}.log`,
             KILO_AGENT_SESSION_ID: this.metadata.identity.sessionId,

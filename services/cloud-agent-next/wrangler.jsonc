@@ -10,6 +10,8 @@
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
+  "upload_source_maps": true,
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "workers_dev": true,
   "dev": {

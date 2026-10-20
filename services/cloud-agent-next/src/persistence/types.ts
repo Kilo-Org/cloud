@@ -123,6 +123,8 @@ export type OperationResult<T = void> = {
 };
 
 export type PersistenceEnv = {
+  CLOUD_AGENT_SENTRY_DSN?: string;
+  CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
   /** Durable Object namespace for shared Sandbox instances */
   Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for shared Sandbox instances with SCM credential containment */

@@ -917,12 +917,13 @@ jobs:
           build_dir=$(mktemp -d "$RUNNER_TEMP/wrapper-build.XXXXXX")
           trap 'rm -rf "$build_dir"' EXIT
 
-          # Match Dockerfile inputs without access to workspace node_modules.
+          # Keep application dependencies isolated; source-map injection needs the build-only CLI.
           tar -C services/cloud-agent-next --exclude=node_modules --exclude=dist \
-            -cf - wrapper src/shared | tar -C "$build_dir" -xf -
+            -cf - wrapper src/shared scripts/sentry-source-maps.ts | tar -C "$build_dir" -xf -
           cd "$build_dir/wrapper"
           bun install --production
           ln -sfn "$build_dir/wrapper/node_modules" "$build_dir/node_modules"
+          ln -s "$GITHUB_WORKSPACE/services/cloud-agent-next/node_modules/@sentry/cli" node_modules/@sentry/cli
           bun run build.ts --install-dir "$build_dir/bin"
 
       - name: Test cloud-agent-next checkers

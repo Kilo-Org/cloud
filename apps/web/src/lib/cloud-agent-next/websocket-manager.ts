@@ -45,7 +45,6 @@ function parseMessage(data: unknown): ParsedMessage | null {
   }
 }
 
-// Reconnection configuration with exponential backoff and jitter
 const MAX_RECONNECT_ATTEMPTS = 8;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
@@ -61,9 +60,7 @@ function calculateBackoffDelay(attempt: number): number {
   return Math.floor(exponentialDelay * jitter);
 }
 
-// WebSocket close codes that indicate auth failures
 const AUTH_FAILURE_CLOSE_CODES = [1008, 4001] as const;
-// Keywords in close reason that indicate auth failures
 const AUTH_FAILURE_KEYWORDS = ['unauthorized', '401', 'auth', 'ticket'] as const;
 
 /**
@@ -139,7 +136,6 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
       console.log('[WebSocketManager] Got new ticket, reconnecting...');
       currentTicket = newTicket;
       ticketRefreshAttempted = true;
-      // Reset reconnect attempts after successful ticket refresh
       connectInternal(0);
     } catch (err) {
       console.error('[WebSocketManager] Failed to refresh ticket:', err);
@@ -209,7 +205,6 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
         lastEventId = event.eventId;
       }
 
-      // Reset ticket refresh flag on successful message
       ticketRefreshAttempted = false;
 
       if (state.status !== 'connected') {
@@ -224,7 +219,6 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
 
     newWs.onerror = (errorEvent: Event) => {
       // WebSocket errors during HTTP upgrade (like 401) may not give us useful close codes
-      // Log the error for debugging
       console.log('[WebSocketManager] WebSocket error', {
         type: errorEvent.type,
         ticketRefreshAttempted,

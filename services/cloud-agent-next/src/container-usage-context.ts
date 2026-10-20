@@ -50,16 +50,16 @@ export type LegacySandboxClassName = Exclude<
 >;
 
 // Production values mirror this service's top-level wrangler.jsonc entries and
-// apps/web/src/lib/cloudflare/container-capacity.ts. The parity test reads all three sources.
+// apps/web/src/lib/cloudflare/container-capacity.ts. Keep all three in sync manually.
 // Development intentionally uses different named instance types and does not query Analytics.
 export const SANDBOX_CAPACITIES: Record<LegacySandboxClassName, SandboxCapacity> = {
   Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
   SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
   SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-  SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 20_000 },
   SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
   SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
-  SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
+  SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 20_000 },
 };
 
 // One `SandboxContainers` Durable Object serves every instance size, so there is no per-size
@@ -232,8 +232,6 @@ export const sandboxBillingInputEnvelopeSchema = z
 
 const KNOWN_ORIGINS = new Set([
   'app-builder',
-  'auto-triage',
-  'autofix',
   'cloud-agent',
   'cloud-agent-web',
   'code-review',

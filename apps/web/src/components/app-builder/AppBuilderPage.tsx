@@ -1,15 +1,3 @@
-/**
- * App Builder Page
- *
- * Main page component that routes between:
- * - Landing page (no projectId): Create new projects
- * - Project view (with projectId): ProjectLoader -> ProjectSession -> AppBuilderProjectView
- *
- * - ProjectLoader: Handles async loading with tRPC/React Query
- * - ProjectSession: Manages ProjectManager lifecycle and provides context
- * - useProject/useProjectManager/useProjectState: Hooks for child components
- */
-
 'use client';
 
 import { useCallback } from 'react';
@@ -49,10 +37,8 @@ function AppBuilderProjectView({ organizationId }: { organizationId?: string }) 
 export function AppBuilderPage({ organizationId, projectId }: AppBuilderPageProps) {
   const router = useRouter();
 
-  // Handle project creation from landing page
   const handleProjectCreated = useCallback(
     (createdProjectId: string, _prompt: string) => {
-      // Navigate to the project page - ProjectLoader will handle loading
       const newPath = organizationId
         ? `/organizations/${organizationId}/app-builder/${createdProjectId}`
         : `/app-builder/${createdProjectId}`;
@@ -61,14 +47,12 @@ export function AppBuilderPage({ organizationId, projectId }: AppBuilderPageProp
     [organizationId, router]
   );
 
-  // Show landing if no projectId
   if (!projectId) {
     return (
       <AppBuilderLanding organizationId={organizationId} onProjectCreated={handleProjectCreated} />
     );
   }
 
-  // Show project
   return (
     <ProjectLoader projectId={projectId} organizationId={organizationId ?? null}>
       {projectWithMessages => (

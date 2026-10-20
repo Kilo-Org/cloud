@@ -34,10 +34,7 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import {
-  isDisabledKiloExclusiveModel,
-  isKiloExclusiveRateLimitedModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -109,11 +106,11 @@ import {
   applyResolvedModel,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { decideCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
+import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
 import {
   fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
-  FRONTIER_ROUTING_FLAG,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
   AUTO_DECISION_HEADER,
@@ -122,7 +119,6 @@ import {
   type AutoRouter,
   type CustomRouterReference,
 } from '@kilocode/auto-routing-contracts';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
@@ -337,6 +333,7 @@ export async function handleLlmProxyRequest(
     const context = await getOrganizationGroupPolicyContext({
       organizationId: auth.organizationId,
       subject: { type: 'member', kiloUserId: auth.user.id },
+      fromDb: readDb,
     });
     return evaluateEffectiveModelAccessPolicy(context);
   });
@@ -402,6 +399,7 @@ export async function handleLlmProxyRequest(
   // validation after resolution.
   let routingTarget: string | null = null;
   let legacyClassifierCostUsd = 0;
+  let autoRoutingUnavailable = false;
   // Efficient/balanced and custom router requests resolve through an auto-routing pool. Kept for
   // the org policy check below so a failed routing decision gets a specific
   // auto-routing error instead of the generic model-not-allowed error.
@@ -479,17 +477,22 @@ export async function handleLlmProxyRequest(
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
     isAutoRoutedRequest = isAutoEfficientId || isCustomRouterModelId(requestedModelLowerCased);
+    let legacyPoolTarget = false;
+    const legacyPoolRouter = async (): Promise<CustomRouterReference | null> => {
+      const auth = await authPromise;
+      if (!auth.user || auth.authFailedResponse) return null;
+      const router = await findEffectiveLegacyPoolRouter({
+        userId: auth.user.id,
+        organizationId: auth.organizationId ?? null,
+      });
+      legacyPoolTarget = router !== null;
+      return router ? { scope: router.ownerType, slug: router.slug } : null;
+    };
     const decisionForRouter = async (router: AutoRouter) => {
       const { user, authFailedResponse, organizationId } = await authPromise;
       // The classifier uses Kilo's paid credential. Unauthenticated callers
       // must never spend classification without a user to attribute it to.
       if (!user || authFailedResponse) return null;
-      if (
-        router === 'frontier' &&
-        !(await isReleaseToggleEnabled(FRONTIER_ROUTING_FLAG, user.id))
-      ) {
-        return null;
-      }
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
         policy => collectDeniedAutoRoutingModelIds(policy, owner, router),
@@ -527,7 +530,9 @@ export async function handleLlmProxyRequest(
             ...decisionRequest(caller),
             router: router.baseRouter,
             customRouter: reference,
-            requestedModel: customRouterModelId(router.ownerType, router.slug),
+            requestedModel: legacyPoolTarget
+              ? requestedModel
+              : customRouterModelId(router.ownerType, router.slug),
             deniedModelIds,
           });
           if (outcome.kind === 'ok') legacyClassifierCostUsd = outcome.costUsd;
@@ -535,7 +540,10 @@ export async function handleLlmProxyRequest(
         },
       });
     };
-    const efficientDecision = isAutoEfficientId ? () => decisionForRouter('efficient') : undefined;
+    const efficientDecision =
+      isAutoEfficientId || requestedModelLowerCased === ORG_AUTO_MODEL.id
+        ? () => decisionForRouter('efficient')
+        : undefined;
     const frontierDecision =
       requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id ||
       requestedModelLowerCased === ORG_AUTO_MODEL.id
@@ -545,13 +553,13 @@ export async function handleLlmProxyRequest(
       {
         model: requestedModelLowerCased,
         modeHeader,
-        featureHeader: feature,
         sessionId: taskId ?? null,
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
         efficientDecision,
         frontierDecision,
         customRouterDecision,
+        legacyPoolRouter,
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;
@@ -571,13 +579,13 @@ export async function handleLlmProxyRequest(
     if (autoResult.kind === 'custom_router_error') {
       return customRouterErrorResponse(autoResult.code, autoResult.message);
     }
-    if (autoResult.kind === 'auto_routing_unavailable') {
-      return autoRoutingUnavailableResponse(requestedModelLowerCased);
-    }
-    routingTarget = autoResult.routingTarget ?? null;
+    autoRoutingUnavailable = autoResult.kind === 'auto_routing_unavailable';
+    routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Custom LLMs count as free; `getProvider` still refuses callers without access.
+  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -644,7 +652,7 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeModel(effectiveModelIdLowerCased)) {
+    if (!isFreeRequestedModel) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -759,6 +767,7 @@ export async function handleLlmProxyRequest(
       })()
     );
   }
+  if (autoRoutingUnavailable) return autoRoutingUnavailableResponse(requestedModelLowerCased);
 
   if (
     requestBodyParsed.kind === 'responses' &&
@@ -835,6 +844,10 @@ export async function handleLlmProxyRequest(
     // instead of silently serving the request through another billing path.
     return chatGptReconnectResponse(providerResult.message);
   }
+  if (providerResult.kind === 'custom-llm-unavailable') {
+    // Same response as an unknown model id, so callers cannot probe for custom LLMs.
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
   const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
@@ -869,10 +882,7 @@ export async function handleLlmProxyRequest(
     return temporarilyUnavailableResponse();
   }
 
-  if (
-    isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
-    (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased)))
-  ) {
+  if (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased))) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
     return unavailableModelResponse();
   }
@@ -889,7 +899,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeModel(effectiveModelIdLowerCased) &&
+      !isFreeRequestedModel &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -965,7 +975,7 @@ export async function handleLlmProxyRequest(
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
-    hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased) &&
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();
@@ -1007,11 +1017,20 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
+  const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
+  const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,
     providerContext: effectiveProviderContext,
     request: requestBodyParsed,
+    costLimit:
+      requestCostLimit !== null && requestCostBalance
+        ? {
+            maximumMicrodollars: requestCostLimit,
+            availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
+          }
+        : undefined,
   });
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);

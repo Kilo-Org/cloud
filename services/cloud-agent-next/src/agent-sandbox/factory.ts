@@ -25,7 +25,12 @@ export function createAgentSandbox(
         'provider_not_configured'
       );
     }
-    return new VercelAgentSandbox(metadata, config, runtimeContext);
+    return new VercelAgentSandbox(metadata, config, runtimeContext, {
+      sentry: {
+        CLOUD_AGENT_SENTRY_DSN: env.CLOUD_AGENT_SENTRY_DSN,
+        CLOUD_AGENT_SENTRY_ENVIRONMENT: env.CLOUD_AGENT_SENTRY_ENVIRONMENT,
+      },
+    });
   }
   if (getSandboxProvider(metadata) === 'cloudflare-containers') {
     throw new AgentSandboxUnavailableError(

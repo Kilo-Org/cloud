@@ -62,17 +62,8 @@ RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
 
 RUN npm install -g bun@${BUN_VERSION} pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
 
-# === Build wrapper bundle inside container ===
-# This mirrors Dockerfile but builds on Alpine, matching the DIND base image.
-# The build entrypoint list lives in src/shared/runtime-distribution.ts.
-COPY wrapper /tmp/wrapper-build/wrapper
-COPY src/shared /tmp/wrapper-build/src/shared
-
-RUN cd /tmp/wrapper-build/wrapper \
-    && bun install --production \
-    && ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules \
-    && bun run build.ts --install-dir /opt/kilo-cloud --link-dir /usr/local/bin \
-    && rm -rf /tmp/wrapper-build
+COPY wrapper/dist/runtime/ /opt/kilo-cloud/
+RUN for artifact in /opt/kilo-cloud/*; do ln -sf "$artifact" "/usr/local/bin/$(basename "$artifact")"; done
 
 # Boot script for rootless Docker-in-Docker.
 #

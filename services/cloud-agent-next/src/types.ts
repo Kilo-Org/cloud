@@ -518,6 +518,9 @@ export type GitTokenService = {
 };
 
 export type Env = {
+  CLOUD_AGENT_SENTRY_DSN?: string;
+  CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
+  CF_VERSION_METADATA?: { id: string };
   CLOUD_AGENT_CONTAINER_BILLING_ENABLED?: string;
   CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
   CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;

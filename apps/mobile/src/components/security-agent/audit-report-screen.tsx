@@ -45,8 +45,9 @@ const MASKED_ACTOR_LABEL_KEYS = {
 
 // The period line is labelled UTC, so every timestamp inside the report carries
 // the same zone: a reader west of UTC must never see a generated date their own
-// calendar has not reached yet. `t` formats in the language's own date, clock
-// and 12/24-hour order; the zone marker stays invariant, like `periodUtc`'s.
+// calendar has not reached yet. `formatDate` renders the date and clock in the
+// language's own order and 12/24-hour cycle; the zone marker stays invariant,
+// like `periodUtc`'s.
 function formatUtcTimestamp(value: string): string {
   const formatOptions: Intl.DateTimeFormatOptions = {
     timeZone: 'UTC',

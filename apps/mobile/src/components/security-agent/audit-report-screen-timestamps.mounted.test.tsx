@@ -121,6 +121,8 @@ function makeReport(findings: unknown[] = [FINDING]) {
   };
 }
 
+let mounted: R | undefined = undefined;
+
 function renderReport(findings: unknown[] = [FINDING]): I {
   useQuery.mockReturnValue({
     isLoading: false,
@@ -131,14 +133,13 @@ function renderReport(findings: unknown[] = [FINDING]): I {
     refetch: vi.fn(),
     data: { status: 'ok', report: makeReport(findings) },
   });
-  const ref: { current: R | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(AuditReportScreen, { scope: 'personal' }));
+    mounted = TestRenderer.create(createElement(AuditReportScreen, { scope: 'personal' }));
   });
-  if (!ref.current) {
+  if (!mounted) {
     throw new Error('renderer was not created');
   }
-  return ref.current.root;
+  return mounted.root;
 }
 
 function renderedText(root: I): string[] {
@@ -168,6 +169,8 @@ describe('AuditReportScreen timestamps and actor labels', () => {
   });
 
   afterEach(async () => {
+    act(() => mounted?.unmount());
+    mounted = undefined;
     await i18n.changeLanguage('en');
   });
 

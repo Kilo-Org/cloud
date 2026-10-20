@@ -46,7 +46,7 @@
     "added": "Lisätty",
     "cancelled": "Peruttu",
     "close": "Sulje",
-    "codeReviewer": "Koodintarkistaja",
+    "codeReviewer": "Koodikatselmoija",
     "connected": "Yhdistetty",
     "couldNotLoadModels": "Mallien lataaminen epäonnistui.",
     "couldNotLoadRepositories": "Koodivarastojen lataaminen epäonnistui.",
@@ -64,7 +64,7 @@
     "off": "Ei käytössä",
     "organization": "Organisaatio",
     "platform": "Alusta",
-    "prReview": "PR-tarkistus",
+    "prReview": "PR-katselmointi",
     "queued": "Jonossa",
     "remove": "Poista",
     "repository": "Koodivarasto",
@@ -122,7 +122,7 @@
     "reply": "Vastaa",
     "reportSubmittedReceipt": "Ilmoitus lähetetty. Tunniste: {{receiptId}}",
     "retryLoadingMore": "Yritä uudelleen ladata lisää",
-    "reviewPr": "Tarkista PR",
+    "reviewPr": "Katselmoi PR",
     "role": "Rooli",
     "searchModels": "Mallin nimi…",
     "selectedRepositories": "Valitut koodivarastot",
@@ -588,7 +588,7 @@
     "couldNotLoadPullRequest": "Muutospyyntöä ei voitu ladata.",
     "description": "Kuvaus",
     "noDescriptionProvided": "Kuvausta ei ole annettu.",
-    "review": "Tarkistus",
+    "review": "Katselmointi",
     "reviewPullRequest": "Katselmoi muutospyyntö",
     "headLine": "{{counts}} · uusin muutostallennus {{sha}}",
     "entry": {
@@ -676,7 +676,7 @@
       "pendingComment": "lähettämätöntä kommenttia",
       "pendingComment_other": "lähettämätöntä kommenttia",
       "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
-      "submitReview": "Lähetä tarkistus",
+      "submitReview": "Lähetä katselmointi",
       "partialPostedMessage": "Julkaistiin {{displayFreshCount}} kommenttia. {{displayStaleCount}} kommenttia viittaa vanhempaan muutostallennukseen ja jäi lähetysjonoon.",
       "blockedRequestChanges": "Lisää yhteenveto tai vähintään yksi kommentti, jotta voit pyytää muutoksia.",
       "blockedComment": "Lisää yhteenveto tai vähintään yksi kommentti, jotta voit lähettää kommentoivan katselmoinnin."
@@ -1378,36 +1378,36 @@
     },
     "instructions": {
       "title": "Mukautetut ohjeet",
-      "deprecation": "Mukautetut ohjeet on tarkoitus poistaa käytöstä. Siirrä nämä ohjeet tietovarastosi REVIEW.md-tiedostoon.",
+      "deprecation": "Mukautetut ohjeet on tarkoitus poistaa käytöstä. Siirrä nämä ohjeet koodivarastosi REVIEW.md-tiedostoon.",
       "placeholder": "esim. noudata virheenkäsittelykäytäntöjämme…"
     },
     "repos": {
-      "unavailable": "Tietovarastot eivät ole käytettävissä. Viimeistele Bitbucketin käyttöönotto osoitteessa kilo.ai.",
+      "unavailable": "Koodivarastot eivät ole käytettävissä. Viimeistele Bitbucketin käyttöönotto osoitteessa kilo.ai.",
       "finishSetup": "Viimeistele käyttöönotto",
       "manageAccess": "Hallinnoi käyttöoikeuksia",
-      "bitbucketNoRepositoriesDescription": "Tässä Bitbucket-työtilassa ei ole saatavilla tietovarastoja.",
+      "bitbucketNoRepositoriesDescription": "Tässä Bitbucket-työtilassa ei ole saatavilla koodivarastoja.",
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
-      "installGithubApp": "Asenna GitHub-sovellus tietovarastoihin",
-      "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus tietovarastoihin, jotka haluat katselmoida.",
-      "noRepositoriesFound": "Tietovarastoja ei löytynyt",
-      "repositoryAccess": "tietovaraston käyttöoikeus"
+      "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
+      "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
+      "noRepositoriesFound": "Koodivarastoja ei löytynyt",
+      "repositoryAccess": "koodivaraston käyttöoikeus"
     },
     "style": {
-      "title": "Tarkistustyyli",
+      "title": "Katselmointityyli",
       "balanced": "Olennaiset havainnot ilman turhia huomautuksia",
       "lenient": "Vain vakavat ongelmat",
       "roast": "Viihdyttävän armoton ja rehellinen",
       "strict": "Huomauta kaikesta ja vaadi korkeaa laatua"
     },
     "reviewDetail": {
-      "title": "Tarkistus",
+      "title": "Katselmointi",
       "cancelTitle": "Peruutetaanko katselmointi?",
       "cancelMessage": "Tämä pysäyttää käynnissä olevan koodikatselmoinnin.",
       "cancelReview": "Peruuta katselmointi",
       "retryTitle": "Yritetäänkö katselmointia uudelleen?",
       "retryMessage": "Tämä suorittaa koodikatselmoinnin uudelleen.",
       "retryReview": "Yritä katselmointia uudelleen",
-      "retryNeedsSettings": "Koodintarkistaja on poissa käytöstä tai sen asetukset vaativat huomiota. Korjaa asetukset ja yritä sitten tätä katselmointia uudelleen.",
+      "retryNeedsSettings": "Koodikatselmoija on poissa käytöstä tai sen asetukset vaativat huomiota. Korjaa asetukset ja yritä sitten tätä katselmointia uudelleen.",
       "fixSettings": "Korjaa asetukset",
       "couldNotLoad": "Katselmointia ei voitu ladata.",
       "couldNotGetLatest": "Uusimpia tietoja ei voitu hakea.",
@@ -1436,13 +1436,13 @@
       "executionStarted": "Suoritus aloitettu",
       "reviewCompleted": "Katselmointi valmis",
       "reviewInterrupted": "Katselmointi keskeytynyt",
-      "sessionError": "Istunnossa tapahtui virhe: {{error}}.",
+      "sessionError": "Istunnossa tapahtui virhe: {{error}}",
       "statusWithValue": "Tila: {{status}}",
       "toolName": "Työkalu: {{name}}",
       "toolNameError": "Työkalussa {{name}} tapahtui virhe."
     },
     "reviewMemory": {
-      "title": "Tarkistusmuisti",
+      "title": "Katselmointimuisti",
       "loading": "Ladataan katselmointimuistia",
       "couldNotLoad": "Katselmointimuistia ei voitu ladata.",
       "off": "Katselmointimuisti on pois käytöstä.",
@@ -1469,11 +1469,11 @@
     },
     "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Vain organisaation omistajat ja laskutusvastaavat voivat yhdistää sen.",
     "webhookSetup": "Webhook-kutsujen määritys on kesken.",
-    "webhookSetupDescription": "Automaattiset katselmoinnit eivät ehkä toimi kaikissa tietovarastoissa.",
+    "webhookSetupDescription": "Automaattiset katselmoinnit eivät ehkä toimi kaikissa koodivarastoissa.",
     "autoReviews": "Automaattiset katselmoinnit",
-    "selectRepository": "Ota automaattiset katselmoinnit käyttöön valitsemalla vähintään yksi tietovarasto.",
+    "selectRepository": "Ota automaattiset katselmoinnit käyttöön valitsemalla vähintään yksi koodivarasto.",
     "followReviewMd": "Noudata REVIEW.md-ohjeita",
-    "followReviewMdSubtitle": "Noudata tietovarastokohtaisia REVIEW.md-ohjeita",
+    "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat ja laskutusvastaavat voivat yhdistää sen.",
       "setupIncomplete": "Käyttöönotto on kesken. Viimeistele määritys osoitteessa kilo.ai.",
@@ -1481,11 +1481,11 @@
     },
     "bitbucketConnect": {
       "description": "Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
-      "scopes": "Tili: luku · Tietovarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhook-kutsut: luku/kirjoitus",
+      "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus"
     },
     "scopeList": {
-      "personalStillAvailable": "Omat tietovarastosi ovat edelleen käytettävissä alla.",
+      "personalStillAvailable": "Omat koodivarastosi ovat edelleen käytettävissä alla.",
       "viewOnly": "Vain katselu"
     },
     "reviewList": {
@@ -1511,12 +1511,12 @@
       "bitbucketError": "Bitbucketin käyttöönottoa ei voitu avata. Yritä uudelleen."
     },
     "overview": {
-      "reviewStyle": "Tarkistustyyli",
+      "reviewStyle": "Katselmointityyli",
       "focusAreas": "Painopisteet",
       "allAreas": "Kaikki osa-alueet",
       "customInstructions": "Mukautetut ohjeet",
       "set": "Määritetty",
-      "nSelected": "{{displayCount}} valittu",
+      "nSelected": "Valittu: {{displayCount}}",
       "proposedReviewMdGuidance": "Ehdotetut REVIEW.md-ohjeet"
     },
     "decision": {
@@ -1549,7 +1549,7 @@
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "description": "Koodikatselmoija poistettiin käytöstä, koska Kilo ei pääse tietovarastoon nykyisellä GitHub-sovelluksen asennuksella. Päivitä GitHub-sovelluksen asennus ja ota koodikatselmoija uudelleen käyttöön.",
+        "description": "Koodikatselmoija poistettiin käytöstä, koska Kilo ei pääse koodivarastoon nykyisellä GitHub-sovelluksen asennuksella. Päivitä GitHub-sovelluksen asennus ja ota koodikatselmoija uudelleen käyttöön.",
         "recoveryLabel": "Päivitä GitHub-sovellus"
       },
       "githubIpAllowList": {
@@ -1568,9 +1568,9 @@
         "recoveryLabel": "Päivitä koodikatselmoijan asetukset"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koodikatselmoija poistettiin käytöstä, koska tietovaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta {{supportEmail}} ja ota sitten koodikatselmoija uudelleen käyttöön."
+        "description": "Koodikatselmoija poistettiin käytöstä, koska koodivaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta {{supportEmail}} ja ota sitten koodikatselmoija uudelleen käyttöön."
       },
-      "title": "Koodintarkistaja vaatii toimenpiteitä.",
+      "title": "Koodikatselmoija vaatii toimenpiteitä",
       "recoveryLabel": "Ota yhteyttä tukeen"
     },
     "unknownError": "Tapahtui tuntematon virhe."

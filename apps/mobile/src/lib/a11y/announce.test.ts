@@ -35,6 +35,17 @@ describe('announceForA11y', () => {
 
     expect(accessibilityMock.announceForAccessibility).not.toHaveBeenCalled();
   });
+
+  it('swallows a throwing native announcement so the caller flow continues', () => {
+    accessibilityMock.announceForAccessibility.mockImplementationOnce(() => {
+      throw new Error('native announcement failed');
+    });
+
+    expect(() => {
+      announceForA11y('Session deleted');
+    }).not.toThrow();
+    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Session deleted');
+  });
 });
 
 describe('moveA11yFocus', () => {
@@ -52,6 +63,17 @@ describe('moveA11yFocus', () => {
     const moved = moveA11yFocus(ref);
 
     expect(moved).toBe(false);
+    expect(accessibilityMock.sendAccessibilityEvent).not.toHaveBeenCalled();
+  });
+
+  it('dispatches focus to the mounted node and reports success', () => {
+    const node: Partial<HostInstance> = {};
+    const ref: RefObject<HostInstance | null> = { current: node as HostInstance };
+
+    const moved = moveA11yFocus(ref);
+
+    expect(moved).toBe(true);
+    expect(accessibilityMock.sendAccessibilityEvent).toHaveBeenCalledWith(node, 'focus');
   });
 
   it('returns false and does not throw when the native focus move fails', () => {

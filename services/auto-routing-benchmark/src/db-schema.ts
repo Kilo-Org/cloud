@@ -390,6 +390,7 @@ export const benchmarkProfiles = sqliteTable(
     // Provenance of the run that measured / is measuring this profile.
     run_id: text('run_id'),
     failure_reason: text('failure_reason'),
+    invalidated_at: text('invalidated_at'),
     requested_at: text('requested_at').notNull(),
     updated_at: text('updated_at').notNull(),
     completed_at: text('completed_at'),
@@ -407,6 +408,19 @@ export const benchmarkProfiles = sqliteTable(
       columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
     }),
   ]
+);
+
+export const benchmarkSubscriptions = sqliteTable(
+  'benchmark_subscriptions',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    owner_type: text('owner_type').$type<'platform' | 'user' | 'org'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    revision: text('revision').notNull(),
+    snapshot: text('snapshot').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [primaryKey({ columns: [table.router, table.owner_type, table.owner_id] })]
 );
 
 /**
@@ -540,6 +554,8 @@ export const clientCaseResults = sqliteTable(
     // This upload's revision from the profile's `upload_seq`, unique within the profile even
     // across same-millisecond uploads and delete-and-reinsert; the rollup guard compares it.
     revision: integer('revision').notNull().default(0),
+    // Grader usage the usage writer has not acknowledged yet; a retried upload resends it.
+    pending_grader_usage: text('pending_grader_usage'),
   },
   table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
 );

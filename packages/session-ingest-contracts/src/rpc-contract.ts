@@ -323,18 +323,96 @@ export const MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE = 100;
  */
 export const DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE = 50;
 
-export const listCloudAgentRootSessionsSchema = z.object({
-  kiloUserId: z.string().min(1),
-  limit: z.number().int().min(1).max(100).optional().default(100),
-  start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
-});
+const cloudAgentRootSessionsCursorTimestampSchema = z
+  .string()
+  .min(20)
+  .max(40)
+  .regex(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00(?::?00)?)$/)
+  .refine(value => Number.isFinite(new Date(value).getTime()));
+
+export const cloudAgentRootSessionsCursorSchema = z
+  .object({
+    version: z.literal(1),
+    updatedAt: cloudAgentRootSessionsCursorTimestampSchema,
+    sessionId: sessionIdSchema,
+  })
+  .strict();
+export type CloudAgentRootSessionsCursor = z.infer<typeof cloudAgentRootSessionsCursorSchema>;
+
+function encodeBase64Url(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+export function encodeCloudAgentRootSessionsCursor(
+  cursor: Omit<CloudAgentRootSessionsCursor, 'version'>
+): string {
+  const parsed = cloudAgentRootSessionsCursorSchema.parse({ version: 1, ...cursor });
+  return encodeBase64Url(JSON.stringify(parsed));
+}
+
+export function decodeCloudAgentRootSessionsCursor(cursor: string): CloudAgentRootSessionsCursor {
+  if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
+    throw new Error('Invalid Cloud Agent root sessions cursor');
+  }
+  const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
+  const paddingLength = (4 - (base64.length % 4)) % 4;
+  const binary = atob(base64 + '='.repeat(paddingLength));
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  const parsed = cloudAgentRootSessionsCursorSchema.parse(
+    JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes))
+  );
+  if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
+    throw new Error('Invalid Cloud Agent root sessions cursor');
+  }
+  return parsed;
+}
+
+export function validateCloudAgentRootSessionsCursor(cursor: string): boolean {
+  try {
+    decodeCloudAgentRootSessionsCursor(cursor);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const listCloudAgentRootSessionsSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    limit: z.number().int().min(1).max(100).optional().default(100),
+    cursor: z.string().min(1).max(256).optional(),
+    start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
+  })
+  .strict()
+  .superRefine((params, ctx) => {
+    if (params.cursor !== undefined && !validateCloudAgentRootSessionsCursor(params.cursor)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cursor'],
+        message: 'cursor is not a valid Cloud Agent root sessions cursor',
+      });
+    }
+  });
 export type ListCloudAgentRootSessionsParams = z.input<typeof listCloudAgentRootSessionsSchema>;
 export type CloudAgentRootSessionSummary = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
+  userId: string;
+  organizationId: string | null;
   title: string | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  profileId: string | null;
+  createdOnPlatform: string;
   created: number;
   updated: number;
+};
+export type CloudAgentRootSessionsPage = {
+  items: CloudAgentRootSessionSummary[];
+  nextCursor: string | null;
 };
 
 export const sdkApiErrorSchema = z.object({
@@ -974,7 +1052,7 @@ export type SessionIngestRpcMethods = {
   ) => Promise<GetCloudAgentRootSessionSnapshotResult>;
   listCloudAgentRootSessions: (
     params: ListCloudAgentRootSessionsParams
-  ) => Promise<CloudAgentRootSessionSummary[]>;
+  ) => Promise<CloudAgentRootSessionsPage>;
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;

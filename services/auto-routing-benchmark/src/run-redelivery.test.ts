@@ -62,7 +62,7 @@ describe('a paid case whose queue invocation is canceled (production migrations 
       },
       BENCH_RUNNER: { idFromName: (name: string) => name, get: () => container },
       BENCHMARK_SCHEDULER_CONFIG: SLOTS,
-      INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+      BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-secret' },
       KILO_WEB_API_BASE_URL: 'https://app.test',
       KILO_CLI_API_URL: 'https://api.test',
       BENCH_RESULT_URL: 'https://bench.test/container/case-result',
@@ -72,8 +72,8 @@ describe('a paid case whose queue invocation is canceled (production migrations 
       .prepare(`
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at, min_accuracy, switch_cost_factor,
-        max_concurrency, repetitions, engine_identity, benchmark_user_id
-      ) VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, 'redelivery-test', 'benchmark-user')
+        max_concurrency, repetitions, engine_identity, benchmark_user_id, benchmark_org_id
+      ) VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, 'redelivery-test', 'bot-internal-benchmark', 'benchmark-org')
     `)
       .run(RUN_ID, new Date(NOW).toISOString());
     const models = ['lane/model', 'other/model'];

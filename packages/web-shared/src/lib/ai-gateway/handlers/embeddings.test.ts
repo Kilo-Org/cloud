@@ -52,6 +52,7 @@ const allowedModelDecision = {
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
   },
   decision: { allowed: true },
 } satisfies Awaited<ReturnType<typeof resolveOrganizationMemberModelDecision>>;

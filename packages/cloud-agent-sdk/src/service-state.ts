@@ -7,7 +7,7 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
-import { sessionCommitDataSchema } from './schemas';
+import { PREPARATION_OUTPUT_TAIL_MAX_BYTES, sessionCommitDataSchema } from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
@@ -23,6 +23,18 @@ import type {
   SessionCommit,
   PreparationStepSnapshot,
 } from './types';
+
+/**
+ * Keep the most recent `maxBytes` UTF-8 bytes of `text`, advancing past any
+ * continuation byte so the decoded result never starts mid-code-point.
+ */
+function utf8Tail(text: string, maxBytes: number): { text: string; truncated: boolean } {
+  const bytes = new TextEncoder().encode(text);
+  if (bytes.length <= maxBytes) return { text, truncated: false };
+  let start = bytes.length - maxBytes;
+  while (start < bytes.length && ((bytes[start] ?? 0) & 0b1100_0000) === 0b1000_0000) start++;
+  return { text: new TextDecoder().decode(bytes.subarray(start)), truncated: true };
+}
 
 /**
  * Keep a known goal reason when a later update for the same session carries the
@@ -593,9 +605,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       if (event.action === 'step_progress' && event.detail !== undefined) {
         nextStep = { ...existingStep, latestDetail: event.detail, revision: event.revision };
       } else if (event.action === 'step_output' && event.output !== undefined) {
+        const tail = utf8Tail(
+          `${existingStep.outputTail ?? ''}${event.output}`,
+          PREPARATION_OUTPUT_TAIL_MAX_BYTES
+        );
         nextStep = {
           ...existingStep,
-          outputTail: `${existingStep.outputTail ?? ''}${event.output}`,
+          outputTail: tail.text,
+          outputTruncated: existingStep.outputTruncated === true || tail.truncated,
           revision: event.revision,
         };
       } else if (event.action === 'step_completed') {

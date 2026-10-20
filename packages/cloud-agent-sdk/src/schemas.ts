@@ -331,6 +331,19 @@ export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
+/** Longest single `preparing` step-output delta the client accepts, in characters. */
+export const PREPARATION_OUTPUT_MAX_LENGTH = 65_536;
+/**
+ * Most recent step-output bytes the client retains per step. Mirrors the
+ * server-side tail in `services/cloud-agent-next/src/session/preparation-history.ts`,
+ * which keeps the last 65,536 UTF-8 bytes of a running setup command.
+ */
+export const PREPARATION_OUTPUT_TAIL_MAX_BYTES = 65_536;
+/** Most message IDs a `session.queue.changed` snapshot may carry. */
+export const SESSION_QUEUE_MAX_IDS = 1_000;
+/** Most questions a `question.asked` event may carry. */
+export const SESSION_QUESTION_MAX_QUESTIONS = 32;
+
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
 const remoteSlashCommandInfoSchema = z
   .object({
@@ -721,7 +734,7 @@ export type SessionTurnCloseData = z.infer<typeof sessionTurnCloseDataSchema>;
 export const sessionQueueChangedDataSchema = z
   .object({
     sessionID: z.string(),
-    queued: z.array(z.string()),
+    queued: z.array(z.string()).max(SESSION_QUEUE_MAX_IDS),
   })
   .passthrough();
 export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
@@ -729,7 +742,7 @@ export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSche
 export const questionAskedDataSchema = z.object({
   id: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  questions: z.array(z.unknown()).optional().catch(undefined),
+  questions: z.array(z.unknown()).max(SESSION_QUESTION_MAX_QUESTIONS).optional().catch(undefined),
 });
 export type QuestionAskedData = z.infer<typeof questionAskedDataSchema>;
 
@@ -825,7 +838,7 @@ const preparationStepSchema = z.object({
   command: z.string().optional(),
   commandIndex: z.number().optional(),
   commandCount: z.number().optional(),
-  outputTail: z.string().optional(),
+  outputTail: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
   outputTruncated: z.boolean().optional(),
   exitCode: z.number().optional(),
 });
@@ -872,7 +885,7 @@ export const preparingDataSchema = z
     commandIndex: z.number().optional(),
     commandCount: z.number().optional(),
     detail: z.string().optional(),
-    output: z.string().optional(),
+    output: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
     safeError: z.string().optional(),
     exitCode: z.number().optional(),
     attempt: preparationAttemptSchema.optional(),
@@ -939,7 +952,7 @@ export const slashCommandInfoSchema = z.object({
   agent: z.string().optional(),
   model: z.string().optional(),
   source: z.enum(['command', 'mcp', 'skill']).optional(),
-  hints: z.array(z.string()).default([]),
+  hints: z.array(z.string()).max(REMOTE_COMMAND_MAX_HINTS).default([]),
   subtask: z.boolean().optional(),
 });
 export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
@@ -950,7 +963,7 @@ export const slashCommandCatalogStatusSchema: z.ZodType<SlashCommandCatalogStatu
 });
 
 export const commandsAvailableDataSchema = z.object({
-  commands: z.array(slashCommandInfoSchema),
+  commands: z.array(slashCommandInfoSchema).max(REMOTE_COMMAND_MAX_COMMANDS),
   // The notice is a nicety and the catalog is essential, so a malformed status
   // is dropped instead of failing the whole event and losing the catalog.
   catalogStatus: slashCommandCatalogStatusSchema.optional().catch(undefined),

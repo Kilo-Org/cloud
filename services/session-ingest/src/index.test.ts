@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignJWT } from 'jose';
+import { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
@@ -55,10 +57,14 @@ type TestBindings = {
 
 function makeDbFakes() {
   const selectResult = vi.fn<() => Promise<unknown[]>>(async () => []);
+  let whereCondition: unknown;
   const select = {
     from: vi.fn(() => select),
     leftJoin: vi.fn(() => select),
-    where: vi.fn(() => select),
+    where: vi.fn((condition: unknown) => {
+      whereCondition = condition;
+      return select;
+    }),
     limit: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
   };
@@ -67,7 +73,7 @@ function makeDbFakes() {
     select: vi.fn(() => select),
   };
 
-  return { db, selectResult };
+  return { db, selectResult, selectCondition: () => whereCondition };
 }
 
 const defaultEnv: TestBindings = {
@@ -332,6 +338,83 @@ describe('public session route', () => {
       expect(res.headers.get('cache-control')).toBe('no-store');
       expect(await res.text()).toBe('{"ok":true}');
       expect(stub.getSharedSessionStream).toHaveBeenCalledWith(now.getTime());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns 404 for a superseded capability and serves the current generation', async () => {
+    const { db, selectResult, selectCondition } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const now = new Date('2026-08-19T10:00:00.000Z');
+    const sessionId = 'ses_12345678901234567890123456';
+    const previousPublicId = '11111111-1111-4111-8111-111111111111';
+    const currentPublicId = '22222222-2222-4222-8222-222222222222';
+    const currentRow = {
+      sessionId,
+      kiloUserId: 'usr_123',
+      title: 'Shared title',
+      ownerName: 'Shared owner',
+      gitUrl: null,
+      gitBranch: null,
+      createdAt: '2026-08-19T10:00:00.000Z',
+    };
+
+    selectResult.mockImplementation(async () => {
+      const condition = selectCondition();
+      if (!(condition instanceof SQL)) throw new Error('Expected a resolution predicate');
+      const params = new PgDialect().sqlToQuery(condition).params;
+      return params[1] === currentPublicId ? [currentRow] : [];
+    });
+
+    const stub = {
+      getSharedSessionStream: vi.fn(async () => new Response('{"ok":true}').body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      stub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const previousToken = await signSessionShareToken(
+      defaultEnv,
+      { sessionId, publicId: previousPublicId },
+      { now: () => now }
+    );
+    const currentToken = await signSessionShareToken(
+      defaultEnv,
+      { sessionId, publicId: currentPublicId },
+      { now: () => new Date(now.getTime() + 1000) }
+    );
+
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    try {
+      const previous = await app.request(
+        `/session/${encodeURIComponent(previousToken)}`,
+        {},
+        defaultEnv
+      );
+      const current = await app.request(
+        `/session/${encodeURIComponent(currentToken)}`,
+        {},
+        defaultEnv
+      );
+      const previousMetadata = await app.request(
+        `/session/${encodeURIComponent(previousToken)}/metadata`,
+        {},
+        defaultEnv
+      );
+      const currentMetadata = await app.request(
+        `/session/${encodeURIComponent(currentToken)}/metadata`,
+        {},
+        defaultEnv
+      );
+
+      expect(previous.status).toBe(404);
+      expect(current.status).toBe(200);
+      expect(await current.text()).toBe('{"ok":true}');
+      expect(previousMetadata.status).toBe(404);
+      expect(currentMetadata.status).toBe(200);
+      expect(stub.getSharedSessionStream).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

@@ -228,8 +228,17 @@ describe('SessionIngestDO integration', () => {
       await stub.ingest(
         [
           { type: 'session', data: { title: 'Shared Session' } },
-          { type: 'message', data: { id: 'msg_1', role: 'user', content: 'public' } },
+          {
+            type: 'message',
+            data: {
+              id: 'msg_1',
+              role: 'user',
+              content: 'public',
+              summary: { diffs: [{ file: 'intentional.ts', after: 'A' }] },
+            },
+          },
           { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'A' } },
+          { type: 'session_diff', data: [{ file: 'shared.ts', patch: 'A' }] },
         ],
         kiloUserId,
         sessionId,
@@ -260,6 +269,9 @@ describe('SessionIngestDO integration', () => {
           m.parts.map(p => p.id),
         ])
       ).toEqual([['msg_1', ['part_1']]]);
+      expect(shared.messages[0].info.summary).toEqual({
+        diffs: [{ file: 'intentional.ts', after: 'A' }],
+      });
       expect(shared.sessionDiff).toEqual([]);
       expect(JSON.stringify(shared)).not.toContain('private');
     });

@@ -24,10 +24,12 @@ function autocaptureEvent(href: string) {
       $session_entry_referrer: SHARE_URL,
       $prev_pageview_pathname: `/s/${SENTINEL}`,
       $external_click_url: href,
+      $el_text: `Open in editor: ${href}`,
       $elements_chain: `a:attr__href="${href}"`,
       $elements: [
         {
           tag_name: 'a',
+          $el_text: `Open in editor: ${href}`,
           attr__href: href,
           attributes: { attr__href: href, attr__class: 'inline-flex items-center gap-2' },
         },
@@ -59,9 +61,13 @@ describe('sanitizePostHogEvent', () => {
     expect(sanitized.properties.$elements_chain).toBe(
       'a:attr__href="vscode://kilocode.kilo-code/kilocode/s/:share_token"'
     );
+    expect(sanitized.properties.$el_text).toBe(
+      'Open in editor: vscode://kilocode.kilo-code/kilocode/s/:share_token'
+    );
     expect(sanitized.properties.$elements).toEqual([
       {
         tag_name: 'a',
+        $el_text: 'Open in editor: vscode://kilocode.kilo-code/kilocode/s/:share_token',
         attr__href: 'vscode://kilocode.kilo-code/kilocode/s/:share_token',
         attributes: {
           attr__href: 'vscode://kilocode.kilo-code/kilocode/s/:share_token',
@@ -146,13 +152,59 @@ describe('sanitizePostHogEvent', () => {
         $current_url: `${LEGACY_SHARE_URL}?utm_source=copy`,
         $pathname: `/share/${SENTINEL}`,
         $referrer: LEGACY_SHARE_URL,
-        $elements: [{ attr__href: `cursor://kilocode.kilo-code/kilocode/share/${SENTINEL}` }],
+        $elements: [
+          {
+            attr__href: buildOpenInEditorUrl(DEFAULT_EDITOR, SENTINEL, `/share/${SENTINEL}`),
+          },
+        ],
       },
     });
 
     expect(JSON.stringify(event)).not.toContain(SENTINEL);
     expect(event.properties.$pathname).toBe('/share/:share_id');
     expect(event.properties.$referrer).toBe('https://app.kilo.ai/share/:share_id');
+  });
+
+  it('sanitizes person properties and encoded initial person info', () => {
+    const encodedUrl = encodeURIComponent(SHARE_URL);
+    const jsonInfo = JSON.stringify({ r: SHARE_URL, u: `${SHARE_URL}?utm_source=copy` });
+    const encodedJsonInfo = encodeURIComponent(jsonInfo);
+
+    const event = sanitizePostHogEvent({
+      uuid: 'test-event',
+      event: '$identify',
+      properties: {
+        $initial_person_info: { r: SHARE_URL, u: encodedUrl },
+      },
+      $set: {
+        $initial_person_info: jsonInfo,
+        $initial_current_url: SHARE_URL,
+      },
+      $set_once: {
+        $initial_current_url: SHARE_URL,
+        $initial_pathname: `/s/${SENTINEL}`,
+        $initial_referrer: SHARE_URL,
+        $initial_person_info: encodedJsonInfo,
+      },
+    });
+
+    expect(JSON.stringify(event)).not.toContain(SENTINEL);
+    expect(event.properties.$initial_person_info).toEqual({
+      r: 'https://app.kilo.ai/s/:share_token',
+      u: encodeURIComponent('https://app.kilo.ai/s/:share_token'),
+    });
+    expect(JSON.parse(String(event.$set?.$initial_person_info))).toEqual({
+      r: 'https://app.kilo.ai/s/:share_token',
+      u: 'https://app.kilo.ai/s/:share_token?utm_source=copy',
+    });
+    expect(event.$set?.$initial_current_url).toBe('https://app.kilo.ai/s/:share_token');
+    expect(event.$set_once?.$initial_current_url).toBe('https://app.kilo.ai/s/:share_token');
+    expect(event.$set_once?.$initial_pathname).toBe('/s/:share_token');
+    expect(event.$set_once?.$initial_referrer).toBe('https://app.kilo.ai/s/:share_token');
+    expect(JSON.parse(decodeURIComponent(String(event.$set_once?.$initial_person_info)))).toEqual({
+      r: 'https://app.kilo.ai/s/:share_token',
+      u: 'https://app.kilo.ai/s/:share_token?utm_source=copy',
+    });
   });
 
   it('preserves unrelated route events with the existing query sanitization', () => {

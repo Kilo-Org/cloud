@@ -28,6 +28,7 @@ import {
   runtimeCredentialProxyFacadeBaseUrl,
 } from '../runtime-credential-proxy.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../shared/credential-upgrade.js';
 import type { GitHubReviewTarget } from '../shared/github-review-target.js';
 import type {
   ControlPlaneCredentialRepository,
@@ -406,8 +407,7 @@ function invalidCredentials(): never {
  * not contained and it has no modern runtime authorization. Callers must deny
  * the start/restore instead of projecting the session's native user token.
  */
-export const SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE =
-  'This session is missing a required credential upgrade. Start a new session to continue.';
+export { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE };
 
 export class SessionCredentialUpgradeRequiredError extends Error {
   constructor() {

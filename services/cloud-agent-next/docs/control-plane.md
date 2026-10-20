@@ -969,13 +969,12 @@ session-bound runtime credential proxy. A native user token is never projected i
 
 Sessions created before containment metadata was stored, or while containment was disabled, may
 have no safe Kilo credential path. Their first start, restore or resume after this change fails
-fast with `workspace_setup_failed`; the route diagnostic records the `credential_upgrade_required`
-stage. An existing control-plane route surfaces the generic workspace setup failure text, while a
-new control-plane registration and the legacy plane report the upgrade message directly. No broad
-token is substituted. Operators can re-enable containment (`CREDENTIAL_CONTAINMENT_ENABLED`) or
-modern resource-token issuance for local development; contained sessions and managed SCM
-direct-token paths continue to work. Existing sessions do not need a production migration: unsafe
-operations fail closed when attempted.
+fast with the `credential_upgrade_required` route reason. Settled messages, callbacks, and the
+route diagnostic carry the same upgrade guidance that new control-plane registrations and the
+legacy plane return. No broad token is substituted. Operators can re-enable containment
+(`CREDENTIAL_CONTAINMENT_ENABLED`) or modern resource-token issuance for local development;
+contained sessions and managed SCM direct-token paths continue to work. Existing sessions do not
+need a production migration: unsafe operations fail closed when attempted.
 
 Handles are per worktree scope, including in a shared checkout: one handle serves every member of
 the scope. A handle is bound to the user, organization, authorization, worktree scope, current

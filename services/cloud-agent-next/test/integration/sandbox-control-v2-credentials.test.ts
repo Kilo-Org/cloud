@@ -1255,7 +1255,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       ...prepareInput(SESSION, source),
       sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
     });
-    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    expect(view).toMatchObject({ state: 'failed', reason: 'credential_upgrade_required' });
 
     const row = await readRouteRow(stub, SESSION);
     expect(row?.state).toBe('failed');
@@ -1346,7 +1346,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     const view = await stub.prepare(prepareInput(SESSION, source));
 
-    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    expect(view).toMatchObject({ state: 'failed', reason: 'credential_upgrade_required' });
     const row = await readRouteRow(stub, SESSION);
     expect(row?.state).toBe('failed');
     // Containment off must not resolve a containment proxy container, which the
@@ -1429,7 +1429,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     });
     spy.mockRestore();
 
-    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    expect(view).toMatchObject({ state: 'failed', reason: 'credential_upgrade_required' });
     expect(diagnostics).toContainEqual(
       expect.objectContaining({ stage: 'credential_upgrade_required' })
     );

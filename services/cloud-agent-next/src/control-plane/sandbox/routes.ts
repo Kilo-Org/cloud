@@ -375,12 +375,13 @@ export async function startAttempt(
   try {
     issued = await ctx.issueGrant(attemptSpec, source, diagnostic);
   } catch (error) {
+    const upgradeRequired = error instanceof SessionCredentialUpgradeRequiredError;
     return failRoute(
       ctx,
       attemptSpec,
       attemptId,
-      'workspace_setup_failed',
-      error instanceof SessionCredentialUpgradeRequiredError
+      upgradeRequired ? 'credential_upgrade_required' : 'workspace_setup_failed',
+      upgradeRequired
         ? 'credential_upgrade_required'
         : admissionFailureStage(error, 'credential_grant_failed'),
       diagnostic.snapshot()

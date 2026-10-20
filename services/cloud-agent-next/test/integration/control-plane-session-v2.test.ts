@@ -47,6 +47,7 @@ import {
 } from '../../src/session/preparation-history.js';
 import { createPreparationProgressRecorder } from '../../src/session/preparation-progress.js';
 import { sessionDoName } from '../../src/session-plane.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../src/sandbox-control/session-credentials.js';
 import {
   createFakeCredentialBroker,
   installFakeCredentialEnv,
@@ -781,6 +782,42 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
       safeError: 'workspace_setup_failed',
     });
     expect(rows.some(row => row.action === 'attempt_completed')).toBe(false);
+    stream.close();
+  });
+
+  it('settles a credential upgrade failure with recoverable guidance', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'clone', attemptId: peer.attemptId });
+
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'credential_upgrade_required',
+    };
+    await stub.onRoute({
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'credential_upgrade_required',
+    });
+
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('failed'));
+    expect(await readMessageReason(stub, 'm1')).toBe('credential_upgrade_required');
+    const stream = await connectStream(sessionId);
+    const replayed = await drainStream(stream);
+    expect(
+      replayed.find(message => message.streamEventType === 'cloud.message.failed')?.data
+    ).toMatchObject({
+      messageId: 'm1',
+      status: 'failed',
+      reason: 'credential_upgrade_required',
+      error: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
+    });
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'failed', reason: 'credential_upgrade_required' },
+    });
     stream.close();
   });
 

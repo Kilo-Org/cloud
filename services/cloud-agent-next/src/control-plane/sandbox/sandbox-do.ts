@@ -3301,12 +3301,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
             throw new Error('Credential policy unavailable');
           this.publishRouteGrant({ ...route, ...issued });
         } catch (error) {
+          const upgradeRequired = error instanceof SessionCredentialUpgradeRequiredError;
           await failCurrentAttempt(
             this.routeContext(next),
             route.sessionId,
             route.attemptId,
-            'workspace_setup_failed',
-            error instanceof SessionCredentialUpgradeRequiredError
+            upgradeRequired ? 'credential_upgrade_required' : 'workspace_setup_failed',
+            upgradeRequired
               ? 'credential_upgrade_required'
               : admissionFailureStage(error, 'runtime_proxy_bind_failed')
           );
@@ -3474,6 +3475,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.failPrepareAttempt(
           route.sessionId,
           route.attemptId,
+          'credential_upgrade_required',
           'credential_upgrade_required'
         ).catch(() => {
           logger
@@ -4097,17 +4099,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async failPrepareAttempt(
     sessionId: string,
     attemptId: string,
-    stage = 'prepare_dispatch_failed'
+    stage = 'prepare_dispatch_failed',
+    reason: ControlPlaneFailureReason = 'workspace_setup_failed'
   ): Promise<void> {
     await this.enqueue(async () => {
       const state = await this.readAllocation();
-      await failCurrentAttempt(
-        this.routeContext(state),
-        sessionId,
-        attemptId,
-        'workspace_setup_failed',
-        stage
-      );
+      await failCurrentAttempt(this.routeContext(state), sessionId, attemptId, reason, stage);
     });
   }
 

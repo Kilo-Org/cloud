@@ -3,6 +3,8 @@ import { type QueryClient } from '@tanstack/react-query';
 import { vi } from 'vitest';
 
 import '@/i18n';
+import type * as ProfileAgentNavigation from '@/lib/profile-agent-navigation';
+import type * as SecurityAgent from '@/lib/security-agent';
 import { ProfileScreen } from '@/components/profile-screen';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -117,14 +119,15 @@ vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
 
-vi.mock('@/lib/profile-agent-navigation', () => ({
-  getCodeReviewerProfilePath: () => '/code-reviewer',
+// The path builders are the real ones: a test that presses a row must observe
+// the route the screen actually pushes, and these modules carry no native import.
+vi.mock('@/lib/profile-agent-navigation', async importOriginal => ({
+  ...(await importOriginal<typeof ProfileAgentNavigation>()),
   getProfileAgentScope: getProfileAgentScopeMock,
-  getPrReviewEntryPath: () => '/pr-review',
 }));
 
-vi.mock('@/lib/security-agent', () => ({
-  getSecurityAgentPath: () => '/security-agent',
+vi.mock('@/lib/security-agent', async importOriginal => ({
+  ...(await importOriginal<typeof SecurityAgent>()),
 }));
 
 vi.mock('@/lib/external-link', () => ({

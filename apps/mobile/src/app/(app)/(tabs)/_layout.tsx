@@ -10,6 +10,7 @@ import { SessionPreviewOverlay } from '@/components/agents/session-preview-overl
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
+import { TabSwitchInputGate } from '@/components/tab-screen-input-gate';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
@@ -347,7 +348,7 @@ export default function TabsLayout() {
   );
   return (
     <TabBarLabelContext value={showTabLabel}>
-      {tabsLayout}
+      <TabSwitchInputGate>{tabsLayout}</TabSwitchInputGate>
       <SessionPreviewOverlay />
     </TabBarLabelContext>
   );

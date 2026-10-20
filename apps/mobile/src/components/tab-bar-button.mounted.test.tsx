@@ -1,9 +1,11 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
 import { createElement } from 'react';
 import { type BottomTabBarButtonProps } from 'expo-router/js-tabs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
+
+import { __resetTabSwitchInputForTests, isTabSwitchPending } from '@/lib/tab-switch-input-gate';
 
 import { TabBarButton } from './tab-bar-button';
 
@@ -33,6 +35,10 @@ function renderButton(props: Partial<BottomTabBarButtonProps>) {
   }
   return renderer.root.findByType('Pressable' as unknown as React.ElementType);
 }
+
+beforeEach(() => {
+  __resetTabSwitchInputForTests();
+});
 
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -68,5 +74,30 @@ describe('TabBarButton mounted layout', () => {
   it('keeps the pointer cursor on every platform', () => {
     const button = renderButton({ style: { opacity: 1 } });
     expect(button.props.style).toEqual(expect.arrayContaining([{ cursor: 'pointer' }]));
+  });
+});
+
+type PressInProps = { onPressIn: (event: unknown) => void };
+
+describe('TabBarButton tab switch gate', () => {
+  // The outgoing tab is still hit-tested until the destination commits, so the
+  // entry arms the input gate on the touch down, before the navigation starts.
+  it('arms the input gate when the entry is touched', () => {
+    const onPressIn = vi.fn<() => void>();
+    const button = renderButton({ onPressIn });
+
+    expect(isTabSwitchPending()).toBe(false);
+    act(() => {
+      (button.props as PressInProps).onPressIn({});
+    });
+
+    expect(isTabSwitchPending()).toBe(true);
+    expect(onPressIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the gate closed before the entry is touched', () => {
+    renderButton({ onPressIn: vi.fn<() => void>() });
+
+    expect(isTabSwitchPending()).toBe(false);
   });
 });

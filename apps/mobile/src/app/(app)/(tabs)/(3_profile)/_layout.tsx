@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { TabSwitchInputSettle } from '@/components/tab-screen-input-gate';
+
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
 export const unstable_settings = {
@@ -15,5 +17,9 @@ export default function ProfileLayout() {
     [['kiloPass']],
     [['agentProfiles']],
   ]);
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <TabSwitchInputSettle>
+      <Stack screenOptions={{ headerShown: false }} />
+    </TabSwitchInputSettle>
+  );
 }

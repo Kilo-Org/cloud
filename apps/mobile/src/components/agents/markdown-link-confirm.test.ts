@@ -21,8 +21,8 @@ const { trusted, getTrustedHostsHasLoaded, isTrustedHost, trustHost } = vi.hoist
   return {
     trusted: trustedHosts,
     getTrustedHostsHasLoaded: hasLoaded,
-    trustHost: trust,
     isTrustedHost: isTrusted,
+    trustHost: trust,
   };
 });
 vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
@@ -60,9 +60,21 @@ describe('formatLinkHost', () => {
     expect(formatLinkHost('http://example.com:80/p')).toBe('example.com');
   });
 
+  it('reports the parsed host for every spelling of a web link', () => {
+    expect(formatLinkHost('https:/example.com/p')).toBe('example.com');
+    expect(formatLinkHost('https:example.com')).toBe('example.com');
+    expect(formatLinkHost('https:///example.com')).toBe('example.com');
+    expect(formatLinkHost('https://user@example.com')).toBe('example.com');
+  });
+
   it('returns null for an unparseable value', () => {
     expect(formatLinkHost('not a url')).toBeNull();
     expect(formatLinkHost('https://')).toBeNull();
+    expect(formatLinkHost('//example.com')).toBeNull();
+  });
+
+  it('returns null for a non-web scheme', () => {
+    expect(formatLinkHost('mailto:hello@kilo.ai')).toBeNull();
   });
 });
 
@@ -149,5 +161,79 @@ describe('confirmAndOpenMarkdownLink', () => {
 
     expect(openExternalUrl).toHaveBeenCalledWith('mailto:hello@kilo.ai', { label: 'link' });
     expect(alert).not.toHaveBeenCalled();
+  });
+
+  it('opens an allowlisted platform scheme through the opener', () => {
+    confirmAndOpenMarkdownLink('tel:+38111222333', { label: 'link' });
+
+    expect(openExternalUrl).toHaveBeenCalledWith('tel:+38111222333', { label: 'link' });
+    expect(alert).not.toHaveBeenCalled();
+  });
+
+  it.each(['https:/evil.example/path', 'https:evil.example', 'https:///evil.example/path'])(
+    'confirms the parsed host for the non-canonical spelling %j',
+    href => {
+      confirmAndOpenMarkdownLink(href, { label: 'link' });
+
+      expect(alert).toHaveBeenCalledTimes(1);
+      const [, message, buttons] = alert.mock.calls[0] as AlertCall;
+      expect(message).toBe('This link opens evil.example in your browser.');
+      expect(openExternalUrl).not.toHaveBeenCalled();
+
+      buttons[1]?.onPress?.();
+      expect(openExternalUrl).toHaveBeenCalledTimes(1);
+      expect(openExternalUrl).toHaveBeenCalledWith(
+        expect.stringMatching(/^https:\/\/evil\.example\/(?:path)?$/),
+        { label: 'link', retryOnError: true }
+      );
+    }
+  );
+
+  it('trusts the parsed host of a non-canonical spelling and stops confirming it', () => {
+    confirmAndOpenMarkdownLink('https:/evil.example/path', { label: 'link' });
+    const buttons = (alert.mock.calls[0] as AlertCall)[2];
+    buttons[2]?.onPress?.();
+
+    expect(trustHost).toHaveBeenCalledWith('evil.example');
+
+    alert.mockClear();
+    openExternalUrl.mockClear();
+    confirmAndOpenMarkdownLink('https:/evil.example/path', { label: 'link' });
+
+    expect(alert).not.toHaveBeenCalled();
+    expect(openExternalUrl).toHaveBeenCalledWith('https://evil.example/path', {
+      label: 'link',
+      retryOnError: true,
+    });
+  });
+
+  it('confirms the host that carries the non-default port', () => {
+    confirmAndOpenMarkdownLink('https:/evil.example:8443/path', { label: 'link' });
+
+    const [, message, buttons] = alert.mock.calls[0] as AlertCall;
+    expect(message).toBe('This link opens evil.example:8443 in your browser.');
+
+    buttons[1]?.onPress?.();
+    expect(openExternalUrl).toHaveBeenCalledWith('https://evil.example:8443/path', {
+      label: 'link',
+      retryOnError: true,
+    });
+  });
+
+  it.each([
+    '//evil.example/path',
+    'ftp://evil.example/path',
+    ['java', 'script:alert(1)'].join(''),
+    'data:text/html,hello',
+    'file:///etc/passwd',
+    'not a url',
+    '',
+  ])('rejects %j without opening anything', href => {
+    confirmAndOpenMarkdownLink(href, { label: 'link' });
+
+    expect(toastError).toHaveBeenCalledWith("This link can't be opened.");
+    expect(openExternalUrl).not.toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalled();
+    expect(trustHost).not.toHaveBeenCalled();
   });
 });

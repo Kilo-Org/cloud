@@ -4,6 +4,7 @@ import {
   SLACK_TRUNCATION_MARKER,
   escapeSlackLabel,
   escapeSlackText,
+  truncateEscapedSlackText,
   truncateSlackText,
 } from './slack-escape';
 
@@ -67,5 +68,21 @@ describe('truncateSlackText', () => {
   it('returns only the marker when the limit is smaller than the marker', () => {
     const result = truncateSlackText('abcdefghij', 4);
     expect(result).toBe(SLACK_TRUNCATION_MARKER.slice(0, 4));
+  });
+});
+
+describe('truncateEscapedSlackText', () => {
+  it('cuts only between whole escape sequences', () => {
+    const escaped = escapeSlackText('<'.repeat(60));
+    expect(escaped).toBe('&lt;'.repeat(60));
+
+    const result = truncateEscapedSlackText(escaped, 40);
+    expect(result.length).toBeLessThanOrEqual(40);
+    expect(result.endsWith(SLACK_TRUNCATION_MARKER)).toBe(true);
+    expect(result.slice(0, -SLACK_TRUNCATION_MARKER.length)).toBe('&lt;'.repeat(6));
+  });
+
+  it('leaves a value that fits unchanged', () => {
+    expect(truncateEscapedSlackText('&lt;ok&gt;', 50)).toBe('&lt;ok&gt;');
   });
 });

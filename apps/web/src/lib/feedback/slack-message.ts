@@ -1,6 +1,10 @@
 import type { AnyBlock } from '@slack/types';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
-import { escapeSlackLabel, truncateSlackText } from '@/lib/slack/slack-escape';
+import {
+  escapeSlackLabel,
+  truncateEscapedSlackText,
+  truncateSlackText,
+} from '@/lib/slack/slack-escape';
 
 /**
  * Slack payload builders for the two feedback surfaces.
@@ -27,8 +31,7 @@ export type FeedbackSlackMessage = {
 };
 
 function metadataValue(value: string): string {
-  // Escape first, then cap, so the escaped value stays inside the section limit.
-  return truncateSlackText(escapeSlackLabel(value), METADATA_LIMIT);
+  return truncateEscapedSlackText(escapeSlackLabel(value), METADATA_LIMIT);
 }
 
 function bodySection(label: string, value: string, limit: number): AnyBlock {

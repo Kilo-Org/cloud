@@ -45,3 +45,16 @@ export function truncateSlackText(value: string, limit: number): string {
   const endsWithHighSurrogate = /[\uD800-\uDBFF]$/.test(head);
   return `${endsWithHighSurrogate ? head.slice(0, -1) : head}${SLACK_TRUNCATION_MARKER}`;
 }
+
+/**
+ * Caps text that has already been through {@link escapeSlackText}. A cut that
+ * lands inside an escape sequence (for example inside `&amp;`) drops the partial
+ * sequence, so the result only ever contains whole entities.
+ */
+export function truncateEscapedSlackText(value: string, limit: number): string {
+  const truncated = truncateSlackText(value, limit);
+  if (!truncated.endsWith(SLACK_TRUNCATION_MARKER)) return truncated;
+
+  const head = truncated.slice(0, -SLACK_TRUNCATION_MARKER.length);
+  return `${head.replace(/&[a-zA-Z]*$/, '')}${SLACK_TRUNCATION_MARKER}`;
+}

@@ -14,6 +14,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GLANCEABLE_SNAPSHOT_SIGNING_SECRET() {
     return mockConfig.signingSecret;
   },
+  INTERNAL_API_SECRET: 'internal-secret',
 }));
 jest.mock('@/lib/glanceable-agents-snapshot-server', () => ({
   buildGlanceableDeliveryForUser: jest.fn(),

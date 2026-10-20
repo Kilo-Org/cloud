@@ -135,6 +135,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const apns: ApnsPayload[] = [];
     const queries: Array<{ sql: string; params: unknown[] }> = [];
     const requestedScopes: Scope[] = [];
+    let fetchCalls = 0;
     const activityRows = new Map<
       string,
       Partial<Scope> & {
@@ -276,6 +277,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
     });
     vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      fetchCalls += 1;
       if (typeof init.body !== 'string') throw new Error('Expected a JSON request body');
       const apnsPrefix = 'https://api.push.apple.com/3/device/';
       if (url.startsWith(apnsPrefix)) {
@@ -373,6 +375,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       apns,
       queries,
       requestedScopes,
+      get fetchCalls() {
+        return fetchCalls;
+      },
       activityRows,
       activities,
       liveActivityProps: () =>
@@ -2118,12 +2123,13 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
   });
 
   it('does not call the snapshot route when the dedicated signing secret is missing', async () => {
-    const { service, messages, requestedScopes } = setupService({
+    const { service, messages, requestedScopes, fetchCalls } = setupService({
       signingSecret: async () => '',
     });
 
     await service.refreshGlanceableSessions(personalRefresh);
 
+    expect(fetchCalls).toBe(0);
     expect(requestedScopes).toEqual([]);
     expect(messages).toEqual([]);
   });

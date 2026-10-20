@@ -1,7 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { eq, and, desc, gte, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { eq, and, desc, gte, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
 import {
   createSessionForCloudAgentSchema,
   cloudAgentWorktreeDeletionSchema,
@@ -13,6 +13,8 @@ import {
   type CanDestroyCloudAgentWorktreeSandboxParams,
   type RetireCloudAgentWorktreeIfSoleMemberParams,
   deleteSessionForCloudAgentSchema,
+  decodeCloudAgentRootSessionsCursor,
+  encodeCloudAgentRootSessionsCursor,
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
   kiloSdkSessionSnapshotOutcomeSchema,
@@ -20,6 +22,7 @@ import {
   persistedKiloSdkMessageHistorySchema,
   resolveCloudAgentRootSessionSchema,
   type CloudAgentRootSessionSnapshot,
+  type CloudAgentRootSessionsPage,
   type CloudAgentRootSessionSummary,
   type CreateSessionForCloudAgentParams,
   type CreateSessionForCloudAgentResult,
@@ -39,7 +42,12 @@ import {
 import type { Env } from './env';
 import { getSessionIngestDO, type InspectCloneStageResult } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
-import { normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
+import {
+  isValidGitUrl,
+  normalizeGitUrl,
+  sanitizeGitUrl,
+  withDORetry,
+} from '@kilocode/worker-utils';
 import { app } from './app';
 import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
 import { cloneSessionIntoDestination } from './clone/session-clone';
@@ -80,8 +88,32 @@ function organizationMembershipJoinCondition(kiloUserId: string) {
   );
 }
 
+function organizationJoinCondition() {
+  return eq(organizations.id, cli_sessions_v2.organization_id);
+}
+
 function personalOrAccessibleOrganizationCondition() {
-  return or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id));
+  return or(
+    isNull(cli_sessions_v2.organization_id),
+    and(isNotNull(organization_memberships.id), isNull(organizations.deleted_at))
+  );
+}
+
+function safeGitUrl(value: string | null): string | null {
+  if (value === null || !isValidGitUrl(value)) return null;
+  const sanitized = sanitizeGitUrl(value);
+  return sanitized.length <= 2048 ? sanitized : null;
+}
+
+function safeGitBranch(value: string | null): string | null {
+  if (value === null || value.length === 0 || value.length > 512) {
+    return null;
+  }
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint !== undefined && (codePoint < 32 || codePoint === 127)) return null;
+  }
+  return value;
 }
 
 /**
@@ -504,8 +536,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
 
   async listCloudAgentRootSessions(
     params: ListCloudAgentRootSessionsParams
-  ): Promise<CloudAgentRootSessionSummary[]> {
+  ): Promise<CloudAgentRootSessionsPage> {
     const parsed = listCloudAgentRootSessionsSchema.parse(params);
+    const cursor = parsed.cursor ? decodeCloudAgentRootSessionsCursor(parsed.cursor) : undefined;
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     const conditions = [
       eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
@@ -516,36 +549,71 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     if (parsed.start !== undefined) {
       conditions.push(gte(cli_sessions_v2.updated_at, new Date(parsed.start).toISOString()));
     }
+    if (cursor !== undefined) {
+      conditions.push(
+        or(
+          lt(cli_sessions_v2.updated_at, cursor.updatedAt),
+          and(
+            eq(cli_sessions_v2.updated_at, cursor.updatedAt),
+            lt(cli_sessions_v2.session_id, cursor.sessionId)
+          )
+        )
+      );
+    }
 
     const rows = await db
       .select({
         kiloSessionId: cli_sessions_v2.session_id,
         cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+        userId: cli_sessions_v2.kilo_user_id,
+        organizationId: cli_sessions_v2.organization_id,
         title: sql<
           string | null
         >`left(${cli_sessions_v2.title}, ${MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS})`,
+        gitUrl: cli_sessions_v2.git_url,
+        gitBranch: cli_sessions_v2.git_branch,
+        profileId: cli_sessions_v2.profile_id,
+        createdOnPlatform: cli_sessions_v2.created_on_platform,
         createdAt: cli_sessions_v2.created_at,
         updatedAt: cli_sessions_v2.updated_at,
       })
       .from(cli_sessions_v2)
       .leftJoin(organization_memberships, organizationMembershipJoinCondition(parsed.kiloUserId))
+      .leftJoin(organizations, organizationJoinCondition())
       .where(and(...conditions))
       .orderBy(desc(cli_sessions_v2.updated_at), desc(cli_sessions_v2.session_id))
-      .limit(parsed.limit);
+      .limit(parsed.limit + 1);
 
+    const hasNextPage = rows.length > parsed.limit;
     const sessions: CloudAgentRootSessionSummary[] = [];
-    for (const row of rows) {
+    for (const row of rows.slice(0, parsed.limit)) {
       if (!row.cloudAgentSessionId) continue;
       const title: string | null = row.title;
       sessions.push({
         kiloSessionId: row.kiloSessionId,
         cloudAgentSessionId: row.cloudAgentSessionId,
+        userId: row.userId,
+        organizationId: row.organizationId,
         title: title?.slice(0, MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS) ?? null,
+        gitUrl: safeGitUrl(row.gitUrl),
+        gitBranch: safeGitBranch(row.gitBranch),
+        profileId: row.profileId,
+        createdOnPlatform: row.createdOnPlatform,
         created: databaseTimestampToMilliseconds(row.createdAt),
         updated: databaseTimestampToMilliseconds(row.updatedAt),
       });
     }
-    return sessions;
+    const lastRow = rows[Math.min(rows.length, parsed.limit) - 1];
+    return {
+      items: sessions,
+      nextCursor:
+        hasNextPage && lastRow
+          ? encodeCloudAgentRootSessionsCursor({
+              updatedAt: lastRow.updatedAt,
+              sessionId: lastRow.kiloSessionId,
+            })
+          : null,
+    };
   }
 
   private async hydrateCloudAgentRootSessionSnapshot(params: {
@@ -580,6 +648,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       .select({ cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id })
       .from(cli_sessions_v2)
       .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
+      .leftJoin(organizations, organizationJoinCondition())
       .where(
         and(
           eq(cli_sessions_v2.session_id, params.kiloSessionId),
@@ -613,6 +682,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       })
       .from(cli_sessions_v2)
       .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
+      .leftJoin(organizations, organizationJoinCondition())
       .where(
         and(
           eq(cli_sessions_v2.session_id, params.kiloSessionId),

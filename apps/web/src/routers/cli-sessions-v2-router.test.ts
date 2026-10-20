@@ -385,8 +385,14 @@ describe('cli-sessions-v2-router', () => {
                     type: 'tool',
                     state: {
                       status: 'completed',
+                      input: {
+                        filePath: `${privateDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                      },
                       output: `Updated ${privateDirectory}/src/app.ts and src/relative.ts`,
                       metadata: {
+                        filediff: {
+                          file: `${privateDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                        },
                         outputs: [
                           `${privateDirectory}/result.txt`,
                           {
@@ -441,40 +447,82 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.info).toMatchObject({
         directory: publicDirectory,
-        summary: { diffs: [{ file: publicDirectory }] },
-        permission: [{ pattern: publicDirectory }],
+        path: `${publicDirectory}/session.json`,
+        summary: { diffs: [{ file: `${publicDirectory}/src/app.ts` }] },
+        permission: [{ pattern: `${publicDirectory}/src` }],
       });
       expect(result.messages[0]).toMatchObject({
         info: { path: { cwd: publicDirectory, root: publicDirectory } },
         parts: [
-          { url: '', source: { path: publicDirectory } },
+          { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
           {
             state: {
+              input: { filePath: `${publicDirectory}/services/cloud-agent-next/.dev.vars.example` },
               output: `Updated ${publicDirectory}/src/app.ts and src/relative.ts`,
               metadata: {
+                filediff: {
+                  file: `${publicDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                },
                 outputs: [
                   `${publicDirectory}/result.txt`,
                   { output: `Read ${publicDirectory}/nested.txt`, relative: 'src/relative.ts' },
                 ],
               },
-              attachments: [{ url: '', source: { path: publicDirectory } }],
+              attachments: [{ url: '', source: { path: `${publicDirectory}/nested.ts` } }],
             },
           },
-          { files: [publicDirectory, 'relative.ts'] },
+          { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
           { text: `Read ${publicDirectory}/src/app.ts and src/relative.ts` },
         ],
       });
       expect(result.messages[1]).toMatchObject({
         info: {
           editorContext: {
-            visibleFiles: [publicDirectory],
-            openTabs: [publicDirectory],
-            activeFile: publicDirectory,
+            visibleFiles: [`${publicDirectory}/visible.ts`],
+            openTabs: [`${publicDirectory}/open.ts`],
+            activeFile: `${publicDirectory}/active.ts`,
           },
-          summary: { diffs: [{ file: publicDirectory }] },
+          summary: { diffs: [{ file: `${publicDirectory}/summary.ts` }] },
         },
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
+    });
+
+    it.each([
+      ['src/relative.ts', 'src/relative.ts'],
+      [
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [`/cloud-agent/sessions/${sessionId}-other/src/app.ts`, `/cloud-agent/sessions/${sessionId}`],
+      ['/unrecognized/private/src/app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['C:\\private\\src\\app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['\\\\server\\private\\src\\app.ts', `/cloud-agent/sessions/${sessionId}`],
+    ])('projects grouped snapshot file path %s to %s', async (path, expected) => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            info: { id: sessionId, summary: { diffs: [{ file: path }] } },
+            messages: [
+              {
+                info: { id: 'msg_assistant', role: 'assistant' },
+                parts: [{ id: 'prt_patch', type: 'patch', files: [path] }],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+      expect(result.info).toMatchObject({ summary: { diffs: [{ file: expected }] } });
+      expect(result.messages[0].parts[0]).toMatchObject({ files: [expected] });
     });
 
     it.each([true, false])(
@@ -631,6 +679,7 @@ describe('cli-sessions-v2-router', () => {
               title: 'Read file',
               time: { start: 1761000000100, end: 1761000000200 },
               metadata: {
+                filediff: { file: `${privateDirectory}/src/app.ts` },
                 outputs: [
                   `${privateDirectory}/result.txt`,
                   { output: `Read ${privateDirectory}/nested.txt`, relative: 'src/relative.ts' },
@@ -748,13 +797,14 @@ describe('cli-sessions-v2-router', () => {
             {
               info: { path: { cwd: publicDirectory, root: publicDirectory } },
               parts: [
-                { url: '', source: { path: publicDirectory } },
-                { files: [publicDirectory, 'relative.ts'] },
+                { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
+                { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
                 {
                   state: {
-                    input: { filePath: publicDirectory },
+                    input: { filePath: `${publicDirectory}/src/app.ts` },
                     output: `Read ${publicDirectory}/src/app.ts and src/relative.ts`,
                     metadata: {
+                      filediff: { file: `${publicDirectory}/src/app.ts` },
                       outputs: [
                         `${publicDirectory}/result.txt`,
                         {

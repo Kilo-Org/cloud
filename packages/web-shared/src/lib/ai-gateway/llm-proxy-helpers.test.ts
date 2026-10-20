@@ -49,6 +49,7 @@ import {
   extractHeaderAndLimitLength,
   extractReasoningSetting,
   getOrganizationProviderPrivacy,
+  getOutputHeaders,
   lastUserPromptText,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
@@ -57,6 +58,36 @@ import {
   requestedLogprobs,
   requestedSamples,
 } from './llm-proxy-helpers';
+
+describe('getOutputHeaders', () => {
+  it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
+    'prevents intermediary compression and caching of %s responses',
+    contentType => {
+      const response = new Response(null, {
+        headers: { 'content-type': contentType, 'cache-control': 'public, max-age=3600' },
+      });
+
+      const headers = getOutputHeaders(response);
+
+      expect(headers.get('content-type')).toBe(contentType);
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+      expect(response.headers.get('cache-control')).toBe('public, max-age=3600');
+    }
+  );
+
+  it.each(['application/json', 'text/plain', 'text/event-stream-other'])(
+    'prevents intermediary caching and compression of %s responses',
+    contentType => {
+      const headers = getOutputHeaders(
+        new Response(null, { headers: { 'content-type': contentType } })
+      );
+
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+    }
+  );
+});
 
 describe('extractReasoningSetting', () => {
   it.each<{ name: string; body: unknown; expected: string | null }>([

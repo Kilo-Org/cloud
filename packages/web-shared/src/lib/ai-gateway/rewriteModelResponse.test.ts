@@ -153,6 +153,22 @@ const rewriters = [
   ['Responses', rewriteModelResponse_Responses],
 ] as const;
 
+describe.each(rewriters)('%s SSE proxy headers', (_name, rewrite) => {
+  test('keeps event streams uncompressed through external rewrites', async () => {
+    const result = await rewrite({
+      response: sseResponse(''),
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+    expect(result.headers.get('content-encoding')).toBe('identity');
+    expect(await readOutputStream(result)).toBe('');
+  });
+});
+
 describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   test.each([
     ['ResponseAborted', 'upstream_disconnect', 'disconnected'],
@@ -622,7 +638,10 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         });
         const reader = result.body?.getReader();
         expect(reader).toBeDefined();
-        await reader?.read();
+        expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+        const first = await reader?.read();
+        expect(first?.done).toBe(false);
+        expect(first?.value).toContain('"id":"gen-chat"');
         expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
 
         upstreamController.current?.close();

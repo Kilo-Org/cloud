@@ -52,10 +52,21 @@ describe('consent gate', () => {
     const { checkConsentGate } = await import('./consent-gate');
     store.set(
       'consent-accepted-757365722d31',
-      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true })
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true, confirmed: true })
     );
 
     expect(await checkConsentGate('user-1')).toEqual({ status: 'accepted', optional: true });
+  });
+
+  it('returns accepted with optional false for a record that predates the confirmation marker', async () => {
+    const { CURRENT_CONSENT_VERSION } = await import('./consent');
+    const { checkConsentGate } = await import('./consent-gate');
+    store.set(
+      'consent-accepted-757365722d31',
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true })
+    );
+
+    expect(await checkConsentGate('user-1')).toEqual({ status: 'accepted', optional: false });
   });
 
   it('returns needs-consent when only a legacy consent key exists', async () => {

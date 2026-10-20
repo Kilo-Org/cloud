@@ -66,6 +66,9 @@ async function flushMicrotasks(): Promise<void> {
   });
 }
 
+// The module under test is imported inside each test, not at file top: it
+// registers its PostHog ready listener at load time, and per-test imports keep
+// every test bound to the hoisted SecureStore/PostHog mocks above.
 describe('consent storage', () => {
   beforeEach(() => {
     store.clear();
@@ -88,7 +91,7 @@ describe('consent storage', () => {
     await acceptConsent('user-1');
     // Hex of "user-1"
     const storedRaw = store.get('consent-accepted-757365722d31');
-    expect(storedRaw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false }));
+    expect(storedRaw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true }));
     expect(await hasAcceptedConsent('user-1')).toBe(true);
   });
 
@@ -198,7 +201,36 @@ describe('consent storage', () => {
 
     // Hex of "user-1"
     const raw = store.get('consent-accepted-757365722d31');
-    expect(raw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false }));
+    expect(raw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true }));
+  });
+
+  it('reads a record without the confirmation marker as optional off', async () => {
+    const { readConsent } = await import('./consent');
+
+    // Hex of "user-1". A record from a build that wrote no marker cannot be
+    // attributed to an explicit choice, so optional sharing reads as off.
+    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: true }));
+
+    expect(await readConsent('user-1')).toEqual({
+      mandatory: true,
+      optional: false,
+    });
+  });
+
+  it('keeps an explicit toggle on an unmarked record', async () => {
+    const { CURRENT_CONSENT_VERSION, readConsent, setOptionalConsent } =
+      await import('./consent');
+
+    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: true }));
+    await setOptionalConsent('user-1', true);
+
+    expect(await readConsent('user-1')).toEqual({
+      mandatory: true,
+      optional: true,
+    });
+    expect(store.get('consent-accepted-757365722d31')).toBe(
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true, confirmed: true })
+    );
   });
 
   it('setOptionalConsent updates optional and leaves mandatory untouched', async () => {
@@ -215,7 +247,7 @@ describe('consent storage', () => {
     });
 
     const raw = store.get('consent-accepted-757365722d31');
-    expect(raw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false }));
+    expect(raw).toBe(JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true }));
   });
 
   it('setOptionalConsent does nothing when no accepted record exists', async () => {
@@ -318,7 +350,7 @@ describe('consent storage', () => {
     await Promise.all([blocker, queued]);
 
     expect(store.get('consent-accepted-757365722d31')).toBe(
-      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false })
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false, confirmed: true })
     );
   });
 
@@ -351,7 +383,7 @@ describe('consent storage', () => {
 
     // Both writes landed without interleaving; the queued one is last.
     expect(store.get('consent-accepted-757365722d31')).toBe(
-      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true })
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true, confirmed: true })
     );
   });
 

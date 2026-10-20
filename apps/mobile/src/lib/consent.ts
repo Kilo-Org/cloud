@@ -89,15 +89,24 @@ export function subscribeToConsentChanges(listener: ConsentChangeListener): () =
 // `readConsent`'s legacy cleanup would re-enter the chain and deadlock.
 // Callers inside a chain observe the state left by the previous serialized
 // write for that user.
+//
+// `optional` counts only when the record carries `confirmed`. Records written
+// before that marker existed hold whatever the then-current flow stored, so
+// they cannot be told apart from an explicit choice; reading them as off keeps
+// optional sharing tied to a choice this build can attribute. The next write
+// (accept or a Privacy choices toggle) adds the marker.
 async function readCurrentConsent(
   userId: string
 ): Promise<{ mandatory: boolean; optional: boolean }> {
   const raw = await SecureStore.getItemAsync(keyFor(userId));
   if (raw) {
     try {
-      const record: { v: unknown; optional: unknown } = JSON.parse(raw);
+      const record: { v: unknown; optional: unknown; confirmed: unknown } = JSON.parse(raw);
       if (record.v === CURRENT_CONSENT_VERSION) {
-        return { mandatory: true, optional: record.optional === true };
+        return {
+          mandatory: true,
+          optional: record.optional === true && record.confirmed === true,
+        };
       }
     } catch {
       // Corrupt record — fall through to the legacy check.
@@ -142,7 +151,7 @@ export async function acceptConsent(userId: string, optional = false): Promise<v
     const prior = await readCurrentConsent(userId);
     await SecureStore.setItemAsync(
       keyFor(userId),
-      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional })
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional, confirmed: true })
     );
     // Queue an enable-side outcome only for a real optional-accept change.
     // Duplicate accepts with the same optional value do not re-queue.
@@ -165,7 +174,7 @@ export async function setOptionalConsent(userId: string, optional: boolean): Pro
     }
     await SecureStore.setItemAsync(
       keyFor(userId),
-      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional })
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional, confirmed: true })
     );
     return { wrote: true, priorOptional: stored.optional };
   });

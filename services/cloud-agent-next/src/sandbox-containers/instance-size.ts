@@ -1,9 +1,6 @@
 export const CODE_REVIEW_CONTAINERS_INSTANCE = 'code-review' as const;
 
 export type ContainerInstanceSize =
-  | 'lite'
-  | 'standard-1'
-  | 'standard-2'
   | 'standard-3'
   | 'standard-4'
   | typeof CODE_REVIEW_CONTAINERS_INSTANCE;

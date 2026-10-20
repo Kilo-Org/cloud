@@ -74,6 +74,22 @@ export function hasExtendedCreateSessionFields(data: CreateSessionWireData): boo
 }
 
 /**
+ * Relay-side bound for a durable command identity (`mutationId`); a longer
+ * value is rejected on the wire.
+ */
+const MAX_WIRE_MUTATION_ID_LENGTH = 128;
+
+const BARE_MUTATION_ID_SUFFIX = ':bare';
+const EXTENDED_MUTATION_ID_SUFFIX = ':ext';
+
+/**
+ * Longest caller create intent key whose `:bare` wire identity stays inside
+ * {@link MAX_WIRE_MUTATION_ID_LENGTH}.
+ */
+export const MAX_CREATE_SESSION_MUTATION_ID_LENGTH =
+  MAX_WIRE_MUTATION_ID_LENGTH - BARE_MUTATION_ID_SUFFIX.length;
+
+/**
  * Derive the durable wire identities of one create intent.
  *
  * The extended attempt and the old-CLI bare retry MUST NOT share an identity:
@@ -84,14 +100,24 @@ export function hasExtendedCreateSessionFields(data: CreateSessionWireData): boo
  *
  * Without a caller key both fields are `undefined` and the wire carries no
  * mutationId; the relay then falls back to a per-wire random correlation id.
+ *
+ * Throws for a key whose derived identity cannot fit the relay bound, so the
+ * caller sees a clear error instead of an opaque wire rejection.
  */
 export function createSessionWireMutationIds(mutationId: string | undefined): {
   extended: string | undefined;
   bare: string | undefined;
 } {
-  return mutationId === undefined
-    ? { extended: undefined, bare: undefined }
-    : { extended: `${mutationId}:ext`, bare: `${mutationId}:bare` };
+  if (mutationId === undefined) return { extended: undefined, bare: undefined };
+  if (mutationId.length > MAX_CREATE_SESSION_MUTATION_ID_LENGTH) {
+    throw new Error(
+      `Create intent key must be at most ${MAX_CREATE_SESSION_MUTATION_ID_LENGTH} characters`
+    );
+  }
+  return {
+    extended: `${mutationId}${EXTENDED_MUTATION_ID_SUFFIX}`,
+    bare: `${mutationId}${BARE_MUTATION_ID_SUFFIX}`,
+  };
 }
 
 export type CreateSessionParseResult =

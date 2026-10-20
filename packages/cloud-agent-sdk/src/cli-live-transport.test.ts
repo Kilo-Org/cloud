@@ -5,6 +5,7 @@ import {
   REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS,
 } from './cli-live-transport';
 import type { SlashCommandInfo } from './schemas';
+import { MAX_CREATE_SESSION_MUTATION_ID_LENGTH } from './create-session';
 import type {
   RemoteModelCatalogV1,
   RemoteModelCatalogWireV1,
@@ -3314,6 +3315,60 @@ describe('CliLiveTransport createSession', () => {
       .mock.calls.filter(([, command]) => command === 'create_session');
     expect(createCalls).toHaveLength(1);
     expect(createCalls[0]).toHaveLength(4);
+    transport.destroy();
+  });
+
+  it('rejects a create intent key that cannot fit the relay wire bound', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    await expect(
+      transport.createSession?.({
+        mutationId: 'k'.repeat(MAX_CREATE_SESSION_MUTATION_ID_LENGTH + 1),
+      })
+    ).rejects.toThrow(
+      `Create intent key must be at most ${MAX_CREATE_SESSION_MUTATION_ID_LENGTH} characters`
+    );
+    expect(
+      jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'create_session')
+    ).toHaveLength(0);
+    transport.destroy();
+  });
+
+  it('keeps the longest accepted create intent key inside the relay wire bound', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+    const key = 'k'.repeat(MAX_CREATE_SESSION_MUTATION_ID_LENGTH);
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+
+    await transport.createSession?.({ mutationId: key, agent: 'code' });
+
+    const createCalls = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'create_session');
+    expect(createCalls[0]?.[4]).toBe(`${key}:ext`);
+    expect(createCalls[1]?.[4]).toBe(`${key}:bare`);
+    expect(createCalls[1]?.[4]).toHaveLength(128);
     transport.destroy();
   });
 });

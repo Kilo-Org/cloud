@@ -19,7 +19,9 @@ type CreateRemoteSessionInput = {
   /**
    * Stable key for a caller retry of the same create intent. Both create
    * paths derive distinct durable wire identities from it (`${key}:ext`,
-   * `${key}:bare`).
+   * `${key}:bare`), so the key is at most
+   * `MAX_CREATE_SESSION_MUTATION_ID_LENGTH` characters; a longer key fails the
+   * create with a clear error before any wire traffic.
    */
   mutationId?: string;
   agent?: string;

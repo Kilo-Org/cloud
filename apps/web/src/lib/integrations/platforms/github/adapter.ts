@@ -417,28 +417,6 @@ export async function hasPRCommentWithMarker(
 }
 
 /**
- * Used to acknowledge @kilo fix mentions on inline review comments.
- */
-export async function addReactionToPRReviewComment(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commentId: number,
-  reaction: 'eyes' | '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket',
-  appType: GitHubAppType = 'standard'
-): Promise<void> {
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
-
-  await octokit.reactions.createForPullRequestReviewComment({
-    owner,
-    repo,
-    comment_id: commentId,
-    content: reaction,
-  });
-}
-
-/**
  * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  */

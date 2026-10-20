@@ -1,6 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
-import { MISTRAL_LARGE_4_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral.constants';
+import {
+  GEMINI_4_ARGON_MODEL_ID,
+  GEMINI_FLASH_CURRENT_MODEL_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { formatPrice } from '@/components/models/util';
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
 
@@ -54,17 +56,17 @@ describe('getOfferingPricing', () => {
 
   test('compares the custom price against the undiscounted list price', () => {
     const pricing = getOfferingPricing(
-      MISTRAL_LARGE_4_MODEL_ID,
+      GEMINI_4_ARGON_MODEL_ID,
       {
-        prompt: '0.00000068',
-        completion: '0.00000209',
+        prompt: '0.000002',
+        completion: '0.00001',
         discount: 0.5,
       },
       {}
     );
-    expect(formatPrice(pricing.promptPrice)).toBe('$0.68/1M tokens');
-    expect(formatPrice(pricing.originalPromptPrice ?? '')).toBe('$1.36/1M tokens');
-    expect(formatPrice(pricing.originalCompletionPrice ?? '')).toBe('$4.18/1M tokens');
+    expect(formatPrice(pricing.promptPrice)).toBe('$2.00/1M tokens');
+    expect(formatPrice(pricing.originalPromptPrice ?? '')).toBe('$4.00/1M tokens');
+    expect(formatPrice(pricing.originalCompletionPrice ?? '')).toBe('$20.00/1M tokens');
   });
 
   test('omits the original price when the custom price is not lower', () => {

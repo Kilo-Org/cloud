@@ -16,7 +16,9 @@ import {
   buildContextLengthByProviderAndModel,
   type ContextLengthByProviderAndModel,
 } from '../model-context-lengths';
+import { toKnownModel, withKnownModel, type KnownModel } from '../known-models';
 import { useOrganizationModels } from './useOrganizationModels';
+import { useRememberKnownModel } from './useRememberKnownModel';
 
 type ActiveSessionType = ResolvedSession['type'];
 
@@ -56,6 +58,8 @@ type UseSessionModelsInput = Omit<
   fetchedSessionData: Pick<FetchedSessionData, 'organizationId'> | null;
   routeOrganizationId?: string;
   sessionIdFromParams: string | null;
+  knownModels: readonly KnownModel[];
+  currentUserId?: string;
 };
 
 type SessionModels = {
@@ -105,6 +109,8 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
     fetchedSessionData,
     routeOrganizationId,
     sessionIdFromParams,
+    knownModels,
+    currentUserId,
   } = input;
   const gatewayOrganization = resolveGatewayOrganization(
     fetchedSessionData,
@@ -116,6 +122,49 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
     gatewayOrganization.organizationId,
     usesGateway && gatewayOrganization.resolved
   );
+  const catalogLoaded = gatewayOrganization.resolved && !gatewayModels.isLoadingModels;
+  // A remote session's model comes from its CLI, not from the composer settings.
+  const usesComposerModel = activeSessionType !== 'remote';
+  const catalog = useMemo(
+    () =>
+      withKnownModel(
+        {
+          modelOptions: gatewayOrganization.resolved ? gatewayModels.modelOptions : [],
+          isLoadingModels: !catalogLoaded,
+          contextLengthByModelId: gatewayModels.contextLengthByModelId,
+        },
+        usesComposerModel ? knownModels : [],
+        gatewayModelId
+      ),
+    [
+      catalogLoaded,
+      gatewayModelId,
+      gatewayModels.contextLengthByModelId,
+      gatewayModels.modelOptions,
+      gatewayOrganization.resolved,
+      knownModels,
+      usesComposerModel,
+    ]
+  );
+  const selectedCatalogModel = useMemo(() => {
+    const option =
+      catalogLoaded && usesComposerModel
+        ? gatewayModels.modelOptions.find(model => model.id === gatewayModelId)
+        : undefined;
+    return option
+      ? toKnownModel(option, gatewayModels.contextLengthByModelId.get(option.id))
+      : null;
+  }, [
+    catalogLoaded,
+    gatewayModelId,
+    gatewayModels.contextLengthByModelId,
+    gatewayModels.modelOptions,
+    usesComposerModel,
+  ]);
+  useRememberKnownModel(knownModels, selectedCatalogModel, {
+    userId: currentUserId,
+    organizationId: routeOrganizationId,
+  });
   const models = useMemo(
     () =>
       buildSessionModels({
@@ -123,19 +172,17 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
         remoteModelState,
         observedModel,
         remoteModelOverride,
-        gatewayModels: gatewayOrganization.resolved ? gatewayModels.modelOptions : [],
-        gatewayModelsLoading: gatewayModels.isLoadingModels || !gatewayOrganization.resolved,
+        gatewayModels: catalog.modelOptions,
+        gatewayModelsLoading: catalog.isLoadingModels,
         gatewayModelId,
         gatewayVariant,
         gatewayOrganizationId: gatewayOrganization.organizationId,
       }),
     [
       activeSessionType,
+      catalog,
       gatewayModelId,
-      gatewayModels.isLoadingModels,
-      gatewayModels.modelOptions,
       gatewayOrganization.organizationId,
-      gatewayOrganization.resolved,
       gatewayVariant,
       observedModel,
       remoteModelOverride,
@@ -152,7 +199,7 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
 
   return {
     ...models,
-    gatewayContextLengthByModelId: gatewayModels.contextLengthByModelId,
+    gatewayContextLengthByModelId: catalog.contextLengthByModelId,
     remoteContextLengthByProviderAndModel,
   };
 }

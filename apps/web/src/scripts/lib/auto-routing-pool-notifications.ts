@@ -19,6 +19,11 @@ export type PoolNotificationTarget = {
   routers: AutoRoutingPoolNoticeRouter[];
 };
 
+export type PoolNotificationPlan = {
+  targets: PoolNotificationTarget[];
+  unreachable: AutoRoutingPoolNoticeRouter[][];
+};
+
 const hashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const targetStateSchema = z
   .object({
@@ -34,6 +39,7 @@ const stateSchema = z
     cutoverAt: z.iso.datetime(),
     hashKey: hashSchema,
     targets: z.record(hashSchema, targetStateSchema),
+    unreachableOwners: z.array(hashSchema).optional(),
   })
   .strict();
 type NotificationState = z.infer<typeof stateSchema>;
@@ -58,6 +64,7 @@ export type PoolNotificationResult = PoolNotificationSummary &
     | {
         mode: 'send' | 'dry-run';
         recipients: number;
+        unreachable: number;
         routers: number;
         sent: number;
         skipped: number;
@@ -179,21 +186,18 @@ export function validateCutoverAt(value: string | undefined, now = Date.now()): 
 
 export function buildPoolNotificationTargets(
   owners: PoolNotificationOwner[]
-): PoolNotificationTarget[] {
+): PoolNotificationPlan {
   const targets = new Map<string, PoolNotificationTarget>();
+  const unreachable: AutoRoutingPoolNoticeRouter[][] = [];
   for (const owner of owners) {
-    if (owner.emails.length === 0) {
-      throw new PoolNotificationError(
-        'An affected pool has no live billing contact; reconcile before sending.'
-      );
+    const emails = owner.emails
+      .map(email => email.trim().toLowerCase())
+      .filter(email => z.email().safeParse(email).success);
+    if (emails.length === 0) {
+      unreachable.push([...owner.routers].sort((a, b) => a.id.localeCompare(b.id)));
+      continue;
     }
-    for (const email of owner.emails) {
-      const to = email.trim().toLowerCase();
-      if (!z.email().safeParse(to).success) {
-        throw new PoolNotificationError(
-          'An affected contact has an invalid email; reconcile before sending.'
-        );
-      }
+    for (const to of emails) {
       let target = targets.get(to);
       if (!target) {
         target = { to, routers: [] };
@@ -205,12 +209,23 @@ export function buildPoolNotificationTargets(
       }
     }
   }
-  return [...targets.values()]
-    .map(target => ({
-      ...target,
-      routers: target.routers.sort((a, b) => a.id.localeCompare(b.id)),
-    }))
-    .sort((a, b) => a.to.localeCompare(b.to));
+  return {
+    targets: [...targets.values()]
+      .map(target => ({
+        ...target,
+        routers: target.routers.sort((a, b) => a.id.localeCompare(b.id)),
+      }))
+      .sort((a, b) => a.to.localeCompare(b.to)),
+    unreachable,
+  };
+}
+
+function unreachableOwnerHashes(hashKey: string, unreachable: AutoRoutingPoolNoticeRouter[][]) {
+  return [
+    ...new Set(
+      unreachable.map(routers => hash(hashKey, JSON.stringify(routers.map(router => router.id))))
+    ),
+  ].sort();
 }
 
 function hash(key: string, value: string): string {
@@ -310,7 +325,8 @@ export async function runPoolNotifications(
   const cutoverAt = options.reconcile
     ? parseCutoverAt(options.cutoverAt)
     : validateCutoverAt(options.cutoverAt);
-  const targets = options.reconcile ? [] : buildPoolNotificationTargets(options.owners);
+  const plan = options.reconcile ? null : buildPoolNotificationTargets(options.owners);
+  const targets = plan?.targets ?? [];
   await mkdir(options.stateDir, { recursive: true, mode: 0o700 });
   const directory = await lstat(options.stateDir);
   if (
@@ -346,7 +362,14 @@ export async function runPoolNotifications(
           'Recovery requires an existing saved plan; retain the original state directory.'
         );
       }
-      state = { version: 1, cutoverAt, hashKey: randomBytes(32).toString('hex'), targets: {} };
+      state = {
+        version: 1,
+        cutoverAt,
+        hashKey: randomBytes(32).toString('hex'),
+        targets: {},
+        unreachableOwners: [],
+      };
+      state.unreachableOwners = unreachableOwnerHashes(state.hashKey, plan?.unreachable ?? []);
       for (const target of targets) {
         state.targets[hash(state.hashKey, target.to)] = {
           routersHash: hash(state.hashKey, JSON.stringify(target.routers)),
@@ -384,10 +407,12 @@ export async function runPoolNotifications(
         hash(state.hashKey, JSON.stringify(target.routers)),
       ])
     );
+    const liveUnreachable = unreachableOwnerHashes(state.hashKey, plan?.unreachable ?? []);
     if (options.refreshPlan) {
       for (const [targetHash, entry] of Object.entries(state.targets)) {
         entry.active = livePlan.has(targetHash);
       }
+      state.unreachableOwners = liveUnreachable;
       for (const [targetHash, routersHash] of livePlan) {
         const entry = state.targets[targetHash];
         if (entry) {
@@ -400,6 +425,7 @@ export async function runPoolNotifications(
       await persistState(options.stateDir, state);
     } else if (
       targets.length !== Object.values(state.targets).filter(target => target.active).length ||
+      JSON.stringify(liveUnreachable) !== JSON.stringify(state.unreachableOwners ?? []) ||
       [...livePlan].some(([targetHash, routersHash]) => {
         const entry = state.targets[targetHash];
         return !entry?.active || (entry.plannedRoutersHash ?? entry.routersHash) !== routersHash;
@@ -440,6 +466,7 @@ export async function runPoolNotifications(
     return {
       mode: options.send ? 'send' : 'dry-run',
       recipients: targets.length,
+      unreachable: liveUnreachable.length,
       routers: new Set(targets.flatMap(target => target.routers.map(router => router.id))).size,
       sent,
       skipped,

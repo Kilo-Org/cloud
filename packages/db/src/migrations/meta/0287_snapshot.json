@@ -1,5 +1,5 @@
 {
-  "id": "7190a549-e00e-4b31-80c7-df07be50cdda",
+  "id": "10f0ec05-e546-4fc4-a09a-e66be47ab708",
   "prevId": "5be2d091-13ed-4f74-8757-d5c5db2ab774",
   "version": "7",
   "dialect": "postgresql",
@@ -2019,8 +2019,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "custom_pricing": {
-          "name": "custom_pricing",
+        "vercel_model_id_overrides": {
+          "name": "vercel_model_id_overrides",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false

@@ -1,14 +1,3 @@
-/**
- * ProjectLoader
- *
- * React component that handles async project loading using tRPC/React Query.
- * Shows loading, error, and success states, calling a render prop when loaded.
- *
- * Uses the appropriate tRPC router based on context:
- * - Personal: trpc.appBuilder.getProject
- * - Organization: trpc.organizations.appBuilder.getProject
- */
-
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
@@ -97,7 +86,6 @@ function NotFoundCard() {
 export function ProjectLoader({ projectId, organizationId, children }: ProjectLoaderProps) {
   const trpc = useTRPC();
 
-  // Use the appropriate query based on context (personal vs organization)
   const queryOptions = organizationId
     ? trpc.organizations.appBuilder.getProject.queryOptions({
         projectId,
@@ -107,23 +95,19 @@ export function ProjectLoader({ projectId, organizationId, children }: ProjectLo
 
   const { data: project, error, isPending, isError, refetch, isFetching } = useQuery(queryOptions);
 
-  // Loading state
   if (isPending) {
     return <LoadingSpinner />;
   }
 
-  // Error state
   if (isError) {
     return (
       <ErrorCard message={error.message} onRetry={() => void refetch()} isRetrying={isFetching} />
     );
   }
 
-  // Not found state (project is null/undefined)
   if (!project) {
     return <NotFoundCard />;
   }
 
-  // Success - render children with the loaded project
   return <>{children(project)}</>;
 }

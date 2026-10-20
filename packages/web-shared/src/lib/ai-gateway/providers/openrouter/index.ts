@@ -191,7 +191,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       const description = isFreeNemotronModel(model.id)
         ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
         : model.description;
-      const isFree = isFreeModel(model.id);
+      const isFree = await isFreeModel(model.id);
       return {
         ...model,
         inference_provider_ids: inferenceProviderIds,

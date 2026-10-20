@@ -11,6 +11,8 @@ import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
 import {
   describeDatabaseError,
   isUsageRowConflict,
+  observeUsageRecordCompletion,
+  type UsageRecordObservationContext,
   stackFramesUnderHeader,
 } from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
@@ -260,7 +262,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: isFreeModel(usageContextInfo.requested_model),
+    is_free: await isFreeModel(usageContextInfo.requested_model),
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -317,7 +319,7 @@ async function enqueueUsageWithinLifetime(
   const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
     if (!registered) return { kind: 'unavailable', reason: 'registration_failed' };
     try {
-      return await enqueueUsage(payload);
+      return await enqueueUsage(payload, { retryTransientFailures: USAGE_QUEUE_ONLY_ENABLED });
     } catch {
       return { kind: 'unavailable', reason: 'unexpected_rejection' };
     }
@@ -327,7 +329,7 @@ async function enqueueUsageWithinLifetime(
     after(publication);
     start.resolve(true);
   } catch {
-    // No request lifetime means no network I/O; preserve usage with the direct writer.
+    // No request lifetime means no network I/O; let the accounting mode handle the failure.
     start.resolve(false);
   }
   return publication;
@@ -356,13 +358,14 @@ export async function logMicrodollarUsage(
       console.info('usage accounting queued', { usageId: core.id });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
-    console.warn('usage accounting direct fallback', {
+    console.error('usage accounting publication failed', {
       usageId: core.id,
       reason: outcome.kind === 'disabled' ? 'publisher_disabled' : outcome.reason,
     });
-  } else {
-    scheduleUsageEnqueue(payload);
+    return null;
   }
+
+  scheduleUsageEnqueue(payload);
 
   const inserted = await saveUsageRelatedData(
     core,
@@ -423,7 +426,8 @@ async function saveUsageRelatedData(
     metadataFields,
     prior_microdollar_usage,
     posthog_distinct_id,
-    bouncer_usage_event
+    bouncer_usage_event,
+    { entrypoint: 'gateway', writer_caller: 'unknown' }
   );
 }
 
@@ -436,28 +440,42 @@ export async function saveUsageRelatedDataLocally(
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
   posthog_distinct_id: string | null,
-  bouncer_usage_event: BouncerUsageEventEnqueue | null = null
-): Promise<UsageRecordWriteOutcome | null> {
-  // `isFirst` must be evaluated before the insert — afterwards this record is
-  // itself prior usage — but the event it drives is only emitted once the insert
-  // has committed. A redelivery that arrives while the first delivery's
-  // transaction is still open cannot see the uncommitted row either, so it also
-  // computes `isFirst`; emitting here would double-count `first_usage`.
-  const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
-  const inserted = await insertUsageRecord(coreUsageFields, metadataFields, bouncer_usage_event);
-  if (!inserted) return null;
-  if (posthog_distinct_id && !inserted.wasRedelivery) {
-    if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
-    await sendFirstMicrodollarUsageEventIfNeeded(
-      inserted.newMicrodollarsUsed === null
-        ? null
-        : { newMicrodollarsUsed: inserted.newMicrodollarsUsed },
-      coreUsageFields,
-      posthog_distinct_id,
-      isFirst
-    );
+  bouncer_usage_event: BouncerUsageEventEnqueue | null = null,
+  observationContext: UsageRecordObservationContext = {
+    entrypoint: 'unknown',
+    writer_caller: 'unknown',
   }
-  return inserted;
+): Promise<UsageRecordWriteOutcome | null> {
+  return observeUsageRecordCompletion(
+    coreUsageFields,
+    async () => {
+      // `isFirst` must be evaluated before the insert — afterwards this record is
+      // itself prior usage — but the event it drives is only emitted once the insert
+      // has committed. A redelivery that arrives while the first delivery's
+      // transaction is still open cannot see the uncommitted row either, so it also
+      // computes `isFirst`; emitting here would double-count `first_usage`.
+      const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
+      const inserted = await insertUsageRecord(
+        coreUsageFields,
+        metadataFields,
+        bouncer_usage_event
+      );
+      if (!inserted) return null;
+      if (posthog_distinct_id && !inserted.wasRedelivery) {
+        if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
+        await sendFirstMicrodollarUsageEventIfNeeded(
+          inserted.newMicrodollarsUsed === null
+            ? null
+            : { newMicrodollarsUsed: inserted.newMicrodollarsUsed },
+          coreUsageFields,
+          posthog_distinct_id,
+          isFirst
+        );
+      }
+      return inserted;
+    },
+    observationContext
+  );
 }
 
 async function isFirstUsage(
@@ -1434,7 +1452,7 @@ export async function processTokenData(
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1449,7 +1467,7 @@ export async function processTokenData(
  *
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
  * transaction and attempts delivery right after commit; the cron drainer retries a failure.
- * Queued and recorded outcomes leave delivery with that writer/outbox. A failed direct write
+ * Queued and recorded outcomes leave delivery with that writer/outbox. Failed accounting
  * keeps the best-effort send; bouncer dedupes on `requestId`. Every other request also keeps the
  * independent best-effort send, which never rejects.
  */
@@ -1531,7 +1549,7 @@ async function getGenerationLookupProvider(
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    isFreeModel(usageContext.requested_model) ||
+    (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);

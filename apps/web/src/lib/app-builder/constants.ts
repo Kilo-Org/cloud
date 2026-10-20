@@ -10,6 +10,8 @@
  */
 export const MIN_BALANCE_FOR_APP_BUILDER = 1;
 
+export const APP_BUILDER_DISABLED = true;
+
 /**
  * Image upload constraints for App Builder messages
  */

@@ -32,6 +32,8 @@ export function computeBillingRefetchInterval(
 
 type ChatHeaderProps = {
   cloudAgentSessionId: string;
+  changesCloudAgentSessionId?: string;
+  worktreeId?: string;
   kiloSessionId?: string;
   organizationId?: string;
   repository: string;
@@ -56,6 +58,8 @@ type ChatHeaderProps = {
 
 export function ChatHeader({
   cloudAgentSessionId,
+  changesCloudAgentSessionId = cloudAgentSessionId,
+  worktreeId,
   repository,
   branch,
   gitUrl,
@@ -147,9 +151,10 @@ export function ChatHeader({
         )}
         {onToggleChanges && (
           <WorktreeChangesButton
-            key={`worktree-changes:${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
-            cloudAgentSessionId={cloudAgentSessionId}
+            key={`worktree-changes:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            cloudAgentSessionId={changesCloudAgentSessionId}
             organizationId={organizationId}
+            worktreeId={worktreeId}
             open={changesOpen}
             onToggle={onToggleChanges}
           />

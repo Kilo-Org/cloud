@@ -100,8 +100,9 @@ jest.mock('./CloudSidebarLayout', () => ({
   }),
   useWorktreeChatTabs: () => ({
     selectedWorktreeId: mockWorktreeId,
-    worktreeChats: mockChats,
-    openWorktreeChats: mockChats,
+    // Like the real sidebar, which lists only chats of the selected worktree in this scope.
+    worktreeChats: mockWorktreeId ? mockChats : [],
+    openWorktreeChats: mockWorktreeId ? mockChats : [],
     closedWorktreeChats: [],
     deletingSessionIds: [],
     openSession: jest.fn(),
@@ -631,11 +632,15 @@ describe('CloudChatPage terminal ownership across navigation', () => {
 
     mockSessionId = 'ses_historical';
     render();
-    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
+    // A sibling chat shares the worktree, so the same changes view stays, closed.
+    expect(dom.container.querySelector('[data-changes-owner]')).toBe(view);
+    expect(view?.hidden).toBe(true);
     resolveSession('worktree_shared');
-    const siblingView = openChanges();
-    expect(siblingView?.getAttribute('data-changes-owner')).toBe('workspace_ses_historical');
+    expect(dom.container.querySelector('[data-changes-owner]')).toBe(view);
+    expect(view?.getAttribute('data-changes-owner')).toBe('workspace_ses_historical');
     expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    // The organization's sidebar lists no chat of this worktree.
+    mockWorktreeId = null;
     render({ organizationId: 'organization-a' });
     expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
     expect(mockTabs.files).toEqual([]);
@@ -758,7 +763,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(mockConversation.commitsAfterMessage?.size).toBe(0);
   });
 
-  it('scopes changes to each sibling control session without replacing its worktree terminal', () => {
+  it('keeps one changes view across sibling chats without replacing its worktree terminal', () => {
     render();
     const terminal = openTerminal();
     const activeTabId = mockTabs.activeTabId;
@@ -768,14 +773,16 @@ describe('CloudChatPage terminal ownership across navigation', () => {
 
     mockSessionId = 'ses_historical';
     render();
-    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
-    expect(dom.container.querySelector('[data-changes-trigger]')).toBeNull();
+    // While the sibling loads, the worktree's control chat serves the shared changes.
+    expect(dom.container.querySelector('[data-changes-owner]')).toBe(changes);
+    expect(changes?.getAttribute('data-changes-owner')).toBe('workspace_recent');
+    expect(dom.container.querySelector('[data-changes-trigger]')).not.toBeNull();
 
     resolveSession('worktree_shared');
-    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+    expect(changes?.hidden).toBe(true);
     const siblingChanges = openChanges();
+    expect(siblingChanges).toBe(changes);
     expect(siblingChanges?.getAttribute('data-changes-owner')).toBe('workspace_ses_historical');
-    expect(siblingChanges).not.toBe(changes);
     expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
     expect(mockClosedPtys).toEqual([]);
   });
@@ -810,10 +817,13 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     const personalChanges = openChanges();
     expect(personalChanges?.getAttribute('data-changes-organization')).toBe('personal');
 
+    // The organization's sidebar lists no personal chat, so it selects no worktree.
+    mockWorktreeId = null;
     render({ organizationId: 'organization-a' });
     expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
     expect(dom.container.querySelector('[data-changes-trigger]')).toBeNull();
 
+    mockWorktreeId = 'worktree_shared';
     mockAtomValues.fetchedSessionData = {
       kiloSessionId: mockSessionId,
       organizationId: 'organization-a',

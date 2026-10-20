@@ -90,7 +90,6 @@ import { canOpenWorktreeChanges } from './worktree-changes';
 import {
   CHAT_TAB_ID,
   addTerminalTab,
-  clearFileTabs,
   closeFileTab,
   closeTerminalTab,
   fileTabId,
@@ -244,14 +243,14 @@ export default function CloudChatPage({
   const childSessionDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
   const [preparationDrawerAttemptId, setPreparationDrawerAttemptId] = useState<string | null>(null);
   const preparationDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
-  const [changesViewSessionId, setChangesViewSessionId] = useState<string | null>(null);
+  const [changesViewScope, setChangesViewScope] = useState<string | null>(null);
   const changesViewFocusTargetRef = useRef<HTMLElement | null>(null);
   const changesViewOpenedTabRef = useRef<WorkspaceTabId | null>(null);
   const activeWorkspaceTabRef = useRef<HTMLButtonElement | null>(null);
   const closeChangesView = useCallback(() => {
     changesViewOpenedTabRef.current = null;
     changesViewFocusTargetRef.current = null;
-    setChangesViewSessionId(null);
+    setChangesViewScope(null);
   }, []);
 
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
@@ -404,12 +403,6 @@ export default function CloudChatPage({
   >({});
   const preserveTerminalSelectionRef = useRef(false);
   const previousSessionIdRef = useRef<string | null>(sessionIdFromParams);
-  const fileTabClearRef = useRef<{
-    fileScope: string;
-    currentUserId?: string;
-    organizationId?: string;
-    scope: string | null;
-  } | null>(null);
   const workspaceTabScope = getWorkspaceTabScope(selectedWorktreeId, sessionIdFromParams);
   const workspaceIdentityResolved =
     !sessionIdFromParams ||
@@ -432,26 +425,31 @@ export default function CloudChatPage({
     ? null
     : getWorkspaceControlSession(selectedWorktreeId, worktreeChats, deletingSessionIds);
   const workspaceCloudSessionId = workspaceControlSession?.cloudAgentSessionId ?? sessionId;
-  const canOpenChanges = workspaceControlSession
-    ? Boolean(currentUserId) && canOpenWorktreeChanges(workspaceCloudSessionId, false)
-    : sessionIdFromParams !== null &&
-      isCurrentSession &&
-      canOpenWorktreeChanges(sessionId, isReadOnly) &&
-      fetchedSessionData?.organizationId === (organizationId ?? null);
-  const changesViewOpen = canOpenChanges && changesViewSessionId === workspaceCloudSessionId;
-  const fileScope = JSON.stringify([
-    currentUserId,
-    organizationId,
-    sessionIdFromParams,
+  const currentSessionCanOpenChanges =
+    sessionIdFromParams !== null &&
+    isCurrentSession &&
+    canOpenWorktreeChanges(sessionId, isReadOnly) &&
+    fetchedSessionData?.organizationId === (organizationId ?? null);
+  const changesControlSession = getWorkspaceControlSession(
     selectedWorktreeId,
-    workspaceCloudSessionId,
-  ]);
+    worktreeChats,
+    deletingSessionIds
+  );
+  const changesCloudSessionId = currentSessionCanOpenChanges
+    ? sessionId
+    : changesControlSession?.cloudAgentSessionId;
+  const canOpenChanges =
+    Boolean(currentUserId) && canOpenWorktreeChanges(changesCloudSessionId, isReadOnly);
+  const fileScope = JSON.stringify([currentUserId, organizationId, workspaceTabScope]);
+  const changesViewOpen = canOpenChanges && changesViewScope === fileScope;
   const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
   const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
+  // Commits come from the loaded chat, so they follow its own access, not the workspace's.
+  const commitsVisible = filesVisible && currentSessionCanOpenChanges;
   const [commitsCache, setCommitsCache] = useState<{
     infos: StoredMessage['info'][];
     commits: readonly SessionCommit[];
-    filesVisible: boolean;
+    commitsVisible: boolean;
     value: ReadonlyMap<string, readonly SessionCommit[]>;
   } | null>(null);
   const messageInfosForCommits = [...staticMessages, ...dynamicMessages].map(
@@ -460,7 +458,7 @@ export default function CloudChatPage({
   let commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>;
   if (
     commitsCache !== null &&
-    commitsCache.filesVisible === filesVisible &&
+    commitsCache.commitsVisible === commitsVisible &&
     commitsCache.commits === commits &&
     commitsCache.infos.length === messageInfosForCommits.length &&
     commitsCache.infos.every((info, index) => info === messageInfosForCommits[index])
@@ -469,12 +467,12 @@ export default function CloudChatPage({
   } else {
     commitsAfterMessage = commitsByMessageAnchor(
       [...staticMessages, ...dynamicMessages],
-      filesVisible ? commits : []
+      commitsVisible ? commits : []
     );
     setCommitsCache({
       infos: messageInfosForCommits,
       commits,
-      filesVisible,
+      commitsVisible,
       value: commitsAfterMessage,
     });
   }
@@ -511,25 +509,6 @@ export default function CloudChatPage({
   }
 
   useEffect(() => {
-    const previous = fileTabClearRef.current;
-    fileTabClearRef.current = {
-      fileScope,
-      currentUserId,
-      organizationId,
-      scope: workspaceTabScope,
-    };
-    if (previous === null || previous.fileScope === fileScope) return;
-    if (
-      previous.currentUserId !== currentUserId ||
-      previous.organizationId !== organizationId ||
-      previous.scope !== workspaceTabScope
-    ) {
-      return;
-    }
-    setWorkspaceTabs(clearFileTabs);
-  }, [fileScope, currentUserId, organizationId, workspaceTabScope, setWorkspaceTabs]);
-
-  useEffect(() => {
     const previousSessionId = previousSessionIdRef.current;
     previousSessionIdRef.current = sessionIdFromParams;
     if (previousSessionId === sessionIdFromParams) return;
@@ -544,7 +523,7 @@ export default function CloudChatPage({
 
   useEffect(() => {
     closeChangesView();
-  }, [workspaceCloudSessionId, currentUserId, organizationId, canOpenChanges, closeChangesView]);
+  }, [fileScope, canOpenChanges, closeChangesView]);
 
   useEffect(() => {
     const openedTab = changesViewOpenedTabRef.current;
@@ -1351,13 +1330,13 @@ export default function CloudChatPage({
       setPreparationDrawerAttemptId(null);
       if (changesViewOpen) {
         changesViewOpenedTabRef.current = null;
-        setChangesViewSessionId(null);
+        setChangesViewScope(null);
       } else {
         changesViewOpenedTabRef.current = activeWorkspaceTabId;
-        setChangesViewSessionId(workspaceCloudSessionId);
+        setChangesViewScope(fileScope);
       }
     },
-    [activeWorkspaceTabId, changesViewOpen, workspaceCloudSessionId]
+    [activeWorkspaceTabId, changesViewOpen, fileScope]
   );
 
   // Surface the session's custom agents plus the current visible profile
@@ -1700,6 +1679,8 @@ export default function CloudChatPage({
   const sessionActions = (
     <ChatHeader
       cloudAgentSessionId={workspaceCloudSessionId ?? 'Starting session…'}
+      changesCloudAgentSessionId={changesCloudSessionId ?? undefined}
+      worktreeId={selectedWorktreeId ?? undefined}
       kiloSessionId={sessionIdFromParams ?? workspaceControlSession?.sessionId}
       organizationId={organizationId}
       repository={workspaceControlSession?.repository ?? sessionConfig?.repository ?? ''}
@@ -2168,7 +2149,7 @@ export default function CloudChatPage({
                       {terminalPaneMap}
                     </div>
                     {filesVisible &&
-                      workspaceCloudSessionId &&
+                      changesCloudSessionId &&
                       workspaceTabs.files.map(tab => {
                         const tabId = fileTabId(tab.path);
                         const active = activeWorkspaceTabId === tabId;
@@ -2176,8 +2157,9 @@ export default function CloudChatPage({
                           <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
                             {active && !changesViewOpen && (
                               <WorktreeFilePane
-                                cloudAgentSessionId={workspaceCloudSessionId}
+                                cloudAgentSessionId={changesCloudSessionId}
                                 organizationId={organizationId}
+                                worktreeId={selectedWorktreeId ?? undefined}
                                 path={tab.path}
                                 mode={tab.mode}
                                 review={review.scope ? review.bindings : undefined}
@@ -2191,11 +2173,12 @@ export default function CloudChatPage({
                         );
                       })}
                   </div>
-                  {canOpenChanges && workspaceCloudSessionId && (
+                  {canOpenChanges && changesCloudSessionId && (
                     <WorktreeChangesView
-                      key={`${currentUserId}:${organizationId ?? 'personal'}:${workspaceCloudSessionId}`}
-                      cloudAgentSessionId={workspaceCloudSessionId}
+                      key={fileScope}
+                      cloudAgentSessionId={changesCloudSessionId}
                       organizationId={organizationId}
+                      worktreeId={selectedWorktreeId ?? undefined}
                       open={changesViewOpen}
                       commentCounts={reviewCommentCounts}
                       review={review.scope ? review.bindings : undefined}

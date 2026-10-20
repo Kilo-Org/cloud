@@ -6260,7 +6260,7 @@ export const sharedCliSessions = pgTable(
   },
   table => [
     index('IDX_shared_cli_sessions_session_id').on(table.session_id),
-    index('IDX_shared_cli_sessions_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_shared_cli_sessions_kilo_user_id').on(table.kilo_user_id).concurrently(),
     index('IDX_shared_cli_sessions_created_at').on(table.created_at),
     enumCheck('shared_cli_sessions_shared_state_check', table.shared_state, CliSessionSharedState),
   ]

@@ -14,18 +14,6 @@ export function hasCustomLlmAccess(
   );
 }
 
-/** Whether the user may call the custom LLM in the context of `organizationId`. */
-export async function canUseCustomLlm(
-  definition: CustomLlmDefinition,
-  kiloUserId: string,
-  organizationId: string | undefined
-) {
-  return (
-    organizationId !== undefined &&
-    (await userHasCustomLlmAccess(definition, organizationId, kiloUserId))
-  );
-}
-
 export async function userHasCustomLlmAccess(
   definition: CustomLlmDefinition,
   organizationId: string,

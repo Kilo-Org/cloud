@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from '@/lib/code-reviews/prompts/default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from '@/lib/code-reviews/prompts/default-prompt-template.json';
 import DEFAULT_PROMPT_TEMPLATE_GITLAB from '@/lib/code-reviews/prompts/default-prompt-template-gitlab.json';
@@ -208,7 +208,7 @@ export async function generateReviewPrompt(
   }
 
   const effectiveModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
-  const freeModel = isFreeModelExcludingCustomLlms(effectiveModel);
+  const freeModel = await isFreeModel(effectiveModel);
   const applyFreeModelBudget = freeModel && !omitSubAgentGuidance;
 
   // Helper to replace common placeholders

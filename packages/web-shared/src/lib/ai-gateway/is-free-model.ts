@@ -15,7 +15,10 @@ export async function isFreeModel(modelId: string): Promise<boolean> {
   return (await isCustomLlm(modelId)) || isFreeModelExcludingCustomLlms(modelId);
 }
 
-/** `isFreeModel` for callers that never see custom LLMs, such as non-chat endpoints. */
+/**
+ * The built-in free model rules, without custom LLMs. Use `isFreeModel` unless
+ * custom LLMs must be excluded outright, as for `kilo-auto/free` candidates.
+ */
 export function isFreeModelExcludingCustomLlms(model: string): boolean {
   const modelId = model ?? '';
   const exclusiveModel = findKiloExclusiveModel(modelId);

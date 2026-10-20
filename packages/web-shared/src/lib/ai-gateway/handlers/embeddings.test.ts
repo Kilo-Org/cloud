@@ -8,6 +8,10 @@ import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 jest.mock('next/server', () => ({
@@ -23,7 +27,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
   getEmbeddingProvider: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModelExcludingCustomLlms: jest.fn(),
+  isFreeModel: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
@@ -103,6 +107,21 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it('never forwards a custom LLM id to an embeddings upstream', async () => {
+    await insertCustomLlmForTest('acme/embedding-custom-model');
+    try {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ model: 'acme/embedding-custom-model' })
+      );
+
+      expect(response.status).toBe(404);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    } finally {
+      await deleteCustomLlmForTest('acme/embedding-custom-model');
+    }
   });
 
   it('forwards personal request privacy with other provider fields', async () => {

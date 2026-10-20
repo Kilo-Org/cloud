@@ -1,7 +1,7 @@
 import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeTranscriptionModelsUrl,
   LOCAL_FAKE_LLM_API_KEY,
@@ -189,7 +189,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       const description = isFreeNemotronModel(model.id)
         ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
         : model.description;
-      const isFree = isFreeModelExcludingCustomLlms(model.id);
+      const isFree = await isFreeModel(model.id);
       return {
         ...model,
         inference_provider_ids: inferenceProviderIds,

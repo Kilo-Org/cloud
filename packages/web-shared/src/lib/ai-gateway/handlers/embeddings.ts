@@ -12,7 +12,8 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   captureProxyError,
   getOrganizationProviderPrivacy,
@@ -126,6 +127,11 @@ export async function handleEmbeddingsRequest(
     return modelDoesNotExistResponse();
   }
 
+  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
+  if (await isCustomLlm(requestBodyParsed.model)) {
+    return modelDoesNotExistResponse();
+  }
+
   if (requestBodyParsed.input == null) {
     return invalidRequestResponse();
   }
@@ -174,7 +180,7 @@ export async function handleEmbeddingsRequest(
       return invalidTokenResponse();
     }
 
-    if (!isFreeModelExcludingCustomLlms(requestedModelLowerCased)) {
+    if (!(await isFreeModel(requestedModelLowerCased))) {
       return NextResponse.json(
         {
           error: {
@@ -274,7 +280,7 @@ export async function handleEmbeddingsRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeModelExcludingCustomLlms(requestedModelLowerCased) &&
+      !(await isFreeModel(requestedModelLowerCased)) &&
       !userByok
     ) {
       return await creditsBlockedResponse({

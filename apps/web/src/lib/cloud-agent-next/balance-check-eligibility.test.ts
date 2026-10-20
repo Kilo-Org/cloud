@@ -4,7 +4,7 @@ const mockGetUserByokProviderIds = jest.fn();
 const mockGetOrganizationByokProviderIds = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModelExcludingCustomLlms: (...args: unknown[]) => mockIsFreeModel(...args),
+  isFreeModel: async (...args: unknown[]) => mockIsFreeModel(...args),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
@@ -15,11 +15,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 }));
 
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
-import {
-  customLlmDefinition,
-  deleteCustomLlmForTest,
-  insertCustomLlmForTest,
-} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 const KILO_EXCLUSIVE_MODEL = 'stealth/qwen3.6-plus';
 const NON_EXCLUSIVE_MODEL = 'anthropic/claude-sonnet-4';
@@ -144,47 +139,5 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: true });
     expect(mockGetOrganizationByokProviderIds).toHaveBeenCalledWith(fakeDb, 'org-1');
     expect(mockGetUserByokProviderIds).not.toHaveBeenCalled();
-  });
-
-  describe('custom LLMs', () => {
-    const CUSTOM_LLM_ID = 'acme/balance-custom-model';
-    const ORG_ID = '00000000-0000-4000-8000-000000000001';
-
-    beforeAll(async () => {
-      await insertCustomLlmForTest(
-        CUSTOM_LLM_ID,
-        customLlmDefinition({ organization_ids: [ORG_ID] })
-      );
-    });
-
-    afterAll(async () => {
-      await deleteCustomLlmForTest(CUSTOM_LLM_ID);
-    });
-
-    it('skips the balance check for a custom LLM the organization may use', async () => {
-      const result = await computeCloudAgentNextBalanceCheckEligibility({
-        fromDb: fakeDb,
-        user: fakeUser,
-        modelId: CUSTOM_LLM_ID,
-        organizationId: ORG_ID,
-      });
-
-      expect(result).toEqual({ isFree: true, hasUserByokAvailable: false });
-    });
-
-    it.each([
-      ['another organization', '00000000-0000-4000-8000-000000000002'],
-      ['a personal account', undefined],
-    ])('keeps the balance check for a custom LLM requested from %s', async (_name, orgId) => {
-      const result = await computeCloudAgentNextBalanceCheckEligibility({
-        fromDb: fakeDb,
-        user: fakeUser,
-        modelId: CUSTOM_LLM_ID,
-        organizationId: orgId,
-      });
-
-      expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
-      expect(mockGetModelUserByokProviders).not.toHaveBeenCalled();
-    });
   });
 });

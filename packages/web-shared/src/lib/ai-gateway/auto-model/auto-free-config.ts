@@ -19,7 +19,8 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
 /**
  * `kilo-auto/free` has no OpenCode settings, so clients talk to it with the
  * default AI SDK provider. Candidates must be free, concrete models that use
- * that same provider.
+ * that same provider. It serves anonymous callers, so custom LLMs, which only
+ * granted organizations may call, are never candidates.
  */
 export function isAutoFreeEligibleModelId(model: string): boolean {
   return (

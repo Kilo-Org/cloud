@@ -37,7 +37,7 @@ import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModelExcludingCustomLlms,
+  isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
@@ -584,6 +584,8 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Custom LLMs count as free; `getProvider` still refuses callers without access.
+  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -649,9 +651,8 @@ export async function handleLlmProxyRequest(
       return invalidTokenResponse();
     }
 
-    // No valid auth. Anonymous callers can never use a custom LLM, so a custom
-    // LLM id must not look free here: that would reveal that the id exists.
-    if (!isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased)) {
+    // No valid auth
+    if (!isFreeRequestedModel) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -898,7 +899,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased) &&
+      !isFreeRequestedModel &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {

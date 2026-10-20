@@ -235,6 +235,7 @@ describe('session access invalidation route', () => {
     const res = await app.request(request, undefined, defaultEnv);
 
     expect(res.status).toBe(401);
+    expect(request.bodyUsed).toBe(false);
     expect(bodyReads).toBe(0);
     expect(cache.invalidateOrganization).not.toHaveBeenCalled();
     expect(getUserConnectionDO).not.toHaveBeenCalled();

@@ -2123,15 +2123,15 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
   });
 
   it('does not call the snapshot route when the dedicated signing secret is missing', async () => {
-    const { service, messages, requestedScopes, fetchCalls } = setupService({
+    const setup = setupService({
       signingSecret: async () => '',
     });
 
-    await service.refreshGlanceableSessions(personalRefresh);
+    await setup.service.refreshGlanceableSessions(personalRefresh);
 
-    expect(fetchCalls).toBe(0);
-    expect(requestedScopes).toEqual([]);
-    expect(messages).toEqual([]);
+    expect(setup.fetchCalls).toBe(0);
+    expect(setup.requestedScopes).toEqual([]);
+    expect(setup.messages).toEqual([]);
   });
 });
 

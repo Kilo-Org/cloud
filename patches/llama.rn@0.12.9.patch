@@ -1,0 +1,94 @@
+diff --git a/ios/RNLlama.h b/ios/RNLlama.h
+--- a/ios/RNLlama.h
++++ b/ios/RNLlama.h
+@@ -1,6 +1,6 @@
+ #import <React/RCTBridgeModule.h>
+-#import <React/RCTBridge+Private.h>
+ #import <ReactCommon/RCTTurboModule.h>
++#import <ReactCommon/RCTTurboModuleWithJSIBindings.h>
+ 
+ #if RNLLAMA_BUILD_FROM_SOURCE
+ #import "json.hpp"
+@@ -8,6 +8,6 @@
+ #import <rnllama/nlohmann/json.hpp>
+ #endif
+ 
+-@interface RNLlama : NSObject <RCTBridgeModule>
++@interface RNLlama : NSObject <RCTBridgeModule, RCTTurboModuleWithJSIBindings>
+ 
+ @end
+diff --git a/ios/RNLlama.mm b/ios/RNLlama.mm
+--- a/ios/RNLlama.mm
++++ b/ios/RNLlama.mm
+@@ -1,5 +1,6 @@
+ #import "RNLlama.h"
+ #import <jsi/jsi.h>
++#include <atomic>
+ 
+ #if RNLLAMA_BUILD_FROM_SOURCE
+ #import "../cpp/llama-impl.h"
+@@ -74,53 +75,29 @@
+ } // namespace rnllama_jsi
+ 
+ @implementation RNLlama {
+-    __unsafe_unretained RCTBridge *_bridge;
++    std::atomic<bool> _bindingsInstalled{false};
+ }
+ 
+ RCT_EXPORT_MODULE()
+ 
+-- (RCTBridge *)bridge {
+-    return _bridge;
+-}
+-
+-- (void)setBridge:(RCTBridge *)bridge {
+-    _bridge = bridge;
++- (void)installJSIBindingsWithRuntime:(facebook::jsi::Runtime &)runtime
++                        callInvoker:(const std::shared_ptr<facebook::react::CallInvoker> &)callInvoker
++{
++    if (!callInvoker) {
++        return;
++    }
++    rnllama_jsi::installJSIBindings(runtime, callInvoker);
++    _bindingsInstalled.store(true, std::memory_order_release);
+ }
+ 
+ RCT_EXPORT_METHOD(install:(RCTPromiseResolveBlock)resolve
+                  withRejecter:(RCTPromiseRejectBlock)reject)
+ {
+-    RCTBridge *bridge = self.bridge ?: [RCTBridge currentBridge];
+-    if (!bridge) {
+-        resolve(@false);
+-        return;
+-    }
+-
+-    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)bridge.batchedBridge;
+-    if (!cxxBridge) {
+-        cxxBridge = (RCTCxxBridge *)bridge;
+-    }
+-    auto callInvoker = cxxBridge.jsCallInvoker ?: bridge.jsCallInvoker;
+-    if (!cxxBridge.runtime) {
+-        resolve(@false);
+-        return;
+-    }
+-
+-    facebook::jsi::Runtime *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
+-
+-    if (callInvoker) {
+-        callInvoker->invokeAsync([runtime, callInvoker]() {
+-            rnllama_jsi::installJSIBindings(*runtime, callInvoker);
+-        });
+-    } else {
+-        resolve(@false);
+-        return;
+-    }
+-
+-    resolve(@true);
++    resolve(@(_bindingsInstalled.load(std::memory_order_acquire)));
+ }
+ 
+ - (void)invalidate {
++    _bindingsInstalled.store(false, std::memory_order_release);
+     rnllama_jsi::cleanupJSIBindings();
+ }
+ 

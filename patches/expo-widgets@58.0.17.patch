@@ -12,6 +12,15 @@ diff --git a/android/src/main/java/expo/modules/widgets/WidgetsModule.kt b/andro
      }
  
      Class("Widget", WidgetObject::class) {
+@@ -86,4 +90,8 @@
+     Class("CustomNotification", CustomNotification::class) {
++      Constructor {
++        throw IllegalStateException("CustomNotification instances are created by CustomNotificationFactory")
++      }
++
+       Function("getId") { notification: CustomNotification ->
+         notification.id
+       }
 diff --git a/build/ExpoWidgets.d.ts b/build/ExpoWidgets.d.ts
 --- a/build/ExpoWidgets.d.ts
 +++ b/build/ExpoWidgets.d.ts

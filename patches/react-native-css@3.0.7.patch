@@ -1,0 +1,39 @@
+diff --git a/src/components/index.cts b/src/components/index.cts
+--- a/src/components/index.cts
++++ b/src/components/index.cts
+@@ -176,6 +176,9 @@
+   get NativeAppEventEmitter() {
+     return require("react-native").NativeAppEventEmitter;
+   },
++  get NativeComponentRegistry() {
++    return require("react-native").NativeComponentRegistry;
++  },
+   get NativeDialogManagerAndroid() {
+     return require("react-native").NativeDialogManagerAndroid;
+   },
+diff --git a/dist/commonjs/components/index.cjs b/dist/commonjs/components/index.cjs
+--- a/dist/commonjs/components/index.cjs
++++ b/dist/commonjs/components/index.cjs
+@@ -177,6 +177,9 @@
+   get NativeAppEventEmitter() {
+     return require("react-native").NativeAppEventEmitter;
+   },
++  get NativeComponentRegistry() {
++    return require("react-native").NativeComponentRegistry;
++  },
+   get NativeDialogManagerAndroid() {
+     return require("react-native").NativeDialogManagerAndroid;
+   },
+diff --git a/dist/module/components/index.cjs b/dist/module/components/index.cjs
+--- a/dist/module/components/index.cjs
++++ b/dist/module/components/index.cjs
+@@ -177,6 +177,9 @@
+   get NativeAppEventEmitter() {
+     return require("react-native").NativeAppEventEmitter;
+   },
++  get NativeComponentRegistry() {
++    return require("react-native").NativeComponentRegistry;
++  },
+   get NativeDialogManagerAndroid() {
+     return require("react-native").NativeDialogManagerAndroid;
+   },

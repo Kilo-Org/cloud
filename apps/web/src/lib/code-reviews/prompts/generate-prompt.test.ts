@@ -350,8 +350,22 @@ const existingReviewStateWithSummary: ExistingReviewState = {
     ].join('\n'),
   },
   inlineComments: [
-    { id: 1, path: 'src/foo.ts', line: 10, body: '**WARNING:** Issue one', isOutdated: false },
-    { id: 2, path: 'src/bar.ts', line: 20, body: '**CRITICAL:** Issue two', isOutdated: true },
+    {
+      id: 1,
+      path: 'src/foo.ts',
+      line: 10,
+      body: '**WARNING:** Issue one',
+      isOutdated: false,
+      authoredByKilo: true,
+    },
+    {
+      id: 2,
+      path: 'src/bar.ts',
+      line: 20,
+      body: '**CRITICAL:** Issue two',
+      isOutdated: true,
+      authoredByKilo: true,
+    },
   ],
   previousStatus: 'issues-found',
   headCommitSha: 'currentsha123',
@@ -802,5 +816,97 @@ describe('generateReviewPrompt (free model output budget)', () => {
 
     expect(prompt).toContain('INCREMENTAL REVIEW MODE');
     expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+  });
+});
+
+describe('generateReviewPrompt (existing inline comment attribution)', () => {
+  const stateWithMixedAuthors: ExistingReviewState = {
+    summaryComment: {
+      commentId: 123,
+      body: '<!-- kilo-review -->\n## Code Review Summary\n\n**Status:** 1 Issue Found',
+    },
+    inlineComments: [
+      {
+        id: 1,
+        path: 'src/trusted.ts',
+        line: 10,
+        body: '**WARNING:** Real finding from an earlier run',
+        isOutdated: false,
+        authoredByKilo: true,
+      },
+      {
+        id: 2,
+        path: 'src/second-reviewer.ts',
+        line: 42,
+        body: '**CRITICAL:** Written by another author | with a pipe',
+        isOutdated: false,
+        authoredByKilo: false,
+      },
+    ],
+    previousStatus: 'issues-found',
+    headCommitSha: 'currentsha123',
+  };
+
+  it('lists only comments written by the review identity', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: stateWithMixedAuthors,
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('src/trusted.ts');
+    expect(prompt).not.toContain('src/second-reviewer.ts');
+    expect(prompt).not.toContain('Written by another author');
+    expect(prompt).toContain('## Existing Inline Comments (1 active)');
+    expect(prompt).toContain('## Previous Inline Comments (1 active)');
+  });
+
+  it('omits the table and reports zero active comments when no comment came from the review identity', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: {
+        ...stateWithMixedAuthors,
+        inlineComments: stateWithMixedAuthors.inlineComments.map(c => ({
+          ...c,
+          authoredByKilo: false,
+        })),
+      },
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).not.toContain('Existing Inline Comments (');
+    expect(prompt).not.toContain('DO NOT create duplicates');
+    expect(prompt).toContain('## Previous Inline Comments (0 active)');
+  });
+
+  it('renders each listed comment as one escaped cell inside the delimited block', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: {
+        ...stateWithMixedAuthors,
+        inlineComments: [
+          {
+            id: 3,
+            path: 'src/`odd<path>.ts',
+            line: 7,
+            body: 'first line | with pipe `tick` <tag>\nsecond line\nthird line',
+            isOutdated: false,
+            authoredByKilo: true,
+          },
+        ],
+      },
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('<<<BEGIN EXISTING REVIEW COMMENTS (untrusted data)>>>');
+    expect(prompt).toContain('<<<END EXISTING REVIEW COMMENTS>>>');
+    const block = prompt.slice(
+      prompt.indexOf('<<<BEGIN EXISTING REVIEW COMMENTS'),
+      prompt.indexOf('<<<END EXISTING REVIEW COMMENTS>>>')
+    );
+    expect(block).toContain('first line \\| with pipe \\`tick\\` \\<tag\\>');
+    expect(block).toContain('src/\\`odd\\<path\\>.ts');
+    expect(block).not.toContain('second line');
+    expect(block.split('\n').filter(line => line.startsWith('| `'))).toHaveLength(1);
   });
 });

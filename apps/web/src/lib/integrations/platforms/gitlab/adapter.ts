@@ -1254,6 +1254,9 @@ export async function hasMRNoteWithMarker(
 
 /**
  * Used to detect duplicates and track outdated inline comments.
+ *
+ * `authoredByKilo` reports whether the user behind the access token that reads the MR wrote
+ * the note (the Project Access Token bot user).
  */
 export async function fetchMRInlineComments(
   accessToken: string,
@@ -1268,6 +1271,7 @@ export async function fetchMRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { username: string };
   }>
 > {
@@ -1306,34 +1310,44 @@ export async function fetchMRInlineComments(
     page++;
   }
 
-  const inlineComments: Array<{
+  const positionedNotes: Array<{
     id: number;
     discussionId: string;
     path: string;
     line: number | null;
     body: string;
     isOutdated: boolean;
-    user: { username: string };
+    authorId: number;
+    authorUsername: string;
   }> = [];
 
   for (const discussion of discussions) {
     if (discussion.individual_note) continue;
 
     for (const note of discussion.notes) {
-      if (note.position) {
-        inlineComments.push({
-          id: note.id,
-          discussionId: discussion.id,
-          path: note.position.new_path || note.position.old_path,
-          line: note.position.new_line ?? note.position.old_line,
-          body: note.body,
-          // In GitLab, resolved discussions are considered "outdated" for our purposes
-          isOutdated: note.resolved === true,
-          user: { username: note.author.username },
-        });
-      }
+      if (!note.position) continue;
+
+      positionedNotes.push({
+        id: note.id,
+        discussionId: discussion.id,
+        path: note.position.new_path || note.position.old_path,
+        line: note.position.new_line ?? note.position.old_line,
+        body: note.body,
+        // In GitLab, resolved discussions are considered "outdated" for our purposes
+        isOutdated: note.resolved === true,
+        authorId: note.author.id,
+        authorUsername: note.author.username,
+      });
     }
   }
+
+  const kiloUserId =
+    positionedNotes.length > 0 ? (await fetchGitLabUser(accessToken, instanceUrl)).id : null;
+  const inlineComments = positionedNotes.map(({ authorId, authorUsername, ...comment }) => ({
+    ...comment,
+    authoredByKilo: kiloUserId !== null && authorId === kiloUserId,
+    user: { username: authorUsername },
+  }));
 
   logExceptInTest('[fetchMRInlineComments] Fetched inline comments', {
     projectId,

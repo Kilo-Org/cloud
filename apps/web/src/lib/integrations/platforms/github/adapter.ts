@@ -670,8 +670,22 @@ export async function updateKiloReviewComment(
   });
 }
 
+/** Review comment fields this module reads. The app attribution is not in the octokit type. */
+type ReviewCommentRow = {
+  id: number;
+  path: string;
+  line?: number | null;
+  body: string;
+  position?: number | null;
+  user?: { login?: string | null } | null;
+  performed_via_github_app?: { id?: number | string | null } | null;
+};
+
 /**
  * Used to detect duplicates and track outdated inline comments.
+ *
+ * `authoredByKilo` reports whether this app identity created the comment, following the same
+ * `performed_via_github_app.id` ownership test `findKiloReviewComment` applies to summaries.
  */
 export async function fetchPRInlineComments(
   installationId: string,
@@ -686,11 +700,13 @@ export async function fetchPRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { login: string };
   }>
 > {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const kiloAppId = String(getGitHubAppCredentials(appType).appId);
 
   const comments: Array<{
     id: number;
@@ -698,6 +714,7 @@ export async function fetchPRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { login: string };
   }> = [];
 
@@ -705,13 +722,13 @@ export async function fetchPRInlineComments(
   const perPage = 100;
 
   while (true) {
-    const { data } = await octokit.pulls.listReviewComments({
+    const { data } = (await octokit.pulls.listReviewComments({
       owner,
       repo,
       pull_number: prNumber,
       per_page: perPage,
       page,
-    });
+    })) as { data: ReviewCommentRow[] };
 
     comments.push(
       ...data.map(c => ({
@@ -720,6 +737,7 @@ export async function fetchPRInlineComments(
         line: c.line ?? null,
         body: c.body,
         isOutdated: c.position === null, // null position = outdated
+        authoredByKilo: String(c.performed_via_github_app?.id ?? '') === kiloAppId,
         user: { login: c.user?.login ?? 'unknown' },
       }))
     );

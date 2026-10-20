@@ -15,6 +15,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     canonical_slug: publicId,
     hugging_face_id: '',
     name: model.display_name,
+    isCustomLlm: true,
     created: 1756238927,
     description: CUSTOM_LLM_DESCRIPTION,
     context_length: model.context_length,

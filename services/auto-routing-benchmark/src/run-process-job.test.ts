@@ -183,6 +183,7 @@ const successfulCliResult = {
 
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
+  BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-secret' },
   KILO_CLI_API_URL: 'http://host.docker.internal:3000',
   KILO_WEB_API_BASE_URL: 'http://host.docker.internal:3000',
   BENCH_RESULT_URL: 'https://bench.test/container/case-result',
@@ -295,7 +296,7 @@ beforeEach(() => {
     classifierModels: ['classifier/a'],
     deciderModels: [{ id: model }],
     minAccuracy: 0.7,
-    benchmarkUserId: 'user-1',
+    benchmarkUserId: 'bot-internal-user-1',
     benchmarkOrgId: null,
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
@@ -362,6 +363,39 @@ afterEach(() => {
 });
 
 describe('processJob — scheduler-owned execution', () => {
+  it('mints the CLI token as the run bot user and org with the dedicated mint secret', async () => {
+    mockClaim();
+
+    await processJob(env, deciderMessage());
+
+    const mintCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => (url as URL).href.includes('/api/internal/bot-token'));
+    expect(mintCalls).toHaveLength(1);
+    const [url, init] = mintCalls[0]!;
+    expect((url as URL).href).toBe(`${env.KILO_WEB_API_BASE_URL}/api/internal/bot-token`);
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer mint-secret');
+    expect(JSON.parse(init?.body as string)).toEqual({
+      userId: 'benchmark-user',
+      organizationId: 'benchmark-org',
+    });
+  });
+
+  it('does not mint a token for a run without an org snapshot', async () => {
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: { ...snapshot.run, benchmark_org_id: null },
+    });
+    mockClaim();
+
+    await processJob(env, deciderMessage());
+    expect(
+      vi.mocked(fetch).mock.calls.some(([u]) => (u as URL).href.includes('/api/internal/bot-token'))
+    ).toBe(false);
+  });
+
   it('uses the stored exact pair, slot, repetition and input rather than message ownership', async () => {
     mockRunSnapshot([
       { model, variant: 'high', reasoning_effort: 'high' },

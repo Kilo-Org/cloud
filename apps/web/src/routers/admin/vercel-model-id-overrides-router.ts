@@ -1,6 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { mapResolvedModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { mapResolvedModelIdToVercelWithoutOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import {
   VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT,
@@ -48,7 +48,9 @@ export const adminVercelModelIdOverridesRouter = createTRPCRouter({
       items: overrides
         .map(override => ({
           ...override,
-          builtin_vercel_model_id: mapResolvedModelIdToVercel(override.openrouter_model_id),
+          builtin_vercel_model_id: mapResolvedModelIdToVercelWithoutOverrides(
+            override.openrouter_model_id
+          ),
         }))
         .sort((a, b) => a.openrouter_model_id.localeCompare(b.openrouter_model_id)),
     };

@@ -76,7 +76,6 @@ import { organizationCloudAgentNextRouter } from '@/routers/organizations/organi
 import { organizationAppBuilderRouter } from '@/routers/organizations/organization-app-builder-router';
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSecurityAuditLogRouter } from '@/routers/organizations/organization-security-audit-log-router';
-import { organizationAutoTriageRouter } from '@/routers/organizations/organization-auto-triage-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
@@ -152,7 +151,6 @@ export const organizationsRouter = createTRPCRouter({
   appBuilder: organizationAppBuilderRouter,
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,
-  autoTriage: organizationAutoTriageRouter,
   autoTopUp: organizationAutoTopUpRouter,
   kiloclaw: organizationKiloclawRouter,
   bitbucket: organizationBitbucketRouter,

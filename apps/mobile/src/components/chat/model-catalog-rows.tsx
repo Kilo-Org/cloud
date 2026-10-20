@@ -7,7 +7,12 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Cpu, Download, Star } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { type DeviceBudget, deviceFit, estimatedMemoryBytes } from '@/lib/chat/device-fit';
+import {
+  type DeviceBudget,
+  deviceFit,
+  estimatedMemoryBytes,
+  fitsDevice,
+} from '@/lib/chat/device-fit';
 import { type CatalogModel } from '@/lib/chat/gguf-catalog';
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfListedModel, hfModelName } from '@/lib/chat/hf-catalog';
@@ -102,8 +107,13 @@ export function ModelRow({
   const smallest = useHfSmallestDownload(model.id);
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);
-  if (fitsOnly && (fit === 'tooLarge' || fit === 'noStorage')) {
-    return null;
+  if (fitsOnly) {
+    if (!smallest.isFetched) {
+      return <ModelRowSkeleton />;
+    }
+    if (!fitsDevice(fit)) {
+      return null;
+    }
   }
   const [owner = '', repo = ''] = model.id.split('/');
   const name = hfModelName(model.id);
@@ -175,12 +185,19 @@ export function LoadingRows() {
     <View accessibilityLabel={t('modelChat.catalog.loading')}>
       {Array.from({ length: SKELETON_ROWS }).map((_, index) => (
         // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
-        <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
-          <Skeleton className="h-3.5 w-1/2" />
-          <Skeleton className="h-3 w-1/4" />
-          <Skeleton className="h-3 w-2/3" />
-        </View>
+        <ModelRowSkeleton key={index} />
       ))}
+    </View>
+  );
+}
+
+/** Holds a catalog row's height while its download size, and so its fit, loads. */
+function ModelRowSkeleton() {
+  return (
+    <View className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
+      <Skeleton className="h-3.5 w-1/2" />
+      <Skeleton className="h-3 w-1/4" />
+      <Skeleton className="h-3 w-2/3" />
     </View>
   );
 }

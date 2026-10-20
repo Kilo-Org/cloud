@@ -34,10 +34,10 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
+  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
@@ -601,11 +601,11 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // For rate-limited Kilo-exclusive models: server-side products (cloud-agent,
-  // code-review, app-builder, gastown) rate-limit per user when the request comes
-  // from Cloudflare IPs (Kilo infrastructure). All other products rate-limit per
-  // IP (fast pre-auth path).
-  if (isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
+  // For free models: server-side products (cloud-agent, code-review, app-builder,
+  // gastown) rate-limit per user when the request comes from Cloudflare IPs (Kilo
+  // infrastructure). All other products rate-limit per IP (fast pre-auth path).
+  // Custom LLMs are only free because Kilo does not bill them, so they are exempt.
+  if (isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased)) {
     const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
     if (rateLimitKey instanceof NextResponse) return rateLimitKey;
 

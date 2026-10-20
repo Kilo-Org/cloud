@@ -59,6 +59,7 @@ import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
@@ -99,7 +100,7 @@ jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
-  isCustomLlm: async () => false,
+  isCustomLlm: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/unavailable-models') as Record<
@@ -229,6 +230,7 @@ const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
 const mockedIsFreeModelRateLimited = jest.mocked(isFreeModelRateLimited);
+const mockedIsCustomLlm = jest.mocked(isCustomLlm);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
@@ -656,6 +658,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     });
     mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
@@ -1269,22 +1272,23 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('applies free-model rate limiting per IP to flagged Kilo-exclusive models', async () => {
-    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+  it.each([gemma_4_26b_a4b_it_free_model.public_id, 'test/free-model:free', 'openrouter/free'])(
+    'applies free-model rate limiting per IP to the free model %s',
+    async modelId => {
+      mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id)) as never
-    );
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(modelId)) as never);
 
-    expect(response.status).toBe(429);
-    expect(await response.json()).toMatchObject({
-      error_type: 'rate_limit_exceeded',
-      message: 'Model usage limit reached. Please try again later.',
-    });
-    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'ip:127.0.0.1');
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({
+        error_type: 'rate_limit_exceeded',
+        message: 'Model usage limit reached. Please try again later.',
+      });
+      expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'ip:127.0.0.1');
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
 
   it('applies free-model rate limiting per user to server-side products on Cloudflare IPs', async () => {
     setUserAuth();
@@ -1324,12 +1328,13 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('does not apply free-model rate limiting to unflagged free models', async () => {
+  it('serves free models under the free-model rate limit', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
       organizationId: undefined,
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -1337,8 +1342,37 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'ip:127.0.0.1');
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not apply free-model rate limiting to paid models', async () => {
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('openai/gpt-4o')) as never);
+
+    expect(response.status).toBe(200);
     expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not apply free-model rate limiting to custom LLMs', async () => {
+    mockedIsCustomLlm.mockImplementation(async modelId => modelId === 'kilo-internal/custom-model');
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    try {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('kilo-internal/custom-model')) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    } finally {
+      mockedIsCustomLlm.mockImplementation(async () => false);
+    }
   });
 
   it('returns the reconnect error instead of serving another billing path when the ChatGPT connection is dead', async () => {

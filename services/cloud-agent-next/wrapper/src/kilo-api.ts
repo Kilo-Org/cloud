@@ -20,7 +20,7 @@ import {
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
-import { kiloClientConfig, type KiloServer } from './kilo-server-auth.js';
+import { kiloClientConfig, kiloServerHeaders, type KiloServer } from './kilo-server-auth.js';
 import {
   boundSlashCommandCatalog,
   toSlashCommandInfo,
@@ -380,6 +380,7 @@ export type WrapperKiloClient = {
   }) => Promise<WrapperPty>;
   resizePty: (ptyId: string, size: WrapperPtySize, directory?: string) => Promise<WrapperPty>;
   deletePty: (ptyId: string, directory?: string) => Promise<boolean>;
+  connectPty: (ptyId: string, directory: string) => WebSocket;
 
   /**
    * Subscribe to kilo events. The stream yields typed events until the abort
@@ -813,6 +814,17 @@ export function createWrapperKiloClient(
         directory,
       });
       return requireSdkData(result, `PTY delete for ${ptyId}`);
+    },
+    connectPty: (ptyId, directory) => {
+      const url = new URL(`/pty/${encodeURIComponent(ptyId)}/connect`, server.url);
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      url.search = '';
+      url.hash = '';
+      url.searchParams.set('directory', directory);
+      const Socket = WebSocket as typeof WebSocket & {
+        new (url: string, options: { headers: Record<string, string> }): WebSocket;
+      };
+      return new Socket(url.toString(), { headers: kiloServerHeaders(server) });
     },
   };
 }

@@ -10,6 +10,7 @@
  */
 export type CloudAgentEvent = {
   eventId: number;
+  cursor?: number;
   executionId?: string | null;
   sessionId: string;
   streamEventType: string;
@@ -59,10 +60,15 @@ export function isValidCloudAgentEvent(event: unknown): event is CloudAgentEvent
     event.executionId === undefined ||
     event.executionId === null ||
     typeof event.executionId === 'string';
+  const hasValidCursor =
+    !('cursor' in event) ||
+    event.cursor === undefined ||
+    (typeof event.cursor === 'number' && Number.isSafeInteger(event.cursor) && event.cursor >= 0);
   return (
     'eventId' in event &&
     typeof event.eventId === 'number' &&
     hasValidExecutionId &&
+    hasValidCursor &&
     'sessionId' in event &&
     typeof event.sessionId === 'string' &&
     'streamEventType' in event &&

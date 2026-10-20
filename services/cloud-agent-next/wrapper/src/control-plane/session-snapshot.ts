@@ -102,7 +102,10 @@ export async function readSessionSnapshot(input: {
         parentID: details.parentID,
         status,
         ...(status === 'retry' && statusEntry ? { retry: executionRetry(statusEntry) } : {}),
-        messages: [...byId.values()],
+        messages: [...byId.values()].map(({ info, parts }) => ({
+          info: { id: info.id, role: info.role, time: info.time },
+          parts,
+        })),
         interactions,
       });
     }

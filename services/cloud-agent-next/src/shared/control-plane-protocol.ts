@@ -638,7 +638,13 @@ export const controlPlaneEventSchema = z
   .strict();
 
 export const controlPlaneEventsNotificationSchema = z
-  .object({ events: z.array(controlPlaneEventSchema).min(1) })
+  .object({
+    events: z.array(controlPlaneEventSchema).min(1),
+    delivery: z
+      .object({ id: z.uuid(), expiresAt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+      .strict()
+      .optional(),
+  })
   .strict();
 
 export const controlPlaneOutcomeSchema = z

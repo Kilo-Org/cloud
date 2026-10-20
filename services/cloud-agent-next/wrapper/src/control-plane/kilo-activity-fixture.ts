@@ -5,6 +5,7 @@ import { createKiloClient } from '@kilocode/sdk/v2/client';
 import { createKiloClient as createLegacyKiloClient } from '@kilocode/sdk';
 import { createWrapperKiloClient } from '../kilo-api.js';
 import { unfilteredKiloEvents } from '../control/feed.js';
+import { createKiloHarness } from './kilo-harness.js';
 
 type ToolCall = { name: string; arguments: Record<string, unknown> };
 export type ModelReply = { text?: string; tools?: ToolCall[]; status?: number };
@@ -170,6 +171,7 @@ export async function activityFixture(
       root,
       directory,
       client,
+      harness: createKiloHarness({ server: { url }, directory }),
       wrapper: createWrapperKiloClient(
         createLegacyKiloClient({ baseUrl: url }),
         { url },

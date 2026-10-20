@@ -18,8 +18,10 @@ import { createSessionWorktreeChangesHandlers } from './router/handlers/session-
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
 import { listHostedSessions } from './router/handlers/hosted-session-list.js';
+import { getSessionMessagesPage } from './router/handlers/session-history.js';
 
 export const appRouter = router({
+  getSessionMessagesPage,
   deleteWorktree,
   getSandboxSelectionOptions,
   getPreviewOptions,

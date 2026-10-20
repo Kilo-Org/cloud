@@ -50,7 +50,7 @@ export type AutoCommitResult = {
 export type AutoCommitOptions = {
   workspacePath: string;
   onEvent: (event: IngestEvent) => void;
-  kiloClient: WrapperKiloClient;
+  kiloClient: Pick<WrapperKiloClient, 'generateCommitMessage'>;
   /** The assistant message ID this autocommit is associated with (for per-message UI rendering) */
   messageId?: string;
   userMessageId?: string;

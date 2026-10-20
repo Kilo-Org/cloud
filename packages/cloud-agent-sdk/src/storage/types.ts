@@ -12,7 +12,7 @@ type SessionStorage = {
   getMessageInfo(messageId: string): MessageInfo | undefined;
 
   // Parts (sorted by ID within their message)
-  upsertPart(messageId: string, part: Part, eventTime?: number): void;
+  upsertPart(messageId: string, part: Part, eventTime?: number, authoritative?: boolean): void;
   applyPartDelta(messageId: string, partId: string, field: string, delta: string): void;
   deletePart(messageId: string, partId: string): void;
   getParts(messageId: string): readonly Part[];

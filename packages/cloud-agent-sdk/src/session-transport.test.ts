@@ -4,7 +4,16 @@ import { createSessionManager } from './session-manager';
 import { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED } from './session';
 import type { CloudAgentSession } from './session';
 import type { CloudAgentApi } from './transport';
-import type { KiloSessionId, SessionSnapshotPage, SessionSnapshotPageOutcome } from './types';
+import type {
+  CloudAgentSessionId,
+  CloudSessionMetadata,
+  CloudSessionSnapshotPage,
+  KiloSessionId,
+  ResolvedSession,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
+  ToolPart,
+} from './types';
 import type { UserWebSystemEvent } from './user-web-connection';
 import { kiloId, cloudAgentId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 
@@ -1076,4 +1085,685 @@ describe('disconnect during resolution', () => {
     expect(jest.mocked(global.WebSocket).mock.calls.length).toBe(0);
     session.destroy();
   });
+});
+
+describe('workspace DO-only session transport', () => {
+  const routeId = kiloId('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa');
+  const nativeId = 'ses_12345678901234567890123456';
+  const workspaceId = cloudAgentId('workspace_12345678-1234-4234-9234-123456789abc');
+
+  function workspaceTool(state: ToolPart['state']): ToolPart {
+    return {
+      id: 'prt_tool',
+      sessionID: nativeId,
+      messageID: 'msg_002',
+      type: 'tool',
+      tool: 'shell',
+      callID: 'call_tool',
+      state,
+    };
+  }
+
+  function page(overrides: Partial<CloudSessionSnapshotPage> = {}): CloudSessionSnapshotPage {
+    return {
+      kind: 'success',
+      info: { id: nativeId, title: 'DO transcript' },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg_002', sessionID: nativeId }),
+          parts: [workspaceTool({ status: 'running', input: {}, time: { start: 1 } })],
+        },
+      ],
+      nextCursor: 'older-page',
+      omittedItemCount: 0,
+      updateCursor: 12,
+      ...overrides,
+    };
+  }
+
+  function workspaceManager() {
+    const store = createStore();
+    const fetchSession = jest.fn(async () => {
+      throw new Error('ingest metadata called');
+    });
+    const fetchSnapshot = jest.fn(async () => {
+      throw new Error('ingest snapshot called');
+    });
+    const fetchSnapshotPage = jest.fn(async () => {
+      throw new Error('ingest page called');
+    });
+    const readCachedSnapshotPage = jest.fn(async () => null);
+    const fetchCloudSession = jest.fn(
+      async (): Promise<CloudSessionMetadata> => ({
+        sessionId: workspaceId,
+        kiloSessionId: routeId,
+        preparedAt: 1,
+        initiatedAt: 1,
+        githubRepo: 'Kilo-Org/cloud',
+      })
+    );
+    const fetchCloudSnapshotPage = jest.fn(
+      async (
+        _id: CloudAgentSessionId,
+        _options: { cursor?: string; limit?: number; kiloSessionId?: string }
+      ): Promise<CloudSessionSnapshotPage | null> => page()
+    );
+    const resolveSession = jest.fn(
+      async (id: KiloSessionId): Promise<ResolvedSession> => ({
+        type: 'cloud-agent',
+        kiloSessionId: id,
+        cloudAgentSessionId: workspaceId,
+      })
+    );
+    const manager = createSessionManager({
+      store,
+      api: createMockApi(),
+      fetchSession,
+      fetchSnapshot,
+      fetchSnapshotPage,
+      fetchCloudSession,
+      fetchCloudSnapshotPage,
+      resolveSession,
+      readCachedSnapshotPage,
+      userWebConnection: createUserWebConnection(),
+      getTicket: async () => 'do-ticket',
+      prepare: async () => ({ cloudAgentSessionId: workspaceId, kiloSessionId: routeId }),
+      initiate: jest.fn(),
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+    return {
+      manager,
+      store,
+      fetchSession,
+      fetchSnapshot,
+      fetchSnapshotPage,
+      fetchCloudSession,
+      fetchCloudSnapshotPage,
+      readCachedSnapshotPage,
+      resolveSession,
+    };
+  }
+
+  function deliver(
+    eventId: number,
+    cursor: number,
+    type: string,
+    properties: Record<string, unknown>
+  ) {
+    mockWs.onmessage?.({
+      data: JSON.stringify({
+        eventId,
+        cursor,
+        sessionId: workspaceId,
+        streamEventType: 'kilocode',
+        timestamp: new Date().toISOString(),
+        data: { type, properties },
+      }),
+    } as MessageEvent);
+  }
+
+  function sync(cursor: number, streamEventType = 'connected', bootstrapPending = false) {
+    mockWs.onmessage?.({
+      data: JSON.stringify({
+        eventId: 0,
+        cursor,
+        sessionId: workspaceId,
+        streamEventType,
+        timestamp: new Date().toISOString(),
+        data: { bootstrapPending },
+      }),
+    } as MessageEvent);
+  }
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('loads initial metadata and older pages only from the DO without an upfront ingest read', async () => {
+    const fixture = workspaceManager();
+    const { manager, store, fetchCloudSnapshotPage } = fixture;
+    fetchCloudSnapshotPage.mockResolvedValueOnce(page()).mockResolvedValueOnce(
+      page({
+        messages: [
+          {
+            info: stubUserMessage({ id: 'msg_001', sessionID: nativeId }),
+            parts: [],
+          },
+        ],
+        nextCursor: null,
+        updateCursor: 15,
+      })
+    );
+    try {
+      await manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.resolveSession).toHaveBeenCalledTimes(1);
+      expect(fixture.fetchCloudSession).toHaveBeenCalledWith(workspaceId);
+      expect(fetchCloudSnapshotPage).toHaveBeenNthCalledWith(1, workspaceId, {});
+      expect(store.get(manager.atoms.messagesList).map(message => message.info.id)).toEqual([
+        'msg_002',
+      ]);
+      expect(store.get(manager.atoms.fetchedSessionData)).toMatchObject({
+        title: 'DO transcript',
+        repository: 'Kilo-Org/cloud',
+      });
+
+      await manager.loadOlderMessages();
+      expect(fetchCloudSnapshotPage).toHaveBeenNthCalledWith(2, workspaceId, {
+        cursor: 'older-page',
+      });
+      expect(store.get(manager.atoms.messagesList).map(message => message.info.id)).toEqual([
+        'msg_001',
+        'msg_002',
+      ]);
+      expect(store.get(manager.atoms.hasOlderMessages)).toBe(false);
+      expect(fixture.fetchSession).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+      expect(fixture.readCachedSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      manager.destroy();
+    }
+  });
+
+  it('keeps delayed tool updates over older snapshots and reconnects from sync cursors, not event ids', async () => {
+    const fixture = workspaceManager();
+    const { manager, store, fetchCloudSnapshotPage } = fixture;
+    let resolveOlder!: (value: CloudSessionSnapshotPage) => void;
+    const olderPage = new Promise<CloudSessionSnapshotPage>(resolve => {
+      resolveOlder = resolve;
+    });
+    fetchCloudSnapshotPage.mockResolvedValueOnce(page()).mockImplementationOnce(() => olderPage);
+    try {
+      await manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      const initialUrl = new URL(String(jest.mocked(global.WebSocket).mock.calls[0]?.[0]));
+      expect(initialUrl.searchParams.get('afterCursor')).toBe('12');
+      expect(initialUrl.searchParams.has('fromId')).toBe(false);
+      mockWs.onopen?.(new Event('open'));
+      sync(12);
+
+      const loadingOlder = manager.loadOlderMessages();
+      const completed = workspaceTool({
+        status: 'completed',
+        input: { command: 'new' },
+        output: 'live result',
+        title: 'shell',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      });
+      deliver(2, 20, 'message.part.updated', { part: completed });
+      resolveOlder(page({ updateCursor: 15, nextCursor: null }));
+      await loadingOlder;
+      expect(store.get(manager.atoms.messagesList)[0]?.parts[0]).toEqual(completed);
+
+      sync(100);
+      mockWs.onclose?.({ code: 1006, reason: 'test reconnect', wasClean: false } as CloseEvent);
+      await jest.advanceTimersByTimeAsync(2500);
+      const reconnectUrl = new URL(String(jest.mocked(global.WebSocket).mock.calls.at(-1)?.[0]));
+      expect(reconnectUrl.searchParams.get('afterCursor')).toBe('100');
+      expect(reconnectUrl.searchParams.has('fromId')).toBe(false);
+      mockWs.onopen?.(new Event('open'));
+
+      const delayed = {
+        ...completed,
+        state: { ...completed.state, input: { command: 'filled later' } },
+      };
+      deliver(2, 32, 'message.part.updated', { part: delayed });
+      deliver(2, 31, 'message.part.updated', { part: completed });
+      expect(store.get(manager.atoms.messagesList)[0]?.parts[0]).toEqual(delayed);
+      expect(fetchCloudSnapshotPage).toHaveBeenCalledTimes(2);
+      expect(fixture.fetchSession).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      manager.destroy();
+    }
+  });
+
+  it('bounds recent wire versions across a long stream and resumes safely after eviction', async () => {
+    const fixture = workspaceManager();
+    let eventMap: Map<number, number> | undefined;
+    const part = {
+      id: 'prt_text',
+      messageID: 'msg_002',
+      sessionID: nativeId,
+      type: 'text' as const,
+      text: 'initial',
+    };
+    fixture.fetchCloudSnapshotPage.mockResolvedValue(
+      page({
+        messages: [
+          { info: stubUserMessage({ id: part.messageID, sessionID: nativeId }), parts: [part] },
+        ],
+      })
+    );
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      mockWs.onopen?.(new Event('open'));
+      sync(12);
+      const mapSet = jest.spyOn(Map.prototype, 'set');
+      try {
+        for (let i = 0; i < 4096; i++) {
+          deliver(1000 + i, 13 + i, 'unrecognized.event', {});
+        }
+        const eventMapIndex = mapSet.mock.calls.findIndex(([key]) => key === 1000);
+        eventMap = mapSet.mock.contexts[eventMapIndex];
+        expect(eventMap).toBeInstanceOf(Map);
+        expect(eventMap?.size).toBe(2048);
+        expect(eventMap?.has(1000)).toBe(false);
+      } finally {
+        mapSet.mockRestore();
+      }
+      deliver(1, 4109, 'message.part.updated', { part: { ...part, text: 'latest' } });
+      for (let i = 0; i < 2048; i++) {
+        deliver(10000 + i, 4110 + i, 'unrecognized.event', {});
+      }
+      mockWs.onclose?.({ code: 1006, reason: 'reconnect', wasClean: false } as CloseEvent);
+      await jest.advanceTimersByTimeAsync(2500);
+      const url = new URL(String(jest.mocked(global.WebSocket).mock.calls.at(-1)?.[0]));
+      expect(url.searchParams.get('afterCursor')).toBe('6157');
+      mockWs.onopen?.(new Event('open'));
+      sync(6157);
+      deliver(1, 4108, 'message.part.updated', { part });
+      const delta = {
+        sessionID: nativeId,
+        messageID: part.messageID,
+        partID: part.id,
+        field: 'text',
+        delta: ' once',
+      };
+      deliver(2, 6158, 'message.part.delta', delta);
+      deliver(2, 6158, 'message.part.delta', delta);
+      expect(fixture.store.get(fixture.manager.atoms.messagesList)[0]?.parts).toEqual([
+        { ...part, text: 'latest once' },
+      ]);
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+    } finally {
+      fixture.manager.destroy();
+    }
+    expect(eventMap?.size).toBe(0);
+  });
+
+  it('preserves DO metadata PR, spend, origin and profile without catalog runtime hydration', async () => {
+    const fixture = workspaceManager();
+    const associatedPr = {
+      url: 'https://github.com/Kilo-Org/cloud/pull/42',
+      number: 42,
+      state: 'open',
+      title: 'Preserve metadata',
+      headSha: 'a'.repeat(40),
+      lastSyncedAt: '2026-10-19T21:00:00.000Z',
+      platform: 'github',
+      reviewDecision: 'approved' as const,
+      reviewDecisionPending: false,
+    };
+    fixture.fetchCloudSession.mockResolvedValue({
+      sessionId: workspaceId,
+      preparedAt: 1,
+      initiatedAt: 1,
+      associatedPr,
+      totalCostMicrodollars: 350_000,
+      createdOnPlatform: 'extension',
+      profileId: 'profile-1',
+    });
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)).toMatchObject({
+        associatedPr,
+        totalCostMicrodollars: 350_000,
+        createdOnPlatform: 'extension',
+        profileId: 'profile-1',
+      });
+      expect(fixture.fetchSession).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('keeps all-root spend from native pages without substituting a child total or a page sum', async () => {
+    const fixture = workspaceManager();
+    const childId = kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb');
+    fixture.fetchCloudSnapshotPage.mockImplementation(async (_id, options) =>
+      options.kiloSessionId
+        ? page({
+            info: { id: childId, parentID: nativeId },
+            messages: [],
+            totalCostMicrodollars: 999_000_000,
+            nextCursor: null,
+          })
+        : page({
+            messages: [],
+            totalCostMicrodollars: options.cursor ? 275_000 : 125_000,
+            nextCursor: options.cursor ? null : 'root-older',
+          })
+    );
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(
+        fixture.store.get(fixture.manager.atoms.fetchedSessionData)?.totalCostMicrodollars
+      ).toBe(125_000);
+      await fixture.manager.hydrateChildSession(childId);
+      expect(
+        fixture.store.get(fixture.manager.atoms.fetchedSessionData)?.totalCostMicrodollars
+      ).toBe(125_000);
+      await fixture.manager.loadOlderMessages();
+      expect(
+        fixture.store.get(fixture.manager.atoms.fetchedSessionData)?.totalCostMicrodollars
+      ).toBe(275_000);
+      expect(fixture.store.get(fixture.manager.atoms.messagesList)).toEqual([]);
+      expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('hydrates and pages native children through the active root DO without child catalog resolution', async () => {
+    const fixture = workspaceManager();
+    const childId = kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb');
+    fixture.fetchCloudSnapshotPage.mockImplementation(async (_id, options) =>
+      options.kiloSessionId === childId
+        ? page({
+            info: { id: childId, parentID: nativeId, title: 'Child title' },
+            messages: [
+              {
+                info: stubUserMessage({
+                  id: options.cursor ? 'msg_child_001' : 'msg_child_002',
+                  sessionID: childId,
+                }),
+                parts: [],
+              },
+            ],
+            nextCursor: options.cursor ? null : 'child-older',
+          })
+        : page()
+    );
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      await fixture.manager.hydrateChildSession(childId);
+      await fixture.manager.loadOlderChildMessages(childId);
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenNthCalledWith(1, workspaceId, {});
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenNthCalledWith(2, workspaceId, {
+        kiloSessionId: childId,
+      });
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenNthCalledWith(3, workspaceId, {
+        kiloSessionId: childId,
+        cursor: 'child-older',
+      });
+      expect(
+        fixture.store
+          .get(fixture.manager.atoms.childMessages)(childId)
+          .map(message => message.info.id)
+      ).toEqual(['msg_child_001', 'msg_child_002']);
+      expect(fixture.store.get(fixture.manager.atoms.hasOlderMessages)).toBe(true);
+      expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)?.title).toBe(
+        'DO transcript'
+      );
+      expect(fixture.resolveSession).toHaveBeenCalledTimes(1);
+      expect(fixture.fetchSession).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('rejects a mismatched native child page instead of resolving another DO or falling back to ingest', async () => {
+    const fixture = workspaceManager();
+    const childId = kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb');
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      await fixture.manager.hydrateChildSession(childId);
+      expect(fixture.store.get(fixture.manager.atoms.childSessionHydrationState)(childId)).toEqual({
+        status: 'error',
+        message: 'Connection failed. Please retry in a moment.',
+      });
+      expect(fixture.store.get(fixture.manager.atoms.childMessages)(childId)).toEqual([]);
+      expect(fixture.resolveSession).toHaveBeenCalledTimes(1);
+      expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it.each(['text', 'reasoning'] as const)(
+    'preserves versioned textless %s wire updates but accepts an explicit empty string',
+    async type => {
+      const fixture = workspaceManager();
+      const part = {
+        id: 'prt_text',
+        messageID: 'msg_002',
+        sessionID: nativeId,
+        type,
+        text: 'streamed',
+        time: { start: 1, end: 2 },
+      };
+      fixture.fetchCloudSnapshotPage.mockResolvedValue(
+        page({
+          messages: [
+            { info: stubUserMessage({ id: 'msg_002', sessionID: nativeId }), parts: [part] },
+          ],
+        })
+      );
+      try {
+        await fixture.manager.switchSession(routeId);
+        await jest.advanceTimersByTimeAsync(0);
+        mockWs.onopen?.(new Event('open'));
+        sync(12);
+        deliver(1, 13, 'message.part.delta', {
+          sessionID: nativeId,
+          messageID: part.messageID,
+          partID: part.id,
+          field: 'text',
+          delta: ' delta',
+        });
+        const textless = {
+          id: part.id,
+          messageID: part.messageID,
+          sessionID: nativeId,
+          type,
+          time: { start: 1, end: 4 },
+        };
+        deliver(2, 14, 'message.part.updated', { part: textless });
+        expect(fixture.store.get(fixture.manager.atoms.messagesList)[0]?.parts).toEqual([
+          { ...textless, text: 'streamed delta' },
+        ]);
+        deliver(2, 15, 'message.part.updated', { part: { ...textless, text: '' } });
+        expect(fixture.store.get(fixture.manager.atoms.messagesList)[0]?.parts).toEqual([
+          { ...textless, text: '' },
+        ]);
+      } finally {
+        fixture.manager.destroy();
+      }
+    }
+  );
+
+  it.each(['kilocode', 'autocommit_completed'])(
+    'normalizes %s ancillary commits and connected root status at or before the page watermark',
+    async streamEventType => {
+      const fixture = workspaceManager();
+      const commitHash = 'a'.repeat(40);
+      const committedAt = '2026-10-19T21:00:00.000Z';
+      const commit = {
+        messageId: 'msg_assistant',
+        userMessageId: 'msg_user',
+        success: true,
+        commitHash,
+        commitMessage: 'Persisted commit',
+        committedAt,
+        pushStatus: 'pushed',
+      };
+      try {
+        await fixture.manager.switchSession(routeId);
+        await jest.advanceTimersByTimeAsync(0);
+        mockWs.onopen?.(new Event('open'));
+        deliver(100, 20, 'unrecognized.event', {});
+        mockWs.onmessage?.({
+          data: JSON.stringify({
+            eventId: 3,
+            cursor: 4,
+            sessionId: workspaceId,
+            streamEventType,
+            timestamp: committedAt,
+            data:
+              streamEventType === 'kilocode'
+                ? {
+                    type: 'autocommit_completed',
+                    event: 'autocommit_completed',
+                    properties: commit,
+                  }
+                : commit,
+          }),
+        } as MessageEvent);
+        mockWs.onmessage?.({
+          data: JSON.stringify({
+            eventId: 0,
+            cursor: 12,
+            sessionId: workspaceId,
+            streamEventType: 'connected',
+            timestamp: committedAt,
+            data: {
+              bootstrapPending: true,
+              sessionStatus: { type: 'retry', attempt: 2, message: 'Restored retry', next: 42 },
+            },
+          }),
+        } as MessageEvent);
+        sync(12, 'bootstrap.complete');
+        expect(fixture.store.get(fixture.manager.atoms.commits)).toMatchObject([
+          { commitHash, commitMessage: 'Persisted commit', committedAt, timestamp: committedAt },
+        ]);
+        expect(fixture.store.get(fixture.manager.atoms.activity)).toMatchObject({
+          type: 'retrying',
+          attempt: 2,
+          message: 'Restored retry',
+        });
+        expect(fixture.store.get(fixture.manager.atoms.messagesList)).toHaveLength(1);
+        expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+        expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+        expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+      } finally {
+        fixture.manager.destroy();
+      }
+    }
+  );
+
+  it('uses bootstrap cursors for empty snapshots and never falls back to ingest on reconnect', async () => {
+    const fixture = workspaceManager();
+    fixture.fetchCloudSnapshotPage.mockResolvedValue(
+      page({ messages: [], nextCursor: null, updateCursor: 0 })
+    );
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      mockWs.onopen?.(new Event('open'));
+      sync(41);
+      sync(47, 'bootstrap.complete');
+      mockWs.onclose?.({ code: 1006, reason: 'empty reconnect', wasClean: false } as CloseEvent);
+      await jest.advanceTimersByTimeAsync(2500);
+      mockWs.onopen?.(new Event('open'));
+      const url = new URL(String(jest.mocked(global.WebSocket).mock.calls.at(-1)?.[0]));
+      expect(url.searchParams.get('afterCursor')).toBe('47');
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('does not overwrite snapshot session info with an older replayed metadata row', async () => {
+    const fixture = workspaceManager();
+    const model = { id: 'snapshot-model', providerID: 'provider' };
+    fixture.fetchCloudSnapshotPage.mockResolvedValue(
+      page({ info: { id: nativeId, model, title: 'Snapshot title' } })
+    );
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      mockWs.onopen?.(new Event('open'));
+      sync(12);
+      deliver(4, 8, 'session.updated', {
+        info: { id: nativeId, model: { id: 'old', providerID: 'provider' }, title: 'Old title' },
+      });
+      expect(fixture.store.get(fixture.manager.atoms.sessionInfo)?.model).toEqual(model);
+      expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)?.title).toBe(
+        'Snapshot title'
+      );
+      deliver(4, 20, 'session.updated', {
+        info: { id: nativeId, model: { id: 'live', providerID: 'provider' }, title: 'Live title' },
+      });
+      expect(fixture.store.get(fixture.manager.atoms.sessionInfo)?.model?.id).toBe('live');
+      deliver(5, 21, 'session.created', {
+        info: { id: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb', parentID: nativeId, title: 'Child title' },
+      });
+      expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)?.title).toBe('Live title');
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('fails closed when a workspace has no DO page callback instead of using the generic ingest callback', async () => {
+    const fetchSnapshot = jest.fn(async () => makeSnapshot({ id: nativeId }));
+    const fetchSnapshotPage = jest.fn(async () => page());
+    const onError = jest.fn();
+    const session = createCloudAgentSession({
+      kiloSessionId: routeId,
+      resolveSession: async () => ({
+        type: 'cloud-agent',
+        kiloSessionId: routeId,
+        cloudAgentSessionId: workspaceId,
+      }),
+      websocketBaseUrl: 'ws://localhost:9999',
+      onError,
+      transport: {
+        api: createMockApi(),
+        getTicket: async () => 'ticket',
+        fetchSnapshot,
+        fetchSnapshotPage,
+      },
+    });
+    try {
+      session.connect();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining('fetchCloudSnapshotPage'));
+      expect(fetchSnapshot).not.toHaveBeenCalled();
+      expect(fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      session.destroy();
+    }
+  });
+
+  it.each(['remote', 'read-only'] as const)(
+    'keeps %s sessions on their existing snapshot fetch path',
+    async type => {
+      const fetchSnapshotPage = jest.fn(async () => page({ info: { id: routeId }, messages: [] }));
+      const fetchCloudSnapshotPage = jest.fn(async () => page());
+      const session = createCloudAgentSession({
+        kiloSessionId: routeId,
+        resolveSession: async () => ({ type, kiloSessionId: routeId }),
+        transport: {
+          fetchSnapshot: async () => makeSnapshot({ id: routeId }),
+          fetchSnapshotPage,
+          fetchCloudSnapshotPage,
+          userWebConnection: createUserWebConnection(),
+        },
+      });
+      try {
+        session.connect();
+        await jest.advanceTimersByTimeAsync(0);
+        expect(fetchSnapshotPage).toHaveBeenCalledWith(routeId, {});
+        expect(fetchCloudSnapshotPage).not.toHaveBeenCalled();
+      } finally {
+        session.destroy();
+      }
+    }
+  );
 });

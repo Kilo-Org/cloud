@@ -2,7 +2,7 @@
  * Cloud Agent transport — wraps createConnection to normalize raw wire events
  * and route them to separate chat/service sinks via the Transport interface.
  *
- * REST messages seed the transcript; WebSocket replay closes ingest lag while
+ * Snapshots seed the transcript; WebSocket replay closes the snapshot gap while
  * service-state notifications are batched until bootstrap completes.
  */
 import { createConnection, type Connection } from './cloud-agent-connection';
@@ -10,8 +10,14 @@ import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connecti
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
 import { partSettledAt } from './part-utils';
+import {
+  cloudMessageInfoSchema,
+  cloudMessagePartSchema,
+  cloudSessionMessagesPageSchema,
+} from './schemas';
 import type {
   CloudAgentSessionId,
+  CloudSessionSnapshotPage,
   KiloSessionId,
   SessionSnapshot,
   SessionSnapshotPage,
@@ -50,7 +56,13 @@ type CloudAgentTransportConfig = {
   getTicket: (
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
-  fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
+  fetchCloudSnapshotPage?:
+    | ((
+        sessionId: CloudAgentSessionId,
+        options: { cursor?: string; limit?: number; kiloSessionId?: string }
+      ) => Promise<CloudSessionSnapshotPage | null>)
+    | undefined;
   /**
    * Page-aware root snapshot fetch. When provided, the transport uses it for
    * its initial bounded read (newest 50) instead of `fetchSnapshot`, and for
@@ -69,8 +81,14 @@ type CloudAgentTransportConfig = {
   websocketHeaders?: WebSocketHeaders | undefined;
 };
 
+const MAX_EVENT_VERSIONS = 2048;
+
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
   const websocketBaseUrl = config.websocketBaseUrl;
+  const workspaceSession = config.sessionId.startsWith('workspace_');
+  if (workspaceSession && !config.fetchCloudSnapshotPage) {
+    throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+  }
 
   return (sink: TransportSink) => {
     let connection: Connection | null = null;
@@ -83,6 +101,9 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     // stored event after it, so content produced while the socket was dead is
     // re-delivered in order instead of being left to snapshot freshness.
     let lastEventId: number | null = null;
+    let lastUpdateCursor = 0;
+    const eventVersions = new Map<number, number>();
+    const sessionInfoVersions = new Map<string, number>();
 
     function startReplay(): void {
       replaying = true;
@@ -108,7 +129,9 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       const url = new URL('/stream', websocketBaseUrl);
       url.searchParams.set('cloudAgentSessionId', config.sessionId);
       url.searchParams.set('bootstrap', 'true');
-      if (lastEventId !== null) {
+      if (workspaceSession) {
+        url.searchParams.set('afterCursor', String(lastUpdateCursor));
+      } else if (lastEventId !== null) {
         // Reconnect cursor or initial watermark: the DO replays everything
         // after this id — either a live cursor from the wire, or the
         // event-log watermark from the initial bounded page.
@@ -134,16 +157,32 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     }
 
     function replayPage(page: SessionSnapshotPage): void {
-      sink.onServiceEvent({ type: 'session.created', info: page.info });
+      const version =
+        !workspaceSession || page.updateCursor === undefined
+          ? undefined
+          : {
+              sourceId: config.sessionId,
+              cursor: page.updateCursor,
+            };
+      const infoCursor = sessionInfoVersions.get(page.info.id);
+      if (!version || infoCursor === undefined || version.cursor >= infoCursor) {
+        if (version) sessionInfoVersions.set(page.info.id, version.cursor);
+        sink.onServiceEvent({ type: 'session.created', info: page.info });
+      }
 
       for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
+        sink.onChatEvent({
+          type: 'message.updated',
+          info: msg.info,
+          ...(version ? { version } : {}),
+        });
 
         for (const part of msg.parts) {
           const settledAt = partSettledAt(part);
           sink.onChatEvent({
             type: 'message.part.updated',
             part,
+            ...(version ? { version } : {}),
             ...(settledAt === undefined ? {} : { time: settledAt }),
           });
         }
@@ -165,6 +204,22 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     async function fetchAndReplayInitial(
       expectedGeneration: number
     ): Promise<{ ticket: CloudAgentStreamTicketResult } | null> {
+      if (workspaceSession) {
+        const fetchPage = config.fetchCloudSnapshotPage;
+        if (!fetchPage)
+          throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+        const [ticket, result] = await Promise.all([
+          Promise.resolve(config.getTicket(config.sessionId)),
+          fetchPage(config.sessionId, {}),
+        ]);
+        if (expectedGeneration !== lifecycleGeneration) return null;
+        const page = cloudSessionMessagesPageSchema.parse(result);
+        if (page === null) throw new Error('Session not found');
+        lastUpdateCursor = Math.max(lastUpdateCursor, page.updateCursor);
+        config.onInitialPageLoaded?.(page);
+        replayPage(page);
+        return { ticket };
+      }
       const fetchPage = config.fetchSnapshotPage;
       if (fetchPage) {
         const [ticket, page] = await Promise.all([
@@ -206,6 +261,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         // without a snapshot replay. The manager will surface the error.
         return { ticket };
       }
+      if (!config.fetchSnapshot)
+        throw new Error('Cloud Agent legacy sessions require fetchSnapshot');
       const [ticket, snapshot] = await Promise.all([
         Promise.resolve(config.getTicket(config.sessionId)),
         config.fetchSnapshot(config.kiloSessionId),
@@ -232,12 +289,31 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           if (expectedGeneration !== lifecycleGeneration || raw.sessionId !== config.sessionId) {
             return;
           }
+          if (workspaceSession && raw.cursor !== undefined) {
+            lastUpdateCursor = Math.max(lastUpdateCursor, raw.cursor);
+            if (raw.eventId > 0) {
+              const previous = eventVersions.get(raw.eventId);
+              if (previous !== undefined && raw.cursor <= previous) return;
+              eventVersions.delete(raw.eventId);
+              eventVersions.set(raw.eventId, raw.cursor);
+              // Bootstrap ancillary rows need not be cursor-ordered; transcript row guards
+              // reject stale payloads even after this recent-event cache evicts them.
+              if (eventVersions.size > MAX_EVENT_VERSIONS) {
+                const oldest = eventVersions.keys().next().value;
+                if (oldest !== undefined) eventVersions.delete(oldest);
+              }
+            }
+          }
           // Track high-water mark for reconnect fromId only. Do not filter
           // by eventId: the DO entity-upserts tool/message parts under a
           // stable row id and rebroadcasts that same (or older) id with a
           // newer payload. Dropping those left live tools stuck on empty input.
           // eventId 0 is a synthetic sentinel and never advances the cursor.
-          if (raw.eventId > 0 && (lastEventId === null || raw.eventId > lastEventId)) {
+          if (
+            !workspaceSession &&
+            raw.eventId > 0 &&
+            (lastEventId === null || raw.eventId > lastEventId)
+          ) {
             lastEventId = raw.eventId;
           }
 
@@ -277,8 +353,45 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           }
 
           if (isChatEvent(event)) {
-            sink.onChatEvent(event);
+            if (!workspaceSession) {
+              sink.onChatEvent(event);
+              return;
+            }
+            if (raw.cursor === undefined) return;
+            const version = {
+              sourceId: config.sessionId,
+              eventId: raw.eventId,
+              cursor: raw.cursor,
+            };
+            if (event.type === 'message.updated') {
+              const info = cloudMessageInfoSchema.safeParse(event.info);
+              if (info.success) sink.onChatEvent({ ...event, info: info.data, version });
+            } else if (event.type === 'message.part.updated') {
+              const part = cloudMessagePartSchema.safeParse(event.part);
+              if (part.success) {
+                const textOmitted =
+                  (event.part.type === 'text' || event.part.type === 'reasoning') &&
+                  !('text' in event.part);
+                sink.onChatEvent({
+                  ...event,
+                  part: part.data,
+                  version,
+                  ...(textOmitted ? { textOmitted: true } : {}),
+                });
+              }
+            } else {
+              sink.onChatEvent({ ...event, version });
+            }
           } else {
+            if (
+              workspaceSession &&
+              (event.type === 'session.created' || event.type === 'session.updated')
+            ) {
+              if (raw.cursor === undefined) return;
+              const previous = sessionInfoVersions.get(event.info.id);
+              if (previous !== undefined && raw.cursor <= previous) return;
+              sessionInfoVersions.set(event.info.id, raw.cursor);
+            }
             sink.onServiceEvent(event);
           }
 
@@ -293,6 +406,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
           startReplay();
+          if (workspaceSession) return;
           // With a replay cursor the socket itself re-delivers everything
           // missed while dead — replaying a (possibly stale) snapshot on top
           // would overwrite newer parts. Only fall back to the snapshot when
@@ -314,7 +428,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
                 },
                 () => undefined
               )
-            : config.fetchSnapshot(config.kiloSessionId).then(
+            : config.fetchSnapshot?.(config.kiloSessionId).then(
                 snapshot => {
                   if (expectedGeneration !== lifecycleGeneration) return;
                   replaySnapshot(snapshot);
@@ -397,6 +511,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         cancelReplay();
         lifecycleGeneration += 1;
         closeConnection('destroy');
+        eventVersions.clear();
+        sessionInfoVersions.clear();
       },
 
       send: input =>

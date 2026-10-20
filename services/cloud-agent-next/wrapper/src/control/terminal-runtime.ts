@@ -14,9 +14,15 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../../src/shared/runtime-environment.js';
 import { isKiloServerUnreachableError } from '../kilo-api.js';
-import { kiloServerHeaders } from '../kilo-server-auth.js';
 import { directoryForSession, forgetAttachedRoot, rootForSession } from './session-directories.js';
-import type { WorktreeKiloRuntime } from './worktree-runtime.js';
+import type { HarnessTerminals } from '../control-plane/harness.js';
+
+export type TerminalRuntimePort = {
+  identity?: SessionRequestIdentity;
+  isolation?: 'per-session' | 'directory-shared';
+  env: Record<string, string>;
+  kiloClient: Pick<HarnessTerminals, 'createPty' | 'resizePty' | 'deletePty' | 'connectPty'>;
+};
 
 type AttachedTerminalSession = SessionRequestIdentity & {
   wrapperInstanceId: string;
@@ -153,8 +159,8 @@ function waitForSocketOpen(socket: WebSocket): Promise<void> {
 export function createControlTerminalRuntime(options: {
   controlUrl: string;
   wrapperInstanceId: string;
-  getKiloRuntime: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
-  getRetainedKiloRuntime?: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
+  getKiloRuntime: (identity: SessionRequestIdentity) => TerminalRuntimePort | undefined;
+  getRetainedKiloRuntime?: (identity: SessionRequestIdentity) => TerminalRuntimePort | undefined;
   onInput?: (identity: SessionRequestIdentity) => void;
 }): ControlTerminalRuntime {
   const { wrapperInstanceId } = options;
@@ -166,7 +172,7 @@ export function createControlTerminalRuntime(options: {
   const recoveringSessions = new Set<string>();
   let shutDown = false;
 
-  function currentKiloRuntime(identity: SessionRequestIdentity): WorktreeKiloRuntime {
+  function currentKiloRuntime(identity: SessionRequestIdentity): TerminalRuntimePort {
     const kiloRuntime = options.getKiloRuntime(identity);
     if (!kiloRuntime) {
       throw new ControlTerminalRuntimeError('not_ready', 'Kilo worktree is not available', true);
@@ -348,20 +354,10 @@ export function createControlTerminalRuntime(options: {
         );
       }
 
-      const kiloServer = currentKiloRuntime(bridge.terminal).kiloClient.server;
-      const localUrl = new URL(
-        `/pty/${encodeURIComponent(bridge.terminal.ptyId)}/connect`,
-        kiloServer.url
+      const local = currentKiloRuntime(bridge.terminal).kiloClient.connectPty(
+        bridge.terminal.ptyId,
+        bridge.terminal.directory
       );
-      localUrl.protocol = localUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-      localUrl.search = '';
-      localUrl.hash = '';
-      localUrl.searchParams.set('directory', bridge.terminal.directory);
-
-      const LocalWebSocket = WebSocket as AuthenticatedWebSocketConstructor;
-      const local = new LocalWebSocket(localUrl.toString(), {
-        headers: kiloServerHeaders(kiloServer),
-      });
       local.binaryType = 'arraybuffer';
       bridge.local = local;
       local.onmessage = event => forwardMessage(bridge, bridge.reverse, event.data);

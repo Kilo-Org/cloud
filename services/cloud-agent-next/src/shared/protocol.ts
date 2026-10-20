@@ -250,6 +250,7 @@ export type SessionStatus =
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
   bootstrapPending?: boolean;
+  ancillaryOmittedItemCount?: number;
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
   activeMessageId?: string | null;

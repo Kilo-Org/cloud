@@ -7,6 +7,7 @@ import { RequestDeadlineError } from '@kilocode/event-service';
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import {
+  type CloudAgentSessionId,
   type KiloSessionId,
   type SessionManager,
   type SessionManagerConfig,
@@ -80,6 +81,10 @@ const cancelQueuedMessageMutate = vi.fn();
 const getSessionQuery = vi.fn();
 const getWithRuntimeStateQuery = vi.fn();
 const getSessionMessagesPageQuery = vi.fn();
+const getCloudSessionQuery = vi.fn();
+const getCloudSessionMessagesPageQuery = vi.fn();
+const getOrganizationCloudSessionQuery = vi.fn();
+const getOrganizationCloudSessionMessagesPageQuery = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cliSessionsV2: {
@@ -88,6 +93,8 @@ vi.mock('@/lib/trpc', () => ({
       getSessionMessagesPage: { query: getSessionMessagesPageQuery },
     },
     cloudAgentNext: {
+      getSession: { query: getCloudSessionQuery },
+      getSessionMessagesPage: { query: getCloudSessionMessagesPageQuery },
       getAttachmentDownloadUrl: { mutate },
       prepareSession: { mutate: prepareSessionMutate },
       sendMessage: { mutate: sendMessageMutate },
@@ -95,6 +102,8 @@ vi.mock('@/lib/trpc', () => ({
     },
     organizations: {
       cloudAgentNext: {
+        getSession: { query: getOrganizationCloudSessionQuery },
+        getSessionMessagesPage: { query: getOrganizationCloudSessionMessagesPageQuery },
         prepareSession: { mutate: prepareSessionMutate },
         sendMessage: { mutate: sendMessageMutate },
         cancelQueuedMessage: { mutate: cancelQueuedMessageMutate },
@@ -466,6 +475,101 @@ describe('StreamTicketResponseSchema', () => {
       ticket: 'ticket-123',
       expiresAt: 1,
     });
+  });
+});
+
+describe('mobile workspace DO callbacks', () => {
+  const sessionId = 'workspace_12345678-1234-4234-9234-123456789abc' as CloudAgentSessionId;
+
+  beforeEach(() => {
+    configHolder.current = null;
+    vi.clearAllMocks();
+  });
+
+  function setup(organizationId?: string): SessionManagerConfig {
+    const options = { store: {}, userWebConnection: {}, organizationId };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (!config) {
+      throw new Error('Missing session manager config');
+    }
+    return config;
+  }
+
+  it.each([undefined, 'org-1'])(
+    'routes metadata and initial/older pages through DO APIs for scope %s',
+    async organizationId => {
+      const config = setup(organizationId);
+      await config.fetchCloudSession?.(sessionId);
+      await config.fetchCloudSnapshotPage?.(sessionId, {});
+      await config.fetchCloudSnapshotPage?.(sessionId, { cursor: 'older', limit: 20 });
+      const childPageOptions = {
+        kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+        cursor: 'child-older',
+        limit: 10,
+      };
+      await config.fetchCloudSnapshotPage?.(sessionId, childPageOptions);
+
+      if (organizationId) {
+        expect(getOrganizationCloudSessionQuery).toHaveBeenCalledWith({
+          cloudAgentSessionId: sessionId,
+          organizationId,
+        });
+        expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(1, {
+          sessionId,
+          organizationId,
+        });
+        expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(2, {
+          sessionId,
+          organizationId,
+          cursor: 'older',
+          limit: 20,
+        });
+        expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(3, {
+          sessionId,
+          organizationId,
+          ...childPageOptions,
+        });
+        expect(getCloudSessionMessagesPageQuery).not.toHaveBeenCalled();
+      } else {
+        expect(getCloudSessionQuery).toHaveBeenCalledWith({ cloudAgentSessionId: sessionId });
+        expect(getCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(1, { sessionId });
+        expect(getCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(2, {
+          sessionId,
+          cursor: 'older',
+          limit: 20,
+        });
+        expect(getCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(3, {
+          sessionId,
+          ...childPageOptions,
+        });
+        expect(getOrganizationCloudSessionMessagesPageQuery).not.toHaveBeenCalled();
+      }
+      expect(getWithRuntimeStateQuery).not.toHaveBeenCalled();
+      expect(getSessionMessagesPageQuery).not.toHaveBeenCalled();
+    }
+  );
+
+  it('adopts organization scope from catalog discovery before requesting DO metadata', async () => {
+    getSessionQuery.mockResolvedValueOnce({
+      session_id: SESSION_ID,
+      cloud_agent_session_id: sessionId,
+      organization_id: 'discovered-org',
+    });
+    const config = setup();
+    await config.resolveSession(SESSION_ID);
+    await config.fetchCloudSession?.(sessionId);
+    await config.fetchCloudSnapshotPage?.(sessionId, {});
+    expect(getOrganizationCloudSessionQuery).toHaveBeenCalledWith({
+      cloudAgentSessionId: sessionId,
+      organizationId: 'discovered-org',
+    });
+    expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenCalledWith({
+      sessionId,
+      organizationId: 'discovered-org',
+    });
+    expect(getWithRuntimeStateQuery).not.toHaveBeenCalled();
+    expect(getSessionMessagesPageQuery).not.toHaveBeenCalled();
   });
 });
 

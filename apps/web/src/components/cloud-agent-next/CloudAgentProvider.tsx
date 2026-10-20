@@ -21,8 +21,12 @@ import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-clie
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { toFetchedSessionData } from './fetched-session-data';
 import { usePostHog } from 'posthog-js/react';
-import { fetchWebSessionSnapshotPage } from './session-page-adapter';
+import {
+  fetchWebCloudSessionSnapshotPage,
+  fetchWebSessionSnapshotPage,
+} from './session-page-adapter';
 import type { CloudAgentApi } from '@kilocode/cloud-agent-sdk/transport';
+import { cloudAgentSessionIdSchema, kiloSessionIdSchema } from '@kilocode/cloud-agent-sdk/schemas';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { createWorktreeReviewSend, type WorktreeReviewSendApi } from './worktree-review-send';
 import { MarkdownParseCacheProvider } from './markdown-parse-cache';
@@ -155,7 +159,9 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           return {
             type: 'cloud-agent',
             kiloSessionId,
-            cloudAgentSessionId: fetchedSession.cloud_agent_session_id as CloudAgentSessionId,
+            cloudAgentSessionId: cloudAgentSessionIdSchema.parse(
+              fetchedSession.cloud_agent_session_id
+            ),
           };
         }
         try {
@@ -173,7 +179,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
             return {
               type: 'cloud-agent',
               kiloSessionId,
-              cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
+              cloudAgentSessionId: cloudAgentSessionIdSchema.parse(session.cloud_agent_session_id),
             };
           }
         } catch {
@@ -217,6 +223,15 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       },
 
       fetchSnapshotPage: (id, options) => fetchWebSessionSnapshotPage(trpcClient, id, options),
+      fetchCloudSnapshotPage: (id, options) =>
+        fetchWebCloudSessionSnapshotPage(trpcClient, id, { ...options, organizationId }),
+      fetchCloudSession: sessionId =>
+        organizationId
+          ? trpcClient.organizations.cloudAgentNext.getSession.query({
+              cloudAgentSessionId: sessionId,
+              organizationId,
+            })
+          : trpcClient.cloudAgentNext.getSession.query({ cloudAgentSessionId: sessionId }),
       readCachedSnapshotPage: transcriptCache.read,
       writeCachedSnapshotPage: transcriptCache.write,
 
@@ -323,8 +338,8 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
             })
           : await trpcClient.cloudAgentNext.prepareSession.mutate(castInput);
         return {
-          cloudAgentSessionId: result.cloudAgentSessionId as CloudAgentSessionId,
-          kiloSessionId: result.kiloSessionId as KiloSessionId,
+          cloudAgentSessionId: cloudAgentSessionIdSchema.parse(result.cloudAgentSessionId),
+          kiloSessionId: kiloSessionIdSchema.parse(result.kiloSessionId),
         };
       },
 

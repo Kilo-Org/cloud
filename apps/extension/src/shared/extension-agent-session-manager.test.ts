@@ -1,6 +1,7 @@
 /* eslint-disable require-await, @typescript-eslint/require-await, typescript-eslint/no-unsafe-type-assertion, max-lines, jest/no-hooks, jest/max-expects, vitest/prefer-called-once -- injectable fakes settle without await; mock objects use `as never` for tRPC types; tests exceed line limit to keep related assertions together; beforeEach is standard test setup; max-expects flagged on tests that verify full mock call shape; prefer-called-once conflicts with prefer-called-times */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
+  CloudAgentSessionId,
   KiloSessionId,
   SessionManager,
   SessionManagerConfig,
@@ -81,6 +82,10 @@ function makeTrpcMock() {
     kiloSessionId: SESSION_ID,
   });
   const orgInitiateFromPreparedSession = mockMutate();
+  const getCloudSession = mockQuery(null);
+  const getCloudSessionMessagesPage = mockQuery(null);
+  const getOrganizationCloudSession = mockQuery(null);
+  const getOrganizationCloudSessionMessagesPage = mockQuery(null);
 
   return {
     activeSessions: { list: { query: list } },
@@ -93,6 +98,8 @@ function makeTrpcMock() {
     cloudAgentNext: {
       answerPermission: { mutate: answerPermission },
       answerQuestion: { mutate: answerQuestion },
+      getSession: { query: getCloudSession },
+      getSessionMessagesPage: { query: getCloudSessionMessagesPage },
       initiateFromPreparedSession: { mutate: initiateFromPreparedSession },
       interruptSession: { mutate: interruptSession },
       prepareSession: { mutate: prepareSession },
@@ -103,6 +110,8 @@ function makeTrpcMock() {
       cloudAgentNext: {
         answerPermission: { mutate: orgAnswerPermission },
         answerQuestion: { mutate: orgAnswerQuestion },
+        getSession: { query: getOrganizationCloudSession },
+        getSessionMessagesPage: { query: getOrganizationCloudSessionMessagesPage },
         initiateFromPreparedSession: { mutate: orgInitiateFromPreparedSession },
         interruptSession: { mutate: orgInterruptSession },
         prepareSession: { mutate: orgPrepareSession },
@@ -141,6 +150,79 @@ function withFakeFetch(response: Response) {
     },
   };
 }
+
+describe('extension workspace DO callbacks', () => {
+  const sessionId = 'workspace_12345678-1234-4234-9234-123456789abc' as CloudAgentSessionId;
+
+  beforeEach(() => {
+    capturedConfig = null;
+    mockCreateSessionManager.mockClear();
+  });
+
+  it.each([
+    {
+      organizationId: null,
+      requestScope: {},
+      selectRoutes: (trpc: ReturnType<typeof makeTrpcMock>) => ({
+        active: trpc.cloudAgentNext,
+        inactive: trpc.organizations.cloudAgentNext,
+      }),
+    },
+    {
+      organizationId: 'org-1',
+      requestScope: { organizationId: 'org-1' },
+      selectRoutes: (trpc: ReturnType<typeof makeTrpcMock>) => ({
+        active: trpc.organizations.cloudAgentNext,
+        inactive: trpc.cloudAgentNext,
+      }),
+    },
+  ])(
+    'uses only DO metadata and initial/older page APIs for scope $organizationId',
+    async ({ organizationId, requestScope, selectRoutes }) => {
+      const trpc = makeTrpcMock();
+      createExtensionAgentSessionManager({
+        ...makeDefaultOptions(),
+        organizationId,
+        trpcClient: trpc as never,
+      });
+      const config = mockCreateSessionManager.mock.calls.at(-1)?.[0];
+      expect(config).toBeDefined();
+      await config?.fetchCloudSession?.(sessionId);
+      await config?.fetchCloudSnapshotPage?.(sessionId, {});
+      await config?.fetchCloudSnapshotPage?.(sessionId, { cursor: 'older', limit: 20 });
+      const childPageOptions = {
+        cursor: 'child-older',
+        kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+        limit: 10,
+      };
+      await config?.fetchCloudSnapshotPage?.(sessionId, childPageOptions);
+      const { active, inactive } = selectRoutes(trpc);
+      expect(active.getSession.query).toHaveBeenCalledWith({
+        ...requestScope,
+        cloudAgentSessionId: sessionId,
+      });
+      expect(active.getSessionMessagesPage.query).toHaveBeenNthCalledWith(1, {
+        ...requestScope,
+        sessionId,
+      });
+      expect(active.getSessionMessagesPage.query).toHaveBeenNthCalledWith(2, {
+        ...requestScope,
+        cursor: 'older',
+        limit: 20,
+        sessionId,
+      });
+      expect(active.getSessionMessagesPage.query).toHaveBeenNthCalledWith(3, {
+        ...requestScope,
+        ...childPageOptions,
+        sessionId,
+      });
+      expect(inactive.getSessionMessagesPage.query).not.toHaveBeenCalled();
+      expect(trpc.cliSessionsV2.getWithRuntimeState.query).not.toHaveBeenCalled();
+      expect(trpc.cliSessionsV2.getSessionMessages.query).not.toHaveBeenCalled();
+      expect(trpc.cliSessionsV2.getSessionMessagesPage.query).not.toHaveBeenCalled();
+    }
+  );
+});
 
 describe('readFetchSessionErrorCode', () => {
   it('reads data.code', () => {

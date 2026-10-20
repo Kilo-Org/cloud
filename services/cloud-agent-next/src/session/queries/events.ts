@@ -98,6 +98,8 @@ export type EventQueryFilters = {
   /** Exclusive: id > fromId */
   fromId?: EventId;
   toId?: EventId;
+  afterCursor?: number;
+  throughCursor?: number;
   /** Only return events for these execution IDs */
   executionIds?: string[];
   /** Only return events of these types */

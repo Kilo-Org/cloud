@@ -12,6 +12,7 @@ import {
   type ControlPlaneKiloRequestsDeps,
 } from './kilo-requests.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import { createKiloHarness } from './kilo-harness.js';
 import type { WorktreeSnapshotCapture } from '../../../src/shared/worktree-changes-wire.js';
 import {
   fenceDirectoryOperations,
@@ -54,7 +55,14 @@ function harness(
   const handler = createControlPlaneKiloRequests({
     emit: emittedFrame => emitted.push(emittedFrame),
     preparedRoute: () => (route ? { runtimeKey: 'runtime_1', directory } : null),
-    clientFor: () => nativeClient,
+    clientFor: () =>
+      nativeClient === null
+        ? null
+        : createKiloHarness({
+            client: nativeClient,
+            server: { url: 'http://127.0.0.1:1' },
+            directory,
+          }).reads,
     ...overrides,
   });
   return { emitted, handler };
@@ -162,6 +170,40 @@ describe('control-plane native reads', () => {
         requestId: 'req_1',
         ok: true,
         result: [{ id: 'q1', sessionID: KILO_SESSION_ID }],
+      },
+    ]);
+  });
+
+  it('reads session details through the harness read capability', async () => {
+    const nativeClient = client();
+    const { emitted, handler } = harness(nativeClient);
+    await handler.handle(frame({ name: 'session.get' }));
+    expect(nativeClient.getSessionDetails).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      DIRECTORY,
+      expect.any(AbortSignal)
+    );
+    expect(emitted).toEqual([
+      { type: 'kilo.result', requestId: 'req_1', ok: true, result: { id: KILO_SESSION_ID } },
+    ]);
+  });
+
+  it('scopes pending permissions to the requested session through the harness', async () => {
+    const nativeClient = client({
+      getPermissions: mock(async () => [
+        { id: 'p1', sessionID: KILO_SESSION_ID },
+        { id: 'p2', sessionID: 'ses_sibling_session_identifier_0' },
+      ]) as never,
+    });
+    const { emitted, handler } = harness(nativeClient);
+    await handler.handle(frame({ name: 'permission.list' }));
+    expect(nativeClient.getPermissions).toHaveBeenCalledWith(DIRECTORY, expect.any(AbortSignal));
+    expect(emitted).toEqual([
+      {
+        type: 'kilo.result',
+        requestId: 'req_1',
+        ok: true,
+        result: [{ id: 'p1', sessionID: KILO_SESSION_ID }],
       },
     ]);
   });

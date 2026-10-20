@@ -6,6 +6,8 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import type { Harness } from './harness.js';
+import { createKiloHarness } from './kilo-harness.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { runtimeKey } from './prepare.js';
@@ -141,7 +143,11 @@ function createFakeClient(onDispatch: (id: string) => void = () => undefined) {
       probeImpl?.(...args) ?? Promise.resolve(null),
   } as unknown as WrapperKiloClient;
   return {
-    client,
+    client: createKiloHarness({
+      client,
+      server: { url: 'http://127.0.0.1:1' },
+      directory: DIRECTORY,
+    }),
     prompts,
     summaries,
     commands,
@@ -249,7 +255,7 @@ function createHarness(
   const flags = new Map<string, Flags>();
   const runtimes = new Map<string, TurnKiloRuntime>();
   const envs = new Map<string, Record<string, string>>();
-  const retiredClients = new WeakSet<WrapperKiloClient>();
+  const retiredClients = new WeakSet<Harness>();
   const timeouts: Array<{ handler: () => void; ms: number; cancelled: boolean }> = [];
   const states = new Map<string, ReturnType<TurnKiloRuntime['sessionState']>>();
   let clock = 0;

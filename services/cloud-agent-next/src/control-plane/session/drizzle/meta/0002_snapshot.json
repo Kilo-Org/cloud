@@ -1,0 +1,54 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "188db3a0-bf6a-4bad-b3b9-cef30cd26348",
+  "prevId": "d3281fe0-02e7-435a-99c2-c238813500b9",
+  "tables": {
+    "events": {
+      "name": "events",
+      "columns": {
+        "id": { "name": "id", "type": "integer", "primaryKey": true, "notNull": true, "autoincrement": true },
+        "execution_id": { "name": "execution_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "session_id": { "name": "session_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "stream_event_type": { "name": "stream_event_type", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "payload": { "name": "payload", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "timestamp": { "name": "timestamp", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "entity_id": { "name": "entity_id", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "mutation_cursor": { "name": "mutation_cursor", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false, "default": 0 }
+      },
+      "indexes": {
+        "idx_events_timestamp": { "name": "idx_events_timestamp", "columns": ["timestamp"], "isUnique": false },
+        "idx_events_execution": { "name": "idx_events_execution", "columns": ["execution_id"], "isUnique": false },
+        "idx_events_type": { "name": "idx_events_type", "columns": ["stream_event_type"], "isUnique": false },
+        "events_entity_id_unique": { "name": "events_entity_id_unique", "columns": ["entity_id"], "isUnique": true },
+        "idx_events_id_execution": { "name": "idx_events_id_execution", "columns": ["id", "execution_id"], "isUnique": false },
+        "idx_events_mutation_cursor": { "name": "idx_events_mutation_cursor", "columns": ["mutation_cursor"], "isUnique": false }
+      },
+      "foreignKeys": {}, "compositePrimaryKeys": {}, "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "event_mutation_cursor": {
+      "name": "event_mutation_cursor",
+      "columns": {
+        "id": { "name": "id", "type": "integer", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "cursor": { "name": "cursor", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false, "default": 0 }
+      },
+      "indexes": {}, "foreignKeys": {}, "compositePrimaryKeys": {}, "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "control_plane_messages": {
+      "name": "control_plane_messages",
+      "columns": {
+        "message_id": { "name": "message_id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "intent": { "name": "intent", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "state": { "name": "state", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "created_at": { "name": "created_at", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "accepted_at": { "name": "accepted_at", "type": "integer", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "settled_at": { "name": "settled_at", "type": "integer", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "reason": { "name": "reason", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "container": { "name": "container", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {}, "compositePrimaryKeys": {}, "uniqueConstraints": {}, "checkConstraints": {}
+    }
+  },
+  "views": {}, "enums": {}, "_meta": { "schemas": {}, "tables": {}, "columns": {} }, "internal": { "indexes": {} }
+}

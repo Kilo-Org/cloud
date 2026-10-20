@@ -4038,6 +4038,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (ownerId === null) throw new Error('Notification owner unavailable');
     const peer = this.sessionPeerFor(ownerId, sessionId);
     if (peer === null) throw new Error('Notification peer unavailable');
+    if (notification.kind === 'events') {
+      notification = {
+        ...notification,
+        payload: {
+          ...notification.payload,
+          delivery: { id: crypto.randomUUID(), expiresAt: deadlineAt },
+        },
+      };
+    }
     await withDORetry(
       () => this.sessionPeerFor(ownerId, sessionId) ?? peer,
       target => {

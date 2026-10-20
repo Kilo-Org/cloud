@@ -1,6 +1,8 @@
 import {
   activeSessionSchema,
   cloudAgentEventSchema,
+  cloudSessionMessagesPageSchema,
+  cloudSessionMetadataSchema,
   cloudWorktreeChangesReadyDataSchema,
   parseCustomerBillingFailure,
   remoteCommandCatalogV1Schema,
@@ -9,6 +11,245 @@ import {
   sessionStatusDataSchema,
   sessionStatusUpdatedPayloadSchema,
 } from './schemas';
+import { stubUserMessage } from './test-helpers';
+import type { AssociatedPrData, FetchedSessionData } from './session-manager';
+import type { CloudSessionSnapshotPage } from './types';
+
+describe('cloudSessionMetadataSchema', () => {
+  it('preserves safe PR, spend, and origin metadata without exposing unprojected fields', () => {
+    const associatedPr = {
+      url: 'https://github.com/Kilo-Org/cloud/pull/42',
+      number: 42,
+      state: 'open',
+      title: 'Preserve metadata',
+      headSha: 'a'.repeat(40),
+      lastSyncedAt: '2026-10-19T21:00:00.000Z',
+      platform: 'github',
+      reviewDecision: 'approved',
+      reviewDecisionPending: false,
+    };
+    const metadata = {
+      sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+      associatedPr,
+      totalCostMicrodollars: 350_000,
+      createdOnPlatform: 'extension',
+      profileId: 'profile-1',
+    };
+    expect(cloudSessionMetadataSchema.parse({ ...metadata, unprojected: 'discarded' })).toEqual(
+      metadata
+    );
+  });
+
+  it.each([-1, Infinity, NaN, '42'])('rejects invalid total spend %p', totalCostMicrodollars => {
+    expect(
+      cloudSessionMetadataSchema.safeParse({ sessionId: 'workspace_root', totalCostMicrodollars })
+        .success
+    ).toBe(false);
+  });
+
+  it.each([{}, { platform: undefined }, { platform: 'github' }])(
+    'accepts optional PR platform %p',
+    platform => {
+      const associatedPr = {
+        url: 'https://github.com/Kilo-Org/cloud/pull/42',
+        number: 42,
+        state: 'open',
+        title: null,
+        headSha: null,
+        lastSyncedAt: '2026-10-19T21:00:00.000Z',
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        ...platform,
+      };
+      const metadata = cloudSessionMetadataSchema.parse({
+        sessionId: 'workspace_root',
+        associatedPr,
+      });
+      const parsedPr: AssociatedPrData | null | undefined = metadata.associatedPr;
+      expect(parsedPr).toEqual(associatedPr);
+    }
+  );
+
+  it.each([{}, { model: undefined, variant: undefined }, { model: 'kilo/auto', variant: 'high' }])(
+    'accepts optional runtime agent overrides %p',
+    overrides => {
+      const runtimeAgents = [{ slug: 'custom', name: 'Custom', ...overrides }];
+      const metadata = cloudSessionMetadataSchema.parse({
+        sessionId: 'workspace_root',
+        runtimeAgents,
+      });
+      const parsedAgents: FetchedSessionData['runtimeAgents'] = metadata.runtimeAgents;
+      expect(parsedAgents).toEqual(runtimeAgents);
+    }
+  );
+});
+
+describe('cloudSessionMessagesPageSchema', () => {
+  const sessionId = 'ses_12345678901234567890123456';
+  const page = {
+    kind: 'success',
+    info: {
+      id: sessionId,
+      title: 'DO session',
+      metadata: { 'kilo.goal': { text: 'Ship', status: 'active' } },
+    },
+    messages: [],
+    nextCursor: null,
+    omittedItemCount: 0,
+    updateCursor: 9,
+  };
+
+  it('preserves the mutation cursor and projects native session metadata', () => {
+    expect(cloudSessionMessagesPageSchema.parse(page)).toMatchObject({
+      info: { id: sessionId, title: 'DO session', goal: { text: 'Ship', status: 'active' } },
+      updateCursor: 9,
+    });
+    expect(cloudSessionMessagesPageSchema.parse(null)).toBeNull();
+  });
+
+  it('preserves the all-messages native cost independently of the bounded page', () => {
+    const parsed = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      messages: [],
+      nextCursor: 'older',
+      totalCostMicrodollars: 350_000,
+    });
+    expect(parsed?.messages).toEqual([]);
+    expect(parsed?.totalCostMicrodollars).toBe(350_000);
+  });
+
+  it.each([{}, { totalCostMicrodollars: undefined }, { totalCostMicrodollars: null }])(
+    'accepts an unavailable native cost %p',
+    cost => {
+      const parsed: CloudSessionSnapshotPage | null = cloudSessionMessagesPageSchema.parse({
+        ...page,
+        ...cost,
+      });
+      expect(parsed?.totalCostMicrodollars).toBe(cost.totalCostMicrodollars);
+    }
+  );
+
+  it.each([
+    [
+      'The message was interrupted',
+      { name: 'UnknownError', data: { message: 'The message was interrupted' } },
+    ],
+    [
+      JSON.stringify({ name: 'MessageAbortedError', data: { message: 'Interrupted' } }),
+      { name: 'MessageAbortedError', data: { message: 'Interrupted' } },
+    ],
+  ])('preserves string-encoded native assistant errors in DO snapshots', (error, expected) => {
+    const info = {
+      id: 'msg_001',
+      sessionID: sessionId,
+      role: 'assistant',
+      parentID: 'msg_user',
+      time: { created: 1, completed: 2 },
+      modelID: 'fake-deterministic',
+      providerID: 'kilo',
+      mode: 'code',
+      agent: 'code',
+      path: { cwd: '/workspace/app', root: '/workspace/app' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      error,
+    };
+    const parsed = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      messages: [{ info, parts: [] }],
+    });
+    expect(parsed?.omittedItemCount).toBe(0);
+    expect(parsed?.messages[0]?.info).toMatchObject({ error: expected });
+  });
+
+  it.each(['text', 'reasoning', 'patch'])(
+    'normalizes a known incomplete native %s part instead of omitting it',
+    type => {
+      const info = stubUserMessage({ id: 'msg_001', sessionID: sessionId });
+      const part = {
+        id: 'prt_001',
+        sessionID: sessionId,
+        messageID: info.id,
+        type,
+        ...(type === 'reasoning' ? { time: { start: 1 } } : {}),
+        ...(type === 'patch' ? { hash: 'patch-hash' } : {}),
+      };
+      const parsed = cloudSessionMessagesPageSchema.parse({
+        ...page,
+        messages: [{ info, parts: [part] }],
+      });
+      expect(parsed?.messages[0]?.parts).toEqual([
+        { ...part, ...(type === 'patch' ? { files: [] } : { text: '' }) },
+      ]);
+      expect(parsed?.omittedItemCount).toBe(0);
+    }
+  );
+
+  it.each([-1, 0.5, Number.MAX_SAFE_INTEGER + 1, '9', null, undefined])(
+    'rejects invalid snapshot mutation cursor %p',
+    updateCursor => {
+      expect(cloudSessionMessagesPageSchema.safeParse({ ...page, updateCursor }).success).toBe(
+        false
+      );
+    }
+  );
+
+  it('adapts known slim native fields and accounts for malformed or cross-session rows', () => {
+    const info = stubUserMessage({ id: 'msg_001', sessionID: sessionId });
+    const part = {
+      id: 'prt_001',
+      sessionID: sessionId,
+      messageID: info.id,
+      type: 'tool',
+      tool: 'shell',
+      callID: 'call_001',
+      state: {
+        status: 'completed',
+        input: {},
+        output: 'done',
+        title: 'shell',
+        time: { start: 1, end: 2 },
+      },
+    };
+    const parsed = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      omittedItemCount: 2,
+      messages: [
+        {
+          info: { ...info, summary: { title: 'Summary' } },
+          parts: [
+            part,
+            { ...part, id: 'prt_bad', messageID: 'wrong-message' },
+            { type: 'unknown' },
+          ],
+        },
+        { info: { ...info, sessionID: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' }, parts: [] },
+      ],
+    });
+    expect(parsed?.messages).toHaveLength(1);
+    expect(parsed?.messages[0]?.info).toMatchObject({ summary: { title: 'Summary', diffs: [] } });
+    expect(parsed?.messages[0]?.parts).toEqual([
+      { ...part, state: { ...part.state, metadata: {} } },
+    ]);
+    expect(parsed?.omittedItemCount).toBe(5);
+  });
+
+  it.each([-1, 0.5, Number.MAX_SAFE_INTEGER + 1, '1'])(
+    'rejects invalid event mutation cursor %p',
+    cursor => {
+      expect(
+        cloudAgentEventSchema.safeParse({
+          eventId: 1,
+          cursor,
+          sessionId: 'workspace_a',
+          streamEventType: 'connected',
+          timestamp: 'now',
+          data: {},
+        }).success
+      ).toBe(false);
+    }
+  );
+});
 
 describe('cloudWorktreeChangesReadyDataSchema', () => {
   it.each([1, 42, Number.MAX_SAFE_INTEGER])('accepts positive safe revision %p', revision => {

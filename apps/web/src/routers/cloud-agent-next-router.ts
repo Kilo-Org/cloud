@@ -38,6 +38,8 @@ import {
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
+  baseGetSessionMessagesPageNextSchema,
+  baseGetSessionMessagesPageNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
@@ -673,6 +675,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
+    }),
+
+  getSessionMessagesPage: baseProcedure
+    .input(baseGetSessionMessagesPageNextSchema)
+    .output(baseGetSessionMessagesPageNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return createCloudAgentNextClient(authToken).getSessionMessagesPage(input);
     }),
 
   getSandboxStatus: baseProcedure

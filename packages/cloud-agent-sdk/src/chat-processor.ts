@@ -5,10 +5,11 @@ import {
 } from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
+import { MAX_REMOVAL_VERSIONS, storageVersions } from './storage/versions';
 import type { UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
 
 type ChatProcessor = {
-  process(event: ChatEvent): void;
+  process(event: ChatEvent): boolean;
   /**
    * Materialize a synthetic user message from a `cloud.message.queued` server
    * event, unless an authoritative message with the same id already exists.
@@ -21,6 +22,107 @@ type ChatProcessor = {
     content: string | undefined;
   }): void;
 };
+
+function acceptVersion(sessionStorage: SessionStorage, event: ChatEvent): boolean {
+  const info = event.type === 'message.updated' ? event.info : undefined;
+  const part = event.type === 'message.part.updated' ? event.part : undefined;
+  const sessionId =
+    info?.sessionID ?? part?.sessionID ?? ('sessionId' in event ? event.sessionId : '');
+  const messageId = info?.id ?? part?.messageID ?? ('messageId' in event ? event.messageId : '');
+  const partId = part?.id ?? ('partId' in event ? event.partId : undefined);
+  const messageKey = `${sessionId}\u0000${messageId}`;
+  const key = partId === undefined ? messageKey : `${messageKey}\u0000${partId}`;
+  let versions = storageVersions.get(sessionStorage);
+  if (!versions && !event.version) return true;
+  if (!versions) {
+    versions = {
+      rows: new Map(),
+      messages: new Map(),
+      removals: new Map(),
+      removalFloors: new Map(),
+    };
+    storageVersions.set(sessionStorage, versions);
+  }
+  const previous = versions.rows.get(key);
+  const removedMessage = versions.rows.get(messageKey);
+  const version = event.version;
+  const floors = versions.removalFloors.get(sessionId);
+  if (!version) return previous === undefined && !removedMessage?.removed && !floors;
+  // Evicted tombstones conservatively fence older pages, not newer history reloads.
+  if (
+    !previous &&
+    floors &&
+    (version.cursor <= (floors.get(version.sourceId) ?? -1) ||
+      (version.eventId === undefined && !floors.has(version.sourceId)))
+  ) {
+    return false;
+  }
+
+  const current =
+    event.type === 'message.removed'
+      ? (versions.messages.get(messageKey) ?? previous?.version)
+      : previous?.version;
+  if (current) {
+    if (current.sourceId === version.sourceId) {
+      if (version.cursor < current.cursor) return false;
+      const rowPresent =
+        partId === undefined
+          ? sessionStorage.getMessageInfo(messageId) !== undefined
+          : sessionStorage.getParts(messageId).some(value => value.id === partId);
+      if (version.cursor === current.cursor && (previous?.removed || rowPresent)) return false;
+    } else if (current.eventId !== undefined && version.eventId === undefined) {
+      return false;
+    }
+  }
+  if (partId !== undefined && removedMessage?.removed) {
+    if (
+      removedMessage.version.sourceId !== version.sourceId ||
+      version.cursor <= removedMessage.version.cursor
+    )
+      return false;
+  }
+  const row = {
+    version,
+    removed: event.type === 'message.removed' || event.type === 'message.part.removed',
+    messageId,
+    sessionId,
+  };
+  versions.rows.set(key, row);
+  versions.removals.delete(key);
+  if (row.removed) {
+    versions.removals.set(key, row);
+    if (versions.removals.size > MAX_REMOVAL_VERSIONS) {
+      const oldest = versions.removals.entries().next().value;
+      if (oldest) {
+        const [oldKey, oldRow] = oldest;
+        versions.removals.delete(oldKey);
+        versions.rows.delete(oldKey);
+        const oldMessageKey = `${oldRow.sessionId}\u0000${oldRow.messageId}`;
+        if (
+          ![...versions.rows.keys()].some(
+            rowKey => rowKey === oldMessageKey || rowKey.startsWith(`${oldMessageKey}\u0000`)
+          )
+        ) {
+          versions.messages.delete(oldMessageKey);
+        }
+        let sourceFloors = versions.removalFloors.get(oldRow.sessionId);
+        if (!sourceFloors) {
+          sourceFloors = new Map();
+          versions.removalFloors.set(oldRow.sessionId, sourceFloors);
+        }
+        sourceFloors.set(
+          oldRow.version.sourceId,
+          Math.max(sourceFloors.get(oldRow.version.sourceId) ?? 0, oldRow.version.cursor)
+        );
+      }
+    }
+  }
+  const latest = versions.messages.get(messageKey);
+  if (!latest || latest.sourceId !== version.sourceId || latest.cursor < version.cursor) {
+    versions.messages.set(messageKey, version);
+  }
+  return true;
+}
 
 type ChatProcessorOptions = {
   /**
@@ -108,6 +210,7 @@ function createChatProcessor(
 ): ChatProcessor {
   return {
     process(event) {
+      if (!acceptVersion(sessionStorage, event)) return false;
       switch (event.type) {
         case 'message.updated':
           sessionStorage.upsertMessage(event.info);
@@ -119,21 +222,36 @@ function createChatProcessor(
           // textless updates so they cannot clobber already streamed text.
           // Identity-preserving for everything else.
           const normalized = normalizeMissingPatchFiles(normalizeMissingPartText(event.part));
+          const textOmitted =
+            event.textOmitted === true ||
+            ((event.part.type === 'text' || event.part.type === 'reasoning') &&
+              typeof event.part.text !== 'string');
           if (options?.onToolAttachment) {
             emitToolAttachmentsBeforeStrip(normalized, options.onToolAttachment);
           }
           if (options?.onFilePart) {
             emitFilePartBeforeStrip(normalized, options.onFilePart);
           }
-          const stripped = stripPartContentIfFile(normalized);
-          if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {
+          let stripped = stripPartContentIfFile(normalized);
+          if (
+            (!event.version || textOmitted) &&
+            hasTextField(stripped) &&
+            stripped.text === '' &&
+            !isSyntheticPart(stripped)
+          ) {
             const existingParts = sessionStorage.getParts(stripped.messageID);
             const existing = existingParts.find(p => p.id === stripped.id);
             if (existing && hasTextField(existing) && existing.text.length > 0) {
-              break;
+              if (!event.version) break;
+              stripped = { ...stripped, text: existing.text };
             }
           }
-          sessionStorage.upsertPart(stripped.messageID, stripped, event.time);
+          sessionStorage.upsertPart(
+            stripped.messageID,
+            stripped,
+            event.time,
+            event.version !== undefined
+          );
           break;
         }
         case 'message.part.delta':
@@ -150,6 +268,7 @@ function createChatProcessor(
           sessionStorage.deleteMessage(event.messageId);
           break;
       }
+      return true;
     },
 
     synthesizeQueuedUserMessage({ messageId, sessionId, content }) {

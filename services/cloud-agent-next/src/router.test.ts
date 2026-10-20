@@ -40,6 +40,10 @@ const { getPgDbMock } = vi.hoisted(() => ({ getPgDbMock: vi.fn() }));
 
 vi.mock('./db/pg.js', () => ({ getPgDb: getPgDbMock }));
 
+vi.mock('./session/session-auxiliary-metadata.js', () => ({
+  getSessionAuxiliaryMetadata: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('./session/model-preflight.js', () => ({
   preflightSessionRuntime: vi.fn().mockResolvedValue(undefined),
   preflightExistingPromptModel: preflightExistingPromptModelMock,

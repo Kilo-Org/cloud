@@ -42,6 +42,7 @@ import type {
   SessionSnapshot,
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
+  CloudSessionSnapshotPage,
 } from './types';
 
 const REMOTE_SESSION_CREATION_NOT_SUPPORTED =
@@ -183,6 +184,12 @@ type CloudAgentSessionTransport = {
         options: { cursor?: string }
       ) => Promise<SessionSnapshotPageOutcome | null>)
     | undefined;
+  fetchCloudSnapshotPage?:
+    | ((
+        sessionId: CloudAgentSessionId,
+        options: { cursor?: string; limit?: number; kiloSessionId?: string }
+      ) => Promise<CloudSessionSnapshotPage | null>)
+    | undefined;
   /** Called by the transport after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
@@ -300,8 +307,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   const sink: TransportSink = {
     onChatEvent(event) {
-      chatProcessor.process(event);
-      config.onEvent?.(event);
+      if (chatProcessor.process(event)) config.onEvent?.(event);
     },
     onServiceEvent(event) {
       serviceState.process(event);
@@ -386,7 +392,10 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             'CloudAgentSession transport.getTicket is required for Cloud Agent sessions'
           );
         }
-        if (!config.transport.fetchSnapshot) {
+        if (
+          !config.transport.fetchSnapshot &&
+          !resolved.cloudAgentSessionId.startsWith('workspace_')
+        ) {
           throw new Error(
             'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
           );
@@ -405,6 +414,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           api: config.transport.api,
           getTicket: config.transport.getTicket,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchCloudSnapshotPage: config.transport.fetchCloudSnapshotPage,
           ...(config.transport.fetchSnapshotPage
             ? { fetchSnapshotPage: config.transport.fetchSnapshotPage }
             : {}),

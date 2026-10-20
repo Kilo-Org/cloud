@@ -9,7 +9,7 @@ import type {
   ControlPlaneRouteSpec,
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import type { Harness } from './harness.js';
 import { createPreparationManager } from './prepare.js';
 import {
   readWorkspaceStamp,
@@ -116,7 +116,7 @@ function manager(allocationId: string, now = T0) {
     },
     emit: frame => frames.push(frame),
     runtimes: {
-      ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
+      ensure: async () => ({ open: async () => true }) as unknown as Harness,
       installCredentials: async () => undefined,
       isUnavailable: () => false,
       getLiveClient: () => undefined,
@@ -130,8 +130,6 @@ function manager(allocationId: string, now = T0) {
       const { git: run } = await import('../utils.js');
       return run(args, options);
     },
-    seedRegistration: async () => undefined,
-    sessionExists: async () => true,
     sleep: async () => undefined,
   });
   return { prepared, frames, gitCalls, captures };

@@ -111,6 +111,62 @@ const {
   readCloudAgentWidgetApprovalKey,
 } = realCloudAgentClientModule;
 
+describe('CloudAgentNextClient DO session history', () => {
+  const input = {
+    sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    cursor: 'opaque',
+    limit: 20,
+  };
+  const page = {
+    kind: 'success',
+    info: { id: 'ses_12345678901234567890123456' },
+    messages: [],
+    nextCursor: null,
+    omittedItemCount: 0,
+    updateCursor: 51,
+  };
+  const query =
+    jest.fn<(request: CloudAgentClientModule.GetSessionMessagesPageInput) => Promise<unknown>>();
+
+  beforeEach(() => {
+    query.mockReset().mockResolvedValue(page);
+    mockCreateTRPCClient.mockReturnValueOnce({ getSessionMessagesPage: { query } });
+  });
+
+  it('forwards the dedicated Worker query and preserves its mutation watermark', async () => {
+    await expect(
+      new CloudAgentNextClient('control-token').getSessionMessagesPage(input)
+    ).resolves.toEqual(page);
+    expect(query).toHaveBeenCalledWith(input);
+  });
+
+  it('keeps a native child selector on the root Worker page query', async () => {
+    const childInput = { ...input, kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb' };
+    await new CloudAgentNextClient('control-token').getSessionMessagesPage(childInput);
+    expect(query).toHaveBeenCalledWith(childInput);
+  });
+
+  it('validates Worker responses and returns not-found without another data source', async () => {
+    const client = new CloudAgentNextClient('control-token');
+    query.mockResolvedValueOnce({ ...page, updateCursor: -1 }).mockResolvedValueOnce(null);
+    await expect(client.getSessionMessagesPage(input)).rejects.toThrow();
+    await expect(client.getSessionMessagesPage(input)).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    { ...input, sessionId: 'agent_12345678-1234-4234-9234-123456789abc' },
+    { ...input, cursor: '' },
+    { ...input, limit: 101 },
+    { ...input, kiloSessionId: 'workspace_12345678-1234-4234-9234-123456789abc' },
+  ])('rejects invalid page inputs before querying the Worker', async invalid => {
+    await expect(
+      new CloudAgentNextClient('control-token').getSessionMessagesPage(invalid)
+    ).rejects.toThrow();
+    expect(query).not.toHaveBeenCalled();
+  });
+});
+
 describe('CloudAgentNextClient review message results', () => {
   const input = {
     cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',

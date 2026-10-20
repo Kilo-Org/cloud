@@ -15,6 +15,14 @@ type PreferenceRowProps = Readonly<{
   busy?: boolean;
   onValueChange: (next: boolean) => void;
   /**
+   * The value a press should flip. Defaults to the rendered `value`, which is
+   * the last render, so two presses inside one frame both flip the same state
+   * and the second one repeats the first. A store that lags its own writes
+   * passes its newest requested value here, and every press then flips the
+   * state the person last asked for.
+   */
+  resolveValue?: () => boolean;
+  /**
    * Accessibility label for the switch. Defaults to the row title; pass an
    * action label when the title names the setting and the action differs
    * (e.g. "Default profile" row whose switch says "Remove as default").
@@ -31,6 +39,7 @@ export function PreferenceRow({
   disabled,
   busy = false,
   onValueChange,
+  resolveValue,
   switchAccessibilityLabel,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
@@ -45,7 +54,7 @@ export function PreferenceRow({
         className="min-h-11 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
         disabled={disabled}
         onPress={() => {
-          onValueChange(!value);
+          onValueChange(!(resolveValue?.() ?? value));
         }}
         accessibilityRole="switch"
         accessibilityLabel={switchAccessibilityLabel ?? title}

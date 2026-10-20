@@ -78,7 +78,7 @@ export async function readRemoteMcpOAuth(
   url: string
 ): Promise<RemoteMcpOAuthState | undefined> {
   await store.whenLoaded();
-  const state = store.get()[id];
+  const state = store.getRequested()[id];
   return state?.url === url ? state : undefined;
 }
 
@@ -97,7 +97,7 @@ export async function writeRemoteMcpOAuth(
     return;
   }
   const { id, url } = owner;
-  const current = store.get();
+  const current = store.getRequested();
   const existing = current[id]?.url === url ? current[id] : undefined;
   store.set({ ...current, [id]: { ...existing, ...patch, url } });
 }
@@ -105,7 +105,7 @@ export async function writeRemoteMcpOAuth(
 /** Drops one server's state, which is what deleting the server or changing its URL does. */
 export async function forgetRemoteMcpOAuth(id: string): Promise<void> {
   await store.whenLoaded();
-  const { [id]: forgotten, ...rest } = store.get();
+  const { [id]: forgotten, ...rest } = store.getRequested();
   if (forgotten !== undefined) {
     store.set(rest);
   }

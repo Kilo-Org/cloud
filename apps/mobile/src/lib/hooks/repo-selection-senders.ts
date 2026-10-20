@@ -3,7 +3,7 @@ import { isSignOutActive } from '@/lib/auth/sign-out-state';
 
 export const REPO_SELECTION_DEBOUNCE_MS = 500;
 
-export type RepoSelectionDelta = {
+type RepoSelectionDelta = {
   add: (number | string)[];
   remove: (number | string)[];
 };

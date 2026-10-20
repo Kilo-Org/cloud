@@ -51,6 +51,8 @@
     "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
     "./r2-client": "./src/r2-client.ts",
     "./direct-byok-model": "./src/direct-byok-model.ts",
+    "./model-families": "./src/model-families.ts",
+    "./ai-sdk-provider": "./src/ai-sdk-provider.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
     "./github-authorization": "./src/github-authorization.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",

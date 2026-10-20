@@ -3,7 +3,7 @@ import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHa
 import type OpenAI from 'openai';
 import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
-import { getAiSdkProvider } from '../model-settings';
+import { getAiSdkProvider } from '@kilocode/worker-utils/ai-sdk-provider';
 import openCodeGo from './opencode-go';
 
 test('allows the Responses API for OpenCode Go', () => {

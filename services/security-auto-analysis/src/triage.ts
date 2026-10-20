@@ -2,7 +2,7 @@ import { APICallError, generateText, RetryError, tool } from 'ai';
 import { z } from 'zod';
 import { logger } from './logger.js';
 import type { SecurityFindingRecord } from './db/queries.js';
-import { createGatewayLanguageModel, resolveAiSdkProvider } from './gateway-model.js';
+import { createGatewayLanguageModel } from './gateway-model.js';
 import type { SecurityFindingTriage } from './types.js';
 
 const TRIAGE_SERVICE_VERSION = '5.1.0';
@@ -113,24 +113,20 @@ export async function triageSecurityFinding(params: {
   if (params.organizationId) {
     headers['X-KiloCode-OrganizationId'] = params.organizationId;
   }
-  const connection = {
-    backendBaseUrl: params.backendBaseUrl,
-    authToken: params.authToken,
-    headers,
-    abortSignal: AbortSignal.timeout(TRIAGE_TIMEOUT_MS),
-  };
-
   try {
-    const provider = await resolveAiSdkProvider(params.model, connection);
     const result = await generateText({
-      model: createGatewayLanguageModel(provider, params.model, connection),
+      model: createGatewayLanguageModel(params.model, {
+        backendBaseUrl: params.backendBaseUrl,
+        authToken: params.authToken,
+        headers,
+      }),
       system: TRIAGE_SYSTEM_PROMPT,
       prompt: buildTriagePrompt(params.finding),
       tools: { submit_triage_result: submitTriageResultTool },
       toolChoice: 'auto',
       // Call-level headers replace the provider's User-Agent, so the triage identity must be repeated here.
       headers,
-      abortSignal: connection.abortSignal,
+      abortSignal: AbortSignal.timeout(TRIAGE_TIMEOUT_MS),
     });
 
     const toolCall = result.toolCalls.find(

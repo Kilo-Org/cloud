@@ -1,4 +1,4 @@
-import { getAiSdkProvider } from '../model-settings';
+import { getAiSdkProvider } from '@kilocode/worker-utils/ai-sdk-provider';
 import type { GatewayRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import edenai from './edenai';

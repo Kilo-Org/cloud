@@ -3476,9 +3476,6 @@ importers:
       '@ai-sdk/openai':
         specifier: 4.0.15
         version: 4.0.15(zod@4.4.3)
-      '@ai-sdk/openai-compatible':
-        specifier: 3.0.11
-        version: 3.0.11(zod@4.4.3)
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db

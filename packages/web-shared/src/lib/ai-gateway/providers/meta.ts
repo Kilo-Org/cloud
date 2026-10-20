@@ -1,3 +1,1 @@
-export function isMuseModel(model: string) {
-  return model.includes('muse-');
-}
+export { isMuseModel } from '@kilocode/worker-utils/model-families';

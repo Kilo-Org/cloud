@@ -1,17 +1,6 @@
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
-import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
-import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
-import type {
-  CustomLlmProvider,
-  OpenCodePrompt,
-  OpenCodeSettings,
-  ReasoningOption,
-} from '@kilocode/db/schema-types';
+import { getAiSdkProvider } from '@kilocode/worker-utils/ai-sdk-provider';
+import type { OpenCodePrompt, OpenCodeSettings, ReasoningOption } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
-import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
-import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   effortOptions,
@@ -62,27 +51,6 @@ export async function getModelVariants(
     await getModelReasoningOptions(model, allowFallback),
     getAiSdkProvider(model, null)
   );
-}
-
-export function getAiSdkProvider(
-  model: string,
-  directProviderId: DirectUserByokInferenceProviderId | null
-): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
-  if (directProviderId === 'morph-byok') {
-    return undefined;
-  }
-  if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
-    return 'anthropic';
-  }
-  if (isClaudeModel(model)) {
-    return 'anthropic';
-  }
-  if (isOpenAiModel(model) || isGrokModel(model) || isMuseModel(model)) {
-    // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects."
-    // xAI: "The Responses API is the recommended way to interact with xAI models."
-    return 'openai';
-  }
-  return undefined;
 }
 
 function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {

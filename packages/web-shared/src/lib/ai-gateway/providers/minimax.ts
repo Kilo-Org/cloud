@@ -1,5 +1,3 @@
-export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m3';
+export { isMinimaxModel } from '@kilocode/worker-utils/model-families';
 
-export function isMinimaxModel(model: string) {
-  return model.includes('minimax');
-}
+export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m3';

@@ -3,7 +3,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type { AutoFreeModel } from '@kilocode/web-shared/lib/ai-gateway/models';
-import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { getAiSdkProvider } from '@kilocode/worker-utils/ai-sdk-provider';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';

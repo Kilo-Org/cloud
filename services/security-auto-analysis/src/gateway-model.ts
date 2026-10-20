@@ -1,86 +1,36 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { CustomLlmProviderSchema, type CustomLlmProvider } from '@kilocode/db/schema-types';
+import { getAiSdkProvider } from '@kilocode/worker-utils/ai-sdk-provider';
+import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import type { LanguageModel } from 'ai';
-import { z } from 'zod';
-import { logger } from './logger.js';
 
 export type GatewayConnection = {
   backendBaseUrl: string;
   authToken: string;
   headers: Record<string, string>;
-  abortSignal?: AbortSignal;
 };
 
-const ModelCatalogSchema = z.object({
-  data: z.array(
-    z.object({
-      id: z.string(),
-      opencode: z
-        .object({ ai_sdk_provider: CustomLlmProviderSchema.optional().catch(undefined) })
-        .nullish()
-        .catch(undefined),
-    })
-  ),
-});
-
-function gatewayBaseUrl(backendBaseUrl: string): string {
-  return `${backendBaseUrl.replace(/\/$/, '')}/api/openrouter`;
-}
-
 /**
- * Picks the AI SDK provider the Kilo CLI would use for this model: the
- * `opencode.ai_sdk_provider` advertised by the gateway model catalog for the
- * same user and organization, falling back to OpenRouter.
+ * Builds the model with the AI SDK provider Kilo clients use for this gateway
+ * model, so the request reaches the gateway API (Messages, Responses or Chat
+ * Completions) that the model's provider route supports.
  */
-export async function resolveAiSdkProvider(
-  model: string,
-  connection: GatewayConnection
-): Promise<CustomLlmProvider> {
-  try {
-    const response = await fetch(`${gatewayBaseUrl(connection.backendBaseUrl)}/models`, {
-      headers: { ...connection.headers, Authorization: `Bearer ${connection.authToken}` },
-      signal: connection.abortSignal,
-    });
-    if (!response.ok) {
-      throw new Error(`Model catalog request failed with status ${response.status}`);
-    }
-    const catalog = ModelCatalogSchema.parse(await response.json());
-    return (
-      catalog.data.find(entry => entry.id === model)?.opencode?.ai_sdk_provider ?? 'openrouter'
-    );
-  } catch (error) {
-    logger.warn('Falling back to the OpenRouter AI SDK provider', {
-      model,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return 'openrouter';
-  }
-}
-
 export function createGatewayLanguageModel(
-  provider: CustomLlmProvider,
   model: string,
   connection: GatewayConnection
 ): LanguageModel {
+  const directProviderId = isDirectByokModelId(model) ? (model.split('/')[0] ?? null) : null;
   const options = {
-    baseURL: gatewayBaseUrl(connection.backendBaseUrl),
+    baseURL: `${connection.backendBaseUrl.replace(/\/$/, '')}/api/openrouter`,
     headers: connection.headers,
   };
-  switch (provider) {
+  switch (getAiSdkProvider(model, directProviderId)) {
     case 'anthropic':
       return createAnthropic({ ...options, authToken: connection.authToken })(model);
     case 'openai':
       return createOpenAI({ ...options, apiKey: connection.authToken }).responses(model);
-    case 'openai-compatible':
-      return createOpenAICompatible({
-        ...options,
-        name: 'kilo-gateway',
-        apiKey: connection.authToken,
-      }).chatModel(model);
-    case 'openrouter':
+    case undefined:
       return createOpenRouter({ ...options, apiKey: connection.authToken }).chat(model);
   }
 }

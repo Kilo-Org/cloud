@@ -1,3 +1,1 @@
-export function isGrokModel(requestedModel: string) {
-  return requestedModel.includes('grok');
-}
+export { isGrokModel } from '@kilocode/worker-utils/model-families';

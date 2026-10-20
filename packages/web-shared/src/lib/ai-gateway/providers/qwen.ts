@@ -1,6 +1,4 @@
-export function isQwenModel(model: string) {
-  return model.includes('qwen');
-}
+export { isQwenModel } from '@kilocode/worker-utils/model-families';
 
 export function isQwenExplicitCacheModel(model: string) {
   return (

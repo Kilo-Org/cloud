@@ -17,7 +17,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
   getPreferredModels: jest.fn(async () => []),
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => ({
+jest.mock('@kilocode/worker-utils/ai-sdk-provider', () => ({
   getAiSdkProvider: jest.fn(),
 }));
 
@@ -202,8 +202,7 @@ describe('getDirectByokModel', () => {
   test('uses the default AI SDK provider unless a model-specific provider applies', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
     const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    const { getAiSdkProvider } =
-      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
+    const { getAiSdkProvider } = await import('@kilocode/worker-utils/ai-sdk-provider');
     jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
     jest.mocked(getAiSdkProvider).mockReturnValueOnce('anthropic').mockReturnValueOnce(undefined);
 

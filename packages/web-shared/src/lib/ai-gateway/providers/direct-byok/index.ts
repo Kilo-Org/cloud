@@ -15,7 +15,7 @@ import {
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { getAiSdkProvider } from '@kilocode/worker-utils/ai-sdk-provider';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 

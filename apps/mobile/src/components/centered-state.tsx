@@ -31,9 +31,11 @@ type CenteredStateProps = {
   /** Classes for the scroller itself: background, width. */
   className?: string;
   /**
-   * Classes for the scroll content container. A horizontal inset belongs here:
-   * the scroller's own padding does not narrow the scroll content, so an inset
-   * set through `className` leaves the end side flush in a right-to-left layout.
+   * Classes for the content box that holds the caller's children. A horizontal
+   * inset belongs here: the scroller's own padding does not narrow the scroll
+   * content, so an inset set through `className` leaves the end side flush in a
+   * right-to-left layout, and the scroller's content container style already
+   * carries the centering layout, so a class applied there is replaced by it.
    */
   contentContainerClassName?: string;
   testID?: string;
@@ -174,7 +176,6 @@ export function CenteredState({
       <ScrollView
         ref={capture}
         className={cn('flex-1', className)}
-        contentContainerClassName={contentContainerClassName}
         testID={testID}
         onLayout={measure}
         contentContainerStyle={contentStyle}
@@ -184,7 +185,7 @@ export function CenteredState({
         keyboardShouldPersistTaps="handled"
       >
         <View
-          className={cn('w-full', !visible && 'opacity-0')}
+          className={cn('w-full', contentContainerClassName, !visible && 'opacity-0')}
           testID={testID ? `${testID}-content` : undefined}
           onLayout={measureContent}
           accessibilityElementsHidden={!visible}

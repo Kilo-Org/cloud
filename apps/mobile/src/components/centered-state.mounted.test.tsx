@@ -225,15 +225,17 @@ describe('Shared state placement', () => {
 });
 
 describe('CenteredState measurements', () => {
-  it('keeps a horizontal inset on the content container, not the scroller', async () => {
+  it('keeps a horizontal inset on the content box, not the scroller', async () => {
     // The scroller's own padding does not narrow the scroll content, so an inset
     // set through `className` leaves the end side flush in a right-to-left layout.
     const mounted = await mount({
       className: 'bg-background',
       contentContainerClassName: 'px-6',
     });
+    mounted.settle();
     expect(mounted.scroll().className).toBe('flex-1 bg-background');
-    expect(mounted.scroll().contentContainerClassName).toBe('px-6');
+    expect(mounted.scroll().contentContainerClassName).toBeUndefined();
+    expect(mounted.content().className).toBe('w-full px-6');
     mounted.unmount();
   });
 

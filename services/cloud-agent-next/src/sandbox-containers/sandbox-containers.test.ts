@@ -352,6 +352,26 @@ describe('supplied startup command', () => {
     expect(readRecord().state).toBe('running');
   });
 
+  it('starts the code-review instance at the legacy code-review capacity', async () => {
+    const { instance, container } = setup();
+    container.cmdlineRaw = `${preinstalledStartup().argv.join('\0')}\0`;
+
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        command: preinstalledStartup(),
+        env: {},
+        instance: 'code-review',
+      })
+    ).resolves.toMatchObject({ started: true });
+
+    expect(container.startCalls[0]?.instance).toEqual({
+      vcpu: 1,
+      memoryMib: 4_096,
+      diskMb: 8_000,
+    });
+  });
+
   it('accepts the stable supervisor after the supplied command execs it', async () => {
     const { instance, container } = setup();
     container.cmdlineRaw = `/bin/sh\0${CONTROL_SUPERVISOR_PATH}\0`;

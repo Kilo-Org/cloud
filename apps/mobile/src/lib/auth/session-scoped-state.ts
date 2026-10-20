@@ -12,6 +12,7 @@ import { clearChatBackends } from '@/lib/chat/backend-store';
 import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
+import { clearRepoSelectionSenders } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
@@ -86,8 +87,9 @@ function clearRecentPrsBestEffort(): void {
  * boundary: trusted hosts, trusted image hosts, confirmed markdown images, media
  * caches, per-session auto-approve and goal-disclosure flags, the remote MCP
  * connection and the stored servers behind it, the app-settings-tools group
- * switch, the browsable artifact mirror, app-owned temp copies, the stored PR
- * recents, and the phone's own search index. Every member is best-effort; one
+ * switch, the debounced repository-selection send state, the browsable
+ * artifact mirror, app-owned temp copies, the stored PR recents, and the
+ * phone's own search index. Every member is best-effort; one
  * member's throw falls through to the members after it, and to the caller's own
  * sign-in/sign-out state reset. The recents delete and OS search clear are
  * fired without awaiting, so the function stays synchronous; a rejection is
@@ -113,6 +115,11 @@ export function clearSessionScopedState(): void {
   runClear(clearRemoteMcpServers);
   runClear(clearChatBackends);
   runClear(clearSettingsToolsEnabled);
+  // The debounced repository selection is account-scoped state: a toggle left
+  // inside its window, its timer, and the server baseline it diffs against
+  // belong to the account that made it, so the account boundary drops them
+  // before the next account mounts the same screen.
+  runClear(clearRepoSelectionSenders);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;

@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as TanStackQuery from '@tanstack/react-query';
 
+import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 
 import {
+  clearRepoSelectionSenders,
   REPO_SELECTION_DEBOUNCE_MS,
-  resetRepoSelectionSendersForTests,
   useRepoSelectionToggle,
 } from './use-code-reviewer-repo-selection';
 
@@ -162,7 +164,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  resetRepoSelectionSendersForTests();
+  clearRepoSelectionSenders();
+  setSignOutActive(false);
   vi.useRealTimers();
   vi.clearAllMocks();
 });
@@ -188,6 +191,7 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
       add: [3, 4, 5, 6, 7],
       remove: [],
       optimisticSelection: [1, 2, 3, 4, 5, 6, 7],
+      authEpoch: currentAuthEpoch(),
     });
   });
 
@@ -260,6 +264,7 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
       add: [],
       remove: [3],
       optimisticSelection: [1, 2],
+      authEpoch: currentAuthEpoch(),
     });
   });
 
@@ -290,6 +295,7 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
       add: [4],
       remove: [],
       optimisticSelection: [1, 2, 3, 4],
+      authEpoch: currentAuthEpoch(),
     });
   });
 
@@ -317,7 +323,113 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
       add: [],
       remove: [2],
       optimisticSelection: [1],
+      authEpoch: currentAuthEpoch(),
     });
+  });
+});
+
+describe('account boundary', () => {
+  it('sends nothing for a toggle left pending when the auth epoch advances', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    toggleRepo(3);
+    bumpAuthEpoch();
+
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('cancels the armed timer when the session-scoped state is cleared', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    toggleRepo(3);
+    clearRepoSelectionSenders();
+
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('does not send while a sign-out is in flight', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    toggleRepo(3);
+    setSignOutActive(true);
+
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('does not re-apply a pending selection to the cache when a refetch outlives its account', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    toggleRepo(3);
+    bumpAuthEpoch();
+
+    fireRefetch(PERSONAL_SCOPE, [1, 2]);
+
+    expect(reviewConfigCache?.selectedRepositoryIds).toEqual([1, 2]);
+
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('does not seed the baseline from a save that settles after the boundary', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const first = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    first.toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+    const staleVars = mutateMock.mock.calls[0]?.[0];
+
+    // The account leaves and the next account's screen mounts and refetches.
+    bumpAuthEpoch();
+    const second = getToggleRepo(PERSONAL_SCOPE, 'github');
+    seedReviewConfigCache([1, 2]);
+    fireRefetch(PERSONAL_SCOPE, [1, 2]);
+    mutateMock.mockClear();
+
+    first.deltaOptions.onSuccess?.({ success: true, webhookSync: null }, staleVars);
+
+    // The next account's first toggle diffs against its own server selection.
+    second.toggleRepo(4);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).toHaveBeenCalledTimes(1);
+    expect(mutateMock.mock.calls[0]?.[0]).toEqual({
+      add: [4],
+      remove: [],
+      optimisticSelection: [1, 2, 4],
+      authEpoch: currentAuthEpoch(),
+    });
+  });
+
+  it('shows no rollback or error toast for a failed save that outlives its account', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo, deltaOptions } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+    const staleVars = mutateMock.mock.calls[0]?.[0];
+
+    bumpAuthEpoch();
+    seedReviewConfigCache([9, 10]);
+    deltaOptions.onError?.(new Error('Network unreachable'), staleVars);
+
+    expect(reviewConfigCache?.selectedRepositoryIds).toEqual([9, 10]);
+    expect(toastErrorMock).not.toHaveBeenCalled();
   });
 });
 
@@ -329,6 +441,7 @@ describe('useSaveReviewConfigDelta mutationFn payload shape', () => {
       add: [3, 4, 'bitbucket-uuid'],
       remove: [1, 'bitbucket-uuid-2'],
       optimisticSelection: [2, 3, 4],
+      authEpoch: currentAuthEpoch(),
     });
 
     expect(personalPatchMutateMock).toHaveBeenCalledTimes(1);
@@ -346,6 +459,7 @@ describe('useSaveReviewConfigDelta mutationFn payload shape', () => {
       add: [3, 'bitbucket-uuid'],
       remove: [1],
       optimisticSelection: [3, 'bitbucket-uuid'],
+      authEpoch: currentAuthEpoch(),
     });
 
     expect(orgPatchMutateMock).toHaveBeenCalledTimes(1);
@@ -365,6 +479,7 @@ describe('useSaveReviewConfigDelta mutationFn payload shape', () => {
       add: [3],
       remove: [1],
       optimisticSelection: [3],
+      authEpoch: currentAuthEpoch(),
     });
 
     expect(personalPatchMutateMock).toHaveBeenCalledTimes(1);
@@ -387,6 +502,7 @@ describe('useSaveReviewConfigDelta mutationFn payload shape', () => {
       add: [3],
       remove: [],
       optimisticSelection: [3],
+      authEpoch: currentAuthEpoch(),
     });
 
     expect(setQueryDataMock).toHaveBeenCalledWith(

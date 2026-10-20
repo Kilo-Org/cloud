@@ -80,6 +80,7 @@ const mocks = vi.hoisted(() => ({
   clearTrustedHosts: vi.fn(),
   forgetRemoteMcp: vi.fn(),
   clearTrustedImageHosts: vi.fn(),
+  clearRepoSelectionSenders: vi.fn(),
   notifyArtifactsChanged: vi.fn(),
   reapTempFiles: vi.fn(),
   resetArtifactMirrorSyncState: vi.fn(),
@@ -132,6 +133,12 @@ vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: mocks.clearChatB
 vi.mock('@/lib/chat/settings-tools-switch', () => ({
   clearSettingsToolsEnabled: mocks.clearSettingsToolsEnabled,
 }));
+// The debounced repository-selection send state lives in a hooks module that
+// reaches the tRPC client and expo-router on import, so the boundary suite
+// observes the clear through this spy.
+vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
+  clearRepoSelectionSenders: mocks.clearRepoSelectionSenders,
+}));
 // The platform provider bridge: sign-out has to tell an open Files app the tree
 // changed, or it keeps the listing it read before the wipe.
 vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
@@ -156,6 +163,7 @@ const SESSION_MEMBERS = [
   mocks.clearRemoteMcpServers,
   mocks.clearChatBackends,
   mocks.clearSettingsToolsEnabled,
+  mocks.clearRepoSelectionSenders,
 ];
 
 /** Android mirror root: `Paths.document` plus the mirror folder name. */

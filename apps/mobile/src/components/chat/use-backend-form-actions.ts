@@ -33,7 +33,9 @@ type BackendAction = keyof typeof FAILURE_KEYS;
  * `save` hands the draft to the caller; `discover` and `check` talk to the
  * server the fields describe. A local-HTTP endpoint needs the one-off approval
  * dialog before either, and every outcome lands in the form's status line.
- * Lives outside the form because the component's own JSX is long enough.
+ * The form owns the fields and their layout; this hook owns the requests and
+ * the state they drive, so both can be read without one standing in for the
+ * other.
  */
 export function useBackendFormActions({
   fields,

@@ -62,17 +62,17 @@ Review the manifest privately before applying. It contains the candidate share
 ids, owner ids, and captured blob filenames needed to finish deletion after the
 share row is removed. The manifest records a hash of the target host, port, and
 database name; use the same database connection for the reviewed dry run and the
-apply, or the manifest will be rejected.
+apply, or the manifest will be rejected. Use a new manifest path when you want a
+fresh candidate set.
 
 ## Apply
 
-Apply requires `--apply`, `--target`, and `--manifest`. The command resumes the
-manifest if it exists, validates that the manifest target and database identity
-match, revalidates every candidate against the current row, and skips candidates
-that changed after review. For v1 targets, apply also needs the web app's
-existing R2 variables: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
-`R2_SECRET_ACCESS_KEY`, and `R2_CLI_SESSIONS_BUCKET_NAME`. Dry run does not need
-R2 credentials.
+Apply requires `--apply`, `--target`, and `--manifest`. The manifest must come
+from a completed dry run. Apply refuses a missing manifest or one whose
+discovery did not finish, so it never discovers and removes candidates in a
+single step. For v1 targets, apply also needs the web app's existing R2
+variables: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and
+`R2_CLI_SESSIONS_BUCKET_NAME`. Dry run does not need R2 credentials.
 
 ```sh
 POSTGRES_URL='postgres://…' \
@@ -82,12 +82,12 @@ POSTGRES_URL='postgres://…' \
   --manifest /secure/operator/session-share-manifest.json
 ```
 
-The script discovers new candidates in bounded batches, persists the manifest
-before making any change, and then applies the reviewed set in bounded batches.
-For v1, the manifest is updated to `revoking` before the share row is deleted and
-to `row_deleted` before the captured blobs are deleted. If blob deletion fails,
-the share row stays removed and the manifest keeps the captured filenames so a
-later run can finish the deletion.
+The script revalidates every manifest candidate against the current row and
+skips candidates that changed after review. It applies the reviewed set in
+bounded batches, and for v1 it updates the manifest to `revoking` before the
+share row is deleted and to `row_deleted` before the captured blobs are deleted.
+If blob deletion fails, the share row stays removed and the manifest keeps the
+captured filenames so a later run can finish the deletion.
 
 A complete run exits `0`. A partial run exits `2` and reports remaining items,
 failed items, and pending blob deletions. Rerun the same command with the same

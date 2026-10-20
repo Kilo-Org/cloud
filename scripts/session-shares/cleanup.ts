@@ -49,7 +49,8 @@ function usage(): never {
   pnpm session-shares:cleanup --target <v2-webhook-bot|v1-publisher-mismatch|all> [--manifest <path>] [--batch-size <n>] [--max-attempts <n>]
   pnpm session-shares:cleanup --apply --target <...> --manifest <path> [--batch-size <n>] [--max-attempts <n>]
 
-Dry-run is the default. Apply requires --apply and a private manifest path outside the repository.
+Dry-run is the default. Apply requires --apply and a private manifest path outside the repository
+created by a completed dry run.
 Set POSTGRES_URL (or USE_PRODUCTION_DB=true with POSTGRES_URL_PRODUCTION) before running.`);
   process.exit(1);
 }

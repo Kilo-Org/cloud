@@ -509,6 +509,7 @@ async function applyV1Item(
           .where(
             and(
               eq(sharedCliSessions.share_id, item.share_id),
+              eq(sharedCliSessions.session_id, item.session_id),
               eq(sharedCliSessions.kilo_user_id, item.publisher_kilo_user_id)
             )
           )
@@ -636,7 +637,15 @@ export async function runCleanup(options: CleanupOptions): Promise<CleanupReport
     if (manifest.database_identity_hash !== options.databaseIdentityHash) {
       throw new CleanupUsageError('Manifest belongs to a different database');
     }
+    if (options.mode === 'apply' && !manifest.discovery_complete) {
+      throw new CleanupUsageError(
+        'Manifest discovery is incomplete; rerun the dry run before applying'
+      );
+    }
   } else {
+    if (options.mode === 'apply') {
+      throw new CleanupUsageError('Apply mode requires a manifest created by a completed dry run');
+    }
     manifest = createManifest({
       target: options.target,
       databaseIdentityHash: options.databaseIdentityHash,

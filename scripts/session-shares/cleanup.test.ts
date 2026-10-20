@@ -19,6 +19,7 @@ import {
 } from './cleanup-core';
 import {
   createFileManifestStore,
+  createManifest,
   createMemoryManifestStore,
   databaseIdentityHash,
 } from './manifest';
@@ -459,6 +460,11 @@ void describe('session share maintenance', () => {
     );
 
     const store = createMemoryManifestStore();
+    const reviewed = await runCleanup(
+      await createRunOptions({ mode: 'dry-run', target: 'v2-webhook-bot', manifestStore: store })
+    );
+    assert.equal(reviewed.manifest_candidates?.v2, 1);
+
     const updatedAtBefore = (await readV2Row(SESSION_V2_WEBHOOK, BOT_WEBHOOK))?.updated_at;
     const report = await runCleanup(
       await createRunOptions({ mode: 'apply', target: 'v2-webhook-bot', manifestStore: store })
@@ -530,6 +536,15 @@ void describe('session share maintenance', () => {
     assert.equal((await resolveV1PublicShare(SHARE_OWNER_A)).length, 1);
 
     const store = createMemoryManifestStore();
+    const reviewed = await runCleanup(
+      await createRunOptions({
+        mode: 'dry-run',
+        target: 'v1-publisher-mismatch',
+        manifestStore: store,
+      })
+    );
+    assert.equal(reviewed.manifest_candidates?.v1, 1);
+
     const report = await runCleanup(
       await createRunOptions({
         mode: 'apply',
@@ -650,6 +665,14 @@ void describe('session share maintenance', () => {
     blobStore.failForShareId = SHARE_MISMATCH_A;
 
     const store = createMemoryManifestStore();
+    await runCleanup(
+      await createRunOptions({
+        mode: 'dry-run',
+        target: 'v1-publisher-mismatch',
+        manifestStore: store,
+      })
+    );
+
     const first = await runCleanup(
       await createRunOptions({
         mode: 'apply',
@@ -722,6 +745,17 @@ void describe('session share maintenance', () => {
     const events: Array<{ phase: string; kind: string; size: number }> = [];
     const store = createMemoryManifestStore();
     const blobStore = new FakeBlobStore();
+    await runCleanup(
+      await createRunOptions({
+        mode: 'dry-run',
+        target: 'all',
+        manifestStore: store,
+        batchSize: 2,
+        onBatch: event => {
+          events.push({ phase: event.phase, kind: event.kind, size: event.size });
+        },
+      })
+    );
     const report = await runCleanup(
       await createRunOptions({
         mode: 'apply',
@@ -746,6 +780,42 @@ void describe('session share maintenance', () => {
     );
     assert.ok(events.filter(event => event.phase === 'apply').length >= 4);
     assert.ok(events.every(event => event.size <= 2));
+  });
+
+  void it('requires a completed reviewed manifest before applying', async () => {
+    await insertUser(BOT_WEBHOOK);
+    await insertV2({
+      sessionId: SESSION_V2_WEBHOOK,
+      userId: BOT_WEBHOOK,
+      publicId: PUBLIC_ID_WEBHOOK,
+    });
+
+    await assert.rejects(
+      runCleanup(
+        await createRunOptions({
+          mode: 'apply',
+          target: 'v2-webhook-bot',
+          manifestStore: createMemoryManifestStore(),
+        })
+      ),
+      /completed dry run/
+    );
+    assert.equal((await readV2Row(SESSION_V2_WEBHOOK, BOT_WEBHOOK))?.public_id, PUBLIC_ID_WEBHOOK);
+
+    const incomplete = createMemoryManifestStore(
+      createManifest({ target: 'v2-webhook-bot', databaseIdentityHash: identityHash })
+    );
+    await assert.rejects(
+      runCleanup(
+        await createRunOptions({
+          mode: 'apply',
+          target: 'v2-webhook-bot',
+          manifestStore: incomplete,
+        })
+      ),
+      /discovery is incomplete/
+    );
+    assert.equal((await readV2Row(SESSION_V2_WEBHOOK, BOT_WEBHOOK))?.public_id, PUBLIC_ID_WEBHOOK);
   });
 
   void it('writes a private manifest and refuses repository paths', async () => {

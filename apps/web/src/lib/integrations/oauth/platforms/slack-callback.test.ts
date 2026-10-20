@@ -64,9 +64,9 @@ const permissionDeniedError = new TRPCError({
 
 async function callCallback(
   owner: string,
-  statePurpose: 'provider_install' | undefined = 'provider_install'
+  statePurpose: 'provider_install' | null = 'provider_install'
 ) {
-  const state = createOAuthState(owner, USER_ID, undefined, statePurpose);
+  const state = createOAuthState(owner, USER_ID, undefined, statePurpose ?? undefined);
   const request = new NextRequest(
     `http://localhost:3000/api/integrations/slack/callback?code=code-1&state=${encodeURIComponent(state)}`
   );
@@ -109,8 +109,11 @@ describe('handleSlackOAuthCallback organization authority', () => {
   it('refuses a member completion that carries no install purpose', async () => {
     mockEnsureOrganizationAccess.mockRejectedValue(permissionDeniedError);
 
-    const { response } = await callCallback(`org_${ORGANIZATION_ID}`, undefined);
+    const { response, state } = await callCallback(`org_${ORGANIZATION_ID}`, null);
 
+    expect(JSON.parse(Buffer.from(state.split('.')[0], 'base64url').toString())).not.toHaveProperty(
+      'purpose'
+    );
     expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
       'permission_required'
     );

@@ -11,6 +11,15 @@ import {
 
 import { TabSwitchInputGate, TabSwitchInputSettle } from './tab-screen-input-gate';
 
+const focus = vi.hoisted(() => ({ active: true }));
+
+vi.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    if (focus.active) {
+      callback();
+    }
+  },
+}));
 vi.mock('react-native', () => ({ View: 'View' }));
 
 type GateProps = {
@@ -41,8 +50,14 @@ function renderGate(): GateProps {
   return root.root.findByType('View' as unknown as React.ElementType).props as GateProps;
 }
 
+function renderSettle(): SettleProps {
+  const root = render(createElement(TabSwitchInputSettle));
+  return root.root.findByType('View' as unknown as React.ElementType).props as SettleProps;
+}
+
 beforeEach(() => {
   __resetTabSwitchInputForTests();
+  focus.active = true;
 });
 
 afterEach(() => {
@@ -73,11 +88,9 @@ describe('TabSwitchInputGate mounted layout', () => {
 });
 
 describe('TabSwitchInputSettle mounted layout', () => {
-  it('closes the window when the tab it wraps is on screen', () => {
+  it('closes the window when the focused tab is on screen', () => {
     markTabSwitchPending();
-    const root = render(createElement(TabSwitchInputSettle));
-    const settle = root.root.findByType('View' as unknown as React.ElementType)
-      .props as SettleProps;
+    const settle = renderSettle();
     expect(isTabSwitchPending()).toBe(true);
 
     act(() => {
@@ -85,5 +98,17 @@ describe('TabSwitchInputSettle mounted layout', () => {
     });
 
     expect(isTabSwitchPending()).toBe(false);
+  });
+
+  it('keeps the window open when the tab that lays out is not the focused one', () => {
+    focus.active = false;
+    markTabSwitchPending();
+    const settle = renderSettle();
+
+    act(() => {
+      settle.onLayout();
+    });
+
+    expect(isTabSwitchPending()).toBe(true);
   });
 });

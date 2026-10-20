@@ -1,4 +1,5 @@
-import { type ReactNode } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { type ReactNode, useCallback, useRef } from 'react';
 import { View } from 'react-native';
 
 import { isTabSwitchPending, settleTabSwitchInput } from '@/lib/tab-switch-input-gate';
@@ -24,13 +25,31 @@ export function TabSwitchInputGate({ children }: Readonly<{ children: ReactNode 
 }
 
 /**
- * A tab screen's own layout root. Its next layout is the moment that tab is on
- * screen, which is when the window can close: the route state changes earlier,
+ * A tab screen's own layout root. Its layout is the moment that tab is on
+ * screen, which is when the window can close — the route state changes earlier,
  * while the outgoing tab's views are still what a touch is hit-tested against.
+ * Only the screen that holds focus closes it: the tab being left can lay out
+ * again during the switch, and closing on that would reopen the leak.
  */
 export function TabSwitchInputSettle({ children }: Readonly<{ children: ReactNode }>) {
+  const focused = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      focused.current = true;
+      return () => {
+        focused.current = false;
+      };
+    }, [])
+  );
   return (
-    <View className="flex-1" onLayout={settleTabSwitchInput}>
+    <View
+      className="flex-1"
+      onLayout={() => {
+        if (focused.current) {
+          settleTabSwitchInput();
+        }
+      }}
+    >
       {children}
     </View>
   );

@@ -1,7 +1,8 @@
+import { useRef } from 'react';
 import { Pressable, type ViewStyle } from 'react-native';
 import { type BottomTabBarButtonProps } from 'expo-router/js-tabs';
 
-import { markTabSwitchPending } from '@/lib/tab-switch-input-gate';
+import { markTabSwitchPending, scheduleTabSwitchSettle } from '@/lib/tab-switch-input-gate';
 
 // `PlatformPressable` cursors the entry on an iOS pointer device, and React
 // Native's `Pressable` sets no cursor at all, so the iPadOS pointing hand would
@@ -29,11 +30,12 @@ const POINTER_CURSOR_STYLE = {
  * and, unlike that module, it does not drag the header's PNG assets into a
  * mounted test's import graph.
  *
- * A press in arms the tab-switch input gate: until the destination screen
- * commits, the outgoing tab is still what a touch is hit-tested against, so the
+ * A press in arms the tab-switch input gate: until the destination screen is on
+ * screen, the outgoing tab is still what a touch is hit-tested against, so the
  * next tap would run a control of the tab being left. Arming on the touch down
  * covers the whole gesture, including a tap that lands before the navigation
- * has rendered.
+ * has rendered. A gesture that ends without its press (dragged off the entry)
+ * settled in, so it closes the gate on the next tick instead of holding it.
  */
 export function TabBarButton({
   ref: _ref,
@@ -41,16 +43,35 @@ export function TabBarButton({
   pressColor: _pressColor,
   pressOpacity: _pressOpacity,
   hoverEffect: _hoverEffect,
+  onPress,
   onPressIn,
+  onPressOut,
   style,
   ...props
 }: BottomTabBarButtonProps) {
+  const pressed = useRef(false);
   return (
     <Pressable
       {...props}
       onPressIn={event => {
+        pressed.current = true;
         markTabSwitchPending();
         onPressIn?.(event);
+      }}
+      onPress={event => {
+        pressed.current = false;
+        // A completed press navigates, so its window starts here: this clears a
+        // settle the touch up may already have scheduled.
+        markTabSwitchPending();
+        onPress?.(event);
+      }}
+      onPressOut={event => {
+        if (pressed.current) {
+          // `onPressOut` runs before `onPress`, so the press still gets this
+          // tick to keep the window open; only a cancelled press settles here.
+          scheduleTabSwitchSettle(0);
+        }
+        onPressOut?.(event);
       }}
       accessible
       role="button"

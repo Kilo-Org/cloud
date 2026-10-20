@@ -77,7 +77,11 @@ describe('TabBarButton mounted layout', () => {
   });
 });
 
-type PressInProps = { onPressIn: (event: unknown) => void };
+type PressProps = {
+  onPressIn: (event: unknown) => void;
+  onPress: (event: unknown) => void;
+  onPressOut: (event: unknown) => void;
+};
 
 describe('TabBarButton tab switch gate', () => {
   // The outgoing tab is still hit-tested until the destination commits, so the
@@ -88,7 +92,7 @@ describe('TabBarButton tab switch gate', () => {
 
     expect(isTabSwitchPending()).toBe(false);
     act(() => {
-      (button.props as PressInProps).onPressIn({});
+      (button.props as PressProps).onPressIn({});
     });
 
     expect(isTabSwitchPending()).toBe(true);
@@ -99,5 +103,44 @@ describe('TabBarButton tab switch gate', () => {
     renderButton({ onPressIn: vi.fn<() => void>() });
 
     expect(isTabSwitchPending()).toBe(false);
+  });
+
+  // A gesture dragged off the entry never presses, so it must not hold the gate
+  // open for the fallback.
+  it('closes the gate when a touched entry is never pressed', async () => {
+    const button = renderButton({ onPress: vi.fn<() => void>() });
+    const props = button.props as PressProps;
+    act(() => {
+      props.onPressIn({});
+      props.onPressOut({});
+    });
+
+    await new Promise<void>(resolve => {
+      setTimeout(() => {
+        resolve();
+      }, 0);
+    });
+
+    expect(isTabSwitchPending()).toBe(false);
+  });
+
+  it('keeps the gate open when the press completes', async () => {
+    const onPress = vi.fn<() => void>();
+    const button = renderButton({ onPress });
+    const props = button.props as PressProps;
+    act(() => {
+      props.onPressIn({});
+      props.onPressOut({});
+      props.onPress({});
+    });
+
+    await new Promise<void>(resolve => {
+      setTimeout(() => {
+        resolve();
+      }, 0);
+    });
+
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(isTabSwitchPending()).toBe(true);
   });
 });

@@ -3,13 +3,16 @@ import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   findingDetailBackTarget,
   findingDetailHasLocalHistory,
   PROFILE_TAB_ROOT,
 } from './finding-detail-back';
+import { profileTabPressListeners } from './tab-press-listeners';
+
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 
 // The `showBackButton` wiring itself (that `FindingDetailScreen` passes
 // `showBackButton` to `ScreenHeader` in the loaded/notFound/error/loading
@@ -80,17 +83,20 @@ describe('profile tab anchor', () => {
     new URL('../app/(app)/(tabs)/(3_profile)/_layout.tsx', import.meta.url)
   );
   const layoutSource = readFileSync(layoutPath, 'utf8');
-  const tabsLayoutPath = fileURLToPath(new URL('../app/(app)/(tabs)/_layout.tsx', import.meta.url));
-  const tabsLayoutSource = readFileSync(tabsLayoutPath, 'utf8');
-
   it("declares initialRouteName: 'index'", () => {
     expect(layoutSource).toMatch(/initialRouteName:\s*'index'/);
   });
 
   it('returns to the profile root when the profile tab is pressed', () => {
-    const profileTab = tabsLayoutSource.split('name="(3_profile)"')[1];
+    const navigate = vi.fn();
+    const preventDefault = vi.fn();
+    const listeners = profileTabPressListeners({ navigate })({
+      navigation: { isFocused: () => false },
+    });
 
-    expect(profileTab).toContain('event.preventDefault()');
-    expect(profileTab).toContain('router.navigate(PROFILE_TAB_ROOT)');
+    listeners.tabPress({ preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(PROFILE_TAB_ROOT);
   });
 });

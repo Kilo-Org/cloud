@@ -27,7 +27,6 @@ const IS_SCRIPT = process.env.IS_SCRIPT === 'true';
 
 if (IS_SCRIPT) {
   // For scripts, we use a different connection string to avoid conflicts with the main app
-  // This allows us to run scripts without affecting the main database connection
   assert(getEnvVariable('POSTGRES_SCRIPT_URL'), 'POSTGRES_SCRIPT_URL must be set for scripts');
   postgresUrl = getEnvVariable('POSTGRES_SCRIPT_URL');
 }
@@ -100,7 +99,7 @@ const sharedPoolConfig: Partial<pg.PoolConfig> = {
   idleTimeoutMillis,
 };
 
-// Primary pool - always points to Frankfurt (writes go here)
+// Primary pool - writes go here; script runs (IS_SCRIPT) connect to POSTGRES_SCRIPT_URL
 const primary = createDrizzleClient({
   connectionString: postgresUrl,
   poolConfig: { ...sharedPoolConfig, application_name: appName },
@@ -108,7 +107,8 @@ const primary = createDrizzleClient({
 });
 export const pool = primary.pool;
 
-// Replica pool - points to US replica in US regions, primary in EU regions
+// Replica pool - US replica in US regions; in EU regions the configured EU
+// replica, with the primary only as fallback
 const replicaUrl = getReplicaUrl();
 export const usesSeparateReplica = replicaUrl !== postgresUrl;
 
@@ -182,7 +182,7 @@ if (usesSeparateReplica) {
  * Primary database instance - use for all writes (INSERT, UPDATE, DELETE)
  * and for reads that require strong consistency (read-after-write).
  *
- * This always connects to the primary database in Frankfurt.
+ * Connects to the primary connection string, or POSTGRES_SCRIPT_URL for script runs.
  */
 const primaryDb = primary.db;
 

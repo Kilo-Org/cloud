@@ -39,7 +39,10 @@ const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
 const announcingWarning = vi.hoisted(() => vi.fn());
 // `sessionEnded` is toggled per test to drive the login screen's announcement
 // effect without re-mocking the module.
-const authState = vi.hoisted(() => ({ sessionEnded: false, token: undefined as string | undefined }));
+const authState = vi.hoisted(() => ({
+  sessionEnded: false,
+  token: undefined as string | undefined,
+}));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -71,7 +74,11 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { warning: announcingWarning },
 }));
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: () => ({ sessionEnded: authState.sessionEnded, signIn: vi.fn(), token: authState.token }),
+  useAuth: () => ({
+    sessionEnded: authState.sessionEnded,
+    signIn: vi.fn(),
+    token: authState.token,
+  }),
 }));
 vi.mock('@/lib/auth/use-device-auth', () => ({
   useDeviceAuth: () => ({

@@ -99,19 +99,20 @@ afterEach(() => {
 });
 
 describe('KiloPassSubscriptionCard mounted layout', () => {
-  it('keeps the card pressable with its action label in a narrow window', () => {
-    // The 160 dp window of the e1 round left the fixed icon tile plus the
-    // fixed Subscribe label wider than the card, so the flexible text block
-    // collapsed to zero width and the wrapped copy stretched the card into an
-    // empty slab (Profile, 2026-09-21). The card must stay one pressable with
-    // its action label after the narrow swap.
+  it('moves the copy below the tile row in a narrow window and keeps one pressable', () => {
+    // A narrow window puts the copy on its own row below the icon tile row.
     windowDims.width = 160;
     const root = renderCard();
     const cards = root.findAllByProps({ accessibilityRole: 'button' });
     expect(cards).toHaveLength(1);
     expect(cards[0]?.props.accessibilityLabel).toBe('Kilo Pass');
+
+    const tileRow = root.find(node => Object.is(node.type, 'KiloPassIcon')).parent?.parent;
     expect(
-      root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Subscribe')
+      tileRow?.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
+    ).toEqual(['Subscribe']);
+    expect(
+      root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Kilo Pass')
     ).toHaveLength(1);
   });
 });

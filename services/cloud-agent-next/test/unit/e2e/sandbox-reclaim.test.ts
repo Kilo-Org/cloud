@@ -279,6 +279,32 @@ describe('reclaimOwnedSandboxes', () => {
     expect(report.failures).toEqual([expect.stringContaining('Command failed: docker exec')]);
     expect(docker.killed).toEqual([]);
   });
+
+  it('stops the container recorded for a released legacy session', async () => {
+    const docker = createDocker({
+      containers: [rootA, proxyOf(rootA), rootB, proxyOf(rootB)],
+    });
+
+    const report = await reclaimOwnedSandboxes(
+      [{ sessionId: 'agent_a', kiloSessionId: 'ses_a', containerId: rootA.id }],
+      { executeDocker: docker.execute, familyGoneTimeoutMs: 20, retryMs: 1 }
+    );
+
+    expect(report).toEqual({ stopped: [rootA.name], failures: [] });
+    expect(docker.running()).toEqual([rootB.name, `${rootB.name}-proxy`]);
+  });
+
+  it('records nothing to stop when the recorded container is already gone', async () => {
+    const docker = createDocker({ containers: [rootB, proxyOf(rootB)] });
+
+    const report = await reclaimOwnedSandboxes(
+      [{ sessionId: 'agent_a', kiloSessionId: 'ses_a', containerId: rootA.id }],
+      { executeDocker: docker.execute, familyGoneTimeoutMs: 20, retryMs: 1 }
+    );
+
+    expect(report).toEqual({ stopped: [], failures: [] });
+    expect(docker.running()).toEqual([rootB.name, `${rootB.name}-proxy`]);
+  });
 });
 
 describe('orphan proxies', () => {

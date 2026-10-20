@@ -77,13 +77,14 @@ async function sandboxOwnsSession(
     const fs = require('node:fs');
     const sessionId = process.argv.at(-1);
     if (!sessionId.startsWith('workspace_')) {
+      // Exclusive ownership: this container holds exactly this session's home,
+      // and that session's wrapper log directory has a wrapper log in it.
+      const homes = fs.readdirSync('/home').filter(name => name.startsWith('agent_'));
       const dir = '/home/' + sessionId + '/.kilocode/wrapper/logs';
       const logs = fs.existsSync(dir)
         ? fs.readdirSync(dir).filter(name => /^kilocode-wrapper-agent_.+\\.log$/.test(name))
         : [];
-      process.exit(logs.length > 0 && logs.every(name =>
-        name.startsWith('kilocode-wrapper-' + sessionId + '-')
-      ) ? 0 : 1);
+      process.exit(homes.length === 1 && homes[0] === sessionId && logs.length > 0 ? 0 : 1);
     }
     const log = fs.readFileSync('/tmp/kilocode-control-wrapper.log', 'utf8');
     const directories = [...log.matchAll(/session\\.attach ready directory=([^\\n]+)/g)];
@@ -166,6 +167,12 @@ export type StopOwnedSandboxFamilyOptions = {
    * worktree, without weakening the exclusive-ownership proof.
    */
   allowedDirectories?: readonly string[];
+  /**
+   * The container itself was identified while the session still existed (see
+   * `ReclaimSession.containerId`), so the live probe below is not the only
+   * ownership evidence. The identity check on `sandbox` still applies.
+   */
+  ownershipRecorded?: boolean;
 };
 
 export async function stopOwnedSandboxFamily(
@@ -200,7 +207,7 @@ export async function stopOwnedSandboxFamily(
       return [];
     }
   } else {
-    if (current) {
+    if (current && options.ownershipRecorded !== true) {
       const owned = await sandboxOwnsSession(current.id, sessionId, kiloSessionId);
       if (!owned) throw new Error(`Cannot prove exclusive ownership of ${sandbox.name}`);
     }
@@ -221,7 +228,16 @@ const RECLAIM_FAMILY_GONE_TIMEOUT_MS = 5_000;
 const RECLAIM_DOCKER_ATTEMPTS = 3;
 const RECLAIM_DOCKER_RETRY_MS = 1_000;
 
-export type ReclaimSession = { sessionId: string; kiloSessionId?: string };
+export type ReclaimSession = {
+  sessionId: string;
+  kiloSessionId?: string;
+  /**
+   * Container the gate observed for this session before releasing it. Present
+   * when the release already removed the session-owned files that would
+   * otherwise identify the container.
+   */
+  containerId?: string;
+};
 
 export type SandboxReclaimReport = {
   /** Sandbox containers this call stopped. */
@@ -230,26 +246,45 @@ export type SandboxReclaimReport = {
   failures: string[];
 };
 
-type LocatedSandbox = { container: SandboxContainer; directory: string | undefined };
+type LocatedSandbox = {
+  container: SandboxContainer;
+  directory: string | undefined;
+  /**
+   * The container was identified from an observation made while the session
+   * existed, so its ownership is already established and does not depend on
+   * files the release removed.
+   */
+  ownershipRecorded: boolean;
+};
 
 /** The one primary sandbox a session provably owns, or `null` when none is running. */
 async function locateOwnedSandbox(
   session: ReclaimSession,
   executeDocker: DockerCommandExecutor | undefined
 ): Promise<LocatedSandbox | null> {
-  const { sessionId, kiloSessionId } = session;
+  const { sessionId, kiloSessionId, containerId } = session;
   if (sessionId.startsWith('workspace_')) {
     if (kiloSessionId === undefined) {
       throw new Error(`no Kilo session id was recorded for ${sessionId}; ownership is unprovable`);
     }
     const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
-    return runtime ? { container: runtime.container, directory: runtime.directory } : null;
+    return runtime
+      ? { container: runtime.container, directory: runtime.directory, ownershipRecorded: false }
+      : null;
+  }
+  if (containerId !== undefined) {
+    const recorded = (await listSandboxContainers(executeDocker)).find(
+      container => container.id === containerId && !container.isProxy
+    );
+    return recorded ? { container: recorded, directory: undefined, ownershipRecorded: true } : null;
   }
   const matches = await listSandboxesForAgentSession(sessionId, executeDocker);
   if (matches.length > 1) {
     throw new Error(`multiple containers match ${sessionId}; refusing ambiguous ownership`);
   }
-  return matches[0] ? { container: matches[0], directory: undefined } : null;
+  return matches[0]
+    ? { container: matches[0], directory: undefined, ownershipRecorded: false }
+    : null;
 }
 
 /**
@@ -294,7 +329,12 @@ export async function reclaimOwnedSandboxes(
   const failures: string[] = [];
   const groups = new Map<
     string,
-    { container: SandboxContainer; sessions: ReclaimSession[]; directories: string[] }
+    {
+      container: SandboxContainer;
+      sessions: ReclaimSession[];
+      directories: string[];
+      ownershipRecorded: boolean;
+    }
   >();
   for (const session of sessions) {
     try {
@@ -307,9 +347,11 @@ export async function reclaimOwnedSandboxes(
         container: located.container,
         sessions: [],
         directories: [],
+        ownershipRecorded: located.ownershipRecorded,
       };
       group.sessions.push(session);
       if (located.directory !== undefined) group.directories.push(located.directory);
+      group.ownershipRecorded ||= located.ownershipRecorded;
       groups.set(located.container.id, group);
     } catch (error) {
       failures.push(`${session.sessionId}: ${errorText(error)}`);
@@ -327,6 +369,7 @@ export async function reclaimOwnedSandboxes(
             ...(executeDocker ? { executeDocker } : {}),
             familyGoneTimeoutMs: deps.familyGoneTimeoutMs ?? RECLAIM_FAMILY_GONE_TIMEOUT_MS,
             allowedDirectories: group.directories,
+            ownershipRecorded: group.ownershipRecorded,
           }),
         retryMs
       );

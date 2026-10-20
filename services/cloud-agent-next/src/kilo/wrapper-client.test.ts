@@ -1749,7 +1749,8 @@ describe('WrapperClient', () => {
       ).resolves.toEqual({ started: true });
 
       expect(session.exec).toHaveBeenCalledWith(
-        "mkdir -p '/home/test-session/.kilocode/wrapper/logs'"
+        "mkdir -p '/home/test-session/.kilocode/wrapper/logs'",
+        { timeout: 5_000 }
       );
     });
 

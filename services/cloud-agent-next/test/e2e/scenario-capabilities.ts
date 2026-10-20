@@ -17,6 +17,13 @@ import { createOwnedSessionRegistry } from './scenarios-shared-runtime.js';
 
 export type Profile = 'local' | 'deployed' | 'local-http';
 
+/**
+ * Bound for the pre-release container read. It runs once per owned session at
+ * teardown, after the scenario's own budget is spent, so it must not extend a
+ * run by more than a few seconds per session.
+ */
+const OWNED_CONTAINER_READ_TIMEOUT_MS = 10_000;
+
 export type CapabilityName =
   | 'sandbox'
   | 'sessionSandbox'
@@ -437,9 +444,13 @@ export type SandboxFaultObservation = {
  * stop the sandboxes those sessions owned. It is not a scenario requirement, so
  * it is not a `CapabilityName`. Only a profile with a sandbox it may stop
  * (`local`) provides it. It reports problems and never throws.
+ *
+ * `containerId` is the container the gate observed for that session before it
+ * released the session, so reclaim does not have to rediscover a container whose
+ * session-owned files are already gone.
  */
 export type SandboxReclaim = (
-  sessions: ReadonlyArray<{ sessionId: string; kiloSessionId?: string }>
+  sessions: ReadonlyArray<{ sessionId: string; kiloSessionId?: string; containerId?: string }>
 ) => Promise<void>;
 
 export type ScenarioEnvironment = {
@@ -625,11 +636,32 @@ export async function runSharedScenario(
   try {
     return await def.run({ ...args, api: resolvedApi.api, config: owned.config }, env);
   } finally {
+    // Reclaim needs the physical container, and releasing a session removes the
+    // session-owned files that identify it, so record the container now. A read
+    // failure only costs that session its reclaim, never the cleanup below.
+    const containers = new Map<string, string>();
+    if (env.reclaimSessions !== undefined && env.sessionSandbox !== undefined) {
+      for (const entry of owned.entries()) {
+        if (entry.kiloSessionId === undefined) continue;
+        const containerId = await env.sessionSandbox
+          .currentContainer({
+            cloudAgentSessionId: entry.sessionId,
+            kiloSessionId: entry.kiloSessionId,
+            signal: AbortSignal.timeout(OWNED_CONTAINER_READ_TIMEOUT_MS),
+          })
+          .catch(() => null);
+        if (containerId !== null) containers.set(entry.sessionId, containerId);
+      }
+    }
     await owned.cleanup(def.name);
-    await env.reclaimSessions?.(owned.entries()).catch(error => {
-      console.warn(
-        `${def.name}: sandbox reclaim failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    });
+    await env
+      .reclaimSessions?.(
+        owned.entries().map(entry => ({ ...entry, containerId: containers.get(entry.sessionId) }))
+      )
+      .catch(error => {
+        console.warn(
+          `${def.name}: sandbox reclaim failed: ${error instanceof Error ? error.message : String(error)}`
+        );
+      });
   }
 }

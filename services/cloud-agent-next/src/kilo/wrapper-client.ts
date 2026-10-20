@@ -594,7 +594,8 @@ export class WrapperClient {
     // writable destination before the wrapper starts appending.
     try {
       const prepared = await this.session.exec(
-        `mkdir -p ${shellQuote(getWrapperLogsDir(sessionHome))}`
+        `mkdir -p ${shellQuote(getWrapperLogsDir(sessionHome))}`,
+        { timeout: 5_000 }
       );
       if (prepared.exitCode !== 0) {
         logger

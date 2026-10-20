@@ -26,7 +26,6 @@ describe('runtime distribution contract', () => {
 
   it('lists every wrapper build entrypoint with a unique install name', () => {
     expect(WRAPPER_BUNDLES.map(bundle => bundle.entry)).toEqual([
-      'src/main.ts',
       'src/restore-session.ts',
       'src/bitbucket-review-cli.ts',
       'src/github-review-publish-mcp.ts',
@@ -40,7 +39,6 @@ describe('runtime distribution contract', () => {
   it('resolves the installed inventory under the shared install directory', () => {
     const files = runtimeDistributionSourceFiles('/pkg');
     expect(files.map(file => file.installName)).toEqual([
-      'kilocode-wrapper.js',
       'kilo-restore-session.js',
       'bb',
       'github-review-publish-mcp',
@@ -89,6 +87,6 @@ describe('runtime distribution contract', () => {
       `test -x '${runtimeInstallPath('kilocode-control-plane-supervisor.sh')}'`
     );
     expect(script).toContain(`test -L '${GIT_CREDENTIAL_HELPER.linkPath}'`);
-    expect(script).not.toContain(`test -x '${runtimeInstallPath('kilocode-wrapper.js')}'`);
+    expect(script).not.toContain('kilocode-wrapper.js');
   });
 });

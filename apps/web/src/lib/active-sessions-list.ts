@@ -96,10 +96,9 @@ export type ActiveSession = z.infer<typeof activeSessionSchema> & {
 export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
 
 /**
- * Warm-idle window for live cloud sessions. Mirrors
- * `KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT` in
- * services/cloud-agent-next/src/persistence/CloudAgentSession.ts:189-190.
- * Env override drift is accepted (A2).
+ * Warm-idle window for live legacy cloud sessions. Mirrors the server's
+ * warm-idle cutoff for the legacy `agent_*` plane. Env override drift is
+ * accepted (A2).
  */
 const CLOUD_AGENT_WARM_IDLE_CUTOFF = sql`now() - interval '15 minutes'`;
 

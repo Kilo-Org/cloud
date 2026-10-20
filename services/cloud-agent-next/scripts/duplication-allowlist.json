@@ -3,15 +3,6 @@
   "scanner": "jscpd@5.0.16",
   "exceptions": [
     {
-      "files": ["src/control-plane/session/session-do.ts", "src/persistence/CloudAgentSession.ts"],
-      "fingerprint": "026e1925da1195c9",
-      "owner": "session runtime authorization adapters",
-      "reason": "Control-plane and legacy Session DOs call the same renewal owner through storage adapters with different metadata serialization and lifecycle rules.",
-      "kind": "intentional",
-      "maxMatches": 1,
-      "maxTokens": 104
-    },
-    {
       "files": ["src/session-service.ts", "src/session-service.ts"],
       "fingerprint": "d074c54d7bd62a52",
       "owner": "session-service workspace preparation",

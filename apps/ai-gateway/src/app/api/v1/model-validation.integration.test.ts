@@ -1,7 +1,7 @@
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 const mockFetchSessionMetadata = jest.fn();
 const mockGetRuntimeToken = jest.fn();
-jest.mock('../../../../../../services/cloud-agent-next/src/session-service', () => ({
+jest.mock('../../../../../../services/cloud-agent-next/src/session/metadata', () => ({
   fetchSessionMetadata: (...args: unknown[]) => mockFetchSessionMetadata(...args),
 }));
 jest.mock('../../../../../../services/cloud-agent-next/src/sandbox-session/session-stub', () => ({

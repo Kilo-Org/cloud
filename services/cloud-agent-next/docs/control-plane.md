@@ -2,8 +2,8 @@
 
 This is the single design and acceptance spec for the `workspace_*` control plane: the Session DO
 (`SandboxSession`), the Sandbox DO (`SandboxControl`), the in-container supervisor and the control
-wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The legacy `agent_*` plane
-(`CloudAgentSession`, legacy wrapper `wrapper/src/main.ts`) is out of scope.
+wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The retired `agent_*` plane is
+out of scope; old session IDs are rejected.
 
 ## 1. Principles
 
@@ -1405,4 +1405,4 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   the desired environment after the next restart. This predates the directory-key flip for legacy
   shared directories.
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
-  the legacy plane.
+  the retired legacy plane.

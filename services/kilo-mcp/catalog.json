@@ -15237,6 +15237,17 @@
     ],
     "searchBlob": "modelPreferences.setLastSelected Save the model and variant a user selected most recently, so the app can preselect it next time. modelpreferences setlastselected model variant model variant"
   },
+  "models.customPricing": {
+    "path": "models.customPricing",
+    "kind": "query",
+    "summary": "Retrieve the admin-configured custom pricing overrides for AI models, including per-model pricing, discount percentages, and fallback-only flags. Use to look up custom model pricing or discounts configured in the AI gateway.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "custompricing"
+    ],
+    "searchBlob": "models.customPricing Retrieve the admin-configured custom pricing overrides for AI models, including per-model pricing, discount percentages, and fallback-only flags. Use to look up custom model pricing or discounts configured in the AI gateway. models custompricing"
+  },
   "models.list": {
     "path": "models.list",
     "kind": "query",

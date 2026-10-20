@@ -33,6 +33,7 @@ import {
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { usePreferredModels } from '@/components/shared/usePreferredModels';
+import { useConfiguredCustomPricing } from '@/components/shared/useConfiguredCustomPricing';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
 import {
@@ -122,6 +123,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   });
 
   const preferredModels = usePreferredModels();
+  const configuredCustomPricing = useConfiguredCustomPricing();
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
@@ -286,13 +288,17 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
-        ...getOfferingPricing(getSnapshotModelVariantId(model), model.endpoint.pricing),
+        ...getOfferingPricing(
+          getSnapshotModelVariantId(model),
+          model.endpoint.pricing,
+          configuredCustomPricing
+        ),
       });
     }
 
     offerings.sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));
     return offerings;
-  }, [infoModel, openRouterProviders]);
+  }, [infoModel, openRouterProviders, configuredCustomPricing]);
 
   const enabledModelCountByProviderSlug = useMemo(() => {
     const map = new Map<string, number>();
@@ -427,7 +433,11 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         modelName: model.name,
         preferredIndex: preferredIndexByModelId.get(normalizedModelId),
         sourceIndex,
-        ...getOfferingPricing(getSnapshotModelVariantId(model), model.endpoint.pricing),
+        ...getOfferingPricing(
+          getSnapshotModelVariantId(model),
+          model.endpoint.pricing,
+          configuredCustomPricing
+        ),
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });
@@ -436,7 +446,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     rows.sort(compareRecommendedThenSourceIndex);
 
     return rows;
-  }, [infoProvider, openRouterProviders, preferredIndexByModelId]);
+  }, [infoProvider, openRouterProviders, preferredIndexByModelId, configuredCustomPricing]);
 
   // NOTE: returns must happen after all hooks above, otherwise React will error
   // with "Rendered more hooks than during the previous render" as data loads.

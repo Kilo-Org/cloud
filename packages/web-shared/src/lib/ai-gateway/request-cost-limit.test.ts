@@ -14,6 +14,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     }),
   },
 }));
+jest.mock('./configured-custom-pricing', () => ({
+  getConfiguredCustomPricing: jest.fn(async () => ({})),
+}));
 jest.mock('./providers/vercel/mapModelIdToVercel', () => ({
   ...jest.requireActual('./providers/vercel/mapModelIdToVercel'),
   getVercelModelIdOverrides: jest.fn(async () => new Map()),
@@ -41,16 +44,35 @@ beforeEach(() => {
 });
 describe('request cost admission', () => {
   it('bounds every route including cache, reasoning and per-request fees', () => {
-    const price = textRequestPriceCeiling(model);
+    const price = textRequestPriceCeiling(model, {});
     expect(price.inputRate).toBeCloseTo(0.000004, 12);
     expect(price.outputRate).toBeCloseTo(0.000006, 12);
     expect(price.requestCost).toBe(0.02);
+  });
+  it('bounds admin-configured custom pricing above the route prices', () => {
+    const price = textRequestPriceCeiling(model, {
+      [model.id]: {
+        pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 10,
+              completion_per_million: 20,
+              input_cache_read_per_million: null,
+              input_cache_write_per_million: null,
+            },
+          },
+        ],
+      },
+    });
+    expect(price.inputRate).toBeCloseTo(0.00001, 12);
+    expect(price.outputRate).toBeCloseTo(0.00002, 12);
   });
   it('fails closed for unknown or incompletely priced routes', async () => {
     await expect(
       enforceRequestCostLimit('2000000', 'missing/model', body, 2_000_000)
     ).resolves.toMatch(/pricing/);
-    expect(() => textRequestPriceCeiling({ ...model, endpoints: [{}] })).toThrow();
+    expect(() => textRequestPriceCeiling({ ...model, endpoints: [{}] }, {})).toThrow();
   });
   it('rejects before upstream spend for an insufficient ceiling or balance', async () => {
     await expect(enforceRequestCostLimit('1', model.id, body, 2_000_000)).resolves.toMatch(

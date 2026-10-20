@@ -1927,6 +1927,32 @@ describe('handleKiloFacadeRequest', () => {
     );
   });
 
+  it('applies the resolved page size to a live message read that carries only a cursor', async () => {
+    const cursor = encodeKiloSdkMessagesCursor({ id: 'msg_user_1', time: 110 });
+    const containerFetch = vi.fn<ContainerFetch>(async () => Response.json(sdkMessageHistory()));
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/session/${kiloSessionId}/message?before=${cursor}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_live',
+        })),
+        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const [forwardedRequest] = containerFetch.mock.calls[0];
+    expect(new URL(forwardedRequest.url).searchParams.get('before')).toBe(cursor);
+    expect(new URL(forwardedRequest.url).searchParams.get('limit')).toBe(
+      String(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE)
+    );
+  });
+
   it('projects private structured paths and preserves file text in live messages', async () => {
     const containerFetch = vi.fn<ContainerFetch>(async () =>
       Response.json(sdkMessageHistoryWithPrivateStructuredPaths())

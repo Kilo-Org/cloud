@@ -1568,7 +1568,8 @@ describe('cli-sessions-router', () => {
 
     it('fails when the share row disappears before its copy finishes', async () => {
       const caller = await createCallerForUser(regularUser.id);
-      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      const { copyBlobs, deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(deleteBlobs).mockClear();
       jest.mocked(copyBlobs).mockImplementationOnce(async () => {
         await db.delete(sharedCliSessions).where(eq(sharedCliSessions.session_id, shareSessionId));
         return {
@@ -1582,6 +1583,13 @@ describe('cli-sessions-router', () => {
           shared_state: CliSessionSharedState.Public,
         })
       ).rejects.toThrow(/removed before its copy finished/);
+
+      expect(deleteBlobs).toHaveBeenCalledWith(expect.any(String), [
+        { folderName: 'shared-sessions', filename: 'api_conversation_history' },
+        { folderName: 'shared-sessions', filename: 'task_metadata' },
+        { folderName: 'shared-sessions', filename: 'ui_messages' },
+        { folderName: 'shared-sessions', filename: 'git_state' },
+      ]);
     });
 
     it('stores a share of a session that has no blobs', async () => {

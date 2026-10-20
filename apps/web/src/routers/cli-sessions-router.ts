@@ -286,6 +286,11 @@ async function createSharedSessionCopy(params: {
       .returning({ share_id: sharedCliSessions.share_id });
 
     if (!completed) {
+      try {
+        await deleteSharedSessionCopies([reservation.shareId]);
+      } catch {
+        // The row is gone; a cleanup failure must not replace the conflict.
+      }
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'The share was removed before its copy finished. Share the session again.',

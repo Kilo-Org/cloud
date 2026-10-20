@@ -14,6 +14,7 @@ import {
 function comment(overrides: Partial<FixReviewComment> = {}): FixReviewComment {
   return {
     id: 1,
+    inReplyToId: null,
     authorLogin: 'octocat',
     authorType: 'User',
     authorId: 583231,
@@ -177,6 +178,20 @@ describe('selectFixReviewComments', () => {
 
     expect(selected).toEqual([]);
     expect(lookupPermission).toHaveBeenCalledWith('octocat[bot]');
+  });
+
+  it('acts on top-level comments only, never on replies', async () => {
+    const selected = await selectFixReviewComments({
+      comments: [
+        comment({ id: 71, authorLogin: 'initiator' }),
+        comment({ id: 72, authorLogin: 'initiator', inReplyToId: 71, body: 'Fixed in abc1234.' }),
+      ],
+      trustedLogins: ['initiator'],
+      settledCommentIds: NO_SETTLED,
+      lookupPermission: permissionTable({}),
+    });
+
+    expect(selected.map(entry => entry.id)).toEqual([71]);
   });
 });
 

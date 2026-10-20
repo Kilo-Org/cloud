@@ -204,6 +204,7 @@ function expectNoSessionCreation() {
 
 const SELECTED_COMMENT: FixReviewComment = {
   id: 4242,
+  inReplyToId: null,
   authorLogin: 'kiloconnect[bot]',
   authorType: 'Bot',
   authorId: 240665456,

@@ -42,6 +42,7 @@ describe('createFixReviewCommentClient', () => {
     const secondPage = [
       {
         id: 900,
+        in_reply_to_id: 899,
         path: 'src/other.ts',
         line: null,
         body: 'last comment',
@@ -58,6 +59,7 @@ describe('createFixReviewCommentClient', () => {
     expect(comments).toHaveLength(101);
     expect(comments[100]).toEqual({
       id: 900,
+      inReplyToId: 899,
       authorLogin: 'kiloconnect[bot]',
       authorType: 'Bot',
       authorId: 240665456,

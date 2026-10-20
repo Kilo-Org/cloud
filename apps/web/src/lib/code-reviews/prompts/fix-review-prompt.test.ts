@@ -7,6 +7,7 @@ const NONCE = '7d1c4b9e-nonce';
 function comment(overrides: Partial<FixReviewComment> = {}): FixReviewComment {
   return {
     id: 987654,
+    inReplyToId: null,
     authorLogin: 'kiloconnect[bot]',
     authorType: 'Bot',
     authorId: 240665456,
@@ -118,6 +119,6 @@ describe('buildFixReviewPrompt', () => {
     const prompt = build([comment()], 7);
 
     expect(prompt).toContain('7 earlier comments matched the selection rules but were left out');
-    expect(prompt).toContain('another fix run is needed for them');
+    expect(prompt).toContain('List how many earlier comments were left out in the summary');
   });
 });

@@ -40,6 +40,7 @@ const KNOWN_PERMISSIONS: Record<string, CollaboratorPermission> = {
 
 export type FixReviewComment = {
   id: number;
+  inReplyToId: number | null;
   authorLogin: string;
   authorType: string;
   authorId: number | null;
@@ -183,6 +184,7 @@ export function createFixReviewCommentClient(
         for (const comment of data) {
           comments.push({
             id: comment.id,
+            inReplyToId: comment.in_reply_to_id ?? null,
             authorLogin: comment.user?.login ?? '',
             authorType: comment.user?.type ?? '',
             authorId: comment.user?.id ?? null,
@@ -339,7 +341,11 @@ export async function selectFixReviewComments(input: {
     return resolved === 'admin' || resolved === 'write';
   }
 
-  const candidates = input.comments.filter(comment => !input.settledCommentIds.has(comment.id));
+  // Only top-level comments can ask for a change. Replies carry the discussion
+  // around one, including the replies the fix session writes itself.
+  const candidates = input.comments.filter(
+    comment => comment.inReplyToId === null && !input.settledCommentIds.has(comment.id)
+  );
   const authorization = await Promise.all(candidates.map(comment => isAuthorized(comment)));
 
   return candidates

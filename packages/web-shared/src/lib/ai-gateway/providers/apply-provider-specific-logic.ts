@@ -234,10 +234,12 @@ export function applyPreferredProvider(
 
 /**
  * Fallback models are not supported: a request for a free model could fall
- * back to a paid model and be served without being charged.
+ * back to a paid model and be served without being charged. OpenRouter accepts
+ * them as `models` on every API and as `fallbacks` on the Messages API.
  */
 export function removeModelsFallback(requestToMutate: GatewayRequest) {
   delete requestToMutate.body.models;
+  delete requestToMutate.body.fallbacks;
 }
 
 export function removeUnsupportedRequestServiceTier(

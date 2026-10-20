@@ -518,6 +518,40 @@ describe('removeModelsFallback', () => {
       expect(request.body.models).toBeUndefined();
     }
   );
+
+  it.each([[[{ model: 'anthropic/claude-opus-4.6' }]], ['default']])(
+    'removes caller-provided Messages API fallbacks %j',
+    fallbacks => {
+      const request = makeMessagesRequest('thinkingmachines/inkling-small:free');
+      request.body.fallbacks = fallbacks;
+
+      removeModelsFallback(request);
+
+      expect(request.body).not.toHaveProperty('fallbacks');
+    }
+  );
+
+  it('removes Messages API fallbacks before a free model request is sent upstream', async () => {
+    const model = 'thinkingmachines/inkling-small:free';
+    const request = makeMessagesRequest(model);
+    request.body.fallbacks = [{ model: 'anthropic/claude-opus-4.6' }];
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    expect(request.body).not.toHaveProperty('fallbacks');
+  });
 });
 
 describe('applyPreferredProvider', () => {

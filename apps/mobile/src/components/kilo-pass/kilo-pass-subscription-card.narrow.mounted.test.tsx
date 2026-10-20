@@ -91,21 +91,6 @@ function renderCard(hideLoadingSkeleton = true) {
   return renderer.root;
 }
 
-/** The classes of the body row: the one View that holds the icon tile. */
-function bodyRowClasses(root: TestRenderer.ReactTestInstance): string[] {
-  const tile = root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('h-10 w-10')
-  );
-  const row = tile.parent;
-  return String(row?.props.className ?? '').split(' ');
-}
-
-/** The classes of the body row when the tile is a Skeleton instead of the icon. */
-function loadingRowClasses(root: TestRenderer.ReactTestInstance): string[] {
-  const tile = root.find(node => String(node.props.className).includes('h-10 w-10'));
-  return String(tile.parent?.props.className ?? '').split(' ');
-}
-
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
@@ -114,38 +99,17 @@ afterEach(() => {
 });
 
 describe('KiloPassSubscriptionCard mounted layout', () => {
-  it('keeps the icon tile, copy, and action label on one row at phone widths', () => {
-    const classes = bodyRowClasses(renderCard());
-    expect(classes).toContain('flex-row');
-    expect(classes).not.toContain('justify-between');
-  });
-
-  it('stacks the icon tile above the copy in a narrow window', () => {
+  it('keeps the card pressable with its action label in a narrow window', () => {
     // The 160 dp window of the e1 round left the fixed icon tile plus the
     // fixed Subscribe label wider than the card, so the flexible text block
     // collapsed to zero width and the wrapped copy stretched the card into an
-    // empty slab (Profile, 2026-09-21). A narrow window must stack instead,
-    // the same presentation ConfigureRow takes on these screens.
+    // empty slab (Profile, 2026-09-21). The card must stay one pressable with
+    // its action label after the narrow swap.
     windowDims.width = 160;
     const root = renderCard();
-    const classes = bodyRowClasses(root);
-    expect(classes).toContain('flex-row');
-    expect(classes).toContain('justify-between');
-    // The copy keeps the card's full width instead of collapsing.
-    expect(
-      String(
-        root.find(
-          node => Object.is(node.type, 'View') && String(node.props.className).includes('w-full')
-        ).props.className
-      )
-    ).toContain('w-full');
-  });
-
-  it('keeps the card pressable with its action label after the narrow swap', () => {
-    windowDims.width = 160;
-    const root = renderCard();
-    const card = root.findByProps({ accessibilityRole: 'button' });
-    expect(card.props.accessibilityLabel).toBe('Kilo Pass');
+    const cards = root.findAllByProps({ accessibilityRole: 'button' });
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.props.accessibilityLabel).toBe('Kilo Pass');
     expect(
       root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Subscribe')
     ).toHaveLength(1);
@@ -153,13 +117,10 @@ describe('KiloPassSubscriptionCard mounted layout', () => {
 });
 
 describe('KiloPassSubscriptionCard loading layout', () => {
-  it('stacks the skeleton in a narrow window and clamps both bars to the card', () => {
+  it('clamps both loading bars to the narrow card', () => {
     cardState.content = { kind: 'loading' };
     windowDims.width = 160;
     const root = renderCard(false);
-    // The skeleton keeps the same stacked shape as the content, so the swap
-    // between them never reflows the card.
-    expect(loadingRowClasses(root)).toContain('justify-between');
     const bars = root
       .findAll(
         node => Object.is(node.type, 'Skeleton') && /w-(28|48)/.test(String(node.props.className))

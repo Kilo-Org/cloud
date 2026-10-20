@@ -21,7 +21,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 
 /**
@@ -63,12 +63,13 @@ async function getModelInferenceUserByokProviders(modelId: string): Promise<User
 /**
  * Kilo-exclusive and free models stay on Kilo's own accounts: they are served
  * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
- * take them over.
+ * take them over. Custom LLMs are never in the gateway catalogs, so the
+ * built-in free rules suffice.
  */
 export async function getModelGatewayUserByokProviders(
   modelId: string
 ): Promise<GatewayUserByokProviderId[]> {
-  if (isKiloExclusiveModel(modelId) || isFreeModel(modelId)) {
+  if (isKiloExclusiveModel(modelId) || isFreeModelExcludingCustomLlms(modelId)) {
     return [];
   }
   const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([

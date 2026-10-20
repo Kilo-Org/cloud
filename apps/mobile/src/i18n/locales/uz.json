@@ -3041,6 +3041,7 @@
       "removeLimit": "Limitni olib tashlash",
       "title": "Kunlik foydalanish limiti",
       "blankError": "Miqdor kiriting yoki quyidagi Limitni olib tashlash tugmasini bosing.",
+      "blankWithoutLimitError": "0 Va {{max}} oralig'idagi kunlik limitni kiriting.",
       "rangeError": "0 Va {{max}} oralig'idagi miqdorni kiriting."
     },
     "members": {

@@ -3081,6 +3081,7 @@
       "removeLimit": "Remover limite",
       "title": "Limite diário de utilização",
       "blankError": "Introduza um valor ou remova o limite através da opção abaixo.",
+      "blankWithoutLimitError": "Introduza um limite diário entre 0 e {{max}}.",
       "rangeError": "Introduza um valor entre 0 e {{max}}."
     },
     "members": {

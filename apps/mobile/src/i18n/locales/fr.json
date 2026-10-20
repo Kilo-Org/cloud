@@ -3080,6 +3080,7 @@
       "removeLimit": "Supprimer la limite",
       "title": "Limite d'utilisation quotidienne",
       "blankError": "Saisissez un montant ou touchez Supprimer la limite ci-dessous.",
+      "blankWithoutLimitError": "Saisissez une limite quotidienne comprise entre 0 et {{max}}.",
       "rangeError": "Saisissez un montant compris entre 0 et {{max}}."
     },
     "members": {

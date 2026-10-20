@@ -3201,6 +3201,7 @@
       "removeLimit": "Dileu'r terfyn",
       "title": "Terfyn defnydd dyddiol",
       "blankError": "Nodwch swm, neu defnyddiwch Dileu'r terfyn isod.",
+      "blankWithoutLimitError": "Nodwch derfyn dyddiol rhwng 0 a {{max}}.",
       "rangeError": "Nodwch swm rhwng 0 a {{max}}."
     },
     "members": {

@@ -3041,6 +3041,7 @@
       "removeLimit": "Kendu muga",
       "title": "Eguneko erabilera-muga",
       "blankError": "Sartu zenbateko bat edo sakatu beheko Kendu muga botoia.",
+      "blankWithoutLimitError": "Sartu eguneroko muga bat 0 eta {{max}} artean.",
       "rangeError": "Sartu 0 eta {{max}} arteko zenbateko bat."
     },
     "members": {

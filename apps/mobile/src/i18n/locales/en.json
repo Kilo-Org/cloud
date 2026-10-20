@@ -3118,6 +3118,7 @@
       "removeLimit": "Remove limit",
       "title": "Daily usage limit",
       "blankError": "Enter an amount, or use Remove limit below",
+      "blankWithoutLimitError": "Enter a daily limit between 0 and {{max}}",
       "rangeError": "Enter an amount between 0 and {{max}}"
     },
     "members": {

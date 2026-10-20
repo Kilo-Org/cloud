@@ -3041,6 +3041,7 @@
       "removeLimit": "Yọ ààlà kúrò",
       "title": "Ààlà lílo ojoojúmọ́",
       "blankError": "Tẹ iye owó kan, tàbí tẹ Yọ ààlà kúrò ní ìsàlẹ̀.",
+      "blankWithoutLimitError": "Tẹ ààlà ojoojúmọ́ tó wà láàárín 0 àti {{max}}.",
       "rangeError": "Tẹ iye owó tó wà láàárín 0 àti {{max}}."
     },
     "members": {

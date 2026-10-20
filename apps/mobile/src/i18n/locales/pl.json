@@ -3120,6 +3120,7 @@
       "removeLimit": "Usuń limit",
       "title": "Dzienny limit wydatków",
       "blankError": "Wpisz kwotę lub wybierz „Usuń limit” poniżej.",
+      "blankWithoutLimitError": "Wpisz dzienny limit od 0 do {{max}}.",
       "rangeError": "Wpisz kwotę od 0 do {{max}}."
     },
     "members": {

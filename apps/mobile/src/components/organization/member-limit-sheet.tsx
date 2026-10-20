@@ -39,11 +39,20 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
     silenceUpdateMemberToast: true,
   });
   const currentLimit = member.dailyUsageLimitUsd;
+  const hasCurrentLimit = currentLimit != null;
 
   const initialValue =
     currentLimit == null ? '' : formatNumber(currentLimit, i18n.language, { useGrouping: false });
   const limitRef = useRef(initialValue);
-  const [canSave, setCanSave] = useState(limitError(limitRef.current) == null);
+  // Live validation, not FormField's blur-only `validate`: Save is already
+  // disabled while the value is invalid, so the reason has to be on screen then,
+  // not after the person gives up and taps elsewhere. The message waits for the
+  // first edit or blur so the sheet does not open showing an error.
+  const [fieldError, setFieldError] = useState<string | null>(() =>
+    limitError(initialValue, hasCurrentLimit)
+  );
+  const [fieldTouched, setFieldTouched] = useState(false);
+  const canSave = fieldError === null;
 
   const onSaved = () => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -70,10 +79,14 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         placeholder={t('organization.memberLimit.noLimitPlaceholder')}
         keyboardType="decimal-pad"
         defaultValue={initialValue || undefined}
-        validate={limitError}
+        error={fieldTouched ? (fieldError ?? undefined) : undefined}
         onChangeText={value => {
           limitRef.current = value;
-          setCanSave(limitError(value) == null);
+          setFieldError(limitError(value, hasCurrentLimit));
+          setFieldTouched(true);
+        }}
+        onBlur={() => {
+          setFieldTouched(true);
         }}
       />
 

@@ -3081,6 +3081,7 @@
       "removeLimit": "Treu el límit",
       "title": "Límit d'ús diari",
       "blankError": "Introdueix un import o treu el límit amb el botó de sota.",
+      "blankWithoutLimitError": "Introdueix un límit diari entre 0 i {{max}}.",
       "rangeError": "Introdueix un import entre 0 i {{max}}."
     },
     "members": {

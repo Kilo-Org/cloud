@@ -3041,6 +3041,7 @@
       "removeLimit": "ገደቡን ያስወግዱ",
       "title": "የዕለት አጠቃቀም ገደብ",
       "blankError": "መጠን ያስገቡ፣ ወይም ከታች «ገደቡን ያስወግዱ»ን ይንኩ።",
+      "blankWithoutLimitError": "በ0 እና {{max}} መካከል ያለ የቀን ገደብ ያስገቡ።",
       "rangeError": "በ0 እና {{max}} መካከል ያለ መጠን ያስገቡ።"
     },
     "members": {

@@ -3081,6 +3081,7 @@
       "removeLimit": "Ukloni limit",
       "title": "Dnevni limit potrošnje",
       "blankError": "Unesi iznos ili dodirni „Ukloni limit“ ispod.",
+      "blankWithoutLimitError": "Unesi dnevni limit između 0 i {{max}}.",
       "rangeError": "Unesi iznos između 0 i {{max}}."
     },
     "members": {

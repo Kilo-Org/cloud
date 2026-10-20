@@ -3041,6 +3041,7 @@
       "removeLimit": "Retire limit la",
       "title": "Limit itilizasyon chak jou",
       "blankError": "Antre yon montan, oswa peze Retire limit la anba a.",
+      "blankWithoutLimitError": "Antre yon limit chak jou ant 0 ak {{max}}.",
       "rangeError": "Antre yon montan ant 0 ak {{max}}."
     },
     "members": {

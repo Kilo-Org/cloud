@@ -3161,6 +3161,7 @@
       "removeLimit": "Neħħi l-limitu",
       "title": "Limitu tal-użu ta' kuljum",
       "blankError": "Daħħal ammont jew tektek Neħħi l-limitu hawn taħt.",
+      "blankWithoutLimitError": "Daħħal limitu ta' kuljum bejn 0 u {{max}}.",
       "rangeError": "Daħħal ammont bejn 0 u {{max}}."
     },
     "members": {

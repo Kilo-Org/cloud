@@ -3161,6 +3161,7 @@
       "removeLimit": "Bain an teorainn",
       "title": "Teorainn úsáide laethúil",
       "blankError": "Iontráil méid nó tapáil Bain an teorainn thíos.",
+      "blankWithoutLimitError": "Iontráil teorainn laethúil idir 0 agus {{max}}.",
       "rangeError": "Iontráil méid idir 0 agus {{max}}."
     },
     "members": {

@@ -3121,6 +3121,7 @@
       "removeLimit": "Zrušit limit",
       "title": "Denní limit útraty",
       "blankError": "Zadejte částku nebo níže klepněte na tlačítko Zrušit limit.",
+      "blankWithoutLimitError": "Zadejte denní limit mezi 0 a {{max}}.",
       "rangeError": "Zadejte částku mezi 0 a {{max}}."
     },
     "members": {

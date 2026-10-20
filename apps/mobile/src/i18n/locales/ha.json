@@ -3041,6 +3041,7 @@
       "removeLimit": "Cire iyaka",
       "title": "Iyakar amfani a rana",
       "blankError": "Shigar da adadin kuɗi, ko danna Cire iyaka a ƙasa.",
+      "blankWithoutLimitError": "Shigar da iyakar yau da kullum tsakanin 0 da {{max}}.",
       "rangeError": "Shigar da adadin kuɗi tsakanin 0 da {{max}}."
     },
     "members": {

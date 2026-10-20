@@ -3041,6 +3041,7 @@
       "removeLimit": "Poista raja",
       "title": "Päivittäinen käyttöraja",
       "blankError": "Anna summa tai poista raja alla olevalla Poista raja -painikkeella.",
+      "blankWithoutLimitError": "Anna päivittäinen raja väliltä 0–{{max}}.",
       "rangeError": "Anna summa väliltä 0–{{max}}."
     },
     "members": {

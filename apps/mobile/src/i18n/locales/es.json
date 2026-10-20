@@ -3080,6 +3080,7 @@
       "removeLimit": "Eliminar límite",
       "title": "Límite de uso diario",
       "blankError": "Introduce un importe o elimina el límite con el botón de abajo.",
+      "blankWithoutLimitError": "Introduce un límite diario entre 0 y {{max}}.",
       "rangeError": "Introduce un importe entre 0 y {{max}}."
     },
     "members": {

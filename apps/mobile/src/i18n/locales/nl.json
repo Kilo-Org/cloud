@@ -3040,6 +3040,7 @@
       "removeLimit": "Limiet verwijderen",
       "title": "Dagelijkse gebruikslimiet",
       "blankError": "Voer een bedrag in of tik hieronder op Limiet verwijderen.",
+      "blankWithoutLimitError": "Voer een dagelijkse limiet tussen 0 en {{max}} in.",
       "rangeError": "Voer een bedrag tussen 0 en {{max}} in."
     },
     "members": {

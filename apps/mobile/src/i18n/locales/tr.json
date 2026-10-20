@@ -3040,6 +3040,7 @@
       "removeLimit": "Sınırı kaldır",
       "title": "Günlük kullanım sınırı",
       "blankError": "Bir tutar gir veya aşağıdaki “Sınırı kaldır” düğmesini kullan.",
+      "blankWithoutLimitError": "0 İle {{max}} arasında bir günlük sınır gir.",
       "rangeError": "0 İle {{max}} arasında bir tutar gir."
     },
     "members": {

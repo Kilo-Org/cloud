@@ -3041,6 +3041,7 @@
       "removeLimit": "Fjarlægja hámark",
       "title": "Daglegt notkunarhámark",
       "blankError": "Sláðu inn upphæð eða fjarlægðu hámarkið hér að neðan.",
+      "blankWithoutLimitError": "Sláðu inn daglegt hámark milli 0 og {{max}}.",
       "rangeError": "Sláðu inn upphæð milli 0 og {{max}}."
     },
     "members": {

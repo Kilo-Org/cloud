@@ -3041,6 +3041,7 @@
       "removeLimit": "Ka saar xadka",
       "title": "Xadka isticmaalka maalinlaha ah",
       "blankError": "Geli qaddar, ama hoos ka taabo Ka saar xadka.",
+      "blankWithoutLimitError": "Geli xad maalinle ah u dhexeeya 0 iyo {{max}}.",
       "rangeError": "Geli qaddar u dhexeeya 0 iyo {{max}}."
     },
     "members": {

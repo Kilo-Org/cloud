@@ -3081,6 +3081,7 @@
       "removeLimit": "Noņemt limitu",
       "title": "Dienas tēriņu limits",
       "blankError": "Ievadi summu vai nospied zemāk esošo pogu „Noņemt limitu”.",
+      "blankWithoutLimitError": "Ievadi dienas limitu no 0 līdz {{max}}.",
       "rangeError": "Ievadi summu no 0 līdz {{max}}."
     },
     "members": {

@@ -63,6 +63,7 @@ import {
   type NativeReadOutcome,
 } from './native-live.js';
 import {
+  canRetainNativeEvent,
   createNativeAttachmentRegistry,
   isDeliverableNativeEvent,
   NATIVE_FACADE_FENCE_EVENT,
@@ -2117,6 +2118,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
   private readonly globalNativeAttachments = new Map<string, Map<string, string>>();
   private readonly globalNativeRefreshes = new Map<string, Promise<void>>();
   private readonly nativeRefreshes = new Map<string, Promise<void>>();
+  private readonly nativeProbeFailures = new Map<string, number>();
   private readonly nativeAttachments = createNativeAttachmentRegistry(
     (attachmentId, kiloSessionId) => {
       for (const [subscriberId, attachments] of this.globalNativeAttachments) {
@@ -2128,6 +2130,12 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
             properties: { sessionID: kiloSessionId, reason: 'continuity_unproven' },
           },
         });
+        for (const [sessionId, id] of attachments) {
+          if (id === attachmentId) attachments.delete(sessionId);
+        }
+        this.nativeUnsubscribes.get(attachmentId)?.();
+        this.nativeUnsubscribes.delete(attachmentId);
+        this.releaseNativeAttachment(attachmentId);
       }
       for (const [subscriberId, writer] of this.nativeWriters) {
         if (writer.attachmentId !== attachmentId) continue;
@@ -2139,6 +2147,11 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
             reason: 'continuity_unproven',
           },
         });
+        const subscriber = this.subscribers.get(subscriberId);
+        if (subscriber !== undefined) {
+          subscriber.controller.close();
+          this.removeSubscriber(subscriberId);
+        }
       }
     }
   );
@@ -2153,7 +2166,12 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     if (
       (input.kind === 'events' ? input.events.length : input.attachmentIds.length) >
         NATIVE_DELIVERY_LIMITS.count ||
-      encoder.encode(JSON.stringify(input)).byteLength > NATIVE_DELIVERY_LIMITS.bytes
+      encoder.encode(JSON.stringify(input)).byteLength > NATIVE_DELIVERY_LIMITS.batchBytes ||
+      (input.kind === 'events' &&
+        input.events.some(
+          ({ event }) =>
+            encoder.encode(JSON.stringify(event)).byteLength > NATIVE_DELIVERY_LIMITS.eventBytes
+        ))
     )
       throw new Error('Native event batch exceeds delivery bounds');
     const resolved = await this.env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession({
@@ -2251,6 +2269,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     const attachment = this.nativeSubscriberSessions.get(attachmentId);
     if (attachment === undefined) return;
     this.nativeSubscriberSessions.delete(attachmentId);
+    this.nativeProbeFailures.delete(attachmentId);
     this.nativeAttachments.release(attachmentId);
     this.ctx.waitUntil(
       withDORetry(
@@ -2391,9 +2410,11 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     this.nativeWriters.set(subscriberId, writer);
     if (native.continuity !== undefined)
       this.nativeAttachments.bind(attachmentId, native.continuity);
+    if (this.nativeWriters.get(subscriberId) !== writer) return;
     const send = async (event: NativePublicEvent) => {
       while (
         this.subscribers.has(subscriberId) &&
+        this.nativeWriters.get(subscriberId) === writer &&
         (this.subscribers.get(subscriberId)?.controller.desiredSize ?? 0) <= 0
       ) {
         await new Promise<void>(resolve => {
@@ -2402,7 +2423,8 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
         writer.waiting = undefined;
       }
       if (
-        this.nativeAttachments.isLost(attachmentId) &&
+        (this.nativeAttachments.isLost(attachmentId) ||
+          this.nativeWriters.get(subscriberId) !== writer) &&
         event.type !== NATIVE_FACADE_RESNAPSHOT_EVENT
       )
         return;
@@ -2422,15 +2444,17 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       let queuedBytes = 0;
       const unsubscribe = this.nativeAttachments.subscribe(attachmentId, event => {
         const bytes = encoder.encode(JSON.stringify(event)).byteLength;
-        queuedBytes += bytes;
-        if (++queued > NATIVE_DELIVERY_LIMITS.count || queuedBytes > NATIVE_DELIVERY_LIMITS.bytes) {
+        if (!canRetainNativeEvent(queued, queuedBytes, bytes)) {
           this.subscribers.get(subscriberId)?.controller.error(new Error(SLOW_SUBSCRIBER_ERROR));
           this.removeSubscriber(subscriberId);
           return;
         }
+        queued++;
+        queuedBytes += bytes;
         tail = tail
           .then(() =>
-            this.nativeAttachments.isLost(attachmentId) &&
+            (this.nativeAttachments.isLost(attachmentId) ||
+              this.nativeWriters.get(subscriberId) !== writer) &&
             event.type !== NATIVE_FACADE_RESNAPSHOT_EVENT
               ? undefined
               : send(event)
@@ -2445,12 +2469,23 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
           });
         this.ctx.waitUntil(tail);
       });
+      if (this.nativeWriters.get(subscriberId) !== writer) {
+        unsubscribe();
+        this.clearNativeSubscriber(subscriberId);
+        return;
+      }
       this.nativeUnsubscribes.set(subscriberId, unsubscribe);
       let events = native.snapshot ?? [];
       let nextPage = native.nextPage;
       for (;;) {
         for (const event of events) {
-          if (this.nativeAttachments.isLost(attachmentId)) return;
+          if (
+            this.nativeAttachments.isLost(attachmentId) ||
+            this.nativeWriters.get(subscriberId) !== writer
+          ) {
+            this.clearNativeSubscriber(subscriberId);
+            return;
+          }
           await send(event);
           if (!this.subscribers.has(subscriberId)) return;
         }
@@ -2467,7 +2502,13 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
         events = page.events;
         nextPage = page.nextPage;
       }
-      if (this.nativeAttachments.isLost(attachmentId)) return;
+      if (
+        this.nativeAttachments.isLost(attachmentId) ||
+        this.nativeWriters.get(subscriberId) !== writer
+      ) {
+        this.clearNativeSubscriber(subscriberId);
+        return;
+      }
       await send({
         type: NATIVE_FACADE_FENCE_EVENT,
         properties: {
@@ -2778,11 +2819,15 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       }
     )
       .then(continuous => {
+        this.nativeProbeFailures.delete(attachmentId);
         if (!continuous) this.nativeAttachments.invalidate(attachmentId);
       })
       .catch(error => {
         logger.withFields({ error: String(error) }).warn('Native attachment refresh failed');
-        this.nativeAttachments.invalidate(attachmentId);
+        if (this.nativeSubscriberSessions.get(attachmentId) !== attachment) return;
+        const failures = (this.nativeProbeFailures.get(attachmentId) ?? 0) + 1;
+        this.nativeProbeFailures.set(attachmentId, failures);
+        if (failures >= 3) this.nativeAttachments.invalidate(attachmentId);
       })
       .finally(() => this.nativeRefreshes.delete(attachmentId));
     this.nativeRefreshes.set(attachmentId, refresh);

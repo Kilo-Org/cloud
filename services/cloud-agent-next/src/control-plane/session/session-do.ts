@@ -122,6 +122,7 @@ import {
 import {
   isDeliverableNativeEvent,
   isMaterializedNativeEvent,
+  NATIVE_DELIVERY_LIMITS,
   toNativePublicEvent,
   type NativeEventSubscription,
 } from '../../kilo-facade/native-event-source.js';
@@ -414,8 +415,7 @@ export type NativeSnapshotCursor = {
   fromId: number;
 };
 
-/** Byte budget per RPC page; a single larger event requires resnapshot. */
-export const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = 256 * 1024;
+export const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = NATIVE_DELIVERY_LIMITS.eventBytes;
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
@@ -559,8 +559,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     identity: () => {
       const kiloUserId = this.metadata?.identity.userId;
       const kiloSessionId = this.registration?.spec.kiloSessionId;
-      if (kiloUserId === undefined || kiloSessionId === undefined)
-        throw new Error('Native delivery identity unavailable');
+      if (kiloUserId === undefined || kiloSessionId === undefined) return null;
       return { kiloUserId, kiloSessionId, cloudAgentSessionId: this.sessionId };
     },
     generation: () => this.nativeDeliveryGeneration,
@@ -1485,16 +1484,40 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }): Promise<NativeSnapshot> {
     await this.initialized;
     if (this.registration === null) return { oversized: false, fence: null, events: [] };
+    const kiloSessionId = this.registration.spec.kiloSessionId;
     const fence =
       input.continuation === undefined
         ? this.eventQueries.getLatestEventId()
         : input.continuation.fence;
     const events: StreamEvent[] = [];
-    let bytes = 0;
+    const encoder = new TextEncoder();
+    const details = {
+      sessionStatus: this.deriveSessionStatus(),
+      questions: this.pendingInteractions?.questions ?? [],
+      permissions: this.pendingInteractions?.permissions ?? [],
+    };
     const push = (event: StreamEvent): boolean => {
-      const size = new TextEncoder().encode(JSON.stringify(event)).byteLength;
-      if (bytes + size > CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES) return false;
-      bytes += size;
+      const native = toNativePublicEvent(event, kiloSessionId);
+      if (
+        native !== null &&
+        encoder.encode(JSON.stringify(native)).byteLength > NATIVE_DELIVERY_LIMITS.eventBytes
+      )
+        return false;
+      const candidate = { oversized: false, fence, events: [...events, event] };
+      const size = Math.max(
+        encoder.encode(JSON.stringify({ ...candidate, ...details })).byteLength,
+        encoder.encode(
+          JSON.stringify({
+            ...candidate,
+            continuation: { fence, phase: 'removals', fromId: Number.MAX_SAFE_INTEGER },
+          })
+        ).byteLength
+      );
+      if (
+        size > CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES &&
+        (events.length > 0 || size > NATIVE_DELIVERY_LIMITS.batchBytes)
+      )
+        return false;
       events.push(event);
       return true;
     };
@@ -1515,14 +1538,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         fromId = event.id;
       }
     }
-    return {
-      oversized: false,
-      fence,
-      events,
-      sessionStatus: this.deriveSessionStatus(),
-      questions: this.pendingInteractions?.questions ?? [],
-      permissions: this.pendingInteractions?.permissions ?? [],
-    };
+    const snapshot = { oversized: false, fence, events, ...details };
+    return encoder.encode(JSON.stringify(snapshot)).byteLength > NATIVE_DELIVERY_LIMITS.batchBytes
+      ? { oversized: true, fence, events: [] }
+      : snapshot;
   }
 
   /**
@@ -2261,6 +2280,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private clearSessionInMemoryState(): void {
+    this.nativeOutbox.close();
     this.registration = null;
     this.metadata = null;
     this.wipeLocator = null;

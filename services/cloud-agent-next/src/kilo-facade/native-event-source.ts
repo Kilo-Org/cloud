@@ -23,14 +23,29 @@ import {
  * interactions before more input is admitted.
  */
 
-/** Bound on pushed events retained per attachment while its snapshot is in flight. */
+/** Large events extend the payload backlog, not the per-event or count limits. */
 export const NATIVE_DELIVERY_LIMITS = {
   count: 512,
   bytes: 64 * 1024,
+  eventBytes: 256 * 1024,
+  retainedBytes: (64 + 256) * 1024,
+  batchBytes: (64 + 256 + 4) * 1024,
   ageMs: 2_000,
   coalesceMs: 10,
 } as const;
 export const MAX_PENDING_NATIVE_EVENTS = NATIVE_DELIVERY_LIMITS.count;
+
+export function canRetainNativeEvent(count: number, retainedBytes: number, eventBytes: number) {
+  const byteBudget =
+    retainedBytes > NATIVE_DELIVERY_LIMITS.bytes || eventBytes > NATIVE_DELIVERY_LIMITS.bytes
+      ? NATIVE_DELIVERY_LIMITS.retainedBytes
+      : NATIVE_DELIVERY_LIMITS.bytes;
+  return (
+    count < NATIVE_DELIVERY_LIMITS.count &&
+    eventBytes <= NATIVE_DELIVERY_LIMITS.eventBytes &&
+    retainedBytes + eventBytes <= byteBudget
+  );
+}
 
 export const NATIVE_FACADE_RESNAPSHOT_EVENT = 'kilo.native.resnapshot';
 export const NATIVE_FACADE_FENCE_EVENT = 'kilo.native.fence';
@@ -223,15 +238,16 @@ export function createNativeAttachmentRegistry(
       delivery.eventId <= state.fence
     )
       return;
+    const bytes = new TextEncoder().encode(JSON.stringify(delivery.event)).byteLength;
+    if (bytes > NATIVE_DELIVERY_LIMITS.eventBytes) {
+      fail(attachmentId, state);
+      return;
+    }
     if (
       state.phase === 'snapshot' ||
       (continuity !== undefined && state.continuity === undefined)
     ) {
-      const bytes = new TextEncoder().encode(JSON.stringify(delivery.event)).byteLength;
-      if (
-        state.pending.length >= NATIVE_DELIVERY_LIMITS.count ||
-        state.pendingBytes + bytes > NATIVE_DELIVERY_LIMITS.bytes
-      ) {
+      if (!canRetainNativeEvent(state.pending.length, state.pendingBytes, bytes)) {
         fail(attachmentId, state);
         return;
       }

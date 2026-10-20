@@ -2,13 +2,16 @@ import type {
   NativeEventDelivery,
   NativeEventBatch,
 } from '../../kilo-facade/native-event-source.js';
-import { NATIVE_DELIVERY_LIMITS } from '../../kilo-facade/native-event-source.js';
+import {
+  canRetainNativeEvent,
+  NATIVE_DELIVERY_LIMITS,
+} from '../../kilo-facade/native-event-source.js';
 
 type Event = Omit<NativeEventDelivery, 'cloudAgentSessionId' | 'kiloSessionId'>;
 type Entry = { event: Event; sequence: number; bytes: number; deadlineAt: number };
 
 export function createNativeEventOutbox(options: {
-  identity: () => { kiloUserId: string; cloudAgentSessionId: string; kiloSessionId: string };
+  identity: () => { kiloUserId: string; cloudAgentSessionId: string; kiloSessionId: string } | null;
   generation: () => number;
   send: (batch: NativeEventBatch, deadlineAt: number) => Promise<void>;
   waitUntil: (work: Promise<void>) => void;
@@ -18,9 +21,11 @@ export function createNativeEventOutbox(options: {
   const pending: Entry[] = [];
   const losses = new Set<string>();
   let sequence = 0;
-  let retainedCount = 0;
+  const retained = new Set<Entry>();
   let retainedBytes = 0;
   let scheduled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancelDelay: (() => void) | undefined;
   const size = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 
   function lose(attachmentIds: string[], reason: string) {
@@ -34,8 +39,7 @@ export function createNativeEventOutbox(options: {
 
   function discardPending() {
     for (const entry of pending) {
-      retainedCount--;
-      retainedBytes -= entry.bytes;
+      if (retained.delete(entry)) retainedBytes -= entry.bytes;
     }
     pending.length = 0;
   }
@@ -44,19 +48,38 @@ export function createNativeEventOutbox(options: {
     return [...subscriptions].filter(([, state]) => state === 'active').map(([id]) => id);
   }
 
+  function quiesce(reason?: string) {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+    cancelDelay?.();
+    cancelDelay = undefined;
+    pending.length = 0;
+    retained.clear();
+    retainedBytes = 0;
+    losses.clear();
+    for (const attachmentId of subscriptions.keys()) subscriptions.set(attachmentId, 'lost');
+    if (reason !== undefined) options.diagnostic(reason);
+  }
+
   async function flush() {
+    if (pending.length === 0 && losses.size === 0) return;
+    const identity = options.identity();
+    if (identity === null) {
+      quiesce('identity_unavailable');
+      return;
+    }
     if (losses.size > 0) {
       const attachmentIds: string[] = [];
       for (const attachmentId of losses) {
         if (attachmentIds.length >= NATIVE_DELIVERY_LIMITS.count) break;
         const candidate = {
-          ...options.identity(),
+          ...identity,
           kind: 'loss',
           generation: options.generation(),
           attachmentIds: [...attachmentIds, attachmentId],
           deadlineAt: Date.now() + NATIVE_DELIVERY_LIMITS.ageMs,
         };
-        if (size(candidate) > NATIVE_DELIVERY_LIMITS.bytes) break;
+        if (size(candidate) > NATIVE_DELIVERY_LIMITS.batchBytes) break;
         attachmentIds.push(attachmentId);
       }
       if (attachmentIds.length === 0) {
@@ -68,7 +91,7 @@ export function createNativeEventOutbox(options: {
       try {
         await options.send(
           {
-            ...options.identity(),
+            ...identity,
             kind: 'loss',
             generation: options.generation(),
             attachmentIds,
@@ -93,7 +116,7 @@ export function createNativeEventOutbox(options: {
       return;
     }
     const batch: Extract<NativeEventBatch, { kind: 'events' }> = {
-      ...options.identity(),
+      ...identity,
       kind: 'events',
       generation: options.generation(),
       firstSequence: first.sequence,
@@ -104,7 +127,7 @@ export function createNativeEventOutbox(options: {
       const next = pending[0];
       if (next === undefined) break;
       batch.events.push(next.event);
-      if (size({ ...batch, deadlineAt: first.deadlineAt }) > NATIVE_DELIVERY_LIMITS.bytes) {
+      if (size({ ...batch, deadlineAt: first.deadlineAt }) > NATIVE_DELIVERY_LIMITS.batchBytes) {
         batch.events.pop();
         break;
       }
@@ -119,11 +142,10 @@ export function createNativeEventOutbox(options: {
     try {
       await options.send(batch, first.deadlineAt);
     } catch {
-      lose(attachments, 'delivery_failed');
+      if (entries.some(entry => retained.has(entry))) lose(attachments, 'delivery_failed');
     } finally {
       for (const entry of entries) {
-        retainedCount--;
-        retainedBytes -= entry.bytes;
+        if (retained.delete(entry)) retainedBytes -= entry.bytes;
       }
     }
   }
@@ -132,8 +154,20 @@ export function createNativeEventOutbox(options: {
     if (scheduled || (pending.length === 0 && losses.size === 0)) return;
     scheduled = true;
     options.waitUntil(
-      new Promise<void>(resolve => setTimeout(resolve, NATIVE_DELIVERY_LIMITS.coalesceMs))
-        .then(flush)
+      new Promise<void>(resolve => {
+        cancelDelay = resolve;
+        timer = setTimeout(() => {
+          timer = undefined;
+          cancelDelay = undefined;
+          resolve();
+        }, NATIVE_DELIVERY_LIMITS.coalesceMs);
+      })
+        .then(async () => {
+          await flush();
+          if (activeAttachments().length > 0 && options.identity() === null)
+            quiesce('identity_unavailable');
+        })
+        .catch(() => quiesce('unexpected_flush_error'))
         .finally(() => {
           scheduled = false;
           schedule();
@@ -142,6 +176,10 @@ export function createNativeEventOutbox(options: {
   }
 
   return {
+    close() {
+      quiesce();
+      subscriptions.clear();
+    },
     subscribe(attachmentId: string) {
       subscriptions.set(attachmentId, subscriptions.get(attachmentId) ?? 'active');
       return { generation: options.generation(), sequence };
@@ -158,28 +196,26 @@ export function createNativeEventOutbox(options: {
       const attachments = activeAttachments();
       if (attachments.length === 0) return;
       sequence++;
-      const bytes = size(event);
-      if (
-        retainedCount >= NATIVE_DELIVERY_LIMITS.count ||
-        retainedBytes + bytes > NATIVE_DELIVERY_LIMITS.bytes
-      ) {
-        lose(attachments, 'overflow');
+      const bytes = size(event.event);
+      if (!canRetainNativeEvent(retained.size, retainedBytes, bytes)) {
+        lose(attachments, bytes > NATIVE_DELIVERY_LIMITS.eventBytes ? 'oversized' : 'overflow');
         discardPending();
       } else {
-        pending.push({
+        const entry = {
           event,
           sequence,
           bytes,
           deadlineAt: Date.now() + NATIVE_DELIVERY_LIMITS.ageMs,
-        });
-        retainedCount++;
+        };
+        pending.push(entry);
+        retained.add(entry);
         retainedBytes += bytes;
       }
       schedule();
     },
     snapshot() {
       return {
-        count: retainedCount,
+        count: retained.size,
         bytes: retainedBytes,
         sequence,
         subscriptions: subscriptions.size,

@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { StreamEvent } from '../websocket/types.js';
 import {
   createNativeAttachmentRegistry,
+  canRetainNativeEvent,
+  NATIVE_DELIVERY_LIMITS,
   isDeliverableNativeEvent,
   isMaterializedNativeEvent,
   MAX_PENDING_NATIVE_EVENTS,
@@ -13,6 +15,26 @@ import { publicCloudAgentDirectory } from './public-sdk-projection.js';
 
 const kiloSessionId = 'ses_12345678901234567890123456';
 const cloudAgentSessionId = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+describe('native delivery admission', () => {
+  it('extends only large-event backlogs to 320 KiB while preserving per-event and count bounds', () => {
+    expect(canRetainNativeEvent(0, 0, NATIVE_DELIVERY_LIMITS.eventBytes)).toBe(true);
+    expect(canRetainNativeEvent(0, 0, NATIVE_DELIVERY_LIMITS.eventBytes + 1)).toBe(false);
+    expect(canRetainNativeEvent(1, NATIVE_DELIVERY_LIMITS.eventBytes, 1)).toBe(true);
+    expect(canRetainNativeEvent(1, 128 * 1024, 128 * 1024)).toBe(true);
+    expect(
+      canRetainNativeEvent(1, NATIVE_DELIVERY_LIMITS.bytes, NATIVE_DELIVERY_LIMITS.eventBytes)
+    ).toBe(true);
+    expect(
+      canRetainNativeEvent(1, NATIVE_DELIVERY_LIMITS.bytes + 1, NATIVE_DELIVERY_LIMITS.eventBytes)
+    ).toBe(false);
+    expect(canRetainNativeEvent(2, NATIVE_DELIVERY_LIMITS.retainedBytes - 1, 1)).toBe(true);
+    expect(canRetainNativeEvent(2, NATIVE_DELIVERY_LIMITS.retainedBytes, 1)).toBe(false);
+    expect(canRetainNativeEvent(1, NATIVE_DELIVERY_LIMITS.bytes - 1, 1)).toBe(true);
+    expect(canRetainNativeEvent(1, NATIVE_DELIVERY_LIMITS.bytes, 1)).toBe(false);
+    expect(canRetainNativeEvent(NATIVE_DELIVERY_LIMITS.count, 0, 1)).toBe(false);
+  });
+});
 
 function streamEvent(id: number, data: unknown, type = 'kilocode'): StreamEvent {
   return {
@@ -245,6 +267,93 @@ describe('createNativeAttachmentRegistry', () => {
       })),
     };
   }
+
+  it.each([70, 128, 240])(
+    'delivers a %s KiB event intact live and after a snapshot cutover',
+    kib => {
+      for (const phase of ['live', 'snapshot']) {
+        const lost = vi.fn();
+        const registry = createNativeAttachmentRegistry(lost);
+        const received = vi.fn();
+        registry.begin(cloudAgentSessionId, kiloSessionId, phase);
+        registry.bind(phase, { generation: 1, sequence: 0 });
+        registry.subscribe(phase, received);
+        if (phase === 'live') registry.complete(phase, 0);
+        const large = batch(1, ['\u00e9'.repeat((kib * 1024) / 2)]);
+        registry.deliverBatch(large, [phase]);
+        if (phase === 'snapshot') {
+          expect(received).not.toHaveBeenCalled();
+          registry.complete(phase, 0);
+        }
+        expect(received).toHaveBeenCalledExactlyOnceWith(
+          large.kind === 'events' ? large.events[0]?.event : undefined
+        );
+        registry.deliverBatch(batch(2, ['after flush']), [phase]);
+        expect(received).toHaveBeenCalledTimes(2);
+        expect(lost).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it('bounds multiple queued events to the aggregate 64 KiB UTF-8 backlog', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+    registry.bind('attachment', { generation: 1, sequence: 0 });
+    const received = vi.fn();
+    registry.subscribe('attachment', received);
+    registry.deliverBatch(batch(1, ['\u00e9'.repeat(20_000)]), ['attachment']);
+    registry.deliverBatch(batch(2, ['\u00e9'.repeat(20_000)]), ['attachment']);
+    registry.complete('attachment', 0);
+    expect(lost).toHaveBeenCalledExactlyOnceWith('attachment', kiloSessionId);
+    expect(received).not.toHaveBeenCalled();
+  });
+
+  it('reports loss above the aggregate 320 KiB payload bound during snapshot', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+    registry.bind('attachment', { generation: 1, sequence: 0 });
+    registry.deliverBatch(batch(1, ['x'.repeat(128 * 1024)]), ['attachment']);
+    registry.deliverBatch(batch(2, ['y'.repeat(240 * 1024)]), ['attachment']);
+    expect(lost).toHaveBeenCalledExactlyOnceWith('attachment', kiloSessionId);
+    expect(registry.isLost('attachment')).toBe(true);
+  });
+
+  it.each([70, 128, 240])(
+    'buffers small metadata, a %s KiB event, and small completion through snapshot in order',
+    kib => {
+      const lost = vi.fn();
+      const registry = createNativeAttachmentRegistry(lost);
+      registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+      registry.bind('attachment', { generation: 1, sequence: 0 });
+      const received = vi.fn();
+      registry.subscribe('attachment', received);
+      const values = ['metadata', '\u00e9'.repeat((kib * 1024) / 2), 'completion'];
+      registry.deliverBatch(batch(1, values), ['attachment']);
+      expect(received).not.toHaveBeenCalled();
+      registry.complete('attachment', 0);
+      expect(received.mock.calls.map(([event]) => event.properties.value)).toEqual(values);
+      expect(lost).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['snapshot', 'live'])(
+    'reports an explicit per-event maximum violation in %s phase',
+    phase => {
+      const lost = vi.fn();
+      const registry = createNativeAttachmentRegistry(lost);
+      registry.begin(cloudAgentSessionId, kiloSessionId, phase);
+      registry.bind(phase, { generation: 1, sequence: 0 });
+      if (phase === 'live') registry.complete(phase, 0);
+      const received = vi.fn();
+      registry.subscribe(phase, received);
+      registry.deliverBatch(batch(1, ['x'.repeat(NATIVE_DELIVERY_LIMITS.eventBytes)]), [phase]);
+      registry.complete(phase, 0);
+      expect(lost).toHaveBeenCalledExactlyOnceWith(phase, kiloSessionId);
+      expect(received).not.toHaveBeenCalled();
+    }
+  );
 
   it('delivers transient zero-ID deltas after the snapshot fence exactly once in producer order', () => {
     const lost = vi.fn();

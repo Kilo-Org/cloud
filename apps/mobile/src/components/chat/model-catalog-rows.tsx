@@ -108,7 +108,7 @@ export function ModelRow({
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);
   if (fitsOnly) {
-    if (!smallest.isFetched) {
+    if (smallest.isPending) {
       return <ModelRowSkeleton />;
     }
     if (!fitsDevice(fit)) {

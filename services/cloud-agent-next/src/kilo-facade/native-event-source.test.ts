@@ -7,6 +7,7 @@ import {
   MAX_PENDING_NATIVE_EVENTS,
   toNativePublicEvent,
   type NativeEventDelivery,
+  type NativeEventBatch,
 } from './native-event-source.js';
 import { publicCloudAgentDirectory } from './public-sdk-projection.js';
 
@@ -213,9 +214,218 @@ describe('toNativePublicEvent', () => {
     expect(isDeliverableNativeEvent(streamEvent(1, {}, 'progress'))).toBe(false);
     expect(isDeliverableNativeEvent(streamEvent(2, {}, 'cloud.message.completed'))).toBe(true);
   });
+
+  it('allows only named transient text deltas on the live path, never in snapshot replay', () => {
+    const delta = streamEvent(0, {
+      type: 'message.part.delta',
+      properties: { sessionID: kiloSessionId, delta: 'text' },
+    });
+    expect(isDeliverableNativeEvent(delta)).toBe(false);
+    expect(isDeliverableNativeEvent(delta, true)).toBe(true);
+    expect(isDeliverableNativeEvent(streamEvent(0, { type: 'message.updated' }), true)).toBe(false);
+    expect(
+      isDeliverableNativeEvent(streamEvent(0, { type: 'cloud.status' }, 'cloud.status'), true)
+    ).toBe(false);
+  });
 });
 
 describe('createNativeAttachmentRegistry', () => {
+  function batch(firstSequence: number, values = ['a', 'b'], generation = 1): NativeEventBatch {
+    return {
+      kiloUserId: 'owner',
+      cloudAgentSessionId,
+      kiloSessionId,
+      kind: 'events',
+      generation,
+      firstSequence,
+      events: values.map(value => ({
+        eventId: 2,
+        materialized: true,
+        event: { type: 'message.part.updated', properties: { value } },
+      })),
+    };
+  }
+
+  it('delivers transient zero-ID deltas after the snapshot fence exactly once in producer order', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+    registry.bind('attachment', { generation: 1, sequence: 0 });
+    registry.complete('attachment', 100);
+    const received = vi.fn();
+    registry.subscribe('attachment', received);
+    const deltas: NativeEventBatch = {
+      ...batch(1),
+      kind: 'events',
+      firstSequence: 1,
+      events: ['first', 'second'].map(delta => ({
+        eventId: 0,
+        event: { type: 'message.part.delta', properties: { delta } },
+      })),
+    };
+    registry.deliverBatch(deltas, ['attachment']);
+    registry.deliverBatch(deltas, ['attachment']);
+    expect(received.mock.calls.map(([event]) => event.properties.delta)).toEqual([
+      'first',
+      'second',
+    ]);
+    expect(lost).not.toHaveBeenCalled();
+  });
+
+  it('requires a resnapshot if post-subscribe transient deltas race the materialized snapshot', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+    const deltas: NativeEventBatch = {
+      ...batch(1),
+      kind: 'events',
+      firstSequence: 1,
+      events: [
+        { eventId: 0, event: { type: 'message.part.delta', properties: { delta: 'ambiguous' } } },
+      ],
+    };
+    registry.deliverBatch(deltas, ['attachment']);
+    registry.bind('attachment', { generation: 1, sequence: 0 });
+    registry.complete('attachment', 100);
+    expect(lost).toHaveBeenCalledExactlyOnceWith('attachment', kiloSessionId);
+    const received = vi.fn();
+    registry.subscribe('attachment', received);
+    expect(received).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ type: 'kilo.native.resnapshot' })
+    );
+  });
+
+  it('does not invalidate a fresh snapshot for a transient captured before it subscribed', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+    registry.deliverBatch(
+      {
+        ...batch(1),
+        kind: 'events',
+        firstSequence: 1,
+        events: [
+          { eventId: 0, event: { type: 'message.part.delta', properties: { delta: 'older' } } },
+        ],
+      },
+      ['attachment']
+    );
+    registry.bind('attachment', { generation: 1, sequence: 1 });
+    registry.complete('attachment', 100);
+    expect(lost).not.toHaveBeenCalled();
+  });
+
+  it('uses producer sequence to replay retained row IDs once and rejects late older batches', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+    registry.bind('attachment', { generation: 1, sequence: 0 });
+    registry.complete('attachment', 100);
+    const received = vi.fn();
+    registry.subscribe('attachment', received);
+    registry.deliverBatch(batch(1), ['attachment']);
+    registry.deliverBatch(batch(1), ['attachment']);
+    registry.deliverBatch(batch(3, ['c']), ['attachment']);
+    registry.deliverBatch(batch(1, ['late']), ['attachment']);
+    expect(received.mock.calls.map(([event]) => event.properties.value)).toEqual(['a', 'b', 'c']);
+    expect(lost).not.toHaveBeenCalled();
+  });
+
+  it('excludes events captured before subscription even when mutable row IDs stay below the fence', () => {
+    const registry = createNativeAttachmentRegistry(vi.fn());
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+    const received = vi.fn();
+    registry.subscribe('attachment', received);
+    registry.deliverBatch(batch(1, ['captured before subscribe', 'after subscribe']), [
+      'attachment',
+    ]);
+    registry.bind('attachment', { generation: 1, sequence: 1 });
+    registry.complete('attachment', 100);
+    registry.deliverBatch(batch(3, ['later']), ['attachment']);
+    expect(received.mock.calls.map(([event]) => event.properties.value)).toEqual([
+      'after subscribe',
+      'later',
+    ]);
+  });
+
+  it('signals a sequence gap once before any subsequent update while a sibling remains healthy', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'root');
+    registry.bind('root', { generation: 1, sequence: 0 });
+    registry.complete('root', 0);
+    registry.begin('sibling', 'ses_sibling', 'sibling');
+    registry.bind('sibling', { generation: 1, sequence: 0 });
+    registry.complete('sibling', 0);
+    const root = vi.fn();
+    const sibling = vi.fn();
+    registry.subscribe('root', root);
+    registry.subscribe('sibling', sibling);
+    registry.deliverBatch(batch(2), ['root', 'sibling']);
+    registry.deliverBatch(batch(4), ['root']);
+    registry.deliverBatch(
+      { ...batch(1), cloudAgentSessionId: 'sibling', kiloSessionId: 'ses_sibling' },
+      ['sibling']
+    );
+    expect(lost).toHaveBeenCalledExactlyOnceWith('root', kiloSessionId);
+    expect(root).not.toHaveBeenCalled();
+    expect(sibling).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores old generations and invalidates a surviving attachment on producer reconstruction', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    registry.begin(cloudAgentSessionId, kiloSessionId, 'attachment');
+    registry.bind('attachment', { generation: 2, sequence: 0 });
+    registry.complete('attachment', 0);
+    const received = vi.fn();
+    registry.subscribe('attachment', received);
+    registry.deliverBatch(batch(1, ['old'], 1), ['attachment']);
+    registry.deliverBatch(
+      {
+        kiloUserId: 'owner',
+        cloudAgentSessionId,
+        kiloSessionId,
+        generation: 1,
+        kind: 'loss',
+        attachmentIds: ['attachment'],
+      },
+      ['attachment']
+    );
+    expect(lost).not.toHaveBeenCalled();
+    registry.deliverBatch(batch(1, ['restart'], 3), ['attachment']);
+    expect(lost).toHaveBeenCalledOnce();
+    expect(received).not.toHaveBeenCalled();
+  });
+
+  it('isolates loss notices to their captured attachments and refuses later delivery to them', () => {
+    const lost = vi.fn();
+    const registry = createNativeAttachmentRegistry(lost);
+    for (const id of ['old', 'new']) {
+      registry.begin(cloudAgentSessionId, kiloSessionId, id);
+      registry.bind(id, { generation: 1, sequence: 0 });
+      registry.complete(id, 0);
+    }
+    const received = vi.fn();
+    registry.subscribe('new', received);
+    registry.deliverBatch(
+      {
+        kiloUserId: 'owner',
+        cloudAgentSessionId,
+        kiloSessionId,
+        generation: 1,
+        kind: 'loss',
+        attachmentIds: ['old'],
+      },
+      ['old', 'new']
+    );
+    registry.deliverBatch(batch(1), ['old', 'new']);
+    expect(lost).toHaveBeenCalledExactlyOnceWith('old', kiloSessionId);
+    expect(received).toHaveBeenCalledTimes(2);
+    registry.release('old');
+    registry.invalidate('old');
+    expect(lost).toHaveBeenCalledOnce();
+  });
   it('replays an autocommit rewrite below the completed fence after its stable-ID snapshot', () => {
     const registry = createNativeAttachmentRegistry(vi.fn());
     const listener = vi.fn();

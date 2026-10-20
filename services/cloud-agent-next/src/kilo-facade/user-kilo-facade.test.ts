@@ -45,8 +45,32 @@ import {
   publicCloudAgentDirectory,
   rewriteGlobalEventDirectory,
   UserKiloFacade,
+  type NativeAttachOutcome,
 } from './user-kilo-facade';
 import type { LiveWrapperResolution, SessionKiloFacadeDecision } from './session-proxy';
+import type { NativeEventDelivery, NativeEventSubscription } from './native-event-source.js';
+
+const fixtureContinuity = { generation: 1, sequence: 0 };
+
+function nativePublisher(facade: UserKiloFacade) {
+  const sequences = new Map<string, number>();
+  return (delivery: NativeEventDelivery & { kiloUserId: string }) => {
+    const sequence = (sequences.get(delivery.cloudAgentSessionId) ?? 0) + 1;
+    sequences.set(delivery.cloudAgentSessionId, sequence);
+    return facade.publishNativeEventBatch({
+      kiloUserId: delivery.kiloUserId,
+      cloudAgentSessionId: delivery.cloudAgentSessionId,
+      kiloSessionId: delivery.kiloSessionId,
+      kind: 'events',
+      generation: 1,
+      firstSequence: sequence,
+      deadlineAt: Date.now() + 2_000,
+      events: [
+        { eventId: delivery.eventId, materialized: delivery.materialized, event: delivery.event },
+      ],
+    });
+  };
+}
 
 const kiloSessionId = 'ses_12345678901234567890123456';
 const siblingKiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
@@ -3833,14 +3857,18 @@ describe('hosted global native events', () => {
       }: {
         kiloSessionId: string;
         attachmentId: string;
-      }): Promise<{ registered: boolean; fence: number | null; kiloSessionId: string }> => ({
+      }): Promise<NativeEventSubscription> => ({
         registered: true,
         fence: 10,
         kiloSessionId: requestedId,
+        continuity: fixtureContinuity,
       })
     );
     const releaseNativeEvents = vi.fn(async (_input: { attachmentId: string }) => undefined);
     const nativeSnapshot = vi.fn();
+    const refreshNativeEvents = vi.fn(
+      async (_input: { kiloSessionId: string; attachmentId: string; generation: number }) => true
+    );
     const nativeLiveRead = vi.fn();
     const kiloRequest = vi.fn();
     const send = vi.fn();
@@ -3851,6 +3879,7 @@ describe('hosted global native events', () => {
     env.SANDBOX_SESSION.get = vi.fn().mockReturnValue({
       subscribeNativeEvents,
       releaseNativeEvents,
+      refreshNativeEvents,
       nativeSnapshot,
       nativeLiveRead,
       kiloRequest,
@@ -3858,9 +3887,10 @@ describe('hosted global native events', () => {
     });
     const waitUntil = vi.fn<(promise: Promise<unknown>) => void>();
     const facade = new UserKiloFacade({ waitUntil } as unknown as DurableObjectState, env);
+    const publish = nativePublisher(facade);
     const push = (eventId: number, root = roots[0], materialized = false) => {
       if (!root) throw new Error('Expected native root fixture');
-      return facade.publishNativeEvent({
+      return publish({
         kiloUserId: groupedOwnerId,
         cloudAgentSessionId: root.cloudAgentSessionId,
         kiloSessionId: root.kiloSessionId,
@@ -3884,6 +3914,7 @@ describe('hosted global native events', () => {
       legacyGet,
       waitUntil,
       push,
+      refreshNativeEvents,
     };
   }
 
@@ -3947,6 +3978,237 @@ describe('hosted global native events', () => {
     );
   });
 
+  it('authorizes a mutable-update batch once and applies an ambiguous retry only once', async () => {
+    const fixture = globalFixture();
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      fixture.resolveRoot.mockClear();
+      const batch = {
+        kind: 'events' as const,
+        kiloUserId: groupedOwnerId,
+        cloudAgentSessionId: firstWorkspaceSessionId,
+        kiloSessionId,
+        generation: 1,
+        firstSequence: 1,
+        deadlineAt: Date.now() + 2_000,
+        events: ['first', 'second', 'third'].map(value => ({
+          eventId: 2,
+          materialized: true,
+          event: { type: 'message.part.updated', properties: { sessionID: kiloSessionId, value } },
+        })),
+      };
+      await fixture.facade.publishNativeEventBatch(batch);
+      expect(fixture.resolveRoot).toHaveBeenCalledOnce();
+      await fixture.facade.publishNativeEventBatch(batch);
+      for (const value of ['first', 'second', 'third'])
+        await expect(readSseFrame(reader)).resolves.toMatchObject({
+          payload: { properties: { value } },
+        });
+      await fixture.facade.publishNativeEventBatch({
+        ...batch,
+        firstSequence: 4,
+        events: [
+          { eventId: 11, event: { type: 'after', properties: { sessionID: kiloSessionId } } },
+        ],
+      });
+      await expect(readSseFrame(reader)).resolves.toMatchObject({ payload: { type: 'after' } });
+    } finally {
+      await reader.cancel();
+    }
+  });
+
+  it('does not apply an expired RPC after ownership lookup returns late', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      const ownership = Promise.withResolvers<{ cloudAgentSessionId: string }>();
+      fixture.resolveRoot.mockReturnValueOnce(ownership.promise);
+      const send = fixture.facade.publishNativeEventBatch({
+        kind: 'events',
+        kiloUserId: groupedOwnerId,
+        cloudAgentSessionId: firstWorkspaceSessionId,
+        kiloSessionId,
+        generation: 1,
+        firstSequence: 1,
+        deadlineAt: Date.now() + 2_000,
+        events: [
+          { eventId: 11, event: { type: 'late', properties: { sessionID: kiloSessionId } } },
+        ],
+      });
+      const rejected = expect(send).rejects.toThrow('deadline');
+      await vi.advanceTimersByTimeAsync(2_000);
+      ownership.resolve({ cloudAgentSessionId: firstWorkspaceSessionId });
+      await rejected;
+      await fixture.push(12);
+      await expect(readSseFrame(reader)).resolves.toMatchObject({
+        payload: { type: 'message.updated', properties: { eventId: 12 } },
+      });
+    } finally {
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('signals eviction or a lost loss-RPC on every affected global and scoped attachment without affecting its sibling', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture([
+      rootSummary(),
+      rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId),
+    ]);
+    const global = globalReader(fixture.facade);
+    const scopedId = fixture.facade.prepareNativeAttachment(
+      firstWorkspaceSessionId,
+      kiloSessionId,
+      groupedOwnerId
+    );
+    const scoped = fixture.facade
+      .openPublicSessionEventStream(kiloSessionId, {
+        attachmentId: scopedId,
+        continuity: fixtureContinuity,
+        fence: 10,
+      })
+      .body!.getReader();
+    try {
+      await expectGlobalConnected(global);
+      await readSseFrame(scoped);
+      await readSseFrame(scoped);
+      fixture.refreshNativeEvents.mockImplementation(
+        async input => input.kiloSessionId !== kiloSessionId
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await readSseTextFrame(global)).toBe(': heartbeat\n\n');
+      await expect(readSseFrame(global)).resolves.toMatchObject({
+        payload: { type: 'kilo.native.resnapshot', properties: { sessionID: kiloSessionId } },
+      });
+      expect(await readSseTextFrame(scoped)).toBe(': heartbeat\n\n');
+      await expect(readSseFrame(scoped)).resolves.toMatchObject({ type: 'kilo.native.resnapshot' });
+      await fixture.push(11, rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId));
+      await expect(readSseFrame(global)).resolves.toMatchObject({
+        payload: { type: 'message.updated', properties: { sessionID: siblingKiloSessionId } },
+      });
+      await fixture.push(11);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await readSseTextFrame(global)).toBe(': heartbeat\n\n');
+      expect(await readSseTextFrame(scoped)).toBe(': heartbeat\n\n');
+    } finally {
+      await global.cancel();
+      await scoped.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds a stalled continuity check and emits resnapshot rather than silent heartbeat-only streaming', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture();
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      fixture.refreshNativeEvents.mockReturnValue(new Promise(() => undefined));
+      await vi.advanceTimersByTimeAsync(12_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+      await expect(readSseFrame(reader)).resolves.toMatchObject({
+        payload: { type: 'kilo.native.resnapshot' },
+      });
+      expect(fixture.refreshNativeEvents).toHaveBeenCalledOnce();
+    } finally {
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not resume snapshot pages after a loss arrives while their next RPC is pending', async () => {
+    const fixture = globalFixture();
+    const page = Promise.withResolvers<NativeAttachOutcome>();
+    const attachmentId = fixture.facade.prepareNativeAttachment(
+      firstWorkspaceSessionId,
+      kiloSessionId,
+      groupedOwnerId
+    );
+    const reader = fixture.facade
+      .openPublicSessionEventStream(kiloSessionId, {
+        attachmentId,
+        fence: 10,
+        continuity: fixtureContinuity,
+        snapshot: [{ type: 'before-loss', properties: {} }],
+        nextPage: () => page.promise,
+      })
+      .body!.getReader();
+    try {
+      await readSseFrame(reader);
+      await expect(readSseFrame(reader)).resolves.toMatchObject({ type: 'before-loss' });
+      await fixture.facade.publishNativeEventBatch({
+        kind: 'loss',
+        kiloUserId: groupedOwnerId,
+        cloudAgentSessionId: firstWorkspaceSessionId,
+        kiloSessionId,
+        generation: 1,
+        attachmentIds: [attachmentId],
+        deadlineAt: Date.now() + 2_000,
+      });
+      await expect(readSseFrame(reader)).resolves.toMatchObject({ type: 'kilo.native.resnapshot' });
+      page.resolve({
+        kind: 'fenced',
+        fence: 10,
+        snapshot: { oversized: false, fence: 10, events: [] },
+        events: [{ type: 'after-loss', properties: {} }],
+      });
+      await Promise.all(fixture.waitUntil.mock.calls.map(([work]) => work));
+      const pendingFrame = readSseFrame(reader);
+      const observed = vi.fn();
+      const observation = pendingFrame.then(observed);
+      await Promise.resolve();
+      expect(observed).not.toHaveBeenCalled();
+      await reader.cancel();
+      await observation.catch(() => undefined);
+    } finally {
+      await reader.cancel();
+    }
+  });
+
+  it('signals revoked ownership without exposing the unauthorized batch', async () => {
+    const fixture = globalFixture();
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      fixture.resolveRoot.mockResolvedValue(null);
+      await fixture.push(11);
+      await expect(readSseFrame(reader)).resolves.toMatchObject({
+        payload: { type: 'kilo.native.resnapshot' },
+      });
+    } finally {
+      await reader.cancel();
+    }
+  });
+
+  it('disconnects when a full subscriber queue cannot accept the loss notice', async () => {
+    const fixture = globalFixture();
+    const reader = globalReader(fixture.facade);
+    try {
+      await expectGlobalConnected(reader);
+      for (let index = 0; index < 64; index++) await fixture.push(11 + index);
+      const attachmentIds = fixture.subscribeNativeEvents.mock.calls.map(
+        ([input]) => input.attachmentId
+      );
+      await fixture.facade.publishNativeEventBatch({
+        kind: 'loss',
+        kiloUserId: groupedOwnerId,
+        cloudAgentSessionId: firstWorkspaceSessionId,
+        kiloSessionId,
+        generation: 1,
+        attachmentIds,
+        deadlineAt: Date.now() + 2_000,
+      });
+      await expect(reader.read()).rejects.toThrow('fell behind');
+      await Promise.all(fixture.waitUntil.mock.calls.map(([work]) => work));
+      expect(fixture.releaseNativeEvents).toHaveBeenCalledOnce();
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+  });
+
   it('completes the subscription fence before global connected and drains only uncovered pushes', async () => {
     vi.useFakeTimers();
     const fixture = globalFixture();
@@ -3954,6 +4216,7 @@ describe('hosted global native events', () => {
       registered: boolean;
       fence: number | null;
       kiloSessionId: string;
+      continuity: typeof fixtureContinuity;
     }>();
     fixture.subscribeNativeEvents.mockReturnValueOnce(subscription.promise);
     const reader = globalReader(fixture.facade);
@@ -3966,7 +4229,12 @@ describe('hosted global native events', () => {
       await fixture.push(11);
       await fixture.push(2, undefined, true);
       expect(firstFrame).not.toHaveBeenCalled();
-      subscription.resolve({ registered: true, fence: 10, kiloSessionId });
+      subscription.resolve({
+        registered: true,
+        fence: 10,
+        kiloSessionId,
+        continuity: fixtureContinuity,
+      });
       await pendingFrame;
       expect(firstFrame).toHaveBeenCalledExactlyOnceWith({
         directory: publicCloudAgentDirectory(kiloSessionId),
@@ -4005,12 +4273,13 @@ describe('hosted global native events', () => {
         eventId: 11,
         event: { type: 'denied', properties: {} },
       };
-      await fixture.facade.publishNativeEvent({ ...denied, kiloUserId: 'foreign-user' });
-      await fixture.facade.publishNativeEvent({
+      const publishDenied = nativePublisher(fixture.facade);
+      await publishDenied({ ...denied, kiloUserId: 'foreign-user' });
+      await publishDenied({
         ...denied,
         cloudAgentSessionId: siblingWorkspaceSessionId,
       });
-      await fixture.facade.publishNativeEvent({ ...denied, kiloSessionId: 'ses_unlisted' });
+      await publishDenied({ ...denied, kiloSessionId: 'ses_unlisted' });
       await fixture.push(11);
       await fixture.push(12, rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId));
       await expect(readSseFrame(reader)).resolves.toEqual({
@@ -4037,8 +4306,18 @@ describe('hosted global native events', () => {
     vi.useFakeTimers();
     const fixture = globalFixture();
     fixture.subscribeNativeEvents
-      .mockResolvedValueOnce({ registered: false, fence: null, kiloSessionId })
-      .mockResolvedValue({ registered: true, fence: null, kiloSessionId });
+      .mockResolvedValueOnce({
+        registered: false,
+        fence: null,
+        kiloSessionId,
+        continuity: fixtureContinuity,
+      })
+      .mockResolvedValue({
+        registered: true,
+        fence: null,
+        kiloSessionId,
+        continuity: fixtureContinuity,
+      });
     const reader = globalReader(fixture.facade);
     try {
       await expectGlobalConnected(reader);
@@ -4107,6 +4386,7 @@ describe('hosted global native events', () => {
       registered: true,
       fence: null,
       kiloSessionId,
+      continuity: fixtureContinuity,
     });
     const reader = globalReader(fixture.facade);
     try {
@@ -4167,6 +4447,7 @@ describe('hosted global native events', () => {
     const scopedBody = fixture.facade.openPublicSessionEventStream(kiloSessionId, {
       attachmentId: scopedId,
       fence: 10,
+      continuity: fixtureContinuity,
     }).body;
     if (!scopedBody) throw new Error('Expected scoped native event response body');
     const scoped = scopedBody.getReader();
@@ -4223,7 +4504,12 @@ describe('hosted global native events', () => {
     fixture.subscribeNativeEvents.mockImplementation(async input => {
       await subscription.promise;
       consumers.add(input.attachmentId);
-      return { registered: true, fence: 10, kiloSessionId: input.kiloSessionId };
+      return {
+        registered: true,
+        fence: 10,
+        kiloSessionId: input.kiloSessionId,
+        continuity: fixtureContinuity,
+      };
     });
     fixture.releaseNativeEvents.mockImplementation(async input => {
       consumers.delete(input.attachmentId);
@@ -4234,7 +4520,6 @@ describe('hosted global native events', () => {
       const attachment = fixture.subscribeNativeEvents.mock.calls[0]?.[0];
       expect(attachment).toBeDefined();
       await reader.cancel();
-      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
       expect(fixture.releaseNativeEvents).toHaveBeenCalledExactlyOnceWith({
         attachmentId: attachment?.attachmentId,
       });
@@ -4264,7 +4549,12 @@ describe('hosted global native events', () => {
     const subscription = Promise.withResolvers<void>();
     fixture.subscribeNativeEvents.mockImplementation(async input => {
       await subscription.promise;
-      return { registered: true, fence: 10, kiloSessionId: input.kiloSessionId };
+      return {
+        registered: true,
+        fence: 10,
+        kiloSessionId: input.kiloSessionId,
+        continuity: fixtureContinuity,
+      };
     });
     fixture.releaseNativeEvents
       .mockResolvedValueOnce(undefined)
@@ -4275,7 +4565,6 @@ describe('hosted global native events', () => {
       const attachment = fixture.subscribeNativeEvents.mock.calls[0]?.[0];
       expect(attachment).toBeDefined();
       await reader.cancel();
-      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
       subscription.resolve();
       await vi.advanceTimersByTimeAsync(0);
       expect(fixture.releaseNativeEvents).toHaveBeenCalledTimes(2);
@@ -4284,7 +4573,7 @@ describe('hosted global native events', () => {
       });
       await expect(
         Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise))
-      ).resolves.toEqual([undefined, undefined]);
+      ).resolves.toEqual([undefined, undefined, undefined]);
       await expect(reader.read()).resolves.toEqual({ done: true, value: undefined });
       expect(vi.getTimerCount()).toBe(0);
     } finally {
@@ -4301,6 +4590,7 @@ describe('hosted global native events', () => {
       registered: boolean;
       fence: number | null;
       kiloSessionId: string;
+      continuity: typeof fixtureContinuity;
     }>();
     fixture.subscribeNativeEvents.mockReturnValueOnce(subscription.promise);
     const reader = globalReader(fixture.facade);
@@ -4311,7 +4601,12 @@ describe('hosted global native events', () => {
       }
       expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledOnce();
       expect(fixture.subscribeNativeEvents).toHaveBeenCalledOnce();
-      subscription.resolve({ registered: true, fence: 10, kiloSessionId });
+      subscription.resolve({
+        registered: true,
+        fence: 10,
+        kiloSessionId,
+        continuity: fixtureContinuity,
+      });
       await expectGlobalConnected(reader);
       await vi.advanceTimersByTimeAsync(20_000);
       expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
@@ -4319,7 +4614,12 @@ describe('hosted global native events', () => {
       expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledTimes(3);
       expect(fixture.subscribeNativeEvents).toHaveBeenCalledOnce();
     } finally {
-      subscription.resolve({ registered: true, fence: 10, kiloSessionId });
+      subscription.resolve({
+        registered: true,
+        fence: 10,
+        kiloSessionId,
+        continuity: fixtureContinuity,
+      });
       await reader.cancel();
       vi.useRealTimers();
     }
@@ -4464,6 +4764,7 @@ describe('hosted native routes', () => {
       registered: true,
       fence: null,
       kiloSessionId,
+      continuity: fixtureContinuity,
     }));
     const nativeSnapshot = vi.fn(async () => ({ oversized: false, fence: 9, events: [] }));
     env.SANDBOX_SESSION.get = vi.fn().mockReturnValue({
@@ -4524,8 +4825,9 @@ describe('hosted native routes', () => {
       cloudAgentSessionId: workspaceSession,
     } as never);
     const facade = new UserKiloFacade({ waitUntil } as unknown as DurableObjectState, env);
+    const publish = nativePublisher(facade);
     const push = (eventId: number, materialized = false) =>
-      facade.publishNativeEvent({
+      publish({
         kiloUserId: 'usr_1',
         cloudAgentSessionId: workspaceSession,
         kiloSessionId,
@@ -4547,6 +4849,7 @@ describe('hosted native routes', () => {
           return {
             kind: 'fenced',
             fence: 10,
+            continuity: fixtureContinuity,
             snapshot: { oversized: false, fence: 10, events: [] },
             events: Array.from({ length: 100 }, (_, id) => ({
               type: 'snapshot',
@@ -4600,23 +4903,29 @@ describe('hosted native routes', () => {
       cloudAgentSessionId: workspaceSession,
     } as never);
     const facade = new UserKiloFacade({ waitUntil: vi.fn() } as unknown as DurableObjectState, env);
+    const publish = nativePublisher(facade);
     const slowId = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
     const healthyId = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
     const slow = facade
       .openPublicSessionEventStream(kiloSessionId, {
         attachmentId: slowId,
         fence: 0,
+        continuity: fixtureContinuity,
         snapshot: Array.from({ length: 100 }, () => ({ type: 'snapshot', properties: {} })),
       })
       .body!.getReader();
     const healthy = facade
-      .openPublicSessionEventStream(kiloSessionId, { attachmentId: healthyId, fence: 0 })
+      .openPublicSessionEventStream(kiloSessionId, {
+        attachmentId: healthyId,
+        fence: 0,
+        continuity: fixtureContinuity,
+      })
       .body!.getReader();
     try {
       await healthy.read();
       await healthy.read();
       for (let eventId = 1; eventId <= 513; eventId++) {
-        await facade.publishNativeEvent({
+        await publish({
           kiloUserId: 'usr_1',
           cloudAgentSessionId: workspaceSession,
           kiloSessionId,

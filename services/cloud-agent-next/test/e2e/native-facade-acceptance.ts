@@ -59,6 +59,14 @@ type NativeStream = {
   error: () => string | undefined;
 };
 
+export const nativeBurstFixture = {
+  prompt: '__fake__:slow:160:10:64',
+  text: Array.from({ length: 160 }, (_, index) => {
+    const token = ` w${index} `;
+    return token.repeat(Math.ceil(64 / token.length)).slice(0, 64);
+  }).join(''),
+};
+
 class Blocked extends Error {}
 
 export function classifyPermissionReply(
@@ -240,6 +248,115 @@ export function assertColdNativeSnapshot(
   assert(expected.length > 0, 'cold transcript baseline was empty');
   assert.deepEqual(comparable([...messages.values()]), comparable(expected));
   return fence;
+}
+
+export function assertNativeBurst(
+  events: NativeEvent[],
+  sessionID: string,
+  userMessageID: string,
+  persisted: MessageEntry,
+  expectedText: string
+) {
+  assert(expectedText.length > 0 && Buffer.byteLength(expectedText) <= 20 * 1024);
+  assert.equal(persisted.info.sessionID, sessionID);
+  assert.equal(persisted.info.role, 'assistant');
+  assert.equal(persisted.info.parentID, userMessageID);
+  assert.equal(persisted.info.error, undefined);
+  assert(typeof persisted.info.id === 'string' && persisted.info.id.length > 0);
+  const completedAt = record(persisted.info.time).completed;
+  assert.equal(typeof completedAt, 'number');
+  const textParts = persisted.parts.filter(
+    part =>
+      part.type === 'text' && record(part.metadata ?? {})['kilocode.lifecycle'] !== 'transient'
+  );
+  assert.equal(textParts.length, 1, 'burst must persist one stable text part');
+  const part = textParts[0];
+  assert(typeof part.id === 'string' && part.id.length > 0);
+  assert.equal(part.sessionID, sessionID);
+  assert.equal(part.messageID, persisted.info.id);
+  assert.equal(part.text, expectedText, 'persisted burst text changed');
+  let deltaText = '';
+  let liveText = '';
+  let lastPartText = '';
+  let deltaCount = 0;
+  let partUpdateCount = 0;
+  let liveCompletedAt: unknown;
+  const updates: Array<{ type: string; text: string }> = [];
+  for (const event of events) {
+    assert.notEqual(event.type, 'kilo.native.resnapshot', 'normal burst required a resnapshot');
+    assert.notEqual(event.type, 'kilo.native.fence', 'burst unexpectedly restarted its snapshot');
+    const properties = record(event.properties);
+    if (event.type === 'message.updated') {
+      const info = record(properties.info);
+      if (info.id !== persisted.info.id && info.parentID !== userMessageID) continue;
+      assert.equal(properties.sessionID, sessionID);
+      assert.equal(info.id, persisted.info.id, 'burst changed assistant identity');
+      assert.equal(info.sessionID, sessionID);
+      assert.equal(info.role, 'assistant');
+      assert.equal(info.parentID, userMessageID);
+      assert.equal(info.error, undefined);
+      const completed = record(info.time).completed;
+      if (liveCompletedAt !== undefined) assert.equal(completed, liveCompletedAt);
+      if (completed !== undefined) liveCompletedAt = completed;
+    } else if (event.type === 'message.part.updated') {
+      const update = record(properties.part);
+      if (update.messageID !== persisted.info.id && update.id !== part.id) continue;
+      if (update.type !== 'text' && update.id !== part.id) continue;
+      if (record(update.metadata ?? {})['kilocode.lifecycle'] === 'transient') continue;
+      assert.equal(properties.sessionID, sessionID);
+      assert.equal(update.sessionID, sessionID);
+      assert.equal(update.messageID, persisted.info.id);
+      assert.equal(update.id, part.id, 'burst changed text part identity');
+      assert.equal(update.type, 'text');
+      assert.equal(typeof update.text, 'string', 'malformed burst text update');
+      assert(typeof update.text === 'string');
+      assert(expectedText.startsWith(update.text), 'burst full update corrupted its text');
+      assert(update.text.startsWith(lastPartText), 'burst full updates arrived out of order');
+      assert(update.text.startsWith(liveText), 'burst full update regressed live assembled text');
+      lastPartText = update.text;
+      liveText = update.text;
+      partUpdateCount += 1;
+      updates.push({ type: event.type, text: update.text });
+    } else if (event.type === 'message.part.delta') {
+      if (properties.messageID !== persisted.info.id && properties.partID !== part.id) continue;
+      assert.equal(properties.sessionID, sessionID);
+      assert.equal(properties.messageID, persisted.info.id);
+      assert.equal(properties.partID, part.id, 'burst delta changed text part identity');
+      assert.equal(properties.field, 'text');
+      assert(typeof properties.delta === 'string' && properties.delta.length > 0);
+      deltaText += properties.delta;
+      assert(
+        expectedText.startsWith(deltaText),
+        'burst delta duplicated, missing, or out of order'
+      );
+      liveText += properties.delta;
+      assert(expectedText.startsWith(liveText), 'burst delta corrupted live assembled text');
+      deltaCount += 1;
+      updates.push({ type: event.type, text: properties.delta });
+    } else if (event.type === 'message.removed') {
+      assert.notEqual(properties.messageID, persisted.info.id, 'burst assistant was removed');
+    } else if (event.type === 'message.part.removed') {
+      assert.notEqual(properties.partID, part.id, 'burst text part was removed');
+    }
+  }
+  assert(deltaCount >= 2, 'burst did not deliver successive native text deltas');
+  assert(partUpdateCount > 0, 'burst omitted materialized text updates');
+  assert.equal(deltaText, expectedText, 'burst lost deltas despite a materialized full update');
+  assert.equal(lastPartText, expectedText, 'burst final text part update was missing');
+  assert.equal(liveText, expectedText, 'live assembled burst differs from persisted text');
+  assert.equal(
+    liveCompletedAt,
+    completedAt,
+    'burst live completion differs from persisted message'
+  );
+  return {
+    messageID: persisted.info.id,
+    partID: part.id,
+    text: liveText,
+    deltaCount,
+    partUpdateCount,
+    updates,
+  };
 }
 
 async function main(): Promise<void> {
@@ -701,6 +818,74 @@ async function main(): Promise<void> {
       );
     });
 
+    await check(
+      'native burst preserves scoped/global live text and durable transcript',
+      async () => {
+        await idle(rootID);
+        const scopedStart = rootStream.events.length;
+        const globalStart = globalStream.events.length;
+        const messageID = await prompt(rootID, nativeBurstFixture.prompt, 'code');
+        const assistant = await completed(rootID, messageID, nativeBurstFixture.text);
+        for (const [stream, start] of [
+          [rootStream, scopedStart],
+          [globalStream, globalStart],
+        ] as const) {
+          await stream.wait(
+            event =>
+              event.type === 'message.updated' &&
+              record(event.properties.info).id === assistant.info.id &&
+              typeof record(record(event.properties.info).time).completed === 'number',
+            'burst live assistant completion',
+            start
+          );
+          await stream.wait(
+            event =>
+              event.type === 'message.part.updated' &&
+              record(event.properties.part).messageID === assistant.info.id &&
+              record(event.properties.part).text === nativeBurstFixture.text,
+            'burst final live text part',
+            start
+          );
+        }
+        await idle(rootID);
+        const messages = await transcript(rootID);
+        assert.equal(messages.filter(entry => entry.info.parentID === messageID).length, 1);
+        const persisted = messages.find(entry => entry.info.id === assistant.info.id);
+        assert(persisted, 'burst disappeared from final transcript');
+        const scoped = assertNativeBurst(
+          rootStream.events.slice(scopedStart),
+          rootID,
+          messageID,
+          persisted,
+          nativeBurstFixture.text
+        );
+        const global = assertNativeBurst(
+          globalStream.events.slice(globalStart),
+          rootID,
+          messageID,
+          persisted,
+          nativeBurstFixture.text
+        );
+        assert.deepEqual(global.updates, scoped.updates, 'scoped/global burst updates diverged');
+        const replay = attach(rootID);
+        try {
+          await replay.wait(event => event.type === 'kilo.native.fence', 'persisted burst fence');
+          assertColdNativeSnapshot(replay.events, rootID, messages);
+          assert(!replay.events.some(event => event.type === 'kilo.native.resnapshot'));
+        } finally {
+          await replay.close();
+        }
+        return {
+          messageID,
+          assistantID: scoped.messageID,
+          partID: scoped.partID,
+          bytes: Buffer.byteLength(scoped.text),
+          scoped: { deltaCount: scoped.deltaCount, partUpdateCount: scoped.partUpdateCount },
+          global: { deltaCount: global.deltaCount, partUpdateCount: global.partUpdateCount },
+        };
+      }
+    );
+
     let siblingID: string | undefined;
     await check('setup: lazy worktree sibling and native bootstrap', async () => {
       const sibling = await createWorktreeChat(
@@ -929,14 +1114,15 @@ async function main(): Promise<void> {
     });
     await check('human-required skill permission rejection prevents shell execution', async () => {
       if (!siblingID) throw new Blocked('requires isolated sibling permission fixture');
+      const permissionSessionID = siblingID;
       const tag = `permission-reject-${randomUUID().slice(0, 8)}`;
       const messageID = await prompt(
-        siblingID,
+        permissionSessionID,
         `__fake__:skill:${tag}:native-human-permission`,
         'code'
       );
       const permission = await poll('rejectable skill shell permission', async () => {
-        const response = await request(`/permission${selected(siblingID)}`);
+        const response = await request(`/permission${selected(permissionSessionID)}`);
         if (isLiveRuntimeUnavailable(response)) return;
         const value = successful(response);
         assert(Array.isArray(value));
@@ -946,13 +1132,16 @@ async function main(): Promise<void> {
         return pending ? record(pending) : undefined;
       });
       successful(
-        await request(`/permission/${String(permission.id)}/reply${selected(siblingID)}`, {
-          method: 'POST',
-          body: { reply: 'reject' },
-        })
+        await request(
+          `/permission/${String(permission.id)}/reply${selected(permissionSessionID)}`,
+          {
+            method: 'POST',
+            body: { reply: 'reject' },
+          }
+        )
       );
       const messages = await poll('rejected native skill tool', async () => {
-        const messages = await transcript(siblingID);
+        const messages = await transcript(permissionSessionID);
         return messages.some(
           entry =>
             entry.info.parentID === messageID &&

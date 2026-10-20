@@ -23,6 +23,7 @@ import {
   type NativeSnapshotCursor,
 } from './session-do.js';
 import type { EventQueryFilters } from '../../session/queries/events.js';
+import { createNativeEventOutbox } from './native-outbox.js';
 
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 const SANDBOX_ID = 'ses-11111111111141118111111111111111';
@@ -143,7 +144,8 @@ describe('native durable attachment', () => {
     > & {
       initialized: Promise<void>;
       registration: unknown;
-      nativeSubscriber: unknown;
+      nativeOutbox: ReturnType<typeof createNativeEventOutbox>;
+      nativeDeliveryGeneration: number;
       eventQueries: unknown;
       sessionId: string;
       deriveSessionStatus: () => unknown;
@@ -152,7 +154,18 @@ describe('native durable attachment', () => {
       initialized: Promise.resolve(),
       registration: { spec: { kiloSessionId: KILO_SESSION_ID } },
       sessionId: SESSION_ID,
-      nativeSubscriber: null,
+      nativeDeliveryGeneration: 1,
+      nativeOutbox: createNativeEventOutbox({
+        identity: () => ({
+          kiloUserId: 'owner',
+          cloudAgentSessionId: SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        }),
+        generation: () => 1,
+        send: async () => undefined,
+        waitUntil: vi.fn(),
+        diagnostic: vi.fn(),
+      }),
       deriveSessionStatus: () => ({ type: 'idle' }),
     });
     return session;
@@ -166,11 +179,11 @@ describe('native durable attachment', () => {
     ).toMatchObject({ registered: true, fence: null });
     await session.subscribeNativeEvents({ kiloSessionId: KILO_SESSION_ID, attachmentId: 'new' });
     await session.releaseNativeEvents({ attachmentId: 'old' });
-    expect(session.nativeSubscriber).not.toBeNull();
+    expect(session.nativeOutbox.snapshot().subscriptions).toBe(1);
     await session.releaseNativeEvents({ attachmentId: 'old' });
-    expect(session.nativeSubscriber).not.toBeNull();
+    expect(session.nativeOutbox.snapshot().subscriptions).toBe(1);
     await session.releaseNativeEvents({ attachmentId: 'new' });
-    expect(session.nativeSubscriber).toBeNull();
+    expect(session.nativeOutbox.snapshot().subscriptions).toBe(0);
     Object.assign(session, { registration: null });
     expect(
       await session.subscribeNativeEvents({

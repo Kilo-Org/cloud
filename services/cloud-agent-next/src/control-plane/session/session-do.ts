@@ -123,7 +123,9 @@ import {
   isDeliverableNativeEvent,
   isMaterializedNativeEvent,
   toNativePublicEvent,
+  type NativeEventSubscription,
 } from '../../kilo-facade/native-event-source.js';
+import { createNativeEventOutbox } from './native-outbox.js';
 import { sandboxControlPeerNamespace } from '../peer-bindings.js';
 import migrations from './drizzle/migrations';
 import {
@@ -211,6 +213,7 @@ const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
+const NATIVE_DELIVERY_GENERATION_KEY = 'native_delivery_generation';
 
 /**
  * Kilo's last root `session.status` type; `settled` once an accepted message settled after it,
@@ -551,12 +554,27 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
-  /**
-   * The native facade attachment currently receiving this session's stored
-   * events. In-memory on purpose: a facade that outlives this DO instance
-   * resnapshots from the durable log before it trusts a live tail again.
-   */
-  private nativeSubscriber: { kiloSessionId: string; attachments: Set<string> } | null = null;
+  private nativeDeliveryGeneration = 0;
+  private readonly nativeOutbox = createNativeEventOutbox({
+    identity: () => {
+      const kiloUserId = this.metadata?.identity.userId;
+      const kiloSessionId = this.registration?.spec.kiloSessionId;
+      if (kiloUserId === undefined || kiloSessionId === undefined)
+        throw new Error('Native delivery identity unavailable');
+      return { kiloUserId, kiloSessionId, cloudAgentSessionId: this.sessionId };
+    },
+    generation: () => this.nativeDeliveryGeneration,
+    send: (batch, deadlineAt) =>
+      withDORetry(
+        () => this.env.USER_KILO_FACADE.get(this.env.USER_KILO_FACADE.idFromName(batch.kiloUserId)),
+        facade => facade.publishNativeEventBatch({ ...batch, deadlineAt }),
+        'publishNativeEventBatch',
+        { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt } }
+      ),
+    waitUntil: work => this.ctx.waitUntil(work),
+    diagnostic: reason =>
+      logger.withFields({ sessionId: this.sessionId, reason }).warn('Native event continuity lost'),
+  });
   private rootStatus: RootStatus | undefined;
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
@@ -701,9 +719,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.ctx.storage.deleteAll();
       await this.ctx.storage.put(GENERATION_KEY, GENERATION);
       await migrate(this.db, migrations);
+      this.nativeDeliveryGeneration = 1;
+      await this.ctx.storage.put(NATIVE_DELIVERY_GENERATION_KEY, this.nativeDeliveryGeneration);
       return;
     }
     await migrate(this.db, migrations);
+    const nativeGeneration = z
+      .number()
+      .int()
+      .nonnegative()
+      .safeParse(await this.ctx.storage.get<unknown>(NATIVE_DELIVERY_GENERATION_KEY));
+    this.nativeDeliveryGeneration = (nativeGeneration.success ? nativeGeneration.data : 0) + 1;
+    await this.ctx.storage.put(NATIVE_DELIVERY_GENERATION_KEY, this.nativeDeliveryGeneration);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
     const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
@@ -1503,55 +1530,56 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * fence is the delivery watermark at subscribe time: the facade's snapshot is
    * complete through it, and later events arrive as pushes.
    */
-  async subscribeNativeEvents(input: { kiloSessionId: string; attachmentId: string }): Promise<{
-    registered: boolean;
-    fence: number | null;
+  async subscribeNativeEvents(input: {
     kiloSessionId: string;
-  }> {
+    attachmentId: string;
+  }): Promise<NativeEventSubscription> {
     await this.initialized;
     if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
-      return { registered: false, fence: null, kiloSessionId: input.kiloSessionId };
-    this.nativeSubscriber ??= { kiloSessionId: input.kiloSessionId, attachments: new Set() };
-    this.nativeSubscriber.attachments.add(input.attachmentId);
+      return {
+        registered: false,
+        fence: null,
+        kiloSessionId: input.kiloSessionId,
+        continuity: { generation: this.nativeDeliveryGeneration, sequence: 0 },
+      };
+    const continuity = this.nativeOutbox.subscribe(input.attachmentId);
     return {
       registered: true,
       fence: this.eventQueries.getLatestEventId(),
       kiloSessionId: input.kiloSessionId,
+      continuity,
     };
+  }
+
+  async refreshNativeEvents(input: {
+    kiloSessionId: string;
+    attachmentId: string;
+    generation: number;
+  }): Promise<boolean> {
+    await this.initialized;
+    return (
+      this.registration?.spec.kiloSessionId === input.kiloSessionId &&
+      this.nativeOutbox.refresh(input.attachmentId, input.generation)
+    );
   }
 
   async releaseNativeEvents(input: { attachmentId: string }): Promise<void> {
     await this.initialized;
-    this.nativeSubscriber?.attachments.delete(input.attachmentId);
-    if (this.nativeSubscriber?.attachments.size === 0) this.nativeSubscriber = null;
+    this.nativeOutbox.release(input.attachmentId);
   }
 
-  private async publishNativeEvent(stored: StoredEvent): Promise<void> {
-    const subscriber = this.nativeSubscriber;
-    const userId = this.metadata?.identity.userId;
-    if (subscriber === null || userId === undefined) return;
+  private publishNativeEvent(stored: StoredEvent): void {
+    const kiloSessionId = this.registration?.spec.kiloSessionId;
+    if (kiloSessionId === undefined || this.metadata?.identity.userId === undefined) return;
     const event = formatStreamEvent(stored, this.sessionId);
-    if (!isDeliverableNativeEvent(event)) return;
-    const native = toNativePublicEvent(event, subscriber.kiloSessionId);
+    if (!isDeliverableNativeEvent(event, true)) return;
+    const native = toNativePublicEvent(event, kiloSessionId);
     if (native === null) return;
-    const facade = this.env.USER_KILO_FACADE.get(this.env.USER_KILO_FACADE.idFromName(userId));
-    try {
-      await withDORetry(
-        () => facade,
-        current =>
-          current.publishNativeEvent({
-            kiloUserId: userId,
-            cloudAgentSessionId: this.sessionId,
-            kiloSessionId: subscriber.kiloSessionId,
-            eventId: stored.id,
-            materialized: isMaterializedNativeEvent(event),
-            event: native,
-          }),
-        'publishNativeEvent'
-      );
-    } catch {
-      // Delivery is best effort; the facade's resnapshot covers a lost push.
-    }
+    this.nativeOutbox.enqueue({
+      eventId: stored.id,
+      materialized: isMaterializedNativeEvent(event),
+      event: native,
+    });
   }
 
   /** The pending questions and permissions this session waits on (C1 adapter). */
@@ -3085,9 +3113,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   private broadcast(event: StoredEvent): void {
     this.streamHandler().broadcastEvent(event);
-    // A subscribed native facade also receives the stored event; the facade
-    // phases it against the fence its snapshot was taken at.
-    void this.publishNativeEvent(event);
+    this.publishNativeEvent(event);
   }
 
   private deriveCloudStatus(): {

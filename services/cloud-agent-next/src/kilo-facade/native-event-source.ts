@@ -10,8 +10,8 @@ import {
  * The control-plane Session DO already receives every wrapper event, persists
  * it, and broadcasts it on its own `/stream`. There is no wrapper-to-facade
  * feed on that plane, and a Durable Object cannot open a WebSocket to another
- * Durable Object, so the Session DO pushes each stored event to the per-user
- * facade and the facade phases that live tail with the durable log snapshot it
+ * Durable Object, so the Session DO pushes bounded sequence-fenced batches to
+ * the per-user facade, which phases that live tail with the durable log snapshot it
  * fetches for the same attachment.
  *
  * The history/live boundary is the attach fence: the snapshot (stored log plus
@@ -24,7 +24,13 @@ import {
  */
 
 /** Bound on pushed events retained per attachment while its snapshot is in flight. */
-export const MAX_PENDING_NATIVE_EVENTS = 512;
+export const NATIVE_DELIVERY_LIMITS = {
+  count: 512,
+  bytes: 64 * 1024,
+  ageMs: 2_000,
+  coalesceMs: 10,
+} as const;
+export const MAX_PENDING_NATIVE_EVENTS = NATIVE_DELIVERY_LIMITS.count;
 
 export const NATIVE_FACADE_RESNAPSHOT_EVENT = 'kilo.native.resnapshot';
 export const NATIVE_FACADE_FENCE_EVENT = 'kilo.native.fence';
@@ -58,6 +64,27 @@ export type NativeEventDelivery = {
   event: NativePublicEvent;
 };
 
+export type NativeEventContinuity = { generation: number; sequence: number };
+export type NativeEventSubscription = {
+  registered: boolean;
+  fence: number | null;
+  kiloSessionId: string;
+  continuity: NativeEventContinuity;
+};
+export type NativeEventBatch = {
+  kiloUserId: string;
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+  generation: number;
+} & (
+  | {
+      kind: 'events';
+      firstSequence: number;
+      events: Omit<NativeEventDelivery, 'cloudAgentSessionId' | 'kiloSessionId'>[];
+    }
+  | { kind: 'loss'; attachmentIds: string[] }
+);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -74,8 +101,14 @@ export function isMaterializedNativeEvent(event: StreamEvent): boolean {
  * message outcomes and Cloud status, which the native client renders as
  * completion/interruption/status updates beside the native events.
  */
-export function isDeliverableNativeEvent(event: StreamEvent): boolean {
-  if (event.eventId === 0) return false;
+export function isDeliverableNativeEvent(event: StreamEvent, live = false): boolean {
+  if (event.eventId === 0)
+    return (
+      live &&
+      event.streamEventType === 'kilocode' &&
+      isRecord(event.data) &&
+      (event.data.event ?? event.data.type) === 'message.part.delta'
+    );
   return event.streamEventType === 'kilocode' || event.streamEventType.startsWith('cloud.');
 }
 
@@ -115,17 +148,23 @@ export type NativeAttachmentState = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
   fence: number | null;
-  snapshotPending: boolean;
+  phase: 'snapshot' | 'live' | 'lost';
   /** Pushed events held until the snapshot through the fence is delivered. */
-  pending: NativeEventDelivery[];
+  pending: { delivery: NativeEventDelivery; continuity?: NativeEventContinuity }[];
+  pendingBytes: number;
+  continuity?: NativeEventContinuity;
   listeners: Set<(event: NativePublicEvent) => void>;
-  overflowed: boolean;
 };
 
 export type NativeAttachmentRegistry = {
   begin(cloudAgentSessionId: string, kiloSessionId: string, attachmentId?: string): void;
   complete(cloudAgentSessionId: string, fence: number | null): void;
   deliver(delivery: NativeEventDelivery): void;
+  bind(attachmentId: string, continuity: NativeEventContinuity): void;
+  deliverBatch(batch: NativeEventBatch, attachmentIds: string[]): void;
+  invalidate(attachmentId: string): void;
+  generation(attachmentId: string): number | undefined;
+  isLost(attachmentId: string): boolean;
   subscribe(cloudAgentSessionId: string, listener: (event: NativePublicEvent) => void): () => void;
   release(cloudAgentSessionId: string): void;
 };
@@ -143,13 +182,67 @@ export function createNativeAttachmentRegistry(
   const attachments = new Map<string, NativeAttachmentState>();
 
   function fail(attachmentId: string, state: NativeAttachmentState): void {
-    state.overflowed = true;
+    if (state.phase === 'lost') return;
+    state.phase = 'lost';
     state.pending = [];
+    state.pendingBytes = 0;
     onOverflow(attachmentId, state.kiloSessionId);
   }
 
   function emit(state: NativeAttachmentState, event: NativePublicEvent): void {
     for (const listener of state.listeners) listener(event);
+  }
+
+  function deliver(
+    attachmentId: string,
+    state: NativeAttachmentState,
+    delivery: NativeEventDelivery,
+    continuity?: NativeEventContinuity
+  ) {
+    if (state.phase === 'lost') return;
+    if (continuity !== undefined && state.continuity !== undefined) {
+      if (continuity.generation !== state.continuity.generation) {
+        if (continuity.generation > state.continuity.generation) fail(attachmentId, state);
+        return;
+      }
+      if (continuity.sequence <= state.continuity.sequence) return;
+      if (continuity.sequence !== state.continuity.sequence + 1) {
+        fail(attachmentId, state);
+        return;
+      }
+      state.continuity = continuity;
+    }
+    if (delivery.eventId === 0 && state.phase === 'snapshot' && state.continuity !== undefined) {
+      fail(attachmentId, state);
+      return;
+    }
+    if (
+      delivery.eventId > 0 &&
+      !delivery.materialized &&
+      state.fence !== null &&
+      delivery.eventId <= state.fence
+    )
+      return;
+    if (
+      state.phase === 'snapshot' ||
+      (continuity !== undefined && state.continuity === undefined)
+    ) {
+      const bytes = new TextEncoder().encode(JSON.stringify(delivery.event)).byteLength;
+      if (
+        state.pending.length >= NATIVE_DELIVERY_LIMITS.count ||
+        state.pendingBytes + bytes > NATIVE_DELIVERY_LIMITS.bytes
+      ) {
+        fail(attachmentId, state);
+        return;
+      }
+      state.pending.push({
+        delivery,
+        continuity: state.continuity === undefined ? continuity : undefined,
+      });
+      state.pendingBytes += bytes;
+      return;
+    }
+    emit(state, delivery.event);
   }
 
   return {
@@ -158,56 +251,106 @@ export function createNativeAttachmentRegistry(
       if (existing !== undefined) {
         existing.kiloSessionId = kiloSessionId;
         existing.fence = null;
-        existing.snapshotPending = true;
+        existing.phase = 'snapshot';
         existing.pending = [];
-        existing.overflowed = false;
+        existing.pendingBytes = 0;
+        existing.continuity = undefined;
         return;
       }
       attachments.set(attachmentId, {
         cloudAgentSessionId,
         kiloSessionId,
         fence: null,
-        snapshotPending: true,
+        phase: 'snapshot',
         pending: [],
+        pendingBytes: 0,
         listeners: new Set(),
-        overflowed: false,
       });
     },
     complete(cloudAgentSessionId, fence) {
       const state = attachments.get(cloudAgentSessionId);
       if (state === undefined) return;
       state.fence = fence;
-      state.snapshotPending = false;
-      if (state.overflowed) return;
+      if (state.phase === 'lost') return;
+      state.phase = 'live';
       const pending = state.pending;
       state.pending = [];
-      for (const delivery of pending) {
-        if (!delivery.materialized && fence !== null && delivery.eventId <= fence) continue;
+      state.pendingBytes = 0;
+      for (const { delivery } of pending) {
+        if (
+          delivery.eventId > 0 &&
+          !delivery.materialized &&
+          fence !== null &&
+          delivery.eventId <= fence
+        )
+          continue;
         emit(state, delivery.event);
       }
     },
     deliver(delivery) {
       for (const [attachmentId, state] of attachments) {
-        if (state.cloudAgentSessionId !== delivery.cloudAgentSessionId || state.overflowed)
+        if (state.cloudAgentSessionId !== delivery.cloudAgentSessionId || state.phase === 'lost')
           continue;
         if (state.kiloSessionId !== delivery.kiloSessionId) continue;
-        if (!delivery.materialized && state.fence !== null && delivery.eventId <= state.fence)
+        deliver(attachmentId, state, delivery);
+      }
+    },
+    bind(attachmentId, continuity) {
+      const state = attachments.get(attachmentId);
+      if (state === undefined || state.phase === 'lost') return;
+      if (state.continuity !== undefined) {
+        if (state.continuity.generation !== continuity.generation) fail(attachmentId, state);
+        return;
+      }
+      state.continuity = continuity;
+      const pending = state.pending;
+      state.pending = [];
+      state.pendingBytes = 0;
+      for (const entry of pending) deliver(attachmentId, state, entry.delivery, entry.continuity);
+    },
+    deliverBatch(batch, attachmentIds) {
+      for (const attachmentId of attachmentIds) {
+        const state = attachments.get(attachmentId);
+        if (
+          state === undefined ||
+          state.cloudAgentSessionId !== batch.cloudAgentSessionId ||
+          state.kiloSessionId !== batch.kiloSessionId
+        )
           continue;
-        if (state.snapshotPending) {
-          if (state.pending.length >= MAX_PENDING_NATIVE_EVENTS) {
-            fail(attachmentId, state);
+        if (batch.kind === 'loss') {
+          if (state.continuity !== undefined && batch.generation < state.continuity.generation)
             continue;
-          }
-          state.pending.push(delivery);
+          if (batch.attachmentIds.includes(attachmentId)) fail(attachmentId, state);
           continue;
         }
-        emit(state, delivery.event);
+        for (const [index, event] of batch.events.entries()) {
+          deliver(
+            attachmentId,
+            state,
+            {
+              ...event,
+              cloudAgentSessionId: batch.cloudAgentSessionId,
+              kiloSessionId: batch.kiloSessionId,
+            },
+            { generation: batch.generation, sequence: batch.firstSequence + index }
+          );
+        }
       }
+    },
+    invalidate(attachmentId) {
+      const state = attachments.get(attachmentId);
+      if (state !== undefined) fail(attachmentId, state);
+    },
+    generation(attachmentId) {
+      return attachments.get(attachmentId)?.continuity?.generation;
+    },
+    isLost(attachmentId) {
+      return attachments.get(attachmentId)?.phase === 'lost';
     },
     subscribe(cloudAgentSessionId, listener) {
       const state = attachments.get(cloudAgentSessionId);
       if (state === undefined) return () => undefined;
-      if (state.overflowed) {
+      if (state.phase === 'lost') {
         listener({
           type: NATIVE_FACADE_RESNAPSHOT_EVENT,
           properties: {

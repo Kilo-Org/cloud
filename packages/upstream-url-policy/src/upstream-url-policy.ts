@@ -35,12 +35,11 @@ const DNS_LOOKUP_TIMEOUT_MS = 2_000;
 const approvedHostnames = new Map<string, { addresses: string[]; expiresAt: number }>();
 
 /**
- * Enforced in every deployment: production, staging and preview all run with
- * `NODE_ENV=production`. Local development reaches the fake LLM over plain HTTP
- * on localhost, and unit tests are not deployments, so both stay exempt.
+ * The staging deployment exercises this policy before a broader rollout.
+ * Activation is controlled by `VERCEL_TARGET_ENV`, independently of build mode.
  */
 export function isUpstreamUrlPolicyEnforced(): boolean {
-  return process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test';
+  return process.env.VERCEL_TARGET_ENV === 'staging';
 }
 
 async function resolveWithSystemResolver(hostname: string): Promise<string[]> {

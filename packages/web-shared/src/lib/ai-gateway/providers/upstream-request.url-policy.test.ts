@@ -17,7 +17,7 @@ jest.mock('next/server', () => ({
 }));
 
 const originalFetch = global.fetch;
-const originalNodeEnv = process.env.NODE_ENV;
+const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
 
 const PUBLIC_IP_URL = 'https://104.18.2.115/v1';
 
@@ -68,11 +68,6 @@ function send(provider: Provider, signal?: AbortSignal) {
 
 const lookupMock = jest.mocked(lookup);
 
-// A non-literal key keeps this assignable: @types/node marks NODE_ENV readonly.
-function setNodeEnv(value: string | undefined) {
-  restoreEnvironmentVariable('NODE_ENV', value);
-}
-
 function restoreEnvironmentVariable(name: string, value: string | undefined): void {
   if (value === undefined) delete process.env[name];
   else process.env[name] = value;
@@ -86,12 +81,12 @@ describe('upstreamRequest upstream URL policy', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-    setNodeEnv(originalNodeEnv);
+    restoreEnvironmentVariable('VERCEL_TARGET_ENV', originalTargetEnv);
   });
 
-  describe('in a deployed environment', () => {
+  describe('in staging', () => {
     beforeEach(() => {
-      setNodeEnv('production');
+      process.env.VERCEL_TARGET_ENV = 'staging';
     });
 
     it('sends to a public HTTPS upstream without following redirects', async () => {
@@ -189,16 +184,19 @@ describe('upstreamRequest upstream URL policy', () => {
     });
   });
 
-  it('leaves the request unchecked in local development', async () => {
-    setNodeEnv('development');
-    const fetchMock = mockFetch();
+  it.each(['production', 'preview', 'development', undefined])(
+    'preserves the rollout: %s',
+    async targetEnv => {
+      restoreEnvironmentVariable('VERCEL_TARGET_ENV', targetEnv);
+      const fetchMock = mockFetch();
 
-    const result = await send(directProvider('http://localhost:8080/v1'));
+      const result = await send(directProvider('http://localhost:8080/v1'));
 
-    expect(result.type).toBe('success');
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://localhost:8080/v1/chat/completions');
-    expect(init?.redirect).toBe('follow');
-    expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
-  });
+      expect(result.type).toBe('success');
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('http://localhost:8080/v1/chat/completions');
+      expect(init?.redirect).toBe('follow');
+      expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
+    }
+  );
 });

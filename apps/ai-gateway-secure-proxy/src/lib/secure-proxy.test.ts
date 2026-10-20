@@ -207,17 +207,16 @@ describe('handleSecureProxyRequest', () => {
   });
 });
 
-// A non-literal key keeps this assignable: @types/node marks NODE_ENV readonly.
-function setNodeEnvironment(name: string, value: string | undefined): void {
-  if (value === undefined) delete process.env[name];
-  else process.env[name] = value;
+function setTargetEnvironment(value: string | undefined): void {
+  if (value === undefined) delete process.env.VERCEL_TARGET_ENV;
+  else process.env.VERCEL_TARGET_ENV = value;
 }
 
 describe('handleSecureProxyRequest with the URL policy enforced', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
+  const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
 
   beforeEach(() => {
-    setNodeEnvironment('NODE_ENV', 'production');
+    process.env.VERCEL_TARGET_ENV = 'staging';
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -227,7 +226,7 @@ describe('handleSecureProxyRequest with the URL policy enforced', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-    setNodeEnvironment('NODE_ENV', originalNodeEnv);
+    setTargetEnvironment(originalTargetEnv);
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
     vi.restoreAllMocks();
   });
@@ -263,4 +262,20 @@ describe('handleSecureProxyRequest with the URL policy enforced', () => {
     expect(init?.redirect).toBe('manual');
     expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBe(upstreamDispatcher());
   });
+
+  it.each(['production', 'preview', 'development', undefined])(
+    'preserves the rollout: %s',
+    async targetEnv => {
+      setTargetEnvironment(targetEnv);
+      const fetchMock = mockUpstream(new Response('{"ok":true}'));
+
+      const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ ok: true });
+      expect(policyCheck).not.toHaveBeenCalled();
+      const { init } = onlyFetchCall(fetchMock);
+      expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
+    }
+  );
 });

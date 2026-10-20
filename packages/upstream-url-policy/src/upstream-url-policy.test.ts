@@ -215,23 +215,28 @@ describe('the approved address window', () => {
 });
 
 describe('isUpstreamUrlPolicyEnforced', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
+  const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'production');
+  });
 
   afterEach(() => {
-    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+    else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    vi.unstubAllEnvs();
   });
 
   test.each([
-    ['production', true],
+    ['production', false],
     ['staging', true],
-    ['preview', true],
-    [undefined, true],
+    ['preview', false],
+    [undefined, false],
     ['development', false],
     ['test', false],
-  ])('NODE_ENV=%s enforces the policy: %s', (nodeEnv, enforced) => {
-    if (nodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = nodeEnv;
+  ])('applies the rollout selection: %s', (targetEnv, enforced) => {
+    if (targetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+    else process.env.VERCEL_TARGET_ENV = targetEnv;
 
     expect(isUpstreamUrlPolicyEnforced()).toBe(enforced);
   });

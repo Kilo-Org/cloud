@@ -4,6 +4,8 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
+  exchangeSlackOAuthCode,
+  getConflictingSlackInstallation,
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
@@ -11,7 +13,6 @@ import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import {
   appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
@@ -20,8 +21,6 @@ import {
   cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
-
-const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
 /**
  * Slack OAuth Callback
@@ -140,29 +139,48 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       throw new Error('Slack OAuth attempt is invalid, expired, or already used');
     }
 
-    // 7. Let the Chat SDK exchange the code and seed its installation state
+    // 7. Resolve the Slack workspace before any Chat SDK state is written. The
+    // installation is stored under a workspace-global key, so a workspace
+    // already held by another Kilo owner has to be rejected before the adapter
+    // can replace that installation.
     await bot.initialize();
     const slackAdapter = bot.getAdapter('slack');
-    const url = new URL(request.url);
-    url.searchParams.set('redirect_uri', SLACK_REDIRECT_URI);
-    const patchedRequest = new Request(url, request);
-    const { teamId, installation } = await slackAdapter.handleOAuthCallback(patchedRequest);
+
+    const { installationId, installation } = await exchangeSlackOAuthCode(code);
+
+    const conflictRedirect = NextResponse.redirect(
+      new URL(
+        buildIntegrationOAuthRedirectPathFromState(
+          PLATFORM.SLACK,
+          state,
+          'error=workspace_already_connected'
+        ),
+        APP_URL
+      )
+    );
+
+    const conflicting = await getConflictingSlackInstallation(owner, installationId);
+    if (conflicting) {
+      return conflictRedirect;
+    }
+
+    const previousInstallation = await slackAdapter.getInstallation(installationId);
+    await slackAdapter.setInstallation(installationId, installation);
 
     // 8. Store installation in database
     try {
-      await upsertSlackInstallation({ owner, teamId, installation });
+      await upsertSlackInstallation({ owner, teamId: installationId, installation });
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
-        return NextResponse.redirect(
-          new URL(
-            buildIntegrationOAuthRedirectPathFromState(
-              PLATFORM.SLACK,
-              state,
-              'error=workspace_already_connected'
-            ),
-            APP_URL
-          )
-        );
+        // A competing row for this workspace appeared after the check above.
+        // Restore the installation this callback replaced, drop only state this
+        // callback created, and leave the workspace identity links alone.
+        if (previousInstallation) {
+          await slackAdapter.setInstallation(installationId, previousInstallation);
+        } else {
+          await slackAdapter.deleteInstallation(installationId);
+        }
+        return conflictRedirect;
       }
 
       throw error;

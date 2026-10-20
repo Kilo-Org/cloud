@@ -3,11 +3,10 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { LinearClient } from '@linear/sdk';
 import {
   exchangeLinearOAuthCode,
   fetchLinearOAuthIdentity,
-  LINEAR_REDIRECT_URI,
+  getConflictingLinearInstallation,
   LinearWorkspaceAlreadyConnectedError,
   type LinearOAuthIdentity,
   revokeLinearToken,
@@ -47,34 +46,6 @@ async function deleteChatSdkLinearInstallation(organizationId: string): Promise<
 
 async function deleteChatSdkLinearIdentityCache(organizationId: string): Promise<void> {
   await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
-}
-
-/**
- * Fetch the workspace name for a freshly installed Linear installation by
- * querying Linear's `organization` GraphQL field with the freshly-issued
- * access token. We cannot use `linearAdapter.getUser('me')` for this: with
- * `actor=app` installs (which is what `getLinearOAuthUrl` uses), the
- * authenticated viewer is the app actor — the configured `userName`
- * (`'kilo'` / `'kilo-dev'`) — not the human installer or the workspace.
- *
- * Falls back to the organizationId on failure so the install still succeeds
- * with a human-readable label.
- */
-async function fetchLinearWorkspaceName(
-  accessToken: string,
-  organizationId: string
-): Promise<string> {
-  try {
-    const organization = await new LinearClient({ accessToken }).organization;
-    return organization.name || organization.urlKey || organizationId;
-  } catch (error) {
-    captureMessage('Failed to fetch Linear workspace name', {
-      level: 'warning',
-      tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-      extra: { organizationId, error: error instanceof Error ? error.message : String(error) },
-    });
-    return organizationId;
-  }
 }
 
 function htmlPage(title: string, message: string, status = 200): Response {
@@ -334,15 +305,45 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       throw new Error('Linear OAuth attempt is invalid, expired, or already used');
     }
 
-    // Chat SDK exchanges the code, persists the per-workspace installation in
-    // its state adapter, and returns the Linear organizationId + installation.
+    // Resolve the target Linear workspace before any Chat SDK state is
+    // written. The installation is stored under a workspace-global key, so a
+    // workspace already held by another Kilo owner has to be rejected before
+    // the adapter can replace that installation.
     await bot.initialize();
     const linearAdapter = bot.getAdapter('linear');
-    const { organizationId, installation } = await linearAdapter.handleOAuthCallback(request, {
-      redirectUri: LINEAR_REDIRECT_URI,
+
+    const { accessToken, refreshToken, expiresIn } = await exchangeLinearOAuthCode(code);
+    const identity = await fetchLinearOAuthIdentity(accessToken);
+    const organizationId = identity.organizationId;
+
+    const conflictRedirect = NextResponse.redirect(
+      new URL(
+        buildIntegrationOAuthRedirectPathFromOwner(
+          PLATFORM.LINEAR,
+          verifiedOwner,
+          'error=workspace_already_connected',
+          verified?.returnTo
+        ),
+        APP_URL
+      )
+    );
+
+    const conflicting = await getConflictingLinearInstallation(owner, organizationId);
+    if (conflicting) {
+      return conflictRedirect;
+    }
+
+    const previousInstallation = await linearAdapter.getInstallation(organizationId);
+
+    await linearAdapter.setInstallation(organizationId, {
+      accessToken,
+      botUserId: identity.viewerId,
+      expiresAt: expiresIn === null ? null : Date.now() + expiresIn * 1000,
+      organizationId,
+      ...(refreshToken ? { refreshToken } : {}),
     });
 
-    const workspaceName = await fetchLinearWorkspaceName(installation.accessToken, organizationId);
+    const workspaceName = identity.organizationName ?? organizationId;
 
     try {
       await upsertLinearInstallation(
@@ -350,7 +351,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
           owner,
           organizationId,
           organizationName: workspaceName,
-          botUserId: installation.botUserId,
+          botUserId: identity.viewerId,
         },
         {
           getChatSdkAccessToken: getChatSdkLinearAccessToken,
@@ -360,25 +361,15 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       );
     } catch (error) {
       if (error instanceof LinearWorkspaceAlreadyConnectedError) {
-        // The Chat SDK adapter already persisted the freshly-issued OAuth
-        // token under linear:installation:${organizationId} during
-        // handleOAuthCallback. Since the uniqueness check rejected this
-        // install, we must roll that state back — otherwise we overwrite the
-        // original installer's token and any future bot/webhook traffic for
-        // that workspace runs with mismatched credentials.
-        await linearAdapter.deleteInstallation(organizationId);
-        await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
-        return NextResponse.redirect(
-          new URL(
-            buildIntegrationOAuthRedirectPathFromOwner(
-              PLATFORM.LINEAR,
-              verifiedOwner,
-              'error=workspace_already_connected',
-              verified?.returnTo
-            ),
-            APP_URL
-          )
-        );
+        // A competing row for this workspace appeared after the check above.
+        // Restore the installation this callback replaced, drop only state
+        // this callback created, and leave the workspace identity links alone.
+        if (previousInstallation) {
+          await linearAdapter.setInstallation(organizationId, previousInstallation);
+        } else {
+          await linearAdapter.deleteInstallation(organizationId);
+        }
+        return conflictRedirect;
       }
       throw error;
     }

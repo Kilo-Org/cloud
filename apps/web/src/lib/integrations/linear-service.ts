@@ -160,11 +160,14 @@ export type LinearOAuthTokenResponse = {
 };
 
 /**
- * Exchange a Linear OAuth authorization code for a transient user-actor
- * access token. This is intentionally separate from
- * `linearAdapter.handleOAuthCallback` — that path persists a workspace
- * installation, but the bot-link flow only needs the token long enough
- * to query the viewer's identity, after which it is revoked.
+ * Exchange a Linear OAuth authorization code at Linear's token endpoint.
+ *
+ * Two callers share it:
+ *  - the bot-link flow, which only needs the token long enough to query the
+ *    viewer's identity, after which it is revoked;
+ *  - the workspace install callback, which resolves the target workspace from
+ *    the token before persisting a Chat SDK installation, so a workspace held
+ *    by a different owner never has its installation replaced.
  */
 export async function exchangeLinearOAuthCode(code: string): Promise<LinearOAuthTokenResponse> {
   if (!LINEAR_CLIENT_ID || !LINEAR_CLIENT_SECRET) {
@@ -273,7 +276,13 @@ function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
     : integration.owned_by_organization_id === owner.id && integration.owned_by_user_id === null;
 }
 
-async function getConflictingLinearInstallation(
+/**
+ * Find a Linear `platform_integrations` row for `organizationId` that belongs to
+ * a different Kilo owner. Callers use this before persisting a workspace
+ * installation so a workspace owned elsewhere is rejected without writing to
+ * the shared Chat SDK installation state.
+ */
+export async function getConflictingLinearInstallation(
   owner: Owner,
   organizationId: string
 ): Promise<PlatformIntegration | null> {
@@ -318,10 +327,10 @@ type LinearUpsertOptions = {
 
 /**
  * Create or update a Linear `platform_integrations` row after a successful
- * OAuth exchange. The OAuth access/refresh tokens are persisted inside the
- * Chat SDK's state adapter by `linearAdapter.handleOAuthCallback`; this row
- * stores only non-secret metadata used by the tRPC router / UI and to gate
- * bot processing via `metadata.bot_enabled`.
+ * OAuth exchange. The OAuth access/refresh tokens live in the Chat SDK state
+ * adapter, written by the install callback after it has confirmed the workspace
+ * belongs to this owner; this row stores only non-secret metadata used by the
+ * tRPC router / UI and to gate bot processing via `metadata.bot_enabled`.
  *
  * When the same Kilo owner reinstalls onto a *different* Linear workspace
  * (`existing.platform_installation_id !== organizationId`), the optional

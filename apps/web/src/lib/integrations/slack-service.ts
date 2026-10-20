@@ -7,7 +7,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
-import { SLACK_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
+import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
@@ -88,6 +88,59 @@ export function getSlackOAuthUrl(state: string): string {
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
 }
 
+export type SlackOAuthExchangeResult = {
+  installationId: string;
+  enterpriseId: string | undefined;
+  isEnterpriseInstall: boolean;
+  installation: SlackInstallation;
+};
+
+/**
+ * Exchange a Slack OAuth V2 authorization code for a workspace installation.
+ *
+ * Produces the same installation record `slackAdapter.handleOAuthCallback`
+ * persists, but without writing it, so the callback can resolve which workspace
+ * is being connected and check its ownership first. Enterprise Grid org-wide
+ * installs are keyed on the enterprise ID, matching the adapter.
+ */
+export async function exchangeSlackOAuthCode(code: string): Promise<SlackOAuthExchangeResult> {
+  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
+    throw new Error('SLACK_CLIENT_ID / SLACK_CLIENT_SECRET are not configured');
+  }
+
+  const result = await new WebClient().oauth.v2.access({
+    client_id: SLACK_CLIENT_ID,
+    client_secret: SLACK_CLIENT_SECRET,
+    code,
+    redirect_uri: SLACK_REDIRECT_URI,
+  });
+
+  const isEnterpriseInstall = Boolean(result.is_enterprise_install);
+  const enterpriseId = result.enterprise?.id;
+  const installationId = isEnterpriseInstall ? enterpriseId : result.team?.id;
+
+  if (!result.ok || !result.access_token || !installationId) {
+    throw new Error(
+      isEnterpriseInstall
+        ? 'Slack OAuth failed: missing access_token or enterprise id'
+        : 'Slack OAuth failed: missing access_token or team id'
+    );
+  }
+
+  return {
+    installationId,
+    enterpriseId,
+    isEnterpriseInstall,
+    installation: {
+      botToken: result.access_token,
+      botUserId: result.bot_user_id,
+      teamName: result.team?.name ?? result.enterprise?.name,
+      ...(enterpriseId ? { enterpriseId } : {}),
+      ...(isEnterpriseInstall ? { isEnterpriseInstall } : {}),
+    },
+  };
+}
+
 /**
  * Revoke Slack access token
  */
@@ -145,7 +198,13 @@ function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
     : integration.owned_by_organization_id === owner.id && integration.owned_by_user_id === null;
 }
 
-async function getConflictingSlackInstallation(
+/**
+ * Find a Slack `platform_integrations` row for `teamId` that belongs to a
+ * different Kilo owner. Callers use this before persisting a workspace
+ * installation so a workspace owned elsewhere is rejected without writing to
+ * the shared Chat SDK installation state.
+ */
+export async function getConflictingSlackInstallation(
   owner: Owner,
   teamId: string
 ): Promise<PlatformIntegration | null> {

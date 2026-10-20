@@ -6,6 +6,7 @@ import { bot } from '@/lib/bot';
 import {
   exchangeLinearOAuthCode,
   fetchLinearOAuthIdentity,
+  getConflictingLinearInstallation,
   LinearWorkspaceAlreadyConnectedError,
   revokeLinearToken,
   upsertLinearInstallation,
@@ -20,18 +21,9 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { createSignedToken } from '@/lib/signed-token';
 
 const mockIsEnabledForBot = jest.fn();
-const mockHandleOAuthCallback = jest.fn();
 const mockConsumeProviderOAuthAttempt = jest.fn(async (_input: unknown) => true);
 const mockCancelProviderOAuthAttempt = jest.fn(async (_input: unknown) => true);
-const mockLinearOrganization = jest.fn(async () => ({ name: 'Acme Workspace', urlKey: 'acme' }));
 
-jest.mock('@linear/sdk', () => ({
-  LinearClient: jest.fn().mockImplementation(() => ({
-    get organization() {
-      return mockLinearOrganization();
-    },
-  })),
-}));
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/bot', () => ({
   bot: {
@@ -47,6 +39,7 @@ jest.mock('@/lib/integrations/linear-service', () => {
     upsertLinearInstallation: jest.fn(),
     exchangeLinearOAuthCode: jest.fn(),
     fetchLinearOAuthIdentity: jest.fn(),
+    getConflictingLinearInstallation: jest.fn(),
     revokeLinearToken: jest.fn(async () => true),
   };
 });
@@ -84,6 +77,7 @@ const mockedUpsertLinearInstallation = jest.mocked(upsertLinearInstallation);
 const mockedUnlinkTeamKiloUsers = jest.mocked(unlinkTeamKiloUsers);
 const mockedExchangeLinearOAuthCode = jest.mocked(exchangeLinearOAuthCode);
 const mockedFetchLinearOAuthIdentity = jest.mocked(fetchLinearOAuthIdentity);
+const mockedGetConflictingLinearInstallation = jest.mocked(getConflictingLinearInstallation);
 const mockedRevokeLinearToken = jest.mocked(revokeLinearToken);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedVerifyLinearBotLinkState = jest.mocked(verifyLinearBotLinkState);
@@ -119,6 +113,10 @@ async function callLinearCallback(request: NextRequest) {
 }
 
 describe('GET /api/integrations/linear/callback', () => {
+  let getInstallation: jest.Mock<Promise<unknown>, [string]>;
+  let setInstallation: jest.Mock<Promise<void>, [string, unknown]>;
+  let deleteInstallation: jest.Mock<Promise<void>, [string]>;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
@@ -134,21 +132,28 @@ describe('GET /api/integrations/linear/callback', () => {
       authFailedResponse: null,
     } as never);
 
-    mockHandleOAuthCallback.mockResolvedValue({
-      organizationId: ORGANIZATION_ID,
-      installation: {
-        accessToken: 'tok',
-        botUserId: 'bot-1',
-        organizationId: ORGANIZATION_ID,
-        expiresAt: null,
-      },
+    mockedExchangeLinearOAuthCode.mockResolvedValue({
+      accessToken: 'lin_app_tok',
+      refreshToken: null,
+      expiresIn: null,
+      scope: null,
     });
-    mockedBotGetAdapter.mockReturnValue({
-      handleOAuthCallback: mockHandleOAuthCallback,
-      deleteInstallation: jest.fn(async () => undefined),
-    } as never);
+    mockedFetchLinearOAuthIdentity.mockResolvedValue({
+      viewerId: 'linear-bot-user',
+      viewerName: 'Kilo',
+      organizationId: ORGANIZATION_ID,
+      organizationName: 'Acme Workspace',
+    });
+    mockedGetConflictingLinearInstallation.mockResolvedValue(null);
 
-    mockLinearOrganization.mockResolvedValue({ name: 'Acme Workspace', urlKey: 'acme' });
+    getInstallation = jest.fn<Promise<unknown>, [string]>(async () => null);
+    setInstallation = jest.fn<Promise<void>, [string, unknown]>(async () => undefined);
+    deleteInstallation = jest.fn<Promise<void>, [string]>(async () => undefined);
+    mockedBotGetAdapter.mockReturnValue({
+      getInstallation,
+      setInstallation,
+      deleteInstallation,
+    } as never);
   });
 
   test('redirects to sign-in when user is unauthenticated', async () => {
@@ -171,7 +176,7 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations/linear?error=access_denied');
     expect(mockCancelProviderOAuthAttempt).toHaveBeenCalledTimes(1);
     expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
-    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedExchangeLinearOAuthCode).not.toHaveBeenCalled();
     expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
   });
 
@@ -209,7 +214,7 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations/linear?error=missing_code');
     expect(mockCancelProviderOAuthAttempt).toHaveBeenCalledTimes(1);
     expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
-    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedExchangeLinearOAuthCode).not.toHaveBeenCalled();
     expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
   });
 
@@ -244,7 +249,7 @@ describe('GET /api/integrations/linear/callback', () => {
       );
 
       expectRedirectLocation(response, '/integrations/linear?success=installed');
-      expect(mockHandleOAuthCallback).toHaveBeenCalledTimes(1);
+      expect(mockedExchangeLinearOAuthCode).toHaveBeenCalledWith('abc');
       expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
       expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
     } finally {
@@ -262,7 +267,7 @@ describe('GET /api/integrations/linear/callback', () => {
         makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
       );
       expectRedirectLocation(response, '/integrations?error=invalid_state');
-      expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+      expect(mockedExchangeLinearOAuthCode).not.toHaveBeenCalled();
       expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
       expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
       expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
@@ -278,24 +283,39 @@ describe('GET /api/integrations/linear/callback', () => {
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
     expectRedirectLocation(response, '/integrations?error=invalid_state');
-    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedExchangeLinearOAuthCode).not.toHaveBeenCalled();
     expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
     expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
     expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
   });
 
-  test('invokes upsertLinearInstallation with the workspace name from Linear GraphQL', async () => {
+  test('persists the installation and the integration row for an unclaimed workspace', async () => {
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
     const state = createProviderState();
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
 
+    expect(mockedExchangeLinearOAuthCode).toHaveBeenCalledWith('abc');
+    expect(mockedFetchLinearOAuthIdentity).toHaveBeenCalledWith('lin_app_tok');
+    expect(mockedGetConflictingLinearInstallation).toHaveBeenCalledWith(
+      { type: 'user', id: USER_ID },
+      ORGANIZATION_ID
+    );
+    expect(setInstallation).toHaveBeenCalledTimes(1);
+    expect(setInstallation).toHaveBeenCalledWith(ORGANIZATION_ID, {
+      accessToken: 'lin_app_tok',
+      botUserId: 'linear-bot-user',
+      expiresAt: null,
+      organizationId: ORGANIZATION_ID,
+    });
+
     expect(mockedUpsertLinearInstallation).toHaveBeenCalledWith(
       expect.objectContaining({
         owner: { type: 'user', id: USER_ID },
         organizationId: ORGANIZATION_ID,
         organizationName: 'Acme Workspace',
+        botUserId: 'linear-bot-user',
       }),
       expect.objectContaining({
         getChatSdkAccessToken: expect.any(Function),
@@ -331,56 +351,84 @@ describe('GET /api/integrations/linear/callback', () => {
     );
   });
 
-  test('falls back to organizationId when the Linear GraphQL query fails', async () => {
-    mockLinearOrganization.mockRejectedValue(new Error('Unauthorized'));
+  test('carries the token lifetime and refresh token into the stored installation', async () => {
+    mockedExchangeLinearOAuthCode.mockResolvedValue({
+      accessToken: 'lin_app_tok',
+      refreshToken: 'lin_refresh_tok',
+      expiresIn: 3600,
+      scope: null,
+    });
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+
+    const before = Date.now();
     const state = createProviderState();
     await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
+    const after = Date.now();
 
-    expect(mockedUpsertLinearInstallation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        organizationName: ORGANIZATION_ID,
-      }),
-      expect.anything()
-    );
+    const installation = setInstallation.mock.calls[0]?.[1] as {
+      expiresAt: number;
+      refreshToken?: string;
+    };
+    expect(installation.refreshToken).toBe('lin_refresh_tok');
+    expect(installation.expiresAt).toBeGreaterThanOrEqual(before + 3_600_000);
+    expect(installation.expiresAt).toBeLessThanOrEqual(after + 3_600_000);
   });
 
-  test('rolls back the Chat SDK installation when the workspace is already connected', async () => {
-    mockedUpsertLinearInstallation.mockRejectedValue(
-      new LinearWorkspaceAlreadyConnectedError('Acme')
-    );
-    const deleteInstallation = jest.fn<Promise<void>, [string]>(async () => undefined);
-    const adapter = {
-      handleOAuthCallback: jest.fn(async () => ({
-        organizationId: ORGANIZATION_ID,
-        installation: {
-          accessToken: 'tok',
-          botUserId: 'bot-1',
-          organizationId: ORGANIZATION_ID,
-          expiresAt: null,
-        },
-      })),
-      withInstallation: jest.fn(async <T>(_orgId: unknown, fn: () => Promise<T> | T) => fn()),
-      getUser: jest.fn(async () => ({ fullName: 'Acme', userName: 'acme' })),
-      deleteInstallation,
-    };
-    mockedBotGetAdapter.mockReturnValue(adapter as never);
+  test('leaves the stored installation and identity links untouched when another owner holds the workspace', async () => {
+    mockedGetConflictingLinearInstallation.mockResolvedValue({ id: 'pi_other' } as never);
 
     const state = createProviderState();
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
 
+    expect(setInstallation).not.toHaveBeenCalled();
+    expect(deleteInstallation).not.toHaveBeenCalled();
+    expect(mockedUnlinkTeamKiloUsers).not.toHaveBeenCalled();
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+    expectRedirectLocation(response, '/integrations/linear?error=workspace_already_connected');
+  });
+
+  test('restores the installation it replaced when the workspace is claimed after the check', async () => {
+    const previousInstallation = {
+      accessToken: 'prior_tok',
+      botUserId: 'linear-bot-user',
+      expiresAt: null,
+      organizationId: ORGANIZATION_ID,
+    };
+    getInstallation.mockResolvedValue(previousInstallation);
+    mockedUpsertLinearInstallation.mockRejectedValue(
+      new LinearWorkspaceAlreadyConnectedError('Acme')
+    );
+
+    const state = createProviderState();
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    expect(setInstallation).toHaveBeenCalledTimes(2);
+    expect(setInstallation).toHaveBeenLastCalledWith(ORGANIZATION_ID, previousInstallation);
+    expect(deleteInstallation).not.toHaveBeenCalled();
+    expect(mockedUnlinkTeamKiloUsers).not.toHaveBeenCalled();
+    expectRedirectLocation(response, '/integrations/linear?error=workspace_already_connected');
+  });
+
+  test('drops only the installation it created when the workspace is claimed after the check', async () => {
+    mockedUpsertLinearInstallation.mockRejectedValue(
+      new LinearWorkspaceAlreadyConnectedError('Acme')
+    );
+
+    const state = createProviderState();
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    expect(getInstallation).toHaveBeenCalledWith(ORGANIZATION_ID);
     expect(deleteInstallation).toHaveBeenCalledTimes(1);
     expect(deleteInstallation).toHaveBeenCalledWith(ORGANIZATION_ID);
-    expect(mockedUnlinkTeamKiloUsers).toHaveBeenCalledTimes(1);
-    expect(mockedUnlinkTeamKiloUsers).toHaveBeenCalledWith(
-      expect.anything(),
-      'linear',
-      ORGANIZATION_ID
-    );
+    expect(mockedUnlinkTeamKiloUsers).not.toHaveBeenCalled();
     expectRedirectLocation(response, '/integrations/linear?error=workspace_already_connected');
   });
 });
@@ -400,11 +448,12 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
       authFailedResponse: null,
     } as never);
 
-    // The default install-flow adapter must NOT be invoked when the bot-link
-    // state matches; tests assert this.
+    // The install-flow adapter must NOT be invoked when the bot-link state
+    // matches; tests assert the install branch never persists an installation.
     mockedBotGetAdapter.mockReturnValue({
-      handleOAuthCallback: jest.fn(async () => {
-        throw new Error('handleOAuthCallback should not be called for bot-link');
+      getInstallation: jest.fn(async () => null),
+      setInstallation: jest.fn(async () => {
+        throw new Error('the workspace install flow must not run for a bot-link callback');
       }),
       deleteInstallation: jest.fn(async () => undefined),
     } as never);
@@ -609,24 +658,11 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
   });
 
   test('does not invoke the workspace install flow when a bot-link state matches', async () => {
-    const handleOAuthCallback = jest.fn(async () => ({
-      organizationId: ORGANIZATION_ID,
-      installation: {
-        accessToken: 'tok',
-        botUserId: 'bot-1',
-        organizationId: ORGANIZATION_ID,
-        expiresAt: null,
-      },
-    }));
-    mockedBotGetAdapter.mockReturnValue({
-      handleOAuthCallback,
-      deleteInstallation: jest.fn(async () => undefined),
-    } as never);
-
     await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
     );
 
-    expect(handleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedGetConflictingLinearInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
   });
 });

@@ -2,9 +2,9 @@
  * In-process stale-while-revalidate cache for async fetchers.
  *
  * Returns the cached value immediately if it's younger than `ttlMs`,
- * otherwise calls `fetcher` to refresh. If the fetcher throws (e.g.
- * a network timeout), returns the last-known-good cached value, or
- * `defaultValue` if nothing has been cached yet.
+ * otherwise calls `fetcher` to refresh. If calling or awaiting the fetcher
+ * throws (e.g. a network timeout), returns the last-known-good cached value,
+ * or `defaultValue` if nothing has been cached yet.
  *
  * Callers that arrive while a refresh is in flight share that refresh, so an
  * expired entry never produces more than one concurrent underlying fetch.
@@ -56,7 +56,7 @@ export function createCachedFetch<T>(
       return await inFlight;
     }
 
-    inFlight = (async (): Promise<T> => {
+    const refresh = (async (): Promise<T> => {
       try {
         const value = await fetcher();
         cached = { value, at: Date.now(), retryAfterMs: 0 };
@@ -69,11 +69,14 @@ export function createCachedFetch<T>(
         const value = cached?.value ?? defaultValue;
         cached = { value, at: 0, retryAfterMs: Date.now() + failureBackoffMs };
         return value;
-      } finally {
-        inFlight = null;
       }
     })();
 
-    return await inFlight;
+    inFlight = refresh;
+    try {
+      return await refresh;
+    } finally {
+      inFlight = null;
+    }
   };
 }

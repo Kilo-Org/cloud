@@ -167,4 +167,36 @@ describe('createCachedFetch', () => {
     expect(await get()).toBe('recovered');
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+
+  test('retries synchronous failures after each backoff window and recovers', async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(100_000);
+    const fetcher = jest
+      .fn<() => Promise<string>>()
+      .mockImplementationOnce(() => {
+        throw new Error('fixture failure');
+      })
+      .mockImplementationOnce(() => {
+        throw new Error('fixture failure');
+      })
+      .mockResolvedValue('recovered');
+    const get = createCachedFetch(fetcher, 10, 'default', { failureBackoffMs: 100 });
+
+    expect(await get()).toBe('default');
+    clock.mockReturnValue(100_099);
+    expect(await get()).toBe('default');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    clock.mockReturnValue(100_100);
+    expect(await get()).toBe('default');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    clock.mockReturnValue(100_199);
+    expect(await get()).toBe('default');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    clock.mockReturnValue(100_200);
+    expect(await get()).toBe('recovered');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(await get()).toBe('recovered');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
 });

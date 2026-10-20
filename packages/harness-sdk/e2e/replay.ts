@@ -51,12 +51,15 @@ interface Answer {
 }
 
 const ask = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text, { maxTokens: 4000 }), { said: '', thought: '' }, (held, event) =>
-    event.kind === 'delta'
-      ? { ...held, said: held.said + event.text }
-      : event.kind === 'reasoning'
-        ? { ...held, thought: held.thought + event.text }
-        : held
+  Stream.runFold(
+    session.ask(text, { maxTokens: 4000 }),
+    { said: '', thought: '' },
+    (held, event) =>
+      event.kind === 'delta'
+        ? { ...held, said: held.said + event.text }
+        : event.kind === 'reasoning'
+          ? { ...held, thought: held.thought + event.text }
+          : held
   );
 
 /**

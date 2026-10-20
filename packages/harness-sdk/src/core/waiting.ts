@@ -147,9 +147,8 @@ const waited = (
     : Effect.map(
         Effect.timeoutOption(
           Effect.raceFirst(
-            Effect.map(
-              Fiber.await(fiber),
-              (exit): Option.Option<Exit.Exit<ToolResult>> => Option.some(exit)
+            Effect.map(Fiber.await(fiber), (exit): Option.Option<Exit.Exit<ToolResult>> =>
+              Option.some(exit)
             ),
             Effect.as(Deferred.await(release), Option.none<Exit.Exit<ToolResult>>())
           ),

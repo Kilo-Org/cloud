@@ -31,12 +31,10 @@ const ALL_ON: UserNotificationPreferences = {
   securityFindingsEnabled: true,
 };
 
-const mockDispatchPush = vi.fn(
-  async (_input: DispatchPushInput): Promise<DispatchPushOutcome> => ({
-    kind: 'delivered',
-    tokenCount: 1,
-  })
-);
+const mockDispatchPush = vi.fn(async (_input: DispatchPushInput): Promise<DispatchPushOutcome> => ({
+  kind: 'delivered',
+  tokenCount: 1,
+}));
 
 function createDeps(
   options: {

@@ -138,8 +138,9 @@ export function useAgentProfileSectionMutations(organizationId?: string) {
           const previous = queryClient.getQueriesData<AgentProfileDetail>({
             queryKey: detailFilter.queryKey,
           });
-          queryClient.setQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }, old =>
-            old ? withMcpEnabled(old, variables.mcpServerId, variables.enabled) : old
+          queryClient.setQueriesData<AgentProfileDetail>(
+            { queryKey: detailFilter.queryKey },
+            old => (old ? withMcpEnabled(old, variables.mcpServerId, variables.enabled) : old)
           );
           return { generation, previous };
         },
@@ -167,8 +168,9 @@ export function useAgentProfileSectionMutations(organizationId?: string) {
           const previous = queryClient.getQueriesData<AgentProfileDetail>({
             queryKey: detailFilter.queryKey,
           });
-          queryClient.setQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }, old =>
-            old ? withKiloCommandEnabled(old, variables.commandId, variables.enabled) : old
+          queryClient.setQueriesData<AgentProfileDetail>(
+            { queryKey: detailFilter.queryKey },
+            old => (old ? withKiloCommandEnabled(old, variables.commandId, variables.enabled) : old)
           );
           return { generation, previous };
         },
@@ -199,8 +201,9 @@ export function useAgentProfileSectionMutations(organizationId?: string) {
           const previous = queryClient.getQueriesData<AgentProfileDetail>({
             queryKey: detailFilter.queryKey,
           });
-          queryClient.setQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }, old =>
-            old ? withKiloCommandOrder(old, variables.orderedIds) : old
+          queryClient.setQueriesData<AgentProfileDetail>(
+            { queryKey: detailFilter.queryKey },
+            old => (old ? withKiloCommandOrder(old, variables.orderedIds) : old)
           );
           return { generation, previous };
         },

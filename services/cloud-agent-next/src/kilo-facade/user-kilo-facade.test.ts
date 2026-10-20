@@ -793,11 +793,9 @@ describe('handleKiloFacadeRequest', () => {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
           cloudAgentSessionId: 'agent_cold',
         })),
-        resolveLiveWrapper: vi.fn(
-          async (): Promise<LiveWrapperResolution> => ({
-            kind: 'unavailable',
-          })
-        ),
+        resolveLiveWrapper: vi.fn(async (): Promise<LiveWrapperResolution> => ({
+          kind: 'unavailable',
+        })),
       },
     });
 
@@ -823,18 +821,16 @@ describe('handleKiloFacadeRequest', () => {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
           cloudAgentSessionId: 'agent_billing_blocked',
         })),
-        resolveLiveWrapper: vi.fn(
-          async (): Promise<LiveWrapperResolution> => ({
-            kind: 'billing-rejected',
-            admission: {
-              success: false,
-              code: 'insufficient_credits',
-              message: 'internal admission detail',
-              remainingMicrodollars: 1,
-              minimumRequiredMicrodollars: 5,
-            },
-          })
-        ),
+        resolveLiveWrapper: vi.fn(async (): Promise<LiveWrapperResolution> => ({
+          kind: 'billing-rejected',
+          admission: {
+            success: false,
+            code: 'insufficient_credits',
+            message: 'internal admission detail',
+            remainingMicrodollars: 1,
+            minimumRequiredMicrodollars: 5,
+          },
+        })),
       },
     });
 

@@ -77,22 +77,18 @@ export function buildToolDiffModel(part: ToolPart): ToolDiffModel | null {
     const cappedAdd = addLines.slice(0, EDIT_LINE_CAP);
 
     const lines: ParsedDiffLine[] = [
-      ...cappedDel.map(
-        (text, i): ParsedDiffLine => ({
-          type: 'del',
-          oldLine: i + 1,
-          text,
-          noNewlineAtEndOfFile: false,
-        })
-      ),
-      ...cappedAdd.map(
-        (text, i): ParsedDiffLine => ({
-          type: 'add',
-          newLine: i + 1,
-          text,
-          noNewlineAtEndOfFile: false,
-        })
-      ),
+      ...cappedDel.map((text, i): ParsedDiffLine => ({
+        type: 'del',
+        oldLine: i + 1,
+        text,
+        noNewlineAtEndOfFile: false,
+      })),
+      ...cappedAdd.map((text, i): ParsedDiffLine => ({
+        type: 'add',
+        newLine: i + 1,
+        text,
+        noNewlineAtEndOfFile: false,
+      })),
     ];
 
     return {

@@ -80,9 +80,10 @@ function buildEngine(overrides: Partial<GatewayVoiceInputEngineDeps> = {}): {
 } {
   const recorder = makeRecorder();
   const events: RecordedEvent[] = [];
-  const upload = vi.fn(
-    async (): Promise<TranscribeRecordingResult> => ({ ok: true, text: 'hello world' })
-  );
+  const upload = vi.fn(async (): Promise<TranscribeRecordingResult> => ({
+    ok: true,
+    text: 'hello world',
+  }));
   const deleteRecording = vi.fn(async (): Promise<void> => undefined);
   const deps: GatewayVoiceInputEngineDeps = {
     setAudioMode: vi.fn(async (): Promise<void> => undefined),

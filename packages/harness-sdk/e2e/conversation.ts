@@ -247,14 +247,12 @@ const converse = (model: string) =>
       Effect.gen(function* () {
         asked.push([...questions]);
         yield* Effect.sleep('5 seconds');
-        return questions.map(
-          (question): Answer => ({
-            id: question.id,
-            ...(question.choices?.[0] === undefined
-              ? { text: 'ultramarine' }
-              : { chosen: [question.choices[0].value] }),
-          })
-        );
+        return questions.map((question): Answer => ({
+          id: question.id,
+          ...(question.choices?.[0] === undefined
+            ? { text: 'ultramarine' }
+            : { chosen: [question.choices[0].value] }),
+        }));
       });
 
     const layers = kilo();

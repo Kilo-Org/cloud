@@ -236,8 +236,9 @@ export function useAgentProfileMutations(organizationId?: string) {
           const previous = queryClient.getQueriesData<AgentProfileDetail>({
             queryKey: detailFilter.queryKey,
           });
-          queryClient.setQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }, old =>
-            old ? withSkillEnabled(old, variables.skillId, variables.enabled) : old
+          queryClient.setQueriesData<AgentProfileDetail>(
+            { queryKey: detailFilter.queryKey },
+            old => (old ? withSkillEnabled(old, variables.skillId, variables.enabled) : old)
           );
           return { generation, previous };
         },

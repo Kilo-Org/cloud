@@ -156,9 +156,10 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
   );
   const getConfigForResponse = vi.fn(async () => config);
   const idFromName = vi.fn((name: string) => name);
-  const invokeScheduled = vi.fn(
-    async (): Promise<ScheduledInvocation> => ({ success: true, requestId: crypto.randomUUID() })
-  );
+  const invokeScheduled = vi.fn(async (): Promise<ScheduledInvocation> => ({
+    success: true,
+    requestId: crypto.randomUUID(),
+  }));
   const stub = { configure, getConfig, updateConfig, getConfigForResponse, invokeScheduled };
   const env = {
     INTERNAL_API_SECRET: { get: vi.fn(async () => INTERNAL_API_SECRET) },

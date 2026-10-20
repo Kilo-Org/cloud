@@ -1221,8 +1221,8 @@ describe('useSidebarSessions live update helpers', () => {
       );
       expect(churnedOrder).toEqual(['ses_idle', 'ses_running']);
 
-      const advancedOrder = groupSidebarSessions([advanced, idle], {}, pinFor(advanced)).map(item =>
-        item.type === 'session' ? item.session.sessionId : item.worktreeId
+      const advancedOrder = groupSidebarSessions([advanced, idle], {}, pinFor(advanced)).map(
+        item => (item.type === 'session' ? item.session.sessionId : item.worktreeId)
       );
       expect(advancedOrder).toEqual(['ses_running', 'ses_idle']);
     });

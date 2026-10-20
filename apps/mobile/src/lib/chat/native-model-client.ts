@@ -170,12 +170,10 @@ function answer(
       output += calls.map(call => call.name + call.arguments).join('');
       await emit.chunk(
         Chunk.fromIterable(
-          calls.map(
-            (call): ModelEvent => ({
-              kind: 'toolCall',
-              call: { id: call.id, name: call.name, arguments: call.arguments },
-            })
-          )
+          calls.map((call): ModelEvent => ({
+            kind: 'toolCall',
+            call: { id: call.id, name: call.name, arguments: call.arguments },
+          }))
         )
       );
       const usage: ModelUsage = {

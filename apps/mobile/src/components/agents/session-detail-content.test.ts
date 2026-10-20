@@ -687,24 +687,22 @@ function toolRunMessage(
 ): StoredMessage {
   const message = assistantMessage(messageId);
   message.info = { ...message.info, sessionID: sessionId };
-  message.parts = partIds.map(
-    (partId, index): ToolPart => ({
-      id: partId,
-      sessionID: sessionId,
-      messageID: messageId,
-      type: 'tool',
-      callID: `call-${partId}`,
-      tool: 'read',
-      state: {
-        status: 'completed',
-        input: { filePath: `/repo/${partId}.ts` },
-        output: '',
-        title: 'read',
-        metadata: {},
-        time: { start: index, end: index + 1 },
-      },
-    })
-  );
+  message.parts = partIds.map((partId, index): ToolPart => ({
+    id: partId,
+    sessionID: sessionId,
+    messageID: messageId,
+    type: 'tool',
+    callID: `call-${partId}`,
+    tool: 'read',
+    state: {
+      status: 'completed',
+      input: { filePath: `/repo/${partId}.ts` },
+      output: '',
+      title: 'read',
+      metadata: {},
+      time: { start: index, end: index + 1 },
+    },
+  }));
   return message;
 }
 

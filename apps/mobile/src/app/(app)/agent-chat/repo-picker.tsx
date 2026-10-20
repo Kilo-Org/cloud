@@ -79,9 +79,11 @@ export default function RepoPickerScreen() {
             key: `${repo.platform}:${repo.fullName}`,
             kind: 'repo',
             repo,
-            // The section header already carries the provider, so repeating it
-            // on every row only steals width from the repository name.
-            showPlatform: false,
+            // A provider section header already carries the provider, so
+            // repeating it on every row only steals width from the repository
+            // name. "Recently used" mixes providers under a header that names
+            // none of them, so those rows keep their provider cell.
+            showPlatform: section.key === 'recents',
           });
         }
       }

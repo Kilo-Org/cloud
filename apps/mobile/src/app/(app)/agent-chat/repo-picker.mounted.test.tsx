@@ -134,6 +134,20 @@ describe('repository picker row layout', () => {
     }
   });
 
+  it('keeps the provider cell on recently used rows, which mix providers under one header', async () => {
+    repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
+      repositories: rows,
+      sections: [{ key: 'recents', titleKey: 'agentChat.newSession.recentlyUsed', repos: rows }],
+      organizationId: 'org-1',
+      currentValue: '',
+      onSelect: vi.fn<() => void>(),
+    });
+    const renderer = await mount();
+
+    const texts = rowFor(renderer, LONG_NAME).findAll(node => String(node.type) === 'Text');
+    expect(texts.map(node => node.props.children)).toEqual(['GitHub', LONG_NAME]);
+  });
+
   it('names the provider and the full repository in the accessibility label', async () => {
     const renderer = await mount();
     const row = rowFor(renderer, SIBLING_NAME);

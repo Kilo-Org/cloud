@@ -1,4 +1,9 @@
-import { InfiniteQueryObserver, onlineManager, QueryClient } from '@tanstack/react-query';
+import {
+  InfiniteQueryObserver,
+  type InfiniteQueryObserverOptions,
+  onlineManager,
+  QueryClient,
+} from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -168,13 +173,20 @@ describe('org invoices first page on a flaky connection', () => {
   function observeInvoicesPage(queryFn: () => Promise<never>) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.mount();
-    const observer = new InfiniteQueryObserver<unknown>(queryClient, {
-      ...buildOrgInvoicesPageQueryOptions(createTrpcStub(), 'org-1'),
+    const options = {
+      // The builder is driven by a `never`-typed stub, so its declared page
+      // types come from the real router; the observer only needs the contract
+      // the behavior under test exercises.
+      ...(buildOrgInvoicesPageQueryOptions(
+        createTrpcStub(),
+        'org-1'
+      ) as unknown as InfiniteQueryObserverOptions<never>),
       queryKey: ['org-invoices-flaky-connection'],
       queryFn,
       initialPageParam: undefined,
       retry: false,
-    });
+    };
+    const observer = new InfiniteQueryObserver(queryClient, options);
     // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
     const unsubscribe = observer.subscribe(() => {});
     return {

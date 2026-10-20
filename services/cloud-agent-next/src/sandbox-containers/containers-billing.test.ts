@@ -29,6 +29,7 @@ import { SandboxContainers, type ContainerInstanceSize } from './SandboxContaine
 
 const RECORD_KEY = 'containers:record:v1';
 const BILLING_CONTEXT_KEY = 'container-usage:billing-context:v1';
+const STOP_REQUESTED_AT_KEY = 'containers:stop-requested-at:v1';
 const START_ACK_KEY = 'container-usage:start-ack-generation:v1';
 const BLOCK_KEY = 'container-usage:budget-block:v1';
 const SCHEDULES_KEY = 'containers:billing-schedules:v1';
@@ -315,6 +316,18 @@ function readMeasurementStarted(storage: FakeStorage): boolean | undefined {
   return context?.measurementStarted;
 }
 
+type StoredBillingContext = {
+  usageMeasuredAtMs: number;
+  stoppedObservedAtMs?: number;
+  measurementStarted?: boolean;
+  pendingStop?: { seq: number; usageSinceLast: number };
+};
+
+/** The fake storage map is untyped; this names the persisted context the tests assert on. */
+function readBillingContext(storage: FakeStorage): StoredBillingContext | undefined {
+  return storage.map.get(BILLING_CONTEXT_KEY) as StoredBillingContext | undefined;
+}
+
 async function admit(instance: SandboxContainers, instanceSize: 'standard-3' | 'standard-4') {
   return instance.ensureBillingAdmission(BILLING_INPUT, instanceSize);
 }
@@ -565,27 +578,47 @@ describe('ContainersBilling physical lifecycle', () => {
 });
 
 describe('ContainersBilling stop boundary', () => {
-  it('reports the last-known-running measurement, not the observation time, for a self-stop', async () => {
-    const { instance, container, storage } = setup();
+  it('reports the first observation as the billable bound for an unobserved self-stop', async () => {
+    const { instance, container, storage, pendingTasks } = setup();
     await admit(instance, 'standard-4');
-    const usageMeasuredAtMs = (
-      storage.map.get(BILLING_CONTEXT_KEY) as { usageMeasuredAtMs: number }
-    ).usageMeasuredAtMs;
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const launched = readBillingContext(storage);
+    if (!launched) throw new Error('Expected a billing context');
 
     container.running = false;
     vi.setSystemTime(T0 + 300_000);
 
     const state = await instance.getState();
 
-    expect(state).toEqual({ status: 'stopped', lastChange: usageMeasuredAtMs });
-    expect(state.lastChange).toBeLessThan(Date.now());
+    expect(state).toEqual({ status: 'stopped', lastChange: T0 + 300_000 });
+    expect(state.lastChange).toBeGreaterThan(launched.usageMeasuredAtMs);
   });
 
-  it('prefers a persisted stopped boundary over the last running measurement', async () => {
+  it('does not end an unmeasured generation at the observation', async () => {
     const { instance, container, storage } = setup();
     await admit(instance, 'standard-4');
-    const context = storage.map.get(BILLING_CONTEXT_KEY) as Record<string, unknown>;
-    const stoppedObservedAtMs = (context.usageMeasuredAtMs as number) - 60_000;
+    const admitted = readBillingContext(storage);
+    if (!admitted) throw new Error('Expected a billing context');
+    expect(admitted.measurementStarted).not.toBe(true);
+
+    container.running = false;
+    vi.setSystemTime(T0 + 300_000);
+
+    await expect(instance.getState()).resolves.toEqual({
+      status: 'stopped',
+      lastChange: admitted.usageMeasuredAtMs,
+    });
+  });
+
+  it('prefers a recorded stop observation over the current observation time', async () => {
+    const { instance, container, storage, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const context = readBillingContext(storage);
+    if (!context) throw new Error('Expected a billing context');
+    const stoppedObservedAtMs = context.usageMeasuredAtMs + 60_000;
     storage.map.set(BILLING_CONTEXT_KEY, { ...context, stoppedObservedAtMs });
 
     container.running = false;
@@ -594,6 +627,38 @@ describe('ContainersBilling stop boundary', () => {
     await expect(instance.getState()).resolves.toEqual({
       status: 'stopped',
       lastChange: stoppedObservedAtMs,
+    });
+  });
+
+  it('prefers a persisted stop request over the observation time', async () => {
+    const { instance, container, storage, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    storage.map.set(STOP_REQUESTED_AT_KEY, T0 + 60_000);
+
+    container.running = false;
+    vi.setSystemTime(T0 + 120_000);
+
+    await expect(instance.getState()).resolves.toEqual({
+      status: 'stopped',
+      lastChange: T0 + 60_000,
+    });
+  });
+
+  it('ignores a stop request that does not follow the last delivered measurement', async () => {
+    const { instance, container, storage, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    storage.map.set(STOP_REQUESTED_AT_KEY, T0 - 60_000);
+
+    container.running = false;
+    vi.setSystemTime(T0 + 120_000);
+
+    await expect(instance.getState()).resolves.toEqual({
+      status: 'stopped',
+      lastChange: T0 + 120_000,
     });
   });
 
@@ -607,26 +672,61 @@ describe('ContainersBilling stop boundary', () => {
     expect(state.lastChange).toBeLessThanOrEqual(Date.now());
   });
 
-  it('persists the getState boundary when a heartbeat observes a self-stop and settles there', async () => {
+  it('settles a platform stop shorter than one heartbeat interval at its elapsed seconds', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    expect(readSchedules(storage)?.billingHeartbeatTick).toBeDefined();
+
+    vi.setSystemTime(T0 + 60_000);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    await flushPending(pendingTasks);
+
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(60);
+  });
+
+  it('settles a platform stop at its request boundary, not the destroy completion', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    container.destroy = async () => {
+      container.destroyCalls += 1;
+      container.running = false;
+      vi.setSystemTime(T0 + 180_000);
+    };
+
+    vi.setSystemTime(T0 + 60_000);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    await flushPending(pendingTasks);
+
+    expect(storage.map.get(STOP_REQUESTED_AT_KEY)).toBe(T0 + 60_000);
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(60);
+  });
+
+  it('settles a heartbeat-observed self-stop at the observed boundary', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');
     await launch(instance, REF_A, 'standard-4');
     await flushPending(pendingTasks);
     const heartbeatDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number;
+    const launched = readBillingContext(storage);
+    if (!launched) throw new Error('Expected a billing context');
 
     container.running = false;
     vi.setSystemTime(heartbeatDue);
     const observed = await instance.getState();
+    expect(observed.lastChange).toBe(heartbeatDue);
 
     await instance.alarm();
     await flushPending(pendingTasks);
 
-    const context = storage.map.get(BILLING_CONTEXT_KEY) as {
-      stoppedObservedAtMs?: number;
-      usageMeasuredAtMs: number;
-    };
+    const context = readBillingContext(storage);
+    if (!context) throw new Error('Expected a billing context');
     expect(context.stoppedObservedAtMs).toBe(observed.lastChange);
-    expect(context.stoppedObservedAtMs).toBeLessThan(heartbeatDue);
     expect(meter.recordStopInputs).toHaveLength(0);
 
     await instance.stop(REF_A);
@@ -636,17 +736,19 @@ describe('ContainersBilling stop boundary', () => {
     expect(meter.recordStopInputs[0].usageSinceLast).toBe(
       ((context.stoppedObservedAtMs as number) - context.usageMeasuredAtMs) / 1_000
     );
-    expect(meter.recordStopInputs[0].usageSinceLast).toBe(0);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(
+      (heartbeatDue - launched.usageMeasuredAtMs) / 1_000
+    );
+    expect(meter.recordStopInputs[0].usageSinceLast).toBeGreaterThan(0);
   });
 
-  it('settles a same-instance readmission at the physical stop, not the readmission time', async () => {
+  it('settles a same-instance readmission through the observed stop boundary', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');
     await launch(instance, REF_A, 'standard-4');
     await flushPending(pendingTasks);
-    const usageMeasuredAtMs = (
-      storage.map.get(BILLING_CONTEXT_KEY) as { usageMeasuredAtMs: number }
-    ).usageMeasuredAtMs;
+    const launched = readBillingContext(storage);
+    if (!launched) throw new Error('Expected a billing context');
 
     vi.setSystemTime(T0 + 60_000);
     container.running = false;
@@ -656,9 +758,8 @@ describe('ContainersBilling stop boundary', () => {
     await flushPending(pendingTasks);
 
     expect(meter.recordStopInputs).toHaveLength(1);
-    expect(meter.recordStopInputs[0].usageSinceLast).toBe(0);
-    expect(meter.recordStopInputs[0].usageSinceLast).not.toBe(
-      (Date.now() - usageMeasuredAtMs) / 1_000
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(
+      (T0 + 120_000 - launched.usageMeasuredAtMs) / 1_000
     );
   });
 });
@@ -1137,12 +1238,9 @@ describe('ContainersBilling identity replacement', () => {
     await flushPending(first.pendingTasks);
 
     expect(first.meter.recordStopInputs).toHaveLength(0);
-    const stoppedContext = first.storage.map.get(BILLING_CONTEXT_KEY) as {
-      stoppedObservedAtMs?: number;
-      usageMeasuredAtMs: number;
-    };
-    expect(stoppedContext.stoppedObservedAtMs).toBe(stoppedContext.usageMeasuredAtMs);
-    expect(stoppedContext.stoppedObservedAtMs).not.toBe(heartbeatDue);
+    const stoppedContext = readBillingContext(first.storage);
+    if (!stoppedContext) throw new Error('Expected a billing context');
+    expect(stoppedContext.stoppedObservedAtMs).toBe(heartbeatDue);
 
     const replacementAt = heartbeatDue + 60_000;
     vi.setSystemTime(replacementAt);
@@ -1161,9 +1259,11 @@ describe('ContainersBilling identity replacement', () => {
     expect(first.meter.recordStopInputs[0].service).toBe(
       'cloud-agent-next-sandbox-containers-standard3'
     );
-    // The final segment ends at the last observed running measurement, not the
-    // later replacement request.
-    expect(first.meter.recordStopInputs[0].usageSinceLast).toBe(0);
+    // The final segment ends at the observed stop boundary, not the later
+    // replacement request.
+    expect(first.meter.recordStopInputs[0].usageSinceLast).toBe(
+      (heartbeatDue - stoppedContext.usageMeasuredAtMs) / 1_000
+    );
     expect(first.meter.recordStopInputs[0].usageSinceLast).not.toBe(
       (replacementAt - stoppedContext.usageMeasuredAtMs) / 1_000
     );

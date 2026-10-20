@@ -344,12 +344,19 @@ export function installBillingHeartbeat(
     if (state.status === 'stopped' || state.status === 'stopped_with_code') {
       if (dependencies.stopOnStoppedState === false) {
         const observedAtMs = Date.now();
-        const stateLastChange = Number.isFinite(state.lastChange) ? state.lastChange : observedAtMs;
-        const stoppedObservedAtMs =
-          context.stoppedObservedAtMs ??
-          (stateLastChange >= 0 && stateLastChange <= observedAtMs
+        // Only a transition timestamp later than the last delivered measurement adds
+        // evidence about when the container stopped. A state whose timestamp is that
+        // measurement (a synthetic stopped state) or lies in the future proves nothing,
+        // so the observation becomes the billable bound instead of a zero segment.
+        const stateLastChange = Number.isFinite(state.lastChange) ? state.lastChange : undefined;
+        const stateBoundaryAtMs =
+          stateLastChange !== undefined &&
+          stateLastChange >= 0 &&
+          stateLastChange > context.usageMeasuredAtMs &&
+          stateLastChange <= observedAtMs
             ? stateLastChange
-            : observedAtMs);
+            : observedAtMs;
+        const stoppedObservedAtMs = context.stoppedObservedAtMs ?? stateBoundaryAtMs;
         if (context.stoppedObservedAtMs === undefined) {
           context = { ...context, stoppedObservedAtMs };
           await updateBillingContext(dependencies.storage, context);

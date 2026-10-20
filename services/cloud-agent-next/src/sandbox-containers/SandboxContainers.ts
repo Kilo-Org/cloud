@@ -136,6 +136,11 @@ type DelayedSchedule<T> = {
 };
 
 const RECORD_KEY = 'containers:record:v1';
+/**
+ * When the platform asked the container to stop, written before the destroy so
+ * settlement keeps that boundary even if the Durable Object is evicted.
+ */
+const STOP_REQUESTED_AT_KEY = 'containers:stop-requested-at:v1';
 const CONTAINER_IMAGE = 'app';
 
 function interceptedProcessEnv(env: Record<string, string>): Record<string, string> {
@@ -583,17 +588,36 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   async getState(): Promise<{ status: 'running' | 'stopped'; lastChange: number }> {
+    const now = Date.now();
     const status = this.ctx.container?.running === true ? 'running' : 'stopped';
-    if (status === 'running') return { status, lastChange: Date.now() };
-    // A self-stop carries no exit timestamp, so the boundary is the last delivered
-    // running measurement, never the observation time. Settlement cannot bill past the
-    // physical stop; the omitted span is up to the last successful measurement, under one
-    // heartbeat only at normal cadence and more if a heartbeat is delayed or undelivered.
+    if (status === 'running') return { status, lastChange: now };
+    // The native container reports no exit timestamp, so `lastChange` is the last
+    // defensible billable boundary and settlement ends there:
+    // - a boundary a heartbeat already recorded is the first observation of the stop;
+    // - a platform stop persisted its request time before destroying the container, and
+    //   that time is used only while it still follows the last delivered measurement, so
+    //   a value from an older run cannot shorten a later segment;
+    // - otherwise the stop is first observed now, and that observation is the billable
+    //   upper bound. Settling at the last measurement instead would drop the final
+    //   interval, including a run shorter than one heartbeat interval.
     const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined) return { status, lastChange: now };
+    if (!context.measurementStarted) {
+      // A generation without a delivered measurement never observed the container
+      // running, so it has no billable interval to end.
+      return { status, lastChange: context.usageMeasuredAtMs };
+    }
+    if (context.stoppedObservedAtMs !== undefined) {
+      return { status, lastChange: context.stoppedObservedAtMs };
+    }
+    const stopRequestedAtMs = await this.ctx.storage.get<number>(STOP_REQUESTED_AT_KEY);
     const lastChange =
-      context === undefined
-        ? Date.now()
-        : (context.stoppedObservedAtMs ?? context.usageMeasuredAtMs);
+      typeof stopRequestedAtMs === 'number' &&
+      Number.isFinite(stopRequestedAtMs) &&
+      stopRequestedAtMs > context.usageMeasuredAtMs &&
+      stopRequestedAtMs <= now
+        ? stopRequestedAtMs
+        : now;
     return { status, lastChange };
   }
 
@@ -680,6 +704,7 @@ export class SandboxContainers extends DurableObject<Env> {
     if (!container || typeof container.destroy !== 'function') {
       throw new Error('Native container destruction is unavailable');
     }
+    await this.recordStopRequest(Date.now());
     await container.destroy();
     const record = await this.readRecord();
     await this.writeRecord(this.terminalRecord(record));
@@ -1221,6 +1246,25 @@ export class SandboxContainers extends DurableObject<Env> {
     };
   }
 
+  /**
+   * Persist the platform's stop request before the container is destroyed. Settlement runs
+   * on the billing queue that a budget stop already holds while it destroys, so this writes
+   * storage directly rather than through `persistStop`. Losing the write only costs the exact
+   * boundary: settlement then ends at the first stop observation.
+   */
+  private async recordStopRequest(atMs: number): Promise<void> {
+    try {
+      await this.ctx.storage.put(STOP_REQUESTED_AT_KEY, atMs);
+    } catch (error) {
+      logger
+        .withFields({
+          sandboxId: this.sandboxNameForLog(),
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Container stop boundary was not persisted');
+    }
+  }
+
   private async finishStop(record: ContainersRecord): Promise<'terminal' | 'retryable'> {
     const container = this.ctx.container;
     if (!container) {
@@ -1237,6 +1281,7 @@ export class SandboxContainers extends DurableObject<Env> {
       return stopPath('no_container_not_started', 'terminal');
     }
     const destroyStartedAt = Date.now();
+    await this.recordStopRequest(destroyStartedAt);
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
     } catch (error) {

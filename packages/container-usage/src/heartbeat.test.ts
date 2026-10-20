@@ -394,6 +394,65 @@ describe('installBillingHeartbeat', () => {
     }
   });
 
+  it('bounds a stopped state that carries no transition time at the observation', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg',
+        dedup: false,
+      }));
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat: async () => ({
+            intervalId: 'instance-1:123',
+            durable: 'pg',
+            dedup: false,
+            budget: { verdict: 'continue' },
+          }),
+          recordStop,
+        },
+        { service: 'cloud-agent-next' }
+      );
+      // The last measurement is the only timestamp the state carries, so it says nothing
+      // about when the container stopped.
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: 1_000 })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client,
+          storage,
+          stopOnStoppedState: false,
+          stoppedStateGraceSeconds: 900,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      now.mockReturnValue(10_000);
+      await controller.billingHeartbeatTick();
+      expect(recordStop).not.toHaveBeenCalled();
+      expect((await getBillingContext(storage))?.stoppedObservedAtMs).toBe(10_000);
+
+      now.mockReturnValue(910_000);
+      await controller.billingHeartbeatTick();
+
+      expect(recordStop).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'runtime_signal', usageSinceLast: 9 })
+      );
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('delivers a pending heartbeat before the final stop remainder', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
     try {

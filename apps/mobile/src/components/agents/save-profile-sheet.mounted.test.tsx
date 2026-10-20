@@ -40,7 +40,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
 
-const confirmMock = vi.hoisted(() => ({ current: (_request: unknown) => undefined as void }));
+const confirmMock = vi.hoisted(() => ({
+  current: (_request: unknown): void => undefined,
+}));
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
 
 function defaults(overrides: Partial<SaveProfileSheetProps> = {}): SaveProfileSheetProps {
   return {
@@ -185,11 +195,14 @@ describe('SaveProfileSheet', () => {
   it('closes an untouched sheet without asking', () => {
     const onClose = vi.fn<() => void>();
     const confirm = vi.fn();
-    confirmMock.current = confirm;
+    confirmMock.current = request => {
+      confirm(request);
+    };
     const renderer = mount({ onClose });
 
+    const onCancel = voidHandler(header(renderer).props.onCancel);
     act(() => {
-      (header(renderer).props.onCancel as () => void)();
+      onCancel();
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -199,7 +212,9 @@ describe('SaveProfileSheet', () => {
   it('asks before Cancel drops a half-typed profile', () => {
     const onClose = vi.fn<() => void>();
     const confirm = vi.fn();
-    confirmMock.current = confirm;
+    confirmMock.current = request => {
+      confirm(request);
+    };
     const renderer = mount({ onClose });
 
     act(() => {

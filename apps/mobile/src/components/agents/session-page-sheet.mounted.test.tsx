@@ -66,6 +66,22 @@ async function mountSheet(
   return renderer;
 }
 
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
+
 function findByType(
   root: TestRenderer.ReactTestInstance,
   type: string
@@ -89,11 +105,10 @@ function sheet(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInst
 }
 
 function press(instance: TestRenderer.ReactTestInstance, key: string): void {
-  const handler = instance.props[key] as (() => void) | undefined;
-  if (typeof handler !== 'function') {
-    throw new TypeError(`target has no ${key}`);
-  }
-  handler();
+  const handler = voidHandler(instance.props[key]);
+  act(() => {
+    handler();
+  });
 }
 
 beforeEach(() => {
@@ -186,10 +201,7 @@ describe('SessionPageSheet mounted', () => {
     // Back (and the Android scrim) stay, so the sheet is never a dead end.
     expect(sheetNode.props.enablePanDownToClose).toBe(true);
     // The form decides whether that requested dismissal really closes it.
-    const requestDismiss: unknown = sheetNode.props.onRequestDismiss;
-    if (typeof requestDismiss !== 'function') {
-      throw new TypeError('the sheet has no dismissal request');
-    }
+    const requestDismiss = booleanHandler(sheetNode.props.onRequestDismiss);
     expect(requestDismiss()).toBe(false);
     expect(onRequestDismiss).toHaveBeenCalledTimes(1);
 

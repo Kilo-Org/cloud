@@ -1,7 +1,6 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { McpFormSheet } from '@/components/profiles/mcp-form-sheet';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -31,6 +30,30 @@ vi.mock('@/components/ui/dialog', () => ({
   }),
 }));
 
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
+
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
+/** A field stub's onChangeText arrives untyped from the host element. */
+function textHandler(value: unknown): (text: string) => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a text handler');
+  }
+  return value as (text: string) => void;
+}
+
 function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
 }
@@ -48,20 +71,14 @@ function changeText(root: ReactTestInstance, label: string, value: string): void
   if (!field) {
     throw new Error(`field ${label} was not rendered`);
   }
-  const onChangeText: unknown = field.props.onChangeText;
-  if (typeof onChangeText !== 'function') {
-    throw new TypeError(`${label} has no onChangeText`);
-  }
+  const onChangeText = textHandler(field.props.onChangeText);
   act(() => {
     onChangeText(value);
   });
 }
 
 function pressCancel(root: ReactTestInstance): void {
-  const onCancel: unknown = findOne(root, 'SheetHeader').props.onCancel;
-  if (typeof onCancel !== 'function') {
-    throw new TypeError('the header has no onCancel');
-  }
+  const onCancel = voidHandler(findOne(root, 'SheetHeader').props.onCancel);
   act(() => {
     onCancel();
   });
@@ -104,11 +121,9 @@ describe('McpFormSheet dismissal', () => {
 
     changeText(renderer.root, 'Server name', 'notes');
 
-    const sheet = findOne(renderer.root, 'SessionPageSheet');
-    const requestDismiss: unknown = sheet.props.onRequestDismiss;
-    if (typeof requestDismiss !== 'function') {
-      throw new TypeError('the sheet has no dismissal request');
-    }
+    const requestDismiss = booleanHandler(
+      findOne(renderer.root, 'SessionPageSheet').props.onRequestDismiss
+    );
     expect(requestDismiss()).toBe(false);
 
     pressCancel(renderer.root);

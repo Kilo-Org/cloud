@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { act, TestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 
 import { useSheetDismissGuard } from './use-sheet-dismiss-guard';
 
@@ -28,6 +28,22 @@ vi.mock('@/components/ui/dialog', () => ({
   }),
 }));
 
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
+
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
 type HarnessProps = Readonly<{
   isDirty: () => boolean;
   onDiscard: () => void;
@@ -35,27 +51,32 @@ type HarnessProps = Readonly<{
 
 function Harness({ isDirty, onDiscard }: HarnessProps) {
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({ isDirty, onDiscard });
-  return createElement('Guard', { requestClose, requestDismiss, hasDialog: dialog !== null });
+  return createElement('View', {
+    testID: 'sheet-dismiss-guard',
+    requestClose,
+    requestDismiss,
+    hasDialog: dialog !== null,
+  });
 }
 
 function mount(props: HarnessProps): TestRenderer.ReactTestInstance {
-  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    renderer = TestRenderer.create(createElement(Harness, props));
+    ref.current = TestRenderer.create(createElement(Harness, props));
   });
+  const renderer = ref.current;
   if (!renderer) {
     throw new Error('renderer was not created');
   }
   return renderer.root;
 }
 
-function guard(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  const found = root.find(node => node.type === 'Guard');
-  return found;
+function harnessNode(root: ReactTestInstance): ReactTestInstance {
+  return root.find(node => node.props.testID === 'sheet-dismiss-guard');
 }
 
-function call(root: TestRenderer.ReactTestInstance, name: 'requestClose' | 'requestDismiss'): void {
-  const handler = guard(root).props[name] as () => void;
+function call(root: ReactTestInstance, name: 'requestClose' | 'requestDismiss'): void {
+  const handler = voidHandler(harnessNode(root).props[name]);
   act(() => {
     handler();
   });
@@ -75,7 +96,7 @@ describe('useSheetDismissGuard', () => {
     expect(onDiscard).toHaveBeenCalledTimes(1);
     expect(confirmMock.requests).toHaveLength(0);
     // A native request for a clean form is allowed; the sheet closes itself.
-    expect((guard(root).props.requestDismiss as () => boolean)()).toBe(true);
+    expect(booleanHandler(harnessNode(root).props.requestDismiss)()).toBe(true);
     expect(confirmMock.requests).toHaveLength(0);
   });
 
@@ -105,7 +126,7 @@ describe('useSheetDismissGuard', () => {
 
     let allowed = true;
     act(() => {
-      allowed = (guard(root).props.requestDismiss as () => boolean)();
+      allowed = booleanHandler(harnessNode(root).props.requestDismiss)();
     });
 
     expect(allowed).toBe(false);

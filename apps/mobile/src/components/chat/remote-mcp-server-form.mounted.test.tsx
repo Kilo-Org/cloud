@@ -207,7 +207,12 @@ describe('the remote MCP server form', () => {
 
   it('reports unsaved edits to the sheet, and clears the report when they are undone', async () => {
     const dirty: boolean[] = [];
-    await mount({ onSave, onDirtyChange: value => dirty.push(value) });
+    await mount({
+      onSave,
+      onDirtyChange: value => {
+        dirty.push(value);
+      },
+    });
 
     await type(0, 'notes');
     await type(1, 'https://notes.example/mcp');

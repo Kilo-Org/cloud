@@ -1,7 +1,6 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { i18n } from '@/i18n';
 import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -37,6 +36,22 @@ function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
 }
 
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
+
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
 function findOne(root: ReactTestInstance, type: string): ReactTestInstance {
   const node = findAll(root, type)[0];
   if (!node) {
@@ -54,10 +69,7 @@ function findField(root: ReactTestInstance, label: string): ReactTestInstance {
 }
 
 function callHandler(node: ReactTestInstance, name: string): void {
-  const handler: unknown = node.props[name];
-  if (typeof handler !== 'function') {
-    throw new TypeError(`${name} is not a function`);
-  }
+  const handler = voidHandler(node.props[name]);
   act(() => {
     handler();
   });
@@ -124,11 +136,9 @@ describe('KiloCommandFormSheet dismissal', () => {
       (findField(renderer.root, 'Template').props.onChangeText as (v: string) => void)('Do it');
     });
 
-    const sheet = findOne(renderer.root, 'SessionPageSheet');
-    const requestDismiss: unknown = sheet.props.onRequestDismiss;
-    if (typeof requestDismiss !== 'function') {
-      throw new TypeError('the sheet has no dismissal request');
-    }
+    const requestDismiss = booleanHandler(
+      findOne(renderer.root, 'SessionPageSheet').props.onRequestDismiss
+    );
     expect(requestDismiss()).toBe(false);
     expect(h.confirm).toHaveBeenCalledTimes(1);
     expect(confirmRequest(0)).toMatchObject({

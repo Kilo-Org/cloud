@@ -1,7 +1,6 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
 import { type AgentSource } from '@/components/profiles/profile-agents-model';
 import { i18n } from '@/i18n';
@@ -101,13 +100,38 @@ function pressDone(root: ReactTestInstance): void {
 }
 
 function pressCancel(root: ReactTestInstance): void {
-  const handler: unknown = findOne(root, 'SheetHeader').props.onCancel;
-  if (typeof handler !== 'function') {
-    throw new TypeError('SheetHeader has no onCancel');
-  }
+  const onCancel = voidHandler(findOne(root, 'SheetHeader').props.onCancel);
   act(() => {
-    handler();
+    onCancel();
   });
+}
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
+
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
+
+function confirmRequest(index: number): ConfirmRequest | undefined {
+  return h.confirm.mock.calls[index]?.[0];
 }
 
 function modelOption(id: string, variants: string[]) {
@@ -259,7 +283,7 @@ describe('AgentFormSheet parity fields', () => {
     });
 
     // Discard closes; Keep editing never reaches this callback.
-    request?.onConfirm();
+    confirmRequest(0)?.onConfirm();
     expect(h.onClose).toHaveBeenCalledTimes(1);
 
     unmount();
@@ -267,11 +291,9 @@ describe('AgentFormSheet parity fields', () => {
 
   it('keeps Android Back while dirty for the confirm, and lets it close a clean form', async () => {
     const { renderer, unmount } = await mountSheet(agentSource());
-    const sheet = findOne(renderer.root, 'SessionPageSheet');
-    const requestDismiss: unknown = sheet.props.onRequestDismiss;
-    if (typeof requestDismiss !== 'function') {
-      throw new TypeError('the sheet has no dismissal request');
-    }
+    const requestDismiss = booleanHandler(
+      findOne(renderer.root, 'SessionPageSheet').props.onRequestDismiss
+    );
 
     expect(requestDismiss()).toBe(true);
     expect(h.confirm).not.toHaveBeenCalled();

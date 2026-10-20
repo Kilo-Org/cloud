@@ -242,7 +242,7 @@ export function useNewSessionRepos({
   const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
 
   const forceFreshGitLab = useCallback(async () => {
-    const fresh = await queryClient.fetchQuery({
+    const fresh = await queryClient.query({
       ...(organizationId
         ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
             organizationId,
@@ -270,7 +270,7 @@ export function useNewSessionRepos({
     if (!organizationId) {
       return;
     }
-    const fresh = await queryClient.fetchQuery({
+    const fresh = await queryClient.query({
       ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
         organizationId,
         forceRefresh: true,

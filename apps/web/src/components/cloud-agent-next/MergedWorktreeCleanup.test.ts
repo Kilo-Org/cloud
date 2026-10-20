@@ -361,6 +361,22 @@ describe('merged workspace cleanup', () => {
     );
   });
 
+  it('clears a previous retry error after starting a new batch', async () => {
+    mockRetry.mockRejectedValueOnce(new Error('Retry unavailable'));
+    await renderCleanup({ cleanup: batch(['failed']) });
+    await click('Retry failed cleanup');
+    expect(dom.container.querySelector('[role="alert"]')).not.toBeNull();
+
+    await click('Clean up merged workspaces');
+    await click('Delete 2 workspaces');
+    await renderCleanup({ cleanup: { ...batch(['failed']), id: 'batch-2' } });
+    expect(dom.container.textContent).toContain('0 of 1 workspaces deleted, 1 failed');
+    expect(button('Retry failed cleanup').disabled).toBe(false);
+    expect(dom.container.querySelector('[role="alert"]')).toBeNull();
+    await click('Retry failed cleanup');
+    expect(mockRetry).toHaveBeenCalledTimes(2);
+  });
+
   function HookHarness(props: Parameters<typeof CleanupHook>[0]) {
     const result = useWorktreeCleanup(props);
     return React.createElement(
@@ -395,7 +411,7 @@ describe('merged workspace cleanup', () => {
     expect(onDeleted).toHaveBeenCalledTimes(1);
   });
 
-  it('reconciles only deleted items once per batch and reconciles persisted results after remount', async () => {
+  it('reconciles deleted items once per batch across layout remounts', async () => {
     const data = batch(['deleted', 'failed', 'pending']);
     mockGet.mockResolvedValue(data);
     const onDeleted = jest.fn().mockResolvedValue(undefined);
@@ -410,13 +426,53 @@ describe('merged workspace cleanup', () => {
     expect(onDeleted).toHaveBeenCalledTimes(1);
     await render(React.createElement(React.Fragment));
     await render(element);
-    expect(onDeleted).toHaveBeenCalledTimes(2);
+    expect(onDeleted).toHaveBeenCalledTimes(1);
     expect(onDeleted).toHaveBeenLastCalledWith('worktree_0', ['session-0', 'child-0']);
     await act(async () => {
       client.setQueryData(cleanupKey({ organizationId: null }), { ...data, id: 'batch-2' });
     });
     await advance();
-    expect(onDeleted).toHaveBeenCalledTimes(3);
+    expect(onDeleted).toHaveBeenCalledTimes(2);
+  });
+
+  it('reconciles deletions completed while the layout was unmounted', async () => {
+    mockGet.mockResolvedValue(batch(['deleted', 'pending']));
+    const onDeleted = jest.fn().mockResolvedValue(undefined);
+    const element = React.createElement(HookHarness, { onDeleted });
+    await render(element);
+    expect(onDeleted).toHaveBeenCalledTimes(1);
+    await render(React.createElement(React.Fragment));
+    mockGet.mockResolvedValue(batch(['deleted', 'deleted']));
+    await render(element);
+    expect(onDeleted).toHaveBeenCalledTimes(2);
+    expect(onDeleted).toHaveBeenLastCalledWith('worktree_1', ['session-1', 'child-1']);
+  });
+
+  it('reconciles persisted results again with a fresh query client', async () => {
+    mockGet.mockResolvedValue(batch(['deleted']));
+    const onDeleted = jest.fn().mockResolvedValue(undefined);
+    const element = React.createElement(HookHarness, { onDeleted });
+    await render(element);
+    expect(onDeleted).toHaveBeenCalledTimes(1);
+    await render(React.createElement(React.Fragment));
+    client.clear();
+    const { QueryClient } = await import('@tanstack/react-query');
+    client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    await render(element);
+    expect(onDeleted).toHaveBeenCalledTimes(2);
+    expect(onDeleted).toHaveBeenLastCalledWith('worktree_0', ['session-0', 'child-0']);
+  });
+
+  it('keeps reconciliation isolated between personal and organization scopes', async () => {
+    mockGet.mockResolvedValue(batch(['deleted']));
+    const onDeleted = jest.fn().mockResolvedValue(undefined);
+    await render(React.createElement(HookHarness, { onDeleted }));
+    await render(React.createElement(HookHarness, { organizationId: 'org-123', onDeleted }));
+    expect(onDeleted).toHaveBeenCalledTimes(2);
+    await render(React.createElement(HookHarness, { onDeleted }));
+    expect(onDeleted).toHaveBeenCalledTimes(2);
   });
 
   it('continues polling after status-query errors and discovers background cleanup from an empty scope', async () => {
@@ -457,6 +513,9 @@ describe('merged workspace cleanup', () => {
     await advance(30_000);
     await advance();
     expect(onDeleted).toHaveBeenCalledTimes(1);
+    await render(React.createElement(React.Fragment));
+    await render(React.createElement(HookHarness, { onDeleted }));
+    expect(onDeleted).toHaveBeenCalledTimes(1);
     await act(async () => reconciliation.resolve());
     await advance(30_000);
     expect(onDeleted).toHaveBeenCalledTimes(1);
@@ -483,6 +542,9 @@ describe('merged workspace cleanup', () => {
         'Failed to reconcile deleted workspace:',
         expect.any(Error)
       );
+      await render(React.createElement(React.Fragment));
+      await render(React.createElement(HookHarness, { onDeleted: latest }));
+      expect(latest).toHaveBeenCalledTimes(2);
       await act(async () => {
         client.setQueryData(cleanupKey({ organizationId: null }), {
           ...batch(['deleted']),

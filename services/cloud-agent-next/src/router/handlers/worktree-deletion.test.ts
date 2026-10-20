@@ -148,7 +148,7 @@ function fixture(rootCount = 1, childCount = 0) {
 beforeEach(() => vi.resetAllMocks());
 
 describe('deleteWorktree authorization and completion', () => {
-  it('forwards merged-only requirements through every ingest deletion phase', async () => {
+  it('checks merged-only eligibility before destruction, not when recording its result', async () => {
     const f = fixture();
     await f.caller.deleteWorktree({ worktreeId, requireMergedPullRequests: true });
     expect(f.begin).toHaveBeenCalledWith({
@@ -156,13 +156,55 @@ describe('deleteWorktree authorization and completion', () => {
       kiloUserId: userId,
       requireMergedPullRequests: true,
     });
-    for (const [input] of f.record.mock.calls) expect(input.requireMergedPullRequests).toBe(true);
+    expect(f.record).toHaveBeenCalledTimes(2);
+    expect(f.record.mock.calls[0][0].requireMergedPullRequests).toBe(true);
+    expect(f.record.mock.calls[1][0]).not.toHaveProperty('requireMergedPullRequests');
     expect(f.complete).toHaveBeenCalledWith({
       worktreeId,
       kiloUserId: userId,
       requireMergedPullRequests: true,
     });
   });
+
+  it.each([undefined, organizationId])(
+    'records runtime-discovered sessions without rechecking merged eligibility in scope %s',
+    async kilocodeOrganizationId => {
+      const f = fixture();
+      const discoveredSessionId = kiloId(1);
+      const record = f.record.getMockImplementation();
+      if (!record) throw new Error('Missing record fixture');
+      f.cleanup.mockResolvedValue({
+        deleted: true,
+        sessionIds: [kiloId(0), discoveredSessionId],
+      });
+      f.record.mockImplementation(async input => {
+        if (input.requireMergedPullRequests && input.sessionIds?.includes(discoveredSessionId)) {
+          throw new Error('worktree_merged_pull_requests_required');
+        }
+        return record(input);
+      });
+
+      await expect(
+        f.caller.deleteWorktree({
+          worktreeId,
+          kilocodeOrganizationId,
+          requireMergedPullRequests: true,
+        })
+      ).resolves.toEqual({
+        success: true,
+        deletedSessionIds: [kiloId(0), discoveredSessionId],
+      });
+      expect(f.record.mock.calls[1][0]).toEqual({
+        worktreeId,
+        kiloUserId: userId,
+        ...(kilocodeOrganizationId ? { organizationId: kilocodeOrganizationId } : {}),
+        directory: getWorktreeWorkspacePath(kilocodeOrganizationId, userId, worktreeId),
+        sessionIds: [kiloId(0), discoveredSessionId],
+      });
+      expect(f.finishSession).toHaveBeenCalledTimes(1);
+      expect(f.complete).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each(['begin', 'record'] as const)(
     'reports permanent merged-only rejection at %s without wiping resources',

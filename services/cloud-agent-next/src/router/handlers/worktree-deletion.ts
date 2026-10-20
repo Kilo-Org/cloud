@@ -204,7 +204,9 @@ export async function deleteWorktreeResources(
       for (const directory of recordDirectories) {
         state = cloudAgentWorktreeDeletionStateSchema.parse(
           await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
-            ...params,
+            worktreeId: params.worktreeId,
+            kiloUserId: params.kiloUserId,
+            ...(params.organizationId ? { organizationId: params.organizationId } : {}),
             directory,
             sessionIds: cleanup.sessionIds,
           })

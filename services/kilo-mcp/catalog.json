@@ -5603,39 +5603,6 @@
     ],
     "searchBlob": "cliSessionsV2.renameWorktree Rename a cloud agent worktree owned by the user or their organization. Return the new worktree name. clisessionsv2 renameworktree worktreeid organizationid name worktreeId organizationId name"
   },
-  "cliSessionsV2.retryWorktreeCleanup": {
-    "path": "cliSessionsV2.retryWorktreeCleanup",
-    "kind": "mutation",
-    "summary": "Retry the failed worktrees in the current cleanup batch, leaving successful ones alone and erroring if there are no failed worktrees to retry. Use to reattempt worktree deletion after a partial cleanup failure.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "organizationId"
-      ],
-      "additionalProperties": false
-    },
-    "tags": [
-      "clisessionsv2",
-      "retryworktreecleanup",
-      "organizationid"
-    ],
-    "searchBlob": "cliSessionsV2.retryWorktreeCleanup Retry the failed worktrees in the current cleanup batch, leaving successful ones alone and erroring if there are no failed worktrees to retry. Use to reattempt worktree deletion after a partial cleanup failure. clisessionsv2 retryworktreecleanup organizationid organizationId"
-  },
   "cliSessionsV2.search": {
     "path": "cliSessionsV2.search",
     "kind": "query",
@@ -5773,48 +5740,6 @@
       "session_id"
     ],
     "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id session_id"
-  },
-  "cliSessionsV2.startMergedWorktreeCleanup": {
-    "path": "cliSessionsV2.startMergedWorktreeCleanup",
-    "kind": "mutation",
-    "summary": "Start cleaning up merged git worktrees by removing the selected eligible ones, rejecting the request if none are still eligible. Use to delete merged worktrees and their branches in bulk.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "worktreeIds": {
-          "maxItems": 1000,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "worktreeIds"
-      ]
-    },
-    "tags": [
-      "clisessionsv2",
-      "startmergedworktreecleanup",
-      "organizationid",
-      "worktreeids"
-    ],
-    "searchBlob": "cliSessionsV2.startMergedWorktreeCleanup Start cleaning up merged git worktrees by removing the selected eligible ones, rejecting the request if none are still eligible. Use to delete merged worktrees and their branches in bulk. clisessionsv2 startmergedworktreecleanup organizationid worktreeids organizationId worktreeIds"
   },
   "cliSessionsV2.unshare": {
     "path": "cliSessionsV2.unshare",

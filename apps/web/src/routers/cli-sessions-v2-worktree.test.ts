@@ -451,6 +451,34 @@ describe('merged worktree cleanup', () => {
     });
   });
 
+  it.each([false, true])(
+    'ignores colliding foreign session PRs when owner eligibility is %s',
+    async eligible => {
+      const owner = eligible
+        ? await mergedSession()
+        : await insertSession({ cloud_agent_worktree_id: newWorktreeId() });
+      await mergedSession(
+        { session_id: owner.session_id, kilo_user_id: OTHER_USER_ID },
+        eligible ? 'open' : 'merged'
+      );
+      const caller = createCaller({ user });
+      await expect(caller.mergedWorktreeCleanupPreview({ organizationId: null })).resolves.toEqual({
+        worktreeIds: eligible ? [owner.cloud_agent_worktree_id] : [],
+      });
+      const start = caller.startMergedWorktreeCleanup({
+        organizationId: null,
+        worktreeIds: [cloudAgentWorktreeIdSchema.parse(owner.cloud_agent_worktree_id)],
+      });
+      if (eligible) {
+        await expect(start).resolves.toMatchObject({ id: 'cleanup-batch' });
+        expect(mockStartWorktreeCleanup).toHaveBeenCalledTimes(1);
+      } else {
+        await expect(start).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(mockStartWorktreeCleanup).not.toHaveBeenCalled();
+      }
+    }
+  );
+
   it('allows restarting eligible unfinished deletions without clearing the deletion fence', async () => {
     const session = await mergedSession();
     await db.insert(cloud_agent_worktrees).values({

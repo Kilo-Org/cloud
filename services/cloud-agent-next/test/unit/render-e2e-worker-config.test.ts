@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { parse } from 'jsonc-parser';
+import { createSourceFile, isExportDeclaration, isNamedExports, ScriptTarget } from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -47,6 +48,7 @@ const KEPT_DO_CLASSES = [
   'UserKiloFacade',
   'SandboxControl',
   'SandboxSession',
+  'WorktreeCleanupCoordinator',
 ];
 
 function readSourceConfig() {
@@ -114,9 +116,31 @@ describe('buildE2eWorkerConfig', () => {
     const migratedClasses = config.migrations.flatMap(
       (migration: { new_sqlite_classes: string[] }) => migration.new_sqlite_classes
     );
+    expect([...bindingClasses].sort()).toEqual(
+      ['Sandbox', 'E2eCallbackSink', ...KEPT_DO_CLASSES].sort()
+    );
     for (const className of KEPT_DO_CLASSES) {
       expect(bindingClasses).toContain(className);
       expect(migratedClasses).toContain(className);
+    }
+  });
+
+  it('exports every rendered Durable Object binding from the e2e entrypoint', () => {
+    const { config } = render();
+    const entrypoint = createSourceFile(
+      'e2e-entry.ts',
+      readFileSync(join(process.cwd(), 'src/e2e-entry.ts'), 'utf8'),
+      ScriptTarget.Latest
+    );
+    const exportedNames = entrypoint.statements.flatMap(statement =>
+      isExportDeclaration(statement) &&
+      statement.exportClause &&
+      isNamedExports(statement.exportClause)
+        ? statement.exportClause.elements.map(element => element.name.text)
+        : []
+    );
+    for (const binding of config.durable_objects.bindings) {
+      expect(exportedNames).toContain(binding.class_name);
     }
   });
 

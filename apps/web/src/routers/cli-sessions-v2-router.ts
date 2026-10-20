@@ -996,6 +996,7 @@ async function mergedWorktreeCleanupIds(
     SELECT worktree_sessions.worktree_id
     FROM worktree_sessions
     JOIN ${cli_sessions_v2} ON ${cli_sessions_v2.session_id} = worktree_sessions.session_id
+      AND ${cli_sessions_v2.kilo_user_id} = ${ctx.user.id}
     LEFT JOIN ${github_branch_pull_requests} ON ${sessionPrJoinPredicate}
     LEFT JOIN ${cloud_agent_worktrees}
       ON ${cloud_agent_worktrees.worktree_id} = worktree_sessions.worktree_id

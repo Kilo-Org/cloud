@@ -41,6 +41,7 @@ export function MergedWorktreeCleanup({
   const start = useMutation(
     trpc.cliSessionsV2.startMergedWorktreeCleanup.mutationOptions({
       onSuccess: batch => {
+        retry.reset();
         queryClient.setQueryData(trpc.cliSessionsV2.getWorktreeCleanup.queryKey(scope), batch);
         setOpen(false);
       },

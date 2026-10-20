@@ -16,11 +16,12 @@ functions run in `sfo1` only (`vercel.json`), via the manually triggered
   the remaining body to `url` with exactly `headers`. Incoming request headers
   are never forwarded; response headers pass through the same allowlist as the
   gateway's `wrapInSafeNextResponse`. Upstream redirects are not followed and
-  become 502 errors. In staging (`VERCEL_TARGET_ENV=staging`), the URL goes
-  through `@kilocode/upstream-url-policy` first (HTTPS, a public address), and
-  the connection uses the addresses that check approved. Policy activation
-  remains staging-only; production, preview, and local environments are outside
-  this rollout.
+  become 502 errors.
+- The deployment workflow targets production only. Shared URL policy activation
+  is outside that deployed target: `@kilocode/upstream-url-policy` and its
+  approved-address dispatcher activate only with `VERCEL_TARGET_ENV=staging`.
+  That runtime selection is exercised locally; there is no relay staging
+  deployment configured in this repository.
 - The body contract lives in `@kilocode/ai-gateway-secure-proxy-contracts`,
   shared with the gateway (`packages/web-shared/src/lib/ai-gateway/providers/secure-proxy.ts`).
 - Keep it dependency-free: no database, Redis, Sentry, or workspace packages

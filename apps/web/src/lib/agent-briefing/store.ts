@@ -464,7 +464,7 @@ async function revalidateOneOffEvidence(row: BriefingReportRow): Promise<Briefin
         row.organization_id
           ? eq(cli_sessions_v2.organization_id, row.organization_id)
           : isNull(cli_sessions_v2.organization_id),
-        inArray(cli_sessions_v2.session_id, sessionIds)
+        sql`${cli_sessions_v2.session_id} = ANY(${sql.param(sessionIds)}::text[])`
       )
     );
   const eventIds = z.array(z.string()).parse(row.facts.evidenceEventIds ?? []);
@@ -477,7 +477,7 @@ async function revalidateOneOffEvidence(row: BriefingReportRow): Promise<Briefin
           .where(
             and(
               eq(agent_briefing_events.kilo_user_id, row.kilo_user_id),
-              inArray(agent_briefing_events.id, eventIds),
+              sql`${agent_briefing_events.id} = ANY(${sql.param(eventIds)}::text[])`,
               row.organization_id
                 ? eq(agent_briefing_events.organization_id, row.organization_id)
                 : isNull(agent_briefing_events.organization_id),
@@ -501,7 +501,7 @@ async function revalidateOneOffEvidence(row: BriefingReportRow): Promise<Briefin
           .where(
             and(
               eq(microdollar_usage.kilo_user_id, row.kilo_user_id),
-              inArray(microdollar_usage.id, usageIds),
+              sql`${microdollar_usage.id} = ANY(${sql.param(usageIds)}::uuid[])`,
               row.organization_id
                 ? eq(microdollar_usage.organization_id, row.organization_id)
                 : isNull(microdollar_usage.organization_id)

@@ -81,6 +81,8 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Incomplete history remains available with a coverage warning. Missing data does not mean zero activity.
 - Empty periods produce a saved report without an AI request or charge.
 - Reports preserve activity and session state at the selected period's end, not current live status.
+- Large AI inputs use an evidence sample across the selected period, with explicit omission counts.
+- The app discards pending results when the signed-in account changes.
 - Find confirmed reports in **History** for 30 days after creation, including reports whose AI summary is still running.
 - One-off reports do not replace the morning Home card or change the schedule or automatic AI preferences.
 - Paid retries require another cost review. Offline paid requests do not enter a background queue.

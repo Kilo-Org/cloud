@@ -139,10 +139,22 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
       url: source.url.split('?')[0],
     })),
   };
+  const fullEvidenceSample = facts.selectedEvidence;
   while (Buffer.byteLength(JSON.stringify(facts), 'utf8') > 28_000) {
     if (facts.selectedEvidence.length > 0) {
-      facts.selectedEvidence.pop();
-      facts.omittedEvidenceCount += 1;
+      const remaining = facts.selectedEvidence.length - 1;
+      if (historical && remaining > 1) {
+        facts.selectedEvidence = Array.from(
+          { length: remaining },
+          (_, index) =>
+            fullEvidenceSample[
+              Math.floor((index * (fullEvidenceSample.length - 1)) / (remaining - 1))
+            ]
+        ).filter(source => source !== undefined);
+      } else {
+        facts.selectedEvidence = facts.selectedEvidence.slice(0, remaining);
+      }
+      facts.omittedEvidenceCount = allSources.length - facts.selectedEvidence.length;
     } else if (facts.sessions.length > 0) {
       facts.sessions.pop();
       facts.omittedSessionCount += 1;

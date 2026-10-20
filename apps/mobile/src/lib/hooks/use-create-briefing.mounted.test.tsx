@@ -1,13 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, TestRenderer } from '@/test/renderer';
-import {
-  type CreateBriefingState,
-  type PreparedBriefing,
-  useCreateBriefing,
-} from './use-create-briefing';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
+import { act } from '@/test/renderer';
+import { type PreparedBriefing } from './use-create-briefing';
+import { input, mount, prepared, state } from './use-create-briefing-test-utils';
 
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
@@ -42,95 +39,14 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 
-const input = {
-  startAt: '2026-10-19T12:00:00.000Z',
-  endAt: '2026-10-20T12:00:00.000Z',
-  timezone: 'Europe/Belgrade',
-  language: 'en',
-};
-const prepared: PreparedBriefing = {
-  report: {
-    id: 'report-1',
-    kind: 'one_off',
-    createdAt: input.endAt,
-    timezone: input.timezone,
-    context: { id: 'personal', organizationId: null, name: 'Personal' },
-    localDate: '2026-10-20',
-    nightStartAt: input.startAt,
-    cutoffAt: input.endAt,
-    morningEndAt: '2026-11-19T12:00:00.000Z',
-    publishedAt: null,
-    updatedAt: input.endAt,
-    revision: 1,
-    revised: false,
-    readAt: null,
-    dismissedAt: null,
-    scorecard: { sessions: 1, pullRequests: 0, blockers: 0, spendMicrodollars: 0 },
-    coverage: {
-      activity: 'partial',
-      spend: 'unavailable',
-      blockers: 'partial',
-      pullRequests: 'partial',
-    },
-    sessions: [],
-    sources: [],
-    summary: {
-      status: 'disabled',
-      text: null,
-      model: null,
-      costMicrodollars: 0,
-      chargeStatus: 'settled',
-      estimatedCostMicrodollars: null,
-      startedAt: null,
-      finishedAt: null,
-      error: null,
-      canRetry: false,
-    },
-    expiresAt: '2026-11-19T12:00:00.000Z',
-  },
-  estimate: {
-    canGenerate: true,
-    estimateToken: 'bound-token',
-    model: 'test/model',
-    estimatedCostMicrodollars: 1,
-    maximumCostMicrodollars: 2,
-    maxDurationSeconds: 60,
-    unavailableReason: null,
-  },
-};
-const published: { current?: CreateBriefingState } = {};
-function Harness() {
-  published.current = useCreateBriefing();
-  return null;
-}
-function state() {
-  if (!published.current) {
-    throw new Error('Hook is not mounted');
-  }
-  return published.current;
-}
-function mount() {
-  const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
-  const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
-  act(() => {
-    holder.renderer = TestRenderer.create(
-      createElement(QueryClientProvider, { client }, createElement(Harness))
-    );
-  });
-  if (!holder.renderer) {
-    throw new Error('Renderer is not mounted');
-  }
-  return { renderer: holder.renderer, client };
-}
-
 describe('one-off briefing request state', () => {
   beforeEach(() => {
+    bumpAuthEpoch();
     mocks.prepare.mockReset();
     mocks.create.mockReset();
     mocks.toast.mockReset();
     mocks.offline = false;
     mocks.nextId = 0;
-    published.current = undefined;
   });
 
   it('coalesces double review taps and keeps the UUID and exact range after a transport failure', async () => {
@@ -245,6 +161,97 @@ describe('one-off briefing request state', () => {
     expect(mocks.create.mock.calls[1]?.[0]).toEqual(mocks.create.mock.calls[0]?.[0]);
     expect(mocks.prepare).toHaveBeenCalledTimes(1);
     renderer.unmount();
+  });
+
+  it('does not publish an earlier account’s report after the account changes', async () => {
+    const pending = Promise.withResolvers<PreparedBriefing['report']>();
+    const started = Promise.withResolvers<undefined>();
+    mocks.prepare.mockResolvedValue(prepared);
+    mocks.create.mockImplementation(async () => {
+      started.resolve(undefined);
+      const result = await pending.promise;
+      return result;
+    });
+    const { renderer, client } = mount();
+    await act(async () => {
+      await state().prepare(input);
+    });
+    let creating: Promise<PreparedBriefing['report'] | null> | undefined = undefined;
+    await act(async () => {
+      creating = state().create();
+      await started.promise;
+    });
+    bumpAuthEpoch();
+    client.clear();
+    let result: PreparedBriefing['report'] | null | undefined = undefined;
+    await act(async () => {
+      pending.resolve(prepared.report);
+      result = await creating;
+    });
+    expect(result).toBeNull();
+    expect(client.getQueryData(['briefing', prepared.report.id])).toBeUndefined();
+    renderer.unmount();
+  });
+
+  it('discards a review that finishes after the account changes', async () => {
+    const pending = Promise.withResolvers<PreparedBriefing>();
+    const started = Promise.withResolvers<undefined>();
+    mocks.prepare.mockImplementation(async () => {
+      started.resolve(undefined);
+      const result = await pending.promise;
+      return result;
+    });
+    const { renderer } = mount();
+    let reviewing: Promise<void> | undefined = undefined;
+    await act(async () => {
+      reviewing = state().prepare(input);
+      await started.promise;
+    });
+    bumpAuthEpoch();
+    await act(async () => {
+      pending.resolve(prepared);
+      await reviewing;
+    });
+    expect(state().prepared).toBeNull();
+    expect(await state().create()).toBeNull();
+    renderer.unmount();
+  });
+
+  it('does not sign out the current account for an earlier account’s failed request', async () => {
+    const pending = Promise.withResolvers<PreparedBriefing['report']>();
+    const started = Promise.withResolvers<undefined>();
+    mocks.prepare.mockResolvedValue(prepared);
+    mocks.create.mockImplementation(async () => {
+      started.resolve(undefined);
+      const result = await pending.promise;
+      return result;
+    });
+    const signOut = vi.fn<() => void>();
+    const restoreHandler = setTrpcUnauthorizedHandler(signOut);
+    const { renderer } = mount();
+    try {
+      await act(async () => {
+        await state().prepare(input);
+      });
+      let creating: Promise<PreparedBriefing['report'] | null> | undefined = undefined;
+      await act(async () => {
+        creating = state().create();
+        await started.promise;
+      });
+      bumpAuthEpoch();
+      await act(async () => {
+        pending.reject(
+          Object.assign(new Error('Expired session'), { data: { authRequired: true } })
+        );
+        await creating;
+      });
+      expect(signOut).not.toHaveBeenCalled();
+      expect(state().error).toBeNull();
+      expect(mocks.toast).not.toHaveBeenCalled();
+    } finally {
+      restoreHandler();
+      renderer.unmount();
+    }
   });
 
   it('blocks unavailable paid estimates and permits empty reports without an estimate token', async () => {

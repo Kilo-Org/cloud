@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { after } from 'next/server';
 import type * as NextServer from 'next/server';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
@@ -623,3 +623,27 @@ it('does not collect late usage or activity when a frozen session changes contex
   expect(sanitized.summary.status).toBe('outdated');
   expect(sanitized.scorecard.spendMicrodollars).toBe(0);
 });
+
+it('opens a frozen report with high-volume provenance', async () => {
+  const caller = agentBriefingRouter.createCaller({ user });
+  const input = period();
+  const { sessionId } = await seedActivity(input);
+  const prepared = await caller.prepareOneOff(input);
+  const eventIds = Array.from({ length: 65_536 }, (_, index) => `volume-${index}`);
+  await db.execute(sql`
+    INSERT INTO ${agent_briefing_events}
+      (id, session_id, kilo_user_id, kind, occurred_at, recorded_at)
+    SELECT 'volume-' || n, ${sessionId}, ${user.id}, 'activity',
+      ${input.startAt}::timestamptz, ${prepared.report.createdAt}::timestamptz
+    FROM generate_series(0, 65535) AS n
+  `);
+  await db
+    .update(agent_briefing_reports)
+    .set({
+      facts: sql`${agent_briefing_reports.facts} || ${JSON.stringify({ evidenceEventIds: eventIds })}::jsonb`,
+    })
+    .where(eq(agent_briefing_reports.id, prepared.report.id));
+  const report = await caller.get({ reportId: prepared.report.id });
+  expect(report.scorecard.sessions).toBe(1);
+  expect(report.sessions[0]?.title).toBe('Historical work');
+}, 30_000);

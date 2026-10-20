@@ -1,18 +1,4 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  isNotNull,
-  lt,
-  lte,
-  notLike,
-  or,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, isNotNull, lt, lte, notLike, or, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_events,
@@ -395,7 +381,7 @@ export async function collectBriefingEvidence(
                 and(
                   eventScope,
                   eq(agent_briefing_events.kind, 'status'),
-                  inArray(agent_briefing_events.session_id, activeSessionIds),
+                  sql`${agent_briefing_events.session_id} = ANY(${sql.param(activeSessionIds)}::text[])`,
                   lt(agent_briefing_events.occurred_at, nightStartAt)
                 )
               )
@@ -419,7 +405,9 @@ export async function collectBriefingEvidence(
             title: cli_sessions_v2.title,
           })
           .from(cli_sessions_v2)
-          .where(and(scope, inArray(cli_sessions_v2.session_id, pending)));
+          .where(
+            and(scope, sql`${cli_sessions_v2.session_id} = ANY(${sql.param(pending)}::text[])`)
+          );
         pending = [];
         for (const row of found) {
           rows.set(row.session_id, row);

@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
 
@@ -24,16 +26,35 @@ export type CreateBriefingState = {
   creating: boolean;
 };
 
+const operationEpochs = new WeakMap<object, number>();
+
+function assertCurrentOperation(epoch: number | undefined): asserts epoch is number {
+  if (epoch === undefined || !isCurrentAuthEpoch(epoch) || isSignOutActive()) {
+    throw new Error('Briefing operation belongs to an inactive account');
+  }
+}
+
+async function settleCurrentOperation<T>(epoch: number, operation: Promise<T>): Promise<T> {
+  try {
+    const result = await operation;
+    assertCurrentOperation(epoch);
+    return result;
+  } catch (error) {
+    assertCurrentOperation(epoch);
+    throw error;
+  }
+}
+
 export function useCreateBriefing(): CreateBriefingState {
   const trpc = useTRPC();
   const client = useQueryClient();
   const [prepared, setPrepared] = useState<PreparedBriefing | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setError] = useState<string | null>(null);
   const revision = useRef(0);
   const busy = useRef(false);
   const mounted = useRef(true);
   const request = useRef<PrepareInput | null>(null);
-  const currentPrepared = useRef<PreparedBriefing | null>(null);
+  const currentPrepared = useRef<{ data: PreparedBriefing; epoch: number } | null>(null);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -46,24 +67,38 @@ export function useCreateBriefing(): CreateBriefingState {
       setError(failure.message);
     }
   };
-  const prepareMutation = useMutation(
-    trpc.agentBriefing.prepareOneOff.mutationOptions({
-      networkMode: 'always',
-      retry: false,
-      onError,
-    })
-  );
-  const createMutation = useMutation(
-    trpc.agentBriefing.createOneOff.mutationOptions({
-      networkMode: 'always',
-      retry: false,
-      onError,
-      onSuccess: report => {
-        client.setQueryData(trpc.agentBriefing.get.queryKey({ reportId: report.id }), report);
-        void client.invalidateQueries({ queryKey: trpc.agentBriefing.list.pathKey() });
-      },
-    })
-  );
+  const prepareOptions = trpc.agentBriefing.prepareOneOff.mutationOptions({
+    networkMode: 'always',
+    retry: false,
+  });
+  const prepareMutation = useMutation({
+    ...prepareOptions,
+    mutationFn: async (input, context) => {
+      const epoch = operationEpochs.get(input);
+      assertCurrentOperation(epoch);
+      if (!prepareOptions.mutationFn) {
+        throw new Error('Missing briefing preparation mutation');
+      }
+      const result = await settleCurrentOperation(epoch, prepareOptions.mutationFn(input, context));
+      return result;
+    },
+  });
+  const createOptions = trpc.agentBriefing.createOneOff.mutationOptions({
+    networkMode: 'always',
+    retry: false,
+  });
+  const createMutation = useMutation({
+    ...createOptions,
+    mutationFn: async (input, context) => {
+      const epoch = operationEpochs.get(input);
+      assertCurrentOperation(epoch);
+      if (!createOptions.mutationFn) {
+        throw new Error('Missing briefing creation mutation');
+      }
+      const result = await settleCurrentOperation(epoch, createOptions.mutationFn(input, context));
+      return result;
+    },
+  });
 
   const reset = () => {
     revision.current += 1;
@@ -83,23 +118,32 @@ export function useCreateBriefing(): CreateBriefingState {
   };
 
   const prepare = async (input: Omit<PrepareInput, 'requestId'>) => {
-    if (busy.current || !online()) {
+    if (busy.current || isSignOutActive() || !online()) {
       return;
     }
     busy.current = true;
     const version = revision.current;
+    const epoch = currentAuthEpoch();
     request.current ??= { ...input, requestId: randomUUID() };
+    operationEpochs.set(request.current, epoch);
     currentPrepared.current = null;
     setPrepared(null);
     setError(null);
     try {
       const result = await prepareMutation.mutateAsync(request.current);
-      if (mounted.current && revision.current === version) {
-        currentPrepared.current = result;
+      if (
+        mounted.current &&
+        revision.current === version &&
+        isCurrentAuthEpoch(epoch) &&
+        !isSignOutActive()
+      ) {
+        currentPrepared.current = { data: result, epoch };
         setPrepared(result);
       }
-    } catch {
-      // The mutation displays the failure; keep the request ID for a safe retry.
+    } catch (error) {
+      if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
+        onError(error instanceof Error ? error : { message: i18n.t('common.somethingWentWrong') });
+      }
     } finally {
       busy.current = false;
     }
@@ -110,21 +154,34 @@ export function useCreateBriefing(): CreateBriefingState {
     if (
       busy.current ||
       !reviewed ||
+      !isCurrentAuthEpoch(reviewed.epoch) ||
+      isSignOutActive() ||
       !online() ||
-      (reviewed.estimate && !reviewed.estimate.canGenerate)
+      (reviewed.data.estimate && !reviewed.data.estimate.canGenerate)
     ) {
       return null;
     }
     busy.current = true;
     const version = revision.current;
+    const epoch = reviewed.epoch;
     setError(null);
     try {
-      const report = await createMutation.mutateAsync({
-        reportId: reviewed.report.id,
-        estimateToken: reviewed.estimate?.estimateToken ?? undefined,
-      });
+      const input = {
+        reportId: reviewed.data.report.id,
+        estimateToken: reviewed.data.estimate?.estimateToken ?? undefined,
+      };
+      operationEpochs.set(input, epoch);
+      const report = await createMutation.mutateAsync(input);
+      if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
+        return null;
+      }
+      client.setQueryData(trpc.agentBriefing.get.queryKey({ reportId: report.id }), report);
+      void client.invalidateQueries({ queryKey: trpc.agentBriefing.list.pathKey() });
       return mounted.current && revision.current === version ? report : null;
-    } catch {
+    } catch (error) {
+      if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
+        onError(error instanceof Error ? error : { message: i18n.t('common.somethingWentWrong') });
+      }
       return null;
     } finally {
       busy.current = false;
@@ -133,7 +190,7 @@ export function useCreateBriefing(): CreateBriefingState {
 
   return {
     prepared,
-    error,
+    error: errorMessage,
     reset,
     prepare,
     create,

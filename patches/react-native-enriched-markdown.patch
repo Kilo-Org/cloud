@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b755491f23 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..7eb3a71c3278e7af6f99a01c62592cf2b49f1095 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 @@ -50,6 +50,19 @@ import kotlin.math.ceil
@@ -103,7 +103,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b7
      props: ReadableMap?,
      allowFontScaling: Boolean,
      fontScale: Float,
-@@ -543,9 +562,29 @@ object MeasurementStore {
+@@ -543,9 +562,31 @@ object MeasurementStore {
              segment.styledText.replaceMathSpansWithPlaceholders(context)
  
              val layout = createStaticLayout(segment.styledText, fontSize, widthPx, id)
@@ -119,7 +119,9 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b7
 +            // single TextPaint, so a line measured as fitting at that width can
 +            // still wrap. A hugged width is the widest line itself, so it is
 +            // always re-measured; an assigned width is only re-measured when the
-+            // widest line fills it, where the same flip is possible.
++            // widest line fills it, where the same flip is possible. The height
++            // is always taken from the layout at the assigned width, never from
++            // the wider measurement layout above.
 +            val displayWidthPx =
 +              if (exactWidth) widthPx else minOf(widthPx, ceil(segmentMaxLineWidth).toInt())
 +            val fillsAssignedWidth = segmentMaxLineWidth > displayWidthPx - HUG_WIDTH_SAFETY_PX
@@ -134,7 +136,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b7
              maxContentWidthPx = maxOf(maxContentWidthPx, ceil(segmentMaxLineWidth))
  
              if (includeBottomMargin) {
-@@ -610,7 +649,7 @@ object MeasurementStore {
+@@ -610,7 +651,7 @@ object MeasurementStore {
        result
      } catch (e: Exception) {
        Log.w(TAG, "Split measurement failed, falling back", e)
@@ -143,7 +145,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b7
      }
    }
  
-@@ -698,6 +737,7 @@ object MeasurementStore {
+@@ -698,6 +739,7 @@ object MeasurementStore {
  
    private fun measure(
      maxWidth: Float,
@@ -151,7 +153,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b7
      text: CharSequence?,
      paintParams: PaintParams,
      viewId: Int?,
-@@ -705,11 +745,12 @@ object MeasurementStore {
+@@ -705,11 +747,12 @@ object MeasurementStore {
      measurePaint.reset()
      measurePaint.typeface = paintParams.typeface
      measurePaint.textSize = paintParams.fontSize
@@ -165,7 +167,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b7
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -737,17 +778,61 @@ object MeasurementStore {
+@@ -737,17 +780,61 @@ object MeasurementStore {
  
      val layout = builder.build()
      val visibleLineCount = visibleLineCount(layout, viewId)
@@ -228,7 +230,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b7
    // Applies the per-view numberOfLines / ellipsizeMode clamp to a builder, matching
    // RN's TextLayoutManager.buildLayout: only when a line limit is set.
    private fun applyLineLimit(
-@@ -816,6 +901,7 @@ object MeasurementStore {
+@@ -816,6 +903,7 @@ object MeasurementStore {
     */
    private fun measureWithLayout(
      maxWidth: Float,
@@ -236,7 +238,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..93b5f767f528568e6bbc5e537b37e8b7
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -847,10 +933,26 @@ object MeasurementStore {
+@@ -847,10 +935,26 @@ object MeasurementStore {
        (0 until visibleLineCount)
          .maxOfOrNull { layout.getLineWidth(it) } ?: 0f
  

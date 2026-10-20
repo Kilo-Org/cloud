@@ -37,6 +37,10 @@ function readLockfile(): Lockfile {
   return load(fs.readFileSync(lockfilePath, 'utf8')) as Lockfile;
 }
 
+function resolved(packages: Record<string, unknown>, selector: string): boolean {
+  return Object.keys(packages).some(key => key === selector || key.startsWith(`${selector}(`));
+}
+
 function entryProblems({ selector, patchPath }: PatchEntry): string[] {
   const problems: string[] = [];
   const version = selector.slice(selector.lastIndexOf('@') + 1);
@@ -75,18 +79,30 @@ test('every pinned version is the one the lockfile resolves', () => {
   const selectors = readPatchedDependencies(workspacePath).map(({ selector }) => selector);
   const packages = readLockfile().packages ?? {};
   assert.deepEqual(
-    selectors.filter(selector => !Object.hasOwn(packages, selector)),
+    selectors.filter(selector => !resolved(packages, selector)),
     []
   );
+});
 
-  // A bump that leaves the selector behind resolves nothing, so pnpm stops
-  // applying the patch instead of failing: the stale selector must be reported.
-  const bumped: Record<string, unknown> = { ...packages };
-  bumped['expo-server-sdk@6.2.0'] = bumped['expo-server-sdk@6.1.0'];
-  delete bumped['expo-server-sdk@6.1.0'];
+test('the resolved-version check accepts peer suffixes and reports a stale selector', () => {
+  // `packages` records bare keys today, while `snapshots` records peer-suffixed
+  // ones such as `react-native@0.86.3(patch_hash=…)(...)`. Accepting either keeps
+  // the check correct if pnpm moves the entry between sections.
+  const packages = {
+    'fixture-sdk@2.0.0': {},
+    '@scope/peer-sdk@3.1.0(peer@1.0.0)': {},
+  };
   assert.deepEqual(
-    selectors.filter(selector => !Object.hasOwn(bumped, selector)),
-    ['expo-server-sdk@6.1.0']
+    ['fixture-sdk@2.0.0', '@scope/peer-sdk@3.1.0'].filter(
+      selector => !resolved(packages, selector)
+    ),
+    []
+  );
+  assert.deepEqual(
+    ['@scope/peer-sdk@3.1.0', 'fixture-sdk@1.9.0'].filter(
+      selector => !resolved(packages, selector)
+    ),
+    ['fixture-sdk@1.9.0']
   );
 });
 

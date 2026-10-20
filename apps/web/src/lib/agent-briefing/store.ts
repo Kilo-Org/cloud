@@ -1,13 +1,16 @@
-import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { createHash } from 'node:crypto';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_preferences,
   agent_briefing_context_preferences,
   agent_briefing_reports,
+  agent_briefing_events,
   cli_sessions_v2,
+  microdollar_usage,
+  microdollar_usage_metadata,
   organizations,
   organization_memberships,
 } from '@kilocode/db/schema';
@@ -105,23 +108,29 @@ export async function getBriefingPreferences(
       .update(agent_briefing_preferences)
       .set({ language })
       .where(eq(agent_briefing_preferences.kilo_user_id, userId));
+  return getOneOffBriefingPreferences(userId, timezone, language);
+}
+export async function getOneOffBriefingPreferences(
+  userId: string,
+  timezone = 'UTC',
+  language = 'en'
+): Promise<BriefingPreferences> {
   const [row] = await db
     .select()
     .from(agent_briefing_preferences)
     .where(eq(agent_briefing_preferences.kilo_user_id, userId));
-  if (!row) throw new Error('Briefing preferences unavailable');
   const contexts = await briefingContexts(userId);
   const settings = await db
     .select()
     .from(agent_briefing_context_preferences)
     .where(eq(agent_briefing_context_preferences.kilo_user_id, userId));
   return {
-    timezone: row.timezone,
-    nightStart: row.night_start,
-    morningStart: row.morning_start,
-    morningEnd: row.morning_end,
-    language: row.language,
-    notificationsEnabled: row.notifications_enabled,
+    timezone: row?.timezone ?? timezone,
+    nightStart: row?.night_start ?? DEFAULT_BRIEFING_SCHEDULE.nightStart,
+    morningStart: row?.morning_start ?? DEFAULT_BRIEFING_SCHEDULE.morningStart,
+    morningEnd: row?.morning_end ?? DEFAULT_BRIEFING_SCHEDULE.morningEnd,
+    language: row?.language ?? language,
+    notificationsEnabled: row?.notifications_enabled ?? false,
     defaultModel: DEFAULT_BRIEFING_MODEL,
     contexts: contexts.map(context => {
       const setting = settings.find(value => value.context_key === context.id);
@@ -199,13 +208,24 @@ export async function saveBriefingPreferences(
   return getBriefingPreferences(userId);
 }
 export async function briefingContextSettings(userId: string, organizationId?: string | null) {
-  const preferences = await getBriefingPreferences(userId);
-  const setting = preferences.contexts.find(
-    value => value.context.organizationId === (organizationId ?? null)
-  );
-  if (!setting)
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Briefing context is no longer accessible' });
-  return setting;
+  const context = await requireBriefingContext(userId, organizationId);
+  const [setting] = await db
+    .select()
+    .from(agent_briefing_context_preferences)
+    .where(
+      and(
+        eq(agent_briefing_context_preferences.kilo_user_id, userId),
+        eq(agent_briefing_context_preferences.context_key, context.id)
+      )
+    );
+  return {
+    context,
+    aiEnabled: setting?.ai_enabled ?? false,
+    model: setting?.model ?? DEFAULT_BRIEFING_MODEL,
+    maxDurationSeconds: setting?.max_duration_seconds ?? DEFAULT_BRIEFING_MAX_DURATION_SECONDS,
+    maxSpendMicrodollars:
+      setting?.max_spend_microdollars ?? DEFAULT_BRIEFING_MAX_SPEND_MICRODOLLARS,
+  };
 }
 export async function briefingReportRow(
   userId: string,
@@ -218,11 +238,24 @@ export async function briefingReportRow(
       and(
         eq(agent_briefing_reports.id, reportId),
         eq(agent_briefing_reports.kilo_user_id, userId),
-        gte(agent_briefing_reports.cutoff_at, new Date(Date.now() - 30 * 86400_000).toISOString())
+        or(
+          and(
+            eq(agent_briefing_reports.kind, 'scheduled'),
+            gte(
+              agent_briefing_reports.cutoff_at,
+              new Date(Date.now() - 30 * 86400_000).toISOString()
+            )
+          ),
+          and(
+            eq(agent_briefing_reports.kind, 'one_off'),
+            gt(agent_briefing_reports.morning_end_at, new Date().toISOString())
+          )
+        )
       )
     );
   if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Briefing not found' });
   await requireBriefingContext(userId, row.organization_id);
+  if (row.kind === 'one_off') return revalidateOneOffEvidence(row);
   const facts = factsSchema.parse(row.facts);
   const sourceSessionIds = [
     ...new Set([
@@ -265,8 +298,17 @@ export async function briefingReportRow(
 export async function serializeBriefing(row: BriefingReportRow): Promise<BriefingReport> {
   const context = await requireBriefingContext(row.kilo_user_id, row.organization_id);
   const iso = (value: string) => new Date(value).toISOString();
+  const [preferences] = row.timezone
+    ? []
+    : await db
+        .select({ timezone: agent_briefing_preferences.timezone })
+        .from(agent_briefing_preferences)
+        .where(eq(agent_briefing_preferences.kilo_user_id, row.kilo_user_id));
   return briefingReportSchema.parse({
     id: row.id,
+    kind: row.kind,
+    createdAt: iso(row.created_at),
+    timezone: row.timezone ?? preferences?.timezone ?? 'UTC',
     context,
     localDate: row.local_date,
     nightStartAt: iso(row.night_start_at),
@@ -315,8 +357,25 @@ export async function listBriefings(
         ),
         scopeFilter,
         isNotNull(agent_briefing_reports.published_at),
-        gte(agent_briefing_reports.cutoff_at, new Date(Date.now() - 30 * 86400_000).toISOString()),
-        input.currentOnly ? gt(agent_briefing_reports.morning_end_at, now) : undefined,
+        or(
+          and(
+            eq(agent_briefing_reports.kind, 'scheduled'),
+            gte(
+              agent_briefing_reports.cutoff_at,
+              new Date(Date.now() - 30 * 86400_000).toISOString()
+            )
+          ),
+          and(
+            eq(agent_briefing_reports.kind, 'one_off'),
+            gt(agent_briefing_reports.morning_end_at, now)
+          )
+        ),
+        input.currentOnly
+          ? and(
+              eq(agent_briefing_reports.kind, 'scheduled'),
+              gt(agent_briefing_reports.morning_end_at, now)
+            )
+          : undefined,
         input.cursor
           ? sql`(${agent_briefing_reports.cutoff_at}, ${agent_briefing_reports.id}) < (SELECT cutoff_at, id FROM agent_briefing_reports WHERE id = ${input.cursor} AND kilo_user_id = ${userId})`
           : undefined
@@ -336,6 +395,7 @@ export async function listBriefings(
   return { reports, nextCursor: rows.length > limit ? (rows[limit - 1]?.id ?? null) : null };
 }
 export async function refreshBriefingEvidence(row: BriefingReportRow): Promise<BriefingReportRow> {
+  if (row.kind === 'one_off') return revalidateOneOffEvidence(row);
   const facts = await collectBriefingEvidence(
     row.kilo_user_id,
     row.organization_id,
@@ -384,4 +444,197 @@ export async function refreshBriefingEvidence(row: BriefingReportRow): Promise<B
       .returning();
     return updated ?? current;
   });
+}
+
+async function revalidateOneOffEvidence(row: BriefingReportRow): Promise<BriefingReportRow> {
+  const facts = factsSchema.parse(row.facts);
+  const sessionIds = [
+    ...new Set([
+      ...facts.sessions.map(session => session.sessionId),
+      ...facts.sources.map(source => source.sessionId),
+    ]),
+  ];
+  if (sessionIds.length === 0) return row;
+  const sessions = await db
+    .select({ id: cli_sessions_v2.session_id, cloudId: cli_sessions_v2.cloud_agent_session_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, row.kilo_user_id),
+        row.organization_id
+          ? eq(cli_sessions_v2.organization_id, row.organization_id)
+          : isNull(cli_sessions_v2.organization_id),
+        inArray(cli_sessions_v2.session_id, sessionIds)
+      )
+    );
+  const eventIds = z.array(z.string()).parse(row.facts.evidenceEventIds ?? []);
+  const events =
+    eventIds.length === 0
+      ? []
+      : await db
+          .select({ id: agent_briefing_events.id })
+          .from(agent_briefing_events)
+          .where(
+            and(
+              eq(agent_briefing_events.kilo_user_id, row.kilo_user_id),
+              inArray(agent_briefing_events.id, eventIds),
+              row.organization_id
+                ? eq(agent_briefing_events.organization_id, row.organization_id)
+                : isNull(agent_briefing_events.organization_id),
+              row.evidence_recorded_before
+                ? lte(agent_briefing_events.recorded_at, row.evidence_recorded_before)
+                : undefined
+            )
+          );
+  const costSources = facts.sources.filter(source => source.kind === 'cost');
+  const usageIds = costSources.map(source => source.id.slice(6));
+  const usage =
+    usageIds.length === 0
+      ? []
+      : await db
+          .select({ id: microdollar_usage.id, sessionId: microdollar_usage_metadata.session_id })
+          .from(microdollar_usage)
+          .innerJoin(
+            microdollar_usage_metadata,
+            eq(microdollar_usage_metadata.id, microdollar_usage.id)
+          )
+          .where(
+            and(
+              eq(microdollar_usage.kilo_user_id, row.kilo_user_id),
+              inArray(microdollar_usage.id, usageIds),
+              row.organization_id
+                ? eq(microdollar_usage.organization_id, row.organization_id)
+                : isNull(microdollar_usage.organization_id)
+            )
+          );
+  const usageById = new Map(usage.map(item => [item.id, item.sessionId]));
+  const sessionById = new Map(sessions.map(session => [session.id, session]));
+  const costsAccessible = costSources.every(source => {
+    const sessionId = usageById.get(source.id.slice(6));
+    const session = sessionById.get(source.sessionId);
+    return (
+      sessionId !== undefined &&
+      session !== undefined &&
+      (sessionId === session.id || sessionId === session.cloudId)
+    );
+  });
+  if (sessions.length === sessionIds.length && events.length === eventIds.length && costsAccessible)
+    return row;
+  const cleared = {
+    scorecard: { sessions: 0, pullRequests: 0, blockers: 0, spendMicrodollars: 0 },
+    sessions: [],
+    sources: [],
+    coverage: {
+      activity: 'partial',
+      spend: 'unavailable',
+      blockers: 'partial',
+      pullRequests: 'partial',
+    },
+  };
+  const [updated] = await db
+    .update(agent_briefing_reports)
+    .set({
+      facts: cleared,
+      evidence_hash: createHash('sha256').update(JSON.stringify(cleared)).digest('hex'),
+      revision: row.revision + 1,
+      updated_at: new Date().toISOString(),
+      summary: sql`${agent_briefing_reports.summary} || '{"status":"outdated","text":null,"error":"permission_unavailable","canRetry":false}'::jsonb`,
+    })
+    .where(
+      and(eq(agent_briefing_reports.id, row.id), eq(agent_briefing_reports.revision, row.revision))
+    )
+    .returning();
+  if (updated) return updated;
+  return briefingReportRow(row.kilo_user_id, row.id);
+}
+
+export async function prepareOneOffBriefing(
+  userId: string,
+  input: {
+    requestId: string;
+    organizationId?: string;
+    startAt: string;
+    endAt: string;
+    timezone: string;
+    language: string;
+  }
+): Promise<BriefingReportRow> {
+  const start = Date.parse(input.startAt);
+  const end = Date.parse(input.endAt);
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start >= end ||
+    end > Date.now() ||
+    end - start > 31 * 86400_000
+  )
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Choose a past period of at most 31 days',
+    });
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: input.timezone }).format();
+  } catch {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid timezone' });
+  }
+  const context = await requireBriefingContext(userId, input.organizationId);
+  const existing = async () => {
+    const [row] = await db
+      .select()
+      .from(agent_briefing_reports)
+      .where(eq(agent_briefing_reports.id, input.requestId));
+    if (!row) return null;
+    if (
+      row.kilo_user_id !== userId ||
+      row.kind !== 'one_off' ||
+      row.organization_id !== context.organizationId ||
+      Date.parse(row.night_start_at) !== start ||
+      Date.parse(row.cutoff_at) !== end ||
+      row.timezone !== input.timezone ||
+      row.language !== input.language
+    )
+      throw new TRPCError({ code: 'CONFLICT', message: 'Request ID has already been used' });
+    return briefingReportRow(userId, row.id);
+  };
+  const previous = await existing();
+  if (previous) return previous;
+  const createdAt = new Date().toISOString();
+  const facts = await collectBriefingEvidence(
+    userId,
+    context.organizationId,
+    new Date(start).toISOString(),
+    new Date(end).toISOString(),
+    createdAt,
+    true
+  );
+  await db
+    .insert(agent_briefing_reports)
+    .values({
+      id: input.requestId,
+      kilo_user_id: userId,
+      context_key: context.id,
+      organization_id: context.organizationId,
+      kind: 'one_off',
+      created_at: createdAt,
+      timezone: input.timezone,
+      language: input.language,
+      evidence_recorded_before: createdAt,
+      local_date: new Intl.DateTimeFormat('en-CA', {
+        timeZone: input.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date(end)),
+      night_start_at: new Date(start).toISOString(),
+      cutoff_at: new Date(end).toISOString(),
+      morning_end_at: new Date(Date.parse(createdAt) + 30 * 86400_000).toISOString(),
+      next_refresh_at: null,
+      facts,
+      evidence_hash: createHash('sha256').update(JSON.stringify(facts)).digest('hex'),
+      summary: emptySummary,
+    })
+    .onConflictDoNothing({ target: agent_briefing_reports.id });
+  const row = await existing();
+  if (!row) throw new Error('Briefing preparation unavailable');
+  return row;
 }

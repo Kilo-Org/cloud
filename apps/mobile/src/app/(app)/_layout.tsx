@@ -164,6 +164,7 @@ export default function AppLayout() {
             <Stack.Screen name="todos/item/[item-id]" />
             <Stack.Screen name="todos/list-settings" options={sheetOptions} />
             <Stack.Screen name="agent-briefing/index" />
+            <Stack.Screen name="agent-briefing/create" />
             <Stack.Screen name="agent-briefing/[report-id]" />
             <Stack.Screen name="agent-briefing/settings" />
             <Stack.Screen name="share-gate" options={sheetOptions} />

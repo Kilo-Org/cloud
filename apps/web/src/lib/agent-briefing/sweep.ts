@@ -15,7 +15,7 @@ import {
 import { briefingWindow, nextBriefingTime, type BriefingWindow } from './schedule';
 import { reconcileBriefingCharge, runBriefingSummary } from './summary';
 
-async function freezeBriefingContexts(userId: string, window: BriefingWindow) {
+async function freezeBriefingContexts(userId: string, window: BriefingWindow, timezone: string) {
   for (const context of await briefingContexts(userId)) {
     const facts = {
       scorecard: { sessions: 0, pullRequests: 0, blockers: 0, spendMicrodollars: 0 },
@@ -34,6 +34,7 @@ async function freezeBriefingContexts(userId: string, window: BriefingWindow) {
         kilo_user_id: userId,
         context_key: context.id,
         organization_id: context.organizationId,
+        timezone,
         local_date: window.localDate,
         night_start_at: window.nightStartAt,
         cutoff_at: window.cutoffAt,
@@ -58,7 +59,7 @@ export async function sweepAgentBriefings(now = new Date()) {
   for (const preferences of due) {
     const night = new Date(preferences.next_run_at);
     const window = briefingWindow(preferences, night);
-    await freezeBriefingContexts(preferences.kilo_user_id, window);
+    await freezeBriefingContexts(preferences.kilo_user_id, window, preferences.timezone);
     await db
       .update(agent_briefing_preferences)
       .set({
@@ -80,6 +81,7 @@ export async function sweepAgentBriefings(now = new Date()) {
     .from(agent_briefing_reports)
     .where(
       and(
+        eq(agent_briefing_reports.kind, 'scheduled'),
         lte(agent_briefing_reports.cutoff_at, iso),
         lte(agent_briefing_reports.next_refresh_at, iso)
       )
@@ -95,12 +97,16 @@ export async function sweepAgentBriefings(now = new Date()) {
       continue;
     }
     if (original.context_key === 'personal')
-      await freezeBriefingContexts(original.kilo_user_id, {
-        localDate: original.local_date,
-        nightStartAt: new Date(original.night_start_at).toISOString(),
-        cutoffAt: new Date(original.cutoff_at).toISOString(),
-        morningEndAt: new Date(original.morning_end_at).toISOString(),
-      });
+      await freezeBriefingContexts(
+        original.kilo_user_id,
+        {
+          localDate: original.local_date,
+          nightStartAt: new Date(original.night_start_at).toISOString(),
+          cutoffAt: new Date(original.cutoff_at).toISOString(),
+          morningEndAt: new Date(original.morning_end_at).toISOString(),
+        },
+        original.timezone ?? (await getScheduledTimezone(original.kilo_user_id))
+      );
     let row = await refreshBriefingEvidence(original);
     row = await reconcileBriefingCharge(row);
     const facts = row.facts;
@@ -279,7 +285,19 @@ export async function sweepAgentBriefings(now = new Date()) {
   await db
     .delete(agent_briefing_reports)
     .where(
-      lte(agent_briefing_reports.cutoff_at, new Date(now.getTime() - 30 * 86400_000).toISOString())
+      or(
+        and(
+          eq(agent_briefing_reports.kind, 'scheduled'),
+          lte(
+            agent_briefing_reports.cutoff_at,
+            new Date(now.getTime() - 30 * 86400_000).toISOString()
+          )
+        ),
+        and(
+          eq(agent_briefing_reports.kind, 'one_off'),
+          lte(agent_briefing_reports.morning_end_at, iso)
+        )
+      )
     );
   return { scheduledUsers: due.length, activeReports: active.length };
 }
@@ -303,4 +321,12 @@ export async function generatePendingAgentBriefings() {
   const rejected = results.filter(result => result.status === 'rejected').length;
   if (rejected > 0) console.error('Agent briefing summary jobs rejected', { rejected });
   return { attempted: reports.length, fulfilled: results.length - rejected, rejected };
+}
+
+async function getScheduledTimezone(userId: string) {
+  const [preferences] = await db
+    .select({ timezone: agent_briefing_preferences.timezone })
+    .from(agent_briefing_preferences)
+    .where(eq(agent_briefing_preferences.kilo_user_id, userId));
+  return preferences?.timezone ?? 'UTC';
 }

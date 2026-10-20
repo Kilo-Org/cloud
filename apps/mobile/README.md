@@ -73,6 +73,20 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
 
+## One-off agent briefings
+
+- Open **Briefings → Create briefing** and select Personal or one organization.
+- Select a preset or a custom period of up to 31 days, then review the exact range and timezone.
+- Review coverage, the payer, the model, and the cost limit before creating a paid summary.
+- Incomplete history remains available with a coverage warning. Missing data does not mean zero activity.
+- Empty periods produce a saved report without an AI request or charge.
+- Reports preserve activity and session state at the selected period's end, not current live status.
+- Find confirmed reports in **History** for 30 days after creation, including reports whose AI summary is still running.
+- One-off reports do not replace the morning Home card or change the schedule or automatic AI preferences.
+- Paid retries require another cost review. Offline paid requests do not enter a background queue.
+
+Deploy the database migration before the backend that uses the new report metadata.
+
 ## Quick Chat backends
 
 Kilo remains the default backend. Custom backends use the harness SDK's remote

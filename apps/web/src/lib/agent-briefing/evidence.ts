@@ -299,7 +299,8 @@ export async function collectBriefingEvidence(
   organizationId: string | null,
   nightStartAt: string,
   cutoffAt: string,
-  recordedBefore?: string
+  recordedBefore?: string,
+  freeze = false
 ) {
   const start = Date.parse(nightStartAt);
   const cutoff = Date.parse(cutoffAt);
@@ -442,7 +443,7 @@ export async function collectBriefingEvidence(
           )
         )
         .limit(1);
-      return aggregateBriefingEvidence(
+      const facts = aggregateBriefingEvidence(
         [...rows.values()],
         [...baseline, ...events],
         usage,
@@ -453,6 +454,16 @@ export async function collectBriefingEvidence(
           legacyStatusInWindow: legacyStatus !== undefined,
         }
       );
+      return {
+        ...facts,
+        ...(freeze
+          ? {
+              evidenceEventIds: [...baseline, ...events]
+                .filter(event => rows.has(event.session_id))
+                .map(event => event.id),
+            }
+          : {}),
+      };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );

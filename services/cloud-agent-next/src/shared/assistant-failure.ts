@@ -171,6 +171,17 @@ const providerErrorBodySchema = z.object({
   statusCode: optionalHttpStatus,
   code: optionalHttpStatus,
   name: optionalString,
+  // The provider timeout envelope nests its cause: the root tag is `error` and
+  // the inner object carries `type` "timeout" with `code` 504 (numeric or
+  // string). Each field is parsed independently so a wrong or missing sibling
+  // cannot make a partial shape look like a timeout.
+  type: asOptional(z.literal('error')),
+  error: asOptional(
+    z.object({
+      type: asOptional(z.literal('timeout')),
+      code: asOptional(z.union([z.literal(504), z.literal('504')])),
+    })
+  ),
 });
 
 type ProviderErrorBody = z.infer<typeof providerErrorBodySchema>;
@@ -260,7 +271,20 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
     if (reason !== undefined) return reason;
   }
 
-  return classifySdkErrorName({ name: responseBody.name });
+  const namedReason = classifySdkErrorName({ name: responseBody.name });
+  if (namedReason !== undefined) return namedReason;
+
+  // Last fallback: the provider's nested timeout envelope. The schema already
+  // validates each value, so a defined nested code is 504 or '504'.
+  if (
+    responseBody.type === 'error' &&
+    responseBody.error?.type === 'timeout' &&
+    responseBody.error.code !== undefined
+  ) {
+    return classifyHttpStatus(504);
+  }
+
+  return undefined;
 }
 
 /**

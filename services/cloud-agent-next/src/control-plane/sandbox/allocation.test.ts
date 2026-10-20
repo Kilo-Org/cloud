@@ -10,6 +10,39 @@ import {
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
 const MAX_ATTEMPTS = TIMERS.providerStopLadderMs.length + 1;
 
+describe('allocation admission limit', () => {
+  it.each([3, 20])(
+    'binds limit %i to the current provider ref and clears it on replacement',
+    limit => {
+      const creating = reduceAllocation(
+        initialAllocationState(),
+        { type: 'ensure', at: 0, allocationId: 'alloc-1' },
+        TIMERS
+      ).state;
+      const event = {
+        type: 'provider-ref' as const,
+        at: 1,
+        allocationId: 'alloc-1',
+        providerRef: 'ref-1',
+        admissionLimit: limit,
+      };
+      expect(reduceAllocation(creating, { ...event, allocationId: 'retired' }, TIMERS).state).toBe(
+        creating
+      );
+      const admitted = reduceAllocation(creating, event, TIMERS).state;
+      expect(admitted).toMatchObject({ providerRef: 'ref-1', admissionLimit: limit });
+      const stopped = reduceAllocation(admitted, { type: 'provider-gone', at: 2 }, TIMERS).state;
+      const replacement = reduceAllocation(
+        stopped,
+        { type: 'ensure', at: 3, allocationId: 'alloc-2' },
+        TIMERS
+      ).state;
+      expect(replacement.admissionLimit).toBeNull();
+      expect(reduceAllocation(replacement, event, TIMERS).state).toBe(replacement);
+    }
+  );
+});
+
 /** A socket lost after activity, with the two deadlines pinned for a case. */
 function disconnectedState(lastActivityAt: number, lastFrameAt: number): AllocationState {
   return {

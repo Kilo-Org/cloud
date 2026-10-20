@@ -364,7 +364,8 @@ export type FixReviewSelectionDeps = {
   getUserAccessToken: typeof getGitHubUserAccessToken;
   generateInstallationToken: (
     installationId: string,
-    appType: GitHubAppType
+    appType: GitHubAppType,
+    expectedIntegrationId: string
   ) => Promise<{ token: string }>;
   createCommentClient: (token: string, target: FixReviewTarget) => FixReviewCommentClient;
 };
@@ -396,17 +397,24 @@ async function resolveCommentClient(input: {
   repositoryFullName: string;
   pullNumber: number;
   initiatorKiloUserId: string;
-  integration: Pick<PlatformIntegration, 'platform_installation_id' | 'github_app_type'> | null;
+  integration: Pick<
+    PlatformIntegration,
+    'id' | 'platform_installation_id' | 'github_app_type'
+  > | null;
   deps: FixReviewSelectionDeps;
 }): Promise<{ client: FixReviewCommentClient; initiatorGitHubLogin: string | null }> {
   const { owner, repo } = splitRepositoryFullName(input.repositoryFullName);
   const initiatorGitHubLogin = await input.deps.getInitiatorGitHubLogin(input.initiatorKiloUserId);
   const target = { owner, repo, pullNumber: input.pullNumber };
-  const installationId = input.integration?.platform_installation_id;
+  const integration = input.integration;
 
-  if (installationId) {
-    const appType: GitHubAppType = input.integration?.github_app_type ?? 'standard';
-    const { token } = await input.deps.generateInstallationToken(installationId, appType);
+  if (integration?.platform_installation_id) {
+    const appType: GitHubAppType = integration.github_app_type ?? 'standard';
+    const { token } = await input.deps.generateInstallationToken(
+      integration.platform_installation_id,
+      appType,
+      integration.id
+    );
     return {
       client: input.deps.createCommentClient(token, target),
       initiatorGitHubLogin,
@@ -443,7 +451,10 @@ export async function selectFixReviewCommentsForReview(input: {
   pullNumber: number;
   prAuthor: string;
   initiatorKiloUserId: string;
-  integration: Pick<PlatformIntegration, 'platform_installation_id' | 'github_app_type'> | null;
+  integration: Pick<
+    PlatformIntegration,
+    'id' | 'platform_installation_id' | 'github_app_type'
+  > | null;
   deps?: Partial<FixReviewSelectionDeps>;
 }): Promise<FixReviewSelection> {
   const deps: FixReviewSelectionDeps = { ...defaultDeps, ...input.deps };

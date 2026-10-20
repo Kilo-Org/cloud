@@ -258,13 +258,18 @@ describe('selectFixReviewCommentsForReview', () => {
 
     const selected = await selectFixReviewCommentsForReview({
       ...baseInput,
-      integration: { platform_installation_id: '42', github_app_type: 'lite' },
+      integration: {
+        id: 'integration-1',
+        platform_installation_id: '42',
+        github_app_type: 'lite',
+      },
       deps: depsFixture(client, {
         createCommentClient,
         getUserAccessToken,
-        generateInstallationToken: async (installationId, appType) => {
+        generateInstallationToken: async (installationId, appType, expectedIntegrationId) => {
           expect(installationId).toBe('42');
           expect(appType).toBe('lite');
+          expect(expectedIntegrationId).toBe('integration-1');
           return { token: 'installation-token' };
         },
       }),
@@ -330,7 +335,11 @@ describe('selectFixReviewCommentsForReview', () => {
     await expect(
       selectFixReviewCommentsForReview({
         ...baseInput,
-        integration: { platform_installation_id: '42', github_app_type: 'standard' },
+        integration: {
+          id: 'integration-1',
+          platform_installation_id: '42',
+          github_app_type: 'standard',
+        },
         deps: depsFixture(client),
       })
     ).rejects.toThrow('GitHub unavailable');
@@ -346,7 +355,11 @@ describe('selectFixReviewCommentsForReview', () => {
 
     const selection = await selectFixReviewCommentsForReview({
       ...baseInput,
-      integration: { platform_installation_id: '42', github_app_type: 'standard' },
+      integration: {
+        id: 'integration-1',
+        platform_installation_id: '42',
+        github_app_type: 'standard',
+      },
       deps: depsFixture(client),
     });
 
@@ -367,7 +380,11 @@ describe('selectFixReviewCommentsForReview', () => {
 
     const selection = await selectFixReviewCommentsForReview({
       ...baseInput,
-      integration: { platform_installation_id: '42', github_app_type: 'standard' },
+      integration: {
+        id: 'integration-1',
+        platform_installation_id: '42',
+        github_app_type: 'standard',
+      },
       deps: depsFixture(client),
     });
 

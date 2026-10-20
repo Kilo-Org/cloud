@@ -297,17 +297,27 @@ describe('shouldRouteToVercel', () => {
     };
   }
 
-  async function loadShouldRouteToVercel(options?: { optOut?: boolean; enabled?: boolean }) {
+  async function loadShouldRouteToVercel(options?: {
+    enabled?: boolean;
+    optOutModels?: string[];
+    vercelModels?: string[];
+    aliasTargets?: Record<string, string>;
+  }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
         vercelEnabled: options?.enabled ?? true,
-        vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
+        vercelOptOutModels: new Set(options?.optOutModels ?? []),
       })),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
+      getVercelModelsFromDatabase: jest.fn(
+        async () => new Set(options?.vercelModels ?? ['anthropic/claude-sonnet-4.5'])
+      ),
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['anthropic']),
+      resolveOpenRouterModelAlias: jest.fn(
+        async (modelId: string) => options?.aliasTargets?.[modelId] ?? modelId
+      ),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .shouldRouteToVercel;
@@ -366,7 +376,9 @@ describe('shouldRouteToVercel', () => {
   });
 
   it('does not resolve provider policy for models opted out of Vercel routing', async () => {
-    const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+    const shouldRouteToVercel = await loadShouldRouteToVercel({
+      optOutModels: ['anthropic/claude-sonnet-4.5'],
+    });
     const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
 
     await expect(

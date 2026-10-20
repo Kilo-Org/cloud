@@ -290,10 +290,7 @@ function getStatusBorderColor(status: string, colors: ThemeColors): string {
   return colors.info;
 }
 
-function StatusBadge({
-  status,
-  label,
-}: Readonly<{ status: ChildSessionStatus; label: string }>) {
+function StatusBadge({ status, label }: Readonly<{ status: ChildSessionStatus; label: string }>) {
   const bgClass = getStatusBgClass(status);
   const textClass = getStatusTextClass(status);
 

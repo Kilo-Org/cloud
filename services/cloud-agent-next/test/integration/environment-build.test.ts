@@ -1,3 +1,8 @@
+import {
+  ContainerAccountBlockedError,
+  ContainerCapacityUnavailableError,
+} from '../../src/container-concurrency.js';
+import { containerLimitError } from '../../src/container-limit-test-helpers.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
 import type {
@@ -38,6 +43,7 @@ type Harness = {
   captureResult: (captureId: string) => NativeCaptureResult;
   stopResult: 'terminal' | 'retryable';
   launchError: Error | null;
+  accountError?: Error;
   /** The image a container would start from now; null when it cannot be read. */
   currentImage: string | null;
   alarms: number[];
@@ -152,7 +158,10 @@ async function setup(): Promise<Harness> {
                   },
                 },
               },
-        actorAccess: async () => harness.environment.access,
+        actorAccess: async () => {
+          if (harness.accountError) throw harness.accountError;
+          return harness.environment.access;
+        },
         gitSource: async () =>
           harness.gitUnavailable
             ? { ok: false, reason: 'unavailable' }
@@ -164,7 +173,6 @@ async function setup(): Promise<Harness> {
                   platform: 'github',
                 },
               },
-        capacity: async () => 'ok',
       },
       provider,
       runnerUrl: (environment, build) =>
@@ -250,6 +258,55 @@ afterEach(async () => {
 });
 
 describe('environment build lifecycle', () => {
+  it.each([
+    ['account_blocked', () => new ContainerAccountBlockedError()],
+    ['billing_unavailable', () => new ContainerCapacityUnavailableError()],
+  ] as const)(
+    'settles %s during queue admission and permits a later build',
+    async (reason, error) => {
+      const h = await setup();
+      await manualBuild(h);
+      h.accountError = error();
+      await tick(h);
+      expect(await status(h)).toMatchObject({
+        activeBuild: null,
+        latestBuild: { state: 'failed', failureReason: reason },
+      });
+      expect(h.launches).toHaveLength(0);
+      h.accountError = undefined;
+      await readyBuild(h);
+      expect(h.launches).toHaveLength(1);
+    }
+  );
+
+  it.each([
+    ['account_blocked', () => new ContainerAccountBlockedError()],
+    ['billing_unavailable', () => new ContainerCapacityUnavailableError()],
+  ] as const)(
+    'cleans up %s during publication and permits a later build',
+    async (reason, error) => {
+      const h = await setup();
+      const { auth } = await readyBuild(h);
+      await h.stub.runnerResult(auth, {
+        outcome: 'ready',
+        commit: 'a'.repeat(40),
+        branch: 'main',
+        setupDurationMs: 1,
+      });
+      h.accountError = error();
+      await drive(h);
+      expect(await status(h)).toMatchObject({
+        activeBuild: null,
+        published: null,
+        latestBuild: { state: 'failed', failureReason: reason, cleanup: 'confirmed' },
+      });
+      expect(h.stops.map(stop => stop.allocationId)).toEqual([auth.allocationId]);
+      h.accountError = undefined;
+      await readyBuild(h);
+      expect(h.launches).toHaveLength(2);
+    }
+  );
+
   it('settles a billing admission when cancellation wins before launch', async () => {
     const h = await setup();
     const accepted = await manualBuild(h);
@@ -969,6 +1026,30 @@ describe('environment snapshot resolution', () => {
         actorUserId: 'user-1',
       })
     ).resolves.toMatchObject({ reason: 'deleted', admission: { status: 'skipped' } });
+  });
+
+  it('backs off capacity-refused automatic builds and still permits manual recovery', async () => {
+    const harness = await setup();
+    harness.billingAdmission = async () => {
+      throw containerLimitError();
+    };
+    await harness.stub.resolveSnapshot({
+      reference: sessionReference(harness, 1),
+      actorUserId: 'user-1',
+    });
+    await drive(harness);
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+      })
+    ).resolves.toMatchObject({ admission: { status: 'skipped', reason: 'backoff' } });
+    expect((await status(harness)).automaticBackoff).toMatchObject({ revision: 1, failures: 1 });
+    expect(harness.launches).toHaveLength(0);
+    await expect(manualBuild(harness)).resolves.toMatchObject({
+      status: 'accepted',
+      created: true,
+    });
   });
 
   it('backs off a failed automatic build while a manual build still admits', async () => {

@@ -5,6 +5,7 @@ import type {
 } from '@kilocode/cloud-agent-profile';
 import { normalizeRepoFullName, repositoryLeaf } from '@kilocode/cloud-agent-profile';
 import type { SandboxBillingInput } from '../container-usage-context.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import { ProviderCreationError } from '../sandbox-control/provider.js';
 import { RUNTIME_BASE_ABI } from '../sandbox-control/runtime-release.js';
 import {
@@ -80,12 +81,6 @@ export type CoordinatorEnvironment = {
     member: EnvironmentReferenceRepository;
     actorUserId: string;
   }): Promise<BuilderGitSource>;
-  /** Owner-level container concurrency, the limit sessions use. */
-  capacity(
-    owner: EnvironmentReference['owner'],
-    sandboxId: string,
-    actorUserId: string
-  ): Promise<'ok' | 'limit_reached'>;
 };
 
 export type CoordinatorDeps = {
@@ -254,13 +249,6 @@ export class EnvironmentBuildCoordinator {
     }
     if (reference.configurationRevision !== request.expectedRevision) {
       return { status: 'conflict', reason: 'revision_changed', buildId: null };
-    }
-    const sandboxId = this.deps.builderSandboxId;
-    if (
-      (await this.deps.environment.capacity(reference.owner, sandboxId, request.actorUserId)) ===
-      'limit_reached'
-    ) {
-      return { status: 'rejected', reason: 'container_limit_reached' };
     }
     const input = await this.deps.environment.buildInput(this.environmentId);
     if (input === null) {
@@ -435,13 +423,6 @@ export class EnvironmentBuildCoordinator {
       !sameEnvironmentScope(current, reference)
     ) {
       return { status: 'skipped', reason: 'revision_superseded' };
-    }
-    const sandboxId = this.deps.builderSandboxId;
-    if (
-      (await this.deps.environment.capacity(current.owner, sandboxId, actorUserId)) ===
-      'limit_reached'
-    ) {
-      return { status: 'skipped', reason: 'container_limit_reached' };
     }
     const input = await this.deps.environment.buildInput(this.environmentId);
     if (
@@ -870,24 +851,14 @@ export class EnvironmentBuildCoordinator {
     ) {
       return this.terminalWithoutAllocation(build, 'obsolete', 'configuration_changed');
     }
-    const access = await this.deps.environment.actorAccess(reference.owner, build.actor_user_id);
-    if (access === 'none' || (build.trigger === 'manual' && access !== 'manage')) {
-      return this.terminalWithoutAllocation(build, 'failed', 'actor_unauthorized');
-    }
-    const sandboxId = this.deps.builderSandboxId;
-    if (
-      (await this.deps.environment.capacity(reference.owner, sandboxId, build.actor_user_id)) ===
-      'limit_reached'
-    ) {
-      return this.terminalWithoutAllocation(build, 'failed', 'container_limit_reached');
-    }
+    if (!(await this.checkActorAccess(build, reference))) return;
     const authorization = await this.authorizeBuildMembers(input, build.actor_user_id);
     if (authorization !== 'ok') {
       if (authorization === 'unavailable') return; // The next alarm retries within the deadline.
       return this.terminalWithoutAllocation(build, 'failed', 'repository_unauthorized');
     }
     const allocation: BuilderAllocation = {
-      sandboxId,
+      sandboxId: this.deps.builderSandboxId,
       allocationId: this.deps.uuid(),
       instance: build.instance as BuilderAllocation['instance'],
     };
@@ -921,9 +892,10 @@ export class EnvironmentBuildCoordinator {
       );
     } catch (error) {
       const reason =
-        error instanceof ProviderCreationError && error.code === 'insufficient_credits'
+        getContainerCapacityFailureReason(error) ??
+        (error instanceof ProviderCreationError && error.code === 'insufficient_credits'
           ? 'billing_blocked'
-          : 'billing_unavailable';
+          : 'billing_unavailable');
       this.beginStopping(build.id, ['preparing'], 'failed', { reason });
       return;
     }
@@ -1029,6 +1001,29 @@ export class EnvironmentBuildCoordinator {
     if (publishing !== null) await this.advancePublishing(publishing);
   }
 
+  /** Settle known account admission errors so they cannot strand an active build. */
+  private async checkActorAccess(
+    build: BuildRow,
+    reference: EnvironmentReference
+  ): Promise<boolean> {
+    let reason: string;
+    try {
+      const access = await this.deps.environment.actorAccess(reference.owner, build.actor_user_id);
+      if (access !== 'none' && (build.trigger !== 'manual' || access === 'manage')) return true;
+      reason = 'actor_unauthorized';
+    } catch (error) {
+      const failure = getContainerCapacityFailureReason(error);
+      if (failure === undefined) throw error;
+      reason = failure;
+    }
+    if (build.state === 'queued') {
+      this.terminalWithoutAllocation(build, 'failed', reason);
+    } else {
+      this.beginStopping(build.id, ['publishing'], 'failed', { reason });
+    }
+    return false;
+  }
+
   /** Plan steps 9 and 10: recheck everything, then replace the descriptor atomically. */
   private async advancePublishing(build: BuildRow): Promise<void> {
     const now = this.deps.now();
@@ -1050,11 +1045,7 @@ export class EnvironmentBuildCoordinator {
       this.beginStopping(build.id, ['publishing'], 'obsolete', { reason: 'configuration_changed' });
       return;
     }
-    const access = await this.deps.environment.actorAccess(reference.owner, build.actor_user_id);
-    if (access === 'none' || (build.trigger === 'manual' && access !== 'manage')) {
-      this.beginStopping(build.id, ['publishing'], 'failed', { reason: 'actor_unauthorized' });
-      return;
-    }
+    if (!(await this.checkActorAccess(build, reference))) return;
     const authorization = await this.authorizeBuildMembers(input, build.actor_user_id);
     if (authorization !== 'ok') {
       if (authorization === 'unavailable' && now < build.deadline_at) return;

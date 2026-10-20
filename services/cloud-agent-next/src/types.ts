@@ -549,7 +549,7 @@ export type Env = {
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */
   GITHUB_APP_BOT_USER_ID?: string;
-  /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
+  /** 'true' skips blocked-account admission and the meter's concurrent-container cap marker. Disposable e2e Workers only. */
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** User or organization IDs enrolled in customer-paid Vercel compute. */
   BYOC_VERCEL_IDS?: string;

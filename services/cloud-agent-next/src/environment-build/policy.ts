@@ -217,8 +217,9 @@ export function automaticAdmission(
   return now >= retryAt ? { admit: true } : { admit: false, retryAt };
 }
 
-/** Builder failure reasons that count toward automatic backoff; admission refusals do not. */
+/** Builder failures and container-cap refusals count toward automatic backoff; other admission refusals do not. */
 export const COUNTED_FAILURE_REASONS: ReadonlySet<string> = new Set([
+  'container_limit_reached',
   'clone_failed',
   'setup_failed',
   'setup_timeout',

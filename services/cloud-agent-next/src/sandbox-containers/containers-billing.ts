@@ -1,3 +1,4 @@
+import { withTimeout } from '@kilocode/worker-utils';
 import {
   createContainerUsageClient,
   getBillingContext,
@@ -30,6 +31,7 @@ export type ContainersBillingHost = {
   container: BillingContainer;
   storage: BillingContextStorage;
   meter: ContainerUsageRpcMethods;
+  enforceContainerCapacity: boolean;
   heartbeatSeconds: number;
   isContainerRunning: () => boolean;
   stopContainer: () => Promise<void>;
@@ -236,10 +238,21 @@ export class ContainersBilling {
   constructor(identity: ContainersBillingIdentity, host: ContainersBillingHost) {
     this.identity = identity;
     this.host = host;
-    const usageClient = createContainerUsageClient(host.meter, { service: identity.service });
+    const usageClient = createContainerUsageClient(
+      {
+        recordStart: input =>
+          withTimeout(host.meter.recordStart(input), 10_000, 'Meter start timed out'),
+        recordHeartbeat: input =>
+          withTimeout(host.meter.recordHeartbeat(input), 10_000, 'Meter heartbeat timed out'),
+        recordStop: input =>
+          withTimeout(host.meter.recordStop(input), 10_000, 'Meter stop timed out'),
+      },
+      { service: identity.service }
+    );
     this.lifecycle = new MeteredBillingLifecycle({
       storage: host.storage,
       usageClient,
+      enforceContainerCapacity: host.enforceContainerCapacity,
       schedule: async (delaySeconds, callback, payload) => {
         await host.container.schedule(delaySeconds, callback, payload);
       },

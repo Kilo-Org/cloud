@@ -35,7 +35,8 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
-import { ContainerConcurrencyLimitError } from '../../src/container-concurrency.js';
+import { ContainerCapacityUnavailableError } from '../../src/container-concurrency.js';
+import { containerLimitError } from '../../src/container-limit-test-helpers.js';
 import { BILLING_HEARTBEAT_CALLBACK as VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/metered-billing-lifecycle.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/provider-ref.js';
 import type { ContainersLaunchInput } from '../../src/sandbox-containers/SandboxContainers.js';
@@ -708,9 +709,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
     await waitFor(() => expect(provider.launchGates).toHaveLength(1));
     await releaseGate(stub, () =>
-      provider.launchGates[0](
-        new Error(`remote: ${new ContainerConcurrencyLimitError('personal', 20).message}`)
-      )
+      provider.launchGates[0](new Error(`remote: ${containerLimitError('user', 20).message}`))
     );
     await waitFor(async () =>
       expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({

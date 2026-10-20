@@ -402,6 +402,23 @@ describe('openai-chatgpt connection store', () => {
       warn.mockRestore();
     });
 
+    it('does not fail the lookup when populating throws synchronously', async () => {
+      await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
+      mockedRedisGet.mockResolvedValue(null);
+      mockedRedisSet.mockImplementation(() => {
+        throw new TypeError('redis client unavailable');
+      });
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toMatchObject({
+        isEnabled: true,
+      });
+      await flushPromises();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      warn.mockRestore();
+    });
+
     it('records present after a save and absent after a disconnect, overriding the cache', async () => {
       cache.set(userKey, 'absent');
 

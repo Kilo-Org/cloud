@@ -15,7 +15,7 @@ jest.mock('next-auth', () => ({
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
-  redisClient: { get: jest.fn(async () => null) },
+  redisClient: { get: jest.fn(async () => null), set: jest.fn(async () => 'OK') },
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),

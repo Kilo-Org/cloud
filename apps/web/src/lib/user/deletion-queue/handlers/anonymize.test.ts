@@ -34,7 +34,8 @@ import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@/lib/user', () => ({
-  anonymizeCloudUserData: jest.fn(async () => undefined),
+  anonymizeCloudUserData: jest.fn(async () => ({ deletedOpenAiChatGptOwners: [] })),
+  recordOpenAiChatGptConnectionsAbsent: jest.fn(async () => undefined),
 }));
 
 jest.mock('@/lib/user/owned-by-user-batch-delete', () => {

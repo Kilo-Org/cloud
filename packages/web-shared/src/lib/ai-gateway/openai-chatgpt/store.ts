@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { waitUntil } from '@vercel/functions';
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -155,19 +156,22 @@ async function readCachedConnectionPresence(
 }
 
 /**
- * Fills a miss from a replica read without delaying the request. `NX` keeps a
- * lagging replica from overwriting the value a writer set after its commit.
+ * Fills a miss from a replica read. `NX` keeps a lagging replica from
+ * overwriting the value a writer set after its commit. Never throws, including
+ * synchronously, so it cannot fail the request.
  */
-function populateCachedConnectionPresence(
+async function populateCachedConnectionPresence(
   owner: OpenAiChatGptOwner,
   presence: OpenAiChatGptConnectionPresence
-): void {
-  void redisClient
-    .set(openAiChatGptConnectionPresenceRedisKey(owner), presence, {
+): Promise<void> {
+  try {
+    await redisClient.set(openAiChatGptConnectionPresenceRedisKey(owner), presence, {
       nx: true,
       ex: CONNECTION_PRESENCE_TTL_SECONDS,
-    })
-    .catch((error: unknown) => logConnectionPresenceFailure('populate', owner, error));
+    });
+  } catch (error) {
+    logConnectionPresenceFailure('populate', owner, error);
+  }
 }
 
 /**
@@ -218,7 +222,7 @@ export async function getOpenAiChatGptStoredConnection(
 
   const row = await readOpenAiChatGptConnectionRow(readDb, owner);
   if (cachedPresence === null) {
-    populateCachedConnectionPresence(owner, row ? 'present' : 'absent');
+    waitUntil(populateCachedConnectionPresence(owner, row ? 'present' : 'absent'));
   }
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);

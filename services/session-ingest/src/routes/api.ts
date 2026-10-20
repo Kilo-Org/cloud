@@ -778,69 +778,82 @@ api.post('/session/:sessionId/share', async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
   const publicId = crypto.randomUUID();
-  // Every share rotates `public_id`, which invalidates the predecessor even
-  // while its signature is still valid.
-  const shareResult = await db.execute<{ public_id: string }>(sql`
-    UPDATE ${cli_sessions_v2}
-    SET public_id = ${publicId}
-    WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
-      AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
-      AND (
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          INNER JOIN ${organizations}
-            ON ${organizations.id} = ${organization_memberships.organization_id}
-            AND ${organizations.deleted_at} IS NULL
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM ${organizations} AS active_target_organization
-          INNER JOIN ${organizations} AS active_parent_organization
-            ON active_parent_organization.id = active_target_organization.parent_organization_id
-            AND active_parent_organization.deleted_at IS NULL
-          INNER JOIN ${organization_memberships} AS active_parent_membership
-            ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
-            AND active_parent_membership.kilo_user_id = ${kiloUserId}
-            AND active_parent_membership.role IN (${sql.join(
-              ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
-              sql`, `
-            )})
-          WHERE active_target_organization.id = ${cli_sessions_v2.organization_id}
-            AND active_target_organization.deleted_at IS NULL
-        )
-      )
-    RETURNING ${cli_sessions_v2.public_id}
-  `);
+  const removeSnapshot = () =>
+    withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(publicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
 
-  const sharedSession = shareResult.rows[0];
-  if (!sharedSession) {
-    return c.json({ success: false, error: 'session_not_found' }, 404);
-  }
-
-  // Freeze the public info before minting the capability. The capability's
-  // `shared_at` is captured after this snapshot, so the info cannot include
-  // session updates that happen after the share boundary.
+  // Freeze the public info and mint the capability before mutating the row so
+  // a snapshot or signing failure leaves the previous generation untouched.
   await withDORetry(
     () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
     stub => stub.captureShareInfo(publicId),
     'SessionIngestDO.captureShareInfo'
   );
 
-  const shareToken = await signSessionShareToken(c.env, {
-    sessionId: parsed.data,
-    publicId,
-  }).catch(async error => {
-    await withDORetry(
-      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-      stub => stub.deleteShareInfo(publicId),
-      'SessionIngestDO.deleteShareInfo'
-    ).catch(() => undefined);
+  let shareToken: string;
+  try {
+    shareToken = await signSessionShareToken(c.env, {
+      sessionId: parsed.data,
+      publicId,
+    });
+  } catch (error) {
+    await removeSnapshot();
     throw error;
-  });
+  }
+
+  // Every share rotates `public_id`, which invalidates the predecessor even
+  // while its signature is still valid. The capability's `shared_at` is
+  // captured after the info snapshot, so the info cannot include session
+  // updates that happen after the share boundary.
+  const shareResult = await db
+    .execute<{ public_id: string }>(sql`
+      UPDATE ${cli_sessions_v2}
+      SET public_id = ${publicId}
+      WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
+        AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
+        AND (
+          ${cli_sessions_v2.organization_id} IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM ${organization_memberships}
+            INNER JOIN ${organizations}
+              ON ${organizations.id} = ${organization_memberships.organization_id}
+              AND ${organizations.deleted_at} IS NULL
+            WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
+              AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM ${organizations} AS active_target_organization
+            INNER JOIN ${organizations} AS active_parent_organization
+              ON active_parent_organization.id = active_target_organization.parent_organization_id
+              AND active_parent_organization.deleted_at IS NULL
+            INNER JOIN ${organization_memberships} AS active_parent_membership
+              ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+              AND active_parent_membership.kilo_user_id = ${kiloUserId}
+              AND active_parent_membership.role IN (${sql.join(
+                ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+                sql`, `
+              )})
+            WHERE active_target_organization.id = ${cli_sessions_v2.organization_id}
+              AND active_target_organization.deleted_at IS NULL
+          )
+        )
+      RETURNING ${cli_sessions_v2.public_id}
+    `)
+    .catch(async error => {
+      await removeSnapshot();
+      throw error;
+    });
+
+  const sharedSession = shareResult.rows[0];
+  if (!sharedSession) {
+    await removeSnapshot();
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
 
   return c.json({ success: true, share_token: shareToken }, 200);
 });

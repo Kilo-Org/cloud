@@ -2651,6 +2651,10 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share rejects an authoritative access failure', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
     fns.executeResult.mockResolvedValueOnce({ rows: [] });
 
     const app = makeApiApp();
@@ -2664,7 +2668,40 @@ describe('api routes', () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ success: false, error: 'session_not_found' });
     expect(resolveAccessibleKiloSession).not.toHaveBeenCalled();
-    expect(getSessionIngestDO).not.toHaveBeenCalled();
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    );
+  });
+
+  it('POST /session/:sessionId/share does not rotate when signing fails', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+      }),
+      makeTestEnv({
+        SESSION_SHARE_JWT_SECRET_PROD: {
+          get: vi.fn(async () => {
+            throw new Error('secret unavailable');
+          }),
+        },
+      })
+    );
+
+    expect(res.status).toBe(500);
+    expect(fns.executeResult).not.toHaveBeenCalled();
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledTimes(1);
+    error.mockRestore();
   });
 
   it('POST /session/:sessionId/unshare clears public_id when session exists', async () => {

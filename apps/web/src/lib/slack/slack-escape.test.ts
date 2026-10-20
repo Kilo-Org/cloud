@@ -42,7 +42,7 @@ describe('escapeSlackLabel', () => {
 
   it('escapes markup inside the label', () => {
     expect(escapeSlackLabel('<https://example.com|label>`')).toBe(
-      '&lt;https://example.com|label&gt;\''
+      "&lt;https://example.com|label&gt;'"
     );
   });
 });

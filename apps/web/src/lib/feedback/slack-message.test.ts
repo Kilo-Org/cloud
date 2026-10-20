@@ -21,8 +21,7 @@ function blocksContaining(message: FeedbackSlackMessage, needle: string): Sectio
 }
 
 describe('buildUserFeedbackSlackMessage', () => {
-  const hostileText =
-    '```\n<!channel> ping <@U12345>\n<https://example.test/phish|the docs>\n```';
+  const hostileText = '```\n<!channel> ping <@U12345>\n<https://example.test/phish|the docs>\n```';
 
   it('carries the feedback body only in a plain_text block', () => {
     const message = buildUserFeedbackSlackMessage({
@@ -122,7 +121,9 @@ describe('buildCloudAgentFeedbackSlackMessage', () => {
       sessionTypeLabel: '<!here>',
       feedbackText: 'body',
     });
-    const metadata = sectionTexts(message).find(section => section.text.includes('• session type:'));
+    const metadata = sectionTexts(message).find(section =>
+      section.text.includes('• session type:')
+    );
     expect(metadata?.text).toContain('&lt;!here&gt;');
   });
 

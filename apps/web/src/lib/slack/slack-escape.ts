@@ -25,7 +25,9 @@ export function escapeSlackText(value: string): string {
  * span) and collapses line breaks (which would forge a following message line).
  */
 export function escapeSlackLabel(value: string): string {
-  return escapeSlackText(value).replaceAll('`', "'").replace(/\r\n|\r|\n/g, ' ');
+  return escapeSlackText(value)
+    .replaceAll('`', "'")
+    .replace(/\r\n|\r|\n/g, ' ');
 }
 
 /**

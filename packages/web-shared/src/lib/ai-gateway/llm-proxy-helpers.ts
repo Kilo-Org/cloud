@@ -228,11 +228,22 @@ export function checkExclusiveModelProviderAllowed(
   model: string,
   provider: OpenRouterProviderConfig | undefined
 ) {
-  if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
   const inferenceProviders = exclusiveModel.inference_providers;
   if (inferenceProviders.length === 0) return null;
+  return checkInferenceProvidersAllowed(inferenceProviders, provider);
+}
+
+/**
+ * Rejects a request whose provider config excludes every provider that can
+ * serve the model. Used for models routed to a fixed set of providers.
+ */
+export function checkInferenceProvidersAllowed(
+  inferenceProviders: readonly string[],
+  provider: OpenRouterProviderConfig | undefined
+) {
+  if (!provider) return null;
   if (
     inferenceProviders.some(
       inferenceProvider =>

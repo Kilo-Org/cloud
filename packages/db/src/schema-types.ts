@@ -2315,16 +2315,6 @@ export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  ...CustomLlmMetadataSchema.shape,
-  ...CustomLlmApiConfigSchema.shape,
-  display_name: z.string(),
-  organization_ids: z.array(z.uuid()),
-  group_ids: z.array(z.uuid()).optional(),
-});
-
-export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
-
 export const GatewayModelIdSchema = z
   .string()
   .trim()
@@ -2340,6 +2330,65 @@ export const CustomLlmPublicIdSchema = GatewayModelIdSchema.refine(
 ).refine(id => !RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.some(prefix => id.startsWith(prefix)), {
   message: `public_id must not start with ${RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.join(', ')}`,
 });
+
+export const CustomLlmInferenceProviderSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a lowercase provider slug such as "acme-ai"');
+
+/**
+ * Makes a custom LLM available to every user, including anonymous ones. Like
+ * every custom LLM it is free; unlike private ones it is subject to
+ * organization provider allow lists.
+ */
+export const CustomLlmPublicSchema = z.object({
+  /** Provider slugs the upstream may serve this model from. They are listed in
+   * the models-by-provider snapshot and enforced against provider allow lists.
+   * A slug that OpenRouter does not know becomes a synthesized provider. */
+  inference_providers: z.array(CustomLlmInferenceProviderSlugSchema).min(1),
+});
+
+export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    ...CustomLlmMetadataSchema.shape,
+    ...CustomLlmApiConfigSchema.shape,
+    display_name: z.string(),
+    description: z.string().trim().min(1).optional(),
+    organization_ids: z.array(z.uuid()).optional(),
+    group_ids: z.array(z.uuid()).optional(),
+    public: CustomLlmPublicSchema.optional(),
+  })
+  .superRefine((definition, ctx) => {
+    if (!definition.public) {
+      if (definition.organization_ids === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['organization_ids'],
+          message: 'organization_ids is required unless public is set',
+        });
+      }
+      return;
+    }
+    for (const key of ['organization_ids', 'group_ids'] as const) {
+      if (definition[key] !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: `${key} must not be set when public is set`,
+        });
+      }
+    }
+    if (definition.description === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['description'],
+        message: 'description is required when public is set',
+      });
+    }
+  });
+
+export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
 export const AutoFreeModelSchema = z.object({
   model: GatewayModelIdSchema,

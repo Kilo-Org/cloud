@@ -3,6 +3,7 @@ import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
 import {
@@ -174,12 +175,14 @@ describe('effective organization model access', () => {
         'acme/other-org-model',
         customLlmDefinition({ organization_ids: ['00000000-0000-4000-8000-0000000000a2'] })
       );
+      await insertCustomLlmForTest('acme/public-model', publicCustomLlmDefinition(['acme']));
     });
 
     afterAll(async () => {
       await deleteCustomLlmForTest('acme/org-model');
       await deleteCustomLlmForTest('acme/group-model');
       await deleteCustomLlmForTest('acme/other-org-model');
+      await deleteCustomLlmForTest('acme/public-model');
     });
 
     it('exempts a custom LLM granted to the organization', async () => {
@@ -210,6 +213,34 @@ describe('effective organization model access', () => {
         ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
       }
     );
+
+    it('routes a public custom LLM only to its allowed inference providers', async () => {
+      const withProviderAllowList = (provider_allow_list: string[]) =>
+        evaluateEffectiveModelAccessPolicy(
+          context({
+            organization: {
+              ...organization,
+              settings: { model_deny_list: [], provider_allow_list },
+            },
+            defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+          })
+        );
+
+      await expect(
+        getEffectiveModelDecision(
+          withProviderAllowList(['acme', 'openai']),
+          'acme/public-model',
+          async () => new Set()
+        )
+      ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['acme']) });
+      await expect(
+        getEffectiveModelDecision(
+          withProviderAllowList(['openai']),
+          'acme/public-model',
+          async () => new Set()
+        )
+      ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+    });
   });
 
   it.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(

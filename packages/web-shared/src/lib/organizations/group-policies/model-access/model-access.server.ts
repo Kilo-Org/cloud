@@ -5,7 +5,6 @@ import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { desc, eq } from 'drizzle-orm';
-import { getKiloExclusiveInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -14,6 +13,7 @@ import {
   withoutVirtualProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
+  getModelInferenceProviderRestriction,
   isModelRestrictionExempt,
   type CustomLlmGrantee,
 } from '@kilocode/web-shared/lib/model-allow.server';
@@ -169,9 +169,9 @@ export async function getEffectiveModelDecision(
   ) {
     return { allowed: false, denialSource: 'organization_model' };
   }
-  const exclusiveProviders = getKiloExclusiveInferenceProviders(modelId);
+  const pinnedProviders = await getModelInferenceProviderRestriction(modelId);
   const currentModelProviders =
-    exclusiveProviders ??
+    pinnedProviders ??
     (policy.requireModelInCurrentSnapshot ? await providerLookup(modelId) : undefined);
   if (currentModelProviders?.size === 0) {
     return { allowed: false, denialSource: 'organization_model' };

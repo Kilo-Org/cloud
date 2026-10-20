@@ -3,6 +3,7 @@ import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import {
   createAllowPredicateFromProviderAllowList,
@@ -26,12 +27,19 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
         : actual.getKiloExclusiveInferenceProviders(modelId),
   };
 });
-
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
 }
 
 describe('model access predicates', () => {
+  beforeAll(async () => {
+    await insertCustomLlmForTest('acme/public-model', publicCustomLlmDefinition(['acme']));
+  });
+
+  afterAll(async () => {
+    await deleteCustomLlmForTest('acme/public-model');
+  });
+
   test('undefined provider allow list only applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       ['openai/gpt-4o'],
@@ -214,6 +222,31 @@ describe('model access predicates', () => {
       await expect(isAllowed(modelId)).resolves.toBe(true);
     }
   );
+
+  test('applies provider allow lists to the providers of a public custom LLM', async () => {
+    const restrictions = { requireModelInCurrentSnapshot: true, modelDenyList: [] };
+    const allowsAcme = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['acme'] },
+      lookup({})
+    );
+    const allowsOpenAi = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['openai'] },
+      lookup({ 'acme/public-model': ['openai'] })
+    );
+    const deniesModel = createAllowPredicateFromRestrictions(
+      {
+        ...restrictions,
+        providerAllowList: ['acme'],
+        modelDenyList: ['acme/public-model'],
+        customLlmGrantee: { organizationId: '00000000-0000-4000-8000-0000000000a1', groupIds: [] },
+      },
+      lookup({})
+    );
+
+    await expect(allowsAcme('acme/public-model')).resolves.toBe(true);
+    await expect(allowsOpenAi('acme/public-model')).resolves.toBe(false);
+    await expect(deniesModel('acme/public-model')).resolves.toBe(false);
+  });
 
   test('provider allow list still applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(

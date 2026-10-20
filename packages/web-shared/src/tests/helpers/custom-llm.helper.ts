@@ -4,16 +4,34 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { eq } from 'drizzle-orm';
 
+const baseDefinition = {
+  internal_id: 'upstream-model',
+  context_length: 128_000,
+  max_completion_tokens: 4096,
+  base_url: 'https://upstream.example.com/v1',
+};
+
+/** A private custom LLM granted to the given organizations (none by default). */
 export function customLlmDefinition(
   overrides: Partial<CustomLlmDefinition> = {}
 ): CustomLlmDefinition {
   return {
-    internal_id: 'upstream-model',
+    ...baseDefinition,
     display_name: 'Custom LLM',
-    context_length: 128_000,
-    max_completion_tokens: 4096,
-    base_url: 'https://upstream.example.com/v1',
     organization_ids: [],
+    ...overrides,
+  };
+}
+
+export function publicCustomLlmDefinition(
+  inferenceProviders: string[],
+  overrides: Partial<CustomLlmDefinition> = {}
+): CustomLlmDefinition {
+  return {
+    ...baseDefinition,
+    display_name: 'Public custom LLM',
+    description: 'A public custom LLM',
+    public: { inference_providers: inferenceProviders },
     ...overrides,
   };
 }

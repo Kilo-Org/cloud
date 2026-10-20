@@ -9,7 +9,7 @@ export function hasCustomLlmAccess(
   groupIds: readonly string[]
 ) {
   return (
-    definition.organization_ids.includes(organizationId) ||
+    definition.organization_ids?.includes(organizationId) === true ||
     definition.group_ids?.some(groupId => groupIds.includes(groupId)) === true
   );
 }

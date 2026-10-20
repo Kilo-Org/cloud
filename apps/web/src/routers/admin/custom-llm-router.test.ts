@@ -31,6 +31,16 @@ const validDefinition: CustomLlmDefinition = {
   group_ids: ['00000000-0000-4000-8000-000000000123'],
 };
 
+const publicDefinition: CustomLlmDefinition = {
+  internal_id: 'upstream-model',
+  display_name: 'Public model',
+  description: 'A public custom model',
+  context_length: 128000,
+  max_completion_tokens: 4096,
+  base_url: 'https://upstream.example.com/v1',
+  public: { inference_providers: ['acme'] },
+};
+
 beforeEach(async () => {
   jest
     .mocked(getOpenRouterModelsMetadataFromDatabase)
@@ -459,23 +469,23 @@ describe('adminCustomLlmRouter', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
     });
 
-    it('rejects a Kilo-exclusive model id', async () => {
+    it('accepts a Kilo-exclusive model id even when OpenRouter lists it', async () => {
       const exclusiveModelId = kiloExclusiveModels.find(
         model => !model.public_id.includes(':')
       )?.public_id;
       if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
+      jest
+        .mocked(getOpenRouterModelsMetadataFromDatabase)
+        .mockResolvedValue({ [exclusiveModelId]: {} as StoredModel });
       const caller = await createCallerForUser(admin.id);
 
-      await expect(
-        caller.admin.customLlm.upsert({
-          public_id: exclusiveModelId,
-          definition: validDefinition,
-          credentials,
-        })
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('Kilo-exclusive'),
+      const result = await caller.admin.customLlm.upsert({
+        public_id: exclusiveModelId,
+        definition: validDefinition,
+        credentials,
       });
+
+      expect(result.public_id).toBe(exclusiveModelId);
     });
 
     it('rejects an id that differs only in case from an existing custom LLM', async () => {
@@ -524,6 +534,59 @@ describe('adminCustomLlmRouter', () => {
           source_public_id: 'acme/copy-source',
           public_id: 'kilo/copy',
           display_name: 'Copy',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+  });
+
+  describe('public definitions', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
+
+    it('creates a public custom LLM', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/public-model',
+        definition: publicDefinition,
+        credentials,
+      });
+
+      expect(result.definition.public).toEqual({ inference_providers: ['acme'] });
+    });
+
+    it.each([
+      ['organization_ids', { organization_ids: [] }],
+      ['group_ids', { group_ids: ['00000000-0000-4000-8000-000000000123'] }],
+      ['description', { description: undefined }],
+    ])('rejects a public definition with an invalid %s', async (_field, overrides) => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/invalid-public-model',
+          definition: { ...publicDefinition, ...overrides },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('requires organization_ids on a private definition', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const { organization_ids: _organizationIds, ...definition } = validDefinition;
+
+      await expect(
+        caller.admin.customLlm.upsert({ public_id: 'acme/private-model', definition, credentials })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('rejects an inference provider that is not a lowercase slug', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/public-model',
+          definition: { ...publicDefinition, public: { inference_providers: ['Acme AI'] } },
+          credentials,
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });

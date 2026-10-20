@@ -1,3 +1,18 @@
+diff --git a/android/build.gradle b/android/build.gradle
+index 0dc730c0f4f6c5921ec41b42777e87d5e7718934..b1681d807c7d4060fc6ea7770d1ab26d2ec6bd58 100644
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -47,6 +47,10 @@ dependencies {
+   implementation "com.squareup.okhttp3:okhttp:4.9.2"
+   implementation "com.google.android.material:material:1.13.0"
+   implementation "androidx.core:core-ktx:1.18.0"
++  // The back press the sheet owns (ModalBottomSheetView.kt) comes from
++  // androidx.activity.compose.BackHandler, which the module otherwise only
++  // reaches transitively.
++  implementation "androidx.activity:activity-compose:1.11.0"
+ 
+   // Testing
+   testImplementation 'junit:junit:4.13.2'
 diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 index e90edd3fd682f1a53a0950526ae63fe20f3efd24..d41c2c63d6b545d11174da5f1da467de1664d15b 100644
 --- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt

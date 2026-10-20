@@ -197,6 +197,27 @@ describe('processDiscordBotMessage session start authorization', () => {
     expect(result.cloudAgentSessionId).toBeUndefined();
   });
 
+  it('answers without session tools when the linked account lacks workspace access', async () => {
+    const otherUser = await insertTestUser();
+    const discordUserId = nextSnowflake();
+    await linkDiscordAccount(otherUser.id, discordUserId);
+
+    const result = await processDiscordBotMessage(
+      `Change something in ${CONNECTED_REPOSITORY}`,
+      guildId,
+      eventContext(discordUserId)
+    );
+
+    const [runInput] = mockRunBot.mock.calls[0];
+    expect(runInput.tools).toEqual([]);
+    expect(runInput.systemPrompt).not.toContain('/connected-accounts');
+
+    const toolResult = await runInput.toolExecutor(spawnToolCall(CONNECTED_REPOSITORY));
+    expect(toolResult.content).toContain('does not have access to this workspace');
+    expect(mockRunSessionToCompletion).not.toHaveBeenCalled();
+    expect(result.cloudAgentSessionId).toBeUndefined();
+  });
+
   it('starts a session for the linked installation owner on a connected repository', async () => {
     const discordUserId = nextSnowflake();
     await linkDiscordAccount(installationOwner.id, discordUserId);

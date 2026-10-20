@@ -35,19 +35,49 @@ export type DiscordSessionAuthorization =
   | { authorized: true; discordUserId: string; kiloUserId: string }
   | { authorized: false; reason: DiscordSessionDenialReason; discordUserId?: string };
 
-export const DISCORD_SESSION_UNAVAILABLE_MESSAGE = `Starting a Cloud Agent session from Discord needs a linked Kilo account with access to this workspace. Connect your Discord account at ${APP_URL}/connected-accounts and mention the bot again.`;
+const LINK_ACCOUNT_MESSAGE = `Starting a Cloud Agent session from Discord needs a linked Kilo account with access to this workspace. Connect your Discord account at ${APP_URL}/connected-accounts and mention the bot again.`;
+const WORKSPACE_ACCESS_MESSAGE =
+  'Your linked Kilo account does not have access to this workspace. Ask the workspace owner or an organization admin to grant access, then mention the bot again.';
 
-/**
- * Instructions appended to the bot system prompt when the author may not start
- * sessions, so a text answer explains the requirement instead of claiming work
- * started.
- */
-export const DISCORD_SESSION_UNAVAILABLE_PROMPT_NOTICE = `
+const LINK_ACCOUNT_PROMPT_NOTICE = `
 
 ## Session starts are unavailable to this Discord account
 This Discord account is not linked to a Kilo account with access to this workspace, so you cannot start Cloud Agent sessions and no tools are available.
 - If the request needs code changes, repository inspection, or a Cloud Agent session, reply that starting a session from Discord needs a linked Kilo account with access to this workspace and ask the user to connect Discord at ${APP_URL}/connected-accounts, then mention the bot again.
 - Never claim a session started, code changed, or a pull request was opened.`;
+
+const ACCOUNT_UNAVAILABLE_PROMPT_NOTICE = `
+
+## Session starts are unavailable to this Kilo account
+The Kilo account linked to this Discord account cannot start Cloud Agent sessions, so no tools are available.
+- If the request needs code changes, repository inspection, or a Cloud Agent session, reply that this Kilo account cannot start sessions and that a Kilo workspace administrator can review it.
+- Never claim a session started, code changed, or a pull request was opened.`;
+
+const WORKSPACE_ACCESS_PROMPT_NOTICE = `
+
+## Session starts are unavailable to this Discord account
+This Discord account is linked to a Kilo account without access to this workspace, so you cannot start Cloud Agent sessions and no tools are available.
+- If the request needs code changes, repository inspection, or a Cloud Agent session, reply that the linked Kilo account needs workspace owner or organization member access, and that a workspace administrator can grant it.
+- Never claim a session started, code changed, or a pull request was opened.`;
+
+/** Reply text for each denial reason, so the guidance matches what can unblock it. */
+export const DISCORD_SESSION_DENIAL_MESSAGES: Record<DiscordSessionDenialReason, string> = {
+  unknown_requester: LINK_ACCOUNT_MESSAGE,
+  unlinked_account: LINK_ACCOUNT_MESSAGE,
+  account_unavailable:
+    'This Kilo account cannot start Cloud Agent sessions. Ask a Kilo workspace administrator to review the account.',
+  not_installation_owner: WORKSPACE_ACCESS_MESSAGE,
+  not_organization_member: WORKSPACE_ACCESS_MESSAGE,
+};
+
+/** System-prompt instructions for each denial reason. */
+export const DISCORD_SESSION_DENIAL_PROMPT_NOTICES: Record<DiscordSessionDenialReason, string> = {
+  unknown_requester: LINK_ACCOUNT_PROMPT_NOTICE,
+  unlinked_account: LINK_ACCOUNT_PROMPT_NOTICE,
+  account_unavailable: ACCOUNT_UNAVAILABLE_PROMPT_NOTICE,
+  not_installation_owner: WORKSPACE_ACCESS_PROMPT_NOTICE,
+  not_organization_member: WORKSPACE_ACCESS_PROMPT_NOTICE,
+};
 
 /**
  * Decide whether a Discord author may start an owner-credentialed Cloud Agent
@@ -85,6 +115,7 @@ export async function authorizeDiscordSessionRequester(
   const [user] = await db
     .select({
       blockedAt: kilocode_users.blocked_at,
+      blockedReason: kilocode_users.blocked_reason,
       personalAccountDisabled: kilocode_users.personal_account_disabled,
     })
     .from(kilocode_users)
@@ -95,7 +126,7 @@ export async function authorizeDiscordSessionRequester(
     return { authorized: false, reason: 'unlinked_account', discordUserId };
   }
 
-  if (user.blockedAt || user.personalAccountDisabled) {
+  if (user.blockedAt || user.blockedReason || user.personalAccountDisabled) {
     return { authorized: false, reason: 'account_unavailable', discordUserId };
   }
 

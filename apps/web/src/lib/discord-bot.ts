@@ -23,8 +23,8 @@ import {
 } from '@/lib/slack-bot/github-repository-context';
 import {
   authorizeDiscordSessionRequester,
-  DISCORD_SESSION_UNAVAILABLE_MESSAGE,
-  DISCORD_SESSION_UNAVAILABLE_PROMPT_NOTICE,
+  DISCORD_SESSION_DENIAL_MESSAGES,
+  DISCORD_SESSION_DENIAL_PROMPT_NOTICES,
 } from '@/lib/discord-bot/discord-session-authorization';
 import {
   formatDiscordConversationContextForPrompt,
@@ -327,7 +327,7 @@ export async function processDiscordBotMessage(
 
   const systemPrompt =
     KILO_BOT_SYSTEM_PROMPT +
-    (authorization.authorized ? '' : DISCORD_SESSION_UNAVAILABLE_PROMPT_NOTICE) +
+    (authorization.authorized ? '' : DISCORD_SESSION_DENIAL_PROMPT_NOTICES[authorization.reason]) +
     discordContextForPrompt +
     (repoContext ? formatGitHubRepositoriesForPrompt(repoContext) : '');
 
@@ -358,7 +358,7 @@ export async function processDiscordBotMessage(
           discordUserId: authorization.discordUserId ?? null,
           reason: authorization.reason,
         });
-        return { content: DISCORD_SESSION_UNAVAILABLE_MESSAGE };
+        return { content: DISCORD_SESSION_DENIAL_MESSAGES[authorization.reason] };
       }
 
       const args = JSON.parse(toolCall.function.arguments);

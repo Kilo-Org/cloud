@@ -117,6 +117,22 @@ describe('authorizeDiscordSessionRequester', () => {
     });
   });
 
+  it('denies a linked Kilo account that carries a block reason without a block timestamp', async () => {
+    const discordUserId = nextDiscordUserId();
+    const blockedUser = await insertTestUser({
+      blocked_at: null,
+      blocked_reason: 'Blocked by an administrator',
+    });
+    await linkDiscordAccount(blockedUser.id, discordUserId);
+    const owner = await createUserOwnedInstallation(blockedUser.id);
+
+    await expect(authorizeDiscordSessionRequester(owner, discordUserId)).resolves.toEqual({
+      authorized: false,
+      discordUserId,
+      reason: 'account_unavailable',
+    });
+  });
+
   it('denies a linked Kilo account whose personal account is disabled', async () => {
     const discordUserId = nextDiscordUserId();
     const disabledUser = await insertTestUser({ personal_account_disabled: true });

@@ -110,8 +110,8 @@ const privateTranscriptPathFields = new Set([
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
-function isAbsoluteTranscriptPath(value: string): boolean {
-  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value);
+function isPrivateTranscriptPath(value: string, directory: string): boolean {
+  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value) && !value.startsWith(`${directory}/`);
 }
 
 function projectGroupedTranscriptPaths(value: unknown, directory: string): void {
@@ -132,7 +132,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
         key === 'directory' ||
         key === 'cwd' ||
         key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isAbsoluteTranscriptPath(current))
+        (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory))
       ) {
         Reflect.set(value, key, directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
@@ -144,7 +144,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
     if (Array.isArray(current) && privateTranscriptPathArrays.has(key)) {
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
-        if (typeof path === 'string' && isAbsoluteTranscriptPath(path)) {
+        if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
           current[index] = directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);

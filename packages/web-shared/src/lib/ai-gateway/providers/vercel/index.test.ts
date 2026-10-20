@@ -387,6 +387,36 @@ describe('shouldRouteToVercel', () => {
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 
+  async function resolveCatalogId(modelId: string) {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      resolveOpenRouterModelAlias: jest.fn(
+        async (id: string) => ({ '~kilo-fast': 'anthropic/claude-sonnet-4-5' })[id] ?? id
+      ),
+    }));
+    const { mapModelIdToVercel } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel');
+    return mapModelIdToVercel(modelId);
+  }
+
+  it.each(['claude-sonnet-4.5', 'mistralai/mistral-large-2512', '~kilo-fast'])(
+    'keeps an opted-out model off the Vercel route %#',
+    async modelId => {
+      const catalogId = await resolveCatalogId(modelId);
+      const shouldRouteToVercel = await loadShouldRouteToVercel({
+        optOutModels: [catalogId],
+        vercelModels: [catalogId],
+        aliasTargets: { '~kilo-fast': 'anthropic/claude-sonnet-4-5' },
+      });
+      const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
+
+      await expect(shouldRouteToVercel(modelId, request(), getRoutingProviderConfig)).resolves.toBe(
+        false
+      );
+      expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+    }
+  );
+
   it('routes models outside the opt-out set to Vercel', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel({
       optOutModels: ['anthropic/claude-sonnet-4.5'],

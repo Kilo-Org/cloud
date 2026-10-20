@@ -5286,6 +5286,38 @@
     ],
     "searchBlob": "cliSessionsV2.getWithRuntimeState Get a session record together with its current cloud agent runtime state and any associated GitHub pull request metadata for the session's branch. clisessionsv2 getwithruntimestate session_id session_id"
   },
+  "cliSessionsV2.getWorktreeCleanup": {
+    "path": "cliSessionsV2.getWorktreeCleanup",
+    "kind": "query",
+    "summary": "Get the status of the current worktree cleanup batch, including each worktree's cleanup result and any failures. Use to check progress or see which merged worktrees failed to clean up.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getworktreecleanup",
+      "organizationid"
+    ],
+    "searchBlob": "cliSessionsV2.getWorktreeCleanup Get the status of the current worktree cleanup batch, including each worktree's cleanup result and any failures. Use to check progress or see which merged worktrees failed to clean up. clisessionsv2 getworktreecleanup organizationid organizationId"
+  },
   "cliSessionsV2.list": {
     "path": "cliSessionsV2.list",
     "kind": "query",
@@ -5400,6 +5432,38 @@
       "fetchreviewdecision"
     ],
     "searchBlob": "cliSessionsV2.list List the current user's CLI/agent sessions with pagination, filtering by organization, worktree, git URL, platform, shared/public status, version, or recent updates. clisessionsv2 list cursor limit orderby includechildren sharedonly createdonplatform organizationid worktreeid giturl updatedsince version fetchreviewdecision cursor limit orderBy includeChildren sharedOnly createdOnPlatform organizationId worktreeId gitUrl updatedSince version fetchReviewDecision"
+  },
+  "cliSessionsV2.mergedWorktreeCleanupPreview": {
+    "path": "cliSessionsV2.mergedWorktreeCleanupPreview",
+    "kind": "query",
+    "summary": "List which merged worktrees are eligible for git worktree cleanup, so you can preview what would be removed before starting a cleanup. Use to check candidates for cleaning up branches and worktrees after merges.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "mergedworktreecleanuppreview",
+      "organizationid"
+    ],
+    "searchBlob": "cliSessionsV2.mergedWorktreeCleanupPreview List which merged worktrees are eligible for git worktree cleanup, so you can preview what would be removed before starting a cleanup. Use to check candidates for cleaning up branches and worktrees after merges. clisessionsv2 mergedworktreecleanuppreview organizationid organizationId"
   },
   "cliSessionsV2.recentRepositories": {
     "path": "cliSessionsV2.recentRepositories",

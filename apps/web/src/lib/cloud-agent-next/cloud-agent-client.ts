@@ -38,6 +38,12 @@ import {
   type SandboxStatusSnapshot,
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import {
+  WorktreeCleanup as worktreeCleanupOutputSchema,
+  type WorktreeCleanup,
+  type WorktreeCleanupScope,
+  type StartWorktreeCleanupInput as WorkerStartWorktreeCleanupInput,
+} from '../../../../../services/cloud-agent-next/src/worktree-cleanup/schemas';
 export type { SendMessagePayload } from './types.js';
 
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
@@ -246,6 +252,10 @@ const deleteWorktreeOutputSchema = z.object({
 });
 
 export type DeleteWorktreeOutput = z.infer<typeof deleteWorktreeOutputSchema>;
+
+export type WorktreeCleanupOutput = WorktreeCleanup;
+export type GetWorktreeCleanupInput = z.infer<typeof WorktreeCleanupScope>;
+export type StartWorktreeCleanupInput = z.infer<typeof WorkerStartWorktreeCleanupInput>;
 
 /** Input for initiating from a prepared session */
 export type InitiateFromPreparedSessionInput = {
@@ -618,6 +628,12 @@ type CloudAgentNextTRPCClient = {
   deleteWorktree: {
     mutate: (input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>;
   };
+  startWorktreeCleanup: {
+    mutate: (input: StartWorktreeCleanupInput) => Promise<WorktreeCleanupOutput>;
+  };
+  getWorktreeCleanup: {
+    query: (input: GetWorktreeCleanupInput) => Promise<WorktreeCleanupOutput | null>;
+  };
   cleanupSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
@@ -800,6 +816,16 @@ export class CloudAgentNextClient {
       });
       throw error;
     }
+  }
+
+  async startWorktreeCleanup(input: StartWorktreeCleanupInput): Promise<WorktreeCleanupOutput> {
+    return worktreeCleanupOutputSchema.parse(await this.client.startWorktreeCleanup.mutate(input));
+  }
+
+  async getWorktreeCleanup(input: GetWorktreeCleanupInput): Promise<WorktreeCleanupOutput | null> {
+    return worktreeCleanupOutputSchema
+      .nullable()
+      .parse(await this.client.getWorktreeCleanup.query(input));
   }
 
   /**

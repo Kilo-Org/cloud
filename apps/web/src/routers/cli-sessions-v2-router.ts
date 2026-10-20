@@ -30,7 +30,10 @@ import {
   organization_memberships,
   type CliSessionV2,
 } from '@kilocode/db/schema';
-import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
+import {
+  createCloudAgentNextClient,
+  rethrowCloudAgentError,
+} from '@/lib/cloud-agent-next/cloud-agent-client';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import {
   readFirstPageStreamState,
@@ -52,6 +55,7 @@ import {
   projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
+  type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
@@ -683,6 +687,9 @@ const WorktreeInputSchema = z.object({
   organizationId: z.uuid().nullable(),
 });
 
+const WorktreeCleanupScopeSchema = z.object({ organizationId: z.uuid().nullable() });
+const MAX_WORKTREE_CLEANUP_SIZE = 1000;
+
 const WorktreeDetailsInputSchema = z.object({
   worktreeIds: z
     .array(cloudAgentWorktreeIdSchema)
@@ -954,6 +961,70 @@ function joinWithAnd(fragments: SQL[]): SQL {
   return sql.join(fragments, sql` AND `);
 }
 
+async function mergedWorktreeCleanupIds(
+  ctx: Parameters<typeof ensureOrganizationAccess>[0],
+  organizationId: string | null,
+  worktreeIds?: string[]
+): Promise<CloudAgentWorktreeId[]> {
+  const conditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
+  await addOrganizationCondition(conditions, ctx, organizationId);
+  if (worktreeIds) {
+    conditions.push(inArray(cli_sessions_v2.cloud_agent_worktree_id, worktreeIds));
+  }
+  const mergedPr = sql`(
+    ${cli_sessions_v2.platform} = 'github'
+    AND ${cli_sessions_v2.pr_url} IS NOT NULL
+    AND ${cli_sessions_v2.pr_link_verified_at} IS NOT NULL
+    AND ${github_branch_pull_requests.pr_state} = 'merged'
+  )`;
+  const { rows } = await db.execute<{ worktree_id: string }>(sql`
+    WITH RECURSIVE worktree_sessions AS (
+      SELECT ${cli_sessions_v2.session_id} AS session_id,
+        ${cli_sessions_v2.cloud_agent_worktree_id} AS worktree_id,
+        ${cli_sessions_v2.cloud_agent_session_id} AS cloud_agent_session_id
+      FROM ${cli_sessions_v2}
+      WHERE ${and(...conditions)}
+        AND ${cli_sessions_v2.cloud_agent_worktree_id} IS NOT NULL
+      UNION
+      SELECT child.session_id, parent.worktree_id, child.cloud_agent_session_id
+      FROM ${cli_sessions_v2} child
+      JOIN worktree_sessions parent ON child.parent_session_id = parent.session_id
+        OR child.cloud_agent_session_scope_id = parent.cloud_agent_session_id
+      WHERE child.kilo_user_id = ${ctx.user.id}
+        AND child.organization_id IS NOT DISTINCT FROM ${organizationId}::uuid
+    )
+    SELECT worktree_sessions.worktree_id
+    FROM worktree_sessions
+    JOIN ${cli_sessions_v2} ON ${cli_sessions_v2.session_id} = worktree_sessions.session_id
+      AND ${cli_sessions_v2.kilo_user_id} = ${ctx.user.id}
+    LEFT JOIN ${github_branch_pull_requests} ON ${sessionPrJoinPredicate}
+    LEFT JOIN ${cloud_agent_worktrees}
+      ON ${cloud_agent_worktrees.worktree_id} = worktree_sessions.worktree_id
+    WHERE ${worktreeMembershipCondition(ctx.user.id, organizationId) ?? sql`true`}
+      AND (${cloud_agent_worktrees.worktree_id} IS NULL OR (
+        ${cloud_agent_worktrees.kilo_user_id} = ${ctx.user.id}
+        AND ${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${organizationId}::uuid
+      ))
+      AND ${cloud_agent_worktrees.deletion_completed_at} IS NULL
+    GROUP BY worktree_sessions.worktree_id
+    HAVING bool_or(COALESCE(${mergedPr}, false))
+      AND NOT bool_or(
+        (${cli_sessions_v2.pr_url} IS NOT NULL OR ${cli_sessions_v2.pr_number} IS NOT NULL)
+        AND NOT COALESCE(${mergedPr}, false)
+      )
+    ORDER BY worktree_sessions.worktree_id
+    LIMIT ${MAX_WORKTREE_CLEANUP_SIZE + 1}
+  `);
+  if (rows.length > MAX_WORKTREE_CLEANUP_SIZE) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        'More than 1000 merged worktrees are eligible for cleanup. Clean up some worktrees individually first.',
+    });
+  }
+  return z.array(cloudAgentWorktreeIdSchema).parse(rows.map(row => row.worktree_id));
+}
+
 /**
  * Router for cli_sessions_v2 table operations.
  * Used by cloud-agent-next for session storage and retrieval.
@@ -962,6 +1033,109 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  mergedWorktreeCleanupPreview: baseProcedure
+    .input(WorktreeCleanupScopeSchema)
+    .output(z.object({ worktreeIds: z.array(cloudAgentWorktreeIdSchema) }))
+    .query(async ({ ctx, input }) => ({
+      worktreeIds: await mergedWorktreeCleanupIds(ctx, input.organizationId),
+    })),
+
+  startMergedWorktreeCleanup: baseProcedure
+    .input(
+      WorktreeCleanupScopeSchema.extend({
+        worktreeIds: z.array(cloudAgentWorktreeIdSchema).max(MAX_WORKTREE_CLEANUP_SIZE),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const worktreeIds = await mergedWorktreeCleanupIds(
+        ctx,
+        input.organizationId,
+        input.worktreeIds
+      );
+      if (worktreeIds.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'None of the selected worktrees are still eligible for merged-worktree cleanup.',
+        });
+      }
+      const client = createCloudAgentNextClient(
+        (
+          await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+            headers: ctx.headersList,
+            organizationId: input.organizationId ?? undefined,
+            tokenSource: 'cloud-agent',
+          })
+        ).token
+      );
+      try {
+        return await client.startWorktreeCleanup({
+          worktreeIds,
+          ...(input.organizationId === null
+            ? {}
+            : { kilocodeOrganizationId: input.organizationId }),
+        });
+      } catch (error) {
+        rethrowCloudAgentError(error);
+      }
+    }),
+
+  retryWorktreeCleanup: baseProcedure
+    .input(WorktreeCleanupScopeSchema.strict())
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId !== null) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const client = createCloudAgentNextClient(
+        (
+          await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+            headers: ctx.headersList,
+            organizationId: input.organizationId ?? undefined,
+            tokenSource: 'cloud-agent',
+          })
+        ).token
+      );
+      const scope =
+        input.organizationId === null ? {} : { kilocodeOrganizationId: input.organizationId };
+      try {
+        const batch = await client.getWorktreeCleanup(scope);
+        const worktreeIds =
+          batch?.items.filter(item => item.status === 'failed').map(item => item.worktreeId) ?? [];
+        if (worktreeIds.length === 0) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'There are no failed worktrees to retry in this cleanup batch.',
+          });
+        }
+        return await client.startWorktreeCleanup({ ...scope, worktreeIds });
+      } catch (error) {
+        rethrowCloudAgentError(error);
+      }
+    }),
+
+  getWorktreeCleanup: baseProcedure
+    .input(WorktreeCleanupScopeSchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId !== null) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const client = createCloudAgentNextClient(
+        (
+          await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+            headers: ctx.headersList,
+            organizationId: input.organizationId ?? undefined,
+            tokenSource: 'cloud-agent',
+          })
+        ).token
+      );
+      try {
+        return await client.getWorktreeCleanup(
+          input.organizationId === null ? {} : { kilocodeOrganizationId: input.organizationId }
+        );
+      } catch (error) {
+        rethrowCloudAgentError(error);
+      }
+    }),
+
   worktreeDetails: baseProcedure.input(WorktreeDetailsInputSchema).query(async ({ ctx, input }) => {
     const worktrees: Record<string, WorktreeDetail> = {};
     if (input.worktreeIds.length === 0) {

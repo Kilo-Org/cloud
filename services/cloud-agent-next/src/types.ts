@@ -547,6 +547,7 @@ export type Env = {
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
   STREAM_TICKET_NONCE_DO: DurableObjectNamespace<StreamTicketNonceDO>;
+  WORKTREE_CLEANUP: Cloudflare.Env['WORKTREE_CLEANUP'];
   /** e2e-only callback sink; bound only by the rendered e2e configs. */
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** One-way shared sandbox failover overrides keyed by shared identity */

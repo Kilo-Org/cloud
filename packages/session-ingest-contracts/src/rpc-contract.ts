@@ -13,6 +13,7 @@ export const cloudAgentWorktreeLocationSchema = z
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;
 export const WORKTREE_RUNTIME_HISTORY_UNAVAILABLE = 'worktree_runtime_history_unavailable';
+export const WORKTREE_MERGED_PULL_REQUESTS_REQUIRED = 'worktree_merged_pull_requests_required';
 
 export const cloudAgentWorktreeDeletionManifestSchema = z
   .object({
@@ -36,6 +37,7 @@ export const cloudAgentWorktreeDeletionSchema = z
     worktreeId: cloudAgentWorktreeIdSchema,
     kiloUserId: z.string().min(1),
     organizationId: z.uuid().optional(),
+    requireMergedPullRequests: z.literal(true).optional(),
   })
   .strict();
 export type CloudAgentWorktreeDeletionParams = z.infer<typeof cloudAgentWorktreeDeletionSchema>;

@@ -91,12 +91,6 @@ describe('useCurrentUserId', () => {
   });
 
   describe('isUnreachable', () => {
-    it('holds while the device is offline and the request waits for a connection', () => {
-      Object.assign(query, { fetchStatus: 'paused' });
-
-      expect(useCurrentUserId().isUnreachable).toBe(true);
-    });
-
     it('holds after a failure a retry can fix, and through that retry', () => {
       Object.assign(query, {
         error: new Error('Network request failed'),

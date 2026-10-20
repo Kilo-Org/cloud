@@ -1,5 +1,5 @@
-import { InfiniteQueryObserver, QueryClient } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
+import { InfiniteQueryObserver, onlineManager, QueryClient } from '@tanstack/react-query';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildOrgCreditTransactionsPageQueryOptions,
@@ -145,6 +145,84 @@ describe('buildOrgInvoicesPageQueryOptions', () => {
     // the newest invoices retained.
     expect(getNextPageParam(page, atBound)).toBeUndefined();
     expect(getNextPageParam(page, belowBound)).toBe('cursor-1');
+  });
+});
+
+/**
+ * Drive the builder's real options through React Query's infinite-query
+ * behavior while the online manager reports offline: a read that pauses there
+ * is pending without fetching, which is the screen's skeleton branch with no
+ * exit, so the builder has to let the request go out and settle.
+ */
+describe('org invoices first page on a flaky connection', () => {
+  afterEach(() => {
+    onlineManager.setOnline(true);
+  });
+
+  /**
+   * Mount the builder's options on a real query client with a failing first
+   * page. `QueryClient` subscribes to the online manager on `mount()` (React's
+   * provider does this for the app); without it the online edge reaches no
+   * cache and the reconnect refetch cannot happen.
+   */
+  function observeInvoicesPage(queryFn: () => Promise<never>) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.mount();
+    const observer = new InfiniteQueryObserver<unknown>(queryClient, {
+      ...buildOrgInvoicesPageQueryOptions(createTrpcStub(), 'org-1'),
+      queryKey: ['org-invoices-flaky-connection'],
+      queryFn,
+      initialPageParam: undefined,
+      retry: false,
+    });
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+    return {
+      observer,
+      stop: () => {
+        unsubscribe();
+        queryClient.unmount();
+      },
+    };
+  }
+
+  function failingPage() {
+    return vi.fn<() => Promise<never>>().mockRejectedValue(new Error('Network request failed'));
+  }
+
+  it('settles to the error state while the manager reports offline', async () => {
+    onlineManager.setOnline(false);
+    const queryFn = failingPage();
+    const { observer, stop } = observeInvoicesPage(queryFn);
+
+    const settled = observer.refetch();
+    await vi.waitFor(() => {
+      expect(observer.getCurrentResult().isError).toBe(true);
+    });
+    await settled;
+
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(observer.getCurrentResult().isPending).toBe(false);
+    stop();
+  });
+
+  it('retries the failed first page when connectivity returns', async () => {
+    onlineManager.setOnline(false);
+    const queryFn = failingPage();
+    const { observer, stop } = observeInvoicesPage(queryFn);
+
+    const settled = observer.refetch();
+    await vi.waitFor(() => {
+      expect(observer.getCurrentResult().isError).toBe(true);
+    });
+    await settled;
+
+    onlineManager.setOnline(true);
+
+    await vi.waitFor(() => {
+      expect(queryFn).toHaveBeenCalledTimes(2);
+    });
+    stop();
   });
 });
 

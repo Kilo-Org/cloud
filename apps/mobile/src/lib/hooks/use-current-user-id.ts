@@ -9,9 +9,20 @@ type UseCurrentUserIdOptions = {
 
 export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
   const trpc = useTRPC();
-  const { data, error, fetchStatus, isLoading, isError, isFetched, refetch } = useQuery({
+  const { data, error, isLoading, isError, isFetched, refetch } = useQuery({
     ...trpc.user.getMe.queryOptions(),
     enabled: options.enabled ?? true,
+    // The identity read must settle even while the online manager reports
+    // offline: NetInfo can hold the device offline while the backend is
+    // reachable, and a paused read leaves every surface gated on the identity
+    // (the Profile credits card among them) waiting on a request that never
+    // starts. The attempt either answers or fails once the control-plane
+    // deadline lands.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
   const refused = error !== null && isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
 
@@ -29,11 +40,11 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     // 2026-09-15).
     isFetchError: isError || (isLoading && isFetched),
     // True while the account is unconfirmed because the API was not reached:
-    // the device is offline (Query pauses the request), or an attempt failed
-    // in a way a retry can fix. It holds through the retry that follows a
-    // failure, which v5 runs as a no-data refetch with `error` cleared. An
-    // answer that refuses the credentials is not this.
-    isUnreachable: data === undefined && !refused && (fetchStatus === 'paused' || isFetched),
+    // the offline attempt failed, or an attempt failed in a way a retry can
+    // fix. It holds through the retry that follows a failure, which v5 runs as
+    // a no-data refetch with `error` cleared. An answer that refuses the
+    // credentials is not this.
+    isUnreachable: data === undefined && !refused && isFetched,
     refetch: () => {
       void refetch();
     },

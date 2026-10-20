@@ -24,6 +24,7 @@ import {
   type CreateOrUpdateUserResult,
 } from '@/lib/user';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
   checkNativeAdmission,
@@ -105,7 +106,7 @@ async function checkExistingProviderAccount(
  * the device session created for this sign-in.
  */
 async function legacyTokenResponse(params: {
-  user: Parameters<typeof generateApiToken>[0];
+  user: User;
   sessionId?: string;
   userAgent?: string;
   created: boolean;

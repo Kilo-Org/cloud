@@ -22,15 +22,13 @@ jest.mock('@/lib/user', () => ({}));
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: (...args: unknown[]) => mockFindUser(...args),
 }));
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: {
-    query: {
-      kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) },
-      device_sessions: { findFirst: (...args: unknown[]) => mockDeviceSession(...args) },
-    },
-  },
-  readDb: {},
-}));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => {
+  const query = {
+    kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) },
+    device_sessions: { findFirst: (...args: unknown[]) => mockDeviceSession(...args) },
+  };
+  return { db: { query }, readDb: { query } };
+});
 jest.mock('@kilocode/worker-utils/account-access', () => ({
   ...jest.requireActual('@kilocode/worker-utils/account-access'),
   isOrganizationMember: (...args: unknown[]) => mockMembership(...args),

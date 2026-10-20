@@ -1091,7 +1091,6 @@ describe('credential exchange bearer authentication guard', () => {
   });
 
   test.each([
-    ['device session', { deviceSessionId: '' }],
     ['bot', { botId: '' }],
     ['organization', { organizationId: '' }],
     ['token source', { tokenSource: '' }],
@@ -1117,6 +1116,63 @@ describe('credential exchange bearer authentication guard', () => {
     );
 
     expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('exchanges a five-year bearer token bound to its device session', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'session-exchange-pepper' });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      deviceSessionId: session!.id,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.deviceSessionId).toBe(session!.id);
+  });
+
+  test('refuses to exchange a five-year bearer token whose device session is revoked', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'revoked-exchange-pepper' });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: user.id,
+        revoked_at: new Date().toISOString(),
+        revoked_reason: 'logout',
+      })
+      .returning({ id: device_sessions.id });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      deviceSessionId: session!.id,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
   });
 
   test.each([

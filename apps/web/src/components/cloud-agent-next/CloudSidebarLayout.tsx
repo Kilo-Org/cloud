@@ -487,7 +487,9 @@ function CloudSidebarLayoutContent({
       ...listedCachedSessions.map(session => session.sessionId),
       ...(worktreeSessionsData?.cliSessions.map(session => session.session_id) ?? []),
       ...localSessions
-        .filter(session => !filteredLocalSessions.includes(session))
+        .filter(
+          session => session.sync.state === 'synced' && !filteredLocalSessions.includes(session)
+        )
         .map(session => session.kiloSessionId),
     ]);
     settleLocalSessions(listedIds, currentSessionId ?? null);

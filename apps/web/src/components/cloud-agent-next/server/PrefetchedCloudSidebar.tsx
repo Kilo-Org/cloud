@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
+import pLimit from 'p-limit';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
@@ -35,24 +36,32 @@ export async function PrefetchedCloudSidebar({
   ...scope
 }: SidebarScope & { children: ReactNode }) {
   const queryClient = new QueryClient();
+  const deadlineAt = Date.now() + SIDEBAR_PREFETCH_TIMEOUT_MS;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
-      prefetchSidebar(queryClient, scope),
-      new Promise(resolve => setTimeout(resolve, SIDEBAR_PREFETCH_TIMEOUT_MS)),
+      prefetchSidebar(queryClient, scope, deadlineAt),
+      new Promise(resolve => {
+        timeout = setTimeout(resolve, SIDEBAR_PREFETCH_TIMEOUT_MS);
+      }),
     ]);
   } catch (error) {
     // The client fetches whatever is missing; still report real server failures.
     Sentry.captureException(error);
+  } finally {
+    clearTimeout(timeout);
   }
   return <HydrationBoundary state={dehydrate(queryClient)}>{children}</HydrationBoundary>;
 }
 
 async function prefetchSidebar(
   queryClient: QueryClient,
-  { userId, organizationId, updatedSince, preferences }: SidebarScope
+  { userId, organizationId, updatedSince, preferences }: SidebarScope,
+  deadlineAt: number
 ): Promise<void> {
   const { platformFilter, projectFilter } = preferences ?? DEFAULT_SIDEBAR_PREFERENCES;
   const ctx = await createTRPCContext();
+  if (Date.now() >= deadlineAt) return;
   const trpc = createTRPCOptionsProxy({ router: rootRouter, ctx, queryClient });
   const filters = {
     organizationId,
@@ -70,24 +79,31 @@ async function prefetchSidebar(
     }),
   ]);
   const folderWorktreeIds = new Set(folders.folders.flatMap(folder => folder.worktreeIds));
+  const limit = pLimit(4);
   const folderLists = await Promise.all(
     [...folderWorktreeIds].flatMap(id => {
       const parsed = cloudAgentWorktreeIdSchema.safeParse(id);
       if (!parsed.success) return [];
       return [
-        queryClient.fetchQuery(
-          trpc.cliSessionsV2.list.queryOptions(sidebarFolderListInput(parsed.data, filters))
-        ),
+        limit(() => {
+          if (Date.now() >= deadlineAt) return undefined;
+          return queryClient.fetchQuery(
+            trpc.cliSessionsV2.list.queryOptions(sidebarFolderListInput(parsed.data, filters))
+          );
+        }),
       ];
     })
   );
-  const sessions = [list, ...folderLists].flatMap(result => result.cliSessions);
+  const sessions = [list, ...folderLists].flatMap(result => result?.cliSessions ?? []);
   await Promise.all(
     worktreeDetailsBatches(sessions.map(session => session.cloud_agent_worktree_id)).map(
       worktreeIds =>
-        queryClient.prefetchQuery(
-          trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId })
-        )
+        limit(() => {
+          if (Date.now() >= deadlineAt) return;
+          return queryClient.prefetchQuery(
+            trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId })
+          );
+        })
     )
   );
 }

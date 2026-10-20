@@ -112,9 +112,19 @@ context, not an authorization or accounting input. Older clients remain compatib
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
-These labels describe the actual persistence entry/caller, so identify queue-only
-fallbacks using the deployment's flag settings and existing
-`usage accounting direct fallback` warning.
+With queue-only enabled, the gateway never calls a billing writer, including on
+publication failure. It retries transient publication failures up to three total
+attempts, with a fresh two-second timeout each and jittered 200–400 ms then
+400–600 ms backoffs. Every attempt reuses the same serialized event and usage ID;
+ambiguous acceptance can create duplicate messages, which the writer deduplicates.
+Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
+Redirects are terminal 3xx failures; their targets are never followed.
+Shadow publication retains one attempt. `usage enqueue retrying` logs the usage
+ID, categorical reason and failed attempt number before each retry. `usage accounting publication failed` logs the finalized
+`usageId` and categorical `reason`; accounting returns null and emits no gateway
+persistence completion. This is not durable recovery: unaccepted events may be
+lost, and ambiguous failures may still be recorded later by the consumer. With
+queue-only off, the existing SFO handoff-to-local fallback remains unchanged.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across

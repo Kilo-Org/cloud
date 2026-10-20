@@ -318,7 +318,7 @@ async function enqueueUsageWithinLifetime(
   const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
     if (!registered) return { kind: 'unavailable', reason: 'registration_failed' };
     try {
-      return await enqueueUsage(payload);
+      return await enqueueUsage(payload, { retryTransientFailures: USAGE_QUEUE_ONLY_ENABLED });
     } catch {
       return { kind: 'unavailable', reason: 'unexpected_rejection' };
     }
@@ -328,7 +328,7 @@ async function enqueueUsageWithinLifetime(
     after(publication);
     start.resolve(true);
   } catch {
-    // No request lifetime means no network I/O; preserve usage with the direct writer.
+    // No request lifetime means no network I/O; let the accounting mode handle the failure.
     start.resolve(false);
   }
   return publication;
@@ -357,13 +357,14 @@ export async function logMicrodollarUsage(
       console.info('usage accounting queued', { usageId: core.id });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
-    console.warn('usage accounting direct fallback', {
+    console.error('usage accounting publication failed', {
       usageId: core.id,
       reason: outcome.kind === 'disabled' ? 'publisher_disabled' : outcome.reason,
     });
-  } else {
-    scheduleUsageEnqueue(payload);
+    return null;
   }
+
+  scheduleUsageEnqueue(payload);
 
   const inserted = await saveUsageRelatedData(
     core,
@@ -1464,7 +1465,7 @@ export async function processTokenData(
  *
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
  * transaction and attempts delivery right after commit; the cron drainer retries a failure.
- * Queued and recorded outcomes leave delivery with that writer/outbox. A failed direct write
+ * Queued and recorded outcomes leave delivery with that writer/outbox. Failed accounting
  * keeps the best-effort send; bouncer dedupes on `requestId`. Every other request also keeps the
  * independent best-effort send, which never rejects.
  */

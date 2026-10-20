@@ -110,11 +110,13 @@ export function RemoteMcpServerForm({
     (changed: Partial<DraftFields> = {}) => {
       const next = fieldsWith(changed);
       setErrors(mcpServerFormError(draftOf(server, next)));
+      // Compare what the saved draft keeps: it trims the name, URL and bearer
+      // token, so whitespace alone is not an edit worth confirming.
       onDirtyChange?.(
-        next.name !== initialName ||
-          next.url !== initialUrl ||
+        next.name.trim() !== initialName.trim() ||
+          next.url.trim() !== initialUrl.trim() ||
           next.method !== initialMethod ||
-          next.token !== initialToken
+          (next.method !== 'none' && next.token.trim() !== initialToken.trim())
       );
     },
     [fieldsWith, server, onDirtyChange, initialName, initialUrl, initialMethod, initialToken]

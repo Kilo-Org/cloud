@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, Pressable, View } from 'react-native';
 
@@ -66,18 +66,22 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   });
 
   // The screen is a native formSheet whose swipe is off, so Android Back is the
-  // one dismissal the platform still offers; it asks the same question.
+  // one dismissal the platform still offers; it asks the same question. Scoped
+  // to focus: the repository, mode and model pickers push above this screen and
+  // own their own Back.
   const requestCloseRef = useRef(requestClose);
   requestCloseRef.current = requestClose;
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      requestCloseRef.current();
-      return true;
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        requestCloseRef.current();
+        return true;
+      });
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
 
   function save() {
     const name = nameRef.current.trim();
@@ -115,7 +119,8 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
         doneLabel={t('common.save')}
         onDone={save}
         onCancel={requestClose}
-        disabled={!hasName || saving}
+        disabled={saving}
+        doneDisabled={!hasName || saving}
       >
         <View className="gap-5 px-4 pt-2">
           <View className="flex-row gap-3">

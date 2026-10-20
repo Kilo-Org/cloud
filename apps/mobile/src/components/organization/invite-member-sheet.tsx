@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, Pressable, ScrollView, View } from 'react-native';
 
@@ -42,18 +42,21 @@ export function InviteMemberSheet() {
     },
   });
   // The screen is a native formSheet whose swipe is off, so Android Back is the
-  // one dismissal the platform still offers; it asks the same question.
+  // one dismissal the platform still offers; it asks the same question. Scoped
+  // to focus, so a screen pushed above keeps its own Back.
   const requestCloseRef = useRef(requestClose);
   requestCloseRef.current = requestClose;
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      requestCloseRef.current();
-      return true;
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        requestCloseRef.current();
+        return true;
+      });
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
 
   if (isResolving) {
     return (
@@ -93,7 +96,8 @@ export function InviteMemberSheet() {
         onDone={onSubmit}
         doneLabel={t('organization.inviteMember.sendInvite')}
         onCancel={requestClose}
-        disabled={!canSubmit || mutations.invite.isPending}
+        disabled={mutations.invite.isPending}
+        doneDisabled={!canSubmit || mutations.invite.isPending}
         topInset="bottom-form-sheet"
       />
       <ScrollView

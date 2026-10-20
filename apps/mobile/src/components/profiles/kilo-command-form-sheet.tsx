@@ -108,7 +108,7 @@ export function KiloCommandFormSheet({
         onDone={submit}
         onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView

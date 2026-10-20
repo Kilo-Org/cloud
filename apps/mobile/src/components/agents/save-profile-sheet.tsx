@@ -102,7 +102,7 @@ export function SaveProfileSheet({
         }}
         onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSubmitting}
+        doneDisabled={isSubmitting}
         topInset="ios-page-sheet"
       />
       <ScrollView

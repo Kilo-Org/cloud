@@ -18,6 +18,7 @@ export function PickerSheet({
   expired = false,
   scrollable = true,
   disabled = false,
+  doneDisabled = false,
 }: {
   title: string;
   onDone: () => void;
@@ -37,6 +38,8 @@ export function PickerSheet({
   scrollable?: boolean;
   /** Disables the header Done/Cancel controls while the caller applies a choice. */
   disabled?: boolean;
+  /** Disables Done alone, so Cancel stays usable while the choice is invalid. */
+  doneDisabled?: boolean;
 }) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
@@ -64,6 +67,7 @@ export function PickerSheet({
           doneLabel={doneLabel}
           cancelLabel={cancelLabel}
           disabled={disabled}
+          doneDisabled={doneDisabled}
           topInset="bottom-form-sheet"
         />
         {headerContent}

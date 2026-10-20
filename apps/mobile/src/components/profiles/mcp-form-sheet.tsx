@@ -119,7 +119,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
         onDone={submit}
         onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView

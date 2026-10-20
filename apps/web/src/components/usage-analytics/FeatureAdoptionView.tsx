@@ -2,16 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import {
-  AlertCircle,
-  ArrowRight,
-  Bot,
-  Cable,
-  Check,
-  Circle,
-  Cloud,
-  Shield,
-} from 'lucide-react';
+import { AlertCircle, ArrowRight, Bot, Cable, Check, Circle, Cloud, Shield } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

@@ -35,6 +35,8 @@
     "connectGithub": "Unganisha GitHub",
     "cost": "Gharama",
     "discard": "Tupa",
+    "discardChangesMessage": "Mabadiliko yako yatapotea.",
+    "discardChangesTitle": "Tupa mabadiliko?",
     "findings": "Matokeo",
     "mergeRequest": "ombi la kuunganisha",
     "notConnected": "Haijaunganishwa",

@@ -35,6 +35,8 @@
     "connectGithub": "Свържи GitHub",
     "cost": "Разход",
     "discard": "Отхвърли",
+    "discardChangesMessage": "Промените ви ще бъдат загубени.",
+    "discardChangesTitle": "Отхвърли промените?",
     "findings": "Открити проблеми",
     "mergeRequest": "merge заявка",
     "notConnected": "Не е свързан",

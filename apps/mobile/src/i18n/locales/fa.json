@@ -35,6 +35,8 @@
     "connectGithub": "اتصال به GitHub",
     "cost": "هزینه",
     "discard": "کنار گذاشتن",
+    "discardChangesMessage": "تغییرات شما از دست می‌رود.",
+    "discardChangesTitle": "تغییرات کنار گذاشته شود؟",
     "findings": "یافته‌ها",
     "mergeRequest": "درخواست ادغام",
     "notConnected": "متصل نیست",

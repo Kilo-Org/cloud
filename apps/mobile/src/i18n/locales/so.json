@@ -35,6 +35,8 @@
     "connectGithub": "Ku xir GitHub",
     "cost": "Kharashka",
     "discard": "Tuur",
+    "discardChangesMessage": "Isbedeladaada way lumi doonaan.",
+    "discardChangesTitle": "Isbedelada tuur?",
     "findings": "Natiijooyin",
     "mergeRequest": "merge request",
     "notConnected": "Kuma xirna",

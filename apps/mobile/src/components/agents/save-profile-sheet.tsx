@@ -8,6 +8,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Lock } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -57,6 +58,12 @@ export function SaveProfileSheet({
 
   const hasSecrets = envVars.some(envVar => envVar.isSecret);
 
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: () =>
+      nameRef.current.trim().length > 0 || descriptionRef.current.trim().length > 0 || setAsDefault,
+    onDiscard: onClose,
+  });
+
   const submit = async () => {
     const name = nameRef.current.trim();
     const description = descriptionRef.current.trim();
@@ -87,13 +94,13 @@ export function SaveProfileSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={t('agentChat.newSession.saveAsProfile')}
         onDone={() => {
           void submit();
         }}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
         disabled={isSubmitting}
         topInset="ios-page-sheet"
@@ -172,6 +179,7 @@ export function SaveProfileSheet({
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

@@ -35,6 +35,8 @@
     "connectGithub": "Sambungkan GitHub",
     "cost": "Kos",
     "discard": "Buang",
+    "discardChangesMessage": "Perubahan anda akan hilang.",
+    "discardChangesTitle": "Buang perubahan?",
     "findings": "Dapatan",
     "mergeRequest": "permintaan gabungan",
     "notConnected": "Tidak disambungkan",

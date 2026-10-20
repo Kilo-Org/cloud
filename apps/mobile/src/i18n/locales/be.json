@@ -35,6 +35,8 @@
     "connectGithub": "Падключыць GitHub",
     "cost": "Кошт",
     "discard": "Адкінуць",
+    "discardChangesMessage": "Вашы змены будуць страчаны.",
+    "discardChangesTitle": "Адкінуць змены?",
     "findings": "Выяўленыя праблемы",
     "mergeRequest": "merge-запыт",
     "notConnected": "Не падключана",

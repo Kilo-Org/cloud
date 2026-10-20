@@ -204,4 +204,21 @@ describe('the remote MCP server form', () => {
 
     expect(saveButton().loading).toBe(true);
   });
+
+  it('reports unsaved edits to the sheet, and clears the report when they are undone', async () => {
+    const dirty: boolean[] = [];
+    await mount({ onSave, onDirtyChange: value => dirty.push(value) });
+
+    await type(0, 'notes');
+    await type(1, 'https://notes.example/mcp');
+
+    // Undoing the typed name clears the flag again.
+    await type(0, '');
+
+    expect(dirty[0]).toBe(true);
+    expect(dirty.at(-1)).toBe(true);
+
+    await type(1, '');
+    expect(dirty.at(-1)).toBe(false);
+  });
 });

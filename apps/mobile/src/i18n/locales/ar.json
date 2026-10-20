@@ -35,6 +35,8 @@
     "connectGithub": "ربط GitHub",
     "cost": "التكلفة",
     "discard": "تجاهل",
+    "discardChangesMessage": "ستفقد تغييراتك.",
+    "discardChangesTitle": "تجاهل التغييرات؟",
     "findings": "الملاحظات",
     "mergeRequest": "طلب دمج",
     "notConnected": "غير مرتبط",

@@ -35,6 +35,8 @@
     "connectGithub": "Kết nối GitHub",
     "cost": "Chi phí",
     "discard": "Hủy bỏ",
+    "discardChangesMessage": "Các thay đổi của bạn sẽ bị mất.",
+    "discardChangesTitle": "Hủy bỏ thay đổi?",
     "findings": "Vấn đề",
     "mergeRequest": "merge request",
     "notConnected": "Chưa kết nối",

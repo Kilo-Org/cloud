@@ -35,6 +35,8 @@
     "connectGithub": "GitHub-ты қосу",
     "cost": "Құны",
     "discard": "Бас тарту",
+    "discardChangesMessage": "Сіздің өзгерісіңіз жоғалады.",
+    "discardChangesTitle": "Өзгерістерден бас тарту?",
     "findings": "Анықталған мәселелер",
     "mergeRequest": "біріктіру сұрауы",
     "notConnected": "Қосылмаған",

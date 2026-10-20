@@ -35,6 +35,8 @@
     "connectGithub": "Connecta GitHub",
     "cost": "Import",
     "discard": "Descarta",
+    "discardChangesMessage": "Es perdran els canvis.",
+    "discardChangesTitle": "Descartar els canvis?",
     "findings": "Problemes",
     "mergeRequest": "sol·licitud de fusió",
     "notConnected": "No connectat",

@@ -35,6 +35,8 @@
     "connectGithub": "Koble til GitHub",
     "cost": "Kostnad",
     "discard": "Forkast",
+    "discardChangesMessage": "Endringene dine vil gå tapt.",
+    "discardChangesTitle": "Forkast endringer?",
     "findings": "Funn",
     "mergeRequest": "merge request",
     "notConnected": "Ikke tilkoblet",

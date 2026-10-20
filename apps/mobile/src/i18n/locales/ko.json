@@ -35,6 +35,8 @@
     "connectGithub": "GitHub 연결",
     "cost": "비용",
     "discard": "버리기",
+    "discardChangesMessage": "변경사항이 사라집니다.",
+    "discardChangesTitle": "변경사항을 버리시겠습니까?",
     "findings": "진단 결과",
     "mergeRequest": "머지 요청",
     "notConnected": "연결 안 됨",

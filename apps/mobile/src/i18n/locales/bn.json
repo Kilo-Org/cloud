@@ -35,6 +35,8 @@
     "connectGithub": "GitHub সংযুক্ত করুন",
     "cost": "খরচ",
     "discard": "বাতিল করুন",
+    "discardChangesMessage": "আপনার পরিবর্তনগুলো হারিয়ে যাবে।",
+    "discardChangesTitle": "পরিবর্তনগুলো বাতিল করবেন?",
     "findings": "শনাক্ত সমস্যা",
     "mergeRequest": "মার্জ রিকোয়েস্ট",
     "notConnected": "সংযুক্ত নয়",

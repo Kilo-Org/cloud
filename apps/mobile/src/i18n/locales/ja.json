@@ -35,6 +35,8 @@
     "connectGithub": "GitHubと連携",
     "cost": "コスト",
     "discard": "破棄",
+    "discardChangesMessage": "変更内容は失われます。",
+    "discardChangesTitle": "変更を破棄しますか？",
     "findings": "検出事項",
     "mergeRequest": "マージリクエスト",
     "notConnected": "未連携",

@@ -35,6 +35,8 @@
     "connectGithub": "بەستنەوەی GitHub",
     "cost": "تێچوون",
     "discard": "وازهێنان",
+    "discardChangesMessage": "گۆڕانکارییەکانت لەدەست دەچن.",
+    "discardChangesTitle": "وازهێنان لە گۆڕانکارییەکان؟",
     "findings": "دۆزینەوەکان",
     "mergeRequest": "داواکاری تێکەڵکردن",
     "notConnected": "نەبەستراوەتەوە",

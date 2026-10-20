@@ -35,6 +35,8 @@
     "connectGithub": "GitHubni ulash",
     "cost": "Xarajat",
     "discard": "Bekor qilish",
+    "discardChangesMessage": "O'zgarishlaringiz yo'qoladi.",
+    "discardChangesTitle": "O'zgarishlar bekor qilinsinmi?",
     "findings": "Aniqlangan muammolar",
     "mergeRequest": "merge so‘rovi",
     "notConnected": "Ulanmagan",

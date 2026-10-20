@@ -8,6 +8,7 @@ import { parseSkillMarkdown, skillErrorKey } from '@/components/profiles/skill-m
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { type SkillInputError, validateSkillInput } from '@/lib/agent-profile-forms';
 
 /** The validated fields a saved skill is built from. */
@@ -56,6 +57,12 @@ export function SkillFormSheet({
   const nameError = error === 'empty' || error === 'bad-name' ? t(skillErrorKey(error)) : undefined;
   const contentError = error === 'no-content' ? t(skillErrorKey(error)) : undefined;
 
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: () =>
+      nameRef.current !== (skill?.name ?? '') || contentRef.current !== (skill?.rawMarkdown ?? ''),
+    onDiscard: onClose,
+  });
+
   const submit = () => {
     const result = validateSkillInput({ name: nameRef.current, content: contentRef.current });
     if (result.error !== null) {
@@ -71,11 +78,11 @@ export function SkillFormSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={skill ? t('profiles.skillEditTitle') : t('profiles.addSkill')}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
         disabled={isSaving}
         topInset="ios-page-sheet"
@@ -132,6 +139,7 @@ export function SkillFormSheet({
         />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

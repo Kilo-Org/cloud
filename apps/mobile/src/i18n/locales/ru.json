@@ -35,6 +35,8 @@
     "connectGithub": "Подключить GitHub",
     "cost": "Стоимость",
     "discard": "Отменить",
+    "discardChangesMessage": "Ваши изменения будут потеряны.",
+    "discardChangesTitle": "Отменить изменения?",
     "findings": "Замечания",
     "mergeRequest": "запрос на слияние",
     "notConnected": "Не подключено",

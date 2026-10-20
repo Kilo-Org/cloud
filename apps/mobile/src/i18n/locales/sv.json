@@ -35,6 +35,8 @@
     "connectGithub": "Anslut GitHub",
     "cost": "Kostnad",
     "discard": "Kassera",
+    "discardChangesMessage": "Dina ändringar kommer att gå förlorade.",
+    "discardChangesTitle": "Kassera ändringar?",
     "findings": "Anmärkningar",
     "mergeRequest": "merge request",
     "notConnected": "Inte ansluten",

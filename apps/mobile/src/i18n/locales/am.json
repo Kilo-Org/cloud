@@ -35,6 +35,8 @@
     "connectGithub": "GitHubን አገናኝ",
     "cost": "ወጪ",
     "discard": "አስወግድ",
+    "discardChangesMessage": "ለውጦችህ ይጠፋሉ።",
+    "discardChangesTitle": "ለውጦችን አስወግድ፧",
     "findings": "ግኝቶች",
     "mergeRequest": "የማዋሃድ ጥያቄ",
     "notConnected": "አልተገናኘም",

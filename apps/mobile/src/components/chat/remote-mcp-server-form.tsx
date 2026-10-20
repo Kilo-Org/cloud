@@ -36,6 +36,11 @@ type RemoteMcpServerFormProps = {
   readonly onSave: (draft: RemoteMcpServerDraft) => void;
   /** A save is in flight, so the Save shows it is working. */
   readonly saving?: boolean;
+  /**
+   * Whether the fields differ from what the form opened with. The sheet asks it
+   * before closing, so a Close or Android Back does not drop a typed server.
+   */
+  readonly onDirtyChange?: (dirty: boolean) => void;
 };
 
 type AuthMethod = RemoteMcpAuth['type'];
@@ -74,15 +79,17 @@ export function RemoteMcpServerForm({
   server,
   onSave,
   saving,
+  onDirtyChange,
 }: Readonly<RemoteMcpServerFormProps>) {
   const { t } = useTranslation();
   const initialName = server?.name ?? '';
   const initialUrl = server?.url ?? '';
   const initialToken = server?.auth.type === 'bearer' ? (server.auth.token ?? '') : '';
+  const initialMethod = server?.auth.type ?? 'none';
   const name = useRef(initialName);
   const url = useRef(initialUrl);
   const token = useRef(initialToken);
-  const [method, setMethod] = useState<AuthMethod>(server?.auth.type ?? 'none');
+  const [method, setMethod] = useState<AuthMethod>(initialMethod);
   const fieldsWith = useCallback(
     (changed: Partial<DraftFields>): DraftFields => ({
       name: name.current,
@@ -101,9 +108,16 @@ export function RemoteMcpServerForm({
 
   const refresh = useCallback(
     (changed: Partial<DraftFields> = {}) => {
-      setErrors(mcpServerFormError(draftOf(server, fieldsWith(changed))));
+      const next = fieldsWith(changed);
+      setErrors(mcpServerFormError(draftOf(server, next)));
+      onDirtyChange?.(
+        next.name !== initialName ||
+          next.url !== initialUrl ||
+          next.method !== initialMethod ||
+          next.token !== initialToken
+      );
     },
-    [fieldsWith, server]
+    [fieldsWith, server, onDirtyChange, initialName, initialUrl, initialMethod, initialToken]
   );
 
   const validateName = useCallback(

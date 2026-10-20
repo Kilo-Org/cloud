@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जोड़ें",
     "cost": "लागत",
     "discard": "छोड़ दें",
+    "discardChangesMessage": "आपके परिवर्तन खो जाएँगे.",
+    "discardChangesTitle": "परिवर्तनों को छोड़ दें?",
     "findings": "मिली समस्याएँ",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जुड़ा नहीं",

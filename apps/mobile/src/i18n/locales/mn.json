@@ -35,6 +35,8 @@
     "connectGithub": "GitHub холбох",
     "cost": "Зардал",
     "discard": "Хаях",
+    "discardChangesMessage": "Таны өөрчлөлтүүд алдагдах болно.",
+    "discardChangesTitle": "Өөрчлөлтүүдийг хаях уу?",
     "findings": "Илэрсэн асуудлууд",
     "mergeRequest": "нэгтгэх хүсэлт",
     "notConnected": "Холбогдоогүй",

@@ -35,6 +35,8 @@
     "connectGithub": "Tengja GitHub",
     "cost": "Kostnaður",
     "discard": "Farga",
+    "discardChangesMessage": "Breytingar þínar munu glatast.",
+    "discardChangesTitle": "Farga breytingum?",
     "findings": "Niðurstöður",
     "mergeRequest": "merge request",
     "notConnected": "Ekki tengt",

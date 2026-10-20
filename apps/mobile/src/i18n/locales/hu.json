@@ -35,6 +35,8 @@
     "connectGithub": "GitHub csatlakoztatása",
     "cost": "Költség",
     "discard": "Elvetés",
+    "discardChangesMessage": "A módosításai elvesznek.",
+    "discardChangesTitle": "Elveti a módosításokat?",
     "findings": "Találatok",
     "mergeRequest": "merge request",
     "notConnected": "Nincs csatlakoztatva",

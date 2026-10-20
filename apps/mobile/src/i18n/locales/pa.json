@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ਨਾਲ ਜੋੜੋ",
     "cost": "ਲਾਗਤ",
     "discard": "ਰੱਦ ਕਰੋ",
+    "discardChangesMessage": "ਤੁਹਾਡੇ ਬਦਲਾਅ ਖਤਮ ਹੋ ਜਾਣਗੇ।",
+    "discardChangesTitle": "ਬਦਲਾਅ ਰੱਦ ਕਰੋ?",
     "findings": "ਜਾਂਚ ਦੇ ਨਤੀਜੇ",
     "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
     "notConnected": "ਜੁੜਿਆ ਨਹੀਂ",

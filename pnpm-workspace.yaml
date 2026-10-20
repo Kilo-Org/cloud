@@ -228,7 +228,9 @@ packageExtensions:
       '@expo/config-plugins': '*'
 patchedDependencies:
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
-  # ("31 minutes", no seconds) and `ago` ("3 minutes ago").
+  # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
+  # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller
+  # veto a requested dismissal, so a scrolling form can keep its values.
   '@expo/ui@57.0.21': patches/@expo+ui@57.0.21.patch
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch

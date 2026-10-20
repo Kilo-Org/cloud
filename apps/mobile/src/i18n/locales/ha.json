@@ -35,6 +35,8 @@
     "connectGithub": "Haɗa GitHub",
     "cost": "Farashi",
     "discard": "Yi watsi",
+    "discardChangesMessage": "Za a rasa canje-canjenka.",
+    "discardChangesTitle": "A yi watsi da canje-canje?",
     "findings": "Sakamakon bincike",
     "mergeRequest": "buƙatar haɗawa",
     "notConnected": "Ba a haɗa ba",

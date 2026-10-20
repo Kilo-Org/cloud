@@ -35,6 +35,8 @@
     "connectGithub": "Prijungti GitHub",
     "cost": "Kaina",
     "discard": "Atmesti",
+    "discardChangesMessage": "Jūsų pakeitimai bus prarasti.",
+    "discardChangesTitle": "Atmesti pakeitimus?",
     "findings": "Problemos",
     "mergeRequest": "merge request",
     "notConnected": "Neprijungta",

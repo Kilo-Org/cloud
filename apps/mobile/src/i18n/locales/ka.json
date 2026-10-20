@@ -35,6 +35,8 @@
     "connectGithub": "GitHub-თან დაკავშირება",
     "cost": "ღირებულება",
     "discard": "გაუქმება",
+    "discardChangesMessage": "თქვენი ცვლილებები დაიკარგება.",
+    "discardChangesTitle": "გააუქმოთ ცვლილებები?",
     "findings": "გამოვლენილი პრობლემები",
     "mergeRequest": "შერწყმის მოთხოვნა",
     "notConnected": "არ არის დაკავშირებული",

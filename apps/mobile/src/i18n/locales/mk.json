@@ -35,6 +35,8 @@
     "connectGithub": "Поврзи GitHub",
     "cost": "Трошок",
     "discard": "Отфрли",
+    "discardChangesMessage": "Вашите промени ќе бидат изгубени.",
+    "discardChangesTitle": "Отфрли промени?",
     "findings": "Наоди",
     "mergeRequest": "merge барање",
     "notConnected": "Неповрзано",

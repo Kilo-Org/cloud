@@ -35,6 +35,8 @@
     "connectGithub": "Ceangail le GitHub",
     "cost": "Costas",
     "discard": "Caith uait",
+    "discardChangesMessage": "Caillfidh tú do chuid athruithe.",
+    "discardChangesTitle": "Caith athruithe uait?",
     "findings": "Torthaí",
     "mergeRequest": "iarratas cumaisc",
     "notConnected": "Gan nasc",

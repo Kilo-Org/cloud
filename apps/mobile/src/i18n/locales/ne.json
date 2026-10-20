@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जडान गर्नुहोस्",
     "cost": "लागत",
     "discard": "खारेज गर्नुहोस्",
+    "discardChangesMessage": "तपाईंका परिवर्तनहरू हराउनेछन्।",
+    "discardChangesTitle": "परिवर्तनहरू खारेज गर्नुहोस्?",
     "findings": "भेटिएका समस्या",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जडान छैन",

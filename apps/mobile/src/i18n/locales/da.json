@@ -35,6 +35,8 @@
     "connectGithub": "Tilknyt GitHub",
     "cost": "Pris",
     "discard": "Kassér",
+    "discardChangesMessage": "Dine ændringer går tabt.",
+    "discardChangesTitle": "Kassér ændringer?",
     "findings": "Fund",
     "mergeRequest": "merge request",
     "notConnected": "Ikke tilknyttet",

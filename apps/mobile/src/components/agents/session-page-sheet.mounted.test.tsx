@@ -29,19 +29,30 @@ vi.mock('@/components/sheet-header', () => ({
 }));
 
 function sheetElement(
-  props: { onClose?: () => void; onDismiss?: () => void; children?: ReactElement | null } = {}
+  props: {
+    onClose?: () => void;
+    onDismiss?: () => void;
+    onRequestDismiss?: () => boolean;
+    children?: ReactElement | null;
+  } = {}
 ): ReactElement {
   return createElement(SessionPageSheet, {
     visible: true,
     onClose: props.onClose ?? vi.fn<() => void>(),
     onDismiss: props.onDismiss,
+    onRequestDismiss: props.onRequestDismiss,
     // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
     children: props.children ?? null,
   });
 }
 
 async function mountSheet(
-  props: { onClose?: () => void; onDismiss?: () => void; children?: ReactElement | null } = {}
+  props: {
+    onClose?: () => void;
+    onDismiss?: () => void;
+    onRequestDismiss?: () => boolean;
+    children?: ReactElement | null;
+  } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -160,6 +171,27 @@ describe('SessionPageSheet mounted', () => {
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
     // The padding keeps the content below the system status bar.
     expect(surface?.props.style).toEqual({ paddingTop: 24 });
+
+    renderer.unmount();
+  });
+
+  it('never lets a drag dismiss the sheet, and forwards the requested dismissal', async () => {
+    const onRequestDismiss = vi.fn(() => false);
+    const renderer = await mountSheet({ onRequestDismiss });
+
+    const sheetNode = sheet(renderer.root);
+    // A full-window sheet owns a form's scroll view: on iOS the native sheet
+    // claims every downward drag that starts over it, so the gesture is off.
+    expect(sheetNode.props.dismissGestures).toBe(false);
+    // Back (and the Android scrim) stay, so the sheet is never a dead end.
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+    // The form decides whether that requested dismissal really closes it.
+    const requestDismiss: unknown = sheetNode.props.onRequestDismiss;
+    if (typeof requestDismiss !== 'function') {
+      throw new TypeError('the sheet has no dismissal request');
+    }
+    expect(requestDismiss()).toBe(false);
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

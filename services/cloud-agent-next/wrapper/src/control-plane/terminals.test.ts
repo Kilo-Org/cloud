@@ -53,6 +53,7 @@ function fakeClient(serverUrl: string): WrapperKiloClient {
 
 function fakeRuntime(client: WrapperKiloClient): KiloRuntime {
   return {
+    nativeRuntimeId: 'rt',
     directory: session.directory,
     env: { TERMINAL: '1' },
     client,
@@ -60,6 +61,7 @@ function fakeRuntime(client: WrapperKiloClient): KiloRuntime {
     installCredentials: async () => undefined,
     applyPendingCredentials: async () => false,
     sessionState: () => undefined,
+    liveTreeExecutions: () => undefined,
     refreshActivity: async () => undefined,
     needsCompute: () => false,
     isRetiredClient: () => false,

@@ -14,7 +14,8 @@
  *   must complete in the same container.
  * - `kilo-hang-recovery`: `SIGSTOP` Kilo while the fake LLM holds the first
  *   token after observing correlated native output. The progressed turn must
- *   fail agent_restarted; a fresh follow-up completes on the new native process,
+ *   fail agent_unresponsive (a hang restart, spec "Kilo hang"); a fresh follow-up
+ *   completes on the new native process,
  *   with the original user message present exactly once in Kilo history.
  *
  * Each declares `controlPlaneV2`, `controlPlaneRuntime`, and `sandboxFaults`, so
@@ -393,8 +394,11 @@ async function runKiloHang(
       Math.max(1, Math.min(HANG_RECOVERY_BUDGET_MS, deadline.remaining('hang terminal'))),
       sent.messageId
     );
-    if (failureReasonFromEvent(terminal) !== 'agent_restarted') {
-      throw new Error(`Progressed hang turn ${sent.messageId} did not fail agent_restarted`);
+    const hangReason = failureReasonFromEvent(terminal);
+    if (hangReason !== 'agent_unresponsive') {
+      throw new Error(
+        `Progressed hang turn ${sent.messageId} reason=${hangReason ?? 'none'}, expected agent_unresponsive`
+      );
     }
     const status = await awaitDurableTerminal(
       scenarioConfig,
@@ -436,7 +440,7 @@ async function runKiloHang(
       ok: true,
       message:
         `session=${session.cloudAgentSessionId}; frozePid=${froze.pid}; ` +
-        `restartedPid=${kiloAfter.pid}; hangTurn=${sent.messageId}/agent_restarted; recovery=${recovery.messageId}/completed; ` +
+        `restartedPid=${kiloAfter.pid}; hangTurn=${sent.messageId}/agent_unresponsive; recovery=${recovery.messageId}/completed; ` +
         `userTextParts=${parts.textParts}; allocation=${allocation}`,
       events,
       durationMs: Date.now() - startedAt,

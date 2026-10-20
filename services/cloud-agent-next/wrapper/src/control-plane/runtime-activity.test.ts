@@ -261,3 +261,45 @@ describe('runtime activity observation', () => {
     expect(h.faults).toEqual([]);
   });
 });
+
+describe('execution tree observation readiness', () => {
+  it('keeps initial, disconnected, and disposed observations unknown', async () => {
+    const h = harness();
+    expect(h.activity.liveTreeExecutions('root')).toBeUndefined();
+    h.activity.connected();
+    await settle();
+    expect(h.activity.liveTreeExecutions('root')).toEqual([]);
+    h.activity.lost();
+    expect(h.activity.liveTreeExecutions('root')).toBeUndefined();
+    h.activity.connected();
+    await settle();
+    expect(h.activity.liveTreeExecutions('root')).toEqual([]);
+    h.activity.dispose();
+    expect(h.activity.liveTreeExecutions('root')).toBeUndefined();
+  });
+
+  it('keeps the tree but suspends native deadlines while a periodic snapshot fails on an open feed', async () => {
+    const h = harness();
+    h.read(async () => [observation()]);
+    h.activity.connected();
+    await h.activity.refresh();
+    const tree = h.activity.liveTreeExecutions('ses_native');
+    expect(tree).toHaveLength(1);
+    h.read(async () => {
+      throw new Error('Kilo activity request timed out');
+    });
+    h.advance(CONTROL_PLANE_TIMERS.wrapper.noProgressMs - 1);
+    await h.activity.refresh();
+    h.advance(1);
+    h.activity.tick();
+    await settle();
+    expect(h.deadlines).toEqual([]);
+    expect(h.activity.liveTreeExecutions('ses_native')).toEqual(tree);
+    h.read(async () => [observation()]);
+    await h.activity.refresh();
+    h.activity.tick();
+    await settle();
+    expect(h.deadlines).toEqual(['no_progress']);
+    h.activity.dispose();
+  });
+});

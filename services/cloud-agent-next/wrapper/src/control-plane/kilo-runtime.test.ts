@@ -128,11 +128,16 @@ function createFeedFactory(options: { failOpens?: number } = {}): {
     callbacks: KiloFeedCallbacks
   ) => { open(): Promise<void>; close(): void };
   feeds: FakeFeedRecord[];
+  /** Refuses the next `count` opens, as a dead Kilo listener does. */
+  failOpens(count: number): void;
 } {
   const feeds: FakeFeedRecord[] = [];
   let remainingFailures = options.failOpens ?? 0;
   return {
     feeds,
+    failOpens(count) {
+      remainingFailures = count;
+    },
     openFeed: (source, callbacks) => {
       const record: FakeFeedRecord = {
         callbacks,
@@ -200,6 +205,7 @@ function createRuntime(options: {
   timers?: ControlPlaneTimers;
   onRestart?: KiloRuntimeOptions['onRestart'];
   onEvent?: KiloRuntimeOptions['onEvent'];
+  onFeedInterrupted?: KiloRuntimeOptions['onFeedInterrupted'];
   sampleMemory?: KiloRuntimeOptions['sampleMemory'];
   memoryHolds?: boolean[];
   readSnapshot?: KiloRuntimeOptions['readSnapshot'];
@@ -224,6 +230,7 @@ function createRuntime(options: {
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     onEvent: options.onEvent,
+    onFeedInterrupted: options.onFeedInterrupted,
     ...(options.isIdle
       ? {
           isIdle: async () => options.isIdle!(),
@@ -633,6 +640,14 @@ describe('createKiloRuntime', () => {
       });
       const client = await runtime.ensure();
       client.sendPromptAsync = async () => undefined;
+      client.drainSession = async input => {
+        turns.observeKiloEvent({
+          type: 'session.drained',
+          properties: { sessionID: input.sessionId, token: input.token },
+          nativeRuntimeId: runtime.nativeRuntimeId!,
+        });
+        return true;
+      };
       const turns = createTurnManager({
         timers: TEST_TIMERS,
         runtimes: { get: () => runtime },
@@ -703,6 +718,14 @@ describe('createKiloRuntime', () => {
       const submitted: string[] = [];
       client.sendPromptAsync = async input => {
         submitted.push(input.messageId ?? '');
+      };
+      client.drainSession = async input => {
+        turns.observeKiloEvent({
+          type: 'session.drained',
+          properties: { sessionID: input.sessionId, token: input.token },
+          nativeRuntimeId: runtime.nativeRuntimeId!,
+        });
+        return true;
       };
       const turns = createTurnManager({
         timers: TEST_TIMERS,
@@ -983,12 +1006,90 @@ describe('createKiloRuntime', () => {
     await runtime.shutdown();
   });
 
+  it('reports established feed loss synchronously before reconnecting, but not retirement', async () => {
+    const feed = createFeedFactory();
+    const gaps: string[] = [];
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      scheduler: createScheduler(),
+      feed,
+      probe: createProbe(true),
+      onFeedInterrupted: id => gaps.push(id),
+    });
+    await runtime.ensure();
+    const first = feed.feeds[0]!;
+    first.callbacks.onFailure();
+    expect(gaps).toEqual([first.nativeRuntimeId]);
+    await waitFor(() => feed.feeds.length === 2);
+    await runtime.shutdown();
+    expect(gaps).toEqual([first.nativeRuntimeId]);
+  });
+
+  it('does not report an opening failure as established feed history loss', async () => {
+    const gaps: string[] = [];
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      scheduler: createScheduler(),
+      feed: createFeedFactory({ failOpens: 1 }),
+      probe: createProbe(true),
+      onFeedInterrupted: id => gaps.push(id),
+    });
+    expect(await runtime.ensure().catch(error => error)).toBeInstanceOf(Error);
+    expect(gaps).toEqual([]);
+    await runtime.shutdown();
+  });
+
+  it('restarts a crashed Kilo for its exit when refused reopens spend the budget first', async () => {
+    const spawner = createSpawner();
+    const feed = createFeedFactory();
+    const { runtime, logs } = createRuntime({
+      spawner,
+      feed,
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      timers: timers({ sseSilenceMs: 60_000, healthRequestMs: 1_000 }),
+    });
+    const limit = CONTROL_PLANE_TIMERS.wrapper.sseReconnectLimit;
+    await runtime.ensure();
+    feed.failOpens(limit);
+    feed.feeds[0]!.callbacks.onFailure();
+    // The listener died first; the spawned process reports its exit a little later.
+    await waitFor(() => feed.feeds.length >= 1 + limit);
+    await Bun.sleep(20);
+    spawner.processes[0]!.exit();
+    await waitFor(() => logs.some(line => line.includes('kilo restarting')));
+    expect(logs.find(line => line.includes('kilo restarting'))).toContain('reason=exit');
+    await runtime.shutdown();
+  });
+
+  it('restarts a live Kilo as hung when its refused reopens spend the budget', async () => {
+    const spawner = createSpawner();
+    const feed = createFeedFactory();
+    const { runtime, logs } = createRuntime({
+      spawner,
+      feed,
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      timers: timers({ sseSilenceMs: 60_000, healthRequestMs: 50 }),
+    });
+    await runtime.ensure();
+    feed.failOpens(CONTROL_PLANE_TIMERS.wrapper.sseReconnectLimit);
+    feed.feeds[0]!.callbacks.onFailure();
+    await waitFor(() => logs.some(line => line.includes('kilo restarting')));
+    expect(logs.find(line => line.includes('kilo restarting'))).toContain(
+      '"trigger":"sse_reconnect_budget"'
+    );
+    await runtime.shutdown();
+  });
+
   it('reconnects the stream and counts it when the health probe answers', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
     const feed = createFeedFactory();
     const probe = createProbe(true);
+    const gaps: string[] = [];
     const { runtime, restarts } = createRuntime({
+      onFeedInterrupted: id => gaps.push(id),
       spawner,
       feed,
       probe,
@@ -1014,6 +1115,7 @@ describe('createKiloRuntime', () => {
     expect(feed.feeds[0]!.closed).toBe(1);
     expect(spawner.spawnCount()).toBe(1);
     expect(restarts).toEqual([]);
+    expect(gaps).toEqual([feed.feeds[0]!.nativeRuntimeId]);
     await runtime.shutdown();
   });
 
@@ -1613,6 +1715,10 @@ describe('Kilo observation recovery', () => {
     const client = await created.runtime.ensure();
     client.sendPromptAsync = async input => {
       submissions.push(input.messageId ?? '');
+    };
+    client.drainSession = async input => {
+      event('session.drained', { sessionID: input.sessionId, token: input.token });
+      return true;
     };
     client.abortSession = async input => {
       aborts.push(input.sessionId);

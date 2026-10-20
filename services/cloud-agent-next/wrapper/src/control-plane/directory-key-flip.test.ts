@@ -297,7 +297,7 @@ describe('directory-key flip (production dispatcher)', () => {
         h.turns.observeKiloEvent({
           type: 'session.turn.open',
           properties: { sessionID: opts.sessionId },
-          nativeRuntimeId: 'rt',
+          nativeRuntimeId: h.runtimes.get(DIRECTORY)!.nativeRuntimeId!,
         });
       };
       client.abortSession = async opts => {
@@ -484,6 +484,7 @@ describe('directory-key flip (production dispatcher)', () => {
         sendPromptAsync: (opts: { sessionId: string }) => Promise<void>;
         abortSessionForCleanup: (input: { sessionId: string }) => Promise<void>;
         stopSessionProcesses: (input: { sessionId: string }) => Promise<void>;
+        drainSession: (input: { sessionId: string; token?: string }) => Promise<boolean>;
         children: (input: {
           sessionId: string;
         }) => Promise<Array<{ id: string; directory: string }>>;
@@ -492,8 +493,16 @@ describe('directory-key flip (production dispatcher)', () => {
         h.turns.observeKiloEvent({
           type: 'session.turn.open',
           properties: { sessionID: opts.sessionId },
-          nativeRuntimeId: 'rt',
+          nativeRuntimeId: h.runtimes.get(DIRECTORY)!.nativeRuntimeId!,
         });
+      };
+      retiredClient.drainSession = async input => {
+        h.turns.observeKiloEvent({
+          type: 'session.drained',
+          properties: { sessionID: input.sessionId, token: input.token },
+          nativeRuntimeId: h.runtimes.get(DIRECTORY)!.nativeRuntimeId!,
+        });
+        return true;
       };
       // If release cleanup used this retired client, these would record it.
       retiredClient.abortSessionForCleanup = async input => {
@@ -525,7 +534,7 @@ describe('directory-key flip (production dispatcher)', () => {
       h.turns.observeKiloEvent({
         type: 'session.turn.close',
         properties: { sessionID: 'ses_kilo_a', reason: 'completed' },
-        nativeRuntimeId: 'rt',
+        nativeRuntimeId: h.runtimes.get(DIRECTORY)!.nativeRuntimeId!,
       });
       await waitFor(() => h.spawner.spawnCount() === 2);
       await Bun.sleep(20);

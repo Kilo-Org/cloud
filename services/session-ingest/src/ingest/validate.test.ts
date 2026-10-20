@@ -92,7 +92,7 @@ describe('validateAndParseIngestPayload', () => {
     });
   });
 
-  it('skips a message whose id exceeds the cursor id length', () => {
+  it('skips a message whose id does not satisfy the cursor id contract', () => {
     const validItem = { type: 'message', data: { id: 'msg_valid' } };
     const result = validate({
       data: [
@@ -101,6 +101,7 @@ describe('validateAndParseIngestPayload', () => {
           type: 'message',
           data: { id: `msg${'"'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}` },
         },
+        { type: 'message', data: { id: 'not_a_message_id' } },
       ],
     });
 
@@ -108,7 +109,7 @@ describe('validateAndParseIngestPayload', () => {
       ok: true,
       items: [validItem],
       validItemCount: 1,
-      skippedItemCount: 1,
+      skippedItemCount: 2,
     });
   });
 

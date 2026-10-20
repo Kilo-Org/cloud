@@ -102,10 +102,26 @@ describe('sanitizeSentryRequestData', () => {
     const result = sanitizeSentryRequestData(event);
 
     expect(result.request?.url).toBe(`https://app.kilo.sh${path}`);
-    // The standalone query string carries no path context, so only the shared
-    // sensitive keys are removed there.
-    expect(result.request?.query_string).toBe('tab=usage');
+    expect(result.request?.query_string).toBe('');
   });
+
+  test.each(SHARED_PATHS)(
+    'drops the whole query string on the %s path for every query form',
+    path => {
+      const relativeUrl = `${path}?email=user%40example.com&tab=usage`;
+      const stringForm: Event = { request: { url: relativeUrl, query_string: 'tab=usage' } };
+      const arrayForm: Event = {
+        request: { url: relativeUrl, query_string: [['tab', 'usage']] },
+      };
+      const objectForm: Event = {
+        request: { url: relativeUrl, query_string: { tab: 'usage' } },
+      };
+
+      expect(sanitizeSentryRequestData(stringForm).request?.query_string).toBe('');
+      expect(sanitizeSentryRequestData(arrayForm).request?.query_string).toEqual([]);
+      expect(sanitizeSentryRequestData(objectForm).request?.query_string).toEqual({});
+    }
+  );
 
   test.each(SHARED_PATHS)(
     'drops the query string on a relative %s path while keeping the fragment',

@@ -156,6 +156,27 @@ function sanitizeRequestUrl(url: string): string {
   }
 }
 
+function requestPathname(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    const hashIndex = url.indexOf('#');
+    const withoutFragment = hashIndex === -1 ? url : url.slice(0, hashIndex);
+    const queryIndex = withoutFragment.indexOf('?');
+    return queryIndex === -1 ? withoutFragment : withoutFragment.slice(0, queryIndex);
+  }
+}
+
+function emptyQueryString(queryString: SentryQueryString): SentryQueryString {
+  if (typeof queryString === 'string') {
+    return '';
+  }
+  if (Array.isArray(queryString)) {
+    return [];
+  }
+  return {};
+}
+
 function sanitizeQueryString(queryString: SentryQueryString): SentryQueryString {
   if (typeof queryString === 'string') {
     return sanitizeStringQuery(queryString);
@@ -181,7 +202,13 @@ export function sanitizeSentryRequestData(event: Event): Event {
     request.url = sanitizeRequestUrl(request.url);
   }
   if (request.query_string !== undefined) {
-    request.query_string = sanitizeQueryString(request.query_string);
+    // A request on a shared policy path keeps no query string, in the URL or
+    // in this field.
+    const sensitivePath =
+      typeof request.url === 'string' && SENSITIVE_PATHS.has(requestPathname(request.url));
+    request.query_string = sensitivePath
+      ? emptyQueryString(request.query_string)
+      : sanitizeQueryString(request.query_string);
   }
   return event;
 }

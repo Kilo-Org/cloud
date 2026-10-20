@@ -22,6 +22,7 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 
 const mockErrorExceptInTest = jest.mocked(errorExceptInTest);
 const originalFetch = global.fetch;
+const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
 const BUDGET_MS = 10 * 60 * 1000;
 const encoder = new TextEncoder();
 
@@ -83,6 +84,7 @@ describe('upstreamRequest duration budget', () => {
   let budgetTimer: AbortController;
 
   beforeEach(() => {
+    process.env.VERCEL_TARGET_ENV = 'development';
     mockErrorExceptInTest.mockReset();
     budgetTimer = new AbortController();
     jest.spyOn(AbortSignal, 'timeout').mockReturnValue(budgetTimer.signal);
@@ -90,6 +92,8 @@ describe('upstreamRequest duration budget', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+    else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
     jest.restoreAllMocks();
   });
 

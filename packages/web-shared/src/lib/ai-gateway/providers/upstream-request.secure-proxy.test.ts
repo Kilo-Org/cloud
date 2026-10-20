@@ -13,6 +13,7 @@ jest.mock('next/server', () => ({
 }));
 
 const originalFetch = global.fetch;
+const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
 
 function secureProxyProvider(disable_url_suffix: boolean) {
   return buildDirectProvider(
@@ -66,8 +67,14 @@ async function sendThroughSecureProxy(disable_url_suffix: boolean) {
 }
 
 describe('upstreamRequest through the secure proxy', () => {
+  beforeEach(() => {
+    process.env.VERCEL_TARGET_ENV = 'development';
+  });
+
   afterEach(() => {
     global.fetch = originalFetch;
+    if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+    else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
   });
 
   it('sends only the proxy secret to the proxy and moves upstream auth into the body', async () => {

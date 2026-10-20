@@ -99,6 +99,7 @@ if (!exclusiveTestModel) throw new Error('Expected synthetic Kilo-exclusive mode
 
 const originalOpenAiChatGptApiKey = process.env.OPENAI_CHATGPT_API_KEY;
 const originalFetch = global.fetch;
+const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
 
 function connectedConnection(): OpenAiChatGptConnection {
   return {
@@ -171,6 +172,7 @@ async function transformResponsesRequest(
 }
 
 beforeEach(() => {
+  process.env.VERCEL_TARGET_ENV = 'development';
   process.env.OPENAI_CHATGPT_API_KEY = PARTNER_KEY;
   jest
     .mocked(getOpenAiChatGptStoredConnection)
@@ -190,6 +192,8 @@ afterAll(() => {
     process.env.OPENAI_CHATGPT_API_KEY = originalOpenAiChatGptApiKey;
   }
   global.fetch = originalFetch;
+  if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+  else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
 });
 
 describe('isOpenAiChatGptEligible', () => {

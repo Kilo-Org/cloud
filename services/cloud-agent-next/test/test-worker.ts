@@ -72,6 +72,7 @@ export class CloudAgentSession extends RealCloudAgentSession {
 }
 
 export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
+export { WorktreeCleanupCoordinator } from '../src/worktree-cleanup/WorktreeCleanupCoordinator.js';
 // The test Worker binds the production `SANDBOX_CONTROL`/`SANDBOX_SESSION`
 // names to the control-plane V2 classes, matching production after the C1c flip.
 export { SandboxControlV2, SandboxSessionV2 };

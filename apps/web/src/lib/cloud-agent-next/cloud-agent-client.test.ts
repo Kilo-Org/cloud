@@ -185,6 +185,63 @@ describe('CloudAgentNextClient review message results', () => {
   });
 });
 
+describe('CloudAgentNextClient worktree cleanup', () => {
+  const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const batch = {
+    id: 'cleanup-batch',
+    createdAt: '2026-10-20T12:00:00.000Z',
+    items: [{ worktreeId, status: 'pending', deletedSessionIds: [], error: null }],
+  };
+  const mutate =
+    jest.fn<(input: CloudAgentClientModule.StartWorktreeCleanupInput) => Promise<unknown>>();
+  const query =
+    jest.fn<(input: CloudAgentClientModule.GetWorktreeCleanupInput) => Promise<unknown>>();
+
+  beforeEach(() => {
+    mutate.mockReset().mockResolvedValue(batch);
+    query.mockReset().mockResolvedValue(batch);
+    mockCreateTRPCClient.mockReturnValueOnce({
+      startWorktreeCleanup: { mutate },
+      getWorktreeCleanup: { query },
+    });
+  });
+
+  it('forwards frozen worktree IDs and organization scope to the typed worker mutation', async () => {
+    const input: CloudAgentClientModule.StartWorktreeCleanupInput = {
+      worktreeIds: [worktreeId],
+      kilocodeOrganizationId: '12345678-1234-4234-9234-123456789abc',
+    };
+    await expect(new CloudAgentNextClient('token').startWorktreeCleanup(input)).resolves.toEqual(
+      batch
+    );
+    expect(mutate).toHaveBeenCalledWith(input);
+  });
+
+  it.each([{}, { kilocodeOrganizationId: '12345678-1234-4234-9234-123456789abc' }])(
+    'forwards cleanup polling scope %j and preserves null',
+    async input => {
+      const client = new CloudAgentNextClient('token');
+      await expect(client.getWorktreeCleanup(input)).resolves.toEqual(batch);
+      expect(query).toHaveBeenCalledWith(input);
+      query.mockResolvedValueOnce(null);
+      await expect(client.getWorktreeCleanup(input)).resolves.toBeNull();
+    }
+  );
+
+  it('rejects malformed worker results rather than exposing unsupported statuses', async () => {
+    query.mockResolvedValueOnce({ ...batch, items: [{ ...batch.items[0], status: 'done' }] });
+    await expect(new CloudAgentNextClient('token').getWorktreeCleanup({})).rejects.toThrow();
+  });
+
+  it('propagates worker failures without storing or replacing them', async () => {
+    const error = new Error('worker unavailable');
+    mutate.mockRejectedValueOnce(error);
+    await expect(
+      new CloudAgentNextClient('token').startWorktreeCleanup({ worktreeIds: [worktreeId] })
+    ).rejects.toBe(error);
+  });
+});
+
 describe('CloudAgentNextClient worktree changes', () => {
   const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const snapshot: WorktreeChangesSnapshot = {

@@ -11,7 +11,10 @@ import {
   type NewCliSessionV2,
   type User,
 } from '@kilocode/db/schema';
-import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentWorktreeIdSchema,
+  type CloudAgentWorktreeId,
+} from '@kilocode/session-ingest-contracts';
 import { TRPCClientError } from '@trpc/client';
 import type * as TrpcServerModule from '@trpc/server';
 import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
@@ -20,6 +23,9 @@ import type { cliSessionsV2Router } from './cli-sessions-v2-router';
 import type {
   DeleteWorktreeInput,
   DeleteWorktreeOutput,
+  StartWorktreeCleanupInput,
+  WorktreeCleanupOutput,
+  GetWorktreeCleanupInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 
 const UUID = '12345678-1234-4234-9234-123456789abc';
@@ -38,6 +44,10 @@ const PR_URL = `${GIT_URL}/pull/42`;
 
 const mockRuntimeDelete = jest.fn<(sessionId: string) => Promise<{ success: boolean }>>();
 const mockWorktreeDelete = jest.fn<(input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>();
+const mockStartWorktreeCleanup =
+  jest.fn<(input: StartWorktreeCleanupInput) => Promise<WorktreeCleanupOutput>>();
+const mockGetWorktreeCleanup =
+  jest.fn<(input: GetWorktreeCleanupInput) => Promise<WorktreeCleanupOutput | null>>();
 const mockGetRuntimeSession = jest.fn<(sessionId: string) => Promise<Record<string, unknown>>>();
 const mockDeleteSessionIngest = jest.fn<(sessionId: string, userId: string) => Promise<void>>();
 const mockFetchSessionSnapshot = jest.fn<() => Promise<null>>();
@@ -50,6 +60,8 @@ const mockCreateCloudAgentNextClient = jest.fn((_token: string) => ({
   deleteSession: mockRuntimeDelete,
   deleteWorktree: mockWorktreeDelete,
   getSession: mockGetRuntimeSession,
+  startWorktreeCleanup: mockStartWorktreeCleanup,
+  getWorktreeCleanup: mockGetWorktreeCleanup,
 }));
 
 jest.mock('@kilocode/web-shared/lib/trpc/init', () => {
@@ -69,6 +81,9 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
+  rethrowCloudAgentError: (error: unknown): never => {
+    throw error;
+  },
 }));
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => ({
@@ -255,6 +270,493 @@ beforeEach(async () => {
       );
   });
   mockFetchSessionSnapshot.mockReset().mockResolvedValue(null);
+  mockStartWorktreeCleanup.mockReset().mockImplementation(async input => ({
+    id: 'cleanup-batch',
+    createdAt: INITIAL_TIME,
+    items: input.worktreeIds.map(worktreeId => ({
+      worktreeId,
+      status: 'pending',
+      deletedSessionIds: [],
+      error: null,
+    })),
+  }));
+  mockGetWorktreeCleanup.mockReset().mockResolvedValue(null);
+});
+
+describe('merged worktree cleanup', () => {
+  async function mergedSession(overrides: Partial<NewCliSessionV2> = {}, state = 'merged') {
+    const session = await insertSession({
+      cloud_agent_worktree_id: newWorktreeId(),
+      platform: 'github',
+      git_url: GIT_URL,
+      pr_url: PR_URL,
+      pr_number: 42,
+      pr_link_verified_at: INITIAL_TIME,
+      ...overrides,
+    });
+    await db.insert(github_branch_pull_requests).values({
+      git_url: GIT_URL,
+      git_branch: `branch-${crypto.randomUUID()}`,
+      owned_by_user_id: session.organization_id === null ? session.kilo_user_id : null,
+      owned_by_organization_id: session.organization_id,
+      pr_url: session.pr_url ?? PR_URL,
+      pr_number: session.pr_number ?? 42,
+      pr_state: state,
+    });
+    return {
+      ...session,
+      cloud_agent_worktree_id: cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id),
+    };
+  }
+
+  it('enumerates all eligible worktrees regardless of list filters, dates, and pagination', async () => {
+    const sessions = await Promise.all(
+      Array.from({ length: 12 }, (_, index) =>
+        mergedSession({
+          pr_number: index + 1,
+          pr_url: `${GIT_URL}/pull/${index + 1}`,
+          created_at: '2020-01-01T00:00:00.000Z',
+          created_on_platform: 'app-builder',
+        })
+      )
+    );
+    const result = await createCaller({ user }).mergedWorktreeCleanupPreview({
+      organizationId: null,
+    });
+    expect(result.worktreeIds.sort()).toEqual(
+      sessions.map(session => session.cloud_agent_worktree_id).sort()
+    );
+  });
+
+  it.each(['open', 'closed', 'unknown', 'unverified', 'gitlab', 'missing-cache'])(
+    'rejects a worktree with a merged PR and another %s PR, including descendants without a worktree ID',
+    async state => {
+      const root = await mergedSession();
+      const child = await insertSession({
+        parent_session_id: root.session_id,
+        cloud_agent_worktree_id: null,
+      });
+      await insertSession({
+        parent_session_id: child.session_id,
+        cloud_agent_worktree_id: null,
+        platform: state === 'gitlab' ? 'gitlab' : 'github',
+        git_url: GIT_URL,
+        pr_url: `${GIT_URL}/pull/99`,
+        pr_number: 99,
+        pr_link_verified_at: state === 'unverified' ? null : INITIAL_TIME,
+      });
+      if (state !== 'missing-cache') {
+        await db.insert(github_branch_pull_requests).values({
+          git_url: GIT_URL,
+          git_branch: 'other-pr',
+          owned_by_user_id: USER_ID,
+          pr_url: `${GIT_URL}/pull/99`,
+          pr_number: 99,
+          pr_state: ['open', 'closed', 'unknown'].includes(state) ? state : 'merged',
+        });
+      }
+      await expect(
+        createCaller({ user }).mergedWorktreeCleanupPreview({ organizationId: null })
+      ).resolves.toEqual({ worktreeIds: [] });
+    }
+  );
+
+  it('accepts multiple verified merged PRs in the same worktree', async () => {
+    const first = await mergedSession();
+    await mergedSession({
+      cloud_agent_worktree_id: first.cloud_agent_worktree_id,
+      pr_url: `${GIT_URL}/pull/99`,
+      pr_number: 99,
+    });
+    await expect(
+      createCaller({ user }).mergedWorktreeCleanupPreview({ organizationId: null })
+    ).resolves.toEqual({ worktreeIds: [first.cloud_agent_worktree_id] });
+  });
+
+  it('rejects mixed merged and open PRs across root sessions in the same worktree', async () => {
+    const first = await mergedSession();
+    await mergedSession(
+      {
+        cloud_agent_worktree_id: first.cloud_agent_worktree_id,
+        pr_url: `${GIT_URL}/pull/99`,
+        pr_number: 99,
+      },
+      'open'
+    );
+    await expect(
+      createCaller({ user }).mergedWorktreeCleanupPreview({ organizationId: null })
+    ).resolves.toEqual({ worktreeIds: [] });
+  });
+
+  it('rejects worktrees whose metadata belongs to another owner or tenant', async () => {
+    const otherOwner = await mergedSession();
+    const otherTenant = await mergedSession({ pr_number: 99 });
+    await db.insert(cloud_agent_worktrees).values([
+      { worktree_id: otherOwner.cloud_agent_worktree_id, kilo_user_id: OTHER_USER_ID },
+      {
+        worktree_id: otherTenant.cloud_agent_worktree_id,
+        kilo_user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+      },
+    ]);
+    await expect(
+      createCaller({ user }).mergedWorktreeCleanupPreview({ organizationId: null })
+    ).resolves.toEqual({ worktreeIds: [] });
+    await expect(
+      createCaller({ user }).startMergedWorktreeCleanup({
+        organizationId: null,
+        worktreeIds: [otherOwner.cloud_agent_worktree_id, otherTenant.cloud_agent_worktree_id],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockStartWorktreeCleanup).not.toHaveBeenCalled();
+  });
+
+  it('does not trust unverified, branch-only, non-GitHub, or absent PR links', async () => {
+    await mergedSession({ pr_link_verified_at: null });
+    await mergedSession({ pr_number: 43, pr_url: null });
+    await mergedSession({ pr_number: 44, platform: 'gitlab' });
+    await insertSession({ git_url: GIT_URL, git_branch: BRANCH });
+    await expect(
+      createCaller({ user }).mergedWorktreeCleanupPreview({ organizationId: null })
+    ).resolves.toEqual({ worktreeIds: [] });
+  });
+
+  it('isolates owners and organization scopes, including PR cache ownership', async () => {
+    const personal = await mergedSession();
+    const org = await mergedSession({ organization_id: ORGANIZATION_ID });
+    await mergedSession({ organization_id: OTHER_ORGANIZATION_ID });
+    await mergedSession({ kilo_user_id: OTHER_USER_ID });
+    await insertSession({
+      cloud_agent_worktree_id: newWorktreeId(),
+      platform: 'github',
+      git_url: GIT_URL,
+      pr_url: PR_URL,
+      pr_number: 42,
+      pr_link_verified_at: INITIAL_TIME,
+      kilo_user_id: OTHER_USER_ID,
+      organization_id: ORGANIZATION_ID,
+    });
+    const caller = createCaller({ user });
+    await expect(caller.mergedWorktreeCleanupPreview({ organizationId: null })).resolves.toEqual({
+      worktreeIds: [personal.cloud_agent_worktree_id],
+    });
+    await expect(
+      caller.mergedWorktreeCleanupPreview({ organizationId: ORGANIZATION_ID })
+    ).resolves.toEqual({ worktreeIds: [org.cloud_agent_worktree_id] });
+    await db
+      .delete(github_branch_pull_requests)
+      .where(eq(github_branch_pull_requests.owned_by_user_id, USER_ID));
+    await expect(caller.mergedWorktreeCleanupPreview({ organizationId: null })).resolves.toEqual({
+      worktreeIds: [],
+    });
+  });
+
+  it('allows restarting eligible unfinished deletions without clearing the deletion fence', async () => {
+    const session = await mergedSession();
+    await db.insert(cloud_agent_worktrees).values({
+      worktree_id: session.cloud_agent_worktree_id,
+      kilo_user_id: USER_ID,
+      deletion_started_at: INITIAL_TIME,
+    });
+    const caller = createCaller({ user });
+    await expect(caller.mergedWorktreeCleanupPreview({ organizationId: null })).resolves.toEqual({
+      worktreeIds: [session.cloud_agent_worktree_id],
+    });
+    await caller.startMergedWorktreeCleanup({
+      organizationId: null,
+      worktreeIds: [session.cloud_agent_worktree_id],
+    });
+    expect(mockStartWorktreeCleanup).toHaveBeenCalledWith({
+      worktreeIds: [session.cloud_agent_worktree_id],
+    });
+    const [worktree] = await db
+      .select()
+      .from(cloud_agent_worktrees)
+      .where(eq(cloud_agent_worktrees.worktree_id, session.cloud_agent_worktree_id));
+    expect(new Date(worktree.deletion_started_at!).toISOString()).toBe(INITIAL_TIME);
+  });
+
+  it('continues to exclude completed deletions', async () => {
+    const session = await mergedSession();
+    await db.insert(cloud_agent_worktrees).values({
+      worktree_id: session.cloud_agent_worktree_id,
+      kilo_user_id: USER_ID,
+      deletion_started_at: INITIAL_TIME,
+      deletion_completed_at: INITIAL_TIME,
+    });
+    await expect(
+      createCaller({ user }).mergedWorktreeCleanupPreview({ organizationId: null })
+    ).resolves.toEqual({ worktreeIds: [] });
+  });
+
+  it.each(['open', 'unverified'])(
+    'rejects a %s PR on a scope-linked session without parent or worktree identity',
+    async state => {
+      const root = await mergedSession();
+      await insertSession({
+        parent_session_id: null,
+        cloud_agent_worktree_id: null,
+        cloud_agent_session_id: null,
+        cloud_agent_session_scope_id: root.cloud_agent_session_id,
+        platform: 'github',
+        git_url: GIT_URL,
+        pr_url: `${GIT_URL}/pull/99`,
+        pr_number: 99,
+        pr_link_verified_at: state === 'unverified' ? null : INITIAL_TIME,
+      });
+      await db.insert(github_branch_pull_requests).values({
+        git_url: GIT_URL,
+        git_branch: 'scope-linked',
+        owned_by_user_id: USER_ID,
+        pr_url: `${GIT_URL}/pull/99`,
+        pr_number: 99,
+        pr_state: state === 'open' ? 'open' : 'merged',
+      });
+      const caller = createCaller({ user });
+      await expect(caller.mergedWorktreeCleanupPreview({ organizationId: null })).resolves.toEqual({
+        worktreeIds: [],
+      });
+      await expect(
+        caller.startMergedWorktreeCleanup({
+          organizationId: null,
+          worktreeIds: [root.cloud_agent_worktree_id],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    }
+  );
+
+  it('keeps scope-linked membership inside the authenticated owner and organization', async () => {
+    const root = await mergedSession();
+    for (const overrides of [
+      { kilo_user_id: OTHER_USER_ID },
+      { organization_id: ORGANIZATION_ID },
+    ]) {
+      await insertSession({
+        cloud_agent_worktree_id: null,
+        cloud_agent_session_id: null,
+        cloud_agent_session_scope_id: root.cloud_agent_session_id,
+        pr_url: `${GIT_URL}/pull/99`,
+        pr_number: 99,
+        ...overrides,
+      });
+    }
+    await expect(
+      createCaller({ user }).mergedWorktreeCleanupPreview({ organizationId: null })
+    ).resolves.toEqual({ worktreeIds: [root.cloud_agent_worktree_id] });
+  });
+
+  it('rechecks and intersects frozen IDs without adding newly eligible worktrees', async () => {
+    const kept = await mergedSession({ pr_number: 1 });
+    const changed = await mergedSession({ pr_number: 2 });
+    await mergedSession({ pr_number: 3 });
+    await db
+      .update(github_branch_pull_requests)
+      .set({ pr_state: 'open' })
+      .where(eq(github_branch_pull_requests.pr_number, 2));
+    const result = await createCaller({ user }).startMergedWorktreeCleanup({
+      organizationId: null,
+      worktreeIds: [
+        kept.cloud_agent_worktree_id,
+        changed.cloud_agent_worktree_id,
+        WORKTREE_ID,
+        kept.cloud_agent_worktree_id,
+      ],
+    });
+    expect(mockStartWorktreeCleanup).toHaveBeenCalledWith({
+      worktreeIds: [kept.cloud_agent_worktree_id],
+    });
+    expect(result.items).toEqual([
+      expect.objectContaining({ worktreeId: kept.cloud_agent_worktree_id }),
+    ]);
+    expect(mockGenerateCloudAgentToken).toHaveBeenCalledWith(user);
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+  });
+
+  it('rejects empty or no-longer-eligible selections before creating a worker client', async () => {
+    const caller = createCaller({ user });
+    for (const worktreeIds of [[], [WORKTREE_ID]]) {
+      await expect(
+        caller.startMergedWorktreeCleanup({ organizationId: null, worktreeIds })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('still eligible'),
+      });
+    }
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it('forwards organization scope on start and get and returns the worker batch unchanged', async () => {
+    const session = await mergedSession({ organization_id: ORGANIZATION_ID });
+    const caller = createCaller({ user });
+    const batch = await caller.startMergedWorktreeCleanup({
+      organizationId: ORGANIZATION_ID,
+      worktreeIds: [session.cloud_agent_worktree_id],
+    });
+    expect(mockStartWorktreeCleanup).toHaveBeenCalledWith({
+      worktreeIds: [session.cloud_agent_worktree_id],
+      kilocodeOrganizationId: ORGANIZATION_ID,
+    });
+    mockGetWorktreeCleanup.mockResolvedValue(batch);
+    await expect(caller.getWorktreeCleanup({ organizationId: ORGANIZATION_ID })).resolves.toEqual(
+      batch
+    );
+    expect(mockGetWorktreeCleanup).toHaveBeenCalledWith({
+      kilocodeOrganizationId: ORGANIZATION_ID,
+    });
+    await caller.getWorktreeCleanup({ organizationId: null });
+    expect(mockGetWorktreeCleanup).toHaveBeenLastCalledWith({});
+  });
+
+  it('denies removed organization members on preview, start, and get', async () => {
+    const session = await mergedSession({ organization_id: ORGANIZATION_ID });
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.kilo_user_id, USER_ID),
+          eq(organization_memberships.organization_id, ORGANIZATION_ID)
+        )
+      );
+    const caller = createCaller({ user });
+    await expect(
+      caller.mergedWorktreeCleanupPreview({ organizationId: ORGANIZATION_ID })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(
+      caller.startMergedWorktreeCleanup({
+        organizationId: ORGANIZATION_ID,
+        worktreeIds: [session.cloud_agent_worktree_id],
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(
+      caller.getWorktreeCleanup({ organizationId: ORGANIZATION_ID })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects previews above the 1000-worktree batch limit instead of truncating', async () => {
+    await mergedSession();
+    await db.insert(cli_sessions_v2).values(
+      Array.from({ length: 1000 }, () =>
+        makeSession({
+          cloud_agent_worktree_id: newWorktreeId(),
+          platform: 'github',
+          git_url: GIT_URL,
+          pr_url: PR_URL,
+          pr_number: 42,
+          pr_link_verified_at: INITIAL_TIME,
+        })
+      )
+    );
+    await expect(
+      createCaller({ user }).mergedWorktreeCleanupPreview({ organizationId: null })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('More than 1000'),
+    });
+  });
+
+  it('rejects input larger than 1000 worktrees', async () => {
+    await expect(
+      createCaller({ user }).startMergedWorktreeCleanup({
+        organizationId: null,
+        worktreeIds: Array.from({ length: 1001 }, newWorktreeId),
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockStartWorktreeCleanup).not.toHaveBeenCalled();
+  });
+});
+
+describe('retryWorktreeCleanup', () => {
+  function cleanupBatch(
+    statuses: WorktreeCleanupOutput['items'][number]['status'][]
+  ): WorktreeCleanupOutput {
+    return {
+      id: 'persisted-cleanup',
+      createdAt: INITIAL_TIME,
+      items: statuses.map(status => ({
+        worktreeId: newWorktreeId(),
+        status,
+        deletedSessionIds: [],
+        error: status === 'failed' ? 'Cleanup attempts exhausted' : null,
+      })),
+    };
+  }
+
+  it.each([null, ORGANIZATION_ID])(
+    'retrieves the persisted batch in scope %s and submits only its failed IDs',
+    async organizationId => {
+      const batch = cleanupBatch(['failed', 'deleted', 'pending', 'deleting', 'failed']);
+      mockGetWorktreeCleanup.mockResolvedValue(batch);
+      const result = await createCaller({ user }).retryWorktreeCleanup({ organizationId });
+      const scope = organizationId === null ? {} : { kilocodeOrganizationId: organizationId };
+      const worktreeIds = [batch.items[0].worktreeId, batch.items[4].worktreeId];
+      expect(mockGetWorktreeCleanup).toHaveBeenCalledWith(scope);
+      expect(mockStartWorktreeCleanup).toHaveBeenCalledWith({ ...scope, worktreeIds });
+      expect(result.items.map(item => item.worktreeId)).toEqual(worktreeIds);
+      expect(mockGenerateCloudAgentToken).toHaveBeenCalledWith(user);
+      expect(mockCreateCloudAgentNextClient).toHaveBeenCalledTimes(1);
+      expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    }
+  );
+
+  it('cannot submit caller-provided worktree IDs', async () => {
+    mockGetWorktreeCleanup.mockResolvedValue(cleanupBatch(['failed']));
+    const input = { organizationId: null, worktreeIds: [WORKTREE_ID] };
+    await expect(createCaller({ user }).retryWorktreeCleanup(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockGetWorktreeCleanup).not.toHaveBeenCalled();
+    expect(mockStartWorktreeCleanup).not.toHaveBeenCalled();
+  });
+
+  it.each([null, cleanupBatch([]), cleanupBatch(['deleted', 'pending', 'deleting'])])(
+    'rejects a batch without failures: %j',
+    async batch => {
+      mockGetWorktreeCleanup.mockResolvedValue(batch);
+      await expect(
+        createCaller({ user }).retryWorktreeCleanup({ organizationId: null })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('no failed worktrees'),
+      });
+      expect(mockStartWorktreeCleanup).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns the active worker batch unchanged when a retry races another start', async () => {
+    mockGetWorktreeCleanup.mockResolvedValue(cleanupBatch(['failed']));
+    const active = cleanupBatch(['pending', 'deleting']);
+    mockStartWorktreeCleanup.mockResolvedValue(active);
+    await expect(
+      createCaller({ user }).retryWorktreeCleanup({ organizationId: null })
+    ).resolves.toEqual(active);
+  });
+
+  it('denies removed membership before reading any persisted batch', async () => {
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.kilo_user_id, USER_ID),
+          eq(organization_memberships.organization_id, ORGANIZATION_ID)
+        )
+      );
+    await expect(
+      createCaller({ user }).retryWorktreeCleanup({ organizationId: ORGANIZATION_ID })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockGetWorktreeCleanup).not.toHaveBeenCalled();
+    expect(mockStartWorktreeCleanup).not.toHaveBeenCalled();
+  });
+
+  it('does not start a retry if reading the authoritative batch fails', async () => {
+    const error = new Error('Batch unavailable');
+    mockGetWorktreeCleanup.mockRejectedValue(error);
+    await expect(
+      createCaller({ user }).retryWorktreeCleanup({ organizationId: null })
+    ).rejects.toMatchObject({ message: error.message });
+    expect(mockStartWorktreeCleanup).not.toHaveBeenCalled();
+  });
 });
 
 describe('cliSessionsV2 worktree projections and session deletion', () => {

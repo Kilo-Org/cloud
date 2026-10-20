@@ -7,6 +7,7 @@ import {
   cloudAgentChildSessionLineageSchema,
   sessionIdSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
+  WORKTREE_MERGED_PULL_REQUESTS_REQUIRED,
   type CloudAgentWorktreeDeletionParams,
   type RecordCloudAgentWorktreeCleanupParams,
 } from '@kilocode/session-ingest-contracts';
@@ -47,6 +48,7 @@ export const DeleteWorktreeInput = z
   .object({
     worktreeId: cloudAgentWorktreeIdSchema,
     kilocodeOrganizationId: z.uuid().optional(),
+    requireMergedPullRequests: z.literal(true).optional(),
   })
   .strict();
 
@@ -59,13 +61,14 @@ export const DeleteWorktreeOutput = z
 
 export async function deleteWorktreeResources(
   input: z.infer<typeof DeleteWorktreeInput>,
-  ctx: TRPCContext
+  ctx: Pick<TRPCContext, 'env' | 'userId' | 'botId'>
 ): Promise<z.infer<typeof DeleteWorktreeOutput>> {
   if (ctx.botId !== undefined)
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Worktree access denied' });
   const params: CloudAgentWorktreeDeletionParams = {
     worktreeId: input.worktreeId,
     kiloUserId: ctx.userId,
+    ...(input.requireMergedPullRequests ? { requireMergedPullRequests: true } : {}),
     ...(input.kilocodeOrganizationId ? { organizationId: input.kilocodeOrganizationId } : {}),
   };
   const startedAt = Date.now();
@@ -235,6 +238,17 @@ export async function deleteWorktreeResources(
           : 'failed';
       errorCode = error.code;
       throw error;
+    }
+    if (error instanceof Error && error.message.includes(WORKTREE_MERGED_PULL_REQUESTS_REQUIRED)) {
+      outcome = 'rejected';
+      errorCode = 'WORKTREE_MERGED_PULL_REQUESTS_REQUIRED';
+      retryable = false;
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message:
+          'Worktree cleanup requires a verified merged GitHub pull request and no other linked pull requests',
+        cause: { error: 'WORKTREE_MERGED_PULL_REQUESTS_REQUIRED', retryable: false },
+      });
     }
     if (error instanceof Error && error.message.includes(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE)) {
       outcome = 'history_unavailable';

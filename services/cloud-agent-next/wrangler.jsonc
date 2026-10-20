@@ -334,6 +334,10 @@
         "name": "STREAM_TICKET_NONCE_DO",
       },
       {
+        "class_name": "WorktreeCleanupCoordinator",
+        "name": "WORKTREE_CLEANUP",
+      },
+      {
         "class_name": "UserKiloFacade",
         "name": "USER_KILO_FACADE",
       },
@@ -399,6 +403,10 @@
     {
       "new_sqlite_classes": ["SandboxContainers"],
       "tag": "v11",
+    },
+    {
+      "new_sqlite_classes": ["WorktreeCleanupCoordinator"],
+      "tag": "v12",
     },
   ],
   /**
@@ -682,6 +690,10 @@
           {
             "class_name": "StreamTicketNonceDO",
             "name": "STREAM_TICKET_NONCE_DO",
+          },
+          {
+            "class_name": "WorktreeCleanupCoordinator",
+            "name": "WORKTREE_CLEANUP",
           },
           {
             "class_name": "UserKiloFacade",

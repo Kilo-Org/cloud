@@ -17,4 +17,5 @@ export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sand
 export { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
 export { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
+export { WorktreeCleanupCoordinator } from './worktree-cleanup/WorktreeCleanupCoordinator.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

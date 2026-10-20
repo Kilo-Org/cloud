@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type DragEvent,
+  type ReactNode,
 } from 'react';
 import {
   SquarePen,
@@ -110,6 +111,7 @@ type ChatSidebarProps = {
   onProjectChange?: (gitUrls: string[]) => void;
   recentProjects?: Array<{ gitUrl: string; displayName: string }>;
   workspaceFolders?: WorkspaceFolderController;
+  workspaceCleanup?: ReactNode;
 };
 
 type WorktreeFolderControls = {
@@ -666,6 +668,7 @@ export function ChatSidebar({
   onProjectChange,
   recentProjects = [],
   workspaceFolders,
+  workspaceCleanup,
 }: ChatSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1110,6 +1113,8 @@ export function ChatSidebar({
           )}
         </div>
       </div>
+
+      {workspaceCleanup}
 
       {/* Collapsible search */}
       {showSearch && (

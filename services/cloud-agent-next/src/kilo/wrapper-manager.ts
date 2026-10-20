@@ -113,6 +113,17 @@ export function extractWrapperInstanceGenerationFromCommand(command: string): nu
 }
 
 /**
+ * True when a command line is a wrapper process carrying this session's marker.
+ * The marker value is compared as a whole token.
+ */
+export function isSessionWrapperCommand(command: string, sessionId: string): boolean {
+  return (
+    command.includes('kilocode-wrapper') &&
+    extractWrapperSessionIdFromCommand(command) === sessionId
+  );
+}
+
+/**
  * Find a wrapper for the given session in a pre-fetched process list.
  * Useful when the caller already has the process list (e.g. to avoid
  * repeated listProcesses() calls in a loop).
@@ -121,10 +132,8 @@ export function findWrapperForSessionInProcesses(
   processes: Process[],
   sessionId: string
 ): WrapperInfo | null {
-  const marker = `${KILO_WRAPPER_SESSION_FLAG} ${sessionId}`;
-
   for (const proc of processes) {
-    if (proc.command.includes(marker) && proc.command.includes('kilocode-wrapper')) {
+    if (isSessionWrapperCommand(proc.command, sessionId)) {
       const status = proc.status;
       if (status === 'running' || status === 'starting') {
         const port = extractWrapperPortFromCommand(proc.command);

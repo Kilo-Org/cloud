@@ -1730,10 +1730,43 @@ describe('WrapperClient', () => {
 
       expect(session.startProcess).toHaveBeenCalledWith(
         expect.stringMatching(
-          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 KILO_CLOUD_AGENT=1 KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=240000 DOCKER_HOST=unix:\/\/\/var\/run\/docker\.sock bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
+          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/home\/test-session\/\.kilocode\/wrapper\/logs\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 KILO_CLOUD_AGENT=1 KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=240000 DOCKER_HOST=unix:\/\/\/var\/run\/docker\.sock bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
         ),
         expect.objectContaining({ cwd: '/workspace' })
       );
+    });
+
+    it('prepares the session-scoped wrapper log directory before starting', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(
+        client.ensureRunning({
+          agentSessionId: 'test-session',
+          userId: 'test-user',
+          workspacePath: '/workspace/test',
+        })
+      ).resolves.toEqual({ started: true });
+
+      expect(session.exec).toHaveBeenCalledWith(
+        "mkdir -p '/home/test-session/.kilocode/wrapper/logs'"
+      );
+    });
+
+    it('still starts the wrapper when the log directory cannot be prepared', async () => {
+      const session = createMockSession(cmd => {
+        if (cmd.startsWith('mkdir -p')) throw new Error('read-only filesystem');
+        return createCurlError(7, 'Connection refused');
+      });
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(
+        client.ensureRunning({
+          agentSessionId: 'test-session',
+          userId: 'test-user',
+          workspacePath: '/workspace/test',
+        })
+      ).resolves.toEqual({ started: true });
     });
   });
 

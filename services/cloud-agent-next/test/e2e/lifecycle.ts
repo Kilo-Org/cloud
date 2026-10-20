@@ -77,7 +77,10 @@ async function sandboxOwnsSession(
     const fs = require('node:fs');
     const sessionId = process.argv.at(-1);
     if (!sessionId.startsWith('workspace_')) {
-      const logs = fs.readdirSync('/tmp').filter(name => /^kilocode-wrapper-agent_.+\\.log$/.test(name));
+      const dir = '/home/' + sessionId + '/.kilocode/wrapper/logs';
+      const logs = fs.existsSync(dir)
+        ? fs.readdirSync(dir).filter(name => /^kilocode-wrapper-agent_.+\\.log$/.test(name))
+        : [];
       process.exit(logs.length > 0 && logs.every(name =>
         name.startsWith('kilocode-wrapper-' + sessionId + '-')
       ) ? 0 : 1);

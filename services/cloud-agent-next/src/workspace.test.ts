@@ -46,6 +46,8 @@ import {
   getControlPlaneSessionDirectory,
   ISOLATED_CONTAINER_WORKSPACE_PATH,
   getSessionHomePath,
+  getWrapperLogFilePath,
+  getWrapperLogsDir,
   sanitizeIdForPath,
   LOW_DISK_THRESHOLD_MB,
   STALE_DIR_MIN_AGE_SECONDS,
@@ -1457,6 +1459,15 @@ describe('workspace path construction', () => {
     ['a session id containing a separator', 'x/y'],
   ])('rejects %s for the session home path too', (_label, sessionId) => {
     expect(() => getSessionHomePath(sessionId)).toThrow(/invalid session id/);
+  });
+
+  it('places wrapper logs inside the session home', () => {
+    const sessionHome = getSessionHomePath(SESSION_ID);
+
+    expect(getWrapperLogsDir(sessionHome)).toBe(`/home/${SESSION_ID}/.kilocode/wrapper/logs`);
+    expect(getWrapperLogFilePath(sessionHome, SESSION_ID, 1234)).toBe(
+      `/home/${SESSION_ID}/.kilocode/wrapper/logs/kilocode-wrapper-${SESSION_ID}-1234.log`
+    );
   });
 
   it('uses the isolated container directory for isolated single-session sandboxes', () => {

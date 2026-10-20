@@ -5,7 +5,7 @@ Use this guide when a local Cloud Agent flow stalls, a sandbox behaves unexpecte
 ## Log Locations
 
 - Worker, Durable Object, router, queue, stream, ingest, callback, and wrapper-client logs are emitted by Wrangler and normally land in `dev/logs/cloud-agent-next.log`.
-- The wrapper runs inside the sandbox container. Its durable debug log is written to `/tmp/kilocode-wrapper-<agentSessionId>-<timestamp>.log` via `WRAPPER_LOG_PATH`.
+- The wrapper runs inside the sandbox container. Its durable debug log is written to `/home/<agentSessionId>/.kilocode/wrapper/logs/kilocode-wrapper-<agentSessionId>-<timestamp>.log` via `WRAPPER_LOG_PATH`. The directory belongs to the session and is removed with the session home.
 - Kilo CLI logs inside the sandbox live under `/home/<agentSessionId>/.local/share/kilo/log/*.log`.
 - After `/session/ready` binds a wrapper session, the wrapper uploads a tarball containing the wrapper log plus Kilo CLI logs roughly every 30 seconds. Wrangler shows matching `PUT /sessions/.../logs/session/logs.tar.gz` traffic.
 - `restore-session` logs print to wrapper stderr and are also mirrored into the wrapper log file, so import/restore traces survive sandbox-side debugging.
@@ -64,18 +64,18 @@ List local sandbox containers and their proxy siblings:
 docker ps --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}'
 ```
 
-Cloudflare sandbox containers usually include `Sandbox` in the synthesized name or use a `cloudflare/sandbox` image. There may be a sibling `-proxy` container. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding `/tmp/kilocode-wrapper-<agentSessionId>-*.log` for the `agent_*` recovered from the Worker log.
+Cloudflare sandbox containers usually include `Sandbox` in the synthesized name or use a `cloudflare/sandbox` image. There may be a sibling `-proxy` container. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding `/home/<agentSessionId>/.kilocode/wrapper/logs/kilocode-wrapper-<agentSessionId>-*.log` for the `agent_*` recovered from the Worker log.
 
 To inspect one candidate:
 
 ```bash
-docker exec <container-id> ls /tmp
+docker exec <container-id> ls /home/<agentSessionId>/.kilocode/wrapper/logs
 ```
 
 To match one candidate to a specific Cloud Agent session:
 
 ```bash
-docker exec <container-id> sh -c 'ls /tmp/kilocode-wrapper-<agentSessionId>-*.log 2>/dev/null'
+docker exec <container-id> sh -c 'ls /home/<agentSessionId>/.kilocode/wrapper/logs/kilocode-wrapper-<agentSessionId>-*.log 2>/dev/null'
 ```
 
 To terminate that local sandbox, kill the matched primary container and its `-proxy` sibling when present, then re-list containers to confirm both disappeared:
@@ -87,11 +87,11 @@ docker ps --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}'
 
 ## Read Wrapper Logs Inside the Sandbox
 
-The wrapper writes one or more log files under `/tmp`:
+The wrapper writes one or more log files under the session home:
 
 ```bash
-docker exec <container-id> sh -c 'ls -t /tmp/kilocode-wrapper-*.log 2>/dev/null'
-docker exec <container-id> sh -c 'ls -t /tmp/kilocode-wrapper-*.log 2>/dev/null | head -n 1 | xargs -r cat'
+docker exec <container-id> sh -c 'ls -t /home/<agentSessionId>/.kilocode/wrapper/logs/*.log 2>/dev/null'
+docker exec <container-id> sh -c 'ls -t /home/<agentSessionId>/.kilocode/wrapper/logs/*.log 2>/dev/null | head -n 1 | xargs -r cat'
 ```
 
 High-value wrapper landmarks:
@@ -145,7 +145,7 @@ Cloudflare sandbox session directories often contain process stdout/stderr artif
 For longer inspection, copy logs out of the container:
 
 ```bash
-docker cp <container-id>:/tmp/kilocode-wrapper-<agentSessionId>-<timestamp>.log /tmp/cloud-agent-wrapper.log
+docker cp <container-id>:/home/<agentSessionId>/.kilocode/wrapper/logs/kilocode-wrapper-<agentSessionId>-<timestamp>.log /tmp/cloud-agent-wrapper.log
 ```
 
 Kilo database or WAL files can also be copied when investigating persistence visibility, but do this only for local debugging and avoid treating copied state as authoritative after the container continues running.
@@ -163,7 +163,7 @@ Wrangler will show the `PUT` requests. The uploaded archive contains:
 - the wrapper log file configured by `WRAPPER_LOG_PATH`
 - the Kilo CLI log directory for the sandbox session
 
-The internal `getWrapperLogs` path also discovers these sandbox-side files directly by scanning `/tmp/kilocode-wrapper-*.log` and the Kilo CLI log directory.
+The internal `getWrapperLogs` path also reads these sandbox-side files directly: the calling session's wrapper log directory and its Kilo CLI log directory.
 
 ## Control-plane Diagnostics
 
@@ -211,7 +211,8 @@ Worker `worktree_ownership` records distinguish `exclusive`, `shared`, and `unre
     `ContainerControlConnection upgrade returned retryable status` (503),
     or `Container is not listening to port …` in
     `dev/logs/cloud-agent-next.log`, then read the wrapper log inside the
-    sandbox (`/tmp/kilocode-wrapper-*.log`) for bootstrap/import detail. The
+    sandbox (`/home/<agentSessionId>/.kilocode/wrapper/logs/*.log`) for
+    bootstrap/import detail. The
     503 from the container control connection means the Docker container's
     control plane isn't ready — this is an environmental issue under Docker
     Desktop load, not a code regression. If the failure is transient, suspect

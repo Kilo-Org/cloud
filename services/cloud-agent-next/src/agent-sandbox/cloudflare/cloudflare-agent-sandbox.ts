@@ -30,6 +30,7 @@ import { WrapperClient, WrapperContainerClient } from '../../kilo/wrapper-client
 import {
   discoverSessionWrappers,
   findWrapperForSession,
+  isSessionWrapperCommand,
   stopObservedWrappers,
 } from '../../kilo/wrapper-manager.js';
 import {
@@ -37,6 +38,7 @@ import {
   cleanupWorkspace,
   getSessionHomePath,
   getSessionWorkspacePath,
+  getWrapperLogsDir,
 } from '../../workspace.js';
 import {
   FAST_SANDBOX_COMMAND_TIMEOUT_MS,
@@ -502,8 +504,14 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   async readWrapperLogs(): Promise<WrapperLogs | null> {
     const sandbox = await this.getSandbox({ sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS });
     const session = await sandbox.getSession(this.existingWrapperSessionName());
+    const sessionId = this.metadata.identity.sessionId;
+    const sessionHome = getSessionHomePath(sessionId);
     const logPaths: string[] = [];
-    const wrapperFiles = await session.listFiles('/tmp').catch(() => undefined);
+    // Wrapper logs live in this session's own directory under its home, which is
+    // the only location this readout lists.
+    const wrapperFiles = await session
+      .listFiles(getWrapperLogsDir(sessionHome), { recursive: true })
+      .catch(() => undefined);
     if (wrapperFiles?.success) {
       for (const file of wrapperFiles.files) {
         if (
@@ -515,7 +523,6 @@ export class CloudflareAgentSandbox implements AgentSandbox {
         }
       }
     }
-    const sessionHome = getSessionHomePath(this.metadata.identity.sessionId);
     const cliFiles = await session
       .listFiles(`${sessionHome}/.local/share/kilo/log`, { recursive: true })
       .catch(() => undefined);
@@ -536,11 +543,13 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     }
     let processes: WrapperLogs['processes'];
     try {
-      processes = (await sandbox.listProcesses()).map(process => ({
-        pid: Number.parseInt(process.id, 10) || 0,
-        command: process.command,
-        status: process.status,
-      }));
+      processes = (await sandbox.listProcesses())
+        .filter(process => isSessionWrapperCommand(process.command, sessionId))
+        .map(process => ({
+          pid: Number.parseInt(process.id, 10) || 0,
+          command: process.command,
+          status: process.status,
+        }));
     } catch {
       processes = undefined;
     }

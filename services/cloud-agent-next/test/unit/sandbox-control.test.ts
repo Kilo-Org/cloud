@@ -70,7 +70,7 @@ describe('listSandboxesForAgentSession', () => {
       ownedPrimary.id,
       'sh',
       '-c',
-      'for log in /tmp/kilocode-wrapper-"$1"-*.log; do test -e "$log" && exit 0; done; exit 1',
+      'for log in /home/"$1"/.kilocode/wrapper/logs/kilocode-wrapper-"$1"-*.log; do test -e "$log" && exit 0; done; exit 1',
       'sandbox-wrapper-log-match',
       'agent_owned',
     ]);
@@ -79,7 +79,7 @@ describe('listSandboxesForAgentSession', () => {
       unrelatedPrimary.id,
       'sh',
       '-c',
-      'for log in /tmp/kilocode-wrapper-"$1"-*.log; do test -e "$log" && exit 0; done; exit 1',
+      'for log in /home/"$1"/.kilocode/wrapper/logs/kilocode-wrapper-"$1"-*.log; do test -e "$log" && exit 0; done; exit 1',
       'sandbox-wrapper-log-match',
       'agent_owned',
     ]);

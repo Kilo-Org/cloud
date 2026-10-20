@@ -16,6 +16,7 @@ import {
   getWrapperSessionMarker,
 } from './wrapper-manager.js';
 import { randomPort } from './ports.js';
+import { getSessionHomePath, getWrapperLogFilePath, getWrapperLogsDir } from '../workspace.js';
 import {
   dockerSocketEnv,
   dockerSocketEnvParts,
@@ -586,7 +587,28 @@ export class WrapperClient {
     // Start the wrapper process using startProcess so it's trackable via listProcesses()
     // The command includes a session marker so we can find this wrapper later
     const sessionMarker = getWrapperSessionMarker(agentSessionId);
-    const wrapperLogPath = `/tmp/kilocode-wrapper-${agentSessionId}-${Date.now()}.log`;
+    const sessionHome = getSessionHomePath(agentSessionId);
+    const wrapperLogPath = getWrapperLogFilePath(sessionHome, agentSessionId);
+    // The log directory lives under the session home, which preparation normally
+    // creates. Recreate it here so a recovered or reused sandbox still owns a
+    // writable destination before the wrapper starts appending.
+    try {
+      const prepared = await this.session.exec(
+        `mkdir -p ${shellQuote(getWrapperLogsDir(sessionHome))}`
+      );
+      if (prepared.exitCode !== 0) {
+        logger
+          .withFields({ agentSessionId, exitCode: prepared.exitCode })
+          .warn('WrapperClient: failed to prepare the wrapper log directory');
+      }
+    } catch (error) {
+      logger
+        .withFields({
+          agentSessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('WrapperClient: failed to prepare the wrapper log directory');
+    }
     const dockerSocketPath = await resolveDockerSocketPath(this.session);
     const dockerEnvParts = dockerSocketEnvParts(dockerSocketPath);
     const validToolCgroupEnv = validShellEnvEntries(toolCgroupEnv ?? {}).filter(([key]) =>

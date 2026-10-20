@@ -986,7 +986,8 @@ export function createSessionManagementHandlers() {
     /**
      * Get all log files and running processes for a session's sandbox.
      *
-     * Discovers wrapper logs from /tmp and CLI logs from the session home directory.
+     * Reads the wrapper logs this session wrote under its own session home and the
+     * CLI logs in the same home. Only this session's wrapper process is reported.
      * Useful for debugging wrapper startup and CLI issues.
      */
     getWrapperLogs: internalApiProtectedProcedure

@@ -1077,3 +1077,121 @@ describe('CloudflareAgentSandbox', () => {
     expect(destroy).toHaveBeenCalledOnce();
   });
 });
+
+/**
+ * A sandbox whose container files are one map; each exec either applies a
+ * `rm -rf` target to it or succeeds silently.
+ */
+function sandboxWithFiles(fileContents: Record<string, string>) {
+  const files = new Map(Object.entries(fileContents));
+  const exec = vi.fn(async (command: string) => {
+    const removal = command.match(/^rm -rf '(.+)'$/);
+    if (removal) {
+      for (const path of [...files.keys()]) {
+        if (path === removal[1] || path.startsWith(`${removal[1]}/`)) files.delete(path);
+      }
+    }
+    return { exitCode: 0, stdout: '', stderr: '' };
+  });
+  const session = {
+    exec,
+    listFiles: vi.fn(async (directory: string) => ({
+      success: true,
+      files: [...files.keys()]
+        .filter(path => path.startsWith(`${directory}/`))
+        .map(path => ({
+          name: path.split('/').at(-1) ?? path,
+          absolutePath: path,
+          type: 'file',
+        })),
+    })),
+    readFile: vi.fn(async (path: string) => ({ content: files.get(path) ?? '' })),
+  };
+  const listProcesses = vi.fn(async () => [
+    {
+      id: 'wrapper-own',
+      command:
+        'WRAPPER_PORT=5000 bun run /usr/local/bin/kilocode-wrapper.js --agent-session agent_cloudflare',
+      status: 'running',
+    },
+    {
+      id: 'wrapper-other',
+      command:
+        'WRAPPER_PORT=5001 bun run /usr/local/bin/kilocode-wrapper.js --agent-session agent_other',
+      status: 'running',
+    },
+    {
+      id: 'wrapper-prefix',
+      command:
+        'WRAPPER_PORT=5002 bun run /usr/local/bin/kilocode-wrapper.js --agent-session agent_cloudflare_other',
+      status: 'running',
+    },
+    {
+      id: 'kilo-server',
+      command: 'bun /usr/local/bin/kilo-server.js --port 4096',
+      status: 'running',
+    },
+  ]);
+  const deleteSession = vi.fn().mockResolvedValue(undefined);
+  const sandbox = {
+    getSession: vi.fn().mockResolvedValue(session),
+    listProcesses,
+    deleteSession,
+  } as unknown as SandboxInstance;
+  return { sandbox, session, files, deleteSession };
+}
+
+const OWN_WRAPPER_LOG =
+  '/home/agent_cloudflare/.kilocode/wrapper/logs/kilocode-wrapper-agent_cloudflare-1.log';
+const OTHER_WRAPPER_LOG =
+  '/home/agent_other/.kilocode/wrapper/logs/kilocode-wrapper-agent_other-2.log';
+const OWN_CLI_LOG = '/home/agent_cloudflare/.local/share/kilo/log/kilo.log';
+const OTHER_CLI_LOG = '/home/agent_other/.local/share/kilo/log/kilo.log';
+
+function twoSessionFiles(): Record<string, string> {
+  return {
+    [OWN_WRAPPER_LOG]: 'own wrapper log',
+    [OWN_CLI_LOG]: 'own cli log',
+    [OTHER_WRAPPER_LOG]: 'other wrapper log',
+    [OTHER_CLI_LOG]: 'other cli log',
+  };
+}
+
+describe('wrapper log readout', () => {
+  it('returns the session files and the session wrapper process', async () => {
+    const { sandbox, session } = sandboxWithFiles(twoSessionFiles());
+    const runtime = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => sandbox,
+    });
+
+    const logs = await runtime.readWrapperLogs();
+
+    expect(logs?.files).toEqual({
+      [OWN_WRAPPER_LOG]: 'own wrapper log',
+      [OWN_CLI_LOG]: 'own cli log',
+    });
+    expect(logs?.processes).toEqual([
+      {
+        pid: 0,
+        command:
+          'WRAPPER_PORT=5000 bun run /usr/local/bin/kilocode-wrapper.js --agent-session agent_cloudflare',
+        status: 'running',
+      },
+    ]);
+    const listedDirectories = session.listFiles.mock.calls.map(call => call[0]);
+    expect(listedDirectories).toContain('/home/agent_cloudflare/.kilocode/wrapper/logs');
+    expect(listedDirectories).not.toContain('/tmp');
+  });
+
+  it('removes the session wrapper logs on explicit delete', async () => {
+    const { sandbox, files, deleteSession } = sandboxWithFiles(twoSessionFiles());
+    const runtime = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => sandbox,
+    });
+
+    await runtime.delete('explicit');
+
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+    expect([...files.keys()]).toEqual([OTHER_WRAPPER_LOG, OTHER_CLI_LOG]);
+  });
+});

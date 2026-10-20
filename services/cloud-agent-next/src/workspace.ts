@@ -126,6 +126,7 @@ const KILOCODE_DIR = `.kilocode`;
 const CLI_DIR = `${KILOCODE_DIR}/cli`;
 const CLI_GLOBAL_TASKS_PATH = `${CLI_DIR}/global/tasks`;
 const CLI_LOGS_PATH = `${CLI_DIR}/logs`;
+const WRAPPER_LOGS_PATH = `${KILOCODE_DIR}/wrapper/logs`;
 
 // Re-export timeout constants so existing imports from workspace.ts keep working.
 export {
@@ -265,8 +266,21 @@ export function getKilocodeLogFilePath(sessionHome: string): string {
   return `${getKilocodeLogsDir(sessionHome)}/cli.txt`;
 }
 
-export function getWrapperLogFilePath(executionId: string): string {
-  return `/tmp/kilocode-wrapper-${executionId}.log`;
+/**
+ * Directory holding this session's wrapper logs. It lives under the session home,
+ * which session preparation creates and session deletion removes together with the
+ * rest of the session's files.
+ */
+export function getWrapperLogsDir(sessionHome: string): string {
+  return `${sessionHome}/${WRAPPER_LOGS_PATH}`;
+}
+
+export function getWrapperLogFilePath(
+  sessionHome: string,
+  sessionId: string,
+  timestamp: number = Date.now()
+): string {
+  return `${getWrapperLogsDir(sessionHome)}/kilocode-wrapper-${requireGeneratedIdPathSegment(sessionId, 'session id')}-${timestamp}.log`;
 }
 
 export function getKilocodeTasksDir(sessionHome: string): string {

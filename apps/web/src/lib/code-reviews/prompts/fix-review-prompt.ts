@@ -17,18 +17,24 @@ function neutralizeReviewCommentMarkers(body: string): string {
   return body.replace(/=+\s*(?:BEGIN|END)\s+REVIEW COMMENT[^\n]*/gi, '[removed marker-like line]');
 }
 
+/** Keeps a value on its own line and out of the marker format. */
+function singleLine(value: string): string {
+  return value.replace(/[\r\n\t]+/g, ' ').replace(/=+\s*(?:BEGIN|END)\s+REVIEW COMMENT/gi, '-');
+}
+
 function renderReviewComment(
   comment: FixReviewComment,
   index: number,
   total: number,
   nonce: string
 ) {
-  const location = comment.line === null ? comment.path : `${comment.path}:${comment.line}`;
+  const path = singleLine(comment.path);
+  const location = comment.line === null ? path : `${path}:${comment.line}`;
   return [
     `===== BEGIN REVIEW COMMENT ${index} OF ${total} ${nonce} =====`,
     `id: ${comment.id}`,
     `path: ${location}`,
-    `author: ${comment.authorLogin}`,
+    `author: ${singleLine(comment.authorLogin)}`,
     'body:',
     neutralizeReviewCommentMarkers(comment.body),
     `===== END REVIEW COMMENT ${index} OF ${total} ${nonce} =====`,
@@ -41,6 +47,8 @@ export function buildFixReviewPrompt(input: {
   pullNumber: number;
   headRef: string;
   comments: readonly FixReviewComment[];
+  /** Comments that matched the selection but did not fit the prompt budget. */
+  omittedCommentCount: number;
   /** Per-session random token embedded in the comment markers. */
   nonce: string;
 }): string {
@@ -53,6 +61,13 @@ export function buildFixReviewPrompt(input: {
       : comments.map((comment, index) =>
           renderReviewComment(comment, index + 1, comments.length, nonce)
         );
+
+  if (input.omittedCommentCount > 0) {
+    commentBlocks.push(
+      '',
+      `${input.omittedCommentCount} more comments matched the selection rules but were left out to keep this prompt small. Do not fetch them yourself. Say in the summary that another fix run is needed for them.`
+    );
+  }
 
   return [
     'Process this GitHub PR review-fix workflow. Do not require input.',

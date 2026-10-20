@@ -88,7 +88,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return redirectToError(url.origin, 'fix_session_failed');
     }
 
-    const comments = await selectFixReviewCommentsForReview({
+    const selection = await selectFixReviewCommentsForReview({
       repositoryFullName: review.repo_full_name,
       pullNumber: review.pr_number,
       prAuthor: review.pr_author,
@@ -103,7 +103,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
         repositoryFullName: review.repo_full_name,
         pullNumber: review.pr_number,
         headRef: review.head_ref,
-        comments,
+        comments: selection.comments,
+        omittedCommentCount: selection.omittedCount,
         nonce: randomUUID(),
       }),
       mode: DEFAULT_CODE_REVIEW_MODE,

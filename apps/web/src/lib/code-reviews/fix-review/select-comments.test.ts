@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import type { CollaboratorPermission } from '@/lib/integrations/platforms/github/adapter';
 import {
   FIX_REVIEW_COMMENT_BODY_MAX_LENGTH,
+  FIX_REVIEW_MAX_COMMENTS,
   selectFixReviewComments,
   selectFixReviewCommentsForReview,
   type FixReviewComment,
@@ -160,6 +161,22 @@ describe('selectFixReviewComments', () => {
       `${'x'.repeat(FIX_REVIEW_COMMENT_BODY_MAX_LENGTH)}\n[comment truncated]`
     );
   });
+
+  it('does not treat a bot account as the initiator whose name it borrows', async () => {
+    const lookupPermission = jest.fn(permissionTable({ 'octocat[bot]': 'read' }));
+
+    const selected = await selectFixReviewComments({
+      comments: [
+        comment({ id: 61, authorLogin: 'octocat[bot]', authorType: 'Bot', authorId: 991 }),
+      ],
+      trustedLogins: ['octocat'],
+      settledCommentIds: NO_SETTLED,
+      lookupPermission,
+    });
+
+    expect(selected).toEqual([]);
+    expect(lookupPermission).toHaveBeenCalledWith('octocat[bot]');
+  });
 });
 
 function clientFixture(overrides: Partial<FixReviewCommentClient> = {}): FixReviewCommentClient {
@@ -237,7 +254,8 @@ describe('selectFixReviewCommentsForReview', () => {
       }),
     });
 
-    expect(selected.map(entry => entry.id)).toEqual([1]);
+    expect(selected.comments.map(entry => entry.id)).toEqual([1]);
+    expect(selected.omittedCount).toBe(0);
     expect(createCommentClient).toHaveBeenCalledWith('installation-token', {
       owner: 'owner',
       repo: 'repo',
@@ -264,7 +282,7 @@ describe('selectFixReviewCommentsForReview', () => {
       }),
     });
 
-    expect(selected.map(entry => entry.id)).toEqual([5]);
+    expect(selected.comments.map(entry => entry.id)).toEqual([5]);
     expect(createCommentClient).toHaveBeenCalledWith('user-token', {
       owner: 'owner',
       repo: 'repo',
@@ -300,5 +318,23 @@ describe('selectFixReviewCommentsForReview', () => {
         deps: depsFixture(client),
       })
     ).rejects.toThrow('GitHub unavailable');
+  });
+
+  it('keeps the prompt within its comment budget and reports the rest', async () => {
+    const client = clientFixture({
+      listComments: async () =>
+        Array.from({ length: FIX_REVIEW_MAX_COMMENTS + 2 }, (_, index) =>
+          comment({ id: index + 1, authorLogin: 'initiator' })
+        ),
+    });
+
+    const selection = await selectFixReviewCommentsForReview({
+      ...baseInput,
+      integration: { platform_installation_id: '42', github_app_type: 'standard' },
+      deps: depsFixture(client),
+    });
+
+    expect(selection.comments).toHaveLength(FIX_REVIEW_MAX_COMMENTS);
+    expect(selection.omittedCount).toBe(2);
   });
 });

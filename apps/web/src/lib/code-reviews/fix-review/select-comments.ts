@@ -25,8 +25,10 @@ import { isKiloReviewBotAuthor, normalizeGitHubLogin } from '@/lib/code-reviews/
  */
 
 export const FIX_REVIEW_COMMENT_BODY_MAX_LENGTH = 4_000;
+export const FIX_REVIEW_MAX_COMMENTS = 20;
 const COMMENTS_PAGE_SIZE = 100;
 const REVIEW_THREADS_MAX_PAGES = 20;
+const THREAD_COMMENTS_MAX_PAGES = 20;
 
 const KNOWN_PERMISSIONS: Record<string, CollaboratorPermission> = {
   admin: 'admin',
@@ -45,6 +47,31 @@ export type FixReviewComment = {
   body: string;
 };
 
+const ThreadCommentSchema = z.object({
+  databaseId: z.number().nullable(),
+  author: z.object({ login: z.string() }).nullable(),
+});
+
+const ThreadCommentsSchema = z.object({
+  pageInfo: z.object({
+    hasNextPage: z.boolean(),
+    endCursor: z.string().nullable(),
+  }),
+  nodes: z.array(ThreadCommentSchema),
+});
+
+const ThreadCommentsResponseSchema = z.object({
+  node: z.object({ comments: ThreadCommentsSchema }).nullable(),
+});
+
+const ReviewThreadSchema = z.object({
+  id: z.string(),
+  isResolved: z.boolean(),
+  comments: ThreadCommentsSchema,
+});
+
+type ReviewThread = z.infer<typeof ReviewThreadSchema>;
+
 const ReviewThreadsResponseSchema = z.object({
   repository: z
     .object({
@@ -55,25 +82,34 @@ const ReviewThreadsResponseSchema = z.object({
               hasNextPage: z.boolean(),
               endCursor: z.string().nullable(),
             }),
-            nodes: z.array(
-              z.object({
-                isResolved: z.boolean(),
-                comments: z.object({
-                  nodes: z.array(
-                    z.object({
-                      databaseId: z.number().nullable(),
-                      author: z.object({ login: z.string() }).nullable(),
-                    })
-                  ),
-                }),
-              })
-            ),
+            nodes: z.array(ReviewThreadSchema),
           }),
         })
         .nullable(),
     })
     .nullable(),
 });
+
+const REVIEW_THREAD_COMMENTS_QUERY = /* GraphQL */ `
+  query FixReviewThreadComments($threadId: ID!, $after: String) {
+    node(id: $threadId) {
+      ... on PullRequestReviewThread {
+        comments(first: 100, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            databaseId
+            author {
+              login
+            }
+          }
+        }
+      }
+    }
+  }
+`;
 
 const REVIEW_THREADS_QUERY = /* GraphQL */ `
   query FixReviewThreads($owner: String!, $name: String!, $number: Int!, $after: String) {
@@ -85,8 +121,13 @@ const REVIEW_THREADS_QUERY = /* GraphQL */ `
             endCursor
           }
           nodes {
+            id
             isResolved
             comments(first: 100) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
               nodes {
                 databaseId
                 author {
@@ -175,7 +216,11 @@ export function createFixReviewCommentClient(
         const response = (await octokit.request('POST /graphql', {
           query: REVIEW_THREADS_QUERY,
           variables: { owner, name: repo, number: pullNumber, after },
-        })) as { data: { data?: unknown } };
+        })) as { data: { data?: unknown; errors?: unknown } };
+
+        if (hasGraphQlErrors(response.data.errors)) {
+          throw new Error('GitHub reported errors while reading the review threads');
+        }
 
         const parsed = ReviewThreadsResponseSchema.safeParse(response.data.data);
         const connection = parsed.success
@@ -186,7 +231,7 @@ export function createFixReviewCommentClient(
         }
 
         for (const thread of connection.nodes) {
-          const nodes = thread.comments.nodes;
+          const nodes = await readAllThreadComments(octokit, thread);
           const authorParticipated = nodes.some(
             node =>
               node.author !== null && normalizeGitHubLogin(node.author.login) === normalizedAuthor
@@ -211,6 +256,54 @@ export function createFixReviewCommentClient(
   };
 }
 
+type ThreadComment = z.infer<typeof ThreadCommentSchema>;
+
+function hasGraphQlErrors(errors: unknown): boolean {
+  return Array.isArray(errors) && errors.length > 0;
+}
+
+async function fetchThreadCommentsPage(
+  octokit: Octokit,
+  threadId: string,
+  after: string | null
+): Promise<z.infer<typeof ThreadCommentsSchema>> {
+  const response = (await octokit.request('POST /graphql', {
+    query: REVIEW_THREAD_COMMENTS_QUERY,
+    variables: { threadId, after },
+  })) as { data: { data?: unknown; errors?: unknown } };
+  if (hasGraphQlErrors(response.data.errors)) {
+    throw new Error('GitHub reported errors while reading a review thread');
+  }
+  const parsed = ThreadCommentsResponseSchema.safeParse(response.data.data);
+  const connection = parsed.success ? parsed.data.node?.comments : undefined;
+  if (!connection) {
+    throw new Error('GitHub did not return the review thread comments');
+  }
+  return connection;
+}
+
+/**
+ * The first page of a thread's comments is part of the thread query; a thread
+ * with more comments than one page is read to the end so a reply by the PR
+ * author cannot be missed.
+ */
+async function readAllThreadComments(
+  octokit: Octokit,
+  thread: ReviewThread
+): Promise<ThreadComment[]> {
+  const comments = [...thread.comments.nodes];
+  let page = thread.comments.pageInfo;
+  for (let fetched = 1; page.hasNextPage; fetched += 1) {
+    if (fetched > THREAD_COMMENTS_MAX_PAGES) {
+      throw new Error('Review thread has too many comments to inspect');
+    }
+    const connection = await fetchThreadCommentsPage(octokit, thread.id, page.endCursor);
+    comments.push(...connection.nodes);
+    page = connection.pageInfo;
+  }
+  return comments;
+}
+
 export async function selectFixReviewComments(input: {
   comments: readonly FixReviewComment[];
   trustedLogins: readonly string[];
@@ -218,7 +311,7 @@ export async function selectFixReviewComments(input: {
   lookupPermission: (login: string) => Promise<CollaboratorPermission | null>;
 }): Promise<FixReviewComment[]> {
   const trustedLogins = new Set(
-    input.trustedLogins.filter(login => login.length > 0).map(normalizeGitHubLogin)
+    input.trustedLogins.map(login => login.trim().toLowerCase()).filter(login => login.length > 0)
   );
   const permissionByLogin = new Map<string, Promise<CollaboratorPermission | null>>();
 
@@ -232,8 +325,8 @@ export async function selectFixReviewComments(input: {
     ) {
       return true;
     }
-    if (comment.authorLogin.length === 0) return false;
-    const loginKey = normalizeGitHubLogin(comment.authorLogin);
+    const loginKey = comment.authorLogin.trim().toLowerCase();
+    if (loginKey.length === 0) return false;
     if (trustedLogins.has(loginKey)) return true;
 
     let permission = permissionByLogin.get(loginKey);
@@ -325,6 +418,12 @@ async function resolveCommentClient(input: {
   };
 }
 
+export type FixReviewSelection = {
+  comments: FixReviewComment[];
+  /** Selected comments beyond the prompt budget, reported to the user. */
+  omittedCount: number;
+};
+
 /**
  * Reads the PR's review comments with a credential the server controls and
  * returns only the comments the fix session may act on.
@@ -339,7 +438,7 @@ export async function selectFixReviewCommentsForReview(input: {
   initiatorKiloUserId: string;
   integration: Pick<PlatformIntegration, 'platform_installation_id' | 'github_app_type'> | null;
   deps?: Partial<FixReviewSelectionDeps>;
-}): Promise<FixReviewComment[]> {
+}): Promise<FixReviewSelection> {
   const deps: FixReviewSelectionDeps = { ...defaultDeps, ...input.deps };
   const { client, initiatorGitHubLogin } = await resolveCommentClient({ ...input, deps });
 
@@ -348,10 +447,15 @@ export async function selectFixReviewCommentsForReview(input: {
     client.listSettledCommentIds(input.prAuthor),
   ]);
 
-  return selectFixReviewComments({
+  const selected = await selectFixReviewComments({
     comments,
     trustedLogins: initiatorGitHubLogin ? [initiatorGitHubLogin] : [],
     settledCommentIds,
     lookupPermission: login => client.lookupPermission(login),
   });
+
+  return {
+    comments: selected.slice(0, FIX_REVIEW_MAX_COMMENTS),
+    omittedCount: Math.max(0, selected.length - FIX_REVIEW_MAX_COMMENTS),
+  };
 }

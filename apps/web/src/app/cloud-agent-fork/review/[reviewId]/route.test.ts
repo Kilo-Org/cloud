@@ -112,7 +112,7 @@ const mockSelectFixReviewCommentsForReview =
       prAuthor: string;
       initiatorKiloUserId: string;
       integration: IntegrationFixture | null;
-    }) => Promise<FixReviewComment[]>
+    }) => Promise<{ comments: FixReviewComment[]; omittedCount: number }>
   >();
 
 jest.mock('@/lib/code-reviews/fix-review/select-comments', () => ({
@@ -229,7 +229,10 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     mockCreateTRPCContext.mockResolvedValue({ user: { id: USER_ID } });
     mockSuccessfulReview();
     mockGetIntegrationById.mockResolvedValue(makeIntegration());
-    mockSelectFixReviewCommentsForReview.mockResolvedValue([SELECTED_COMMENT]);
+    mockSelectFixReviewCommentsForReview.mockResolvedValue({
+      comments: [SELECTED_COMMENT],
+      omittedCount: 0,
+    });
     mockPersonalPrepareSession.mockResolvedValue({
       kiloSessionId: PERSONAL_KILO_SESSION_ID,
       cloudAgentSessionId: 'agent_personal',
@@ -339,7 +342,7 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
   });
 
   it('starts a no-op session when no review comment is in scope', async () => {
-    mockSelectFixReviewCommentsForReview.mockResolvedValue([]);
+    mockSelectFixReviewCommentsForReview.mockResolvedValue({ comments: [], omittedCount: 0 });
 
     const response = await requestReview();
 

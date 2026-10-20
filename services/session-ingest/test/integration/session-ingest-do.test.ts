@@ -740,10 +740,10 @@ describe('SessionIngestDO integration', () => {
       expect(earlier.nextCursor).toBeNull();
     });
 
-    it('ends the page instead of failing when the boundary identity does not fit a cursor', async () => {
+    it('omits a message identity outside the cursor contract from a bounded page', async () => {
       const sessionId = 'ses_sdk_page_cursor_fit_0001';
       const stub = getStub(kiloUserId, sessionId);
-      const longId = `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}`;
+      const longId = `msg${'z'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}`;
       const message = (id: string, created: number) => ({
         id,
         sessionID: sessionId,
@@ -754,7 +754,11 @@ describe('SessionIngestDO integration', () => {
       });
 
       await runInDurableObject(stub, async (_instance, state) => {
-        for (const info of [message('msg_short', 100), message(longId, 200)]) {
+        for (const info of [
+          message('msg_1_old', 100),
+          message('msg_2_mid', 200),
+          message(longId, 300),
+        ]) {
           state.storage.sql.exec(
             'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
             `message/${info.id}`,
@@ -764,11 +768,14 @@ describe('SessionIngestDO integration', () => {
         }
       });
 
-      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toMatchObject({
-        messages: [{ info: { id: longId } }],
-        nextCursor: null,
-        omittedItemCount: 0,
-      });
+      const latest = await stub.readKiloSdkMessages({ limit: 1 });
+      expect(latest.messages.map(entry => entry.info.id)).toEqual(['msg_2_mid']);
+      expect(latest.omittedItemCount).toBe(1);
+      expect(latest.nextCursor).toBeTruthy();
+
+      const earlier = await stub.readKiloSdkMessages({ limit: 1, before: latest.nextCursor! });
+      expect(earlier.messages.map(entry => entry.info.id)).toEqual(['msg_1_old']);
+      expect(earlier.nextCursor).toBeNull();
     });
 
     it('reads the newest page without scanning the part rows that sort after message rows', async () => {

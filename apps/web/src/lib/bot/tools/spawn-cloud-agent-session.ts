@@ -24,6 +24,7 @@ import z from 'zod';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { authorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
 
 /**
  * Derive a per-request callback token so the dedicated callback HMAC secret
@@ -96,6 +97,10 @@ export default async function spawnCloudAgentSession(
     chatPlatform?: string;
     currentStep?: number;
     attachments?: CloudAgentAttachments;
+    /** GitHub login of the account that triggered this bot run. */
+    actorLogin?: string;
+    /** Repository of the conversation the bot was mentioned in. */
+    threadRepository?: string | null;
   }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -122,6 +127,18 @@ export default async function spawnCloudAgentSession(
 
   if (!args.githubRepo && !args.gitlabProject) {
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
+  }
+
+  if (args.githubRepo) {
+    const targetAuthorization = await authorizeGitHubRepository({
+      platformIntegration,
+      repository: args.githubRepo,
+      threadRepository: options?.threadRepository,
+      actorLogin: options?.actorLogin,
+    });
+    if (!targetAuthorization.allowed) {
+      return { response: targetAuthorization.markdown };
+    }
   }
 
   let prompt = args.prompt;

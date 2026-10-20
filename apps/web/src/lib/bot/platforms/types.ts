@@ -42,6 +42,17 @@ export type BotPlatform = {
     message: Message;
     platformIntegration: PlatformIntegration;
   }): Promise<boolean> | boolean;
+  /**
+   * Authorization gate for bot actions that can change code. Runs after the
+   * account is resolved and before any bot request is created. GitHub checks
+   * that the triggering account can write to the conversation's repository.
+   * Platforms without this hook allow every message.
+   */
+  authorizeBotActions?(params: {
+    thread: Thread;
+    message: Message;
+    platformIntegration: PlatformIntegration;
+  }): Promise<{ allowed: true } | { allowed: false; markdown: string }>;
   promptLinkAccount(params: {
     thread: Thread;
     message: Message;

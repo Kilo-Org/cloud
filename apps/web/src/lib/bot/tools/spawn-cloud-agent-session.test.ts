@@ -12,6 +12,16 @@ import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
 
 const mockGetGitHubIntegrationById =
   jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
+const mockAuthorizeGitHubRepositoryFn =
+  jest.fn<(params: unknown) => Promise<{ allowed: true } | { allowed: false; markdown: string }>>();
+
+function authorizeGitHubRepository(params: unknown) {
+  return mockAuthorizeGitHubRepositoryFn(params);
+}
+
+jest.mock('@/lib/bot/github-repository-permission', () => ({
+  authorizeGitHubRepository,
+}));
 
 jest.mock('@/lib/web-config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'callback-secret',
@@ -97,6 +107,7 @@ describe('spawnCloudAgentSession delegation', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuthorizeGitHubRepositoryFn.mockResolvedValue({ allowed: true });
     mockCreateCloudAgentNextClient.mockReturnValue({
       prepareSession: mockPrepareSession,
       initiateFromPreparedSession: mockInitiateFromPreparedSession,
@@ -170,6 +181,53 @@ describe('spawnCloudAgentSession delegation', () => {
       cloudAgentSessionId: 'cloud-session-1',
       kiloSessionId: 'kilo-session-1',
     });
+  });
+
+  it('rejects a session target when the triggering account cannot write to it', async () => {
+    mockAuthorizeGitHubRepositoryFn.mockResolvedValue({
+      allowed: false,
+      markdown: 'I could not confirm write access to `other/repo`.',
+    });
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'other/repo', prompt: 'Please change it', mode: 'code' },
+        'model',
+        organizationIntegration,
+        'auth-token',
+        'request-denied',
+        undefined,
+        { actorLogin: 'octocat', threadRepository: 'owner/repo' }
+      )
+    ).resolves.toEqual({ response: 'I could not confirm write access to `other/repo`.' });
+    expect(mockAuthorizeGitHubRepositoryFn).toHaveBeenCalledWith({
+      platformIntegration: organizationIntegration,
+      repository: 'other/repo',
+      threadRepository: 'owner/repo',
+      actorLogin: 'octocat',
+    });
+    expect(mockResolveGitHubRepositoryForOwner).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('authorizes the conversation repository with the triggering account', async () => {
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Please change it', mode: 'code' },
+      'model',
+      organizationIntegration,
+      'auth-token',
+      'request-allowed',
+      undefined,
+      { actorLogin: 'octocat', threadRepository: 'owner/repo' }
+    );
+
+    expect(mockAuthorizeGitHubRepositoryFn).toHaveBeenCalledWith({
+      platformIntegration: organizationIntegration,
+      repository: 'owner/repo',
+      threadRepository: 'owner/repo',
+      actorLogin: 'octocat',
+    });
+    expect(mockPrepareSession).toHaveBeenCalled();
   });
 
   it('rejects GitHub repositories outside the owner inventory', async () => {

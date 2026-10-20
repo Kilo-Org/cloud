@@ -9,7 +9,8 @@ import { load } from 'js-yaml';
 // build, and `kilo-app-release-upload-cap.mjs` holds a run that Apple's rolling
 // upload limit would refuse. Every check below sits beside a mutation applied to
 // a parsed copy, so a dropped gate, a moved step or a wrong destination fails
-// this suite instead of a real release.
+// this suite instead of a real release. The build and submission jobs run the
+// workspace EAS CLI, so the manifest, eas.json and the workflow must agree.
 
 const workflowPath = '.github/workflows/kilo-app-release.yml';
 
@@ -19,6 +20,53 @@ function readWorkflow() {
 
 function step(workflow, jobName, id) {
   return workflow.jobs[jobName].steps.find(item => item.id === id);
+}
+
+const mobilePackagePath = 'apps/mobile/package.json';
+const easConfigPath = 'apps/mobile/eas.json';
+
+function readJson(rel) {
+  return JSON.parse(readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8'));
+}
+
+// A build or a submission runs the EAS CLI the workspace installs, so the
+// version recorded in the lockfile is the version that drives it. The manifest,
+// eas.json and the workflow all have to name that same tool.
+function validateEasCli(workflow, mobilePackage, easConfig) {
+  const declared = mobilePackage.devDependencies?.['eas-cli'];
+  assert.match(
+    declared ?? '',
+    /^\d+\.\d+\.\d+$/,
+    'eas-cli must be an exact development dependency'
+  );
+  assert.equal(
+    easConfig.cli?.version,
+    declared,
+    'eas.json must select the CLI version the workspace declares'
+  );
+
+  for (const [name, command] of Object.entries(mobilePackage.scripts ?? {})) {
+    if (!/\beas\b/.test(command)) continue;
+    assert.equal(
+      command.split(/\s+/)[0],
+      'eas',
+      `mobile script ${name} must run the workspace eas binary`
+    );
+  }
+
+  const lines = Object.values(workflow.jobs)
+    .flatMap(job => job.steps ?? [])
+    .flatMap(item => (item.run ?? '').split('\n'))
+    .filter(line => /\beas (?:env:|build|submit)\b/.test(line))
+    .filter(line => !/^\s*echo\b/.test(line));
+  assert.ok(lines.length > 0, 'the workflow must run the EAS CLI');
+  for (const line of lines) {
+    assert.match(
+      line,
+      /\bpnpm exec eas (?:env:|build|submit)\b/,
+      `the workflow must run the installed CLI: ${line.trim()}`
+    );
+  }
 }
 
 function validate(workflow) {
@@ -283,6 +331,10 @@ test('the release workflow gates the build on the upload cap and lands the chang
   validate(readWorkflow());
 });
 
+test('the mobile build tooling runs the EAS CLI the workspace installs', () => {
+  validateEasCli(readWorkflow(), readJson(mobilePackagePath), readJson(easConfigPath));
+});
+
 const mutations = {
   'change detection keeps CHANGELOG.md': workflow => {
     const check = step(workflow, 'check-changes', 'check');
@@ -506,5 +558,33 @@ for (const [name, mutate] of Object.entries(mutations)) {
     const workflow = readWorkflow();
     mutate(workflow);
     assert.throws(() => validate(workflow), assert.AssertionError);
+  });
+}
+
+const toolchainMutations = {
+  'a mobile script calls another binary': ({ mobilePackage }) => {
+    mobilePackage.scripts.build = mobilePackage.scripts.build.replace(/^eas /, 'eas-cli ');
+  },
+  'eas.json selects another CLI version': ({ mobilePackage, easConfig }) => {
+    easConfig.cli.version = `${mobilePackage.devDependencies['eas-cli']}.1`;
+  },
+  'eas-cli is declared as a range': ({ mobilePackage }) => {
+    mobilePackage.devDependencies['eas-cli'] = `^${mobilePackage.devDependencies['eas-cli']}`;
+  },
+  'a workflow step calls the CLI directly': ({ workflow }) => {
+    const build = workflow.jobs['build-and-submit'].steps.find(item =>
+      /\beas build\b/.test(item.run ?? '')
+    );
+    build.run = build.run.replace('pnpm exec eas build', 'eas build');
+  },
+};
+
+for (const [name, mutate] of Object.entries(toolchainMutations)) {
+  test(`the mobile toolchain validator rejects: ${name}`, () => {
+    const workflow = readWorkflow();
+    const mobilePackage = readJson(mobilePackagePath);
+    const easConfig = readJson(easConfigPath);
+    mutate({ workflow, mobilePackage, easConfig });
+    assert.throws(() => validateEasCli(workflow, mobilePackage, easConfig), assert.AssertionError);
   });
 }

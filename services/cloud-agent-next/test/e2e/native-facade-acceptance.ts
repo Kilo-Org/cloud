@@ -531,6 +531,13 @@ async function main(): Promise<void> {
               config: { mode: 'primary', permission: { '*': 'allow', edit: 'ask' } },
             },
           ],
+          runtimeSkills: [
+            {
+              name: 'native-human-permission',
+              rawMarkdown:
+                '---\nname: native-human-permission\ndescription: Harmless human permission fixture\n---\n!`printf native-skill-shell-approved`\n',
+            },
+          ],
           createdOnPlatform: 'cloud-agent-web',
           clientProvenance: 'browser',
           operationKey: randomUUID(),
@@ -841,23 +848,25 @@ async function main(): Promise<void> {
       return { questionID: question.id, messageID };
     });
 
-    await check('permission list/reply and sibling isolation with ask-edit agent', async () => {
+    await check('human-required skill permission reply and sibling isolation', async () => {
       if (!siblingID) throw new Blocked('requires isolated sibling permission fixture');
       const permissionSessionID = siblingID;
       const tag = `permission-${randomUUID().slice(0, 8)}`;
       const messageID = await prompt(
         permissionSessionID,
-        `__fake__:file:write:${tag}:native-permission.txt:permission-e2e`,
-        'native-probe'
+        `__fake__:skill:${tag}:native-human-permission`,
+        'code'
       );
       const permission = await poll(
-        'pending native edit permission',
+        'pending native skill shell permission',
         async () => {
           const response = await request(`/permission${selected(permissionSessionID)}`);
           if (isLiveRuntimeUnavailable(response)) return;
           const value = successful(response);
           assert(Array.isArray(value));
-          const pending: unknown = value[0];
+          const pending: unknown = value.find(
+            item => record(record(item).metadata).skillShell === true
+          );
           if (pending) return record(pending);
           const messages = await transcript(permissionSessionID);
           const assistant = messages.find(
@@ -867,13 +876,14 @@ async function main(): Promise<void> {
           );
           if (assistant)
             throw new Blocked(
-              'ordinary edit permissions are automatically approved by wrapper policy; a skillShell/sandboxEscalation fixture is required for public reply coverage'
+              'trusted runtime skill did not produce a pending skillShell permission'
             );
         },
         45_000
       );
       assert.equal(typeof permission.id, 'string');
       assert.equal(permission.sessionID, permissionSessionID);
+      assert.equal(record(permission.metadata).skillShell, true);
       const wrong = await request(`/permission/${String(permission.id)}/reply${selected(rootID)}`, {
         method: 'POST',
         body: { reply: 'once' },
@@ -891,7 +901,22 @@ async function main(): Promise<void> {
         throw new Blocked(
           `automatic-approval race prevents public permission reply coverage: ${JSON.stringify({ permission, reply, pending })}`
         );
-      await completed(permissionSessionID, messageID, 'file-write:native-permission.txt');
+      await completed(permissionSessionID, messageID, `skill-complete:${tag}`);
+      const messages = await transcript(permissionSessionID);
+      assert(
+        messages.some(
+          entry =>
+            entry.info.parentID === messageID &&
+            entry.parts.some(
+              part =>
+                part.type === 'tool' &&
+                part.tool === 'skill' &&
+                record(part.state).status === 'completed' &&
+                String(record(part.state).output).includes('native-skill-shell-approved')
+            )
+        ),
+        'approved shell substitution did not complete'
+      );
       const stale = await request(
         `/permission/${String(permission.id)}/reply${selected(permissionSessionID)}`,
         {
@@ -901,6 +926,71 @@ async function main(): Promise<void> {
       );
       assert.equal(stale.status, 409, JSON.stringify(stale));
       return permission;
+    });
+    await check('human-required skill permission rejection prevents shell execution', async () => {
+      if (!siblingID) throw new Blocked('requires isolated sibling permission fixture');
+      const tag = `permission-reject-${randomUUID().slice(0, 8)}`;
+      const messageID = await prompt(
+        siblingID,
+        `__fake__:skill:${tag}:native-human-permission`,
+        'code'
+      );
+      const permission = await poll('rejectable skill shell permission', async () => {
+        const response = await request(`/permission${selected(siblingID)}`);
+        if (isLiveRuntimeUnavailable(response)) return;
+        const value = successful(response);
+        assert(Array.isArray(value));
+        const pending: unknown = value.find(
+          item => record(record(item).metadata).skillShell === true
+        );
+        return pending ? record(pending) : undefined;
+      });
+      successful(
+        await request(`/permission/${String(permission.id)}/reply${selected(siblingID)}`, {
+          method: 'POST',
+          body: { reply: 'reject' },
+        })
+      );
+      const messages = await poll('rejected native skill tool', async () => {
+        const messages = await transcript(siblingID);
+        return messages.some(
+          entry =>
+            entry.info.parentID === messageID &&
+            entry.parts.some(
+              part =>
+                part.type === 'tool' &&
+                part.tool === 'skill' &&
+                record(part.state).status === 'error'
+            )
+        )
+          ? messages
+          : undefined;
+      });
+      assert(
+        messages.some(
+          entry =>
+            entry.info.parentID === messageID &&
+            entry.parts.some(
+              part =>
+                part.type === 'tool' &&
+                part.tool === 'skill' &&
+                record(part.state).status === 'error'
+            )
+        ),
+        'rejected skill unexpectedly completed'
+      );
+      const pending = successful(await request(`/permission${selected(siblingID)}`));
+      assert(Array.isArray(pending));
+      assert(!pending.some(item => record(item).id === permission.id));
+      const stale = await request(
+        `/permission/${String(permission.id)}/reply${selected(siblingID)}`,
+        {
+          method: 'POST',
+          body: { reply: 'once' },
+        }
+      );
+      assert.equal(stale.status, 409, JSON.stringify(stale));
+      return { permissionID: permission.id, messageID };
     });
     await check(
       'isolated permission fixture is stopped before independent root checks',
@@ -1231,8 +1321,7 @@ async function main(): Promise<void> {
             'nonempty todo fixture',
             'status map while sibling is active',
             'large multi-page SSE snapshot and overflow/resnapshot injection',
-            'permission always/reject branches',
-            'custom permission profile is overridden by ordinary-edit automatic approval; positive reply coverage is race-dependent',
+            'permission always branch',
             'org model allowlist and unfunded command rejection',
           ],
         }),

@@ -54,10 +54,10 @@ catalog:
   zod: 4.4.3
 
 catalogs:
-  # Active test stack: vitest 5 plus its companions at the same version. Every
-  # workspace uses `catalog:vitest5` except the ones that run their tests through
-  # `@cloudflare/vitest-pool-workers`, whose only peer range is `^4.1.0`; those
-  # keep the default `catalog:` entries above on vitest 4.
+  # Active test stack: vitest 5 plus its companions at the same version.
+  # Workspaces still on the default `catalog:` entries above at vitest 4 are the
+  # ones that test through `@cloudflare/vitest-pool-workers` (it peers only
+  # `^4.1.0`, so vitest 5 breaks its pool) and the excluded features.
   vitest5:
     '@vitest/coverage-v8': 5.0.4
     '@vitest/ui': 5.0.4

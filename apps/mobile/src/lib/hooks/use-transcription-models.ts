@@ -9,6 +9,7 @@ import {
   toModelOptions,
 } from '@/lib/hooks/use-available-models';
 import { TELEMETRY_DESCRIPTION_KEY, type TelemetryDescription } from '@/lib/telemetry/error-sink';
+import { isExpectedStatus } from '@/lib/telemetry/network-errors';
 
 const TRANSCRIPTION_MODELS_TIMEOUT_MS = 15_000;
 
@@ -35,6 +36,7 @@ class TranscriptionModelsFetchError extends Error {
     options: {
       cause?: unknown;
       level?: 'warning' | 'error';
+      report?: 'event' | 'breadcrumb';
       tags?: Record<string, string | number>;
     } = {}
   ) {
@@ -43,6 +45,7 @@ class TranscriptionModelsFetchError extends Error {
     this[TELEMETRY_DESCRIPTION_KEY] = {
       level: options.level ?? 'warning',
       fingerprint: ['transcription-models-fetch', outcome],
+      ...(options.report === undefined ? {} : { report: options.report }),
       tags: {
         'error.subsystem': 'transcription-models',
         'error.operation': 'fetch',
@@ -85,11 +88,33 @@ export async function fetchTranscriptionModels(organizationId?: string): Promise
       throw new TranscriptionModelsFetchError(
         `http.${response.status}`,
         `Failed to fetch transcription models: ${response.status} ${response.statusText}`,
-        { tags: { 'http.status': response.status } }
+        {
+          tags: { 'http.status': response.status },
+          // A rate limit, a stale token, or a not-found answer names no defect:
+          // the network layer already keeps those as breadcrumbs, so this
+          // failure records its own trail entry instead of an issue.
+          ...(isExpectedStatus(response.status, {}) ? { report: 'breadcrumb' } : {}),
+        }
       );
     }
 
-    const parsed = OpenRouterModelsResponseSchema.safeParse(await response.json());
+    let body: unknown = undefined;
+    try {
+      body = await response.json();
+    } catch (error) {
+      // An abort also rejects a body read already in flight: leave that to the
+      // deadline branch below.
+      if (controller.signal.aborted) {
+        throw error;
+      }
+      throw new TranscriptionModelsFetchError(
+        'invalid-response',
+        'Transcription models response was not valid JSON',
+        { level: 'error', cause: error }
+      );
+    }
+
+    const parsed = OpenRouterModelsResponseSchema.safeParse(body);
     if (!parsed.success) {
       throw new TranscriptionModelsFetchError(
         'invalid-response',
@@ -100,17 +125,18 @@ export async function fetchTranscriptionModels(organizationId?: string): Promise
 
     return toModelOptions(parsed.data);
   } catch (error) {
-    // An abort also rejects a body read already in flight, so this check comes
-    // before the branch rethrow.
+    // A typed failure is the more specific outcome, even when the deadline
+    // fired while it was thrown: an abort rejects with a raw error, never with
+    // one of these.
+    if (error instanceof TranscriptionModelsFetchError) {
+      throw error;
+    }
     if (controller.signal.aborted) {
       throw new TranscriptionModelsFetchError(
         'timeout',
         `Timed out fetching transcription models after ${TRANSCRIPTION_MODELS_TIMEOUT_MS}ms`,
         { cause: error }
       );
-    }
-    if (error instanceof TranscriptionModelsFetchError) {
-      throw error;
     }
 
     throw new TranscriptionModelsFetchError(

@@ -188,4 +188,56 @@ describe('fetchTranscriptionModels', () => {
       tags: DECLARED_OUTCOME_TAGS,
     });
   });
+
+  it('declares a body that is not JSON as a contract failure, not a transport one', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>proxy error</html>', { status: 200 }));
+
+    const error = await declarationOf(fetchTranscriptionModels());
+
+    expect(error.message).toBe('Transcription models response was not valid JSON');
+    expect(error.cause).toBeInstanceOf(SyntaxError);
+    expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
+      level: 'error',
+      fingerprint: ['transcription-models-fetch', 'invalid-response'],
+      tags: DECLARED_OUTCOME_TAGS,
+    });
+  });
+
+  it('records an expected answer as a breadcrumb instead of an event', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({ error: 'Unauthorized' }, { status: 401, statusText: 'Unauthorized' })
+    );
+
+    const error = await declarationOf(fetchTranscriptionModels());
+
+    expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
+      level: 'warning',
+      fingerprint: ['transcription-models-fetch', 'http.401'],
+      report: 'breadcrumb',
+      tags: { ...DECLARED_OUTCOME_TAGS, 'http.status': 401 },
+    });
+  });
+
+  it('keeps a response status that arrived while the deadline fired', async () => {
+    vi.useFakeTimers();
+    const arrived = Promise.withResolvers<undefined>();
+    fetchMock.mockImplementation(async () => {
+      await arrived.promise;
+      return Response.json(
+        { error: 'Failed' },
+        { status: 500, statusText: 'Internal Server Error' }
+      );
+    });
+
+    const pending = declarationOf(fetchTranscriptionModels());
+    await vi.advanceTimersByTimeAsync(15_000);
+    arrived.resolve(undefined);
+    const error = await pending;
+
+    expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
+      level: 'warning',
+      fingerprint: ['transcription-models-fetch', 'http.500'],
+      tags: { ...DECLARED_OUTCOME_TAGS, 'http.status': 500 },
+    });
+  });
 });

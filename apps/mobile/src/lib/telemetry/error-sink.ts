@@ -30,6 +30,13 @@ export type TelemetryDescription = {
   fingerprint: readonly string[];
   /** Defaults to `error`. An expected, recoverable outcome declares `warning`. */
   level?: TelemetryLevel;
+  /**
+   * `breadcrumb` records the failure on the next event instead of filing its
+   * own: use it for an answer the app handles (a 401 the auth layer refreshes,
+   * a 404 for a deleted object) that would otherwise open a defect issue.
+   * Defaults to `event`.
+   */
+  report?: 'event' | 'breadcrumb';
   tags?: Record<string, string | number | boolean>;
   contexts?: Record<string, Record<string, unknown>>;
   extra?: Record<string, unknown>;

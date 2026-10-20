@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { isAlreadyReportedNetworkError, reportAppError } from '@/lib/telemetry/app-error-reporting';
 import {
+  setBreadcrumbSink,
   setTelemetrySink,
   TELEMETRY_DESCRIPTION_KEY,
+  type TelemetryBreadcrumb,
   type TelemetryEvent,
 } from '@/lib/telemetry/error-sink';
 
@@ -154,6 +156,38 @@ describe('reportAppError', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ level: 'warning', fingerprint: ['expected-outage'] });
+  });
+
+  it('records a declared breadcrumb instead of filing an event', () => {
+    const breadcrumbs: TelemetryBreadcrumb[] = [];
+    setBreadcrumbSink(breadcrumb => {
+      breadcrumbs.push(breadcrumb);
+    });
+    try {
+      reportAppError(
+        Object.assign(new Error('stale token'), {
+          [TELEMETRY_DESCRIPTION_KEY]: {
+            fingerprint: ['transcription-models-fetch', 'http.401'],
+            level: 'warning',
+            report: 'breadcrumb',
+            tags: { 'error.subsystem': 'transcription-models', 'http.status': 401 },
+          },
+        }),
+        { source: 'query' }
+      );
+    } finally {
+      setBreadcrumbSink(null);
+    }
+
+    expect(events).toEqual([]);
+    expect(breadcrumbs).toEqual([
+      {
+        category: 'app-error',
+        level: 'warning',
+        message: 'stale token',
+        data: { 'error.subsystem': 'transcription-models', 'http.status': 401 },
+      },
+    ]);
   });
 
   it('ignores a malformed declared telemetry and keeps the generic fingerprint', () => {

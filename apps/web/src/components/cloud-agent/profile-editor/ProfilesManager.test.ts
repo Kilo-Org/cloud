@@ -7,7 +7,7 @@ import type * as ProfilesManagerModule from './ProfilesManager';
 const mockCanManage = jest.fn<() => { data?: { canManage: boolean }; error?: Error }>();
 
 jest.mock('@/hooks/useCloudAgentSettings', () => ({
-  useCloudAgentSettingsCanManage: () => mockCanManage(),
+  useCloudAgentSettings: () => mockCanManage(),
 }));
 
 jest.mock('@/hooks/useCloudAgentProfiles', () => ({

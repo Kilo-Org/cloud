@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { useCloudAgentSettingsCanManage } from '@/hooks/useCloudAgentSettings';
+import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
 import {
   useProfiles,
   useCombinedProfiles,
@@ -32,7 +32,7 @@ export function ProfilesManager({
   openToNewProfile,
   initialSelectedProfileId,
 }: ProfilesManagerProps) {
-  const permissionsQuery = useCloudAgentSettingsCanManage({
+  const permissionsQuery = useCloudAgentSettings({
     organizationId,
     enabled: !!organizationId,
   });

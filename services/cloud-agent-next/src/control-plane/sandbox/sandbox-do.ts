@@ -73,9 +73,11 @@ import {
 import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
 import type { GrantDiagnostic } from '../../sandbox-control/grant-diagnostic.js';
 import {
+  hasSafeKiloCredentialPath,
   kiloTokenHasRuntimeAuthorization,
   prepareCredentialGrant,
   resolveSessionCredential,
+  SessionCredentialUpgradeRequiredError,
   sessionCredentialsPayloadFromGrant,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
@@ -2619,7 +2621,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const now = Date.now();
     return this.refreshVercelNetworkPolicy([
       ...listScopeGrants(this.db).filter(
-        grant => scopeGrantId(grant) !== scopeGrantId(candidate) && grant.expiresAt > now
+        grant =>
+          hasSafeKiloCredentialPath(grant) &&
+          scopeGrantId(grant) !== scopeGrantId(candidate) &&
+          grant.expiresAt > now
       ),
       candidate,
     ]);
@@ -3173,7 +3178,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async activeGrants(now: number): Promise<SessionCredentialGrant[]> {
-    return listScopeGrants(this.db).filter(grant => grant.expiresAt > now);
+    return listScopeGrants(this.db).filter(
+      grant => hasSafeKiloCredentialPath(grant) && grant.expiresAt > now
+    );
   }
 
   /**
@@ -3299,7 +3306,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
             route.sessionId,
             route.attemptId,
             'workspace_setup_failed',
-            admissionFailureStage(error, 'runtime_proxy_bind_failed')
+            error instanceof SessionCredentialUpgradeRequiredError
+              ? 'credential_upgrade_required'
+              : admissionFailureStage(error, 'runtime_proxy_bind_failed')
           );
         }
       }
@@ -3460,6 +3469,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // A route without a grant never reaches `preparing` (issuance failure marks
     // it `failed`), so never send a spec that could carry raw issuer material.
     if (route.grant === null) return;
+    if (!hasSafeKiloCredentialPath(route.grant)) {
+      this.ctx.waitUntil(
+        this.failPrepareAttempt(
+          route.sessionId,
+          route.attemptId,
+          'credential_upgrade_required'
+        ).catch(() => {
+          logger
+            .withFields({
+              sandboxId: this.sandboxId,
+              sessionId: route.sessionId,
+              attemptId: route.attemptId,
+            })
+            .warn('Could not persist credential upgrade failure');
+        })
+      );
+      return;
+    }
     if (route.grant.kilo.runtimeProxy !== undefined) {
       // R1: minting the runtime credential proxy handle is a Session DO call that
       // must stay off this DO's serial queue; the frame is sent once the handle

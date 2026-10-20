@@ -163,7 +163,7 @@ const scmSchema = z
   })
   .strict();
 
-export const sessionCredentialGrantSchema = z
+const sessionCredentialGrantShape = z
   .object({
     version: z.literal(1),
     containmentEnabled: z.boolean().optional(),
@@ -206,128 +206,150 @@ export const sessionCredentialGrantSchema = z
     preparedAt: timestampSchema,
     expiresAt: timestampSchema,
   })
-  .strict()
-  .superRefine((grant, context) => {
-    const reject = () => context.addIssue({ code: 'custom', message: 'Invalid credential grant' });
+  .strict();
+
+function refineSessionCredentialGrant(
+  grant: z.infer<typeof sessionCredentialGrantShape>,
+  context: z.RefinementCtx,
+  options: { allowLegacyDirect: boolean }
+): void {
+  const reject = () => context.addIssue({ code: 'custom', message: 'Invalid credential grant' });
+  if (
+    grant.expiresAt <= grant.preparedAt ||
+    grant.expiresAt - grant.preparedAt > WORKTREE_LEASE_MS ||
+    (grant.kilo.tokenSelectedAt !== undefined && grant.kilo.tokenSelectedAt > grant.preparedAt) ||
+    new Set(grant.members.map(member => member.sessionId)).size !== grant.members.length ||
+    new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
+    (grant.containmentEnabled !== false &&
+      providerUsesOutboundCredentialProxy(grant.provider) &&
+      !grant.outboundContainerId)
+  ) {
+    reject();
+  }
+  if (grant.containmentEnabled === false) {
+    // A direct grant may only carry the session-bound runtime proxy. Without
+    // containment there is no outbound broker boundary for a Kilo capability,
+    // and a native user token must never be projected into a sandbox.
+    const legacyDirect =
+      options.allowLegacyDirect &&
+      grant.kilo.alias === undefined &&
+      grant.kilo.runtimeProxy === undefined &&
+      Object.keys(grant.kilo.capabilities).length === 0;
     if (
-      grant.expiresAt <= grant.preparedAt ||
-      grant.expiresAt - grant.preparedAt > WORKTREE_LEASE_MS ||
-      (grant.kilo.tokenSelectedAt !== undefined && grant.kilo.tokenSelectedAt > grant.preparedAt) ||
-      new Set(grant.members.map(member => member.sessionId)).size !== grant.members.length ||
-      new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
-      (grant.containmentEnabled !== false &&
-        providerUsesOutboundCredentialProxy(grant.provider) &&
-        !grant.outboundContainerId)
-    ) {
-      reject();
-    }
-    if (grant.containmentEnabled === false) {
-      // A direct grant may only carry the session-bound runtime proxy. Without
-      // containment there is no outbound broker boundary for a Kilo capability,
-      // and a native user token must never be projected into a sandbox.
-      if (
-        grant.kilo.alias === undefined ||
+      !legacyDirect &&
+      (grant.kilo.alias === undefined ||
         grant.kilo.runtimeProxy === undefined ||
-        Object.keys(grant.kilo.capabilities).length > 0
-      )
-        reject();
+        Object.keys(grant.kilo.capabilities).length > 0)
+    )
+      reject();
+  }
+  if (grant.containmentEnabled !== false || grant.kilo.runtimeProxy !== undefined) {
+    const kiloAlias = grant.kilo.alias && parseControlPlaneCredential(grant.kilo.alias);
+    if (!kiloAlias || kiloAlias.sandboxId !== grant.sandboxId || kiloAlias.purpose !== 'kilo') {
+      reject();
     }
-    if (grant.containmentEnabled !== false || grant.kilo.runtimeProxy !== undefined) {
-      const kiloAlias = grant.kilo.alias && parseControlPlaneCredential(grant.kilo.alias);
-      if (!kiloAlias || kiloAlias.sandboxId !== grant.sandboxId || kiloAlias.purpose !== 'kilo') {
-        reject();
-      }
-    }
-    const targets = deriveKiloSandboxTargets(
-      {
-        KILOCODE_BACKEND_BASE_URL: grant.kilo.targets.backendBaseUrl,
-        KILO_OPENROUTER_BASE: grant.kilo.targets.providerBaseUrl,
-        KILO_SESSION_INGEST_URL: grant.kilo.targets.sessionIngestBaseUrl,
-      },
-      grant.kilo.token,
-      { requireHttps: grant.provider === 'vercel' }
-    );
+  }
+  const targets = deriveKiloSandboxTargets(
+    {
+      KILOCODE_BACKEND_BASE_URL: grant.kilo.targets.backendBaseUrl,
+      KILO_OPENROUTER_BASE: grant.kilo.targets.providerBaseUrl,
+      KILO_SESSION_INGEST_URL: grant.kilo.targets.sessionIngestBaseUrl,
+    },
+    grant.kilo.token,
+    { requireHttps: grant.provider === 'vercel' }
+  );
+  if (!targets.success || JSON.stringify(targets.targets) !== JSON.stringify(grant.kilo.targets)) {
+    reject();
+  }
+  for (const [sessionId, capability] of Object.entries(grant.kilo.capabilities)) {
     if (
-      !targets.success ||
-      JSON.stringify(targets.targets) !== JSON.stringify(grant.kilo.targets)
+      !grant.members.some(member => member.sessionId === sessionId) ||
+      !capability.credential.startsWith('kka1.') ||
+      !providerUsesOutboundCredentialProxy(grant.provider)
     ) {
       reject();
     }
-    for (const [sessionId, capability] of Object.entries(grant.kilo.capabilities)) {
-      if (
-        !grant.members.some(member => member.sessionId === sessionId) ||
-        !capability.credential.startsWith('kka1.') ||
-        !providerUsesOutboundCredentialProxy(grant.provider)
-      ) {
-        reject();
-      }
-    }
-    if (grant.kilo.runtimeProxy) {
-      const members = grant.kilo.runtimeProxy.members;
-      if (
-        !deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets) ||
-        Object.keys(grant.kilo.capabilities).length > 0 ||
-        new Set(members.map(member => member.sessionId)).size !== members.length ||
-        new Set(members.map(member => member.kiloSessionId)).size !== members.length ||
-        members.some(
-          member =>
-            !grant.members.some(
-              expected =>
-                expected.sessionId === member.sessionId &&
-                expected.kiloSessionId === member.kiloSessionId
-            )
-        )
-      ) {
-        reject();
-      }
-    }
-    if (grant.repository && grant.repository.type !== 'git') {
-      if (grant.scm?.purpose !== grant.repository.type) reject();
-    } else if (grant.scm) {
+  }
+  if (grant.kilo.runtimeProxy) {
+    const members = grant.kilo.runtimeProxy.members;
+    if (
+      !deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets) ||
+      Object.keys(grant.kilo.capabilities).length > 0 ||
+      new Set(members.map(member => member.sessionId)).size !== members.length ||
+      new Set(members.map(member => member.kiloSessionId)).size !== members.length ||
+      members.some(
+        member =>
+          !grant.members.some(
+            expected =>
+              expected.sessionId === member.sessionId &&
+              expected.kiloSessionId === member.kiloSessionId
+          )
+      )
+    ) {
       reject();
     }
-    if (!grant.scm) return;
-    if (grant.scm.author && grant.scm.purpose !== 'github') reject();
-    if (grant.containmentEnabled === false) {
-      if (
-        grant.scm.alias !== undefined ||
-        grant.scm.capability !== undefined ||
-        !grant.scm.nativeToken ||
-        (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined)
-      ) {
-        reject();
-      }
-      return;
-    }
-    const alias = grant.scm.alias && parseControlPlaneCredential(grant.scm.alias);
-    if (!alias || alias.sandboxId !== grant.sandboxId || alias.purpose !== grant.scm.purpose) {
+  }
+  if (grant.repository && grant.repository.type !== 'git') {
+    if (grant.scm?.purpose !== grant.repository.type) reject();
+  } else if (grant.scm) {
+    reject();
+  }
+  if (!grant.scm) return;
+  if (grant.scm.author && grant.scm.purpose !== 'github') reject();
+  if (grant.containmentEnabled === false) {
+    if (
+      grant.scm.alias !== undefined ||
+      grant.scm.capability !== undefined ||
+      !grant.scm.nativeToken ||
+      (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined)
+    ) {
       reject();
     }
-    if (grant.provider === 'vercel') {
-      if (
-        grant.scm.purpose !== 'github' ||
-        !grant.scm.nativeToken ||
-        grant.scm.capability ||
-        grant.scm.gitlab
-      ) {
-        reject();
-      }
-    } else {
-      const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
-      if (
-        grant.scm.nativeToken ||
-        !grant.scm.capability?.credential.startsWith(prefixes[grant.scm.purpose]) ||
-        (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined) ||
-        (grant.scm.gitlab !== undefined &&
-          (!grant.scm.gitlab.projectPath ||
-            !grant.scm.gitlab.integrationId ||
-            !grant.scm.gitlab.authType ||
-            !grant.scm.gitlab.identity))
-      ) {
-        reject();
-      }
+    return;
+  }
+  const alias = grant.scm.alias && parseControlPlaneCredential(grant.scm.alias);
+  if (!alias || alias.sandboxId !== grant.sandboxId || alias.purpose !== grant.scm.purpose) {
+    reject();
+  }
+  if (grant.provider === 'vercel') {
+    if (
+      grant.scm.purpose !== 'github' ||
+      !grant.scm.nativeToken ||
+      grant.scm.capability ||
+      grant.scm.gitlab
+    ) {
+      reject();
     }
-  });
+  } else {
+    const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
+    if (
+      grant.scm.nativeToken ||
+      !grant.scm.capability?.credential.startsWith(prefixes[grant.scm.purpose]) ||
+      (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined) ||
+      (grant.scm.gitlab !== undefined &&
+        (!grant.scm.gitlab.projectPath ||
+          !grant.scm.gitlab.integrationId ||
+          !grant.scm.gitlab.authType ||
+          !grant.scm.gitlab.identity))
+    ) {
+      reject();
+    }
+  }
+}
+
+export const sessionCredentialGrantSchema = sessionCredentialGrantShape.superRefine(
+  (grant, context) => refineSessionCredentialGrant(grant, context, { allowLegacyDirect: false })
+);
+
+/**
+ * Read schema for grants persisted before the direct containment-off fallback
+ * was removed. Such a grant has no alias and no runtime proxy; it is never
+ * usable for a sandbox, but must remain readable so cleanup and route reads do
+ * not fail for unrelated sessions on the same sandbox.
+ */
+export const persistedSessionCredentialGrantSchema = sessionCredentialGrantShape.superRefine(
+  (grant, context) => refineSessionCredentialGrant(grant, context, { allowLegacyDirect: true })
+);
 
 export type SessionCredentialGrant = z.infer<typeof sessionCredentialGrantSchema>;
 type CredentialMember = z.infer<typeof memberSchema>;
@@ -343,6 +365,15 @@ export function isContainedSessionCredentialGrant(
   grant: SessionCredentialGrant
 ): grant is ContainedSessionCredentialGrant {
   return grant.containmentEnabled !== false;
+}
+
+/**
+ * Whether the grant can back a sandbox at all: contained broker credentials or
+ * the session-bound runtime proxy. A persisted legacy containment-off grant has
+ * neither and may only be read for cleanup and upgrade handling.
+ */
+export function hasSafeKiloCredentialPath(grant: SessionCredentialGrant): boolean {
+  return isContainedSessionCredentialGrant(grant) || grant.kilo.runtimeProxy !== undefined;
 }
 
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
@@ -387,6 +418,23 @@ export class SessionCredentialUpgradeRequiredError extends Error {
 
 function validateGrant(value: unknown, diagnostic?: GrantDiagnostic): SessionCredentialGrant {
   const parsed = sessionCredentialGrantSchema.safeParse(value);
+  if (!parsed.success) {
+    diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_grant' });
+    invalidCredentials();
+  }
+  return parsed.data;
+}
+
+/**
+ * Persisted grants may predate the direct containment-off removal. Accept the
+ * readable legacy shape here; callers still deny it before projecting anything
+ * into a sandbox.
+ */
+function validatePersistedGrant(
+  value: unknown,
+  diagnostic?: GrantDiagnostic
+): SessionCredentialGrant {
+  const parsed = persistedSessionCredentialGrantSchema.safeParse(value);
   if (!parsed.success) {
     diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_grant' });
     invalidCredentials();
@@ -792,7 +840,6 @@ async function refreshScmCapability(
   return { ...grant, scm };
 }
 
-
 /**
  * The environment key names the grant projection in `preparedPayload` owns. The
  * frame builder restores any of these that the pre-overlay spec already carried
@@ -831,10 +878,8 @@ function preparedPayload(input: {
   // token. The emitted `git` comes only from the issued grant below (B3 review 2, N3).
   const { git: _inputGit, ...payloadWithoutGit } = payload;
   const contained = isContainedSessionCredentialGrant(grant);
-  const kiloToken =
-    contained || grant.kilo.runtimeProxy
-      ? (grant.kilo.alias ?? invalidCredentials())
-      : grant.kilo.token;
+  if (!hasSafeKiloCredentialPath(grant)) throw new SessionCredentialUpgradeRequiredError();
+  const kiloToken = grant.kilo.alias ?? invalidCredentials();
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   let githubReviewTarget: GitHubReviewTarget | undefined;
   const reviewRepository = input.source.repository;
@@ -1189,7 +1234,7 @@ export async function prepareCredentialGrant(
     invalidCredentials();
   }
   const existing =
-    input.existing === undefined ? undefined : validateGrant(input.existing, diagnostic);
+    input.existing === undefined ? undefined : validatePersistedGrant(input.existing, diagnostic);
   const directory = input.directory;
   if (!directory) {
     diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_directory' });
@@ -1552,10 +1597,8 @@ export function sessionCredentialsPayloadFromGrant(
   };
 } {
   const contained = isContainedSessionCredentialGrant(grant);
-  const kiloToken =
-    contained || grant.kilo.runtimeProxy
-      ? (grant.kilo.alias ?? invalidCredentials())
-      : grant.kilo.token;
+  if (!hasSafeKiloCredentialPath(grant)) throw new SessionCredentialUpgradeRequiredError();
+  const kiloToken = grant.kilo.alias ?? invalidCredentials();
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   // The runtime credential proxy facade and the route's handle (the scope's
   // shared canonical handle for an adopted worktree scope, or a per-session one

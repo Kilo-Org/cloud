@@ -18,7 +18,8 @@ import {
   allocation as allocationTable,
   scopeGrants,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
-import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
+import { readScopeGrant, listScopeGrants } from '../../src/control-plane/sandbox/scope-grants.js';
+import { deleteRoute } from '../../src/control-plane/sandbox/routes.js';
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
 import { buildControlNetworkPolicy } from '../../src/sandbox-control/session-credentials.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
@@ -184,6 +185,46 @@ function routeSpec(sessionId: string): ControlPlaneRouteSpec {
     kiloSessionId: kiloSessionIdFor(sessionId),
     directory: `/workspace/${sessionId}`,
     attemptId: `${sessionId}-requested`,
+  };
+}
+
+const LEGACY_SCOPE = 'legacy_scope';
+const LEGACY_SESSION = 'workspace_33333333-3333-3333-3333-333333333333';
+const LEGACY_KILO_SESSION = 'ses_cccccccccccccccccccccccccc';
+const LOCAL_KILO_TARGETS = {
+  backendBaseUrl: 'https://api.kilo.ai',
+  providerBaseUrl: 'https://api.kilo.ai',
+  sessionIngestBaseUrl: 'https://ingest.kilosessions.ai',
+};
+
+/** The grant shape written before the direct containment-off fallback was removed. */
+function legacyGrant(input: {
+  sessionId: string;
+  kiloSessionId: string;
+  scopeId: string;
+  directory: string;
+  targets: {
+    backendBaseUrl: string;
+    providerBaseUrl: string;
+    sessionIngestBaseUrl: string;
+  };
+  provider?: 'cloudflare' | 'vercel';
+}) {
+  const now = Date.now();
+  return {
+    version: 1,
+    containmentEnabled: false,
+    scopeId: input.scopeId,
+    sandboxId: SANDBOX_ID,
+    directory: input.directory,
+    userId: 'user_123',
+    orgId: 'org_123',
+    provider: input.provider ?? 'cloudflare',
+    members: [{ sessionId: input.sessionId, kiloSessionId: input.kiloSessionId }],
+    repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+    kilo: { token: NATIVE_KILO_TOKEN, targets: input.targets, capabilities: {} },
+    preparedAt: now,
+    expiresAt: now + 60 * 60 * 1000,
   };
 }
 
@@ -1313,6 +1354,122 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(row?.grant?.containmentEnabled).toBeUndefined();
     expect(provider.intents).toHaveLength(0);
     expect(JSON.stringify(row)).not.toContain(NATIVE_KILO_TOKEN);
+  });
+
+  it('reads, lists, and cleans up a persisted legacy containment-off grant', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    await prepareWarmRoute(stub, provider);
+    const legacy = legacyGrant({
+      sessionId: LEGACY_SESSION,
+      kiloSessionId: LEGACY_KILO_SESSION,
+      scopeId: LEGACY_SCOPE,
+      directory: '/workspace/legacy',
+      targets: LOCAL_KILO_TARGETS,
+    });
+
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      db.insert(scopeGrants)
+        .values({ id: `${LEGACY_SCOPE}:legacy`, grant: JSON.stringify(legacy) })
+        .run();
+
+      expect(readScopeGrant(db, `${LEGACY_SCOPE}:legacy`)).toMatchObject({
+        containmentEnabled: false,
+        scopeId: LEGACY_SCOPE,
+      });
+      expect(listScopeGrants(db).map(grant => grant.scopeId)).toEqual(
+        expect.arrayContaining([LEGACY_SCOPE])
+      );
+
+      await deleteRoute(db, state.storage.kv, LEGACY_SESSION);
+
+      expect(readScopeGrant(db, `${LEGACY_SCOPE}:legacy`)).toBeNull();
+      expect(listScopeGrants(db).map(grant => grant.scopeId)).not.toContain(LEGACY_SCOPE);
+    });
+  });
+
+  it('fails a persisted legacy containment-off grant with the upgrade stage', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    const spec = { ...routeSpec(SESSION), directory: '/workspace/legacy' };
+    const legacy = legacyGrant({
+      sessionId: SESSION,
+      kiloSessionId: kiloSessionIdFor(SESSION),
+      scopeId: LEGACY_SCOPE,
+      directory: spec.directory,
+      targets: LOCAL_KILO_TARGETS,
+    });
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      db.insert(scopeGrants)
+        .values({ id: `${LEGACY_SCOPE}:legacy`, grant: JSON.stringify(legacy) })
+        .run();
+    });
+    const source = {
+      ...credentialsSource(SESSION, {
+        repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+      }),
+      scopeId: LEGACY_SCOPE,
+    };
+    const diagnostics: Record<string, unknown>[] = [];
+    const spy = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'route_failed') diagnostics.push(bounded);
+      return logger;
+    });
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source, spec),
+      sandboxSelection: {
+        provider: 'cloudflare',
+        containment: { kilocode: false, github: false },
+      },
+    });
+    spy.mockRestore();
+
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    expect(diagnostics).toContainEqual(
+      expect.objectContaining({ stage: 'credential_upgrade_required' })
+    );
+    expect(provider.intents).toHaveLength(0);
+    expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(NATIVE_KILO_TOKEN);
+  });
+
+  it('excludes a persisted legacy grant from the Vercel policy for unrelated routes', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    await prepareWarmRoute(stub, provider, prepareInput(SESSION, vercelSource(SESSION)));
+    const policyCalls = provider.policyCalls.length;
+    const legacy = legacyGrant({
+      sessionId: LEGACY_SESSION,
+      kiloSessionId: LEGACY_KILO_SESSION,
+      scopeId: LEGACY_SCOPE,
+      directory: '/workspace/legacy',
+      targets: {
+        backendBaseUrl: VERCEL_TARGET,
+        providerBaseUrl: VERCEL_TARGET,
+        sessionIngestBaseUrl: VERCEL_TARGET,
+      },
+      provider: 'vercel',
+    });
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      db.insert(scopeGrants)
+        .values({ id: `${LEGACY_SCOPE}:legacy`, grant: JSON.stringify(legacy) })
+        .run();
+    });
+
+    expect((await stub.prepare(prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT)))).state).toBe(
+      'preparing'
+    );
+    expect(provider.policyCalls.length).toBeGreaterThan(policyCalls);
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      expect(readScopeGrant(db, `${LEGACY_SCOPE}:legacy`)).not.toBeNull();
+    });
   });
 
   it('derives the outbound container id from a custom allocation name while stopped', async () => {

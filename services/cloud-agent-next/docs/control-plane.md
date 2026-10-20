@@ -959,7 +959,7 @@ Session-owned token through its renewing authorization path. No modern backing t
 wrapper, and no capability or direct-token fallback can redeem the registration snapshot.
 
 A legacy non-policy-bearing token uses the broker-issued Kilo capability whenever the sandbox has
-any credential containment (Kilo, GitHub or Bitbucket), because that sandbox class carries the
+any credential containment (Kilo, GitHub, GitLab or Bitbucket), because that sandbox class carries the
 outbound credential interceptor. A sandbox without containment has no broker boundary; such a
 session is denied unless its token has modern runtime authorization, in which case it uses the
 session-bound runtime credential proxy. A native user token is never projected into a route spec,
@@ -969,12 +969,13 @@ session-bound runtime credential proxy. A native user token is never projected i
 
 Sessions created before containment metadata was stored, or while containment was disabled, may
 have no safe Kilo credential path. Their first start, restore or resume after this change fails
-quickly with `workspace_setup_failed`; the route diagnostic records the
-`credential_upgrade_required` stage and the user is told to start a new session. No broad token is
-substituted. Operators can re-enable containment (`CREDENTIAL_CONTAINMENT_ENABLED`) or modern
-resource-token issuance for local development; contained sessions and managed SCM direct-token
-paths continue to work. Existing sessions do not need a production migration: unsafe operations
-fail closed when attempted.
+fast with `workspace_setup_failed`; the route diagnostic records the `credential_upgrade_required`
+stage. An existing control-plane route surfaces the generic workspace setup failure text, while a
+new control-plane registration and the legacy plane report the upgrade message directly. No broad
+token is substituted. Operators can re-enable containment (`CREDENTIAL_CONTAINMENT_ENABLED`) or
+modern resource-token issuance for local development; contained sessions and managed SCM
+direct-token paths continue to work. Existing sessions do not need a production migration: unsafe
+operations fail closed when attempted.
 
 Handles are per worktree scope, including in a shared checkout: one handle serves every member of
 the scope. A handle is bound to the user, organization, authorization, worktree scope, current

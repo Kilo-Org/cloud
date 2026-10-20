@@ -210,6 +210,37 @@ describe('session access invalidation route', () => {
     expect(closeViewerSockets).not.toHaveBeenCalled();
   });
 
+  it('rejects an invalid credential without reading the request body', async () => {
+    const { cache, closeViewerSockets } = setInvalidationDos();
+    const request = new Request('http://localhost/internal/session-access/invalidate', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer not-a-jwt',
+      },
+      body: JSON.stringify({
+        kiloUserId: INVALIDATION_USER_ID,
+        organizationId: INVALIDATION_ORG_ID,
+      }),
+    });
+    let bodyReads = 0;
+    const readBody = request.text.bind(request);
+    Object.defineProperty(request, 'text', {
+      value: async () => {
+        bodyReads += 1;
+        return readBody();
+      },
+    });
+
+    const res = await app.request(request, undefined, defaultEnv);
+
+    expect(res.status).toBe(401);
+    expect(bodyReads).toBe(0);
+    expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
+    expect(closeViewerSockets).not.toHaveBeenCalled();
+  });
+
   it('rejects an expired credential', async () => {
     const { cache, closeViewerSockets } = setInvalidationDos();
     const token = await signedInvalidationToken({ expiresInSeconds: -10 });

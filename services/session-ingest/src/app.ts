@@ -161,6 +161,15 @@ app.post('/internal/session-access/invalidate', async c => {
     return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
   }
 
+  const credential = await verifySessionAccessInvalidationCredential({
+    token,
+    secret: expectedSecret,
+  });
+  if (!credential.ok) {
+    logInvalidationAudit('unauthorized', 401, startedAt);
+    return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+  }
+
   const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     logInvalidationAudit('invalid_request', 400, startedAt);
@@ -171,24 +180,12 @@ app.post('/internal/session-access/invalidate', async c => {
     );
   }
 
-  const verification = await verifySessionAccessInvalidationCredential({
-    token,
-    secret: expectedSecret,
-    userId: parsed.data.kiloUserId,
-    organizationId: parsed.data.organizationId,
-  });
-  if (!verification.ok) {
-    const forbidden = verification.reason === 'subject_mismatch';
-    logInvalidationAudit(
-      forbidden ? 'forbidden' : 'unauthorized',
-      forbidden ? 403 : 401,
-      startedAt
-    );
-    return c.json(
-      { success: false, error: forbidden ? 'Forbidden' : 'Unauthorized' },
-      forbidden ? 403 : 401,
-      NO_STORE
-    );
+  if (
+    credential.userId !== parsed.data.kiloUserId ||
+    credential.organizationId !== parsed.data.organizationId
+  ) {
+    logInvalidationAudit('forbidden', 403, startedAt);
+    return c.json({ success: false, error: 'Forbidden' }, 403, NO_STORE);
   }
 
   try {

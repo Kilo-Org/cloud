@@ -3658,7 +3658,7 @@
       "tools": "Työkalut",
       "visibility": "Näkyvyys",
       "visibilityPrimary": "Ensisijainen – näkyy valitsimessa",
-      "visibilitySubagent": "Subagentti – vain muiden kutsuttavissa",
+      "visibilitySubagent": "Aliagentti – vain muiden kutsuttavissa",
       "visibilityAll": "Kaikki – molemmat",
       "saveFailed": "Agenttia ei voitu tallentaa",
       "nameRequired": "Anna agentin nimi",

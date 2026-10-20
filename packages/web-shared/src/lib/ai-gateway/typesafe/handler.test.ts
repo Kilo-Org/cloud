@@ -8,6 +8,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
@@ -142,6 +143,7 @@ const memberDecision = {
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' as const },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
   },
   decision: { allowed: true },
 };
@@ -630,7 +632,11 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(creditsBlockedResponse).mockResolvedValue(blockedResponse);
 
     expect(await handleSystemOneRequest(makeRequest())).toBe(blockedResponse);
-    expect(getBalanceAndOrgSettings).toHaveBeenCalledWith('org-123', user);
+    const [organizationId, balanceUser, fromDb] =
+      jest.mocked(getBalanceAndOrgSettings).mock.lastCall ?? [];
+    expect(organizationId).toBe('org-123');
+    expect(balanceUser).toEqual(user);
+    expect(fromDb).toBe(readDb);
     expect(creditsBlockedResponse).toHaveBeenCalledWith({
       user,
       balance,
@@ -650,12 +656,15 @@ describe('handleSystemOneRequest', () => {
     });
 
     expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
-    expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith({
+    const { fromDb, ...decisionParams } =
+      jest.mocked(resolveOrganizationMemberModelDecision).mock.lastCall?.[0] ?? {};
+    expect(decisionParams).toEqual({
       organizationId: 'org-123',
       kiloUserId: user.id,
       modelId: TYPESAFE_MODEL,
       providerLookup: getProviderSlugsForModel,
     });
+    expect(fromDb).toBe(readDb);
     expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);

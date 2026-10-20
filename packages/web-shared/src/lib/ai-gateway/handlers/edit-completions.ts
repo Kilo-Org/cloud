@@ -222,7 +222,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     readDb
   );
 
-  if (!canSpendPaidUsage(balance) && !isFreeModel(requestBody.model) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !(await isFreeModel(requestBody.model)) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },
@@ -237,6 +237,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
       organizationId,
       kiloUserId: user.id,
       modelId: requestBody.model,
+      fromDb: readDb,
     });
     if (
       !decision.allowed ||

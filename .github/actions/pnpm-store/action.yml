@@ -1,10 +1,8 @@
 name: pnpm store
 description: >-
-  Mount the root node_modules from a Blacksmith sticky disk and keep the pnpm
-  store inside it. The store and the virtual store (node_modules/.pnpm) then
-  share one filesystem, so pnpm hard-links instead of copying, and a warm disk
-  leaves only the per-package links to write. pnpm checks every package against
-  the lockfile integrity hash and prunes what the lockfile no longer lists.
+  Cache only pnpm's content-addressed store on a Blacksmith sticky disk. Each
+  job builds its installed dependency graph and hoisted links from the lockfile,
+  rather than reusing node_modules metadata from a different installation.
 
   Each job mounts its own clone of the disk, so parallel jobs do not wait on
   each other. Keep Branch Protection for sticky disks on in the Blacksmith
@@ -14,12 +12,12 @@ description: >-
 runs:
   using: composite
   steps:
-    - name: Mount node_modules
+    - name: Mount pnpm content store
       uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
       with:
-        key: ${{ github.repository }}-node-modules-${{ runner.os }}-${{ runner.arch }}
-        path: ./node_modules
+        key: ${{ github.repository }}-pnpm-content-store-v1-${{ runner.os }}-${{ runner.arch }}
+        path: ./node_modules/.pnpm-store
 
-    - name: Keep the pnpm store on the same disk
+    - name: Configure pnpm store
       shell: bash
       run: echo "pnpm_config_store_dir=$GITHUB_WORKSPACE/node_modules/.pnpm-store" >> "$GITHUB_ENV"

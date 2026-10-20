@@ -52,8 +52,8 @@ const STEP_LABELS: Record<string, { label: string; description: string }> = {
     description: 'Delete the Pylon contact',
   },
   csa_support_db: {
-    label: 'CSA support DB',
-    description: 'Anonymize the CSA Pylon user and support artifacts',
+    label: 'CSA support DB (retired)',
+    description: 'Retired integration. This legacy task does not block deletion completion.',
   },
 };
 

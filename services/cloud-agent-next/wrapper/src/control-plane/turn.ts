@@ -17,14 +17,10 @@ import type { ControlDiagnosticReporter } from '../../../src/shared/control-diag
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { slashCommandCatalogStatus } from '../../../src/shared/slash-commands.js';
 import { runAutoCommit } from '../auto-commit.js';
-import {
-  DEFAULT_CONDENSE_TIMEOUT_MS,
-  summarizeWithTimeout,
-  type CondenseResult,
-} from '../condense-on-complete.js';
+import { DEFAULT_CONDENSE_TIMEOUT_MS, type CondenseResult } from '../condense-on-complete.js';
 import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js';
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
-import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
+import type { Harness } from './harness.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import { isUnresponsiveRestart, type KiloRestartInfo } from './kilo-runtime.js';
 import type {
@@ -56,12 +52,12 @@ export type TurnTimers = ControlPlaneTimers['wrapper'];
 export type TurnKiloRuntime = {
   readonly directory: string;
   readonly env: Record<string, string>;
-  readonly client: WrapperKiloClient;
-  ensure(): Promise<WrapperKiloClient>;
+  readonly client: Harness;
+  ensure(): Promise<Harness>;
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
-  isRetiredClient(client: WrapperKiloClient): boolean;
+  isRetiredClient(client: Harness): boolean;
   sessionState(id: string): ReturnType<SessionSupervisor['state']>;
   refreshActivity(): Promise<void>;
   applyPendingCredentials?(canRestart: () => boolean): Promise<boolean>;
@@ -87,7 +83,7 @@ export type TurnManagerDeps = {
   materializeAttachments?: typeof materializeMessageAttachments;
   runAutoCommit?: typeof runAutoCommit;
   runCondense?: (input: {
-    kiloClient: WrapperKiloClient;
+    kiloClient: Harness;
     kiloSessionId: string;
     directory: string;
     model: string;
@@ -266,12 +262,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
   const condense =
     deps.runCondense ??
     ((input: {
-      kiloClient: WrapperKiloClient;
+      kiloClient: Harness;
       kiloSessionId: string;
       directory: string;
       model: string;
       signal?: AbortSignal;
-    }) => summarizeWithTimeout({ ...input, directory: input.directory }));
+    }) =>
+      input.kiloClient.condense({
+        sessionId: input.kiloSessionId,
+        directory: input.directory,
+        model: input.model,
+        signal: input.signal,
+      }));
 
   const routes = new Map<string, TurnRoute>();
   const turns = new Map<string, Turn>();
@@ -477,13 +479,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
           const agent = turn.prompts.at(-1)?.payload.agent;
           turn.submittedSinceIdle = true;
           turn.deferredCompletion = undefined;
-          await runtime.client.sendPromptAsync({
+          await runtime.client.submit({
             sessionId: route.kiloSessionId,
             directory: route.directory,
             messageId: createMessageId(),
             prompt: PUBLICATION_RECOVERY_PROMPT,
             ...(agent?.mode ? { agent: agent.mode } : {}),
-            ...(agent?.model ? { model: { providerID: 'kilo', modelID: agent.model } } : {}),
+            ...(agent?.model ? { model: agent.model } : {}),
             ...(agent?.variant ? { variant: agent.variant } : {}),
             signal,
           });
@@ -610,7 +612,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         // Now handed to Kilo. The mark lives on the prompt, so a resubmission of
         // the same messageId cannot outrun the receipt count.
         markDispatched(turn, pending);
-        await client.sendPromptAsync({
+        await client.submit({
           sessionId: route.kiloSessionId,
           directory: route.directory,
           signal: pending.abort.signal,
@@ -621,7 +623,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             : { variant: pending.payload.agent.variant }),
           ...(message.prompt === undefined ? {} : { prompt: message.prompt }),
           ...(message.parts === undefined ? {} : { parts: message.parts }),
-          ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
+          ...(model === undefined ? {} : { model }),
         });
       } else if (pending.payload.turn.command === 'compact') {
         if (model === undefined) throw new Error('Compact requires a model');
@@ -631,11 +633,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
         pending.nativeClose = nativeClose;
         markDispatched(turn, pending);
         try {
-          const summarized = await client.summarizeSession({
+          const summarized = await client.compact({
             sessionId: route.kiloSessionId,
             directory: route.directory,
             signal: pending.abort.signal,
-            model: { modelID: model },
+            model,
           });
           if (!summarized) throw new Error('Session summarization failed');
           if (!isCurrent()) return;
@@ -653,7 +655,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         }
       } else {
         markDispatched(turn, pending);
-        await client.sendCommand({
+        await client.command({
           sessionId: route.kiloSessionId,
           directory: route.directory,
           signal: pending.abort.signal,
@@ -664,14 +666,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
           ...(pending.payload.agent.variant === undefined
             ? {}
             : { variant: pending.payload.agent.variant }),
-          ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
+          ...(model === undefined ? {} : { model }),
         });
       }
     } catch (error) {
       // A restart cancels the retired dispatch and resubmits the batch; that
       // cancellation must not fail the resubmitted turn.
       if (!isCurrent() && isCancelledBy(error, dispatchSignal)) return;
-      if (runtime.isRetiredClient(client) && isKiloServerUnreachableError(error)) return;
+      if (runtime.isRetiredClient(client) && client.isUnavailableError(error)) return;
       throw error;
     }
     if (isCurrent()) {
@@ -720,7 +722,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const runtime = deps.runtimes.get(route.runtimeKey);
     if (runtime === undefined) return;
     try {
-      await runtime.client.abortSession({
+      await runtime.client.interrupt({
         sessionId: route.kiloSessionId,
         directory: route.directory,
         signal: AbortSignal.timeout(10_000),
@@ -751,26 +753,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
       log(`turn: answer with no runtime for ${sessionId}`);
       return;
     }
-    let client: WrapperKiloClient;
+    let client: Harness;
     try {
       client = runtime.client;
     } catch {
       return;
     }
     try {
-      if (reply.action === 'permission') {
-        await client.answerPermission(
-          reply.permissionId,
-          reply.response,
-          reply.message,
-          true,
-          route.directory
-        );
-      } else if (reply.action === 'reject') {
-        await client.rejectQuestion(reply.questionId, route.directory);
-      } else {
-        await client.answerQuestion(reply.questionId, reply.answers, route.directory);
-      }
+      await client.answer({ reply, directory: route.directory, interactive: true });
     } catch (error) {
       log(`turn: answer failed - ${error instanceof Error ? error.message : String(error)}`);
       return;
@@ -1010,13 +1000,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
       try {
         const runtime = deps.runtimes.get(route.runtimeKey);
         if (runtime === undefined) throw new Error('Kilo runtime unavailable');
-        const success = await runtime.client.answerPermission(
-          permissionId,
-          reply.response,
-          reply.response === 'reject' ? reply.message : undefined,
-          undefined,
-          route.directory
-        );
+        const success = await runtime.client.answer({
+          directory: route.directory,
+          reply: {
+            action: 'permission',
+            permissionId,
+            response: reply.response,
+            ...(reply.response === 'reject' ? { message: reply.message } : {}),
+          },
+        });
         if (!success) throw new Error('Permission reply was not accepted');
         return;
       } catch (error) {
@@ -1049,7 +1041,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const runtime = deps.runtimes.get(route.runtimeKey);
-        if (!runtime || !(await runtime.client.rejectQuestion(questionId, route.directory)))
+        if (
+          !runtime ||
+          !(await runtime.client.answer({
+            directory: route.directory,
+            reply: { action: 'reject', questionId },
+          }))
+        )
           throw new Error('Question rejection was not accepted');
         return;
       } catch {
@@ -1074,7 +1072,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     if (route === undefined) return;
     const runtime = deps.runtimes.get(route.runtimeKey);
     if (runtime === undefined || runtime.isRestarting() || runtime.isUnavailable()) return;
-    let client: WrapperKiloClient;
+    let client: Harness;
     try {
       client = runtime.client;
     } catch {

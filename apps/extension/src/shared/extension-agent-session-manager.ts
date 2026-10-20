@@ -567,6 +567,23 @@ export function createExtensionAgentSessionManager({
       },
     },
 
+    fetchCloudSession: sessionId =>
+      organizationId === null
+        ? trpcClient.cloudAgentNext.getSession.query({ cloudAgentSessionId: sessionId })
+        : trpcClient.organizations.cloudAgentNext.getSession.query({
+            cloudAgentSessionId: sessionId,
+            organizationId,
+          }),
+
+    fetchCloudSnapshotPage: (sessionId, options) =>
+      organizationId === null
+        ? trpcClient.cloudAgentNext.getSessionMessagesPage.query({ ...options, sessionId })
+        : trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query({
+            ...options,
+            organizationId,
+            sessionId,
+          }),
+
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
       const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId, {
         query: id => trpcClient.cliSessionsV2.getWithRuntimeState.query({ session_id: id }),

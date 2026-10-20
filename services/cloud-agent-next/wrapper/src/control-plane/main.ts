@@ -38,7 +38,6 @@ import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
-import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   parseAgentSandboxProvider,
@@ -456,9 +455,7 @@ export async function runControlPlaneWrapper(
   worktreeDeletionRef.current = createControlPlaneWorktreeDeletion({
     emit: frame => connection.send(frame),
     clients: directory =>
-      runtimes
-        .runtimesForDirectory(directory)
-        .map(runtime => createWorktreeKiloCleanupClient(runtime.client.server)),
+      runtimes.runtimesForDirectory(directory).map(runtime => runtime.client.worktree),
     retireDirectory: directory => runtimes.retireDirectory(directory),
     detachTerminals: directory =>
       terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
@@ -468,7 +465,7 @@ export async function runControlPlaneWrapper(
   kiloRequestsRef.current = createControlPlaneKiloRequests({
     emit: frame => connection.send(frame),
     preparedRoute: sessionId => preparationRef.current?.preparedRoute(sessionId) ?? null,
-    clientFor: key => liveRuntimeClient(runtimes.get(key)) ?? null,
+    clientFor: key => liveRuntimeClient(runtimes.get(key))?.reads ?? null,
     log: logToFile,
   });
   const nativeStatus = createNativeStatusReporter({

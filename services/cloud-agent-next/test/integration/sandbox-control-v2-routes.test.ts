@@ -1996,7 +1996,10 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await waitFor(() => expect(peer.events).toHaveLength(1));
     expect(peer.events[0]).toEqual({
       sessionId: SESSION,
-      notification: { events: [{ type: 'kilo.chunk', properties: { text: 'hi' } }] },
+      notification: {
+        events: [{ type: 'kilo.chunk', properties: { text: 'hi' } }],
+        delivery: { id: expect.any(String), expiresAt: expect.any(Number) },
+      },
     });
 
     wrapper.send({

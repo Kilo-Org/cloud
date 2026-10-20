@@ -17,8 +17,7 @@ import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timer
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import { parseControlPlaneCredential } from '../../../src/shared/control-plane-credential.js';
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
-import { fetchKiloServer } from '../kilo-server-auth.js';
+import type { Harness } from './harness.js';
 import {
   git,
   runProcess,
@@ -51,7 +50,6 @@ import {
   createGitProgressReporter,
   isBloblessReviewCloneEligible,
 } from '../session-bootstrap.js';
-import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
 import { restoreWorktreeRecovery } from './worktree-recovery.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
@@ -88,10 +86,7 @@ const SETUP_OUTPUT_EVENT_LIMIT = 8_192;
  * effort: it must terminate and never block the route release, so the walk is
  * capped by depth, node count and a shared deadline, with one retry per step.
  */
-const RELEASE_CLEANUP_MAX_DEPTH = 8;
-const RELEASE_CLEANUP_MAX_NODES = 64;
 const RELEASE_CLEANUP_DEADLINE_MS = 10_000;
-const RELEASE_CLEANUP_ATTEMPTS = 2;
 
 /**
  * Spec §7: eligible managed GitHub HTTPS preparation clone/fetch opts into the
@@ -146,7 +141,7 @@ export type PrepareRuntimePort = {
     directory: string;
     env: Record<string, string>;
     workload?: ControlWorkload;
-  }): Promise<WrapperKiloClient>;
+  }): Promise<Harness>;
   installCredentials(key: string, env: Record<string, string>): Promise<void>;
   /** True when the runtime is gone or has spent its restart budget. */
   isUnavailable(key: string): boolean;
@@ -154,7 +149,7 @@ export type PrepareRuntimePort = {
    * The runtime's client only while it is live; undefined during a restart, when
    * unavailable, or after shutdown. Never throws.
    */
-  getLiveClient(key: string): WrapperKiloClient | undefined;
+  getLiveClient(key: string): Harness | undefined;
   remove(key: string): void;
   release(key: string): void;
 };
@@ -179,16 +174,8 @@ export type PrepareDeps = {
   ) => Promise<ExecResult>;
   /** Starts the default setup command, e.g. inside the setup cgroup. */
   spawnSetup?: ProcessSpawn;
-  restore?: typeof restoreSession;
   recoverWorktree?: typeof restoreWorktreeRecovery;
-  seedRegistration?: typeof seedSessionIngestRegistration;
   configureGitAuthor?: typeof configureWorkspaceGitAuthor;
-  sessionExists?: (
-    client: WrapperKiloClient,
-    kiloSessionId: string,
-    directory: string,
-    signal: AbortSignal
-  ) => Promise<boolean>;
   mkdir?: (directory: string) => Promise<void>;
   hasGit?: (directory: string) => Promise<boolean>;
   readStamp?: (directory: string) => Promise<WorkspaceStamp | null>;
@@ -269,24 +256,6 @@ async function defaultHasGit(directory: string): Promise<boolean> {
   }
 }
 
-async function defaultSessionExists(
-  client: WrapperKiloClient,
-  kiloSessionId: string,
-  directory: string,
-  signal: AbortSignal
-): Promise<boolean> {
-  const url = new URL(`/session/${encodeURIComponent(kiloSessionId)}`, client.serverUrl);
-  url.searchParams.set('directory', directory);
-  const response = await fetchKiloServer(client.server, url, { signal });
-  if (response.status === 404) return false;
-  if (!response.ok) throw new Error('Kilo session probe failed');
-  const data: unknown = await response.json();
-  if (typeof data !== 'object' || data === null || !('id' in data) || data.id !== kiloSessionId) {
-    throw new Error('Kilo session probe returned an invalid session');
-  }
-  return true;
-}
-
 /** Keep existing allocations on their original runtime and HOME identities. */
 export function runtimeKey(spec: ControlPlaneRouteSpec): string {
   return spec.runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory;
@@ -311,111 +280,10 @@ function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): bo
   return error instanceof Error && error.message === `${step} timed out`;
 }
 
-type ReleaseCleanupResult = {
-  ok: boolean;
-  sessions: number;
-  failures: number;
-  elapsedMs: number;
-};
-
 type InflightCleanup = {
   promise: Promise<void>;
   controller: AbortController;
 };
-
-/**
- * Best-effort abort of a released route's Kilo session tree. Walks children from
- * the root with a visited set and shared depth/node/deadline bounds; each step
- * retries once. It must terminate on a cyclic or unbounded tree, never throw,
- * and never block the route release that called it. `externalSignal` lets a
- * re-prepare stop the walk before it can abort the new session under the same
- * kiloSessionId.
- */
-async function cleanupKiloSessionTree(
-  client: WrapperKiloClient,
-  directory: string,
-  rootSessionId: string,
-  deadlineMs: number,
-  externalSignal: AbortSignal
-): Promise<ReleaseCleanupResult> {
-  const startedAt = Date.now();
-  const controller = new AbortController();
-  const signal = controller.signal;
-  const onExternalAbort = (): void => controller.abort();
-  externalSignal.addEventListener('abort', onExternalAbort, { once: true });
-  if (externalSignal.aborted) controller.abort();
-  const timer = setTimeout(() => controller.abort(), deadlineMs);
-  const abortedError = new Error('release cleanup deadline exceeded');
-  const deadline = new Promise<never>((_, reject) => {
-    signal.addEventListener('abort', () => reject(abortedError), { once: true });
-  });
-  void deadline.catch(() => undefined);
-  const visited = new Set<string>();
-  const queue: Array<{ id: string; depth: number }> = [{ id: rootSessionId, depth: 0 }];
-  let sessions = 0;
-  let failures = 0;
-
-  const attempt = async (operation: () => Promise<void>): Promise<boolean> => {
-    for (let attemptNumber = 1; attemptNumber <= RELEASE_CLEANUP_ATTEMPTS; attemptNumber += 1) {
-      if (signal.aborted) return false;
-      try {
-        await Promise.race([operation(), deadline]);
-        return true;
-      } catch {
-        if (attemptNumber === RELEASE_CLEANUP_ATTEMPTS) return false;
-      }
-    }
-    return false;
-  };
-
-  try {
-    while (queue.length > 0 && sessions < RELEASE_CLEANUP_MAX_NODES && !signal.aborted) {
-      const next = queue.shift();
-      if (next === undefined) break;
-      if (visited.has(next.id)) continue;
-      visited.add(next.id);
-      sessions += 1;
-      if (
-        !(await attempt(async () => {
-          await client.abortSessionForCleanup({ sessionId: next.id, directory, signal });
-        }))
-      ) {
-        failures += 1;
-      }
-      if (
-        !(await attempt(async () => {
-          await client.stopSessionProcesses({ sessionId: next.id, directory, signal });
-        }))
-      ) {
-        failures += 1;
-      }
-      if (next.depth >= RELEASE_CLEANUP_MAX_DEPTH) continue;
-      let children: Array<{ id: string; directory: string }> = [];
-      if (
-        !(await attempt(async () => {
-          children = await client.children({ sessionId: next.id, directory, signal });
-        }))
-      ) {
-        failures += 1;
-        continue;
-      }
-      for (const child of children) {
-        if (child.directory !== directory) continue;
-        if (!visited.has(child.id)) queue.push({ id: child.id, depth: next.depth + 1 });
-      }
-    }
-
-    return {
-      ok: failures === 0 && !signal.aborted,
-      sessions,
-      failures,
-      elapsedMs: Date.now() - startedAt,
-    };
-  } finally {
-    clearTimeout(timer);
-    externalSignal.removeEventListener('abort', onExternalAbort);
-  }
-}
 
 export function createPreparationManager(deps: PrepareDeps): PreparationManager {
   const timers = deps.timers.wrapper;
@@ -435,10 +303,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         hardTimeoutMs: SETUP_COMMAND_HARD_TIMEOUT_MS,
         ...(onOutput ? { onOutput } : {}),
       }));
-  const restore = deps.restore ?? restoreSession;
-  const seedRegistration = deps.seedRegistration ?? seedSessionIngestRegistration;
   const configureGitAuthor = deps.configureGitAuthor ?? configureWorkspaceGitAuthor;
-  const sessionExists = deps.sessionExists ?? defaultSessionExists;
   const sleep = deps.sleep ?? defaultSleep;
   const now = deps.now ?? Date.now;
   const homeRoot = deps.homeRoot ?? path.join(os.tmpdir(), 'kilo-worktrees');
@@ -1087,37 +952,18 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     spec: ControlPlaneRouteSpec,
     directory: string,
     env: Record<string, string>,
-    client: WrapperKiloClient,
+    client: Harness,
     signal: AbortSignal,
     restoreFiles: boolean
   ): Promise<void> {
-    await seedRegistration(spec.kiloSessionId, env, signal);
-    if (await sessionExists(client, spec.kiloSessionId, directory, signal)) return;
-    emitProgress(spec.sessionId, 'kilo_session', 'Loading session history');
-    const restored = await restore(spec.kiloSessionId, directory, undefined, {
+    await client.open({
+      sessionId: spec.kiloSessionId,
+      directory,
       env,
       signal,
       restoreFiles,
+      onRestore: () => emitProgress(spec.sessionId, 'kilo_session', 'Loading session history'),
     });
-    if (restored.ok) {
-      if (restored.diffs.skipped > 0) {
-        await reportRestoreIncomplete({
-          diffs: restored.diffs,
-          identity: `kiloSessionId=${spec.kiloSessionId}`,
-          log,
-        }).catch(() => undefined);
-      }
-      return;
-    }
-    if (restored.code !== 404 && !restored.emptySnapshot) {
-      throw new WrapperBootstrapError({
-        code: 'WORKSPACE_SETUP_FAILED',
-        subtype: restored.subtype ?? 'kilo_import_failed',
-        message: restored.error,
-        retryable: true,
-      });
-    }
-    await client.ensureSession(spec.kiloSessionId, directory, signal);
   }
 
   async function withRuntimeStartRetry<T>(
@@ -1190,13 +1036,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       controller: new AbortController(),
       promise: Promise.resolve(),
     };
-    entry.promise = cleanupKiloSessionTree(
-      client,
-      input.spec.directory,
-      input.spec.kiloSessionId,
-      releaseCleanupDeadlineMs,
-      entry.controller.signal
-    )
+    entry.promise = client
+      .release({
+        directory: input.spec.directory,
+        sessionId: input.spec.kiloSessionId,
+        deadlineMs: releaseCleanupDeadlineMs,
+        signal: entry.controller.signal,
+      })
       .then(result => {
         if (!result.ok) {
           log(

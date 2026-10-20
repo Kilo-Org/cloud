@@ -6338,6 +6338,47 @@
     ],
     "searchBlob": "cloudAgentNext.getSession Retrieve the current status and details of a cloud agent session. cloudagentnext getsession cloudagentsessionid cloudAgentSessionId"
   },
+  "cloudAgentNext.getSessionMessagesPage": {
+    "path": "cloudAgentNext.getSessionMessagesPage",
+    "kind": "query",
+    "summary": "Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "pattern": "^ses_.*"
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsessionmessagespage",
+      "sessionid",
+      "kilosessionid",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit sessionId kiloSessionId cursor limit"
+  },
   "cloudAgentNext.getWorktreeChanges": {
     "path": "cloudAgentNext.getWorktreeChanges",
     "kind": "query",
@@ -17755,6 +17796,55 @@
       "cloudagentsessionid"
     ],
     "searchBlob": "organizations.cloudAgentNext.getSession Get details of an organization cloud agent session by session ID. organizations cloudagentnext getsession organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
+  "organizations.cloudAgentNext.getSessionMessagesPage": {
+    "path": "organizations.cloudAgentNext.getSessionMessagesPage",
+    "kind": "query",
+    "summary": "Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "pattern": "^ses_.*"
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsessionmessagespage",
+      "organizationid",
+      "sessionid",
+      "kilosessionid",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit organizationId sessionId kiloSessionId cursor limit"
   },
   "organizations.cloudAgentNext.getWorktreeChanges": {
     "path": "organizations.cloudAgentNext.getWorktreeChanges",

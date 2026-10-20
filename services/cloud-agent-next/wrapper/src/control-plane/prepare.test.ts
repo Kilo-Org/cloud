@@ -17,6 +17,8 @@ import type {
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import type { Harness as HarnessClient } from './harness.js';
+import { createKiloHarness } from './kilo-harness.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
 import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
@@ -360,14 +362,14 @@ function createHarness(
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
-  let currentClient: WrapperKiloClient | undefined;
+  let currentClient: HarnessClient | undefined;
 
   const defaultRuntimes: PrepareRuntimePort = {
     ensure: async input => {
       ensureCalls += 1;
       ensureInputs.push({ key: input.key, directory: input.directory, env: input.env });
       await options.beforeEnsure?.();
-      if (ensureHung) return new Promise<WrapperKiloClient>(() => undefined);
+      if (ensureHung) return new Promise<HarnessClient>(() => undefined);
       if (ensureError !== undefined) throw ensureError;
       if (ensureRejects) throw new Error('kilo server failed to start');
       const client = {
@@ -423,8 +425,22 @@ function createHarness(
           if (cleanupFailure) throw new Error('stop failed');
         },
       } as unknown as WrapperKiloClient;
-      currentClient = client;
-      return client;
+      currentClient = createKiloHarness({
+        client,
+        server: { url: 'http://127.0.0.1:1' },
+        directory: input.directory,
+        restore: (async (...args: unknown[]) => {
+          restoreArgs.push(args[3] as Record<string, unknown> | undefined);
+          return restore();
+        }) as never,
+        seedRegistration: async () => undefined,
+        sessionExists: async () => {
+          if (sessionExistsHung) return new Promise<boolean>(() => undefined);
+          return sessionExists;
+        },
+        log: message => logs.push(message),
+      });
+      return currentClient;
     },
     installCredentials: async (key, env) => {
       installCalls.push({ key, env });
@@ -508,16 +524,7 @@ function createHarness(
       setupOutput?.(onOutput ?? (() => undefined));
       return setupResult;
     },
-    restore: (async (...args: unknown[]) => {
-      restoreArgs.push(args[3] as Record<string, unknown> | undefined);
-      return restore();
-    }) as never,
-    seedRegistration: async () => undefined,
     recoverWorktree: options.recoverWorktree,
-    sessionExists: async () => {
-      if (sessionExistsHung) return new Promise<boolean>(() => undefined);
-      return sessionExists;
-    },
     sleep: async () => undefined,
   });
 
@@ -684,8 +691,8 @@ function createRegistryRuntimes(): {
         get env() {
           return env;
         },
-        client: {} as WrapperKiloClient,
-        ensure: async () => ({}) as WrapperKiloClient,
+        client: { open: async () => true } as unknown as HarnessClient,
+        ensure: async () => ({ open: async () => true }) as unknown as HarnessClient,
         installCredentials: async (next: Record<string, string>) => {
           env = next;
         },
@@ -1524,9 +1531,8 @@ describe('createPreparationManager', () => {
         runtimes: {
           ensure: async () =>
             ({
-              serverUrl: 'http://127.0.0.1:1',
-              ensureSession: async () => undefined,
-            }) as unknown as WrapperKiloClient,
+              open: async () => true,
+            }) as unknown as HarnessClient,
           installCredentials: async () => undefined,
           isUnavailable: () => false,
           getLiveClient: () => undefined,
@@ -1540,8 +1546,6 @@ describe('createPreparationManager', () => {
         writeStamp: async () => undefined,
         mkdir: async () => undefined,
         configureGitAuthor: async () => undefined,
-        seedRegistration: async () => undefined,
-        sessionExists: async () => true,
       });
 
       await manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
@@ -1914,7 +1918,7 @@ describe('createPreparationManager', () => {
       timers: FAST_TIMERS,
       emit: frame => harness.frames.push(frame),
       runtimes: {
-        ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
+        ensure: async () => ({ open: async () => true }) as unknown as HarnessClient,
         installCredentials: async () => undefined,
         isUnavailable: () => false,
         getLiveClient: () => undefined,
@@ -1934,14 +1938,6 @@ describe('createPreparationManager', () => {
         onOutput?.('stdout', 'installing dependencies\n');
         return result(1);
       },
-      restore: (async () => ({
-        ok: false,
-        code: 404,
-        error: 'missing',
-        step: 'download',
-      })) as never,
-      seedRegistration: async () => undefined,
-      sessionExists: async () => true,
       sleep: async () => undefined,
     });
     const spec = routeSpec({ setupCommands: ['npm install'] });
@@ -3294,12 +3290,12 @@ describe('release cleanup with no live runtime client', () => {
       runtimes: {
         ensure: async () =>
           ({
-            serverUrl: 'http://127.0.0.1:1',
-            ensureSession: async () => undefined,
-            abortSessionForCleanup: async (opts: { sessionId: string }) => {
+            open: async () => true,
+            release: async (opts: { sessionId: string }) => {
               abortCalls.push(opts.sessionId);
+              return { ok: true, sessions: 1, failures: 0, elapsedMs: 0 };
             },
-          }) as unknown as WrapperKiloClient,
+          }) as unknown as HarnessClient,
         installCredentials: async () => undefined,
         isUnavailable: () => false,
         // The runtime is restarting: the real adapter reports no live client.
@@ -3314,8 +3310,6 @@ describe('release cleanup with no live runtime client', () => {
       writeStamp: async () => undefined,
       mkdir: async () => undefined,
       configureGitAuthor: async () => undefined,
-      seedRegistration: async () => undefined,
-      sessionExists: async () => true,
     });
     const directory = '/tmp/release-no-client';
     await manager.prepare(routeSpec({ sessionId: 'ses_a', directory }));

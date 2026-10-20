@@ -1138,6 +1138,25 @@ export const ExecutionStatusSchema = z
 export const GetSessionOutput = z.object({
   sessionId: z.string().describe('Cloud-agent session ID'),
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
+  title: z.string().nullable().optional(),
+  associatedPr: z
+    .object({
+      url: z.string(),
+      number: z.number(),
+      state: z.string(),
+      title: z.string().nullable(),
+      headSha: z.string().nullable(),
+      lastSyncedAt: z.string().datetime(),
+      platform: z.string().optional(),
+      reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
+      reviewDecisionPending: z.boolean(),
+    })
+    .nullable()
+    .optional(),
+  totalCostMicrodollars: z.number().finite().nonnegative().nullable().optional(),
+  createdOnPlatform: z.string().nullable().optional(),
+  profileId: z.string().nullable().optional(),
+  updateCursor: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   userId: z.string().describe('Owner user ID'),
   orgId: z.string().optional().describe('Organization ID if applicable'),
   sandboxId: z

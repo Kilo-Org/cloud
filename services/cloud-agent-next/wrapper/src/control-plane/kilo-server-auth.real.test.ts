@@ -3,8 +3,9 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
-import { fetchKiloServer, kiloServerHeaders } from '../kilo-server-auth.js';
+import { fetchKiloServer, kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
 import { createKiloRuntime } from './kilo-runtime.js';
+import { createKiloEventFeed } from './kilo-event-feed.js';
 
 const binary = process.env.KILO_781_BINARY;
 const suite = binary ? describe : describe.skip;
@@ -31,6 +32,7 @@ suite('pinned Kilo server password', () => {
     if (!binary) throw new Error('KILO_781_BINARY is required');
     expect(Bun.spawnSync([binary, '--version']).stdout.toString().trim()).toBe('7.8.1');
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-auth-781-'));
+    let server: KiloServer | undefined;
     const runtime = createKiloRuntime({
       directory: root,
       env: {
@@ -45,28 +47,40 @@ suite('pinned Kilo server password', () => {
       timers: CONTROL_PLANE_TIMERS,
       pidfileDirectory: path.join(root, 'pids'),
       log: () => undefined,
+      openFeed(source, callbacks) {
+        server = source.server;
+        return createKiloEventFeed({ source, ...callbacks, log: () => undefined });
+      },
     });
     try {
       // `ensure` resolves only after the runtime's SSE feed delivered a frame,
       // so the authenticated feed is part of this assertion.
       const client = await runtime.ensure();
-      expect(client.server.authorization).toStartWith('Basic ');
+      if (!server) throw new Error('Native server not observed');
+      expect(server.authorization).toStartWith('Basic ');
 
-      const sessionsUrl = new URL('/session', client.serverUrl);
+      const sessionsUrl = new URL('/session', server.url);
       sessionsUrl.searchParams.set('directory', root);
       // A preview request carries no Kilo credential.
       expect((await fetch(sessionsUrl)).status).toBe(401);
-      expect((await fetch(new URL('/global/health', client.serverUrl))).status).toBe(401);
-      expect((await fetchKiloServer(client.server, sessionsUrl)).status).toBe(200);
-      expect(await client.getSessionStatuses(root)).toEqual({});
+      expect((await fetch(new URL('/global/health', server.url))).status).toBe(401);
+      expect((await fetchKiloServer(server, sessionsUrl)).status).toBe(200);
+      expect(
+        await client.observe({
+          directory: root,
+          observedDirectories: [],
+          knownSessions: [],
+          signal: AbortSignal.timeout(5000),
+        })
+      ).toEqual([]);
 
-      const pty = await client.createPty({ cwd: root, title: 'auth', env: {} });
-      const connect = new URL(`/pty/${encodeURIComponent(pty.id)}/connect`, client.serverUrl);
+      const pty = await client.terminals.createPty({ cwd: root, title: 'auth', env: {} });
+      const connect = new URL(`/pty/${encodeURIComponent(pty.id)}/connect`, server.url);
       connect.protocol = 'ws:';
       connect.searchParams.set('directory', root);
       expect(await socketOutcome(connect, {})).toBe('error');
-      expect(await socketOutcome(connect, kiloServerHeaders(client.server))).toBe('open');
-      expect(await client.deletePty(pty.id, root)).toBe(true);
+      expect(await socketOutcome(connect, kiloServerHeaders(server))).toBe('open');
+      expect(await client.terminals.deletePty(pty.id, root)).toBe(true);
     } finally {
       await runtime.shutdown();
       await fsp.rm(root, { recursive: true, force: true });

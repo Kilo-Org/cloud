@@ -1481,7 +1481,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
 
     const running = await connectStream(sessionId);
     const runningConnected = await waitForStreamEvent(running, 'connected');
-    expect(runningConnected.data).not.toHaveProperty('sessionStatus');
+    expect(runningConnected.data).toMatchObject({ sessionStatus: { type: 'busy' } });
     running.close();
 
     await stub.onOutcome({
@@ -1507,7 +1507,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     await stub.onEvents({ events: [busy] });
     const native = await connectStream(sessionId);
     const nativeConnected = await waitForStreamEvent(native, 'connected');
-    expect(nativeConnected.data).not.toHaveProperty('sessionStatus');
+    expect(nativeConnected.data).toMatchObject({ sessionStatus: { type: 'busy' } });
     native.close();
   });
 

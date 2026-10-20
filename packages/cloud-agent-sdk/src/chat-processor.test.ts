@@ -11,6 +11,9 @@ import type {
 import { createChatProcessor } from './chat-processor';
 import type { ChatEvent } from './normalizer';
 import { createMemoryStorage } from './storage/memory';
+import { createJotaiStorage } from './storage/jotai';
+import { MAX_REMOVAL_VERSIONS, storageVersions } from './storage/versions';
+import { createStore } from 'jotai';
 
 // Helpers that return properly typed stubs (literal role/type fields).
 function makeUserMsg(id: string, sessionID = 'ses-1') {
@@ -979,5 +982,327 @@ describe('createChatProcessor', () => {
       expect(parts[0].id).toBe('part-1');
       expect((parts[0] satisfies Part as TextPart).text).toBe('Hello world!');
     });
+  });
+});
+
+describe.each([
+  { backend: 'memory', createStorage: () => createMemoryStorage() },
+  { backend: 'jotai', createStorage: () => createJotaiStorage(createStore()) },
+])('$backend workspace row versions', ({ createStorage }) => {
+  const sourceId = 'workspace_root';
+
+  it.each(['text', 'reasoning'] as const)(
+    'preserves streamed %s text and merges lifecycle fields from a versioned textless update',
+    type => {
+      const storage = createStorage();
+      const processor = createChatProcessor(storage);
+      const part =
+        type === 'text'
+          ? makeTextPart('part-1', 'msg-1', 'streamed')
+          : makeReasoningPart('part-1', 'msg-1', 'streamed');
+      processor.process({
+        type: 'message.part.updated',
+        part,
+        version: { sourceId, eventId: 1, cursor: 10 },
+      });
+      processor.process({
+        type: 'message.part.delta',
+        sessionId: part.sessionID,
+        messageId: part.messageID,
+        partId: part.id,
+        field: 'text',
+        delta: ' delta',
+        version: { sourceId, eventId: 2, cursor: 11 },
+      });
+      const textless = {
+        id: part.id,
+        sessionID: part.sessionID,
+        messageID: part.messageID,
+        type,
+        time: { start: 1, end: 4 },
+      } as Part;
+      processor.process({
+        type: 'message.part.updated',
+        part: textless,
+        version: { sourceId, eventId: 1, cursor: 12 },
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part,
+        version: { sourceId, cursor: 11 },
+      });
+      expect(storage.getParts(part.messageID)).toEqual([{ ...textless, text: 'streamed delta' }]);
+    }
+  );
+
+  it.each(['text', 'reasoning'] as const)(
+    'accepts an explicit authoritative empty %s string and rejects an older nonempty snapshot',
+    type => {
+      const storage = createStorage();
+      const processor = createChatProcessor(storage);
+      const part =
+        type === 'text'
+          ? makeTextPart('part-1', 'msg-1', 'old')
+          : makeReasoningPart('part-1', 'msg-1', 'old');
+      processor.process({
+        type: 'message.part.updated',
+        part,
+        version: { sourceId, cursor: 10 },
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: { ...part, text: '' },
+        version: { sourceId, eventId: 1, cursor: 12 },
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part,
+        version: { sourceId, cursor: 11 },
+      });
+      expect(storage.getParts(part.messageID)).toEqual([{ ...part, text: '' }]);
+    }
+  );
+
+  it('shares guards between snapshot and live processors without ordering rows by cursor', () => {
+    const storage = createStorage();
+    const live = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    const message = makeUserMsg('msg-2');
+    const latest = makeTextPart('part-2', 'msg-2', 'new');
+    live.process({
+      type: 'message.updated',
+      info: message,
+      version: { sourceId, eventId: 2, cursor: 20 },
+    });
+    live.process({
+      type: 'message.part.updated',
+      part: latest,
+      version: { sourceId, eventId: 3, cursor: 25 },
+    });
+    snapshot.process({
+      type: 'message.updated',
+      info: { ...message, agent: 'old' },
+      version: { sourceId, cursor: 10 },
+    });
+    snapshot.process({
+      type: 'message.part.updated',
+      part: { ...latest, text: 'old' },
+      version: { sourceId, cursor: 10 },
+    });
+    live.process({
+      type: 'message.updated',
+      info: makeUserMsg('msg-1'),
+      version: { sourceId, eventId: 1, cursor: 30 },
+    });
+
+    expect(storage.getMessageInfo('msg-2')).toEqual(message);
+    expect(storage.getParts('msg-2')).toEqual([latest]);
+    expect(storage.getMessageIds()).toEqual(['msg-1', 'msg-2']);
+  });
+
+  it('accepts a higher revision for the same completed tool event even when lifecycle times are unchanged', () => {
+    const storage = createStorage();
+    const processor = createChatProcessor(storage);
+    const completed = makeCompletedToolPart('part-1', 'msg-1', []);
+    const updated = {
+      ...completed,
+      state: { ...completed.state, input: { filePath: '/later.png' }, output: 'late output' },
+    };
+    processor.process({
+      type: 'message.part.updated',
+      part: completed,
+      version: { sourceId, eventId: 1, cursor: 10 },
+    });
+    processor.process({
+      type: 'message.part.updated',
+      part: updated,
+      version: { sourceId, eventId: 1, cursor: 30 },
+    });
+    processor.process({
+      type: 'message.part.updated',
+      part: completed,
+      version: { sourceId, eventId: 1, cursor: 20 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([updated]);
+  });
+
+  it('retains removal tombstones against older snapshots and stale deletes against newer parts', () => {
+    const storage = createStorage();
+    const live = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    const info = makeUserMsg('msg-1');
+    const part = makeTextPart('part-1', 'msg-1', 'latest');
+    live.process({ type: 'message.updated', info, version: { sourceId, eventId: 1, cursor: 10 } });
+    live.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 2, cursor: 30 },
+    });
+    live.process({
+      type: 'message.removed',
+      sessionId: 'ses-1',
+      messageId: info.id,
+      version: { sourceId, eventId: 3, cursor: 20 },
+    });
+    expect(storage.getMessageInfo(info.id)).toEqual(info);
+
+    live.process({
+      type: 'message.removed',
+      sessionId: 'ses-1',
+      messageId: info.id,
+      version: { sourceId, eventId: 3, cursor: 40 },
+    });
+    snapshot.process({ type: 'message.updated', info, version: { sourceId, cursor: 35 } });
+    snapshot.process({ type: 'message.part.updated', part, version: { sourceId, cursor: 35 } });
+    expect(storage.getMessageIds()).toEqual([]);
+    expect(storage.getParts(info.id)).toEqual([]);
+  });
+
+  it('does not compare another DO snapshot cursor with live row revisions', () => {
+    const storage = createStorage();
+    const live = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    const part = makeTextPart('part-1', 'msg-1', 'live child');
+    live.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 1, cursor: 2 },
+    });
+    snapshot.process({
+      type: 'message.part.updated',
+      part: { ...part, text: 'older child' },
+      version: { sourceId: 'workspace_other', cursor: 200 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([part]);
+  });
+
+  it('releases versions when retained history is trimmed and allows the same page to reload', () => {
+    const storage = createStorage();
+    const processor = createChatProcessor(storage);
+    const retained = makeTextPart('retained-part', 'retained', 'latest');
+    processor.process({
+      type: 'message.part.updated',
+      part: retained,
+      version: { sourceId, eventId: 1, cursor: 20 },
+    });
+    for (let i = 0; i < 1024; i++) {
+      const info = makeUserMsg(`trimmed-${i}`);
+      processor.process({ type: 'message.updated', info, version: { sourceId, cursor: 10 } });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart(`part-${i}`, info.id, 'older page'),
+        version: { sourceId, cursor: 10 },
+      });
+      storage.deleteMessage(info.id);
+    }
+    expect(storageVersions.get(storage)?.rows.size).toBe(1);
+    expect(storageVersions.get(storage)?.messages.size).toBe(1);
+    expect(storageVersions.get(storage)?.removals.size).toBe(0);
+    expect(
+      processor.process({
+        type: 'message.updated',
+        info: makeUserMsg('trimmed-0'),
+        version: { sourceId, cursor: 10 },
+      })
+    ).toBe(true);
+    expect(
+      processor.process({
+        type: 'message.part.updated',
+        part: { ...retained, text: 'stale' },
+        version: { sourceId, cursor: 10 },
+      })
+    ).toBe(false);
+    expect(storage.getParts(retained.messageID)).toEqual([retained]);
+    storage.deletePart(retained.messageID, retained.id);
+    expect(storageVersions.get(storage)?.rows.size).toBe(1);
+    expect(storageVersions.get(storage)?.messages.size).toBe(1);
+    for (let i = 0; i < 1024; i++) {
+      const part = makeTextPart(`orphan-part-${i}`, `orphan-${i}`, 'text');
+      processor.process({ type: 'message.part.updated', part, version: { sourceId, cursor: 10 } });
+      storage.deletePart(part.messageID, part.id);
+    }
+    expect(storageVersions.get(storage)?.rows.size).toBe(1);
+    expect(storageVersions.get(storage)?.messages.size).toBe(1);
+  });
+
+  it.each(['message.removed', 'message.part.removed'] as const)(
+    'bounds %s tombstones without allowing evicted stale rows to resurrect',
+    type => {
+      const storage = createStorage();
+      const processor = createChatProcessor(storage);
+      for (let i = 0; i < MAX_REMOVAL_VERSIONS * 2; i++) {
+        const messageId = type === 'message.removed' ? `removed-${i}` : 'retained';
+        processor.process({
+          type,
+          sessionId: 'ses-1',
+          messageId,
+          partId: `part-${i}`,
+          version: { sourceId, eventId: i + 1, cursor: i + 1 },
+        });
+      }
+      const versions = storageVersions.get(storage);
+      expect(versions?.rows.size).toBe(MAX_REMOVAL_VERSIONS);
+      expect(versions?.removals.size).toBe(MAX_REMOVAL_VERSIONS);
+      expect(versions?.messages.size).toBeLessThanOrEqual(MAX_REMOVAL_VERSIONS);
+      expect(versions?.removalFloors.get('ses-1')?.get(sourceId)).toBe(MAX_REMOVAL_VERSIONS);
+      const part = makeTextPart(
+        'part-0',
+        type === 'message.removed' ? 'removed-0' : 'retained',
+        'stale'
+      );
+      expect(
+        processor.process({
+          type: 'message.part.updated',
+          part,
+          version: { sourceId, cursor: 1 },
+        })
+      ).toBe(false);
+      expect(
+        processor.process({
+          type: 'message.part.updated',
+          part,
+          version: { sourceId: 'workspace_other', cursor: 9999 },
+        })
+      ).toBe(false);
+      expect(storage.getParts(part.messageID)).toEqual([]);
+      expect(
+        processor.process({
+          type: 'message.part.updated',
+          part: { ...part, text: 'new revision' },
+          version: { sourceId, eventId: 1, cursor: MAX_REMOVAL_VERSIONS * 2 + 1 },
+        })
+      ).toBe(true);
+      expect(storage.getParts(part.messageID)).toEqual([{ ...part, text: 'new revision' }]);
+    }
+  );
+
+  it('clears all row versions, tombstones and eviction floors for existing processors', () => {
+    const storage = createStorage();
+    const processor = createChatProcessor(storage);
+    const snapshot = createChatProcessor(storage);
+    for (let i = 0; i <= MAX_REMOVAL_VERSIONS; i++) {
+      processor.process({
+        type: 'message.removed',
+        sessionId: 'ses-1',
+        messageId: `msg-${i}`,
+        version: { sourceId, eventId: i + 1, cursor: i + 1 },
+      });
+    }
+    expect(storageVersions.get(storage)?.removalFloors.size).toBe(1);
+    processor.process({
+      type: 'message.updated',
+      info: makeUserMsg('retained'),
+      version: { sourceId, cursor: MAX_REMOVAL_VERSIONS + 2 },
+    });
+    storage.clear();
+    expect(storageVersions.has(storage)).toBe(false);
+    const info = makeUserMsg('msg-0');
+    expect(
+      snapshot.process({ type: 'message.updated', info, version: { sourceId, cursor: 0 } })
+    ).toBe(true);
+    expect(storage.getMessageInfo(info.id)).toEqual(info);
+    expect(
+      processor.process({ type: 'message.updated', info, version: { sourceId, cursor: 0 } })
+    ).toBe(false);
   });
 });

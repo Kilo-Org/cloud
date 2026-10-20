@@ -287,6 +287,7 @@ export function createMobileAgentSessionManager({
         cloudAgentSessionId = memo.cloudAgentSessionId;
       } else {
         const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+        organizationId ??= session.organization_id ?? undefined;
         cloudAgentSessionId = session.cloud_agent_session_id as CloudAgentSessionId | null;
       }
       if (cloudAgentSessionId) {
@@ -355,6 +356,25 @@ export function createMobileAgentSessionManager({
       }
       const outcome = await fetchMobileSessionSnapshotPage(id, options);
       return outcome;
+    },
+    fetchCloudSnapshotPage: async (sessionId, options) => {
+      const page = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query({
+            sessionId,
+            ...options,
+            organizationId,
+          })
+        : await trpcClient.cloudAgentNext.getSessionMessagesPage.query({ sessionId, ...options });
+      return page;
+    },
+    fetchCloudSession: async sessionId => {
+      const metadata = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.getSession.query({
+            cloudAgentSessionId: sessionId,
+            organizationId,
+          })
+        : await trpcClient.cloudAgentNext.getSession.query({ cloudAgentSessionId: sessionId });
+      return metadata;
     },
     api: {
       send: async input => {

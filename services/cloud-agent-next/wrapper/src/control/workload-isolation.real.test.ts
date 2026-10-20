@@ -15,6 +15,8 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import { createKiloRuntime } from '../control-plane/kilo-runtime.js';
+import { createKiloEventFeed } from '../control-plane/kilo-event-feed.js';
+import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
 import { createOwnedProcessScope } from './owned-processes.js';
 import { closeControlWorkload, initializeControlWorkload } from './workload-cgroup.js';
 
@@ -105,6 +107,7 @@ suite('Linux workload memory isolation', () => {
       const control = workload();
       const root = mkdtempSync(path.join(tmpdir(), 'kilo-memory-'));
       const restarts: string[] = [];
+      let server: KiloServer | undefined;
       const runtime = createKiloRuntime({
         directory: root,
         workload: control,
@@ -112,6 +115,10 @@ suite('Linux workload memory isolation', () => {
         pidfileDirectory: path.join(root, 'pids'),
         log: () => undefined,
         onRestart: info => restarts.push(info.reason),
+        openFeed(source, callbacks) {
+          server = source.server;
+          return createKiloEventFeed({ source, ...callbacks, log: () => undefined });
+        },
         env: {
           PATH: process.env.PATH ?? '',
           HOME: root,
@@ -135,7 +142,8 @@ suite('Linux workload memory isolation', () => {
       });
       try {
         const native = await runtime.ensure();
-        const client = createKiloClient({ baseUrl: native.serverUrl, directory: root });
+        if (!server) throw new Error('Native server not observed');
+        const client = createKiloClient(kiloClientConfig(server, root));
         const parent = await client.session.create({ directory: root }, { throwOnError: true });
         const parentID = parent.data.id;
         const children = await Promise.all(

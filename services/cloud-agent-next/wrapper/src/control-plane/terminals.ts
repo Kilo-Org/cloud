@@ -1,13 +1,13 @@
 import {
   ControlTerminalRuntimeError,
   createControlTerminalRuntime,
+  type TerminalRuntimePort,
 } from '../control/terminal-runtime.js';
 import {
   forgetAttachedRoot,
   rememberAttachedRoot,
   rootForSession,
 } from '../control/session-directories.js';
-import type { WorktreeKiloRuntime } from '../control/worktree-runtime.js';
 import type { SessionRequestIdentity } from '../../../src/shared/sandbox-control-protocol.js';
 import type {
   ControlPlaneTerminalRequestFrame,
@@ -32,7 +32,6 @@ export type ControlPlaneTerminalRuntime = {
 };
 
 const TERMINAL_INPUT_WINDOW_MS = 30_000;
-const terminalSignal = new AbortController().signal;
 
 type AttachedTerminal = {
   identity: SessionRequestIdentity;
@@ -50,16 +49,12 @@ function adaptRuntime(
   runtime: KiloRuntime,
   identity: SessionRequestIdentity,
   isolation: 'per-session' | 'directory-shared'
-): WorktreeKiloRuntime {
+): TerminalRuntimePort {
   return {
     identity,
     isolation,
-    scopeId: identity.kiloSessionId,
-    runtimeId: identity.sessionId,
-    directory: runtime.directory,
     env: runtime.env,
-    kiloClient: runtime.client,
-    signal: terminalSignal,
+    kiloClient: runtime.client.terminals,
   };
 }
 

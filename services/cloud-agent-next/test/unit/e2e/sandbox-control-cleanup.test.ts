@@ -376,6 +376,25 @@ function exclusiveLayoutInput(input: {
 }
 
 describe('computeExclusiveLayout directory guard', () => {
+  it('accepts the standalone workspace when it is the only directory and listener', () => {
+    expect(
+      computeExclusiveLayout(exclusiveLayoutInput({ directory: '/workspace/app' })).exclusive
+    ).toBe(true);
+  });
+
+  it('refuses a standalone workspace with unknown sibling directories or listeners', () => {
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({ directory: '/workspace/app', siblings: ['app', 'other'] })
+      ).exclusive
+    ).toBe(false);
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({ directory: '/workspace/app', listeners: ['/workspace/other'] })
+      ).exclusive
+    ).toBe(false);
+  });
+
   it('accepts the worktrees layout when the target is the only directory', () => {
     expect(
       computeExclusiveLayout(

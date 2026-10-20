@@ -488,7 +488,7 @@
       "unresolveThread": "கருத்துத் தொடரைத் தீர்க்கப்படாததாகக் குறிக்கவும்",
       "resolved": "தீர்க்கப்பட்டது",
       "outdated": "பழையது",
-      "comment_one": "1 கருத்து",
+      "comment_one": "{{displayCount}} கருத்து",
       "comment": "{{displayCount}} கருத்துகள்",
       "comment_other": "{{displayCount}} கருத்துகள்",
       "startedRelative": " · {{relative}} தொடங்கியது",

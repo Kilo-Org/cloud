@@ -488,7 +488,7 @@
       "unresolveThread": "Szál megnyitása újra",
       "resolved": "Megoldva",
       "outdated": "Elavult",
-      "comment_one": "1 hozzászólás",
+      "comment_one": "{{displayCount}} hozzászólás",
       "comment": "{{displayCount}} hozzászólás",
       "comment_other": "{{displayCount}} hozzászólás",
       "startedRelative": " · kezdődött: {{relative}}",

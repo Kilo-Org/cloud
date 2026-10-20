@@ -2570,7 +2570,7 @@
       "mutedUser": "{{login}} mis en sourdine",
       "noDiscussion": "Aucun échange pour le moment",
       "noDiscussionDescription": "Cette demande de fusion ne contient encore aucun fil de revue ni commentaire.",
-      "comment_one": "1 commentaire",
+      "comment_one": "{{displayCount}} commentaire",
       "outdated": "Obsolète",
       "quotedDiffSnippet": "Extrait des différences cité",
       "reactionPill": "réaction {{emoji}}, {{displayCount}} {{countLabel}}",

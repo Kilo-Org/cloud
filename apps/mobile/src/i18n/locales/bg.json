@@ -488,7 +488,7 @@
       "unresolveThread": "Отвори отново нишката",
       "resolved": "Приключена",
       "outdated": "Остаряло",
-      "comment_one": "1 коментар",
+      "comment_one": "{{displayCount}} коментар",
       "comment": "{{displayCount}} коментара",
       "comment_other": "{{displayCount}} коментара",
       "startedRelative": " · започната {{relative}}",

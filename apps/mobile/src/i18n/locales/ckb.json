@@ -488,7 +488,7 @@
       "unresolveThread": "نیشانەی چارەسەرکراو لە زنجیرەی گفتوگۆکە لاببە",
       "resolved": "چارەسەرکراو",
       "outdated": "کۆنبوو",
-      "comment_one": "1 بۆچوون",
+      "comment_one": "{{displayCount}} بۆچوون",
       "comment": "{{displayCount}} بۆچوون",
       "comment_other": "{{displayCount}} بۆچوون",
       "startedRelative": " · {{relative}} دەستی پێ کردووە",

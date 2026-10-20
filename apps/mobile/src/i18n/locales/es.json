@@ -2570,7 +2570,7 @@
       "mutedUser": "{{login}} silenciado",
       "noDiscussion": "Aún no hay conversación",
       "noDiscussionDescription": "Esta PR aún no tiene hilos de revisión ni comentarios en la conversación.",
-      "comment_one": "1 comentario",
+      "comment_one": "{{displayCount}} comentario",
       "outdated": "Desactualizado",
       "quotedDiffSnippet": "Fragmento citado de las diferencias",
       "reactionPill": "reacción {{emoji}}, {{displayCount}} {{countLabel}}",

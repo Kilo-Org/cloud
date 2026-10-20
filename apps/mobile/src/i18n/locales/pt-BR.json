@@ -2570,7 +2570,7 @@
       "mutedUser": "{{login}} silenciado",
       "noDiscussion": "Ainda não há discussão",
       "noDiscussionDescription": "Este pull request ainda não tem conversas de revisão nem comentários gerais.",
-      "comment_one": "1 comentário",
+      "comment_one": "{{displayCount}} comentário",
       "outdated": "Desatualizado",
       "quotedDiffSnippet": "Trecho citado da comparação",
       "reactionPill": "reação {{emoji}}, {{displayCount}} {{countLabel}}",

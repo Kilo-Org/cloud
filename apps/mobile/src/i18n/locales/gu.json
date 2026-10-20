@@ -488,7 +488,7 @@
       "unresolveThread": "થ્રેડને વણઉકેલાયેલો ગણો",
       "resolved": "ઉકેલાયું",
       "outdated": "જૂનું",
-      "comment_one": "1 ટિપ્પણી",
+      "comment_one": "{{displayCount}} ટિપ્પણી",
       "comment": "{{displayCount}} ટિપ્પણીઓ",
       "comment_other": "{{displayCount}} ટિપ્પણીઓ",
       "startedRelative": " · {{relative}} શરૂ થયો",

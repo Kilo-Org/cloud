@@ -504,7 +504,7 @@
       "unresolveThread": "Označiť vlákno ako nevyriešené",
       "resolved": "Vyriešené",
       "outdated": "Zastarané",
-      "comment_one": "1 komentár",
+      "comment_one": "{{displayCount}} komentár",
       "comment": "{{displayCount}} komentárov",
       "comment_other": "{{displayCount}} komentárov",
       "startedRelative": " · začaté {{relative}}",

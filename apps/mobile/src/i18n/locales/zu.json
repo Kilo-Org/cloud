@@ -488,7 +488,7 @@
       "unresolveThread": "Hlehlisa ukuxazululwa kochungechunge lwengxoxo",
       "resolved": "Kuxazululiwe",
       "outdated": "Kuphelelwe yisikhathi",
-      "comment_one": "amazwana awodwa",
+      "comment_one": "Amazwana: {{displayCount}}",
       "comment": "Amazwana angu-{{displayCount}}",
       "comment_other": "Amazwana angu-{{displayCount}}",
       "startedRelative": " · kuqalwe {{relative}}",

@@ -2545,7 +2545,7 @@
       "mutedUser": "{{login}} gedempt",
       "noDiscussion": "Nog geen discussie",
       "noDiscussionDescription": "Er zijn nog geen discussies over de beoordeling of algemene opmerkingen bij deze PR.",
-      "comment_one": "1 opmerking",
+      "comment_one": "{{displayCount}} opmerking",
       "outdated": "Verouderd",
       "quotedDiffSnippet": "Geciteerd diff-fragment",
       "reactionPill": "Reactie {{emoji}}, {{displayCount}} {{countLabel}}",

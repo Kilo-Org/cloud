@@ -488,7 +488,7 @@
       "unresolveThread": "चर्चेतील मुद्दा सुटल्याची खूण काढा",
       "resolved": "मुद्दा सुटला",
       "outdated": "कालबाह्य",
-      "comment_one": "1 टिप्पणी",
+      "comment_one": "{{displayCount}} टिप्पणी",
       "comment": "{{displayCount}} टिप्पण्या",
       "comment_other": "{{displayCount}} टिप्पण्या",
       "startedRelative": " · {{relative}} सुरू झाली",

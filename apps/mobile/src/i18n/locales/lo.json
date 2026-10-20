@@ -488,7 +488,7 @@
       "unresolveThread": "ເອົາເຄື່ອງໝາຍແກ້ໄຂແລ້ວອອກຈາກກະທູ້",
       "resolved": "ແກ້ໄຂແລ້ວ",
       "outdated": "ລ້າສະໄໝ",
-      "comment_one": "ຄຳເຫັນ 1 ລາຍການ",
+      "comment_one": "ຄຳເຫັນ {{displayCount}} ລາຍການ",
       "comment": "ຄຳເຫັນ {{displayCount}} ລາຍການ",
       "comment_other": "ຄຳເຫັນ {{displayCount}} ລາຍການ",
       "startedRelative": " · ເລີ່ມ {{relative}}",

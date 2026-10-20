@@ -2545,7 +2545,7 @@
       "mutedUser": "{{login}} dibisukan",
       "noDiscussion": "Belum ada diskusi",
       "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada PR ini.",
-      "comment_one": "1 komentar",
+      "comment_one": "{{displayCount}} komentar",
       "outdated": "Usang",
       "quotedDiffSnippet": "Cuplikan perbedaan kode yang dikutip",
       "reactionPill": "reaksi {{emoji}}, {{displayCount}} {{countLabel}}",

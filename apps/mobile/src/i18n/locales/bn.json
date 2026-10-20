@@ -488,7 +488,7 @@
       "unresolveThread": "থ্রেড থেকে সমাধান হয়েছে চিহ্নটি সরান",
       "resolved": "সমাধানকৃত",
       "outdated": "পুরোনো",
-      "comment_one": "1টি মন্তব্য",
+      "comment_one": "{{displayCount}}টি মন্তব্য",
       "comment": "{{displayCount}}টি মন্তব্য",
       "comment_other": "{{displayCount}}টি মন্তব্য",
       "startedRelative": " · শুরু হয়েছে {{relative}}",

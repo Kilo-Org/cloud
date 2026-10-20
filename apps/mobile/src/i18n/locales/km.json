@@ -488,7 +488,7 @@
       "unresolveThread": "សម្គាល់ការពិភាក្សាថាមិនទាន់ដោះស្រាយ",
       "resolved": "បានដោះស្រាយ",
       "outdated": "ហួសសម័យ",
-      "comment_one": "មតិយោបល់ 1",
+      "comment_one": "មតិយោបល់ {{displayCount}}",
       "comment": "មតិយោបល់ {{displayCount}}",
       "comment_other": "មតិយោបល់ {{displayCount}}",
       "startedRelative": " · បានចាប់ផ្តើម {{relative}}",

@@ -488,7 +488,7 @@
       "unresolveThread": "ทำเครื่องหมายเธรดว่ายังไม่แก้ไข",
       "resolved": "แก้ไขแล้ว",
       "outdated": "ล้าสมัย",
-      "comment_one": "ความคิดเห็น 1 รายการ",
+      "comment_one": "ความคิดเห็น {{displayCount}} รายการ",
       "comment": "ความคิดเห็น {{displayCount}} รายการ",
       "comment_other": "ความคิดเห็น {{displayCount}} รายการ",
       "startedRelative": " · เริ่มเมื่อ {{relative}}",

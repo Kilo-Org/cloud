@@ -488,7 +488,7 @@
       "unresolveThread": "تھریڈ سے حل شدہ ہونے کا نشان ہٹائیں",
       "resolved": "حل شدہ",
       "outdated": "متروک",
-      "comment_one": "1 تبصرہ",
+      "comment_one": "{{displayCount}} تبصرہ",
       "comment": "{{displayCount}} تبصرے",
       "comment_other": "{{displayCount}} تبصرے",
       "startedRelative": " · {{relative}} شروع ہوا",

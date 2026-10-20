@@ -488,7 +488,7 @@
       "unresolveThread": "Müzakirənin həll olunmuş işarəsini götür",
       "resolved": "Həll olunub",
       "outdated": "Köhnəlmiş",
-      "comment_one": "1 şərh",
+      "comment_one": "{{displayCount}} şərh",
       "comment": "{{displayCount}} şərh",
       "comment_other": "{{displayCount}} şərh",
       "startedRelative": " · {{relative}} başladı",

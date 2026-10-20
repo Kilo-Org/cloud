@@ -496,7 +496,7 @@
       "unresolveThread": "Anular resolução da conversa",
       "resolved": "Resolvida",
       "outdated": "Desatualizado",
-      "comment_one": "1 comentário",
+      "comment_one": "{{displayCount}} comentário",
       "comment": "{{displayCount}} comentários",
       "comment_other": "{{displayCount}} comentários",
       "startedRelative": " · iniciada {{relative}}",

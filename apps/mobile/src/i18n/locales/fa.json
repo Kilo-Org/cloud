@@ -488,7 +488,7 @@
       "unresolveThread": "برداشتن علامت حل‌شده از گفت‌وگو",
       "resolved": "حل‌شده",
       "outdated": "قدیمی",
-      "comment_one": "1 نظر",
+      "comment_one": "{{displayCount}} نظر",
       "comment": "{{displayCount}} نظر",
       "comment_other": "{{displayCount}} نظر",
       "startedRelative": " · شروع‌شده {{relative}}",

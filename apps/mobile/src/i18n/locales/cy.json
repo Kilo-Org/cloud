@@ -520,7 +520,7 @@
       "unresolveThread": "Ailagor yr edefyn",
       "resolved": "Wedi'i ddatrys",
       "outdated": "Wedi dyddio",
-      "comment_one": "1 sylw",
+      "comment_one": "{{displayCount}} sylw",
       "comment": "{{displayCount}} sylw",
       "comment_other": "{{displayCount}} sylw",
       "startedRelative": " · dechreuodd {{relative}}",

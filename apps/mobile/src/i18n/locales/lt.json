@@ -504,7 +504,7 @@
       "unresolveThread": "Pažymėti giją kaip neišspręstą",
       "resolved": "Išspręsta",
       "outdated": "Pasenę",
-      "comment_one": "1 komentaras",
+      "comment_one": "{{displayCount}} komentaras",
       "comment": "{{displayCount}} komentarų",
       "comment_other": "{{displayCount}} komentarų",
       "startedRelative": " · pradėta {{relative}}",

@@ -488,7 +488,7 @@
       "unresolveThread": "Yọ àmì pé a ti yanjú ọ̀wọ́ ìjíròrò kúrò",
       "resolved": "A ti yanjú rẹ̀",
       "outdated": "Ti di àtijọ́",
-      "comment_one": "àsọyé 1",
+      "comment_one": "àsọyé {{displayCount}}",
       "comment": "àsọyé {{displayCount}}",
       "comment_other": "àsọyé {{displayCount}}",
       "startedRelative": " · bẹ̀rẹ̀ {{relative}}",

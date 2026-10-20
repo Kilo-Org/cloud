@@ -2545,7 +2545,7 @@
       "mutedUser": "{{login}}をミュートしました",
       "noDiscussion": "まだディスカッションはありません",
       "noDiscussionDescription": "このプルリクエストには、レビュースレッドもコメントもまだありません。",
-      "comment_one": "1件のコメント",
+      "comment_one": "{{displayCount}}件のコメント",
       "outdated": "古い内容",
       "quotedDiffSnippet": "引用した差分の一部",
       "reactionPill": "{{emoji}}のリアクション、{{displayCount}}{{countLabel}}",

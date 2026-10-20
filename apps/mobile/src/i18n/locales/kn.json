@@ -488,7 +488,7 @@
       "unresolveThread": "ಚರ್ಚಾ ಸರಣಿಯನ್ನು ಪರಿಹರಿಸಲಾಗಿಲ್ಲ ಎಂದು ಗುರುತಿಸಿ",
       "resolved": "ಪರಿಹರಿಸಲಾಗಿದೆ",
       "outdated": "ಹಳೆಯದು",
-      "comment_one": "1 ಕಾಮೆಂಟ್",
+      "comment_one": "{{displayCount}} ಕಾಮೆಂಟ್",
       "comment": "{{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
       "comment_other": "{{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
       "startedRelative": " · {{relative}} ಪ್ರಾರಂಭವಾಗಿದೆ",

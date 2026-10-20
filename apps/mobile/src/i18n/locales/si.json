@@ -488,7 +488,7 @@
       "unresolveThread": "සාකච්ඡා පෙළේ විසඳූ සලකුණ ඉවත් කරන්න",
       "resolved": "විසඳා ඇත",
       "outdated": "යල් පැන ගිය",
-      "comment_one": "අදහස් 1 ක්",
+      "comment_one": "අදහස් {{displayCount}} ක්",
       "comment": "අදහස් {{displayCount}}ක්",
       "comment_other": "අදහස් {{displayCount}}ක්",
       "startedRelative": " · {{relative}} ආරම්භ විය",

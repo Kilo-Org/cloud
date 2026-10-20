@@ -552,7 +552,7 @@
       "unresolveThread": "Unresolve thread",
       "resolved": "Resolved",
       "outdated": "Outdated",
-      "comment_one": "1 comment",
+      "comment_one": "{{displayCount}} comment",
       "comment": "{{displayCount}} comments",
       "comment_other": "{{displayCount}} comments",
       "startedRelative": " · started {{relative}}",

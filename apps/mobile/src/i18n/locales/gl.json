@@ -488,7 +488,7 @@
       "unresolveThread": "Marcar o fío como non resolto",
       "resolved": "Resolto",
       "outdated": "Desactualizado",
-      "comment_one": "1 comentario",
+      "comment_one": "{{displayCount}} comentario",
       "comment": "{{displayCount}} comentarios",
       "comment_other": "{{displayCount}} comentarios",
       "startedRelative": " · comezou {{relative}}",

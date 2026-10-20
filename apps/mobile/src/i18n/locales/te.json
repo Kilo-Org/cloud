@@ -488,7 +488,7 @@
       "unresolveThread": "చర్చ పరిష్కారమైనట్లు పెట్టిన గుర్తును తీసివేయండి",
       "resolved": "పరిష్కారమైంది",
       "outdated": "పాతది",
-      "comment_one": "1 వ్యాఖ్య",
+      "comment_one": "{{displayCount}} వ్యాఖ్య",
       "comment": "{{displayCount}} వ్యాఖ్యలు",
       "comment_other": "{{displayCount}} వ్యాఖ్యలు",
       "startedRelative": " · {{relative}} ప్రారంభమైంది",

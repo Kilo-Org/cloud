@@ -488,7 +488,7 @@
       "unresolveThread": "Merkitse ketju ratkaisemattomaksi",
       "resolved": "Ratkaistu",
       "outdated": "Vanhentunut",
-      "comment_one": "1 kommentti",
+      "comment_one": "{{displayCount}} kommentti",
       "comment": "{{displayCount}} kommenttia",
       "comment_other": "{{displayCount}} kommenttia",
       "startedRelative": " · aloitettu {{relative}}",

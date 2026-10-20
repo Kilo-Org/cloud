@@ -488,7 +488,7 @@
       "unresolveThread": "د بحث لړۍ ناحل شوې وټاکئ",
       "resolved": "حل شوی",
       "outdated": "زوړ",
-      "comment_one": "1 تبصره",
+      "comment_one": "{{displayCount}} تبصره",
       "comment": "{{displayCount}} تبصرې",
       "comment_other": "{{displayCount}} تبصرې",
       "startedRelative": " · {{relative}} پیل شوې",

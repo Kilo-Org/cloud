@@ -2545,7 +2545,7 @@
       "mutedUser": "{{login}} sessize alındı",
       "noDiscussion": "Henüz tartışma yok",
       "noDiscussionDescription": "Bu çekme isteğinde henüz inceleme yorumu veya genel yorum yok.",
-      "comment_one": "1 yorum",
+      "comment_one": "{{displayCount}} yorum",
       "outdated": "Güncel değil",
       "quotedDiffSnippet": "Alıntılanan fark parçası",
       "reactionPill": "{{emoji}} tepkisi, {{displayCount}} {{countLabel}}",

@@ -504,7 +504,7 @@
       "unresolveThread": "Пазначыць абмеркаванне як нявырашанае",
       "resolved": "Вырашана",
       "outdated": "Састарэла",
-      "comment_one": "1 каментар",
+      "comment_one": "{{displayCount}} каментар",
       "comment": "{{displayCount}} каментара",
       "comment_other": "{{displayCount}} каментара",
       "startedRelative": " · пачата {{relative}}",

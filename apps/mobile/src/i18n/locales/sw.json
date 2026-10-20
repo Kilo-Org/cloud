@@ -488,7 +488,7 @@
       "unresolveThread": "Weka mada kuwa haijatatuliwa",
       "resolved": "Imetatuliwa",
       "outdated": "Imepitwa na wakati",
-      "comment_one": "maoni 1",
+      "comment_one": "maoni {{displayCount}}",
       "comment": "Maoni {{displayCount}}",
       "comment_other": "Maoni {{displayCount}}",
       "startedRelative": " · ilianzishwa {{relative}}",

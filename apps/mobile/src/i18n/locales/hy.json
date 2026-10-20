@@ -488,7 +488,7 @@
       "unresolveThread": "Հեռացնել քննարկման շղթայի լուծված լինելու նշումը",
       "resolved": "Լուծված",
       "outdated": "Հնացած",
-      "comment_one": "1 մեկնաբանություն",
+      "comment_one": "{{displayCount}} մեկնաբանություն",
       "comment": "{{displayCount}} մեկնաբանություն",
       "comment_other": "{{displayCount}} մեկնաբանություն",
       "startedRelative": " · սկսվել է {{relative}}",

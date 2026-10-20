@@ -488,7 +488,7 @@
       "unresolveThread": "ଥ୍ରେଡ୍‌ରୁ ସମାଧାନ ହୋଇଥିବା ଚିହ୍ନ ହଟାନ୍ତୁ",
       "resolved": "ସମାଧାନ ହୋଇଛି",
       "outdated": "ପୁରୁଣା",
-      "comment_one": "1ଟି ମନ୍ତବ୍ୟ",
+      "comment_one": "{{displayCount}}ଟି ମନ୍ତବ୍ୟ",
       "comment": "{{displayCount}} ମନ୍ତବ୍ୟ",
       "comment_other": "{{displayCount}} ମନ୍ତବ୍ୟ",
       "startedRelative": " · {{relative}} ଆରମ୍ଭ ହେଲା",

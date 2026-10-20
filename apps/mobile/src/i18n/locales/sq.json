@@ -488,7 +488,7 @@
       "unresolveThread": "Rihap diskutimin",
       "resolved": "I zgjidhur",
       "outdated": "I vjetëruar",
-      "comment_one": "1 koment",
+      "comment_one": "{{displayCount}} koment",
       "comment": "{{displayCount}} komente",
       "comment_other": "{{displayCount}} komente",
       "startedRelative": " · nisur {{relative}}",

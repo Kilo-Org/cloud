@@ -2545,7 +2545,7 @@
       "mutedUser": "{{login}} को म्यूट किया गया",
       "noDiscussion": "अभी कोई चर्चा नहीं",
       "noDiscussionDescription": "इस पुल रिक्वेस्ट पर अभी समीक्षा का कोई थ्रेड नहीं है और बातचीत में भी कोई टिप्पणी नहीं है।",
-      "comment_one": "1 टिप्पणी",
+      "comment_one": "{{displayCount}} टिप्पणी",
       "outdated": "पुराना",
       "quotedDiffSnippet": "डिफ़ से लिया गया अंश",
       "reactionPill": "{{emoji}} प्रतिक्रिया, {{displayCount}} {{countLabel}}",

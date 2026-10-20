@@ -2545,7 +2545,7 @@
       "mutedUser": "Đã tắt tiếng {{login}}",
       "noDiscussion": "Chưa có thảo luận",
       "noDiscussionDescription": "PR này chưa có chuỗi thảo luận đánh giá hay bình luận nào.",
-      "comment_one": "1 bình luận",
+      "comment_one": "{{displayCount}} bình luận",
       "outdated": "Lỗi thời",
       "quotedDiffSnippet": "Đoạn trích từ bản so sánh",
       "reactionPill": "Cảm xúc {{emoji}}, {{displayCount}} {{countLabel}}",

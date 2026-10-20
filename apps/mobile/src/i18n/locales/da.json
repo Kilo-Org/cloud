@@ -488,7 +488,7 @@
       "unresolveThread": "Markér tråden som uløst",
       "resolved": "Løst",
       "outdated": "Forældet",
-      "comment_one": "1 kommentar",
+      "comment_one": "{{displayCount}} kommentar",
       "comment": "{{displayCount}} kommentarer",
       "comment_other": "{{displayCount}} kommentarer",
       "startedRelative": " · startet {{relative}}",

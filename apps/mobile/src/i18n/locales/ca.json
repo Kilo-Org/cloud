@@ -496,7 +496,7 @@
       "unresolveThread": "Desfés la resolució del fil",
       "resolved": "Resolt",
       "outdated": "Desactualitzat",
-      "comment_one": "1 comentari",
+      "comment_one": "{{displayCount}} comentari",
       "comment": "{{displayCount}} comentaris",
       "comment_other": "{{displayCount}} comentaris",
       "startedRelative": " · començat {{relative}}",

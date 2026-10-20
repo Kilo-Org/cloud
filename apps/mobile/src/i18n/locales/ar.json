@@ -2645,7 +2645,7 @@
       "mutedUser": "تم كتم {{login}}",
       "noDiscussion": "لا توجد مناقشة بعد",
       "noDiscussionDescription": "لا توجد سلاسل مناقشة للمراجعة أو تعليقات عامة على طلب السحب هذا.",
-      "comment_one": "تعليق واحد",
+      "comment_one": "{{displayCount}} تعليق",
       "outdated": "قديم",
       "quotedDiffSnippet": "مقتطف مقتبس من الفروق",
       "reactionPill": "تفاعل {{emoji}}، {{displayCount}} {{countLabel}}",

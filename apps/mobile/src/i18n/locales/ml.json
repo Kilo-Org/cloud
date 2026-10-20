@@ -488,7 +488,7 @@
       "unresolveThread": "ത്രെഡ് പരിഹരിച്ചതായുള്ള അടയാളം നീക്കുക",
       "resolved": "പരിഹരിച്ചു",
       "outdated": "പഴയത്",
-      "comment_one": "1 അഭിപ്രായം",
+      "comment_one": "{{displayCount}} അഭിപ്രായം",
       "comment": "{{displayCount}} അഭിപ്രായങ്ങൾ",
       "comment_other": "{{displayCount}} അഭിപ്രായങ്ങൾ",
       "startedRelative": " · {{relative}} ആരംഭിച്ചു",

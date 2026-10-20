@@ -504,7 +504,7 @@
       "unresolveThread": "Označit vlákno jako nevyřešené",
       "resolved": "Vyřešeno",
       "outdated": "Zastaralé",
-      "comment_one": "1 komentář",
+      "comment_one": "{{displayCount}} komentář",
       "comment": "{{displayCount}} komentářů",
       "comment_other": "{{displayCount}} komentářů",
       "startedRelative": " · zahájeno {{relative}}",

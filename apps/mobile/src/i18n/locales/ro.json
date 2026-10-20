@@ -496,7 +496,7 @@
       "unresolveThread": "Marchează firul de discuție ca nerezolvat",
       "resolved": "Rezolvat",
       "outdated": "Depășit",
-      "comment_one": "1 comentariu",
+      "comment_one": "{{displayCount}} comentariu",
       "comment": "{{displayCount}} de comentarii",
       "comment_other": "{{displayCount}} de comentarii",
       "startedRelative": " · început {{relative}}",

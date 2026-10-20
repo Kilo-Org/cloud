@@ -488,7 +488,7 @@
       "unresolveThread": "Cire alamar an warware daga silsilar tattaunawa",
       "resolved": "An warware",
       "outdated": "Ya tsufa",
-      "comment_one": "tsokaci 1",
+      "comment_one": "tsokaci {{displayCount}}",
       "comment": "tsokace-tsokace {{displayCount}}",
       "comment_other": "tsokace-tsokace {{displayCount}}",
       "startedRelative": " · an fara {{relative}}",

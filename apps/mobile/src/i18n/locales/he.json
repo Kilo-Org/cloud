@@ -2570,7 +2570,7 @@
       "mutedUser": "{{login}} הושתק",
       "noDiscussion": "אין עדיין דיון",
       "noDiscussionDescription": "אין שרשורי סקירה או תגובות בדיון של בקשת המשיכה הזו.",
-      "comment_one": "תגובה אחת",
+      "comment_one": "{{displayCount}} תגובה",
       "outdated": "לא עדכני",
       "quotedDiffSnippet": "קטע מצוטט מהשוואת השינויים",
       "reactionPill": "תגובת אימוג׳י {{emoji}}, {{displayCount}} {{countLabel}}",

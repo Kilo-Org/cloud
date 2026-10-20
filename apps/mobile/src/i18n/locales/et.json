@@ -488,7 +488,7 @@
       "unresolveThread": "Märgi lõim lahendamata",
       "resolved": "Lahendatud",
       "outdated": "Aegunud",
-      "comment_one": "1 kommentaar",
+      "comment_one": "{{displayCount}} kommentaar",
       "comment": "{{displayCount}} kommentaari",
       "comment_other": "{{displayCount}} kommentaari",
       "startedRelative": " · alustatud {{relative}}",

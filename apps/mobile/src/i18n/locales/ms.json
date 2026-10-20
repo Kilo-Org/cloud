@@ -488,7 +488,7 @@
       "unresolveThread": "Buka semula rantaian perbincangan",
       "resolved": "Selesai",
       "outdated": "Usang",
-      "comment_one": "1 komen",
+      "comment_one": "{{displayCount}} komen",
       "comment": "{{displayCount}} komen",
       "comment_other": "{{displayCount}} komen",
       "startedRelative": " · bermula {{relative}}",

@@ -488,7 +488,7 @@
       "unresolveThread": "थ्रेडबाट समाधान भएको चिन्ह हटाउनुहोस्",
       "resolved": "समाधान भएको",
       "outdated": "पुरानो",
-      "comment_one": "1 टिप्पणी",
+      "comment_one": "{{displayCount}} टिप्पणी",
       "comment": "{{displayCount}} टिप्पणी",
       "comment_other": "{{displayCount}} टिप्पणी",
       "startedRelative": " · {{relative}} सुरु भयो",

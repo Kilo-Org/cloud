@@ -488,7 +488,7 @@
       "unresolveThread": "Markatu haria konpondu gabeko gisa",
       "resolved": "Konponduta",
       "outdated": "Zaharkitua",
-      "comment_one": "1 iruzkin",
+      "comment_one": "{{displayCount}} iruzkin",
       "comment": "{{displayCount}} iruzkin",
       "comment_other": "{{displayCount}} iruzkin",
       "startedRelative": " · {{relative}} hasita",

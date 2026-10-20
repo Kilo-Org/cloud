@@ -488,7 +488,7 @@
       "unresolveThread": "የውይይት ሰንሰለቱን እንደገና ክፈት",
       "resolved": "ተፍቷል",
       "outdated": "ጊዜው ያለፈበት",
-      "comment_one": "1 አስተያየት",
+      "comment_one": "{{displayCount}} አስተያየት",
       "comment": "{{displayCount}} አስተያየቶች",
       "comment_other": "{{displayCount}} አስተያየቶች",
       "startedRelative": " · {{relative}} ተጀምሯል",

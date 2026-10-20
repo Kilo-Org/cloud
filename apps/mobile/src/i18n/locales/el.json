@@ -488,7 +488,7 @@
       "unresolveThread": "Αναίρεση επίλυσης νήματος",
       "resolved": "Επιλύθηκε",
       "outdated": "Παρωχημένο",
-      "comment_one": "1 σχόλιο",
+      "comment_one": "{{displayCount}} σχόλιο",
       "comment": "{{displayCount}} σχόλια",
       "comment_other": "{{displayCount}} σχόλια",
       "startedRelative": " · ξεκίνησε {{relative}}",

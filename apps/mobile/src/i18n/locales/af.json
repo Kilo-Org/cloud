@@ -488,7 +488,7 @@
       "unresolveThread": "Merk die draad as onopgelos",
       "resolved": "Opgelos",
       "outdated": "Verouderd",
-      "comment_one": "1 kommentaar",
+      "comment_one": "{{displayCount}} kommentaar",
       "comment": "{{displayCount}} kommentare",
       "comment_other": "{{displayCount}} kommentare",
       "startedRelative": " · {{relative}} begin",

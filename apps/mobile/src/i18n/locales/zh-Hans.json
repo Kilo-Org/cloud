@@ -2545,7 +2545,7 @@
       "mutedUser": "已静音 {{login}}",
       "noDiscussion": "暂无讨论",
       "noDiscussionDescription": "此拉取请求暂无审查讨论串或评论。",
-      "comment_one": "1 条评论",
+      "comment_one": "{{displayCount}} 条评论",
       "outdated": "已过时",
       "quotedDiffSnippet": "引用的差异片段",
       "reactionPill": "{{emoji}} 表情回应，{{displayCount}} {{countLabel}}",

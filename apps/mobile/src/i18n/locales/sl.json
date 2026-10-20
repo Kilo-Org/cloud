@@ -504,7 +504,7 @@
       "unresolveThread": "Prekliči razrešitev niti",
       "resolved": "Razrešeno",
       "outdated": "Zastarelo",
-      "comment_one": "1 komentar",
+      "comment_one": "{{displayCount}} komentar",
       "comment": "{{displayCount}} komentarjev",
       "comment_other": "{{displayCount}} komentarjev",
       "startedRelative": " · začeto {{relative}}",

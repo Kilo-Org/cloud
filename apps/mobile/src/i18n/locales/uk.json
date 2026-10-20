@@ -2595,7 +2595,7 @@
       "mutedUser": "Користувача {{login}} додано до ігнорованих",
       "noDiscussion": "Обговорень ще немає",
       "noDiscussionDescription": "У цьому запиті на злиття ще немає обговорень коду чи загальних коментарів.",
-      "comment_one": "1 коментар",
+      "comment_one": "{{displayCount}} коментар",
       "outdated": "Застаріло",
       "quotedDiffSnippet": "Цитований фрагмент змін",
       "reactionPill": "реакція {{emoji}}, {{displayCount}} {{countLabel}}",

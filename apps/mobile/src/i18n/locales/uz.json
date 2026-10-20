@@ -488,7 +488,7 @@
       "unresolveThread": "Izohlar zanjiridan hal qilingan belgisini olib tashlash",
       "resolved": "Hal qilingan",
       "outdated": "Eskirgan",
-      "comment_one": "1 izoh",
+      "comment_one": "{{displayCount}} izoh",
       "comment": "{{displayCount}} ta izoh",
       "comment_other": "{{displayCount}} ta izoh",
       "startedRelative": " · {{relative}} boshlangan",

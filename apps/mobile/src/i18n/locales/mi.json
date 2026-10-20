@@ -488,7 +488,7 @@
       "unresolveThread": "Whakakorea te tohu kua oti i te aho kōrero",
       "resolved": "Kua oti",
       "outdated": "Kua tawhito",
-      "comment_one": "1 kōrero",
+      "comment_one": "{{displayCount}} kōrero",
       "comment": "{{displayCount}} kōrero",
       "comment_other": "{{displayCount}} kōrero",
       "startedRelative": " · i tīmata {{relative}}",

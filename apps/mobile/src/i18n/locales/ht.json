@@ -488,7 +488,7 @@
       "unresolveThread": "Relouvri fil diskisyon an",
       "resolved": "Rezoud",
       "outdated": "Depase",
-      "comment_one": "1 kòmantè",
+      "comment_one": "{{displayCount}} kòmantè",
       "comment": "{{displayCount}} kòmantè",
       "comment_other": "{{displayCount}} kòmantè",
       "startedRelative": " · kòmanse {{relative}}",

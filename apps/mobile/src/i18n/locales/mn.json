@@ -488,7 +488,7 @@
       "unresolveThread": "Сэдвийн шийдвэрлэсэн тэмдэглэгээг арилгах",
       "resolved": "Шийдвэрлэсэн",
       "outdated": "Хуучирсан",
-      "comment_one": "1 сэтгэгдэл",
+      "comment_one": "{{displayCount}} сэтгэгдэл",
       "comment": "{{displayCount}} сэтгэгдэл",
       "comment_other": "{{displayCount}} сэтгэгдэл",
       "startedRelative": " · {{relative}} эхэлсэн",

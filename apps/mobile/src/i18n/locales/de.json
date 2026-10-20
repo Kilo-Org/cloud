@@ -2545,7 +2545,7 @@
       "mutedUser": "{{login}} stummgeschaltet",
       "noDiscussion": "Noch keine Diskussion",
       "noDiscussionDescription": "Zu diesem Pull-Request gibt es noch keine Review-Threads oder Kommentare.",
-      "comment_one": "1 kommentar",
+      "comment_one": "{{displayCount}} kommentar",
       "outdated": "Veraltet",
       "quotedDiffSnippet": "Zitierter Diff-Ausschnitt",
       "reactionPill": "Reaktion {{emoji}}, {{displayCount}} {{countLabel}}",

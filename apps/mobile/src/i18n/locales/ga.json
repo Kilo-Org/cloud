@@ -512,7 +512,7 @@
       "unresolveThread": "Oscail an snáithe arís",
       "resolved": "Réitithe",
       "outdated": "As dáta",
-      "comment_one": "1 trácht",
+      "comment_one": "{{displayCount}} trácht",
       "comment": "{{displayCount}} trácht",
       "comment_other": "{{displayCount}} trácht",
       "startedRelative": " · tosaithe {{relative}}",

@@ -2545,7 +2545,7 @@
       "mutedUser": "{{login}} 님을 숨겼습니다.",
       "noDiscussion": "아직 토론 없음",
       "noDiscussionDescription": "이 풀 리퀘스트에는 아직 리뷰 스레드나 댓글이 없습니다.",
-      "comment_one": "댓글 1개",
+      "comment_one": "댓글 {{displayCount}}개",
       "outdated": "이전 버전",
       "quotedDiffSnippet": "인용된 변경 내용 일부",
       "reactionPill": "{{emoji}} {{countLabel}} {{displayCount}}개",

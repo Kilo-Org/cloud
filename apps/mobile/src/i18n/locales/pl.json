@@ -2595,7 +2595,7 @@
       "mutedUser": "Wyciszono {{login}}",
       "noDiscussion": "Brak dyskusji",
       "noDiscussionDescription": "W tym PR nie ma jeszcze wątków przeglądu ani komentarzy w dyskusji.",
-      "comment_one": "1 komentarz",
+      "comment_one": "{{displayCount}} komentarz",
       "outdated": "Nieaktualny",
       "quotedDiffSnippet": "Cytowany fragment różnic",
       "reactionPill": "reakcja {{emoji}}, {{displayCount}} {{countLabel}}",

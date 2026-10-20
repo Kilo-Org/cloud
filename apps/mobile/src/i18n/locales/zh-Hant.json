@@ -2545,7 +2545,7 @@
       "mutedUser": "已將 {{login}} 設為靜音",
       "noDiscussion": "尚無討論",
       "noDiscussionDescription": "此提取請求尚無審查討論串或留言。",
-      "comment_one": "1 則留言",
+      "comment_one": "{{displayCount}} 則留言",
       "outdated": "已過時",
       "quotedDiffSnippet": "引用的差異片段",
       "reactionPill": "{{emoji}} 表情反應，共 {{displayCount}} {{countLabel}}",

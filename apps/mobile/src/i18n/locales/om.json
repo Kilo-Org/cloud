@@ -488,7 +488,7 @@
       "unresolveThread": "Mallattoo furamuu damee marii irraa haqi",
       "resolved": "Furame",
       "outdated": "Yeroon isaa darbe",
-      "comment_one": "yaada 1",
+      "comment_one": "yaada {{displayCount}}",
       "comment": "Yaadota {{displayCount}}",
       "comment_other": "Yaadota {{displayCount}}",
       "startedRelative": " · {{relative}} jalqabame",

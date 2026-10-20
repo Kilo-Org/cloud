@@ -488,7 +488,7 @@
       "unresolveThread": "Mariho ho tsy voavaha indray ny loha-dresaka",
       "resolved": "Voavaha",
       "outdated": "Lany daty",
-      "comment_one": "hevitra 1",
+      "comment_one": "hevitra {{displayCount}}",
       "comment": "fanehoan-kevitra {{displayCount}}",
       "comment_other": "fanehoan-kevitra {{displayCount}}",
       "startedRelative": " · nanomboka {{relative}}",

@@ -488,7 +488,7 @@
       "unresolveThread": "Талқылау тармағының шешілген белгісін алып тастау",
       "resolved": "Шешілді",
       "outdated": "Ескірген",
-      "comment_one": "1 пікір",
+      "comment_one": "{{displayCount}} пікір",
       "comment": "{{displayCount}} пікір",
       "comment_other": "{{displayCount}} пікір",
       "startedRelative": " · {{relative}} басталды",

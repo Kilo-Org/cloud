@@ -488,7 +488,7 @@
       "unresolveThread": "ਥ੍ਰੈਡ ਨੂੰ ਮੁੜ ਅਣਸੁਲਝਿਆ ਕਰੋ",
       "resolved": "ਹੱਲ ਹੋਇਆ",
       "outdated": "ਪੁਰਾਣੀ",
-      "comment_one": "1 ਟਿੱਪਣੀ",
+      "comment_one": "{{displayCount}} ਟਿੱਪਣੀ",
       "comment": "{{displayCount}} ਟਿੱਪਣੀਆਂ",
       "comment_other": "{{displayCount}} ਟਿੱਪਣੀਆਂ",
       "startedRelative": " · {{relative}} ਸ਼ੁਰੂ ਹੋਇਆ",

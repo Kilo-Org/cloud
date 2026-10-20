@@ -488,7 +488,7 @@
       "unresolveThread": "თემის მოგვარებულად მონიშვნის გაუქმება",
       "resolved": "მოგვარებულია",
       "outdated": "მოძველებულია",
-      "comment_one": "1 კომენტარი",
+      "comment_one": "{{displayCount}} კომენტარი",
       "comment": "{{displayCount}} კომენტარი",
       "comment_other": "{{displayCount}} კომენტარი",
       "startedRelative": " · დაიწყო {{relative}}",

@@ -488,7 +488,7 @@
       "unresolveThread": "Merkja þráð sem óleystan",
       "resolved": "Leyst",
       "outdated": "Úrelt",
-      "comment_one": "1 athugasemd",
+      "comment_one": "{{displayCount}} athugasemd",
       "comment": "{{displayCount}} athugasemdir",
       "comment_other": "{{displayCount}} athugasemdir",
       "startedRelative": " · hófst {{relative}}",

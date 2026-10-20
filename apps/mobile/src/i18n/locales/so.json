@@ -488,7 +488,7 @@
       "unresolveThread": "Dib u fur doodda",
       "resolved": "Waa la xalliyay",
       "outdated": "Duugoobay",
-      "comment_one": "1 faallo",
+      "comment_one": "{{displayCount}} faallo",
       "comment": "{{displayCount}} faallo",
       "comment_other": "{{displayCount}} faallo",
       "startedRelative": " · la bilaabay {{relative}}",

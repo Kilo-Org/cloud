@@ -512,7 +512,7 @@
       "unresolveThread": "Immarka s-sensiela bħala mhux solvuta",
       "resolved": "Solvuta",
       "outdated": "Mhux aġġornat",
-      "comment_one": "kumment wieħed",
+      "comment_one": "{{displayCount}} kumment",
       "comment": "{{displayCount}} kummenti",
       "comment_other": "{{displayCount}} kummenti",
       "startedRelative": " · bdiet {{relative}}",

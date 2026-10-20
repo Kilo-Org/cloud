@@ -488,7 +488,7 @@
       "unresolveThread": "Wepụ akara ndozi n'usoro mkparịta ụka",
       "resolved": "Edoziela",
       "outdated": "Ochie",
-      "comment_one": "okwu 1",
+      "comment_one": "okwu {{displayCount}}",
       "comment": "nkwupụta {{displayCount}}",
       "comment_other": "nkwupụta {{displayCount}}",
       "startedRelative": " · malitere {{relative}}",

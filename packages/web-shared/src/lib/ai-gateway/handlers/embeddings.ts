@@ -12,7 +12,10 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  isFreeModel,
+  isAnonymousFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   captureProxyError,
@@ -127,11 +130,6 @@ export async function handleEmbeddingsRequest(
     return modelDoesNotExistResponse();
   }
 
-  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
-  if (await isCustomLlm(requestBodyParsed.model)) {
-    return modelDoesNotExistResponse();
-  }
-
   if (requestBodyParsed.input == null) {
     return invalidRequestResponse();
   }
@@ -180,7 +178,7 @@ export async function handleEmbeddingsRequest(
       return invalidTokenResponse();
     }
 
-    if (!(await isFreeModel(requestedModelLowerCased))) {
+    if (!(await isAnonymousFreeModel(requestedModelLowerCased))) {
       return NextResponse.json(
         {
           error: {
@@ -197,6 +195,11 @@ export async function handleEmbeddingsRequest(
     organizationId = undefined;
   } else {
     user = maybeUser;
+  }
+
+  // Custom LLMs are chat-only; reject after auth to keep their existence private.
+  if (await isCustomLlm(requestedModelLowerCased)) {
+    return modelDoesNotExistResponse();
   }
 
   // Extract fraud/project headers

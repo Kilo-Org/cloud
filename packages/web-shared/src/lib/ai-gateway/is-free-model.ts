@@ -9,6 +9,7 @@ import {
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 
 /** Whether Kilo charges nothing for the model. Custom LLMs are always free. */
 export async function isFreeModel(modelId: string): Promise<boolean> {
@@ -33,6 +34,21 @@ export function isFreeModelExcludingCustomLlms(model: string): boolean {
     modelId === 'openrouter/free' ||
     (modelId.startsWith('stealth/') && modelId.endsWith('-alpha'))
   );
+}
+
+/** Anonymous eligibility must depend only on public models, never the private catalog. */
+export async function isAnonymousFreeModel(modelId: string): Promise<boolean> {
+  if (!isFreeModelExcludingCustomLlms(modelId)) return false;
+  if (
+    findKiloExclusiveModel(modelId) ||
+    modelId === KILO_AUTO_FREE_MODEL.id ||
+    modelId === 'openrouter/free' ||
+    (isLocalFakeLlmEnabled() &&
+      (isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)))
+  ) {
+    return true;
+  }
+  return Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId);
 }
 
 /** Free models, custom LLMs included, are assumed to train on prompts. */

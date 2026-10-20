@@ -38,6 +38,7 @@ import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gat
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
+  isAnonymousFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
@@ -584,8 +585,6 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
-  // Custom LLMs count as free; `getProvider` still refuses callers without access.
-  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -651,8 +650,8 @@ export async function handleLlmProxyRequest(
       return invalidTokenResponse();
     }
 
-    // No valid auth
-    if (!isFreeRequestedModel) {
+    // Anonymous eligibility must not reveal membership in the private custom LLM catalog.
+    if (!(await isAnonymousFreeModel(effectiveModelIdLowerCased))) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -899,7 +898,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeRequestedModel &&
+      !(await isFreeModel(effectiveModelIdLowerCased)) &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {

@@ -3,6 +3,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -99,7 +100,7 @@ jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
-  isCustomLlm: async () => false,
+  isCustomLlm: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/unavailable-models') as Record<
@@ -133,7 +134,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.createMockFromModule<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => ({
+    'test/free-model:free': { id: 'test/free-model:free' },
+  })),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   getToolsAvailable: jest.fn(() => false),
@@ -393,6 +401,38 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
         organizationId: undefined,
       })
     );
+  });
+
+  it.each([
+    { path: '/chat/completions', input: { messages: makeBody().messages } },
+    { path: '/responses', input: { input: 'hello' } },
+    { path: '/messages', input: { messages: makeBody().messages, max_tokens: 100 } },
+  ])('does not reveal custom LLM ids to anonymous $path callers', async ({ path, input }) => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+    });
+    try {
+      for (const model of ['acme/private-model', 'stealth/private-alpha', 'acme/legacy:free']) {
+        jest.mocked(isCustomLlm).mockResolvedValue(true);
+        const customResponse = await handleLlmProxyRequest(
+          makeRequest({ model, ...input, provider: { data_collection: 'deny' } }, undefined, path)
+        );
+        jest.mocked(isCustomLlm).mockResolvedValue(false);
+        const unknownResponse = await handleLlmProxyRequest(
+          makeRequest({ model, ...input, provider: { data_collection: 'deny' } }, undefined, path)
+        );
+
+        expect(customResponse.status).toBe(401);
+        expect(unknownResponse.status).toBe(401);
+        expect(await customResponse.json()).toEqual(await unknownResponse.json());
+      }
+      expect(isCustomLlm).not.toHaveBeenCalled();
+      expect(mockedGetProvider).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    } finally {
+      jest.mocked(isCustomLlm).mockResolvedValue(false);
+    }
   });
 
   it('rejects an API-only token sent to the gateway endpoint', async () => {

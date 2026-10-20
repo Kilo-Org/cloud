@@ -42,6 +42,13 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
     '${{ github.repository }}-node-modules-${{ runner.os }}-${{ runner.arch }}'
   );
 
+  const mountIndex = action.runs.steps.indexOf(mount);
+  const cleanupIndex = action.runs.steps.findIndex(
+    step => step.name === 'Reset pnpm installed graph'
+  );
+  const configureIndex = action.runs.steps.findIndex(step => step.name === 'Configure pnpm store');
+  assert.ok(mountIndex < cleanupIndex && cleanupIndex < configureIndex);
+
   const workspace = mkdtempSync(join(tmpdir(), 'pnpm-cache-cleanup-'));
   t.after(() => rmSync(workspace, { recursive: true, force: true }));
   const modules = join(workspace, 'node_modules');
@@ -82,6 +89,14 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
       step.run?.includes('pnpm_config_store_dir=$GITHUB_WORKSPACE/node_modules/.pnpm-store')
     )
   );
+
+  const missingMountWorkspace = mkdtempSync(join(tmpdir(), 'pnpm-cache-missing-mount-'));
+  t.after(() => rmSync(missingMountWorkspace, { recursive: true, force: true }));
+  const missingMountResult = spawnSync(process.execPath, [pnpmCleanup], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_WORKSPACE: missingMountWorkspace },
+  });
+  assert.equal(missingMountResult.status, 0, missingMountResult.stderr);
 });
 
 for (const [file, name, command, condition] of [

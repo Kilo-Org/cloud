@@ -18,6 +18,7 @@ import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
+import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 import {
   isUpstreamUrlPolicyEnforced,
   rejectDisallowedUpstreamUrls,
@@ -258,6 +259,36 @@ function upstreamFetchFailureResponse(
   );
 }
 
+async function buildDirectRequest({
+  url,
+  method,
+  headers,
+  body,
+  provider,
+}: {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
+  provider: Provider;
+}) {
+  const serializedBody = JSON.stringify(body);
+  if (!provider.awsBedrock) {
+    return { url, headers, body: serializedBody };
+  }
+  return {
+    url,
+    headers: await signBedrockRequest({
+      url,
+      method,
+      headers,
+      body: serializedBody,
+      credentials: provider.awsBedrock,
+    }),
+    body: serializedBody,
+  };
+}
+
 export async function upstreamRequest({
   chatApi,
   search,
@@ -290,7 +321,7 @@ export async function upstreamRequest({
     }
   } else if (provider.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', provider.apiKey);
-  } else {
+  } else if (!provider.awsBedrock) {
     headers.set('Authorization', `Bearer ${provider.apiKey}`);
   }
   headers.set('Content-Type', 'application/json');
@@ -337,7 +368,7 @@ export async function upstreamRequest({
           upstreamHeaders: headers,
           body,
         })
-      : { url: targetUrl, headers, body: JSON.stringify(body) };
+      : await buildDirectRequest({ url: targetUrl, method, headers, body, provider });
 
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.

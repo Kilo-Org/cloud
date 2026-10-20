@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { TRPCError } from '@trpc/server';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
-import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
+import type { FixReviewComment } from '@/lib/code-reviews/fix-review/select-comments';
 
 type TrpcContextFixture = {
   user: {
@@ -17,7 +17,10 @@ type ReviewFixture = {
   owned_by_organization_id: string | null;
   platform_integration_id: string | null;
   repo_full_name: string;
+  pr_number: number;
   pr_url: string;
+  pr_author: string;
+  head_ref: string;
   platform: string;
   model: string | null;
 };
@@ -101,6 +104,23 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationById: mockGetIntegrationById,
 }));
 
+const mockSelectFixReviewCommentsForReview =
+  jest.fn<
+    (input: {
+      repositoryFullName: string;
+      pullNumber: number;
+      prAuthor: string;
+      initiatorKiloUserId: string;
+      integration: IntegrationFixture | null;
+    }) => Promise<FixReviewComment[]>
+  >();
+
+jest.mock('@/lib/code-reviews/fix-review/select-comments', () => ({
+  selectFixReviewCommentsForReview: (
+    input: Parameters<typeof mockSelectFixReviewCommentsForReview>[0]
+  ) => mockSelectFixReviewCommentsForReview(input),
+}));
+
 let getRoute: RouteGet;
 
 const REVIEW_ID = '00000000-0000-4000-8000-000000000001';
@@ -110,6 +130,9 @@ const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_ORG_ID = '22222222-2222-4222-8222-222222222222';
 const REVIEW_INTEGRATION_ID = '33333333-3333-4333-8333-333333333333';
 const PR_URL = 'https://github.com/owner/repo/pull/123';
+const PR_NUMBER = 123;
+const PR_AUTHOR = 'pr-author';
+const PR_BRANCH = 'feature/widgets';
 const CONFIGURED_BOT_MODEL = 'z-ai/glm-5.2';
 const RESOLVED_USAGE_MODEL = 'z-ai/glm-5.2-20260616';
 const PERSONAL_KILO_SESSION_ID = 'ses_12345678901234567890123456';
@@ -122,7 +145,10 @@ function makeReview(overrides: Partial<ReviewFixture> = {}): ReviewFixture {
     owned_by_organization_id: null,
     platform_integration_id: REVIEW_INTEGRATION_ID,
     repo_full_name: 'owner/repo',
+    pr_number: PR_NUMBER,
     pr_url: PR_URL,
+    pr_author: PR_AUTHOR,
+    head_ref: PR_BRANCH,
     platform: 'github',
     model: RESOLVED_USAGE_MODEL,
     ...overrides,
@@ -176,6 +202,23 @@ function expectNoSessionCreation() {
   expect(mockOrganizationPrepareSession).not.toHaveBeenCalled();
 }
 
+const SELECTED_COMMENT: FixReviewComment = {
+  id: 4242,
+  authorLogin: 'kiloconnect[bot]',
+  authorType: 'Bot',
+  authorId: 240665456,
+  path: 'src/widget.ts',
+  line: 9,
+  body: 'Handle the empty response before reading the body.',
+};
+
+function sessionPrompt(): string {
+  const call =
+    mockPersonalPrepareSession.mock.calls[0] ?? mockOrganizationPrepareSession.mock.calls[0];
+  expect(call).toBeTruthy();
+  return call?.[0].prompt ?? '';
+}
+
 describe('GET /cloud-agent-fork/review/[reviewId]', () => {
   beforeAll(async () => {
     ({ GET: getRoute } = await import('./route'));
@@ -186,6 +229,7 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     mockCreateTRPCContext.mockResolvedValue({ user: { id: USER_ID } });
     mockSuccessfulReview();
     mockGetIntegrationById.mockResolvedValue(makeIntegration());
+    mockSelectFixReviewCommentsForReview.mockResolvedValue([SELECTED_COMMENT]);
     mockPersonalPrepareSession.mockResolvedValue({
       kiloSessionId: PERSONAL_KILO_SESSION_ID,
       cloudAgentSessionId: 'agent_personal',
@@ -222,21 +266,36 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expectNoSessionCreation();
   });
 
-  it('starts personal review fix sessions with the exact linked integration bot model', async () => {
+  it('starts personal review fix sessions from the server-selected review comments', async () => {
     const response = await requestReview();
     const redirectUrl = getRedirectUrl(response);
 
     expect(mockCodeReviewsGet).toHaveBeenCalledWith({ reviewId: REVIEW_ID });
     expect(mockGetIntegrationById).toHaveBeenCalledWith(REVIEW_INTEGRATION_ID);
     expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
+    expect(mockSelectFixReviewCommentsForReview).toHaveBeenCalledWith({
+      repositoryFullName: 'owner/repo',
+      pullNumber: PR_NUMBER,
+      prAuthor: PR_AUTHOR,
+      initiatorKiloUserId: USER_ID,
+      integration: makeIntegration(),
+    });
     expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
-      prompt: buildFixReviewPrompt(PR_URL),
+      prompt: expect.any(String),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: CONFIGURED_BOT_MODEL,
       autoInitiate: true,
       autoCommit: false,
     });
+
+    const prompt = sessionPrompt();
+    expect(prompt).toContain(`GitHub PR URL: ${PR_URL}`);
+    expect(prompt).toContain('Repository: owner/repo');
+    expect(prompt).toContain(`Pull request: #${PR_NUMBER}`);
+    expect(prompt).toContain(`PR branch: ${PR_BRANCH}`);
+    expect(prompt).toContain(`id: ${SELECTED_COMMENT.id}`);
+    expect(prompt).toContain(SELECTED_COMMENT.body);
     expect(mockOrganizationPrepareSession).not.toHaveBeenCalled();
 
     expect(response.status).toBe(303);
@@ -264,13 +323,14 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
     expect(mockOrganizationPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
-      prompt: buildFixReviewPrompt(PR_URL),
+      prompt: expect.any(String),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: CONFIGURED_BOT_MODEL,
       autoInitiate: true,
       autoCommit: false,
       organizationId: ORG_ID,
     });
+    expect(sessionPrompt()).toContain(`id: ${SELECTED_COMMENT.id}`);
 
     expect(response.status).toBe(303);
     expect(`${redirectUrl.pathname}${redirectUrl.search}`).toBe(
@@ -278,20 +338,24 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     );
   });
 
-  it('expands the fix-review workflow into ordinary prompt text', () => {
-    const prompt = buildFixReviewPrompt(PR_URL);
+  it('starts a no-op session when no review comment is in scope', async () => {
+    mockSelectFixReviewCommentsForReview.mockResolvedValue([]);
 
-    expect(prompt).toContain(`GitHub PR URL: ${PR_URL}`);
-    expect(prompt).toContain(`gh pr checkout "${PR_URL}"`);
-    expect(prompt).toContain('gh api repos/{owner}/{repo}/pulls/{number}/comments --paginate');
-    expect(prompt).toContain('gh api user --jq');
-    expect(prompt).toContain("reactions -f content='+1'");
-    expect(prompt).toContain('Create one commit per fixed review comment');
-    expect(prompt).toContain('git push');
-    expect(prompt).toContain('summary table');
-    expect(prompt).toContain('in_reply_to');
-    expect(prompt).not.toContain('$ARGUMENTS');
-    expect(prompt).not.toContain('/fix-review');
+    const response = await requestReview();
+
+    expect(response.status).toBe(303);
+    const prompt = sessionPrompt();
+    expect(prompt).toContain('None. There are no review comments in scope for this run.');
+    expect(prompt).toContain('Make no commit, push nothing, and reply to nothing.');
+  });
+
+  it('refuses to start a session when comment selection fails', async () => {
+    mockSelectFixReviewCommentsForReview.mockRejectedValue(new Error('GitHub unavailable'));
+
+    const response = await requestReview();
+
+    expectErrorRedirect(response, 'fix_session_failed');
+    expectNoSessionCreation();
   });
 
   it('redirects missing reviews to review_not_found without creating a session', async () => {
@@ -342,9 +406,16 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     const response = await requestReview();
 
     expect(mockGetIntegrationById).not.toHaveBeenCalled();
+    expect(mockSelectFixReviewCommentsForReview).toHaveBeenCalledWith({
+      repositoryFullName: 'owner/repo',
+      pullNumber: PR_NUMBER,
+      prAuthor: PR_AUTHOR,
+      initiatorKiloUserId: USER_ID,
+      integration: null,
+    });
     expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
-      prompt: buildFixReviewPrompt(PR_URL),
+      prompt: expect.any(String),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: DEFAULT_BOT_MODEL,
       autoInitiate: true,
@@ -362,7 +433,7 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
     expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
-      prompt: buildFixReviewPrompt(PR_URL),
+      prompt: expect.any(String),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: DEFAULT_BOT_MODEL,
       autoInitiate: true,

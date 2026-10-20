@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
+import { selectFixReviewCommentsForReview } from '@/lib/code-reviews/fix-review/select-comments';
 import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
 import { resolveBotModelSlug } from '@/lib/bot/model';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
@@ -86,9 +88,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return redirectToError(url.origin, 'fix_session_failed');
     }
 
+    const comments = await selectFixReviewCommentsForReview({
+      repositoryFullName: review.repo_full_name,
+      pullNumber: review.pr_number,
+      prAuthor: review.pr_author,
+      initiatorKiloUserId: ctx.user.id,
+      integration,
+    });
+
     const sessionInput = {
       githubRepo: review.repo_full_name,
-      prompt: buildFixReviewPrompt(review.pr_url),
+      prompt: buildFixReviewPrompt({
+        prUrl: review.pr_url,
+        repositoryFullName: review.repo_full_name,
+        pullNumber: review.pr_number,
+        headRef: review.head_ref,
+        comments,
+        nonce: randomUUID(),
+      }),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: resolveBotModelSlug(integration),
       autoInitiate: true,

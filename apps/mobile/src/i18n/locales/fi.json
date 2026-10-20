@@ -57,7 +57,7 @@
     "draft": "Luonnos",
     "enabled": "Käytössä",
     "github": "GitHub",
-    "imageUnavailable": "Kuva ei ole saatavilla.",
+    "imageUnavailable": "Kuva ei ole saatavilla",
     "loading": "Ladataan…",
     "loadMore": "Lataa lisää",
     "message": "Viesti",
@@ -88,7 +88,7 @@
     "copyLink": "Kopioi linkki",
     "couldNotLoadOrganizations": "Organisaatioiden lataaminen epäonnistui.",
     "couldNotLoadSessions": "Istuntojen lataaminen epäonnistui.",
-    "couldnTLoadMore": "Lisätietojen lataaminen epäonnistui.",
+    "couldnTLoadMore": "Lisää ei voitu ladata.",
     "deviceSessions": "Laiteistunnot",
     "disabled": "Ei käytössä",
     "email": "Sähköposti",
@@ -105,7 +105,7 @@
     "newSession": "Uusi istunto",
     "noKiloclawInstances": "Ei KiloClaw-instansseja",
     "noModelsAvailable": "Ei malleja saatavilla",
-    "notFound": "Kohdetta ei löytynyt.",
+    "notFound": "Kohdetta ei löytynyt",
     "online": "Verkossa",
     "open": "Avaa {{name}}",
     "openPullRequest": "Avaa muutospyyntö",
@@ -124,7 +124,7 @@
     "retryLoadingMore": "Yritä uudelleen ladata lisää",
     "reviewPr": "Tarkista PR",
     "role": "Rooli",
-    "searchModels": "Mallin nimi…",
+    "searchModels": "Hae malleja…",
     "selectedRepositories": "Valitut koodivarastot",
     "selectRepositories": "Valitse koodivarastot",
     "sendMessage": "Lähetä viesti",
@@ -2728,7 +2728,7 @@
   },
   "deviceSessions": {
     "couldNotLoadDescription": "Aktiiviset istuntosi eivät ole käytettävissä, ennen kuin niiden tiedot on ladattu.",
-    "currentDeviceUnidentified": "Nykyistä laitetta ei voitu tunnistaa.",
+    "currentDeviceUnidentified": "Nykyistä laitetta ei voitu tunnistaa",
     "noSessions": "Ei aktiivisia istuntoja",
     "noSessionsDescription": "Kirjaudu Kilo-sovellukseen toisella laitteella, niin laite näkyy tässä.",
     "onlyKiloAppSignIns": "Täällä näkyvät vain Kilo-sovelluksen kirjautumiset. Editorin ja CLI:n kirjautumisia ei luetella.",
@@ -2740,7 +2740,7 @@
     "sessionSignedOut": "Istunto kirjattiin ulos.",
     "signOutThisDeviceTitle": "Kirjataanko tämä laite ulos?",
     "signOutThisSessionTitle": "Kirjataanko tämä istunto ulos?",
-    "signOutThisSessionMessage": "Laite {{device}} kirjataan ulos. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",
+    "signOutThisSessionMessage": "{{device}} kirjataan ulos. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",
     "webBrowser": "Verkkoselain"
   },
   "forceUpdate": {
@@ -2936,7 +2936,7 @@
     "aiProvidersWho": "Anthropic, OpenAI, Google ja muut palveluntarjoajat, jotka valitset pyyntökohtaisesti.",
     "gatewayWhat": "Tilisi tunnus, pyyntöjen metatiedot, tokenien käyttö sekä kehotteet ja äänitallenteet, jotka sovellus lähettää sen kautta.",
     "viaGateway": "Kilo Gatewayn kautta",
-    "gatewayWhy": "Tunnistaminen, pyyntöjen reititys ja laskutuksen täsmäytys.",
+    "gatewayWhy": "Todennus, pyyntöjen reititys ja laskutuksen täsmäytys.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Kaatumis- ja virheraportit, joista sovelluksen sisältö on poistettu.",
     "crashReportingWhy": "Kaatumisten tunnistamiseen ja korjaamiseen.",
@@ -2944,11 +2944,11 @@
     "productAnalyticsWhat": "Sovelluksen tapahtumat (avaukset, katsotut näkymät, ominaisuuksien käyttö), laitetyyppi, sovellusversio.",
     "productAnalyticsWhy": "Sovelluksen suorituskyvyn mittaamiseen ja ominaisuuksien käytön ymmärtämiseen.",
     "productAnalyticsWho": "PostHog.",
-    "errorScreenshotsWhat": "Näyttökuvat virhetilanteista sekä tallenteet pienestä otoksesta istuntoja. Teksti ja kuvat on peitetty.",
+    "errorScreenshotsWhat": "Peitetyt näyttökuvat virhetilanteista ja peitetyt tallenteet pienen otoksen istunnoista.",
     "errorScreenshotsWhy": "Sen selvittämiseen, mitä sovellus näytti virhetilanteessa.",
     "performanceProfilingTitle": "Suorituskyvyn profilointi",
-    "performanceProfilingWhat": "CPU-profiileja pienestä otoksesta istuntoja, mukaan lukien funktionimet ja kutsupinot.",
-    "performanceProfilingWhy": "Etsiä ja korjata koodin, joka hidastaa sovellusta.",
+    "performanceProfilingWhat": "CPU-profiileja pienen otoksen istunnoista, mukaan lukien funktionimet ja kutsupinot.",
+    "performanceProfilingWhy": "Sovellusta hidastavan koodin etsimiseen ja korjaamiseen.",
     "performanceProfilingNote": "Profiilit tallentavat funktionimet ja kutsupinot, ei koskaan kehotteitasi tai keskustelujen sisältöä.",
     "installAttributionWhat": "Asennuslähde ja kampanjatunnisteet.",
     "installAttributionWhy": "Sen selvittämiseen, mistä kanavista uudet käyttäjät tulevat.",
@@ -3199,9 +3199,9 @@
       "searching": "Verkkohaku",
       "thinking": "Pohdinta"
     },
-    "planOf": "viidestä",
+    "planOf": "/",
     "filesChanged": "tiedostoa muutettu",
-    "finishedIn": "Valmis",
+    "finishedIn": "Kesti",
     "noActivityFor": "Ei toimintaa",
     "prOpened": "Pull request avattu",
     "permissionWants": "Haluaa suorittaa",
@@ -3209,7 +3209,7 @@
       "provider": "Pysäytetty: tarjoajan virhe",
       "tool": "Pysäytetty: työkalun virhe",
       "cancelled": "Pysäytetty: peruutettu",
-      "other": "PYSÄYTETTY"
+      "other": "Pysäytetty"
     }
   },
   "transcriptionModel": {
@@ -3718,7 +3718,7 @@
     "noMatchingProducts": "App Store ei palauttanut yhtään sopivaa krediittipakettia.",
     "noMatchingProductsPlay": "Google Play ei palauttanut yhtään sopivaa krediittipakettia.",
     "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
-    "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat eri Kilo-tilille. Käytä niitä kirjautumalla siihen Kilo-tiliin."
+    "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille."
   },
   "todos": {
     "saveAsTodo": "Tallenna tehtävänä",

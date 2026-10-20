@@ -254,7 +254,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       'https://web.example.test/api/internal/auto-routing/owner-pool-conversions'
     );
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer internal-secret');
-    expect(init?.redirect).toBe('error');
+    expect(init?.redirect).toBe('manual');
     expect(init?.signal).toBeInstanceOf(AbortSignal);
     expect(webRequests()).toEqual([
       {
@@ -398,6 +398,11 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
 
   it.each([
     ['a non-2xx response', async () => new Response('boom', { status: 502 })],
+    [
+      'a redirect',
+      async () =>
+        new Response(null, { status: 307, headers: { location: 'https://elsewhere.test/' } }),
+    ],
     ['an invalid response', async () => Response.json({ results: [] })],
     ['a network error', async () => Promise.reject(new Error('connection reset'))],
     [

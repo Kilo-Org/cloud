@@ -18,6 +18,7 @@ import {
   deniedAutoRoutingModelIdsForMember,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
+  loadAutoRoutingCandidateModelIds,
   loadEffectivePoolModelIds,
 } from './auto-routing-denied-models';
 
@@ -221,6 +222,38 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
     await expect(
       collectDataCollectionRequiredAutoRoutingModelIds(owner, 'efficient')
     ).resolves.toEqual(['meta/muse-spark-1.3-contributor', 'provider/free-model:free']);
+  });
+
+  it('uses frontier candidates for privacy denials rather than the efficient table or custom pool', async () => {
+    jest.mocked(getAutoRoutingSettings).mockClear();
+    jest.mocked(getCachedRoutingTable).mockReset();
+    jest.mocked(getCachedRoutingTable).mockImplementation(
+      async router =>
+        (router === 'frontier'
+          ? {
+              routes: {
+                'implementation/code_generation': [
+                  { model: 'frontier/private-model' },
+                  { model: 'frontier/ordinary-model' },
+                ],
+              },
+            }
+          : {
+              routes: { 'implementation/code_generation': [{ model: 'efficient/private-model' }] },
+            }) as never
+    );
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['frontier/private-model', 'efficient/private-model']));
+
+    await expect(loadAutoRoutingCandidateModelIds(owner, 'frontier')).resolves.toEqual([
+      'frontier/private-model',
+      'frontier/ordinary-model',
+    ]);
+    await expect(
+      collectDataCollectionRequiredAutoRoutingModelIds(owner, 'frontier')
+    ).resolves.toEqual(['frontier/private-model']);
+    expect(getAutoRoutingSettings).not.toHaveBeenCalled();
   });
 });
 

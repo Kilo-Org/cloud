@@ -7,6 +7,9 @@ import {
   routingTableKvKey,
   AUTO_ROUTERS,
   type AutoRouter,
+  type BenchmarkIdentity,
+  BenchmarkIdentityError,
+  type BenchmarkIdentityOverrides,
   resolveBenchmarkIdentity,
   resolveEffectivePolicy,
   ComplexityLabelsSchema,
@@ -119,6 +122,7 @@ import {
   getPaidCaseStartedAt,
   getSchedulerOverrides,
   hasUnsettledChunks,
+  listSettledSchedulerRuns,
   recoverChunks,
   releaseInitializationLease,
   restartPaidCase,
@@ -670,6 +674,17 @@ export class BenchmarkRunConfigError extends Error {
   }
 }
 
+// A saved non-bot identity override is an admin configuration error (400),
+// resolved before any claim or run row so nothing has to be rolled back.
+export function resolveRunIdentity(config: BenchmarkIdentityOverrides): BenchmarkIdentity {
+  try {
+    return resolveBenchmarkIdentity(config);
+  } catch (error) {
+    if (error instanceof BenchmarkIdentityError) throw new BenchmarkRunConfigError(error.message);
+    throw error;
+  }
+}
+
 export type StartRunOptions = {
   router?: AutoRouter;
   /** Classifier only: re-measure models that already have current results. */
@@ -703,6 +718,7 @@ export async function startRun(
   if (!config) {
     throw new Error('benchmark config not set: save it in the admin panel before starting a run');
   }
+  const benchmarkIdentity = resolveRunIdentity(config);
 
   // One active run per (kind, purpose). The unique partial index is the atomic
   // backstop; this pre-check turns the common case (a run already going) into a
@@ -751,8 +767,6 @@ export async function startRun(
   const carriedSummaries = skippedEntries.flatMap(
     e => priorByPair.get(exactPairKey(e.model, e.variant))?.summaries ?? []
   );
-
-  const benchmarkIdentity = resolveBenchmarkIdentity(config);
 
   const laneBudget = kind === 'classifier' ? BENCHMARK_CLASSIFIER_PARALLELISM : 0;
 
@@ -973,7 +987,7 @@ export async function drainQueue(
   const pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
   const remeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
   if (pending.length === 0 && remeasures.length === 0) return null;
-  const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveBenchmarkIdentity(config));
+  const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveRunIdentity(config));
   const unavailable = pending.filter(
     row =>
       !catalogSupportsBenchmarkPair(catalog, {
@@ -1062,7 +1076,9 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   if (initialized) return true;
   const { run, models } = (await getRunWithModels(env.BENCH_DB, runId)) ?? {};
   if (!run || !models || run.status !== 'running') return false;
-  if (!run.benchmark_user_id) {
+  // The catalog mint requires an org; only rows written before the org
+  // snapshot existed lack one.
+  if (!run.benchmark_user_id || !run.benchmark_org_id) {
     const reason = 'Benchmark run is missing its execution identity.';
     await markProfilesFailedForRun(env.BENCH_DB, runId, reason);
     await markRunFailed(env.BENCH_DB, runId, reason);
@@ -1163,17 +1179,8 @@ export async function dispatchScheduler(env: Env): Promise<void> {
     });
     await finalizeRunIfComplete(env, claim.run_id, 'decider', await getRunState(env, claim.run_id));
   }
-  const settled = await env.BENCH_DB.prepare(`
-    SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
-      AND EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
-      AND NOT EXISTS (SELECT 1 FROM scheduler_chunks AS chunk WHERE chunk.run_id = benchmark_runs.id
-        AND chunk.status IN ('pending', 'queued', 'active')
-        AND (chunk.status = 'active' OR NOT EXISTS (SELECT 1 FROM run_lane_failures AS failure
-          WHERE failure.run_id = chunk.run_id AND failure.model = chunk.model
-            AND failure.variant = chunk.variant AND failure.rep = chunk.rep))) LIMIT 3
-  `).all<{ id: string }>();
-  for (const run of settled.results) {
-    await finalizeRunIfComplete(env, run.id, 'decider', await getRunState(env, run.id));
+  for (const runId of await listSettledSchedulerRuns(env.BENCH_DB, 3)) {
+    await finalizeRunIfComplete(env, runId, 'decider', await getRunState(env, runId));
   }
   let claimed = await dispatchClaims(env, config);
   if (await initializeScheduledRuns(env)) claimed += await dispatchClaims(env, config);
@@ -1641,7 +1648,7 @@ async function processDeciderJob(
   const cases = deciderCasesForRouter(state.router).filter(c => caseIds.has(c.id));
   if (cases.length !== message.caseIds.length) throw new Error('Scheduler chunk has unknown cases');
 
-  const { benchmarkUserId } = state;
+  const { benchmarkUserId, benchmarkOrgId } = state;
   if (!benchmarkUserId) {
     // startRun snapshots the effective default/override identity, so this only
     // happens if the run row was tampered with; throwing lets the queue retry.
@@ -1717,13 +1724,17 @@ async function processDeciderJob(
     let cli: Promise<string> | undefined;
     const cliToken = () =>
       (cli ??= (async () => {
-        const kiloToken = await fetchBenchmarkUserToken(env, benchmarkUserId, state.benchmarkOrgId);
+        // The bot-token mint requires an org. Only run rows written before the
+        // org snapshot existed lack one; checked here so chunks whose cases are
+        // all recorded still finish without a mint.
+        if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
+        const kiloToken = await fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId);
         await warmUpCliContainer(env, {
           instanceName,
           model: message.model,
           kiloToken,
           kiloApiUrl: env.KILO_CLI_API_URL,
-          orgId: state.benchmarkOrgId,
+          orgId: benchmarkOrgId,
         }).catch(error => {
           if (isRetryableContainerAvailabilityError(error)) throw error;
         });
@@ -1766,7 +1777,7 @@ async function processDeciderJob(
             benchCase,
             kiloToken,
             kiloApiUrl: env.KILO_CLI_API_URL,
-            orgId: state.benchmarkOrgId,
+            orgId: benchmarkOrgId,
             variant: cliVariant,
             resultCallback: { url: env.BENCH_RESULT_URL, execution },
           }).catch(error => {

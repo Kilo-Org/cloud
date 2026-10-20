@@ -35,10 +35,10 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : input);
       const headers = new Headers(init?.headers);
-      if (url.href === 'https://app.test/api/internal/auto-routing-benchmark/token') {
+      if (url.href === 'https://app.test/api/internal/bot-token') {
         if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
         expect(init?.method).toBe('POST');
-        expect(headers.get('authorization')).toBe(`Bearer ${'internal-test-secret'}`);
+        expect(headers.get('authorization')).toBe(`Bearer ${'mint-test-secret'}`);
         expect(JSON.parse(init.body)).toEqual({
           userId: 'scheduler-user',
           organizationId: 'scheduler-org',
@@ -84,7 +84,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       BENCHMARK_SCHEDULER_CONFIG: '{}',
       KILO_WEB_API_BASE_URL: 'https://app.test',
       KILO_CLI_API_URL: 'https://api.test',
-      INTERNAL_API_SECRET_PROD: { get: async () => 'internal-test-secret' },
+      BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-test-secret' },
     } as unknown as Env;
   });
 
@@ -233,28 +233,31 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     expect(sent.some(message => message.runId === 'settled')).toBe(false);
   });
 
-  it('fails an identity-less run and releases its profiles without blocking a sibling', async () => {
-    insertRun('invalid', 'platform', 1, 1);
-    insertRun('healthy', 'user', 1, 1);
-    sqlite.prepare("UPDATE benchmark_runs SET benchmark_user_id = NULL WHERE id = 'invalid'").run();
-    sqlite
-      .prepare(`INSERT INTO benchmark_profiles (
+  it.each(['benchmark_user_id', 'benchmark_org_id'])(
+    'fails a run without %s and releases its profiles without blocking a sibling',
+    async column => {
+      insertRun('invalid', 'platform', 1, 1);
+      insertRun('healthy', 'user', 1, 1);
+      sqlite.prepare(`UPDATE benchmark_runs SET ${column} = NULL WHERE id = 'invalid'`).run();
+      sqlite
+        .prepare(`INSERT INTO benchmark_profiles (
       router, model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at
     ) VALUES ('efficient', 'invalid/model-0', '', 'scheduler-init-test', 1, 'running', 'invalid', ?, ?)`)
-      .run(new Date(NOW).toISOString(), new Date(NOW).toISOString());
+        .run(new Date(NOW).toISOString(), new Date(NOW).toISOString());
 
-    const result = await tick();
+      const result = await tick();
 
-    expect(sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'invalid'").get()).toEqual({
-      status: 'failed',
-    });
-    expect(
-      sqlite.prepare("SELECT status FROM benchmark_profiles WHERE run_id = 'invalid'").get()
-    ).toEqual({ status: 'failed' });
-    expect(chunkCount('invalid')).toBe(0);
-    expect(initialized('healthy')).toBe(true);
-    expect(result.claims.some(claim => claim.runId === 'healthy')).toBe(true);
-  });
+      expect(
+        sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'invalid'").get()
+      ).toEqual({ status: 'failed' });
+      expect(
+        sqlite.prepare("SELECT status FROM benchmark_profiles WHERE run_id = 'invalid'").get()
+      ).toEqual({ status: 'failed' });
+      expect(chunkCount('invalid')).toBe(0);
+      expect(initialized('healthy')).toBe(true);
+      expect(result.claims.some(claim => claim.runId === 'healthy')).toBe(true);
+    }
+  );
 
   it('contains a temporary catalog failure while initializing and dispatching a sibling', async () => {
     insertRun('retryable', 'platform', 1, 1);
@@ -267,10 +270,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     if (!base) throw new Error('Catalog fixture was not installed.');
     fetcher.mockImplementation(async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : input);
-      if (
-        url.pathname === '/api/internal/auto-routing-benchmark/token' &&
-        typeof init?.body === 'string'
-      ) {
+      if (url.pathname === '/api/internal/bot-token' && typeof init?.body === 'string') {
         const body: unknown = JSON.parse(init.body);
         if (
           typeof body === 'object' &&
@@ -383,5 +383,52 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     await tick();
     expect(chunkCount('abandoned')).toBe(materialized);
     expect(initialized('abandoned')).toBe(false);
+  });
+
+  it('finalizes a run whose only pending chunks belong to a dead-lettered lane', async () => {
+    insertRun('dead-lane', 'platform', 2, 1);
+    const [dead, live] = ['dead-lane/model-0', 'dead-lane/model-1'];
+    const caseIds = DECIDER_CASES.map(benchCase => benchCase.id);
+    await scheduleRunChunks(setupDb, {
+      runId: 'dead-lane',
+      entries: [dead, live].map(model => ({ model, variant: null, providers: ['deepinfra'] })),
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+    });
+    const profile = sqlite.prepare(`
+      INSERT INTO benchmark_profiles
+        (model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at)
+      VALUES (?, '', 'scheduler-init-test', 1, 'running', 'dead-lane', ?, ?)
+    `);
+    for (const model of [dead, live]) {
+      profile.run(model, new Date(NOW).toISOString(), new Date(NOW).toISOString());
+    }
+    const result = sqlite.prepare(`
+      INSERT INTO case_results (run_id, model, variant, case_id, score, latency_ms, rep)
+      VALUES ('dead-lane', ?, '', ?, 1, 100, 0)
+    `);
+    for (const caseId of caseIds) result.run(live, caseId);
+    sqlite.prepare("UPDATE scheduler_chunks SET status = 'completed' WHERE model = ?").run(live);
+    sqlite
+      .prepare(`INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at)
+        VALUES ('dead-lane', ?, '', 0, 0, 0, ?)`)
+      .run(dead, new Date(NOW).toISOString());
+
+    await dispatchScheduler(env);
+
+    expect(
+      sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'dead-lane'").get()
+    ).toEqual({ status: 'completed' });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT model, status FROM benchmark_profiles WHERE run_id = 'dead-lane' ORDER BY model"
+        )
+        .all()
+    ).toEqual([
+      { model: dead, status: 'failed' },
+      { model: live, status: 'ready' },
+    ]);
   });
 });

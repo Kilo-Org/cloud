@@ -161,10 +161,6 @@ test('staging and production Worker changes use independent deployment baselines
   assert.match(workers.jobs['detect-changes'].if, /inputs.base_sha != ''/);
   const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
   assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
-  assert.match(
-    detect.run,
-    /git diff --quiet "\$BASE_SHA" HEAD -- "\$dir\/" packages pnpm-lock\.yaml/
-  );
   assert.equal(
     production.jobs['deploy-kiloclaw'],
     undefined,

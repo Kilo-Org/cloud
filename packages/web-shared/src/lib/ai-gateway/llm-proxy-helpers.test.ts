@@ -1007,10 +1007,81 @@ describe('makeErrorReadable', () => {
 
       expect(result?.status).toBe(status);
       const body = await result?.json();
+      const baselineBody = await baseline?.json();
       expect(body).toMatchObject({ error_type: 'byok_error' });
-      expect(body).toEqual(await baseline?.json());
+      expect(body.message.startsWith(baselineBody.message)).toBe(true);
     }
   );
+
+  it('appends the provider explanation to a specific BYOK 401 message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/glm-5.3-flash',
+      request,
+      response: Response.json(
+        {
+          error: {
+            type: 'authentication_error',
+            code: 'api_key_expired',
+            message:
+              'This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.',
+          },
+        },
+        { status: 401 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration. Provider message: This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.';
+    expect(result?.status).toBe(401);
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('appends the provider explanation to the OpenCode Go BYOK permission message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/mimo-v2.5',
+      request,
+      response: Response.json(
+        { message: 'Synthetic data collection opt-in required.' },
+        { status: 403 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go. Provider message: Synthetic data collection opt-in required.';
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('removes control characters and bounds provider text appended to a specific BYOK message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(
+        { error: { message: `  Synthetic\u0000\n${'x'.repeat(400)}  ` } },
+        { status: 429 }
+      ),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    const expected = `[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider. Provider message: ${`Synthetic  ${'x'.repeat(400)}`.slice(0, 300)}`;
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
 
   it.each([400, 500, 502, 503])(
     'leaves non-BYOK errors and BYOK outages unchanged for status %i',

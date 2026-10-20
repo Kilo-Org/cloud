@@ -57,7 +57,6 @@ export const PromptTemplateSchema = z
     workflow: z.string(),
     whatToReview: z.string(),
     commentFormat: z.string(),
-    inlineCommentFooter: z.string().optional(),
     summaryFormatIssuesFound: z.string(),
     summaryFormatNoIssues: z.string(),
     summaryMarkerNote: z.string(),
@@ -320,10 +319,6 @@ export async function generateReviewPrompt(
   // 8. Comment format (use style override if available, otherwise default)
   const commentFormat = template.commentFormatOverrides?.[reviewStyle] ?? template.commentFormat;
   prompt += commentFormat + '\n\n';
-
-  if (platform === 'github' && template.inlineCommentFooter) {
-    prompt += template.inlineCommentFooter + '\n\n';
-  }
 
   // 9. Dynamic context section (separator)
   prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';

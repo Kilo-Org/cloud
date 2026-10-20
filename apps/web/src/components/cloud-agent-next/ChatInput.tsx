@@ -547,7 +547,6 @@ export function ChatInput({
       }
     : undefined;
 
-  // Check if toolbar should be rendered (has callbacks and options)
   const hasToolbar =
     showToolbar && onModeChange && onModelChange && (modelOptions.length > 0 || pinnedModelOption);
 

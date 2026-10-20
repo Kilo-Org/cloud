@@ -80,6 +80,13 @@ An omitted Frontier pool uses its router-specific alias preset.
 The worker benchmarks that pool before it publishes a complete Frontier table.
 It does not fabricate measurements or reuse the Efficient table.
 
+Frontier serves all authenticated callers through the benchmark router.
+It has no per-user rollout toggle or mode-based legacy model selection.
+Publish a complete Frontier table before deploying the gateway cutover.
+Missing or invalid Frontier decisions return service unavailable without invoking a legacy or organization fallback model.
+Authentication, organization access, privacy restrictions, and classification billing retain their existing checks.
+Catalog annotations and pre-classification denial hints use visible Frontier table candidates, independently of Efficient custom pools.
+
 Decider execution uses a global pool of reusable container slots, not run reservations.
 An atomic D1 claim selects an eligible unfinished chunk from any running run whenever a
 slot becomes free. Queued and executing claims both count against the limit.
@@ -868,7 +875,9 @@ the local database before `wrangler dev` starts, so a fresh stack has every tabl
   `localhost`).
 - **Secrets store** (seeded via `pnpm dev:env -y auto-routing-benchmark`, not
   `.dev.vars`): `INTERNAL_API_SECRET_PROD` (same value as the gateway's
-  `INTERNAL_API_SECRET`) and `OPENROUTER_API_KEY`.
+  `INTERNAL_API_SECRET`), `BOT_TOKEN_MINT_SECRET` (same value as the gateway's
+  `BOT_TOKEN_MINT_SECRET`; it authenticates only the decider CLI token mint)
+  and `OPENROUTER_API_KEY`.
 
 ### Hitting it locally
 
@@ -892,10 +901,13 @@ curl -s -X PUT 'http://localhost:8814/admin/config?router=efficient' \
        "updatedAt":null,"updatedBy":null}'
 ```
 
-Decider runs use the worker's default benchmark user and org unless
-`benchmarkUserId` / `benchmarkOrgId` overrides are saved in config. Any
-effective benchmark user must exist locally with credits and belong to the
-effective org. The dev seed provides `auto-routing-cli-local`.
+Decider runs use the worker's default benchmark user (`bot-internal-benchmark`)
+and org unless `benchmarkUserId` / `benchmarkOrgId` overrides are saved in
+config. Each queue message mints a one-hour CLI token from
+`POST /api/internal/bot-token`, which only issues for internal bot users
+(`bot-internal-*`) that belong to the org, so a non-bot override fails the run
+start with a clear error. Create the user locally from the admin
+**Internal Bot Users** page; it also needs credits.
 
 > Local KV/D1 writes from a *second* `wrangler` process are not seen by the
 > running dev process (miniflare holds its own view). After writing state out of

@@ -226,4 +226,27 @@ describe('the remote MCP server form', () => {
     await type(1, '');
     expect(dirty.at(-1)).toBe(false);
   });
+
+  it('counts a bearer token edit and clears it when the token is restored', async () => {
+    const dirty: boolean[] = [];
+    await mount({
+      server: {
+        id: 'remote',
+        name: 'Remote',
+        url: 'https://remote.example/mcp',
+        auth: { type: 'bearer', token: 'secret' },
+        enabled: true,
+      },
+      onSave,
+      onDirtyChange: value => {
+        dirty.push(value);
+      },
+    });
+
+    await type(2, 'another');
+    expect(dirty.at(-1)).toBe(true);
+
+    await type(2, 'secret');
+    expect(dirty.at(-1)).toBe(false);
+  });
 });

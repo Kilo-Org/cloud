@@ -116,7 +116,7 @@ export function RemoteMcpServerForm({
         next.name.trim() !== initialName.trim() ||
           next.url.trim() !== initialUrl.trim() ||
           next.method !== initialMethod ||
-          (next.method !== 'none' && next.token.trim() !== initialToken.trim())
+          (next.method === 'bearer' && next.token.trim() !== initialToken.trim())
       );
     },
     [fieldsWith, server, onDirtyChange, initialName, initialUrl, initialMethod, initialToken]

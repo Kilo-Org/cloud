@@ -204,11 +204,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     integrationId = row.id;
     wasInserted = true;
   } else {
-    const [existing] = await db
+    // One installation can have a workflow owner plus agent-only shares for
+    // other accounts, so pick this user's own row from all of them.
+    const peers = await db
       .select({
         id: platform_integrations.id,
         ownedByUserId: platform_integrations.owned_by_user_id,
         ownedByOrganizationId: platform_integrations.owned_by_organization_id,
+        connectionRole: platform_integrations.github_connection_role,
       })
       .from(platform_integrations)
       .where(
@@ -217,10 +220,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
           eq(platform_integrations.github_app_type, options.appType),
           eq(platform_integrations.platform_installation_id, options.installationId)
         )
-      )
-      .limit(1);
+      );
+    const existing = peers.find(peer => peer.ownedByUserId === user.id);
 
-    if (!existing) {
+    if (peers.length === 0) {
       // Edge case: a concurrent delete blocked the insert without leaving a row
       // to re-read. Retry so the database enforces uniqueness (or throws).
       const [retried] = await db
@@ -229,7 +232,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         .returning({ id: platform_integrations.id });
       integrationId = retried.id;
       wasInserted = true;
-    } else if (existing.ownedByUserId === user.id && existing.ownedByOrganizationId === null) {
+    } else if (existing?.connectionRole === 'workflow') {
       await db
         .update(platform_integrations)
         .set({
@@ -251,9 +254,16 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       integrationId = existing.id;
       wasInserted = false;
     } else {
-      const ownerHint = existing.ownedByUserId
-        ? `user ${existing.ownedByUserId}`
-        : `organization ${existing.ownedByOrganizationId ?? 'unknown'}`;
+      // Mirrors upsertPlatformIntegrationForOwner: only this user's own
+      // workflow row refreshes; another workflow owner or an agent-only
+      // share is a claim by another account.
+      const claimant =
+        peers.find(peer => peer.connectionRole === 'workflow') ??
+        peers.find(peer => peer !== existing) ??
+        peers[0];
+      const ownerHint = claimant.ownedByUserId
+        ? `user ${claimant.ownedByUserId}`
+        : `organization ${claimant.ownedByOrganizationId ?? 'unknown'}`;
       throw new Error(
         `This GitHub installation is already claimed by another account (${ownerHint}). ` +
           `Delete that platform_integrations row first, or seed the integration for the owning account.`

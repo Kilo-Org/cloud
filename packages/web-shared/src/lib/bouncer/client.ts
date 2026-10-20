@@ -181,7 +181,11 @@ type UsageEventFields = {
  * `accountId`, so it can never be joined to a payer.
  */
 export type UsageEvent =
-  | (UsageEventFields & { accountId: string })
+  | (UsageEventFields & {
+      accountId: string;
+      /** The request ran on the person's own ChatGPT subscription through Sign in with ChatGPT. */
+      siwc?: boolean;
+    })
   | (UsageEventFields & { tier: 'anonymous'; ip: string });
 
 export type DecideTier = 'anonymous' | 'free' | 'paid' | 'team';
@@ -631,7 +635,7 @@ export function usageEventWireBody(event: UsageEvent): Record<string, unknown> {
   // An anonymous request carries only the tier and its required ip; a signed-in one adds accountId.
   return 'tier' in event
     ? compact({ ...common, tier: event.tier })
-    : compact({ ...common, accountId: event.accountId });
+    : compact({ ...common, accountId: event.accountId, siwc: event.siwc === true || undefined });
 }
 
 /** Reports one inference request after its upstream response. Resolves on any failure. */

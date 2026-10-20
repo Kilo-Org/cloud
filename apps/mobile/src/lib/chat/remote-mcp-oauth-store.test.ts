@@ -109,7 +109,7 @@ describe('matching a remote MCP server OAuth state to its endpoint', () => {
     });
   });
 
-  it('keeps the older spelling of one endpoint when a field is written', async () => {
+  it('merges a field into the state an older spelling saved', async () => {
     const { store, epoch } = await fresh();
     heldDiskRead(JSON.stringify({ demo: { url: 'https://demo.example/', tokens: TOKENS } }))();
 

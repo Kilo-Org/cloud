@@ -219,7 +219,7 @@ async function buildMetadata(
   if (sandboxId === undefined || sandboxId.length === 0) {
     throw new ControlPlaneRegistrationError('Session metadata requires a sandboxId');
   }
-  return { metadata: built.metadata, sandboxId: sandboxId as SandboxId };
+  return { metadata: built.metadata, sandboxId: sandboxId };
 }
 
 /**

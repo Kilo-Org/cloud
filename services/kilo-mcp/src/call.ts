@@ -1,4 +1,4 @@
-import { Validator, type OutputUnit, type Schema, type SchemaDraft } from '@cfworker/json-schema';
+import { Validator, type OutputUnit, type SchemaDraft } from '@cfworker/json-schema';
 import { ORGANIZATION_ID_HEADER } from './auth';
 import { isGuardedRow } from './search';
 import {
@@ -41,7 +41,7 @@ function draftFor(inputSchema: Record<string, unknown>): SchemaDraft {
 function validatorFor(inputSchema: Record<string, unknown>): Validator {
   const cached = validatorCache.get(inputSchema);
   if (cached) return cached;
-  const validator = new Validator(inputSchema as Schema, draftFor(inputSchema), false);
+  const validator = new Validator(inputSchema, draftFor(inputSchema), false);
   validatorCache.set(inputSchema, validator);
   return validator;
 }

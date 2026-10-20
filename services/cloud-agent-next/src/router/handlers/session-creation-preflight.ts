@@ -4,7 +4,6 @@ import {
   mergeProfileConfiguration,
   profileMcpServersToClientRecord,
   ProfileNotFoundError,
-  type ClientMcpServerValue,
   type InlineAgentInput,
   type MergeProfileConfigurationResult,
   type ProfileOwner,
@@ -86,7 +85,7 @@ async function resolveProfileForSessionCreateRequest(
       envVars: overrides?.envVars,
       setupCommands: overrides?.setupCommands,
       encryptedSecrets: overrides?.encryptedSecrets,
-      mcpServers: overrides?.mcpServers as Record<string, ClientMcpServerValue> | undefined,
+      mcpServers: overrides?.mcpServers,
       runtimeSkills: overrides?.runtimeSkills,
       runtimeAgents: overrides?.runtimeAgents as InlineAgentInput[] | undefined,
     });

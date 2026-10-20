@@ -102,7 +102,7 @@ import {
 } from '../../shared/control-plane-protocol.js';
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
-import type { EventId, SessionId } from '../../types/ids.js';
+import type { SessionId } from '../../types/ids.js';
 import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import type { StoredEvent } from '../../websocket/types.js';
@@ -148,7 +148,6 @@ import {
 } from '../../sandbox-session/report-outbox.js';
 import {
   CloudAgentRunContainerSchema,
-  type CloudAgentQueueReport,
   type CloudAgentRunContainer,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type {
@@ -546,7 +545,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.eventQueries = createEventQueries(this.db, ctx.storage.sql);
     this.reportOutbox = createReportOutbox({
       storage: ctx.storage,
-      getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE as Queue<CloudAgentQueueReport> | undefined,
+      getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
     });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
@@ -2827,7 +2826,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     timestamp: number = Date.now()
   ): void {
     this.broadcast({
-      id: 0 as EventId,
+      id: 0,
       execution_id: '',
       session_id: this.sessionId,
       stream_event_type: streamEventType,

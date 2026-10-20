@@ -12,7 +12,6 @@ import {
 } from './kilo/wrapper-manager.js';
 import {
   DISK_CHECK_TIMEOUT_MS,
-  FAST_SANDBOX_COMMAND_TIMEOUT_MS,
   GIT_CLONE_TIMEOUT_MS,
   GIT_COMMAND_TIMEOUT_MS,
   timedExec,

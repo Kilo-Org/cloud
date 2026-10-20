@@ -442,7 +442,7 @@ async function handleInvokeScheduled(c: RouteContext, namespace: string, trigger
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
       async stub => {
         const result = await stub.invokeScheduled();
-        return result as ScheduledInvocationResult;
+        return result;
       },
       'invokeScheduled',
       { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 }

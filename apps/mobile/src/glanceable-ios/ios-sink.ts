@@ -611,7 +611,9 @@ export function republishAggregateCard(): void {
 export const iosSink: GlanceableSink = {
   async waitForNativeTerminal() {
     await Promise.all(
-      [...endingActivities.values()].map((ending): Promise<void> | null => ending.pending)
+      [...endingActivities.values()]
+        .map(ending => ending.pending)
+        .filter((pending): pending is Promise<void> => pending !== null)
     );
     // A replacement card deferred behind a dismissal is part of that terminal work.
     await pendingStart;

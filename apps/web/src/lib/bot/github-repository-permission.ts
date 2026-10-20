@@ -29,6 +29,22 @@ type CachedRepositoryPermission = {
 const permissionCache = new Map<string, CachedRepositoryPermission>();
 const permissionRequests = new Map<string, Promise<CollaboratorPermission | null>>();
 
+export const MAX_CACHED_REPOSITORY_PERMISSIONS = 500;
+
+function trimPermissionCache(now: number): void {
+  if (permissionCache.size <= MAX_CACHED_REPOSITORY_PERMISSIONS) return;
+
+  for (const [key, entry] of permissionCache) {
+    if (entry.expiresAtMs <= now) permissionCache.delete(key);
+  }
+
+  while (permissionCache.size > MAX_CACHED_REPOSITORY_PERMISSIONS) {
+    const oldestKey = permissionCache.keys().next().value;
+    if (oldestKey === undefined) return;
+    permissionCache.delete(oldestKey);
+  }
+}
+
 function repositoryPermissionCacheKey(input: GitHubRepositoryPermissionInput): string {
   return [
     input.installationId.trim().toLowerCase(),
@@ -64,10 +80,9 @@ export async function getGitHubRepositoryPermission(
       input.platformIntegrationId
     );
     if (permission !== null) {
-      permissionCache.set(cacheKey, {
-        permission,
-        expiresAtMs: Date.now() + GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS,
-      });
+      const expiresAtMs = Date.now() + GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS;
+      permissionCache.set(cacheKey, { permission, expiresAtMs });
+      trimPermissionCache(Date.now());
     }
     return permission;
   })();
@@ -111,6 +126,9 @@ export async function authorizeGitHubRepository(params: {
   const { platformIntegration, repository, threadRepository, actorLogin } = params;
 
   if (platformIntegration.platform !== PLATFORM.GITHUB) return { allowed: true };
+  // Organization-owned integrations get repository-level verification. Personally
+  // owned integrations stay owner-controlled, which is documented here because
+  // the gate deliberately does not run for them.
   if (!platformIntegration.owned_by_organization_id) return { allowed: true };
 
   if (!repository) return { allowed: false, markdown: writeAccessRequiredMarkdown(null) };
@@ -139,17 +157,19 @@ export async function authorizeGitHubRepository(params: {
       appType,
       platformIntegration.id
     );
-    const permission = await getGitHubRepositoryPermission(
-      {
-        installationId,
-        appType,
-        owner,
-        repo,
-        username: actorLogin,
-        platformIntegrationId: platformIntegration.id,
-      },
-      params.fetchPermission
-    );
+    const permissionInput = {
+      installationId,
+      appType,
+      owner,
+      repo,
+      username: actorLogin,
+      platformIntegrationId: platformIntegration.id,
+    };
+    let permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
+    if (permission === null) {
+      // A single GitHub error (rate limit, 5xx, timeout) must not end the action.
+      permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
+    }
     if (permission === 'admin' || permission === 'write') return { allowed: true };
   } catch (error) {
     console.warn('[KiloBot] Failed to verify GitHub repository access:', {

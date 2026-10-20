@@ -8,6 +8,7 @@ import {
   authorizeGitHubRepository,
   getGitHubRepositoryPermission,
   GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS,
+  MAX_CACHED_REPOSITORY_PERMISSIONS,
 } from './github-repository-permission';
 
 const mockedAssertAuthorized = jest.mocked(assertGitHubInstallationRuntimeAuthorized);
@@ -78,7 +79,7 @@ describe('authorizeGitHubRepository', () => {
     expect(result).toEqual({ allowed: false, markdown: expect.stringContaining('write access') });
   });
 
-  test('a failed permission lookup is denied without a second lookup', async () => {
+  test('a repeatedly failing permission lookup is denied after one retry', async () => {
     const fetchPermission = createFetchPermission(null);
 
     const result = await authorizeGitHubRepository({
@@ -89,7 +90,22 @@ describe('authorizeGitHubRepository', () => {
     });
 
     expect(result.allowed).toBe(false);
-    expect(fetchPermission).toHaveBeenCalledTimes(1);
+    expect(fetchPermission).toHaveBeenCalledTimes(2);
+  });
+
+  test('a transient permission lookup failure recovers on the retry', async () => {
+    const fetchPermission = createFetchPermission(null);
+    fetchPermission.mockResolvedValueOnce(null).mockResolvedValueOnce('write');
+
+    const result = await authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/transient',
+      actorLogin: 'octocat',
+      fetchPermission,
+    });
+
+    expect(result).toEqual({ allowed: true });
+    expect(fetchPermission).toHaveBeenCalledTimes(2);
   });
 
   test('personally owned integrations do not consult repository permissions', async () => {
@@ -224,5 +240,30 @@ describe('getGitHubRepositoryPermission cache', () => {
     await getGitHubRepositoryPermission(input, fetchPermission);
 
     expect(fetchPermission).toHaveBeenCalledTimes(2);
+  });
+
+  test('evicts the oldest entry when the cache reaches its bound', async () => {
+    const fetchPermission = createFetchPermission('write');
+    const base = {
+      installationId: '5004',
+      appType: 'standard' as const,
+      owner: 'acme',
+      repo: 'bounded',
+      username: 'octocat',
+    };
+    const first = { ...base, repo: 'first' };
+
+    await getGitHubRepositoryPermission(first, fetchPermission);
+    for (let index = 0; index <= MAX_CACHED_REPOSITORY_PERMISSIONS; index += 1) {
+      await getGitHubRepositoryPermission({ ...base, repo: `repo-${index}` }, fetchPermission);
+    }
+
+    const callsAfterFill = fetchPermission.mock.calls.length;
+    await getGitHubRepositoryPermission(first, fetchPermission);
+    expect(fetchPermission.mock.calls.length).toBe(callsAfterFill + 1);
+
+    const recent = { ...base, repo: `repo-${MAX_CACHED_REPOSITORY_PERMISSIONS}` };
+    await getGitHubRepositoryPermission(recent, fetchPermission);
+    expect(fetchPermission.mock.calls.length).toBe(callsAfterFill + 1);
   });
 });

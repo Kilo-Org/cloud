@@ -166,7 +166,7 @@ Both environments use the following consumer settings:
 |---|---|---|
 | `max_batch_size` | `1` | One message per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | Production: `1`; staging: `10` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
+| `max_concurrency` | Production: `1`; staging: `100` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
 | `max_retries` | `3` | Initial delivery plus up to three retries. |
 | `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |

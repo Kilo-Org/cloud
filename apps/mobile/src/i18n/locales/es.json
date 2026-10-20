@@ -3870,7 +3870,7 @@
     "view": "Leer resumen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ver estado en vivo",
+    "dismiss": "Descartar resumen",
     "offline": "Sin conexión · resumen guardado",
     "cached": "Informe guardado · no se puede actualizar",
     "revised": "Revisado · {{revision}}",

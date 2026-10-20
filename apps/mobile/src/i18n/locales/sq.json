@@ -3825,7 +3825,7 @@
     "view": "Lexo përmbledhjen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Shfaq statusin live",
+    "dismiss": "Hidh poshtë përmbledhjen",
     "offline": "Jashtë linje · përmbledhje e ruajtur",
     "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
     "revised": "Rishikuar · {{revision}}",

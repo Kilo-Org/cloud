@@ -3825,7 +3825,7 @@
     "view": "Прочитај преглед",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Прикажи статус во живо",
+    "dismiss": "Отфрли го прегледот",
     "offline": "Офлајн · зачуван преглед",
     "cached": "Зачуван извештај · освежувањето е недостапно",
     "revised": "Ревидирано · {{revision}}",

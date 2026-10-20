@@ -3825,7 +3825,7 @@
     "view": "ब्रिफिङ पढ्नुहोस्",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "लाइभ स्थिति देखाउनुहोस्",
+    "dismiss": "ब्रिफिङ खारेज गर्नुहोस्",
     "offline": "अफलाइन · सेभ गरिएको ब्रिफिङ",
     "cached": "सेभ गरिएको रिपोर्ट · रिफ्रेस उपलब्ध छैन",
     "revised": "संशोधित · {{revision}}",

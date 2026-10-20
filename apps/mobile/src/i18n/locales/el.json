@@ -3825,7 +3825,7 @@
     "view": "Ανάγνωση ενημέρωσης",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Εμφάνιση τρέχουσας κατάστασης",
+    "dismiss": "Απόρριψη ενημέρωσης",
     "offline": "Εκτός σύνδεσης · αποθηκευμένη ενημέρωση",
     "cached": "Αποθηκευμένη αναφορά · η ανανέωση δεν είναι διαθέσιμη",
     "revised": "Αναθεωρημένη · {{revision}}",

@@ -3870,7 +3870,7 @@
     "view": "Citește rezumatul",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Afișează starea live",
+    "dismiss": "Ignoră rezumatul",
     "offline": "Offline · rezumat salvat",
     "cached": "Raport salvat · reîmprospătare indisponibilă",
     "revised": "Revizuit · {{revision}}",

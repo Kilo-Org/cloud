@@ -3825,7 +3825,7 @@
     "view": "Կարդալ ամփոփումը",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ցույց տալ ընթացիկ կարգավիճակը",
+    "dismiss": "Անտեսել ամփոփումը",
     "offline": "Անցանց · պահված ամփոփում",
     "cached": "Պահված հաշվետվություն · թարմացումն անհասանելի է",
     "revised": "Վերանայված · {{revision}}",

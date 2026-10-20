@@ -3870,7 +3870,7 @@
     "view": "Lasīt kopsavilkumu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Rādīt tiešsaistes statusu",
+    "dismiss": "Noraidīt kopsavilkumu",
     "offline": "Bezsaistē · saglabāts kopsavilkums",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
     "revised": "Pārskatīts · {{revision}}",

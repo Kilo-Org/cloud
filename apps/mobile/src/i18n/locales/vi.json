@@ -3825,7 +3825,7 @@
     "view": "Đọc bản tin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Hiện trạng thái trực tiếp",
+    "dismiss": "Bỏ qua bản tin",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Báo cáo đã lưu · không thể làm mới",
     "revised": "Đã sửa đổi · {{revision}}",

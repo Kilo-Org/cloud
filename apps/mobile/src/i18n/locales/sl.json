@@ -3915,7 +3915,7 @@
     "view": "Preberi povzetek",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutno stanje",
+    "dismiss": "Zavrzi povzetek",
     "offline": "Brez povezave · shranjen povzetek",
     "cached": "Shranjeno poročilo · osvežitev ni na voljo",
     "revised": "Popravljeno · {{revision}}",

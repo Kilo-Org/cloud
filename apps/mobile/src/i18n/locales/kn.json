@@ -3825,7 +3825,7 @@
     "view": "ಸಾರಾಂಶ ಓದಿ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ಲೈವ್ ಸ್ಥಿತಿ ತೋರಿಸಿ",
+    "dismiss": "ಸಾರಾಂಶವನ್ನು ಕಡೆಗಣಿಸಿ",
     "offline": "ಆಫ್‌ಲೈನ್ · ಉಳಿಸಿದ ಸಾರಾಂಶ",
     "cached": "ಉಳಿಸಿದ ವರದಿ · ರಿಫ್ರೆಶ್ ಲಭ್ಯವಿಲ್ಲ",
     "revised": "ಪರಿಷ್ಕೃತ · {{revision}}",

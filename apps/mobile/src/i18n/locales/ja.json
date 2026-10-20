@@ -3825,7 +3825,7 @@
     "view": "ブリーフィングを読む",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}、{{time}}",
-    "dismiss": "ライブ状況を表示",
+    "dismiss": "ブリーフィングを却下",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みレポート · 更新できません",
     "revised": "改訂 · {{revision}}",

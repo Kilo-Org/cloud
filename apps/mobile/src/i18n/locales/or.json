@@ -3825,7 +3825,7 @@
     "view": "ସାରାଂଶ ପଢନ୍ତୁ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ଲାଇଭ ସ୍ଥିତି ଦେଖାନ୍ତୁ",
+    "dismiss": "ସାରାଂଶ ଖାରଜ କରନ୍ତୁ",
     "offline": "ଅଫଲାଇନ · ସଂରକ୍ଷିତ ସାରାଂଶ",
     "cached": "ସଂରକ୍ଷିତ ରିପୋର୍ଟ · ରିଫ୍ରେସ ଉପଲବ୍ଧ ନାହିଁ",
     "revised": "ସଂଶୋଧିତ · {{revision}}",

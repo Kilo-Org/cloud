@@ -3825,7 +3825,7 @@
     "view": "Прочети брифинга",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Покажи текущия статус",
+    "dismiss": "Отхвърли брифинга",
     "offline": "Офлайн · запазен брифинг",
     "cached": "Запазен отчет · опресняването не е налично",
     "revised": "Редактиран · {{revision}}",

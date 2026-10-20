@@ -3870,7 +3870,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži status uživo",
+    "dismiss": "Odbaci pregled",
     "offline": "Van mreže · sačuvan pregled",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
     "revised": "Izmenjeno · {{revision}}",

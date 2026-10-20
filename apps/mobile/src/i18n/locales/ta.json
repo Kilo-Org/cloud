@@ -3825,7 +3825,7 @@
     "view": "சுருக்கத்தைப் படிக்கவும்",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "நேரடி நிலையைக் காட்டு",
+    "dismiss": "சுருக்கத்தைப் புறக்கணிக்கவும்",
     "offline": "ஆஃப்லைன் · சேமித்த சுருக்கம்",
     "cached": "சேமித்த அறிக்கை · புதுப்பிக்க இயலாது",
     "revised": "திருத்தப்பட்டது · {{revision}}",

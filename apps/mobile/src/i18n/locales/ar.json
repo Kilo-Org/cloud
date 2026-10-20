@@ -4005,7 +4005,7 @@
     "view": "قراءة الملخص",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "عرض الحالة المباشرة",
+    "dismiss": "استبعاد الملخص",
     "offline": "غير متصل · ملخص محفوظ",
     "cached": "تقرير محفوظ · التحديث غير متاح",
     "revised": "منقّح · {{revision}}",

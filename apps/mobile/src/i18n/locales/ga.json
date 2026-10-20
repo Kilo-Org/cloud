@@ -3960,7 +3960,7 @@
     "view": "Léigh an achoimre",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Taispeáin stádas beo",
+    "dismiss": "Cuir an achoimre as an áireamh",
     "offline": "As líne · achoimre shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
     "revised": "Athbhreithnithe · {{revision}}",

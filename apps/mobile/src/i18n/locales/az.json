@@ -3825,7 +3825,7 @@
     "view": "Brifinqi oxu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Canlı statusu göstər",
+    "dismiss": "Brifinqi rədd et",
     "offline": "Oflayn · saxlanmış brifinq",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
     "revised": "Yenilənib · {{revision}}",

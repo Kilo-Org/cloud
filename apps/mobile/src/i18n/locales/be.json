@@ -3915,7 +3915,7 @@
     "view": "Чытаць зводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Паказаць бягучы стан",
+    "dismiss": "Адхіліць зводку",
     "offline": "Па-за сеткай · захаваная зводка",
     "cached": "Захаваная справаздача · абнаўленне недаступнае",
     "revised": "Абноўлена · {{revision}}",

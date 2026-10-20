@@ -3825,7 +3825,7 @@
     "view": "బ్రీఫింగ్ చదవండి",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ప్రత్యక్ష స్థితిని చూపండి",
+    "dismiss": "బ్రీఫింగ్ విస్మరించండి",
     "offline": "ఆఫ్‌లైన్ · సేవ్ చేసిన బ్రీఫింగ్",
     "cached": "సేవ్ చేసిన రిపోర్ట్ · రిఫ్రెష్ అందుబాటులో లేదు",
     "revised": "సవరించబడింది · {{revision}}",

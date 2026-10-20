@@ -3825,7 +3825,7 @@
     "view": "អានសេចក្តីសង្ខេប",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "បង្ហាញស្ថានភាពផ្ទាល់",
+    "dismiss": "មិនអើពើនឹងសេចក្តីសង្ខេប",
     "offline": "គ្មានអ៊ីនធឺណិត · សេចក្តីសង្ខេបដែលបានរក្សាទុក",
     "cached": "របាយការណ៍ដែលបានរក្សាទុក · មិនអាចធ្វើឱ្យស្រស់បាន",
     "revised": "បានកែប្រែ · {{revision}}",

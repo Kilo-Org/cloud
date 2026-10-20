@@ -3825,7 +3825,7 @@
     "view": "閱讀簡報",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
-    "dismiss": "顯示即時狀態",
+    "dismiss": "忽略簡報",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的報告 · 無法重新整理",
     "revised": "已修訂 · {{revision}}",

@@ -3825,7 +3825,7 @@
     "view": "Тойм унших",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Шууд төлөв харуулах",
+    "dismiss": "Тоймыг хасах",
     "offline": "Офлайн · хадгалсан тойм",
     "cached": "Хадгалсан тайлан · шинэчлэх боломжгүй",
     "revised": "Засварласан · {{revision}}",

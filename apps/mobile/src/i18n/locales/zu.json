@@ -3825,7 +3825,7 @@
     "view": "Funda isifinyezo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Bonisa isimo samanje",
+    "dismiss": "Chitha isifinyezo",
     "offline": "Akuxhunyiwe · isifinyezo esilondoloziwe",
     "cached": "Umbiko olondoloziwe · ukuvuselela akutholakali",
     "revised": "Kubuyekeziwe · {{revision}}",

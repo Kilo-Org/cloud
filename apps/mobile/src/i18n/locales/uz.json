@@ -3825,7 +3825,7 @@
     "view": "Brifingni o‘qish",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Jonli holatni ko‘rsatish",
+    "dismiss": "Brifingni e’tiborsiz qoldirish",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan hisobot · yangilab bo‘lmaydi",
     "revised": "Tahrirlangan · {{revision}}",

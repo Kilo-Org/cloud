@@ -3825,7 +3825,7 @@
     "view": "Loe ülevaadet",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Näita reaalajas olekut",
+    "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud aruanne · värskendamine pole saadaval",
     "revised": "Muudetud · {{revision}}",

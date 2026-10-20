@@ -3825,7 +3825,7 @@
     "view": "Soma muhtasari",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Onyesha hali ya sasa",
+    "dismiss": "Puuza muhtasari",
     "offline": "Nje ya mtandao · muhtasari uliohifadhiwa",
     "cached": "Ripoti iliyohifadhiwa · haiwezi kuonyeshwa upya",
     "revised": "Imerekebishwa · {{revision}}",

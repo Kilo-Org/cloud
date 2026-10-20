@@ -3825,7 +3825,7 @@
     "view": "Pānui whakamōhiotanga",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Whakaatu tūnga ora",
+    "dismiss": "Whakakorea te whakamōhiotanga",
     "offline": "Tuimotu · whakamōhiotanga kua tiakina",
     "cached": "Pūrongo kua tiakina · kāore e taea te whakahou",
     "revised": "Kua arotakea · {{revision}}",

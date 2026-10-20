@@ -3825,7 +3825,7 @@
     "view": "لنډیز ولولئ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "ژوندی حالت وښایاست",
+    "dismiss": "لنډیز له پامه وغورځوئ",
     "offline": "آفلاین · خوندي شوی لنډیز",
     "cached": "خوندي شوی راپور · تازه کول شوني نه دي",
     "revised": "بیاکتل شوی · {{revision}}",

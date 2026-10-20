@@ -3825,7 +3825,7 @@
     "view": "خوێندنەوەی کورتە",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "پیشاندانی دۆخی ڕاستەوخۆ",
+    "dismiss": "پشتگوێخستنی کورتە",
     "offline": "دەرهێڵ · کورتەی پاشەکەوتکراو",
     "cached": "ڕاپۆرتی پاشەکەوتکراو · نوێکردنەوە بەردەست نییە",
     "revised": "پێداچوونەوەکراو · {{revision}}",

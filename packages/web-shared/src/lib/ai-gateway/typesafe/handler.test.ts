@@ -526,14 +526,18 @@ describe('handleSystemOneRequest', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('refuses the request when the cap cannot be enforced, before authentication', async () => {
+  it('returns the admission backoff response before authentication', async () => {
     jest.mocked(checkGatewayAccountRateLimit).mockResolvedValue('unavailable');
     const request = makeRequest();
 
     const response = await handleSystemOneRequest(request);
 
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ error_type: 'temporarily_unavailable' });
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('60');
+    expect(await response.json()).toEqual({
+      message: 'Rate limit exceeded',
+      error_type: 'rate_limit_exceeded',
+    });
     expect(getUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });

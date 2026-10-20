@@ -43,11 +43,8 @@ export function gatewayRateLimitKey(headers: Headers, ipAddress: string | undefi
 }
 
 /**
- * Result of the account inference cap.
- *
- * `unavailable` is separate from `rate-limited` because the two mean different
- * things to the caller: a limited account asked for too much, while an
- * unavailable cap means the gateway cannot enforce the limit at all.
+ * Account admission verdict. Both non-admitted outcomes use HTTP 429;
+ * `unavailable` additionally requests a 60-second client backoff via Retry-After.
  */
 export type GatewayRateLimitOutcome = 'admitted' | 'rate-limited' | 'unavailable';
 

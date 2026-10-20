@@ -18,7 +18,6 @@ import {
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
-  temporarilyUnavailableResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -73,11 +72,12 @@ export async function handleSystemOneRequest(request: NextRequest) {
     request,
     gatewayRateLimitKey(request.headers, ipAddress)
   );
-  if (admission === 'unavailable') {
-    return temporarilyUnavailableResponse();
-  }
-  if (admission === 'rate-limited') {
-    return errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
+  if (admission !== 'admitted') {
+    const response = errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
+    if (admission === 'unavailable') {
+      response.headers.set('Retry-After', '60');
+    }
+    return response;
   }
 
   const { user, authFailedResponse, organizationId, botId, tokenSource } = await getUserFromAuth({

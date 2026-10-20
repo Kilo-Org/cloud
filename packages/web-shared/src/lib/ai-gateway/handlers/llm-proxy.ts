@@ -242,20 +242,20 @@ export async function handleLlmProxyRequest(
   // instead, which costs no query.
   const accountKey = gatewayRateLimitKey(request.headers, ipAddress);
   const admission = await checkGatewayAccountRateLimit(request, accountKey);
-  if (admission === 'unavailable') {
-    // The cap guards admission, so a request it cannot count is refused
-    // instead of served without the cap.
-    return temporarilyUnavailableResponse();
-  }
-  if (admission === 'rate-limited') {
-    console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
+  if (admission !== 'admitted') {
+    if (admission === 'rate-limited') {
+      console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
+    }
     return NextResponse.json(
       {
         error: 'Rate limit exceeded',
         error_type: ProxyErrorType.rate_limit_exceeded,
         message: 'Too many requests. Please try again later.',
       },
-      { status: 429 }
+      {
+        status: 429,
+        headers: admission === 'unavailable' ? { 'Retry-After': '60' } : undefined,
+      }
     );
   }
 

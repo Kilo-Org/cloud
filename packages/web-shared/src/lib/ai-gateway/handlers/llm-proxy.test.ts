@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
+import { checkRateLimit } from '@vercel/firewall';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -85,6 +86,10 @@ jest.mock('@sentry/nextjs', () => ({
   getRootSpan: jest.fn(() => null),
   captureException: jest.fn(),
   captureMessage: jest.fn(),
+}));
+
+jest.mock('@vercel/firewall', () => ({
+  checkRateLimit: jest.fn(async () => ({ rateLimited: false })),
 }));
 
 jest.mock('@kilocode/web-shared/lib/user/server');
@@ -659,6 +664,26 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+  });
+
+  it.each([
+    { verdict: { rateLimited: false, error: 'not-found' as const }, retryAfter: '60' },
+    { verdict: { rateLimited: true }, retryAfter: null },
+  ])('returns the admission response with backoff $retryAfter', async ({ verdict, retryAfter }) => {
+    jest.mocked(checkRateLimit).mockResolvedValueOnce(verdict);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe(retryAfter);
+    expect(await response.json()).toEqual({
+      error: 'Rate limit exceeded',
+      error_type: 'rate_limit_exceeded',
+      message: 'Too many requests. Please try again later.',
+    });
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('rejects providerOptions and directs clients to provider', async () => {

@@ -17,9 +17,7 @@ import {
   Key,
   List,
   MessageSquare,
-  Plus,
   Receipt,
-  Rocket,
   Settings,
   Shield,
   Sparkles,
@@ -142,11 +140,6 @@ const kiloClawItems: SidebarStoryItem[] = [
 
 const cloudItems: SidebarStoryItem[] = [
   {
-    title: 'App Builder',
-    icon: Plus,
-    url: '/app-builder',
-  },
-  {
     title: 'Cloud Agent',
     icon: Cloud,
     url: '/cloud',
@@ -172,14 +165,9 @@ const cloudItems: SidebarStoryItem[] = [
     url: '/security-agent',
   },
   {
-    title: 'Deploy',
-    icon: Rocket,
-    url: '/deploy',
-  },
-  {
-    title: 'Gas Town',
-    icon: Factory,
-    url: '/gastown',
+    title: 'Security Agent',
+    icon: Shield,
+    url: '/security-agent',
   },
   {
     title: 'Managed Indexing',

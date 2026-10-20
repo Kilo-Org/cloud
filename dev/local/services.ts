@@ -44,7 +44,6 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
     id: 'security-agent',
@@ -187,24 +186,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/cloud-agent-next',
   },
   'cloud-agent-public-tunnels': { group: 'cloud-agent-public-tunnels', dependsOn: [] },
-  // git-token-service (shared by cloud-agent, app-builder, gastown)
+  // git-token-service (shared by cloud-agent, gastown)
   'cloudflare-git-token-service': {
     group: 'git-token-service',
     dependsOn: ['postgres'],
     dir: 'services/git-token-service',
-  },
-  // app-builder
-  'app-builder-tunnel': { group: 'app-builder', dependsOn: [] },
-  'cloudflare-app-builder': {
-    group: 'app-builder',
-    dependsOn: ['cloudflare-db-proxy', 'cloudflare-git-token-service', 'app-builder-tunnel'],
-    dir: 'services/app-builder',
-    useLanIp: true,
-  },
-  'cloudflare-db-proxy': {
-    group: 'app-builder',
-    dependsOn: ['postgres'],
-    dir: 'services/db-proxy',
   },
   // code-review
   'bitbucket-webhook-tunnel': {
@@ -232,17 +218,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'cloudflare-session-ingest',
     ],
     dir: 'services/security-auto-analysis',
-  },
-  // deploy
-  'cloudflare-deploy-builder': {
-    group: 'deploy',
-    dependsOn: ['nextjs'],
-    dir: 'services/deploy-infra/builder',
-  },
-  'cloudflare-deploy-dispatcher': {
-    group: 'deploy',
-    dependsOn: [],
-    dir: 'services/deploy-infra/dispatcher',
   },
   // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
@@ -944,21 +919,6 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
-    if (name === 'app-builder-tunnel') {
-      const appBuilderPort =
-        readWranglerPort(path.join(repoRoot, 'services/app-builder')) + portOffset;
-      defs.push({
-        name,
-        type: 'process',
-        dir: '.',
-        port: 0,
-        dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-app-builder-tunnel.ts', String(appBuilderPort)],
-        group: meta.group,
-      });
-      continue;
-    }
-
     if (name === 'cloud-agent-public-tunnels') {
       const workerPort =
         readWranglerPort(path.join(repoRoot, 'services/cloud-agent-next')) + portOffset;
@@ -1034,15 +994,6 @@ const SERVICES_EXCLUDED_FROM_ALL = new Set([
 export const shortcuts: Record<string, string[]> = {
   app: ['nextjs'],
   'data-export': ['nextjs', 'user-data-export'],
-  'app-builder': [
-    'nextjs',
-    'cloud-agent-next',
-    'cloudflare-session-ingest',
-    'cloudflare-db-proxy',
-    'cloudflare-git-token-service',
-    'app-builder-tunnel',
-    'cloudflare-app-builder',
-  ],
   agents: ['cloud-agent-next', 'nextjs', 'cloudflare-session-ingest'],
   all: serviceDefs.map(s => s.name).filter(name => !SERVICES_EXCLUDED_FROM_ALL.has(name)),
 };

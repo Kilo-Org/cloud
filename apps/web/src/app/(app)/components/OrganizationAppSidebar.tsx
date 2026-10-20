@@ -5,13 +5,11 @@ import { useUser } from '@/hooks/useUser';
 import {
   Bot,
   Building,
-  ChartColumnIncreasing,
   Layers,
   Activity,
   Sliders,
   Sparkles,
   Cable,
-  Rocket,
   Database,
   Users,
   CreditCard,
@@ -19,14 +17,12 @@ import {
   Key,
   List,
   Shield,
-  Plus,
   Webhook,
   Settings,
   MessageSquare,
   ChevronLeft,
   ChevronRight,
   UsersRound,
-  Network,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -57,10 +53,7 @@ export default function OrganizationAppSidebar({
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags
-  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
-  const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isChatGptSignInEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
-  const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
   const currentOrg = organizationData;
@@ -122,19 +115,10 @@ export default function OrganizationAppSidebar({
       url: `/organizations/${organizationId}`,
     },
     {
-      title: 'Usage',
-      icon: ChartColumnIncreasing,
-      url: `/organizations/${organizationId}/usage-details?view=ai-usage`,
+      title: 'Security Agent',
+      icon: Shield,
+      url: `/organizations/${organizationId}/security-agent`,
     },
-    ...(hasOwnerLevelAccess && currentOrg?.parent_organization_id === null
-      ? [
-          {
-            title: 'Sub-organizations',
-            icon: Network,
-            url: `/organizations/${organizationId}/sub-organizations`,
-          },
-        ]
-      : []),
   ];
 
   // KiloClaw group
@@ -178,15 +162,6 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
-    ...(isAppBuilderEnabled || isDevelopment
-      ? [
-          {
-            title: 'App Builder',
-            icon: Plus,
-            url: `/organizations/${organizationId}/app-builder`,
-          },
-        ]
-      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -222,15 +197,6 @@ export default function OrganizationAppSidebar({
       icon: Shield,
       url: `/organizations/${organizationId}/security-agent`,
     },
-    ...(isDeployEnabled || isDevelopment
-      ? [
-          {
-            title: 'Deploy',
-            icon: Rocket,
-            url: `/organizations/${organizationId}/deploy`,
-          },
-        ]
-      : []),
     ...(organizationData?.settings?.code_indexing_enabled
       ? [
           {

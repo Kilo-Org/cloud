@@ -55,16 +55,16 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('./cloud-agent-client', () => {
   const createCloudAgentNextClient = jest.fn((_token: string) => ({ marker: 'default' }));
-  const createAppBuilderCloudAgentNextClient = jest.fn((_token: string) => ({
-    marker: 'appbuilder',
+  const createSkippedBalanceCheckCloudAgentNextClient = jest.fn((_token: string) => ({
+    marker: 'skipped-balance',
   }));
   return {
     createCloudAgentNextClient,
-    createAppBuilderCloudAgentNextClient,
+    createSkippedBalanceCheckCloudAgentNextClient,
     createCloudAgentNextClientForModel: jest.fn(
       (token: string, model: { isFree: boolean; hasUserByokAvailable: boolean }) =>
         model.isFree || model.hasUserByokAvailable
-          ? createAppBuilderCloudAgentNextClient(token)
+          ? createSkippedBalanceCheckCloudAgentNextClient(token)
           : createCloudAgentNextClient(token)
     ),
     rethrowCloudAgentError: jest.fn(),
@@ -77,7 +77,7 @@ const { captureException } = jest.requireMock<jest.Mocked<typeof SentryModule>>(
 
 const clientModule: {
   createCloudAgentNextClient: jest.Mock;
-  createAppBuilderCloudAgentNextClient: jest.Mock;
+  createSkippedBalanceCheckCloudAgentNextClient: jest.Mock;
   createCloudAgentNextClientForModel: (
     token: string,
     model: { isFree: boolean; hasUserByokAvailable: boolean }
@@ -86,13 +86,13 @@ const clientModule: {
 
 const {
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
-  createAppBuilderCloudAgentNextClient: mockCreateAppBuilderCloudAgentNextClient,
+  createSkippedBalanceCheckCloudAgentNextClient: mockCreateSkippedBalanceCheckCloudAgentNextClient,
   createCloudAgentNextClientForModel,
 } = clientModule;
 
 beforeEach(() => {
   mockCreateCloudAgentNextClient.mockClear();
-  mockCreateAppBuilderCloudAgentNextClient.mockClear();
+  mockCreateSkippedBalanceCheckCloudAgentNextClient.mockClear();
   mockCreateTRPCClient.mockClear();
   mockHttpLink.mockClear();
   mockCaptureException.mockClear();
@@ -105,7 +105,7 @@ const realCloudAgentClientModule =
 const {
   closeCloudAgentOrgStreams,
   CloudAgentNextClient,
-  createAppBuilderCloudAgentNextClient,
+  createSkippedBalanceCheckCloudAgentNextClient,
   readCloudAgentWidgetApprovalKey,
 } = realCloudAgentClientModule;
 
@@ -436,38 +436,37 @@ describe('createCloudAgentNextClientForModel', () => {
     });
     expect(result).toEqual({ marker: 'default' });
     expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('token');
-    expect(mockCreateAppBuilderCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockCreateSkippedBalanceCheckCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
-  it('returns the AppBuilder client when the model is free', () => {
+  it('returns the skipped-balance client when the model is free', () => {
     const result = createCloudAgentNextClientForModel('token', {
       isFree: true,
       hasUserByokAvailable: false,
     });
-    expect(result).toEqual({ marker: 'appbuilder' });
-    expect(mockCreateAppBuilderCloudAgentNextClient).toHaveBeenCalledWith('token');
+    expect(result).toEqual({ marker: 'skipped-balance' });
+    expect(mockCreateSkippedBalanceCheckCloudAgentNextClient).toHaveBeenCalledWith('token');
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
-  it('returns the AppBuilder client when the model is BYOK-capable, even if it is not free', () => {
+  it('returns the skipped-balance client when the model is BYOK-capable, even if it is not free', () => {
     const result = createCloudAgentNextClientForModel('token', {
       isFree: false,
       hasUserByokAvailable: true,
     });
-    expect(result).toEqual({ marker: 'appbuilder' });
-    expect(mockCreateAppBuilderCloudAgentNextClient).toHaveBeenCalledWith('token');
+    expect(result).toEqual({ marker: 'skipped-balance' });
+    expect(mockCreateSkippedBalanceCheckCloudAgentNextClient).toHaveBeenCalledWith('token');
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 });
 
-describe('createAppBuilderCloudAgentNextClient', () => {
-  it('forwards the original App Builder JWT to Cloud Agent Next with its dedicated policy headers', async () => {
+describe('createSkippedBalanceCheckCloudAgentNextClient', () => {
+  it('forwards the token with the skipped-balance-check policy headers', async () => {
     const { token } = await signKiloToken({
-      userId: 'synthetic-app-builder-user',
-      pepper: 'synthetic-app-builder-pepper',
-      secret: 'synthetic-app-builder-secret',
+      userId: 'synthetic-skipped-balance-user',
+      pepper: 'synthetic-skipped-balance-pepper',
+      secret: 'synthetic-skipped-balance-secret',
       expiresInSeconds: 60,
-      extra: { tokenSource: 'app-builder' },
     });
     const prepareSession = jest.fn(async () => ({
       kiloSessionId: 'ses_12345678901234567890123456',
@@ -497,7 +496,7 @@ describe('createAppBuilderCloudAgentNextClient', () => {
       sendMessageV2: { mutate: sendMessageV2 },
     });
 
-    const client = createAppBuilderCloudAgentNextClient(token);
+    const client = createSkippedBalanceCheckCloudAgentNextClient(token);
     const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
     await client.prepareSession({ prompt: 'Build an app', mode: 'code', model: 'kilo/test-model' });
     await client.getSession(cloudAgentSessionId);

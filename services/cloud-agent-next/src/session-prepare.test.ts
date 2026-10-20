@@ -547,7 +547,6 @@ describe('effective session profile policy', () => {
     { origin: 'github', expected: 'include-web-defaults' },
     { origin: 'linear', expected: 'include-web-defaults' },
     { origin: 'discord', expected: 'include-web-defaults' },
-    { origin: 'app-builder', expected: 'include-web-defaults' },
     { origin: 'webhook', expected: 'include-web-defaults' },
     { origin: 'scheduled', expected: 'include-web-defaults' },
     { origin: undefined, expected: 'explicit-profile-only' },
@@ -1955,14 +1954,14 @@ describe('start endpoint', () => {
     expect(createCliSessionMock).toHaveBeenCalled();
   });
 
-  it('resolves implicit profiles for grouped App Builder starts', async () => {
+  it('resolves implicit profiles for grouped GitHub starts', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
     await caller.start({
-      message: { prompt: 'App Builder start' },
+      message: { prompt: 'GitHub start' },
       agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
       repository: { type: 'github', repo: 'acme/repo' },
-      options: { createdOnPlatform: 'app-builder' },
+      options: { createdOnPlatform: 'github' },
     });
 
     expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(

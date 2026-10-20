@@ -20,6 +20,23 @@ const extension = JSON.parse(
 const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url));
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
 
+test('dependency cache preserves package contents without restoring installed dependency links', () => {
+  const action = load(
+    readFileSync(new URL('../.github/actions/pnpm-store/action.yml', import.meta.url), 'utf8')
+  );
+  const mount = action.runs.steps.find(step => step.uses?.startsWith('useblacksmith/stickydisk@'));
+  assert.equal(mount.with.path, './node_modules/.pnpm-store');
+  assert.equal(
+    mount.with.key,
+    '${{ github.repository }}-pnpm-content-store-v1-${{ runner.os }}-${{ runner.arch }}'
+  );
+  assert.ok(
+    action.runs.steps.some(step =>
+      step.run?.includes('pnpm_config_store_dir=$GITHUB_WORKSPACE/node_modules/.pnpm-store')
+    )
+  );
+});
+
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
   ['ci.yml', 'lint-groups', harnessBuild],

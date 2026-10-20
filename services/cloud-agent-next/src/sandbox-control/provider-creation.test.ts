@@ -1,9 +1,7 @@
 import { preinstalledStartup } from './preinstalled-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  ContainerCapacityUnavailableError,
-  ContainerConcurrencyLimitError,
-} from '../container-concurrency.js';
+import { ContainerCapacityUnavailableError } from '../container-concurrency.js';
+import { containerLimitError } from '../container-limit-test-helpers.js';
 import {
   parseSandboxBillingInput,
   type MeteredSandboxInstance,
@@ -183,16 +181,16 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
     }
   );
 
-  it.each([
-    new ContainerConcurrencyLimitError('personal', 20),
-    new ContainerCapacityUnavailableError(),
-  ])('preserves RPC-wrapped capacity failure: %s', async failure => {
-    const denial = new Error(`remote RPC: ${failure.message}`);
-    const provider = cloudflareProvider(kind, async () => {
-      throw denial;
-    });
-    await expect(provider.create(intent)).rejects.toBe(denial);
-  });
+  it.each([containerLimitError(), new ContainerCapacityUnavailableError()])(
+    'preserves RPC-wrapped capacity failure: %s',
+    async failure => {
+      const denial = new Error(`remote RPC: ${failure.message}`);
+      const provider = cloudflareProvider(kind, async () => {
+        throw denial;
+      });
+      await expect(provider.create(intent)).rejects.toBe(denial);
+    }
+  );
   it.each(['insufficient_credits', 'stopping', 'meter_unavailable'] as const)(
     'preserves %s independently of unsafe provider text',
     async code => {

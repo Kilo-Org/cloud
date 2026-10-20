@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { SandboxId, SandboxInstance } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
-import { ContainerConcurrencyLimitError } from './container-concurrency.js';
+import { containerLimitError } from './container-limit-test-helpers.js';
 import {
   assertSandboxBillingAllocation,
   billingCapacityForSandboxClass,
@@ -600,7 +600,7 @@ describe('container usage context', () => {
   });
 
   it('rethrows a capacity failure from the admission RPC', async () => {
-    const failure = new ContainerConcurrencyLimitError('personal', 20);
+    const failure = containerLimitError();
     const ensureBillingAdmission = vi.fn().mockRejectedValue(failure);
     await expect(
       ensureSandboxBillingAdmissionInput(

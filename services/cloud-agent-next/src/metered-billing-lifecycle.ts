@@ -17,6 +17,10 @@ import {
 import { z } from 'zod';
 import { logger } from './logger.js';
 import {
+  ContainerCapacityUnavailableError,
+  getContainerCapacityFailureReason,
+} from './container-concurrency.js';
+import {
   assertSandboxBillingAllocation,
   billingCapacityForSandboxClass,
   parseSandboxBillingInput,
@@ -36,6 +40,12 @@ const BILLING_BLOCK_STORAGE_KEY = 'container-usage:budget-block:v1';
 const DESTROY_RECOVERY_MARKER_STORAGE_KEY_PREFIX = 'container-usage:destroy-recovery-marker:v1:';
 const BILLING_FORCE_STOP_SECONDS = 120;
 const BILLING_FORCE_STOP_RETRY_SECONDS = 5;
+/**
+ * The meter counts an interval toward the container cap for 11 minutes after it
+ * was last seen. A stopped container reuses an admission only while its first
+ * heartbeat (300 s) still lands inside that window; an older one is admitted again.
+ */
+const ADMISSION_REUSE_MS = 5 * 60_000;
 
 export type BillingIdentity = { sandboxClassName: SandboxClassName };
 
@@ -68,6 +78,8 @@ export type OpenIntervalOutcome =
 export type MeteredBillingHost = {
   storage: BillingContextStorage;
   usageClient: ContainerUsageClient;
+  /** Asks the meter to apply the concurrent-container cap before a container launches. */
+  enforceContainerCapacity: boolean;
   schedule: (delaySeconds: number, callback: string, payload?: unknown) => Promise<unknown>;
   deleteSchedules: (callback: string) => void;
   getState: () => Promise<{ status: string; lastChange?: number; exitCode?: number }>;
@@ -115,7 +127,8 @@ function startInputFromContext(context: BillingContext): ClientRecordStartInput 
 function isDefiniteAdmissionRejection(error: unknown): boolean {
   return (
     isNonRetryableSkuAdmissionError(error) ||
-    (error instanceof ContainerUsageAdmissionError && error.code === 'insufficient_credits')
+    (error instanceof ContainerUsageAdmissionError &&
+      (error.code === 'insufficient_credits' || error.code === 'container_limit_reached'))
   );
 }
 
@@ -187,7 +200,9 @@ export class MeteredBillingLifecycle {
         const acknowledgedGeneration = await this.host.storage.get<string>(
           START_ACK_GENERATION_STORAGE_KEY
         );
-        if (acknowledgedGeneration === active.generation) {
+        const reusable =
+          this.host.isContainerRunning() || Date.now() - active.startEpochMs < ADMISSION_REUSE_MS;
+        if (acknowledgedGeneration === active.generation && reusable) {
           return { success: true };
         }
       }
@@ -214,9 +229,14 @@ export class MeteredBillingLifecycle {
 
       if (active) {
         try {
+          // A persisted stop keeps its observed usage. Without one, an unmeasured generation
+          // has no known run, and the SDK state of a container that never started reads as
+          // stopped now, so its stop carries no usage.
           await this.heartbeat.recordStop(
             { reason: 'runtime_signal' },
-            stoppedAtFromState(await this.host.getState())
+            active.measurementStarted
+              ? stoppedAtFromState(await this.host.getState())
+              : active.usageMeasuredAtMs
           );
           await this.host.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
         } catch (error) {
@@ -232,13 +252,15 @@ export class MeteredBillingLifecycle {
 
       const context = await this.createBillingGeneration(identity, parsed, 'attribution-adoption');
       try {
-        await this.host.usageClient.recordStart(startInputFromContext(context));
+        await this.host.usageClient.recordStart(this.admissionStartInput(context));
       } catch (error) {
         // Only a definite rejection of this fresh generation means the interval cannot exist.
         // An uncertain error must keep the generation so a later attempt can settle it.
         if (isDefiniteAdmissionRejection(error)) {
           await clearBillingContext(this.host.storage);
         }
+        // Callers recognize a container limit from the thrown error, as for a refused start.
+        if (getContainerCapacityFailureReason(error)) throw error;
         return billingAdmissionFailureFromError(error);
       }
       await this.host.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
@@ -298,7 +320,7 @@ export class MeteredBillingLifecycle {
       const existing = await getBillingContext(this.host.storage);
       if (existing) {
         try {
-          await this.ensureStartAcknowledged(existing);
+          await this.ensureAdmissionAcknowledged(existing);
           return { kind: 'acked', generation: existing.generation };
         } catch (error) {
           return isDefiniteAdmissionRejection(error)
@@ -308,7 +330,7 @@ export class MeteredBillingLifecycle {
       }
       const context = await this.createBillingGeneration(identity, parsed, 'container-start');
       try {
-        await this.ensureStartAcknowledged(context);
+        await this.ensureAdmissionAcknowledged(context);
       } catch (error) {
         return isDefiniteAdmissionRejection(error)
           ? { kind: 'definite_rejection', generation: context.generation, error }
@@ -595,11 +617,28 @@ export class MeteredBillingLifecycle {
   }
 
   async ensureStartAcknowledged(context: BillingContext): Promise<void> {
+    await this.acknowledgeStart(context, startInputFromContext(context));
+  }
+
+  /** The admission of a container that has not launched yet; the meter applies the cap. */
+  private async ensureAdmissionAcknowledged(context: BillingContext): Promise<void> {
+    await this.acknowledgeStart(context, this.admissionStartInput(context));
+  }
+
+  private admissionStartInput(context: BillingContext): ClientRecordStartInput {
+    const input = startInputFromContext(context);
+    return this.host.enforceContainerCapacity ? { ...input, enforceCapacity: true } : input;
+  }
+
+  private async acknowledgeStart(
+    context: BillingContext,
+    input: ClientRecordStartInput
+  ): Promise<void> {
     const acknowledgedGeneration = await this.host.storage.get<string>(
       START_ACK_GENERATION_STORAGE_KEY
     );
     if (acknowledgedGeneration !== context.generation) {
-      await this.host.usageClient.recordStart(startInputFromContext(context));
+      await this.host.usageClient.recordStart(input);
       await this.host.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
     }
   }
@@ -688,34 +727,20 @@ export class MeteredBillingLifecycle {
     });
   }
 
-  /** The account and instance the next container start is attributed to, if known. */
-  async getStartAttribution(): Promise<
-    | {
-        subject: BillingContext['subject'];
-        actor: BillingContext['actor'];
-        instanceId: string;
-        billingOrigin?: string;
-      }
-    | undefined
-  > {
-    const pending = await this.getPendingAttribution();
-    if (pending) {
-      return {
-        subject: pending.subject,
-        actor: pending.actor,
-        instanceId: pending.sandboxId,
-        billingOrigin: pending.metadata?.origin,
-      };
+  /**
+   * Admits a start that did not come through `ensureBillingAdmission`, such as
+   * an SDK request that wakes a stopped container. A start that is already
+   * admitted returns without a meter call.
+   */
+  async admitBeforeStart(identity: BillingIdentity): Promise<void> {
+    const input = await this.getPendingAttribution();
+    if (!input) return;
+    const admission = await this.ensureBillingAdmission(identity, input);
+    if (admission.success) return;
+    if (admission.code === 'insufficient_credits') {
+      throw new ContainerUsageAdmissionError(admission.code, admission.message, admission);
     }
-    const context = await getBillingContext(this.host.storage);
-    return context
-      ? {
-          subject: context.subject,
-          actor: context.actor,
-          instanceId: context.instanceId,
-          billingOrigin: context.metadata?.origin,
-        }
-      : undefined;
+    throw new ContainerCapacityUnavailableError();
   }
 
   private async getPendingAttribution(): Promise<SandboxBillingInput | undefined> {

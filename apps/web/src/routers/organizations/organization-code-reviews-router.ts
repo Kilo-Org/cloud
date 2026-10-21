@@ -9,6 +9,9 @@ import {
   ensureOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   getIntegrationForOrganization,
   updateIntegrationMetadata,
@@ -360,6 +363,17 @@ async function ensureBitbucketWorkspaceWebhook(input: {
       message: bitbucketWebhookSetupFailureMessage(result.reason),
     });
   }
+}
+
+// The rotated secret is returned to the caller, so an elevated admin rotation
+// is recorded durably. The secret itself is never logged.
+async function recordGitLabSecretRotation(ctx: TRPCContext, organizationId: string) {
+  await recordElevatedOrganizationAdminAction(ctx, {
+    organizationId,
+    requiredRoles: ORGANIZATION_BILLING_ROLES,
+    action: 'organization.gitlab_webhook_secret.rotate',
+    message: 'Rotated GitLab webhook secret (new secret returned to the caller)',
+  });
 }
 
 export const organizationReviewAgentRouter = createTRPCRouter({
@@ -1364,6 +1378,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_name: ctx.user.google_user_name,
           message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
         });
+        await recordGitLabSecretRotation(ctx, organizationId);
         return {
           webhookSecret: newSecret,
           webhookSync: {
@@ -1452,6 +1467,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
       });
 
+      await recordGitLabSecretRotation(ctx, organizationId);
       return {
         webhookSecret: newSecret,
         webhookSync: webhookSyncResult,

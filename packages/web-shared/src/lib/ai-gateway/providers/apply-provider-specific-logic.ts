@@ -60,6 +60,10 @@ import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import {
+  addReflectionReasoningPlaceholders,
+  isReflectionModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -230,10 +234,32 @@ export function applyPreferredProvider(
 
 /**
  * Fallback models are not supported: a request for a free model could fall
- * back to a paid model and be served without being charged.
+ * back to a paid model and be served without being charged. OpenRouter accepts
+ * them as `models` on every API and as `fallbacks` on the Messages API.
  */
-export function removeModelsFallback(requestToMutate: GatewayRequest) {
+export function removeModelsFallback(
+  requestedModel: string,
+  requestToMutate: GatewayRequest,
+  userId: string
+) {
+  const { models, fallbacks } = requestToMutate.body;
   delete requestToMutate.body.models;
+  delete requestToMutate.body.fallbacks;
+
+  if (!hasFallbackModels(models) && !hasFallbackModels(fallbacks)) {
+    return;
+  }
+  console.warn('[applyProviderSpecificLogic] Removed caller-provided fallback models', {
+    userId,
+    model: requestedModel,
+    requestKind: requestToMutate.kind,
+    models,
+    fallbacks,
+  });
+}
+
+function hasFallbackModels(value: unknown) {
+  return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
 }
 
 export function removeUnsupportedRequestServiceTier(
@@ -300,7 +326,7 @@ export async function applyProviderSpecificLogic(
   taskId: string | null,
   isNonTrialEnterprise: boolean
 ) {
-  removeModelsFallback(requestToMutate);
+  removeModelsFallback(requestedModel, requestToMutate, userId);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
@@ -370,6 +396,10 @@ export async function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
+  }
+
+  if (isReflectionModel(requestedModel)) {
+    addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
   }
 
   if (provider.id === 'vercel') {

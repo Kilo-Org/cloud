@@ -69,7 +69,7 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
   if (query.data === null) return null;
 
   const routers = (query.data?.routers ?? []).filter(router => router.scope === scope);
-  const canCreate = !readonly;
+  const canCreate = !readonly && query.data?.canCreate !== false;
 
   const header = (
     <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -127,7 +127,7 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full" id={`custom-routers-${scope}`}>
       {header}
       <CardContent className="space-y-3">
         {query.isRefetchError ? (
@@ -198,9 +198,14 @@ function CustomRouterItem({
           <p className="font-medium">{router.name}</p>
           <p className="text-muted-foreground truncate font-mono text-sm">{router.modelId}</p>
           <p className="text-muted-foreground text-sm">
-            {baseLabel} base · {modeLabel}
+            Benchmark difficulty: {baseLabel} · {modeLabel}
             {defaultEntry ? ` · Default: ${entryLabel(defaultEntry.entry)}` : null}
           </p>
+          {router.legacyPool ? (
+            <p className="text-muted-foreground text-sm">
+              Shared with kilo-auto/efficient during the transition.
+            </p>
+          ) : null}
         </div>
         {router.canEdit ? (
           <div className="flex shrink-0 items-start gap-2">
@@ -208,12 +213,14 @@ function CustomRouterItem({
               <Pencil className="size-4" aria-hidden />
               Edit
             </Button>
-            <InlineDeleteConfirmation
-              onDelete={onDelete}
-              isLoading={deleting}
-              confirmText="Delete router"
-              warningText={`Requests that use ${router.modelId} will fail.`}
-            />
+            {!router.legacyPool ? (
+              <InlineDeleteConfirmation
+                onDelete={onDelete}
+                isLoading={deleting}
+                confirmText="Delete router"
+                warningText={`Requests that use ${router.modelId} will fail.`}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>

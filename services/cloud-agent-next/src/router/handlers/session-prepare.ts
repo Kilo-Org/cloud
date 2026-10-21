@@ -163,6 +163,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       clientProvenance: input.clientProvenance,
       shallow: input.shallow,
       operationKey: input.operationKey,
+      kiloSessionId: 'kiloSessionId' in input ? input.kiloSessionId : undefined,
     },
   };
 }

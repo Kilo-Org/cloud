@@ -120,6 +120,66 @@ describe('classifier input normalization', () => {
     });
   });
 
+  it.each([
+    'key',
+    'private_key',
+    'privateKey',
+    'access_key',
+    'accessKeyId',
+    'client_key',
+    'clientKey',
+    'signing_key',
+    'signingKey',
+    'encryption_key',
+    'encryptionKey',
+    'x-functions-key',
+    'apiKey',
+    'secret',
+    'password',
+    'authorization',
+  ])('redacts the credential-bearing provider hint key %s', key => {
+    const hints = redactProviderHints({
+      provider: { order: ['openai'], [key]: 'provider-secret' },
+      providerOptions: { openrouter: { sort: 'price', [key]: 'option-secret' } },
+    });
+
+    expect(hints).toEqual({
+      provider: { order: ['openai'], [key]: '[REDACTED]' },
+      providerOptions: { openrouter: { sort: 'price', [key]: '[REDACTED]' } },
+    });
+  });
+
+  it('redacts credential-bearing keys nested in provider option arrays', () => {
+    expect(
+      redactProviderHints({
+        provider: undefined,
+        providerOptions: { chain: [{ sort: 'price', privateKey: 'nested-secret' }] },
+      })
+    ).toEqual({
+      provider: null,
+      providerOptions: { chain: [{ sort: 'price', privateKey: '[REDACTED]' }] },
+    });
+  });
+
+  it('keeps provider routing hints that name no credential', () => {
+    const provider = {
+      order: ['openai'],
+      only: ['openai'],
+      ignore: ['azure'],
+      sort: 'latency',
+      data_collection: 'deny',
+      zdr: true,
+      allow_fallbacks: false,
+      quantizations: ['int8'],
+      monkey: 'banana',
+    };
+
+    expect(redactProviderHints({ provider, providerOptions: undefined })).toEqual({
+      provider,
+      providerOptions: null,
+    });
+  });
+
   it('stops walking pathologically large arrays once the budget is exhausted', () => {
     const huge = Array.from({ length: 10_000 }, (_, index) => `entry-${index}`);
 
@@ -133,14 +193,14 @@ describe('classifier input normalization', () => {
 
   it('stops walking pathologically key-dense objects once the budget is exhausted', () => {
     const huge = Object.fromEntries(
-      Array.from({ length: 10_000 }, (_, index) => [`key-${index}`, index])
+      Array.from({ length: 10_000 }, (_, index) => [`field-${index}`, index])
     );
 
     const hints = redactProviderHints({ provider: huge, providerOptions: undefined });
     const provider = hints.provider as Record<string, unknown>;
 
     expect(Object.keys(provider).length).toBeLessThan(600);
-    expect(provider['key-0']).toBe(0);
+    expect(provider['field-0']).toBe(0);
     expect(provider['[truncated]']).toBe('[TRUNCATED]');
   });
 

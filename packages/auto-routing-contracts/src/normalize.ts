@@ -16,15 +16,54 @@ const TRUNCATED_KEY = '[truncated]';
 // consumed per visited node and per object property, and traversal stops
 // (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
-const SENSITIVE_KEY_PATTERNS = [
-  'authorization',
-  'api_key',
+// Credential keys are matched on token boundaries: key names split at
+// separators, digits, and camelCase humps into tokens, and a credential token
+// matches exactly, so ordinary words that merely contain those letters stay
+// intact. A credential word joined to a credential qualifier without any
+// boundary counts as a credential key.
+const SENSITIVE_KEY_TOKENS: Record<string, true> = {
+  apikey: true,
+  authorization: true,
+  cookie: true,
+  credential: true,
+  credentials: true,
+  key: true,
+  keys: true,
+  password: true,
+  passwd: true,
+  secret: true,
+  secrets: true,
+  token: true,
+  tokens: true,
+};
+const SENSITIVE_KEY_WORDS = [
   'apikey',
+  'authorization',
   'cookie',
   'credential',
+  'key',
   'password',
+  'passwd',
   'secret',
   'token',
+];
+const SENSITIVE_KEY_QUALIFIERS = [
+  'access',
+  'account',
+  'api',
+  'app',
+  'auth',
+  'client',
+  'encryption',
+  'master',
+  'private',
+  'public',
+  'root',
+  'secret',
+  'service',
+  'session',
+  'signing',
+  'subscription',
 ];
 const REDUNDANT_CONTENT_TYPES = new Set([
   'function_call_output',
@@ -326,8 +365,27 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
 }
 
 function isSensitiveKey(key: string) {
-  const normalizedKey = key.replaceAll(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  return SENSITIVE_KEY_PATTERNS.some(pattern => normalizedKey.includes(pattern));
+  return splitKeyTokens(key).some(isSensitiveToken);
+}
+
+function splitKeyTokens(key: string) {
+  return key
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replaceAll(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(token => token.length > 0);
+}
+
+function isSensitiveToken(token: string) {
+  if (SENSITIVE_KEY_TOKENS[token]) return true;
+  for (const word of SENSITIVE_KEY_WORDS) {
+    for (let index = token.indexOf(word, 1); index !== -1; index = token.indexOf(word, index + 1)) {
+      const prefix = token.slice(0, index);
+      if (SENSITIVE_KEY_QUALIFIERS.some(qualifier => prefix.endsWith(qualifier))) return true;
+    }
+  }
+  return false;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -713,7 +713,9 @@ describe('addCacheBreakpoints', () => {
     addCacheBreakpoints(request);
 
     expect(request.body.messages.at(0)?.content).toBe('You are helpful.');
-    expect((request.body.messages.at(-1)?.content as unknown[])[0]).toEqual({
+    const lastContent = request.body.messages.at(-1)?.content;
+    expect(Array.isArray(lastContent)).toBe(true);
+    expect((lastContent as unknown[]).at(0)).toEqual({
       type: 'text',
       text: 'Latest prompt',
     });

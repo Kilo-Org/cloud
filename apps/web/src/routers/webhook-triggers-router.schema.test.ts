@@ -19,6 +19,10 @@ import type {
   WebhookTriggerUpdateInput as WebhookTriggerUpdateInputType,
   webhookTriggersRouter as webhookTriggersRouterType,
 } from './webhook-triggers-router';
+import {
+  getSandboxAllocationRequest,
+  sandboxAllocationSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
 
 const mockEnsureOrganizationAccess = jest.fn<typeof ensureOrganizationAccess>();
 const mockGetWebhookRequestLogs = jest.fn<typeof getWebhookRequestLogs>();
@@ -53,6 +57,7 @@ const mockSelectWhere = jest.fn<
       id: string;
       activation_mode: string;
       target_type: 'cloud_agent' | 'kiloclaw_chat';
+      github_repo?: string | null;
     }>
   >
 >();
@@ -537,6 +542,15 @@ describe('webhook trigger variant inputs', () => {
     );
   });
 
+  it.each(sandboxAllocationSchema.options)(
+    'accepts create sandbox allocation %s',
+    sandboxAllocation => {
+      expect(
+        WebhookTriggerCreateInput.safeParse({ ...createInput, sandboxAllocation }).success
+      ).toBe(true);
+    }
+  );
+
   it.each(['standard', '', null])(
     'rejects invalid create sandbox allocation %s',
     sandboxAllocation => {
@@ -558,6 +572,22 @@ describe('webhook trigger variant inputs', () => {
     ).toBe(false);
   });
 
+  it.each(sandboxAllocationSchema.options)(
+    'accepts update sandbox allocation %s',
+    sandboxAllocation => {
+      expect(
+        WebhookTriggerUpdateInput.safeParse({ triggerId: 'trigger-id', sandboxAllocation }).success
+      ).toBe(true);
+    }
+  );
+
+  it('accepts clearing an update sandbox allocation', () => {
+    expect(
+      WebhookTriggerUpdateInput.safeParse({ triggerId: 'trigger-id', sandboxAllocation: null })
+        .success
+    ).toBe(true);
+  });
+
   it.each(['standard', 'isolated', ''])(
     'rejects invalid update sandbox allocation %s',
     sandboxAllocation => {
@@ -571,13 +601,18 @@ describe('webhook trigger variant inputs', () => {
     'uses Worker organization capabilities for an organization %s',
     async role => {
       const organizationId = '00000000-0000-4000-8000-000000000003';
+      const disabledCapabilities = { enabled: false, options: [] };
+      const enabledCapabilities = { enabled: true, options: [] };
       mockEnsureOrganizationAccess.mockResolvedValue(role);
+      mockGetSandboxSelectionOptions.mockResolvedValueOnce(disabledCapabilities);
       await expect(createCaller({ user }).capabilities({ organizationId })).resolves.toEqual({
         canSetSandboxAllocation: false,
+        sandboxSelection: disabledCapabilities,
       });
-      mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: true, options: [] });
+      mockGetSandboxSelectionOptions.mockResolvedValueOnce(enabledCapabilities);
       await expect(createCaller({ user }).capabilities({ organizationId })).resolves.toEqual({
         canSetSandboxAllocation: true,
+        sandboxSelection: enabledCapabilities,
       });
       expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(expect.anything(), organizationId);
       expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
@@ -586,9 +621,36 @@ describe('webhook trigger variant inputs', () => {
     }
   );
 
+  it('passes repository context through to Worker capabilities', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    const capabilities = {
+      enabled: true,
+      options: [
+        {
+          allocation: getSandboxAllocationRequest('vercel-small'),
+          unavailableReason: 'Vercel sandboxes are not configured',
+        },
+      ],
+    };
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
+
+    await expect(
+      createCaller({ user }).capabilities({ organizationId, githubRepo: 'owner/repo' })
+    ).resolves.toEqual({
+      canSetSandboxAllocation: true,
+      sandboxSelection: capabilities,
+    });
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+      kilocodeOrganizationId: organizationId,
+      repositoryType: 'github',
+      repositoryFullName: 'owner/repo',
+    });
+  });
+
   it.each([false, true])('never enables personal selection for is_admin=%s', async is_admin => {
     await expect(createCaller({ user: { ...user, is_admin } }).capabilities({})).resolves.toEqual({
       canSetSandboxAllocation: false,
+      sandboxSelection: undefined,
     });
     expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
   });
@@ -643,6 +705,131 @@ describe('webhook trigger variant inputs', () => {
     }
   );
 
+  it('allows a create allocation that the Worker offers for the repository', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({
+      enabled: true,
+      options: [{ allocation: getSandboxAllocationRequest('vercel-small') }],
+    });
+
+    await createCaller({ user }).create({
+      ...createInput,
+      organizationId,
+      sandboxAllocation: 'vercel-small',
+    });
+
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+      kilocodeOrganizationId: organizationId,
+      repositoryType: 'github',
+      repositoryFullName: 'owner/repo',
+    });
+    expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
+      undefined,
+      organizationId,
+      'trigger-id',
+      expect.objectContaining({ sandboxAllocation: 'vercel-small' })
+    );
+  });
+
+  it('uses the stored repository for update allocation capabilities', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockSelectWhere.mockResolvedValueOnce([
+      {
+        id: '00000000-0000-4000-8000-000000000002',
+        activation_mode: 'webhook',
+        target_type: 'cloud_agent',
+        github_repo: 'owner/stored-repo',
+      },
+    ]);
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({
+      enabled: true,
+      options: [{ allocation: getSandboxAllocationRequest('cloudflare-shared') }],
+    });
+
+    await createCaller({ user }).update({
+      triggerId: 'trigger-id',
+      organizationId,
+      sandboxAllocation: 'cloudflare-shared',
+    });
+
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+      kilocodeOrganizationId: organizationId,
+      repositoryType: 'github',
+      repositoryFullName: 'owner/stored-repo',
+    });
+    expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
+      undefined,
+      organizationId,
+      'trigger-id',
+      expect.objectContaining({ sandboxAllocation: 'cloudflare-shared' })
+    );
+  });
+
+  it.each([
+    { unavailableReason: 'Vercel sandboxes are not configured' },
+    { repositoryUnavailableReason: 'This allocation does not support the repository' },
+  ])('rejects an unavailable allocation option %j before writes', async reasons => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({
+      enabled: true,
+      options: [{ allocation: getSandboxAllocationRequest('vercel-small'), ...reasons }],
+    });
+
+    await expect(
+      createCaller({ user }).create({
+        ...createInput,
+        organizationId,
+        sandboxAllocation: 'vercel-small',
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: Object.values(reasons)[0],
+    });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('rejects an allocation the Worker does not offer before writes', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: true, options: [] });
+
+    await expect(
+      createCaller({ user }).create({
+        ...createInput,
+        organizationId,
+        sandboxAllocation: 'cloudflare-shared',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('rejects an explicit allocation when the organization does not exist', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockSelectWhere.mockResolvedValueOnce([]);
+
+    await expect(
+      createCaller({ user }).create({
+        ...createInput,
+        organizationId,
+        sandboxAllocation: 'cloudflare-shared',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('rejects a personal explicit allocation before requesting capabilities', async () => {
+    await expect(
+      createCaller({ user }).create({
+        ...createInput,
+        sandboxAllocation: 'cloudflare-shared',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
   it.each([
     { activationMode: 'webhook', organizationId: undefined },
     { activationMode: 'scheduled', organizationId: '00000000-0000-4000-8000-000000000003' },
@@ -679,6 +866,7 @@ describe('webhook trigger variant inputs', () => {
         'trigger-id',
         expect.objectContaining({ sandboxAllocation: undefined })
       );
+      expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
     }
   );
 

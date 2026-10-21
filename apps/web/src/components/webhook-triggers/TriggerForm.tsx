@@ -2,6 +2,18 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import {
+  sandboxAllocationSchema,
+  getSandboxAllocationRequest,
+  type SandboxAllocation,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import { formatSandboxDestination } from '@/components/cloud-agent-next/sandbox-selection';
+import {
+  describeDefaultSandbox,
+  getEligibleAllocationChoices,
+  groupChoicesByProvider,
+} from '@/components/cloud-agent-next/settings/settings-options';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +24,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -56,7 +70,7 @@ export type TriggerFormData = {
   mode: AgentMode;
   model: string;
   variant?: string | null;
-  sandboxAllocation?: 'isolated-standard' | null;
+  sandboxAllocation?: SandboxAllocation | null;
   promptTemplate: string;
   profileId: string;
   autoCommit?: boolean;
@@ -82,7 +96,7 @@ export type TriggerFormProps = {
     mode: AgentMode;
     model: string;
     variant?: string;
-    sandboxAllocation?: 'isolated-standard' | null;
+    sandboxAllocation?: SandboxAllocation | null;
     promptTemplate: string;
     profileId?: string;
     autoCommit?: boolean;
@@ -104,6 +118,8 @@ export type TriggerFormProps = {
   onDelete?: () => Promise<void>;
   isLoading?: boolean;
   canSetSandboxAllocation?: boolean;
+  sandboxSelection?: SandboxSelectionCapabilities;
+  onRepositoryChange?: (repository: string) => void;
   isLoadingCapabilities?: boolean;
   /** Full inbound webhook URL (only needed in edit mode) */
   inboundUrl?: string;
@@ -134,6 +150,8 @@ export function TriggerForm({
   onDelete,
   isLoading = false,
   canSetSandboxAllocation = false,
+  sandboxSelection,
+  onRepositoryChange,
   isLoadingCapabilities = false,
   inboundUrl,
 }: TriggerFormProps) {
@@ -160,16 +178,20 @@ export function TriggerForm({
   const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
   const [model, setModel] = useState(initialData?.model ?? '');
   const [variant, setVariant] = useState(initialData?.variant);
-  const initialSandboxAllocation =
-    initialData?.sandboxAllocation === 'isolated-standard' ? 'isolated-standard' : 'automatic';
-  const [sandboxAllocation, setSandboxAllocation] = useState<'automatic' | 'isolated-standard'>(
+  const initialSandboxAllocation = initialData?.sandboxAllocation ?? 'automatic';
+  const [sandboxAllocation, setSandboxAllocation] = useState<'automatic' | SandboxAllocation>(
     initialSandboxAllocation
   );
-  const hasSavedSandboxAllocation = initialSandboxAllocation === 'isolated-standard';
+  const hasSavedSandboxAllocation = initialSandboxAllocation !== 'automatic';
+  const sandboxChoices = getEligibleAllocationChoices(sandboxSelection);
+  const sandboxIsAvailable = sandboxChoices.some(choice => choice.allocation === sandboxAllocation);
+  const sandboxIsUnchanged = isEditMode && sandboxAllocation === initialSandboxAllocation;
+  const showUnavailableSandbox = sandboxAllocation !== 'automatic' && !sandboxIsAvailable;
+  const defaultSandbox = describeDefaultSandbox(
+    sandboxSelection?.effectiveDestination ?? sandboxSelection?.defaultDestination
+  );
   const showSandboxAllocation =
-    canSetSandboxAllocation ||
-    hasSavedSandboxAllocation ||
-    sandboxAllocation === 'isolated-standard';
+    canSetSandboxAllocation || hasSavedSandboxAllocation || sandboxAllocation !== 'automatic';
   const modelVariants = models.find(option => option.id === model)?.variants ?? [];
   const [showRepoDefaults, setShowRepoDefaults] = useState(false);
 
@@ -351,13 +373,12 @@ export function TriggerForm({
     }
 
     const requiresSandboxAllocationEligibility =
-      sandboxAllocation === 'isolated-standard' &&
-      (!isEditMode || sandboxAllocation !== initialSandboxAllocation);
+      sandboxAllocation !== 'automatic' && !sandboxIsUnchanged;
     if (
       requiresSandboxAllocationEligibility &&
-      (!canSetSandboxAllocation || isLoadingCapabilities)
+      (!canSetSandboxAllocation || isLoadingCapabilities || !sandboxIsAvailable)
     ) {
-      errors.push('Dedicated Standard allocation is not available');
+      errors.push('Selected sandbox is not available. Choose another sandbox or Automatic.');
     }
 
     return errors;
@@ -375,8 +396,8 @@ export function TriggerForm({
     runAsCreator,
     webhookAuthEnabled,
     sandboxAllocation,
-    initialSandboxAllocation,
-    isEditMode,
+    sandboxIsUnchanged,
+    sandboxIsAvailable,
     canSetSandboxAllocation,
     isLoadingCapabilities,
   ]);
@@ -408,7 +429,7 @@ export function TriggerForm({
         : sandboxAllocation === 'automatic'
           ? null
           : sandboxAllocation
-      : sandboxAllocation === 'isolated-standard'
+      : sandboxAllocation !== 'automatic'
         ? sandboxAllocation
         : undefined;
 
@@ -617,7 +638,10 @@ export function TriggerForm({
                 <RepositoryCombobox
                   repositories={repositories}
                   value={githubRepo}
-                  onValueChange={setGithubRepo}
+                  onValueChange={repository => {
+                    setGithubRepo(repository);
+                    onRepositoryChange?.(repository);
+                  }}
                   isLoading={isLoadingRepositories}
                   error={repositoriesError}
                   placeholder="Select a repository"
@@ -724,44 +748,74 @@ export function TriggerForm({
 
             {showSandboxAllocation && (
               <div className="space-y-2">
-                <Label htmlFor="sandboxAllocation">Container allocation</Label>
+                <Label htmlFor="sandboxAllocation">Sandbox</Label>
                 <Select
                   value={sandboxAllocation}
                   onValueChange={value => {
-                    if (value === 'automatic' || value === 'isolated-standard') {
-                      setSandboxAllocation(value);
-                    }
+                    if (value === 'automatic') return setSandboxAllocation(value);
+                    const allocation = sandboxAllocationSchema.safeParse(value);
+                    if (allocation.success) setSandboxAllocation(allocation.data);
                   }}
                   disabled={isLoading || isLoadingCapabilities}
                 >
                   <SelectTrigger
                     id="sandboxAllocation"
-                    className="w-full sm:w-80"
+                    className="w-full min-w-0 pointer-coarse:min-h-11 sm:max-w-lg"
                     aria-describedby="sandboxAllocationHelp"
+                    aria-invalid={showUnavailableSandbox && !sandboxIsUnchanged}
                   >
-                    <SelectValue />
+                    <SelectValue>
+                      <span className="truncate tabular-nums">
+                        {sandboxAllocation === 'automatic'
+                          ? defaultSandbox
+                            ? `Automatic · ${defaultSandbox.summary}`
+                            : 'Automatic'
+                          : formatSandboxDestination(
+                              getSandboxAllocationRequest(sandboxAllocation)
+                            )}
+                      </span>
+                    </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="automatic">Automatic</SelectItem>
-                    <SelectItem
-                      value="isolated-standard"
-                      disabled={!canSetSandboxAllocation && !hasSavedSandboxAllocation}
-                    >
-                      Dedicated Standard
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
+                    <SelectItem value="automatic" className="pointer-coarse:min-h-11">
+                      Automatic
                     </SelectItem>
+                    {groupChoicesByProvider(sandboxChoices).map(group => (
+                      <SelectGroup key={group.provider}>
+                        <SelectLabel>{group.provider}</SelectLabel>
+                        {group.choices.map(choice => (
+                          <SelectItem
+                            key={choice.allocation}
+                            value={choice.allocation}
+                            textValue={choice.instance}
+                            className="pointer-coarse:min-h-11"
+                          >
+                            <span className="whitespace-normal tabular-nums">
+                              {choice.instance}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                    {showUnavailableSandbox && (
+                      <SelectItem value={sandboxAllocation} disabled>
+                        {sandboxAllocation === 'isolated-standard'
+                          ? 'Dedicated Standard (legacy)'
+                          : formatSandboxDestination(
+                              getSandboxAllocationRequest(sandboxAllocation)
+                            )}
+                        {' (unavailable)'}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 <p id="sandboxAllocationHelp" className="text-muted-foreground max-w-prose text-xs">
-                  Automatic uses existing Cloud Agent routing. Dedicated Standard provisions one
-                  container per execution with 4 vCPU, 12 GiB RAM, and 20 GB disk, which may affect
-                  compute charges.
+                  {showUnavailableSandbox
+                    ? sandboxIsUnchanged
+                      ? 'The saved sandbox is no longer offered. It is kept unless you choose another sandbox or Automatic.'
+                      : 'Selected sandbox is not available. Choose another sandbox or Automatic.'
+                    : 'Automatic uses your Cloud Agent repository and organization defaults. Sandbox selection may affect compute charges.'}
                 </p>
-                {!canSetSandboxAllocation && hasSavedSandboxAllocation && (
-                  <p className="text-muted-foreground text-xs">
-                    Dedicated Standard requires an enabled organization. Choose Automatic to use
-                    default routing.
-                  </p>
-                )}
               </div>
             )}
 

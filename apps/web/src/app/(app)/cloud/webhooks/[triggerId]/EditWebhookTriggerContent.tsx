@@ -45,10 +45,6 @@ export function EditWebhookTriggerContent({
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
 
-  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
-    trpc.webhookTriggers.capabilities.queryOptions({ organizationId })
-  );
-
   // Fetch trigger configuration
   const {
     data: triggerData,
@@ -59,6 +55,13 @@ export function EditWebhookTriggerContent({
     trpc.webhookTriggers.get.queryOptions({
       triggerId,
       organizationId: organizationId ?? undefined,
+    })
+  );
+
+  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions({
+      organizationId,
+      githubRepo: triggerData?.githubRepo || undefined,
     })
   );
 
@@ -420,6 +423,7 @@ export function EditWebhookTriggerContent({
           models={modelOptions}
           isLoadingModels={isLoadingModels}
           canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
+          sandboxSelection={capabilities?.sandboxSelection}
           isLoadingCapabilities={isLoadingCapabilities}
           onSubmit={handleSubmit}
           onSaveAndInvoke={!isKiloclawChat && isScheduled ? handleSaveAndInvoke : undefined}

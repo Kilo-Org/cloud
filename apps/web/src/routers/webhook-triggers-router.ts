@@ -12,8 +12,15 @@ import {
   organization_memberships,
   agent_environment_profiles,
   kiloclaw_instances,
+  organizations,
   type User,
 } from '@kilocode/db/schema';
+import {
+  getKiloSandboxAllocation,
+  sandboxAllocationSchema,
+  type SandboxAllocation,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import {
@@ -57,7 +64,7 @@ export const WebhookTriggerCreateInput = z
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1, 'Model is required').optional(),
     variant: variantSchema.optional(),
-    sandboxAllocation: z.literal('isolated-standard').optional(),
+    sandboxAllocation: sandboxAllocationSchema.optional(),
     profileId: z.string().uuid().optional(),
     // Shared fields
     promptTemplate: z
@@ -174,7 +181,7 @@ export const WebhookTriggerUpdateInput = z
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1).optional(),
     variant: variantSchema.nullable().optional(),
-    sandboxAllocation: z.literal('isolated-standard').nullable().optional(),
+    sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
     profileId: z.string().uuid().optional(),
     autoCommit: z.boolean().nullable().optional(),
@@ -336,23 +343,100 @@ async function assertProfileOwnership(
   }
 }
 
-async function canSetSandboxAllocation(user: User, organizationId?: string): Promise<boolean> {
-  if (!organizationId) return false;
-  const capabilities = await createCloudAgentNextClient(
-    generateCloudAgentToken(user)
-  ).getSandboxSelectionOptions({ kilocodeOrganizationId: organizationId });
-  return capabilities.enabled;
+function sandboxSelectionInput(organizationId: string, githubRepo?: string) {
+  return {
+    kilocodeOrganizationId: organizationId,
+    ...(githubRepo ? { repositoryType: 'github' as const, repositoryFullName: githubRepo } : {}),
+  };
+}
+
+async function getSandboxSelection(
+  user: User,
+  organizationId?: string,
+  githubRepo?: string
+): Promise<SandboxSelectionCapabilities | undefined> {
+  if (!organizationId) return undefined;
+  return createCloudAgentNextClient(generateCloudAgentToken(user)).getSandboxSelectionOptions(
+    sandboxSelectionInput(organizationId, githubRepo)
+  );
+}
+
+async function assertOrganizationExists(organizationId: string | undefined): Promise<string> {
+  if (!organizationId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Sandbox selection requires an organization',
+    });
+  }
+
+  const [organization] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
+
+  if (!organization) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Organization not found',
+    });
+  }
+
+  return organizationId;
+}
+
+async function assertSandboxAllocationAvailable(
+  user: User,
+  organizationId: string | undefined,
+  sandboxAllocation: SandboxAllocation,
+  githubRepo: string | undefined
+): Promise<void> {
+  const selectedOrganizationId = await assertOrganizationExists(organizationId);
+  const capabilities = await getSandboxSelection(user, selectedOrganizationId, githubRepo);
+
+  if (!capabilities?.enabled) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Sandbox selection requires an enabled organization',
+    });
+  }
+
+  // Existing triggers predate named choices; an enabled owner may keep using
+  // the legacy allocation even though the picker no longer lists it.
+  if (sandboxAllocation === 'isolated-standard') return;
+
+  const option = capabilities.options.find(
+    candidate => getKiloSandboxAllocation(candidate.allocation) === sandboxAllocation
+  );
+  const unavailableReason = option?.unavailableReason ?? option?.repositoryUnavailableReason;
+
+  if (!option || unavailableReason) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: unavailableReason ?? 'Sandbox allocation is not available',
+    });
+  }
 }
 
 export const webhookTriggersRouter = createTRPCRouter({
   capabilities: baseProcedure
-    .input(z.object({ organizationId: z.string().uuid().optional() }))
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        githubRepo: z.string().min(1).max(500).optional(),
+      })
+    )
     .query(async ({ ctx, input }) => {
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
+      const sandboxSelection = await getSandboxSelection(
+        ctx.user,
+        input.organizationId,
+        input.githubRepo
+      );
       return {
-        canSetSandboxAllocation: await canSetSandboxAllocation(ctx.user, input.organizationId),
+        canSetSandboxAllocation: sandboxSelection?.enabled ?? false,
+        sandboxSelection,
       };
     }),
 
@@ -512,14 +596,13 @@ export const webhookTriggersRouter = createTRPCRouter({
       }
     }
 
-    if (
-      input.sandboxAllocation &&
-      !(await canSetSandboxAllocation(ctx.user, input.organizationId))
-    ) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Sandbox selection requires an enabled organization',
-      });
+    if (input.sandboxAllocation !== undefined) {
+      await assertSandboxAllocationAvailable(
+        ctx.user,
+        input.organizationId,
+        input.sandboxAllocation,
+        input.githubRepo
+      );
     }
 
     // KiloClaw Chat triggers are personal only — org-scoped triggers would fail at delivery
@@ -713,14 +796,13 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    if (
-      input.sandboxAllocation &&
-      !(await canSetSandboxAllocation(ctx.user, input.organizationId))
-    ) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Sandbox selection requires an enabled organization',
-      });
+    if (input.sandboxAllocation !== undefined && input.sandboxAllocation !== null) {
+      await assertSandboxAllocationAvailable(
+        ctx.user,
+        input.organizationId,
+        input.sandboxAllocation,
+        dbTrigger.github_repo ?? undefined
+      );
     }
 
     // Validate profile ownership if profileId provided

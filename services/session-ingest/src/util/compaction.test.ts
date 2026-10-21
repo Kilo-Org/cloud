@@ -30,14 +30,19 @@ describe('getPartItemIdentityRange', () => {
     });
   });
 
-  it('lists the current layout first and keeps the two ranges disjoint', () => {
-    const [current, previous] = getPartItemIdentityRanges('part');
-    expect(current).toEqual({ start: 'part/part/', end: 'part/part0' });
-    expect(previous).toEqual({ start: 'part/', end: 'part0' });
+  it('lists the current layout first and keeps both ranges disjoint for a normal message id', () => {
     expect(getPartItemIdentityRanges('msg_parent')).toEqual([
       { start: 'part/msg_parent/', end: 'part/msg_parent0' },
       { start: 'msg_parent/', end: 'msg_parent0' },
     ]);
+  });
+
+  it('nests the current range inside the previous one when the message id is a reserved namespace', () => {
+    const [current, previous] = getPartItemIdentityRanges('part');
+    expect(current).toEqual({ start: 'part/part/', end: 'part/part0' });
+    expect(previous).toEqual({ start: 'part/', end: 'part0' });
+    const currentLayoutItemId = 'part/part/prt_1';
+    expect(currentLayoutItemId >= previous.start && currentLayoutItemId < previous.end).toBe(true);
   });
 });
 

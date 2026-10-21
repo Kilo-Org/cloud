@@ -38,7 +38,6 @@ const billing = parseSandboxBillingInput({
   actor: { type: 'user', id: 'user-1' },
   sessionId: 'workspace_test',
   metadata: { origin: 'cloud-agent' },
-  enforcementRequested: true,
 });
 const intent: ProviderCreateIntent = { intentId: 'attempt', createdAt: 0, billing };
 const config: VercelSandboxRuntimeConfig = {
@@ -92,6 +91,7 @@ describe('native egress policy forwarding', () => {
     async ({ egressAllowlist, egressAudit }) => {
       const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
       const container = {
+        ensureBillingAdmission: vi.fn().mockResolvedValue({ success: true }),
         launchWrapper,
         ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
       };
@@ -102,7 +102,7 @@ describe('native egress policy forwarding', () => {
         egressAudit,
         getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
       });
-      const created = await provider.create({ intentId: 'egress-attempt', createdAt: 0 });
+      const created = await provider.create({ ...intent, intentId: 'egress-attempt' });
       if ('unresolved' in created) throw new Error('Expected provider reference');
       await provider.launch(created.providerRef, {
         command: preinstalledStartup(),
@@ -126,6 +126,7 @@ describe('native image forwarding', () => {
     async nativeImage => {
       const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
       const container = {
+        ensureBillingAdmission: vi.fn().mockResolvedValue({ success: true }),
         launchWrapper,
         ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
       };
@@ -134,7 +135,7 @@ describe('native image forwarding', () => {
         allocationName: SANDBOX_ID,
         getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
       });
-      const created = await provider.create({ intentId: 'image-attempt', createdAt: 0 });
+      const created = await provider.create({ ...intent, intentId: 'image-attempt' });
       if ('unresolved' in created) throw new Error('Expected provider reference');
 
       await provider.launch(
@@ -150,6 +151,7 @@ describe('native image forwarding', () => {
   it('omits the image selection when none is supplied', async () => {
     const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
     const container = {
+      ensureBillingAdmission: vi.fn().mockResolvedValue({ success: true }),
       launchWrapper,
       ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
     };
@@ -158,7 +160,7 @@ describe('native image forwarding', () => {
       allocationName: SANDBOX_ID,
       getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
     });
-    const created = await provider.create({ intentId: 'image-attempt', createdAt: 0 });
+    const created = await provider.create({ ...intent, intentId: 'image-attempt' });
     if ('unresolved' in created) throw new Error('Expected provider reference');
 
     await provider.launch(created.providerRef, { command: preinstalledStartup(), env: {} });
@@ -168,39 +170,46 @@ describe('native image forwarding', () => {
 });
 
 describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
-  it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
-    const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
-    const failed = {
-      isBillingBlocked: vi.fn().mockResolvedValue(false),
-      configureBilling: vi.fn().mockRejectedValue(error),
-    };
-    const recovered = { configureBilling: vi.fn().mockResolvedValue(undefined) };
-    const resolveHandle = vi
-      .fn()
-      .mockReturnValueOnce(failed)
-      .mockReturnValueOnce(failed)
-      .mockReturnValue(recovered);
-    const provider =
-      kind === 'cloudflare'
-        ? createCloudflareProviderAdapter({
-            sandboxId: SANDBOX_ID,
-            getSandbox: resolveHandle,
-            destroy: async () => {},
-          })
-        : createCloudflareContainersProviderAdapter({
-            logicalSandboxId: SANDBOX_ID,
-            allocationName: SANDBOX_ID,
-            getContainer: resolveHandle,
-          });
+  const providerWith = (resolveHandle: () => unknown): ProviderAdapter =>
+    kind === 'cloudflare'
+      ? createCloudflareProviderAdapter({
+          sandboxId: SANDBOX_ID,
+          getSandbox: () => resolveHandle() as MeteredSandboxInstance,
+          destroy: async () => {},
+        })
+      : createCloudflareContainersProviderAdapter({
+          logicalSandboxId: SANDBOX_ID,
+          allocationName: SANDBOX_ID,
+          getContainer: () => resolveHandle() as DurableObjectStub<SandboxContainers>,
+        });
+
+  it('fails a create without a billing identity before it reaches the container', async () => {
+    const resolveHandle = vi.fn();
 
     await expect(
-      provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
-    ).resolves.toMatchObject({ providerRef: expect.any(String) });
+      providerWith(resolveHandle).create({ intentId: 'attempt', createdAt: 0 })
+    ).rejects.toMatchObject({
+      code: 'invalid_configuration',
+      permanentReason: 'invalid_configuration',
+    });
 
-    expect(resolveHandle).toHaveBeenCalledTimes(3);
-    expect(failed.configureBilling).toHaveBeenCalledOnce();
-    expect(recovered.configureBilling).toHaveBeenCalledOnce();
-    expect(recovered.configureBilling.mock.calls[0]).toEqual(failed.configureBilling.mock.calls[0]);
+    expect(resolveHandle).not.toHaveBeenCalled();
+  });
+
+  it('retries billing admission with a fresh handle and unchanged attribution', async () => {
+    const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
+    const failed = { ensureBillingAdmission: vi.fn().mockRejectedValue(error) };
+    const recovered = { ensureBillingAdmission: vi.fn().mockResolvedValue({ success: true }) };
+    const resolveHandle = vi.fn().mockReturnValueOnce(failed).mockReturnValue(recovered);
+
+    await expect(providerWith(resolveHandle).create(intent)).resolves.toMatchObject({
+      providerRef: expect.any(String),
+    });
+
+    expect(resolveHandle).toHaveBeenCalledTimes(2);
+    expect(recovered.ensureBillingAdmission.mock.calls[0]).toEqual(
+      failed.ensureBillingAdmission.mock.calls[0]
+    );
   });
 
   it.each([
@@ -208,34 +217,18 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
     { flags: { retryable: false }, attempts: 1 },
     { flags: { overloaded: true }, attempts: 1 },
   ])(
-    'propagates shadow configuration failure after $attempts attempts: $flags',
+    'fails closed when billing admission fails after $attempts attempts: $flags',
     async ({ flags, attempts }) => {
-      const error = Object.assign(new Error('Billing configuration failed'), flags);
-      const configureBilling = vi.fn().mockRejectedValue(error);
-      const resolveHandle = vi.fn(() => ({
-        isBillingBlocked: async () => false,
-        configureBilling,
-      }));
-      const provider =
-        kind === 'cloudflare'
-          ? createCloudflareProviderAdapter({
-              sandboxId: SANDBOX_ID,
-              getSandbox: () => resolveHandle() as unknown as MeteredSandboxInstance,
-              destroy: async () => {},
-            })
-          : createCloudflareContainersProviderAdapter({
-              logicalSandboxId: SANDBOX_ID,
-              allocationName: SANDBOX_ID,
-              getContainer: () =>
-                resolveHandle() as unknown as DurableObjectStub<SandboxContainers>,
-            });
+      const error = Object.assign(new Error('Billing admission failed'), flags);
+      const ensureBillingAdmission = vi.fn().mockRejectedValue(error);
+      const resolveHandle = vi.fn(() => ({ ensureBillingAdmission }));
 
-      await expect(
-        provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
-      ).rejects.toBe(error);
+      await expect(providerWith(resolveHandle).create(intent)).rejects.toMatchObject({
+        code: 'meter_unavailable',
+      });
 
-      expect(configureBilling).toHaveBeenCalledTimes(attempts);
-      expect(resolveHandle).toHaveBeenCalledTimes(attempts + 1);
+      expect(ensureBillingAdmission).toHaveBeenCalledTimes(attempts);
+      expect(resolveHandle).toHaveBeenCalledTimes(attempts);
     }
   );
 

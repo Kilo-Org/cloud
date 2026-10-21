@@ -1926,7 +1926,10 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(retained.schedule?.[VERCEL_BILLING_SETTLEMENT_CALLBACK]?.dueAtMs).toBe(dueAtMs);
     expect(retained.acknowledgement).toBe('generation-1');
     expect(await readAlarm(stub)).toBeNull();
-    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').billing).toMatchObject(billing);
+    const { enforcementRequested: _retiredFlag, ...expectedBilling } = billing;
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').billing).toMatchObject(
+      expectedBilling
+    );
   });
 
   it('keeps a legacy sandbox recoverable when its optional billing input is malformed', async () => {

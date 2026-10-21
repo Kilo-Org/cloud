@@ -423,7 +423,8 @@ const requestPartText = async (
     throw new Error(`The response body for request #${String(position)} is not available.`);
   }
 
-  const text = parsed.success && parsed.data.base64Encoded === true ? `(base64) ${body}` : body;
+  const masked = redactSensitiveBody(body) ?? body;
+  const text = parsed.success && parsed.data.base64Encoded === true ? `(base64) ${masked}` : masked;
 
   return text.length > MAX_BROWSER_TOOL_RESPONSE_BODY_LENGTH
     ? `${text.slice(0, MAX_BROWSER_TOOL_RESPONSE_BODY_LENGTH)}... (body truncated)`

@@ -663,7 +663,7 @@ describe('browser_network_request', () => {
           status: 200,
         }),
       ],
-      responseBody: { body: '{"ok":true}' },
+      responseBody: { body: '{"ok":true,"refreshToken":"rt-fixture-1"}' },
     });
 
     const headers = await runReadBrowserTool(
@@ -703,7 +703,25 @@ describe('browser_network_request', () => {
     expect(String(responseHeaders.ok ? responseHeaders.value : '')).toContain(
       'response-headers for request #1:'
     );
-    expect(String(body.ok ? body.value : '')).toContain('{"ok":true}');
+    const responseBodyText = String(body.ok ? body.value : '');
+
+    expect(responseBodyText).toContain('"refreshToken": "[REDACTED]"');
+    expect(responseBodyText).not.toContain('rt-fixture-1');
+  });
+
+  it('renders a base64 body with its marker', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [networkRequest('blob', { resourceType: 'XHR', status: 200 })],
+      responseBody: { base64Encoded: true, body: 'eyJvayI6dHJ1ZX0=' },
+    });
+
+    const result = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'response-body' },
+      session
+    );
+
+    expect(String(result.ok ? result.value : '')).toContain('(base64) eyJvayI6dHJ1ZX0=');
   });
 
   it('replaces listed keys in JSON request bodies returned for the explicit part', async () => {

@@ -2011,7 +2011,7 @@ export const createBrowserToolSession = ({
           const parsedBody = networkBodySchema.safeParse(body);
 
           detail += parsedBody.success
-            ? `\nresponse body: ${parsedBody.data.body}`
+            ? `\nresponse body: ${redactSensitiveBody(parsedBody.data.body) ?? parsedBody.data.body}`
             : '\nresponse body: unavailable.';
         } catch (error) {
           detail += `\nresponse body: ${error instanceof Error ? error.message : 'unavailable'}`;

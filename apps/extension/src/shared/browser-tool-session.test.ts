@@ -31,10 +31,12 @@ const ENABLED_DOMAINS = [
 const createDebuggerApi = ({
   documentNodeId = 11,
   gate,
+  responseBodies,
 }: {
   documentNodeId?: number;
   /** When set, `sendCommand` waits on `gate.wait` before resolving the gated method. */
   gate?: { readonly command: string; readonly wait: Promise<void> };
+  responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
 } = {}): {
   api: ChromeDebuggerApi;
   attachCalls: number[];
@@ -98,6 +100,12 @@ const createDebuggerApi = ({
         return { nodeId: 42 };
       }
 
+      if (method === 'Network.getResponseBody') {
+        const requestId = params?.['requestId'];
+
+        return (typeof requestId === 'string' ? responseBodies?.[requestId] : undefined) ?? {};
+      }
+
       return {};
     },
   };
@@ -158,12 +166,17 @@ const createSession = ({
   tabId = 7,
   url = 'https://example.com/',
   gate,
+  responseBodies,
 }: {
   tabId?: number;
   url?: string;
   gate?: { readonly command: string; readonly wait: Promise<void> };
+  responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
 } = {}) => {
-  const debuggerApi = createDebuggerApi(gate === undefined ? {} : { gate });
+  const debuggerApi = createDebuggerApi({
+    ...(gate === undefined ? {} : { gate }),
+    ...(responseBodies === undefined ? {} : { responseBodies }),
+  });
   const tabsApi = createTabsApi({ url });
 
   return {
@@ -584,6 +597,32 @@ describe('browser tool session', () => {
     expect(requests).toHaveLength(MAX_BROWSER_TOOL_NETWORK_REQUESTS);
     expect(requests.at(-1)?.requestId).toBe(`r-${MAX_BROWSER_TOOL_NETWORK_REQUESTS + 2}`);
     expect(requests.some(request => request.requestId === 'fail-1')).toBe(false);
+  });
+
+  it('renders the body part with the shared field rules', async () => {
+    const { debuggerApi, session } = createSession({
+      responseBodies: { r1: { body: '{"ok":true,"refreshToken":"rt-fixture-1"}' } },
+    });
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Network.requestWillBeSent', {
+      request: { url: 'https://example.com/api' },
+      requestId: 'r1',
+    });
+    debuggerApi.emitEvent(7, 'Network.responseReceived', {
+      requestId: 'r1',
+      response: { status: 200 },
+    });
+
+    const result = await session.callTool('kilo_browser_network_request', {
+      number: 1,
+      part: 'body',
+    });
+
+    const text = JSON.stringify(result);
+
+    expect(text).toContain(String.raw`\"refreshToken\": \"[REDACTED]\"`);
+    expect(text).not.toContain('rt-fixture-1');
   });
 
   it('records the frame id and scopes requests since load to the main-frame document', async () => {

@@ -40,7 +40,6 @@ export {
   getProfileAgentScopeMock,
   interactionState,
   keys,
-  openExternalUrlFn,
   organizationState,
   organizationsQueryFn,
   providersQueryFn,

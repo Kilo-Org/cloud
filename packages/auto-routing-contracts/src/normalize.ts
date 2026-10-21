@@ -21,21 +21,6 @@ const PROVIDER_HINTS_MAX_NODES = 512;
 // matches exactly, so ordinary words that merely contain those letters stay
 // intact. A credential word joined to a credential qualifier without any
 // boundary counts as a credential key.
-const SENSITIVE_KEY_TOKENS: Record<string, true> = {
-  apikey: true,
-  authorization: true,
-  cookie: true,
-  credential: true,
-  credentials: true,
-  key: true,
-  keys: true,
-  password: true,
-  passwd: true,
-  secret: true,
-  secrets: true,
-  token: true,
-  tokens: true,
-};
 const SENSITIVE_KEY_WORDS = [
   'apikey',
   'authorization',
@@ -378,7 +363,8 @@ function splitKeyTokens(key: string) {
 }
 
 function isSensitiveToken(token: string) {
-  if (SENSITIVE_KEY_TOKENS[token]) return true;
+  const singular = token.endsWith('s') ? token.slice(0, -1) : token;
+  if (SENSITIVE_KEY_WORDS.some(word => word === token || word === singular)) return true;
   for (const word of SENSITIVE_KEY_WORDS) {
     for (let index = token.indexOf(word, 1); index !== -1; index = token.indexOf(word, index + 1)) {
       const prefix = token.slice(0, index);

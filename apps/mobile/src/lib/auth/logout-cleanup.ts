@@ -60,7 +60,7 @@ const logoutCleanupRecordSchema = z.object({
 export type LogoutCleanupRecord = z.infer<typeof logoutCleanupRecordSchema>;
 
 /** Account identity a record belongs to; null while it is unknown. */
-export type LogoutCleanupOwner = string | null;
+type LogoutCleanupOwner = string | null;
 
 /**
  * The pre-ownership record shape (a single object, one `pushToken`). It is
@@ -133,7 +133,7 @@ export async function readLogoutCleanupRecords(): Promise<LogoutCleanupRecord[]>
   }
 }
 
-export function logoutCleanupRecordFor(
+function logoutCleanupRecordFor(
   records: readonly LogoutCleanupRecord[],
   owner: LogoutCleanupOwner
 ): LogoutCleanupRecord | null {
@@ -146,7 +146,7 @@ export function hasLogoutCleanupObligation(record: LogoutCleanupRecord): boolean
 }
 
 /** Replaces only the record of the same owner; every other record is kept. */
-export function upsertLogoutCleanupRecord(
+function upsertLogoutCleanupRecord(
   records: readonly LogoutCleanupRecord[],
   record: LogoutCleanupRecord
 ): LogoutCleanupRecord[] {
@@ -154,7 +154,7 @@ export function upsertLogoutCleanupRecord(
 }
 
 /** Removes only the record of `owner`; every other record is kept. */
-export function removeLogoutCleanupRecord(
+function removeLogoutCleanupRecord(
   records: readonly LogoutCleanupRecord[],
   owner: LogoutCleanupOwner
 ): LogoutCleanupRecord[] {
@@ -187,7 +187,7 @@ export async function writeLogoutCleanupRecords(
  * Reads, changes and writes the record list as one serialized transaction with
  * the other logout-cleanup writers.
  */
-export async function chainLogoutCleanupRecords(
+async function chainLogoutCleanupRecords(
   mutate: (records: LogoutCleanupRecord[]) => LogoutCleanupRecord[]
 ): Promise<void> {
   await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {

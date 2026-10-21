@@ -3096,6 +3096,7 @@
       "removeLimit": "한도 해제",
       "title": "일일 사용 한도",
       "blankError": "금액을 입력하거나 아래의 한도 해제를 누르세요.",
+      "blankWithoutLimitError": "0에서 {{max}} 사이의 일일 한도를 입력하세요.",
       "rangeError": "0에서 {{max}} 사이의 금액을 입력하세요."
     },
     "members": {

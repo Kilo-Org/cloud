@@ -3097,6 +3097,7 @@
       "removeLimit": "Daangaa baasi",
       "title": "Daangaa fayyadama guyyaa",
       "blankError": "Hamma galchi yookaan gadiitti Daangaa baasi tuqi.",
+      "blankWithoutLimitError": "Daangaa guyyaa 0 fi {{max}} gidduu jiru galchi.",
       "rangeError": "Hamma 0 fi {{max}} gidduu jiru galchi."
     },
     "members": {

@@ -3256,6 +3256,7 @@
       "removeLimit": "إزالة الحد",
       "title": "حد الاستخدام اليومي",
       "blankError": "أدخل مبلغًا، أو اضغط على «إزالة الحد» أدناه.",
+      "blankWithoutLimitError": "أدخل حدًّا يوميًّا بين 0 و{{max}}.",
       "rangeError": "أدخل مبلغًا بين 0 و{{max}}."
     },
     "members": {

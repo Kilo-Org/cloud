@@ -3096,6 +3096,7 @@
       "removeLimit": "Bỏ giới hạn",
       "title": "Giới hạn sử dụng hằng ngày",
       "blankError": "Hãy nhập số tiền hoặc chọn Bỏ giới hạn bên dưới.",
+      "blankWithoutLimitError": "Hãy nhập giới hạn hằng ngày từ 0 đến {{max}}.",
       "rangeError": "Hãy nhập số tiền từ 0 đến {{max}}."
     },
     "members": {

@@ -3097,6 +3097,7 @@
       "removeLimit": "Fjern grænse",
       "title": "Daglig forbrugsgrænse",
       "blankError": "Angiv et beløb, eller tryk på Fjern grænse nedenfor.",
+      "blankWithoutLimitError": "Angiv en daglig grænse mellem 0 og {{max}}.",
       "rangeError": "Angiv et beløb mellem 0 og {{max}}."
     },
     "members": {

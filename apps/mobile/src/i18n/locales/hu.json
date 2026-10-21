@@ -3097,6 +3097,7 @@
       "removeLimit": "Korlát eltávolítása",
       "title": "Napi használati korlát",
       "blankError": "Adj meg egy összeget, vagy koppints az alábbi Korlát eltávolítása gombra.",
+      "blankWithoutLimitError": "Adj meg egy napi korlátot 0 és {{max}} között.",
       "rangeError": "Adj meg 0 és {{max}} közötti összeget."
     },
     "members": {

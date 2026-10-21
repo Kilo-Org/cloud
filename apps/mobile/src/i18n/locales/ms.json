@@ -3097,6 +3097,7 @@
       "removeLimit": "Buang had",
       "title": "Had penggunaan harian",
       "blankError": "Masukkan amaun atau ketik Buang had di bawah.",
+      "blankWithoutLimitError": "Masukkan had harian antara 0 dan {{max}}.",
       "rangeError": "Masukkan amaun antara 0 dan {{max}}."
     },
     "members": {

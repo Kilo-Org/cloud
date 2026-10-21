@@ -3097,6 +3097,7 @@
       "removeLimit": "Wepụ oke",
       "title": "Oke ojiji kwa ụbọchị",
       "blankError": "Tinye ego, ma ọ bụ pịa Wepụ oke n'okpuru.",
+      "blankWithoutLimitError": "Tinye oke kwa ụbọchị dị n'etiti 0 na {{max}}.",
       "rangeError": "Tinye ego dị n'etiti 0 na {{max}}."
     },
     "members": {

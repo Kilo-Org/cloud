@@ -3177,6 +3177,7 @@
       "removeLimit": "Panaikinti ribą",
       "title": "Dienos išlaidų riba",
       "blankError": "Įveskite sumą arba žemiau panaikinkite ribą.",
+      "blankWithoutLimitError": "Įveskite dienos ribą nuo 0 iki {{max}}.",
       "rangeError": "Įveskite sumą nuo 0 iki {{max}}."
     },
     "members": {

@@ -3097,6 +3097,7 @@
       "removeLimit": "Hiq kufirin",
       "title": "Kufiri ditor i përdorimit",
       "blankError": "Shkruaj një shumë ose përdor «Hiq kufirin» më poshtë.",
+      "blankWithoutLimitError": "Shkruaj një kufi ditor midis 0 dhe {{max}}.",
       "rangeError": "Shkruaj një shumë midis 0 dhe {{max}}."
     },
     "members": {

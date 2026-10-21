@@ -3097,6 +3097,7 @@
       "removeLimit": "Esory ny fetra",
       "title": "Fetran'ny fampiasana isan'andro",
       "blankError": "Mampidira vola, na tsindrio ny Esory ny fetra etsy ambany.",
+      "blankWithoutLimitError": "Mampidira fetra isan'andro eo anelanelan'ny 0 sy {{max}}.",
       "rangeError": "Mampidira vola eo anelanelan'ny 0 sy {{max}}."
     },
     "members": {

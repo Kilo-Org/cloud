@@ -3097,6 +3097,7 @@
       "removeLimit": "Verwyder perk",
       "title": "Daaglikse gebruiksperk",
       "blankError": "Voer 'n bedrag in of tik hieronder op Verwyder perk.",
+      "blankWithoutLimitError": "Voer 'n daaglikse perk tussen 0 en {{max}} in.",
       "rangeError": "Voer 'n bedrag tussen 0 en {{max}} in."
     },
     "members": {

@@ -3097,6 +3097,7 @@
       "removeLimit": "Eemalda piirang",
       "title": "Päevane kasutuspiirang",
       "blankError": "Sisesta summa või eemalda piirang alloleva nupuga.",
+      "blankWithoutLimitError": "Sisesta päevane piirang vahemikus 0 kuni {{max}}.",
       "rangeError": "Sisesta summa vahemikus 0 kuni {{max}}."
     },
     "members": {

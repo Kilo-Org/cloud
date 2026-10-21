@@ -3096,6 +3096,7 @@
       "removeLimit": "取消限制",
       "title": "每日用量上限",
       "blankError": "请输入金额，或点击下方的“取消限制”。",
+      "blankWithoutLimitError": "请输入 0 到 {{max}} 之间的每日上限。",
       "rangeError": "请输入 0 到 {{max}} 之间的金额。"
     },
     "members": {

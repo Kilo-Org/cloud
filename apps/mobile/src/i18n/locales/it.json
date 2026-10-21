@@ -3136,6 +3136,7 @@
       "removeLimit": "Rimuovi il limite",
       "title": "Limite di utilizzo giornaliero",
       "blankError": "Inserisci un importo oppure rimuovi il limite con il pulsante qui sotto.",
+      "blankWithoutLimitError": "Inserisci un limite giornaliero tra 0 e {{max}}.",
       "rangeError": "Inserisci un importo tra 0 e {{max}}."
     },
     "members": {

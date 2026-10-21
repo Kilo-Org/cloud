@@ -3097,6 +3097,7 @@
       "removeLimit": "Eliminar límite",
       "title": "Límite de uso diario",
       "blankError": "Introduce unha cantidade ou elimina o límite coa opción que aparece abaixo.",
+      "blankWithoutLimitError": "Introduce un límite diario entre 0 e {{max}}.",
       "rangeError": "Introduce unha cantidade entre 0 e {{max}}."
     },
     "members": {

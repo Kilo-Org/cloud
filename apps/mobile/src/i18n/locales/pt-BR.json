@@ -3136,6 +3136,7 @@
       "removeLimit": "Remover limite",
       "title": "Limite de uso diário",
       "blankError": "Digite um valor ou toque em Remover limite abaixo.",
+      "blankWithoutLimitError": "Digite um limite diário entre 0 e {{max}}.",
       "rangeError": "Digite um valor entre 0 e {{max}}."
     },
     "members": {

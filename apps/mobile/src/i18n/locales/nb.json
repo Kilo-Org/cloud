@@ -3097,6 +3097,7 @@
       "removeLimit": "Fjern grense",
       "title": "Daglig bruksgrense",
       "blankError": "Angi et beløp, eller fjern grensen med knappen nedenfor.",
+      "blankWithoutLimitError": "Angi en daglig grense mellom 0 og {{max}}.",
       "rangeError": "Angi et beløp mellom 0 og {{max}}."
     },
     "members": {

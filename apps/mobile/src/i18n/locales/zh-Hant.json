@@ -3096,6 +3096,7 @@
       "removeLimit": "移除限制",
       "title": "每日用量限制",
       "blankError": "請輸入金額，或點一下下方的「移除限制」。",
+      "blankWithoutLimitError": "請輸入介於 0 與 {{max}} 之間的每日上限。",
       "rangeError": "請輸入介於 0 與 {{max}} 之間的金額。"
     },
     "members": {

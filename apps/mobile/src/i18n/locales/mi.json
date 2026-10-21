@@ -3097,6 +3097,7 @@
       "removeLimit": "Tangohia te tepe",
       "title": "Te tepe whakamahinga ā-rā",
       "blankError": "Whakaurua he moni, tangohia rānei te tepe mā te pātene i raro nei.",
+      "blankWithoutLimitError": "Whakaurua he tepe ā-rā i waenga i te 0 me te {{max}}.",
       "rangeError": "Whakaurua he moni i waenga i te 0 me te {{max}}."
     },
     "members": {

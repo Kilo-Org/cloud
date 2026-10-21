@@ -3097,6 +3097,7 @@
       "removeLimit": "Alisin ang limitasyon",
       "title": "Pang-araw-araw na limitasyon sa paggamit",
       "blankError": "Maglagay ng halaga, o piliin ang Alisin ang limitasyon sa ibaba.",
+      "blankWithoutLimitError": "Maglagay ng pang-araw-araw na limitasyon na nasa pagitan ng 0 at {{max}}.",
       "rangeError": "Maglagay ng halagang nasa pagitan ng 0 at {{max}}."
     },
     "members": {

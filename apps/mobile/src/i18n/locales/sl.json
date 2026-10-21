@@ -3177,6 +3177,7 @@
       "removeLimit": "Odstrani omejitev",
       "title": "Dnevna omejitev porabe",
       "blankError": "Vnesi znesek ali spodaj izberi »Odstrani omejitev«.",
+      "blankWithoutLimitError": "Vnesi dnevno omejitev med 0 in {{max}}.",
       "rangeError": "Vnesi znesek med 0 in {{max}}."
     },
     "members": {

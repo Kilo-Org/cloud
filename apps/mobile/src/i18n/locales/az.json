@@ -3097,6 +3097,7 @@
       "removeLimit": "Limiti götür",
       "title": "Gündəlik istifadə limiti",
       "blankError": "Məbləğ daxil et və ya aşağıdakı «Limiti götür» düyməsindən istifadə et.",
+      "blankWithoutLimitError": "0 İlə {{max}} arasında gündəlik limit daxil et.",
       "rangeError": "0 İlə {{max}} arasında məbləğ daxil et."
     },
     "members": {

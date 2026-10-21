@@ -3177,6 +3177,7 @@
       "removeLimit": "Odstrániť limit",
       "title": "Denný limit spotreby",
       "blankError": "Zadaj sumu alebo klepni na Odstrániť limit nižšie.",
+      "blankWithoutLimitError": "Zadaj denný limit od 0 do {{max}}.",
       "rangeError": "Zadaj sumu od 0 do {{max}}."
     },
     "members": {

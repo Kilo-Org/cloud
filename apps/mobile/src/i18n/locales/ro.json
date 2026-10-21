@@ -3137,6 +3137,7 @@
       "removeLimit": "Elimină limita",
       "title": "Limită zilnică de utilizare",
       "blankError": "Introdu o sumă sau atinge „Elimină limita” mai jos.",
+      "blankWithoutLimitError": "Introdu o limită zilnică între 0 și {{max}}.",
       "rangeError": "Introdu o sumă între 0 și {{max}}."
     },
     "members": {

@@ -3096,6 +3096,7 @@
       "removeLimit": "上限を解除",
       "title": "1日の利用上限額",
       "blankError": "金額を入力するか、下の「上限を解除」をタップしてください。",
+      "blankWithoutLimitError": "0から{{max}}までの1日の上限額を入力してください。",
       "rangeError": "0から{{max}}までの金額を入力してください。"
     },
     "members": {

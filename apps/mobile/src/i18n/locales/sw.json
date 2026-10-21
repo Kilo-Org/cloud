@@ -3097,6 +3097,7 @@
       "removeLimit": "Ondoa kikomo",
       "title": "Kikomo cha matumizi ya kila siku",
       "blankError": "Weka kiasi au uguse Ondoa kikomo hapa chini.",
+      "blankWithoutLimitError": "Weka kikomo cha kila siku kati ya 0 na {{max}}.",
       "rangeError": "Weka kiasi kati ya 0 na {{max}}."
     },
     "members": {

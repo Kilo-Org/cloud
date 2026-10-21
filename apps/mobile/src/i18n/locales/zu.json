@@ -3097,6 +3097,7 @@
       "removeLimit": "Susa umkhawulo",
       "title": "Umkhawulo wokusetshenziswa kwansuku zonke",
       "blankError": "Faka inani, noma usebenzise inkinobho yokususa umkhawulo ngezansi.",
+      "blankWithoutLimitError": "Faka umkhawulo wansuku zonke ophakathi kuka-0 no-{{max}}.",
       "rangeError": "Faka inani eliphakathi kuka-0 no-{{max}}."
     },
     "members": {

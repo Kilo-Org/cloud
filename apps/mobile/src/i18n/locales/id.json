@@ -3096,6 +3096,7 @@
       "removeLimit": "Hapus batas",
       "title": "Batas penggunaan harian",
       "blankError": "Masukkan jumlah atau ketuk Hapus batas di bawah.",
+      "blankWithoutLimitError": "Masukkan batas harian antara 0 dan {{max}}.",
       "rangeError": "Masukkan jumlah antara 0 dan {{max}}."
     },
     "members": {

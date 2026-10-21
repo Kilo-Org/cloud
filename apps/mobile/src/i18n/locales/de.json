@@ -3096,6 +3096,7 @@
       "removeLimit": "Limit entfernen",
       "title": "Tägliches Nutzungslimit",
       "blankError": "Gib einen Betrag ein oder tippe unten auf „Limit entfernen“.",
+      "blankWithoutLimitError": "Gib ein tägliches Limit zwischen 0 und {{max}} ein.",
       "rangeError": "Gib einen Betrag zwischen 0 und {{max}} ein."
     },
     "members": {

@@ -1,18 +1,5 @@
 import { TRPCError } from '@trpc/server';
 
-vi.mock('./session-id-guard.js', async () => {
-  const { TRPCError } = await import('@trpc/server');
-  return {
-    assertControlSessionId: (sessionId: string): void => {
-      if (!sessionId.startsWith('workspace_')) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Only workspace sessions are supported',
-        });
-      }
-    },
-  };
-});
 import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -109,12 +96,5 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
     await expect(preflightRuntimeAuthorizationRecovery('workspace_a', ctx)).rejects.toBeInstanceOf(
       TRPCError
     );
-  });
-
-  it('rejects a non-workspace ID before reading runtime authorization', async () => {
-    await expect(preflightRuntimeAuthorizationRecovery('agent_a', ctx)).rejects.toBeInstanceOf(
-      TRPCError
-    );
-    expect(getRuntimeAuthorizationStatus).not.toHaveBeenCalled();
   });
 });

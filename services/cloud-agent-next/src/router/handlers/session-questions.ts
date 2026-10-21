@@ -3,7 +3,6 @@ import * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
 import type { SessionId, Env } from '../../types.js';
 import { fetchSessionMetadata } from '../../session/metadata.js';
-import { assertControlSessionId } from '../../session/session-id-guard.js';
 import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
@@ -57,7 +56,6 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            assertControlSessionId(sessionId);
             const result = await answerControlPlane(env, userId, sessionId, {
               action: 'answer',
               questionId: input.questionId,
@@ -98,7 +96,6 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            assertControlSessionId(sessionId);
             const result = await answerControlPlane(env, userId, sessionId, {
               action: 'reject',
               questionId: input.questionId,
@@ -140,7 +137,6 @@ export function createSessionQuestionHandlers() {
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            assertControlSessionId(sessionId);
             const result = await answerControlPlane(env, userId, sessionId, {
               action: 'permission',
               permissionId: input.permissionId,
@@ -183,7 +179,6 @@ export function createSessionQuestionHandlers() {
           kiloUserId: userId,
           cloudAgentSessionId: sessionId,
         });
-        assertControlSessionId(sessionId);
         return await withDORetry(
           () => getSandboxSessionStub(env, userId, sessionId),
           session => session.getPendingInteractions(),

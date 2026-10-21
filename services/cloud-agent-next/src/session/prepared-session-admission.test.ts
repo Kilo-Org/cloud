@@ -1,19 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TRPCError } from '@trpc/server';
-
-vi.mock('./session-id-guard.js', async () => {
-  const { TRPCError } = await import('@trpc/server');
-  return {
-    assertControlSessionId: (sessionId: string): void => {
-      if (!sessionId.startsWith('workspace_')) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Only workspace sessions are supported',
-        });
-      }
-    },
-  };
-});
 
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 
@@ -97,17 +82,5 @@ describe('retained prepared admission on the control plane', () => {
     await expect(replayPreparedInitialMessageIfAlreadyAdmitted(input, ctx)).resolves.toBe(
       undefined
     );
-  });
-
-  it('rejects a non-workspace ID before metadata or the Session DO', async () => {
-    const legacyInput = { cloudAgentSessionId: 'agent_prepared' };
-
-    await expect(admitPreparedInitialMessage(legacyInput, ctx)).rejects.toBeInstanceOf(TRPCError);
-    await expect(
-      replayPreparedInitialMessageIfAlreadyAdmitted(legacyInput, ctx)
-    ).rejects.toBeInstanceOf(TRPCError);
-
-    expect(fetchSessionMetadata).not.toHaveBeenCalled();
-    expect(getSandboxSessionStub).not.toHaveBeenCalled();
   });
 });

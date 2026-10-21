@@ -5,7 +5,6 @@ import { logger, withLogTags } from '../../logger.js';
 import { generateSandboxId } from '../../sandbox-id.js';
 import type { SessionId, InterruptResult, TRPCContext, SandboxId } from '../../types.js';
 import { fetchSessionMetadata } from '../../session/metadata.js';
-import { assertControlSessionId } from '../../session/session-id-guard.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { interruptControlSession } from '../control-plane-session.js';
@@ -168,7 +167,6 @@ export function createSessionManagementHandlers() {
       )
       .mutation(async ({ input, ctx }) => {
         const sessionId = input.sessionId as SessionId;
-        assertControlSessionId(sessionId);
         return withLogTags({ source: 'deleteSession' }, () =>
           deleteSessionResources(sessionId, ctx.userId, ctx.env, async () => {
             await requireCurrentSessionAccess({
@@ -188,7 +186,6 @@ export function createSessionManagementHandlers() {
       )
       .mutation(async ({ input, ctx }) => {
         const sessionId = input.sessionId as SessionId;
-        assertControlSessionId(sessionId);
         return withLogTags({ source: 'cleanupSession' }, () =>
           deleteSessionResources(sessionId, ctx.userId, ctx.env)
         );
@@ -208,7 +205,6 @@ export function createSessionManagementHandlers() {
       .mutation(async ({ input, ctx }): Promise<InterruptResult> => {
         return withLogTags({ source: 'interruptSession' }, async () => {
           const sessionId = input.sessionId as SessionId;
-          assertControlSessionId(sessionId);
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
@@ -286,7 +282,6 @@ export function createSessionManagementHandlers() {
       .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'cancelQueuedMessage' }, async () => {
           const sessionId = input.sessionId as SessionId;
-          assertControlSessionId(sessionId);
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
@@ -331,7 +326,6 @@ export function createSessionManagementHandlers() {
       .query(async ({ input, ctx }) => {
         return withLogTags({ source: 'getSession' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
-          assertControlSessionId(sessionId);
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
@@ -509,7 +503,6 @@ export function createSessionManagementHandlers() {
       .output(GetSandboxStatusOutput)
       .query(async ({ input, ctx }) => {
         const sessionId = input.cloudAgentSessionId as SessionId;
-        assertControlSessionId(sessionId);
         await requireCurrentSessionAccess({
           env: ctx.env,
           kiloUserId: ctx.userId,
@@ -549,7 +542,6 @@ export function createSessionManagementHandlers() {
       .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'getSessionHealth' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
-          assertControlSessionId(sessionId);
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
@@ -657,7 +649,6 @@ export function createSessionManagementHandlers() {
       .query(async ({ input, ctx }) => {
         return withLogTags({ source: 'getMessageResult' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
-          assertControlSessionId(sessionId);
           const { userId, env } = ctx;
           await requireCurrentSessionAccess({
             env,
@@ -694,7 +685,6 @@ export function createSessionManagementHandlers() {
       .query(async ({ input, ctx }) => {
         return withLogTags({ source: 'getPreparationAttempts' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
-          assertControlSessionId(sessionId);
           const { userId, env } = ctx;
           await requireCurrentSessionAccess({
             env,
@@ -716,7 +706,6 @@ export function createSessionManagementHandlers() {
       .query(async ({ input, ctx }) => {
         return withLogTags({ source: 'getLatestAssistantMessage' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
-          assertControlSessionId(sessionId);
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });

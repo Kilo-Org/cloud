@@ -4,7 +4,6 @@ import type { CloudAgentSessionState } from '../persistence/types.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { assertControlSessionId } from './session-id-guard.js';
 
 export class InvalidSessionMetadataError extends Error {
   constructor(
@@ -22,7 +21,6 @@ export async function fetchSessionMetadata(
   userId: string,
   sessionId: string
 ): Promise<CloudAgentSessionState | null> {
-  assertControlSessionId(sessionId);
   const metadata = await withDORetry(
     () => getSandboxSessionStub(env, userId, sessionId),
     stub => stub.getMetadata(),

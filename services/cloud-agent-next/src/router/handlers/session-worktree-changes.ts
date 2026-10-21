@@ -1,7 +1,6 @@
 import { withLogTags } from '../../logger.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
-import { assertControlSessionId } from '../../session/session-id-guard.js';
 import type { SessionId } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure } from '../auth.js';
@@ -25,7 +24,6 @@ function worktreeChangesFor<T>(
   sessionId: SessionId,
   operation: (getStub: () => ControlPlaneSessionStub) => Promise<T>
 ): Promise<T> {
-  assertControlSessionId(sessionId);
   return operation(() => getSandboxSessionStub(env, userId, sessionId));
 }
 

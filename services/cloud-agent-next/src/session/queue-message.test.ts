@@ -8,20 +8,6 @@ import type { SessionId } from '../types/ids.js';
 import type { CustomerBillingFailure, SessionMessageAdmissionResult } from '../execution/types.js';
 import { QUEUED_MESSAGE_LIMIT } from '../control-plane/session/messages.js';
 
-vi.mock('./session-id-guard.js', async () => {
-  const { TRPCError } = await import('@trpc/server');
-  return {
-    assertControlSessionId: (sessionId: string): void => {
-      if (!sessionId.startsWith('workspace_')) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Only workspace sessions are supported',
-        });
-      }
-    },
-  };
-});
-
 vi.mock('./model-preflight.js', () => ({
   preflightExistingPromptModel: vi.fn(),
   preflightSessionRuntime: vi.fn(),
@@ -129,23 +115,6 @@ describe('preflightAndQueuePromptMessage', () => {
       send.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
     expect(send).toHaveBeenCalledOnce();
-  });
-
-  it('rejects a non-workspace ID before metadata or preflight', async () => {
-    const send = makeSend({ type: 'ok' });
-
-    await expect(
-      preflightAndQueuePromptMessage(
-        { ...promptInput, cloudAgentSessionId: 'agent_existing' },
-        { env: makeEnv({ send }) as Env, userId: 'user_abc' },
-        'send'
-      )
-    ).rejects.toBeInstanceOf(TRPCError);
-
-    expect(fetchSessionMetadata).not.toHaveBeenCalled();
-    expect(preflightSessionRuntime).not.toHaveBeenCalled();
-    expect(preflightExistingPromptModel).not.toHaveBeenCalled();
-    expect(send).not.toHaveBeenCalled();
   });
 });
 
@@ -285,20 +254,6 @@ describe('queueMessage', () => {
     await expect(
       queueMessage(promptInput, { env: makeEnv({ send }) as Env, userId: 'user_abc' })
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
-    expect(send).not.toHaveBeenCalled();
-  });
-
-  it('rejects a non-workspace ID before metadata or the send RPC', async () => {
-    const send = makeSend({ type: 'ok' });
-
-    await expect(
-      queueMessage(
-        { ...promptInput, cloudAgentSessionId: 'agent_x' as SessionId },
-        { env: makeEnv({ send }) as Env, userId: 'u' }
-      )
-    ).rejects.toBeInstanceOf(TRPCError);
-
-    expect(fetchSessionMetadata).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
   });
 });

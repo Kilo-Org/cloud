@@ -36,7 +36,6 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import { resolveSecret } from '../auth.js';
 import { fetchSessionMetadata } from './metadata.js';
-import { assertControlSessionId } from './session-id-guard.js';
 import jwt from 'jsonwebtoken';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 
@@ -133,7 +132,6 @@ export async function preflightRuntimeAuthorizationRecovery(
   cloudAgentSessionId: string,
   ctx: QueueMessageContext
 ): Promise<void> {
-  assertControlSessionId(cloudAgentSessionId as SessionId);
   if (!ctx.authToken) return;
   const claims = jwt.decode(ctx.authToken);
   if (
@@ -222,7 +220,6 @@ export async function preflightAndAdmitPromptMessage<T>(
   procedure: string,
   admit: (input: QueueMessageInput, ctx: QueueMessageContext) => Promise<T>
 ): Promise<T> {
-  assertControlSessionId(input.cloudAgentSessionId as SessionId);
   await preflightSessionRuntime({
     env: ctx.env,
     userId: ctx.userId,
@@ -245,16 +242,15 @@ export function preflightAndQueuePromptMessage(
   ctx: QueueMessageContext,
   procedure: string
 ): Promise<QueueAckResponse> {
-  return preflightAndAdmitPromptMessage(input, ctx, procedure, queueMessageAfterRecoveryPreflight);
+  return preflightAndAdmitPromptMessage(input, ctx, procedure, queueControlPlaneMessage);
 }
 
 export async function queueMessage(
   input: QueueMessageInput,
   ctx: QueueMessageContext
 ): Promise<QueueAckResponse> {
-  assertControlSessionId(input.cloudAgentSessionId as SessionId);
   await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
-  return queueMessageAfterRecoveryPreflight(input, ctx);
+  return queueControlPlaneMessage(input, ctx);
 }
 
 /**
@@ -310,12 +306,4 @@ async function queueControlPlaneMessage(
     messageId: payload.messageId,
     delivery: 'queued',
   };
-}
-
-async function queueMessageAfterRecoveryPreflight(
-  input: QueueMessageInput,
-  ctx: QueueMessageContext
-): Promise<QueueAckResponse> {
-  assertControlSessionId(input.cloudAgentSessionId as SessionId);
-  return queueControlPlaneMessage(input, ctx);
 }

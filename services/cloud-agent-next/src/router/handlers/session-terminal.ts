@@ -4,7 +4,6 @@ import type { OperationResult } from '../../persistence/types.js';
 import type { SessionId } from '../../types/ids.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
-import { assertControlSessionId } from '../../session/session-id-guard.js';
 import { protectedProcedure } from '../auth.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { SANDBOX_STATUS_DETAIL_MESSAGES } from '../../shared/sandbox-status.js';
@@ -48,7 +47,6 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
-          assertControlSessionId(sessionId);
 
           // Generate once so a retry reuses the same creation identity.
           const operationId = crypto.randomUUID();
@@ -84,7 +82,6 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
-          assertControlSessionId(sessionId);
           const result = await withDORetry(
             () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
             stub =>
@@ -117,7 +114,6 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
-          assertControlSessionId(sessionId);
 
           const result = await withDORetry(
             () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),

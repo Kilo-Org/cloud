@@ -1,5 +1,6 @@
 import type { QueueAckResponse } from '../router/schemas.js';
 import type { Env } from '../types.js';
+import type { SessionId } from '../types/ids.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import {
@@ -17,7 +18,6 @@ import {
   projectAdmissionToPublicAck,
   throwAdmissionError,
 } from './queue-message.js';
-import { assertControlSessionId } from './session-id-guard.js';
 
 export type PreparedInitialAdmissionInput = {
   cloudAgentSessionId: string;
@@ -27,8 +27,7 @@ export async function replayPreparedInitialMessageIfAlreadyAdmitted(
   input: PreparedInitialAdmissionInput,
   ctx: { env: Env; userId: string; botId?: string }
 ): Promise<QueueAckResponse | undefined> {
-  assertControlSessionId(input.cloudAgentSessionId);
-  const sessionId = input.cloudAgentSessionId;
+  const sessionId = input.cloudAgentSessionId as SessionId;
   const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, sessionId);
   const messageId = metadata?.initialMessage?.id;
   if (!messageId) return undefined;
@@ -50,8 +49,7 @@ export async function admitPreparedInitialMessage(
   input: PreparedInitialAdmissionInput,
   ctx: { env: Env; userId: string; botId?: string }
 ): Promise<QueueAckResponse> {
-  assertControlSessionId(input.cloudAgentSessionId);
-  const sessionId = input.cloudAgentSessionId;
+  const sessionId = input.cloudAgentSessionId as SessionId;
   const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, sessionId);
   if (!metadata) {
     throwAdmissionError({ success: false, code: 'NOT_FOUND', error: 'Session not found' });

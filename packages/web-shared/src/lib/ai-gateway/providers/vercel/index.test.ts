@@ -708,7 +708,10 @@ describe('applyVercelSettings managed requests', () => {
     };
   }
 
-  function managedRequestForApi(kind: GatewayRequest['kind'], model: string): GatewayRequest {
+  function managedRequestForApi(
+    kind: 'chat_completions' | 'messages' | 'responses',
+    model: string
+  ): GatewayRequest {
     const provider = { ignore: ['openai'] };
     if (kind === 'responses') {
       return { kind, body: { model, input: 'hello', provider } };
@@ -785,7 +788,7 @@ describe('applyVercelSettings session affinity', () => {
   const conversationId = 'conversation-hash';
 
   function requestWithConversationId(
-    kind: GatewayRequest['kind'],
+    kind: 'chat_completions' | 'messages' | 'responses',
     id: string | undefined
   ): GatewayRequest {
     const model = 'anthropic/claude-sonnet-4.5';

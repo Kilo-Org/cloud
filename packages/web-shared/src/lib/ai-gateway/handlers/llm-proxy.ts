@@ -16,7 +16,13 @@ import type {
   GatewayResponsesRequest,
   GatewayMessagesRequest,
   GatewayRequest,
+  GeminiGenerateContentRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  isServerSentEventsStream,
+  parseGenerateContentPath,
+  type GenerateContentPath,
+} from '@kilocode/web-shared/lib/ai-gateway/generate-content';
 import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
@@ -66,6 +72,7 @@ import {
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
+  streamGenerateContentRequiresSseResponse,
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
@@ -117,6 +124,7 @@ import {
   customRouterModelId,
   isCustomRouterModelId,
   type AutoRouter,
+  type ClassifierApiKind,
   type CustomRouterReference,
 } from '@kilocode/auto-routing-contracts';
 import {
@@ -158,6 +166,8 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
+const AUTO_MODEL_CHAT_APIS = ['chat_completions', 'messages', 'responses'] as const;
+
 /**
  * Checks if a string starts with a required prefix and removes it.
  * @param str The input string to check
@@ -171,11 +181,11 @@ function stripRequiredPrefix(str: string, prefix: string): string | null {
   return null;
 }
 
-function validatePath(
-  url: URL
-):
-  | { path: '/chat/completions' | '/responses' | '/messages' }
-  | { errorResponse: ReturnType<typeof invalidPathResponse> } {
+type ValidatedPath =
+  | { kind: 'chat_completions' | 'responses' | 'messages' }
+  | ({ kind: 'generate_content' } & GenerateContentPath);
+
+function validatePath(url: URL): ValidatedPath | { errorResponse: NextResponseType<unknown> } {
   const pathSuffix =
     stripRequiredPrefix(url.pathname, '/api/gateway/v1') ??
     stripRequiredPrefix(url.pathname, '/api/openrouter/v1') ??
@@ -184,12 +194,16 @@ function validatePath(
     // The ai-gateway app serves the proxy under /api/v1.
     stripRequiredPrefix(url.pathname, '/api/v1');
 
-  if (
-    pathSuffix === '/chat/completions' ||
-    pathSuffix === '/responses' ||
-    pathSuffix === '/messages'
-  ) {
-    return { path: pathSuffix };
+  if (pathSuffix === '/chat/completions') return { kind: 'chat_completions' };
+  if (pathSuffix === '/responses') return { kind: 'responses' };
+  if (pathSuffix === '/messages') return { kind: 'messages' };
+
+  const generateContentPath = pathSuffix === null ? null : parseGenerateContentPath(pathSuffix);
+  if (generateContentPath) {
+    if (generateContentPath.stream && !isServerSentEventsStream(url.searchParams)) {
+      return { errorResponse: streamGenerateContentRequiresSseResponse() };
+    }
+    return { kind: 'generate_content', ...generateContentPath };
   }
   return { errorResponse: invalidPathResponse() };
 }
@@ -227,7 +241,6 @@ export async function handleLlmProxyRequest(
 
   const pathResult = validatePath(url);
   if ('errorResponse' in pathResult) return pathResult.errorResponse;
-  const { path } = pathResult;
 
   // Extract IP early (needed for free model routing fallback and rate limiting)
   const ipAddress = rawClientIp(request);
@@ -262,16 +275,22 @@ export async function handleLlmProxyRequest(
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: GatewayRequest;
   try {
-    if (path === '/chat/completions') {
+    if (pathResult.kind === 'chat_completions') {
       const body: OpenRouterChatCompletionRequest = JSON.parse(requestBodyText);
       // Inject or merge stream_options.include_usage = true (only when streaming)
       if (body.stream) {
         body.stream_options = { ...(body.stream_options || {}), include_usage: true };
       }
       requestBodyParsed = { kind: 'chat_completions', body };
-    } else if (path === '/messages') {
+    } else if (pathResult.kind === 'messages') {
       const body: GatewayMessagesRequest = JSON.parse(requestBodyText);
       requestBodyParsed = { kind: 'messages', body };
+    } else if (pathResult.kind === 'generate_content') {
+      const body: GeminiGenerateContentRequest = JSON.parse(requestBodyText);
+      requestBodyParsed = {
+        kind: 'generate_content',
+        body: { ...body, model: pathResult.model, stream: pathResult.stream },
+      };
     } else {
       const body: GatewayResponsesRequest = JSON.parse(requestBodyText);
       requestBodyParsed = { kind: 'responses', body };
@@ -306,6 +325,13 @@ export async function handleLlmProxyRequest(
     if (input != null && typeof input !== 'string' && !Array.isArray(input)) {
       return invalidRequestResponse();
     }
+  }
+
+  if (
+    requestBodyParsed.kind === 'generate_content' &&
+    !Array.isArray(requestBodyParsed.body.contents)
+  ) {
+    return invalidRequestResponse();
   }
 
   const requestedModel = requestBodyParsed.body.model.trim();
@@ -364,7 +390,7 @@ export async function handleLlmProxyRequest(
       'AI gateway client disconnected (aborting in-flight upstream work for this request), requested model: %s',
       requestedModelLowerCased,
       {
-        path,
+        api_kind: requestBodyParsed.kind,
         elapsed_ms: Math.round(performance.now() - requestStartedAt),
         client_request_id: clientRequestId,
         session_id: taskId ?? sessionHeader,
@@ -434,9 +460,12 @@ export async function handleLlmProxyRequest(
     ]);
     return [...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy])];
   };
-  const decisionRequest = (caller: { userId: string; organizationId: string | null }) => ({
-    apiKind: requestBodyParsed.kind,
-    body: requestBodyParsed.body,
+  const decisionRequest = (
+    autoRoutedRequest: { kind: ClassifierApiKind; body: unknown },
+    caller: { userId: string; organizationId: string | null }
+  ) => ({
+    apiKind: autoRoutedRequest.kind,
+    body: autoRoutedRequest.body,
     providerHints: autoRoutingProviderHints,
     bodyBytes: Buffer.byteLength(requestBodyText),
     userId: caller.userId,
@@ -468,6 +497,11 @@ export async function handleLlmProxyRequest(
     applyResolvedModel(requestBodyParsed, check.resolved);
     autoModel = check.routerModelId;
   } else if (isKiloAutoModel(requestedModelLowerCased)) {
+    // The Auto classifier does not read Gemini API requests.
+    if (requestBodyParsed.kind === 'generate_content') {
+      return apiKindNotSupportedResponse(requestBodyParsed.kind, AUTO_MODEL_CHAT_APIS);
+    }
+    const autoRoutedRequest = requestBodyParsed;
     if (isCustomRouterModelId(requestedModelLowerCased)) {
       const caller = await authenticatedRoutingCaller();
       if (caller instanceof NextResponse) return caller;
@@ -499,7 +533,7 @@ export async function handleLlmProxyRequest(
         () => collectDataCollectionRequiredAutoRoutingModelIds(owner, router)
       );
       const result = await fetchEfficientAutoDecision({
-        ...decisionRequest(owner),
+        ...decisionRequest(autoRoutedRequest, owner),
         ...(router === 'frontier' ? { router } : {}),
         requestedModel,
         deniedModelIds,
@@ -527,7 +561,7 @@ export async function handleLlmProxyRequest(
           ),
         decide: async (router, deniedModelIds) => {
           const outcome = await fetchCustomRouterDecision({
-            ...decisionRequest(caller),
+            ...decisionRequest(autoRoutedRequest, caller),
             router: router.baseRouter,
             customRouter: reference,
             requestedModel: legacyPoolTarget
@@ -554,7 +588,7 @@ export async function handleLlmProxyRequest(
         model: requestedModelLowerCased,
         modeHeader,
         sessionId: taskId ?? null,
-        apiKind: requestBodyParsed.kind,
+        apiKind: autoRoutedRequest.kind,
         clientIp: ipAddress ?? null,
         efficientDecision,
         frontierDecision,
@@ -566,7 +600,7 @@ export async function handleLlmProxyRequest(
           return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
         },
       },
-      requestBodyParsed,
+      autoRoutedRequest,
       authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );

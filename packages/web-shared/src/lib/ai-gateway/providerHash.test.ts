@@ -9,6 +9,18 @@ import {
   generateVercelDownstreamSafetyIdentifier,
 } from './providerHash';
 
+function trackedSessionId(request: GatewayRequest) {
+  switch (request.kind) {
+    case 'messages':
+      return request.body.session_id;
+    case 'chat_completions':
+    case 'responses':
+      return request.body.prompt_cache_key;
+    case 'generate_content':
+      return undefined;
+  }
+}
+
 describe('generateProviderSpecificHash', () => {
   const testUserId = 'test-user-123';
 
@@ -61,10 +73,7 @@ describe('session tracking identifiers', () => {
     const trackedRequest = structuredClone(request);
     applyTrackingIds(trackedRequest, OPENROUTER, userId, sessionId);
 
-    const trackedSession =
-      trackedRequest.kind === 'messages'
-        ? trackedRequest.body.session_id
-        : trackedRequest.body.prompt_cache_key;
+    const trackedSession = trackedSessionId(trackedRequest);
     expect(trackedSession).toBe(generateProviderSpecificSessionHash(userId, sessionId, OPENROUTER));
   });
 
@@ -72,10 +81,7 @@ describe('session tracking identifiers', () => {
     const trackedRequest = structuredClone(request);
     applyTrackingIds(trackedRequest, OPENROUTER, userId, null);
 
-    const trackedSession =
-      trackedRequest.kind === 'messages'
-        ? trackedRequest.body.session_id
-        : trackedRequest.body.prompt_cache_key;
+    const trackedSession = trackedSessionId(trackedRequest);
     expect(trackedSession).toBeUndefined();
   });
 
@@ -83,10 +89,7 @@ describe('session tracking identifiers', () => {
     const trackedRequest = structuredClone(request);
     applyTrackingIds(trackedRequest, VERCEL_AI_GATEWAY, userId, sessionId);
 
-    const trackedSession =
-      trackedRequest.kind === 'messages'
-        ? trackedRequest.body.session_id
-        : trackedRequest.body.prompt_cache_key;
+    const trackedSession = trackedSessionId(trackedRequest);
     expect(trackedSession).toBe(
       generateProviderSpecificSessionHash(userId, sessionId, VERCEL_AI_GATEWAY)
     );

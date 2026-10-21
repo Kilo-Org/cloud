@@ -1,4 +1,5 @@
 import type { Organization } from '@kilocode/db/schema';
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { OrganizationAutoModelSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
@@ -95,7 +96,7 @@ export async function validateOrganizationAutoTarget(
   organization: OrganizationAutoPolicyOrganization,
   targetModelId: string,
   options: {
-    apiKind?: 'chat_completions' | 'responses' | 'messages';
+    apiKind?: GatewayChatApiKind;
     dbClient?: typeof readDb | DrizzleTransaction;
   } = {}
 ): Promise<OrganizationAutoTargetValidationResult> {

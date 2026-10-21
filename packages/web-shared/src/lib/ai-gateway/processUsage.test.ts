@@ -279,6 +279,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     ['responses', 'TimeoutError'],
     ['messages', 'ResponseAborted'],
     ['messages', 'TimeoutError'],
+    ['generate_content', 'ResponseAborted'],
+    ['generate_content', 'TimeoutError'],
     ['chat_completions', 'undici terminated'],
     ['responses', 'undici terminated'],
     ['messages', 'undici terminated'],
@@ -1693,6 +1695,24 @@ describe('logMicrodollarUsage', () => {
 
       expect(mockedReportUsageEvent).toHaveBeenCalledWith(
         expect.objectContaining({ requestId, accountId: `user:${user.id}`, siwc: true })
+      );
+    });
+
+    test('omits the Gemini API kind, which bouncer does not accept yet', async () => {
+      const user = await insertTestUser({
+        id: 'test-bouncer-gemini-user',
+        microdollars_used: 0,
+        google_user_email: 'bouncer-gemini@example.com',
+      });
+      const requestId = 'req-bouncer-gemini';
+
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null },
+        { ...spendWatchContext(user, requestId, false), api_kind: 'generate_content' }
+      );
+
+      expect(mockedReportUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId, apiKind: undefined })
       );
     });
   });

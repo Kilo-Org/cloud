@@ -1,5 +1,6 @@
 import type {
   GatewayRequest,
+  GeminiGenerationConfig,
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
@@ -422,29 +423,56 @@ export async function applyResolvedAutoModel(
 
 export function applyResolvedModel(request: GatewayRequest, resolved: ResolvedAutoModel): void {
   request.body.model = resolved.model;
-  if (resolved.reasoning) {
-    if (request.kind === 'messages') {
-      request.body.thinking = { type: resolved.reasoning.enabled ? 'adaptive' : 'disabled' };
-    } else {
-      request.body.reasoning = { ...resolved.reasoning };
-      if (request.kind === 'chat_completions') {
+  const { reasoning, verbosity } = resolved;
+  switch (request.kind) {
+    case 'messages':
+      if (reasoning) {
+        request.body.thinking = { type: reasoning.enabled ? 'adaptive' : 'disabled' };
+      }
+      if (verbosity) {
+        request.body.output_config = { ...request.body.output_config, effort: verbosity };
+      }
+      return;
+    case 'responses':
+      if (reasoning) {
+        request.body.reasoning = { ...reasoning };
+      }
+      if (verbosity) {
+        request.body.text = {
+          ...request.body.text,
+          verbosity: verbosity as OpenAI.Responses.ResponseTextConfig['verbosity'],
+        };
+      }
+      return;
+    case 'chat_completions':
+      if (reasoning) {
+        request.body.reasoning = { ...reasoning };
         delete request.body.reasoning_effort;
       }
-    }
+      if (verbosity) {
+        request.body.verbosity = verbosity as OpenRouterChatCompletionRequest['verbosity'];
+      }
+      return;
+    case 'generate_content':
+      // The Gemini API has no verbosity setting.
+      if (reasoning) {
+        request.body.generationConfig = {
+          ...request.body.generationConfig,
+          thinkingConfig: geminiThinkingConfig(reasoning),
+        };
+      }
+      return;
   }
-  if (resolved.verbosity) {
-    if (request.kind === 'messages') {
-      request.body.output_config = {
-        ...request.body.output_config,
-        effort: resolved.verbosity,
-      };
-    } else if (request.kind === 'responses') {
-      request.body.text = {
-        ...request.body.text,
-        verbosity: resolved.verbosity as OpenAI.Responses.ResponseTextConfig['verbosity'],
-      };
-    } else {
-      request.body.verbosity = resolved.verbosity as OpenRouterChatCompletionRequest['verbosity'];
-    }
+}
+
+function geminiThinkingConfig(
+  reasoning: NonNullable<ResolvedAutoModel['reasoning']>
+): NonNullable<GeminiGenerationConfig['thinkingConfig']> {
+  if (reasoning.enabled === false || reasoning.effort === 'none') {
+    return { thinkingBudget: 0 };
   }
+  return {
+    ...(reasoning.effort ? { thinkingLevel: reasoning.effort } : {}),
+    ...(reasoning.max_tokens ? { thinkingBudget: reasoning.max_tokens } : {}),
+  };
 }

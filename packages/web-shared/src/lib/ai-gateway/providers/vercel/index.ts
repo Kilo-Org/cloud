@@ -122,7 +122,17 @@ export async function shouldRouteToVercel(
 }
 
 function getConversationId(request: GatewayRequest): string | undefined {
-  const id = request.kind === 'messages' ? request.body.session_id : request.body.prompt_cache_key;
+  const id = (() => {
+    switch (request.kind) {
+      case 'messages':
+        return request.body.session_id;
+      case 'chat_completions':
+      case 'responses':
+        return request.body.prompt_cache_key;
+      case 'generate_content':
+        return undefined;
+    }
+  })();
   return typeof id === 'string' && id.length > 0 ? id : undefined;
 }
 
@@ -177,7 +187,8 @@ export function convertProviderOptions(
     );
   })();
 
-  const serviceTier = requestToMutate.body.service_tier;
+  const serviceTier =
+    requestToMutate.kind === 'generate_content' ? undefined : requestToMutate.body.service_tier;
   return {
     gateway: {
       only,

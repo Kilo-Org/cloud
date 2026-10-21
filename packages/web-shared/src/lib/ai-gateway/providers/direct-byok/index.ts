@@ -18,6 +18,19 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+
+type DirectByokKeyOwner = 'user' | 'organization';
+
+/** The Gemini API is enabled for personal BYOK keys only, for now. */
+export function getDirectByokSupportedChatApis(
+  provider: DirectByokProvider,
+  keyOwner: DirectByokKeyOwner
+): ReadonlyArray<GatewayChatApiKind> {
+  return keyOwner === 'user'
+    ? provider.supported_chat_apis
+    : provider.supported_chat_apis.filter(kind => kind !== 'generate_content');
+}
 
 /** Providers for `/api/v1/providers` that the general provider list lacks. */
 export function getDirectByokProviderListings(): OpenRouterProvider[] {
@@ -36,7 +49,8 @@ export function formatDirectByokModelId(provider: DirectByokProvider, model: Dir
 function convertModel(
   provider: DirectByokProvider,
   model: DirectByokModel,
-  preferredIndex: number
+  preferredIndex: number,
+  ai_sdk_provider: DirectByokModel['ai_sdk_provider']
 ) {
   const id = formatDirectByokModelId(provider, model);
   const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
@@ -77,7 +91,7 @@ function convertModel(
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: withLegacyVariants({
-      ai_sdk_provider: getAiSdkProvider(id, provider.id),
+      ai_sdk_provider,
       reasoning_options:
         model.reasoning_options ??
         (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),
@@ -85,18 +99,34 @@ function convertModel(
   };
 }
 
-async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
+async function getDirectByokModels(
+  byokProviders: UserByokProviderId[],
+  keyOwner: DirectByokKeyOwner
+) {
   const firstPreferredId = (await getPreferredModels()).length;
   const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
     byokProviders.includes(provider.id)
   );
   const modelsByProvider = await Promise.all(
-    enabledProviders.map(async provider => ({ provider, models: await provider.models() }))
+    enabledProviders.map(async provider => {
+      const models: ReadonlyArray<DirectByokModel> = await provider.models();
+      return { provider, models };
+    })
   );
   let nextPreferredId = firstPreferredId;
-  return modelsByProvider.flatMap(({ provider, models }) =>
-    models.map(model => convertModel(provider, model, nextPreferredId++))
-  );
+  return modelsByProvider.flatMap(({ provider, models }) => {
+    const supportsGeminiApi = getDirectByokSupportedChatApis(provider, keyOwner).includes(
+      'generate_content'
+    );
+    return models.flatMap(model => {
+      const ai_sdk_provider =
+        model.ai_sdk_provider ??
+        getAiSdkProvider(formatDirectByokModelId(provider, model), provider.id);
+      return ai_sdk_provider === 'google' && !supportsGeminiApi
+        ? []
+        : [convertModel(provider, model, nextPreferredId++, ai_sdk_provider)];
+    });
+  });
 }
 
 export async function getDirectByokModel(requestedModel: string): Promise<{
@@ -122,12 +152,14 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
 
 export async function getDirectByokModelsForOrganization(organizationId: string) {
   const byokProviderIds = await getOrganizationByokProviderIds(readDb, organizationId);
-  return byokProviderIds.length === 0 ? [] : await getDirectByokModels(byokProviderIds);
+  return byokProviderIds.length === 0
+    ? []
+    : await getDirectByokModels(byokProviderIds, 'organization');
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
   const byokProviderIds = await getUserByokProviderIds(readDb, userId);
-  return byokProviderIds.length === 0 ? [] : await getDirectByokModels(byokProviderIds);
+  return byokProviderIds.length === 0 ? [] : await getDirectByokModels(byokProviderIds, 'user');
 }
 
 export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {

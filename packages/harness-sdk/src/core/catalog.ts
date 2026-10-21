@@ -1,6 +1,10 @@
 import { Context, Data, type Effect } from 'effect';
 
-/** The three shapes the gateway speaks. A model does not always speak all three. */
+/**
+ * The three shapes this package sends through the gateway. A model does not
+ * always speak all three. The gateway also serves Gemini's generateContent for
+ * some BYOK models, which this package does not send.
+ */
 type ApiKind = 'messages' | 'responses' | 'chat_completions';
 
 /** What the package needs to know about a model before it calls one. */

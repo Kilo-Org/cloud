@@ -1,4 +1,5 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { geminiFunctionDeclarations } from '@kilocode/web-shared/lib/ai-gateway/generate-content';
 
 // Keywords whose values are instance data rather than subschemas.
 const DATA_KEYWORDS = new Set(['const', 'default', 'enum', 'examples']);
@@ -116,6 +117,11 @@ export function removeRecursiveToolSchemaRefs(request: GatewayRequest): void {
     case 'messages':
       for (const tool of request.body.tools ?? []) {
         if ('input_schema' in tool) removeRecursiveJsonSchemaRefs(tool.input_schema);
+      }
+      break;
+    case 'generate_content':
+      for (const declaration of geminiFunctionDeclarations(request.body)) {
+        removeRecursiveJsonSchemaRefs(declaration.parametersJsonSchema ?? declaration.parameters);
       }
       break;
   }

@@ -1,9 +1,7 @@
 import {
   isOpenRouterProviderConfig,
-  type GatewayResponsesRequest,
   type OpenRouterChatCompletionRequest,
   type GatewayRequest,
-  type GatewayMessagesRequest,
   type OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -209,10 +207,7 @@ export function withIgnoredProviders(
 
 export function applyPreferredProvider(
   requestedModel: string,
-  requestToMutate:
-    | OpenRouterChatCompletionRequest
-    | GatewayResponsesRequest
-    | GatewayMessagesRequest,
+  requestToMutate: GatewayRequest['body'],
   isAnthropicProviderAllowed: boolean
 ) {
   const preferredProviderOrder = getPreferredProviderOrder(requestedModel);
@@ -274,8 +269,11 @@ export function removeUnsupportedRequestServiceTier(
       : kiloExclusiveModel && !kiloExclusiveModel.flags.includes('flex')
         ? 'non-Flex Kilo-exclusive model'
         : null;
+  if (!reason || requestToMutate.kind === 'generate_content') {
+    return;
+  }
   const serviceTier = requestToMutate.body.service_tier;
-  if (!reason || serviceTier === undefined) {
+  if (serviceTier === undefined) {
     return;
   }
 

@@ -166,6 +166,8 @@ export function addReflectionReasoningPlaceholders(model: string, request: Gatew
         return addMessagesReasoningPlaceholders(request.body);
       case 'responses':
         return addResponsesReasoningPlaceholders(request.body);
+      case 'generate_content':
+        return 0;
     }
   })();
   if (placeholderCount > 0) {

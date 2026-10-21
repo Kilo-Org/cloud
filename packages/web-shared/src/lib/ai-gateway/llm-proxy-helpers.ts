@@ -47,6 +47,7 @@ import type {
   ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { lastGeminiUserText } from '@kilocode/web-shared/lib/ai-gateway/processUsage.generateContent';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -260,6 +261,14 @@ export function apiKindNotSupportedResponse(
   warnExceptInTest(`[apiKindNotSupportedResponse] ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },
+    { status: 400 }
+  );
+}
+
+export function streamGenerateContentRequiresSseResponse() {
+  const error = 'streamGenerateContent is only supported with server-sent events (alt=sse).';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.invalid_request, message: error },
     { status: 400 }
   );
 }
@@ -803,22 +812,25 @@ function lastUserTurnText(input: unknown): string | null {
 
 /**
  * The request shapes that carry a user prompt. The body is typed structurally
- * because only the three gateway kinds pass through here, and FIM's `prompt`
- * body is not part of `GatewayRequest`.
+ * because the gateway kinds pass through here, and FIM's `prompt` body is not
+ * part of `GatewayRequest`.
  */
 type PromptBearingRequest = {
   kind: GatewayChatApiKind | 'fim_completions';
-  body: { messages?: unknown; input?: unknown; prompt?: unknown };
+  body: { messages?: unknown; input?: unknown; prompt?: unknown; contents?: unknown };
 };
 
 /**
  * The last user turn's text, which bouncer hashes into a prompt SimHash.
  * Chat Completions and Messages carry it in `messages`, Responses in `input`
- * (a prompt string or an input-item list), FIM in `prompt`. Null when the
- * request carries no user text.
+ * (a prompt string or an input-item list), the Gemini API in `contents`, FIM
+ * in `prompt`. Null when the request carries no user text.
  */
 export function lastUserPromptText(request: PromptBearingRequest): string | null {
   if (request.kind === 'responses') return lastUserTurnText(request.body.input);
+  if (request.kind === 'generate_content') {
+    return Array.isArray(request.body.contents) ? lastGeminiUserText(request.body.contents) : null;
+  }
   if (request.kind === 'fim_completions') {
     return typeof request.body.prompt === 'string' ? request.body.prompt : null;
   }
@@ -828,7 +840,8 @@ export function lastUserPromptText(request: PromptBearingRequest): string | null
 /**
  * True when the request asked for token-level probabilities, which bouncer
  * reads as a distillation signal. No gateway request type declares all three
- * fields (Messages declares none), so read them structurally.
+ * fields (Messages declares none), so read them structurally. Gemini API
+ * requests set them in `generationConfig`.
  */
 export function requestedLogprobs(body: unknown): boolean {
   if (typeof body !== 'object' || body === null) return false;
@@ -836,14 +849,23 @@ export function requestedLogprobs(body: unknown): boolean {
   return (
     ('logprobs' in body && Boolean(body.logprobs)) ||
     ('top_logprobs' in body && Boolean(body.top_logprobs)) ||
-    (typeof logitBias === 'object' && logitBias !== null && Object.keys(logitBias).length > 0)
+    ('responseLogprobs' in body && Boolean(body.responseLogprobs)) ||
+    (typeof logitBias === 'object' && logitBias !== null && Object.keys(logitBias).length > 0) ||
+    ('generationConfig' in body && requestedLogprobs(body.generationConfig))
   );
 }
 
-/** The `n` sampling parameter, or null when the request did not set one. */
+/**
+ * The `n` sampling parameter, or Gemini's `generationConfig.candidateCount`,
+ * or null when the request did not set one.
+ */
 export function requestedSamples(body: unknown): number | null {
-  if (typeof body !== 'object' || body === null || !('n' in body)) return null;
-  return typeof body.n === 'number' ? body.n : null;
+  if (typeof body !== 'object' || body === null) return null;
+  if ('n' in body) return typeof body.n === 'number' ? body.n : null;
+  if ('candidateCount' in body) {
+    return typeof body.candidateCount === 'number' ? body.candidateCount : null;
+  }
+  return 'generationConfig' in body ? requestedSamples(body.generationConfig) : null;
 }
 
 function reasoningBudgetBucket(value: unknown): string | null {
@@ -877,9 +899,29 @@ export function extractReasoningSetting(body: unknown): string | null {
     labels.push(`thinking:${thinking.type}${bucket ? `:${bucket}` : ''}`);
   }
 
+  const geminiThinkingConfig =
+    isReasoningObject(body.generationConfig) &&
+    isReasoningObject(body.generationConfig.thinkingConfig)
+      ? body.generationConfig.thinkingConfig
+      : undefined;
+  const geminiThinkingBudget = geminiThinkingConfig?.thinkingBudget;
+  if (typeof geminiThinkingBudget === 'number') {
+    const bucket = geminiThinkingBudget > 0 ? reasoningBudgetBucket(geminiThinkingBudget) : null;
+    labels.push(
+      geminiThinkingBudget === 0
+        ? 'thinking:disabled'
+        : `thinking:enabled${bucket ? `:${bucket}` : ''}`
+    );
+  }
+
   const outputConfig = isReasoningObject(body.output_config) ? body.output_config : undefined;
   const reasoning = isReasoningObject(body.reasoning) ? body.reasoning : undefined;
-  const effort = outputConfig?.effort ?? body.reasoning_effort ?? reasoning?.effort;
+  const geminiThinkingLevel = geminiThinkingConfig?.thinkingLevel;
+  const effort =
+    outputConfig?.effort ??
+    body.reasoning_effort ??
+    reasoning?.effort ??
+    (typeof geminiThinkingLevel === 'string' ? geminiThinkingLevel.toLowerCase() : undefined);
   if (typeof effort === 'string') {
     switch (effort) {
       case 'none':

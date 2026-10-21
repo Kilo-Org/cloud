@@ -38,7 +38,7 @@ import type { CustomRouterResolution } from './custom-router';
 import type * as CustomRouters from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 
-const { resolveAutoModel, applyResolvedAutoModel } =
+const { resolveAutoModel, applyResolvedAutoModel, applyResolvedModel } =
   jest.requireActual<typeof AutoModelResolution>('./resolution');
 
 const baseParams = {
@@ -1259,5 +1259,44 @@ describe('applyResolvedAutoModel', () => {
       reasoning_effort: 'high',
     });
     expect(request.body).not.toHaveProperty('reasoning');
+  });
+});
+
+describe('applyResolvedModel for Gemini API requests', () => {
+  function geminiRequest(): Extract<GatewayRequest, { kind: 'generate_content' }> {
+    return {
+      kind: 'generate_content',
+      body: {
+        model: 'kilo-auto/frontier',
+        stream: false,
+        contents: [],
+        generationConfig: { maxOutputTokens: 100 },
+      },
+    };
+  }
+
+  it('maps reasoning effort to the thinking level and ignores verbosity', () => {
+    const request = geminiRequest();
+
+    applyResolvedModel(request, {
+      model: 'gemini-4-argon',
+      reasoning: { effort: 'high' },
+      verbosity: 'low',
+    });
+
+    expect(request.body).toEqual({
+      model: 'gemini-4-argon',
+      stream: false,
+      contents: [],
+      generationConfig: { maxOutputTokens: 100, thinkingConfig: { thinkingLevel: 'high' } },
+    });
+  });
+
+  it('maps disabled reasoning to a zero thinking budget', () => {
+    const request = geminiRequest();
+
+    applyResolvedModel(request, { model: 'gemini-4-argon', reasoning: { enabled: false } });
+
+    expect(request.body.generationConfig?.thinkingConfig).toEqual({ thinkingBudget: 0 });
   });
 });

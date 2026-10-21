@@ -1619,6 +1619,110 @@ describe.each([
   });
 });
 
+describe('Gemini API requests', () => {
+  const geminiProvider = {
+    ...provider,
+    id: 'direct-byok',
+    supportedChatApis: ['chat_completions', 'messages', 'responses', 'generate_content'],
+  } satisfies Provider;
+  const geminiBody = { contents: [{ role: 'user', parts: [{ text: 'hello' }] }] };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: geminiProvider,
+      userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'opencode-go' }],
+      isFree: false,
+      bypassAccessCheck: true,
+    });
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ responseId: 'response-1', candidates: [] }),
+    });
+  });
+
+  it.each([
+    {
+      path: '/opencode-go/gemini-4-argon-contributor:streamGenerateContent?alt=sse',
+      stream: true,
+    },
+    { path: '/models/opencode-go/gemini-4-argon-contributor:generateContent', stream: false },
+  ])('takes the model and streaming mode from $path', async ({ path, stream }) => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(geminiBody, undefined, path, '/api/v1')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetProvider.mock.calls[0]?.[0]).toMatchObject({
+      requestedModel: 'opencode-go/gemini-4-argon-contributor',
+      request: { kind: 'generate_content' },
+    });
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0]).toMatchObject({
+      chatApi: 'generate_content',
+      body: { ...geminiBody, model: 'opencode-go/gemini-4-argon-contributor', stream },
+    });
+  });
+
+  it('rejects streamGenerateContent without server-sent events', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(
+        geminiBody,
+        undefined,
+        '/opencode-go/gemini-4-argon-contributor:streamGenerateContent',
+        '/api/v1'
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a request without contents', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest({}, undefined, '/models/gemini-4-argon:generateContent', '/api/v1')
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects providers that do not serve the Gemini API', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(geminiBody, undefined, '/models/google/gemini-4-argon:generateContent', '/api/v1')
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'api_kind_not_supported' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects Auto models before routing', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(geminiBody, undefined, '/kilo-auto/frontier:generateContent', '/api/v1')
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'api_kind_not_supported' });
+    expect(mockedApplyResolvedAutoModel).not.toHaveBeenCalled();
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+  });
+});
+
 describe('kilo-auto/efficient classifier billing', () => {
   beforeEach(() => {
     jest.clearAllMocks();

@@ -94,7 +94,7 @@ type TokenLimitMutation = 'removed' | 'clamped';
 function logMaxTokenMutation(
   requestToMutate: GatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel,
-  field: 'max_completion_tokens' | 'max_tokens' | 'max_output_tokens',
+  field: 'max_completion_tokens' | 'max_tokens' | 'max_output_tokens' | 'maxOutputTokens',
   requestedValue: number,
   mutation: TokenLimitMutation
 ) {
@@ -160,6 +160,24 @@ function removeNonSensicalMaxTokens(
       requestToMutate.body.max_tokens = kiloExclusiveModel.max_completion_tokens;
     }
   }
+  if (requestToMutate.kind === 'generate_content') {
+    const generationConfig = requestToMutate.body.generationConfig;
+    const maxOutputTokens = generationConfig?.maxOutputTokens;
+    if (
+      generationConfig &&
+      maxOutputTokens !== undefined &&
+      maxOutputTokens > kiloExclusiveModel.max_completion_tokens
+    ) {
+      logMaxTokenMutation(
+        requestToMutate,
+        kiloExclusiveModel,
+        'maxOutputTokens',
+        maxOutputTokens,
+        'removed'
+      );
+      delete generationConfig.maxOutputTokens;
+    }
+  }
 }
 
 /** Rewrites a gateway request to target a Kilo-exclusive model. */
@@ -169,7 +187,7 @@ export function applyKiloExclusiveModelSettings(
 ) {
   requestToMutate.body.model = kiloExclusiveModel.internal_id;
   removeNonSensicalMaxTokens(requestToMutate, kiloExclusiveModel);
-  if (kiloExclusiveModel.flags.includes('flex')) {
+  if (kiloExclusiveModel.flags.includes('flex') && requestToMutate.kind !== 'generate_content') {
     requestToMutate.body.service_tier = 'flex';
   }
   const restriction = kiloExclusiveModel.inference_providers;

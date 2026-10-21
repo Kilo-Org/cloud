@@ -65,6 +65,10 @@ export function applyTrackingIds(
   userId: string,
   taskId: string | null
 ) {
+  // The Gemini API has no user or session fields, and rejects unknown ones.
+  if (request.kind === 'generate_content') {
+    return;
+  }
   const userHash = generateProviderSpecificHash(userId, provider);
   const taskHash = taskId ? generateProviderSpecificSessionHash(userId, taskId, provider) : '';
   if (request.kind === 'messages') {

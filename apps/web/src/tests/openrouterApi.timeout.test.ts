@@ -73,6 +73,50 @@ describe('upstreamRequest timeout', () => {
 
   test.each([
     {
+      stream: true,
+      expectedUrl:
+        'https://google.example.test/v1beta/models/gemini-4-argon-contributor:streamGenerateContent?alt=sse',
+    },
+    {
+      stream: false,
+      expectedUrl:
+        'https://google.example.test/v1beta/models/gemini-4-argon-contributor:generateContent',
+    },
+  ])(
+    'builds the Gemini API URL and body from the request without the client query (stream: $stream)',
+    async ({ stream, expectedUrl }) => {
+      const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+      global.fetch = mockFetch;
+      const contents = [{ role: 'user', parts: [{ text: 'test' }] }];
+
+      await upstreamRequest({
+        chatApi: 'generate_content',
+        reasoningEffort: null,
+        search: '?alt=sse&key=kilo-token',
+        method: 'POST',
+        body: {
+          model: 'gemini-4-argon-contributor',
+          stream,
+          contents,
+          provider: { data_collection: 'deny' },
+        },
+        extraHeaders: {},
+        provider: {
+          ...OPENROUTER,
+          apiUrl: 'https://gateway.example.test/v3',
+          apiUrlOverrides: { generate_content: 'https://google.example.test/v1beta' },
+        },
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expectedUrl,
+        expect.objectContaining({ body: JSON.stringify({ contents }) })
+      );
+    }
+  );
+
+  test.each([
+    {
       chatApi: 'messages',
       apiUrlOverrides: { messages: 'https://messages.example.test/deployments/model:invoke' },
       search: '',

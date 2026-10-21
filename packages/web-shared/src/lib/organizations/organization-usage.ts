@@ -248,7 +248,13 @@ export async function mutateOrganizationUsage(
       updated_at = NOW()
   `);
 
-  const [orgData] = await tx
+  type OrganizationBalanceRow = {
+    total_microdollars_acquired: number;
+    previous_microdollars_used: number;
+    new_microdollars_used: number;
+    settings: OrganizationSettings | null;
+  };
+  const balanceRows: OrganizationBalanceRow[] = await tx
     .update(organizations)
     .set({
       microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
@@ -264,6 +270,7 @@ export async function mutateOrganizationUsage(
       settings: organizations.settings,
     });
 
+  const [orgData] = balanceRows;
   if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
 
   const currentBalance = orgData.total_microdollars_acquired - orgData.previous_microdollars_used;

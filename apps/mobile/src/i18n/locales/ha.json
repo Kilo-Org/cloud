@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Fara wakili na buƙatar umarni. Ƙara umarni sannan ka sake gudanar da shi.",
+      "confirmTitle": "Fara wakili?",
+      "confirmMessage": "Kilo zai fara sabon zaman wakili da wannan umarni: {{prompt}}",
       "repositoryUnknown": "Kilo ba ya gane {{repository}} a matsayin ma'ajiyar GitHub ko GitLab. Zaɓi wata ma'ajiya a cikin Kilo.",
       "repositoryUnsupported": "{{repository}} ma'ajiyar Bitbucket ce — Fara wakili ba zai iya amfani da ita ba tukuna. Zaɓi wata ma'ajiya a cikin Kilo."
     }

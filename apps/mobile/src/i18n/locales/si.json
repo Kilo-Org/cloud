@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "නියෝජිතයා දියත් කිරීමට ඉල්ලීමක් අවශ්‍යයි. ඉල්ලීමක් එක් කර නැවත ධාවනය කරන්න.",
+      "confirmTitle": "නියෝජිතයා දියත් කරන්නද?",
+      "confirmMessage": "Kilo මෙම ඉල්ලීම සමඟ නව නියෝජිත සැසියක් දියත් කරයි: {{prompt}}",
       "repositoryUnknown": "Kilo, {{repository}} GitHub හෝ GitLab කේත ගබඩාවක් ලෙසවත් හඳුනා නොගනී. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න.",
       "repositoryUnsupported": "{{repository}} යනු Bitbucket කේත ගබඩාවකි — නියෝජිතයා දියත් කරන්නට තවම එය භාවිත කළ නොහැක. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න."
     }

@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "برای شروع عامل، یک پیام لازم است. یک پیام اضافه کنید و دوباره اجرا کنید.",
+      "confirmTitle": "شروع عامل؟",
+      "confirmMessage": "Kilo با این پیام یک نشست جدید عامل را شروع می‌کند: {{prompt}}",
       "repositoryUnknown": "Kilo مخزن {{repository}} را به عنوان مخزن GitHub یا GitLab نمی‌شناسد. در Kilo مخزن دیگری انتخاب کنید.",
       "repositoryUnsupported": "{{repository}} یک مخزن Bitbucket است — شروع عامل هنوز نمی‌تواند از آن استفاده کند. در Kilo مخزن دیگری انتخاب کنید."
     }

@@ -16,10 +16,11 @@ export type NativeAppActionHandler = (payload: unknown) => Promise<AppActionResu
 /** What registering the JS dispatcher yields. */
 export type NativeAppActionRegistration = {
   /**
-   * Runs one payload and reports its settled result to the entry point that is
-   * waiting for it. The native module holds this same handler for its live
-   * dispatches; the buffered replay runs through it too, so a payload that
-   * arrived while the app was cold answers its caller exactly like a live one.
+   * Runs one payload through the JS dispatcher. The native module holds this
+   * same handler for its live dispatches; the buffered replay runs through it
+   * too, so a payload that arrived while the app was cold runs exactly like a
+   * live one. Its result is the app's own: nothing travels back through the
+   * entry point that started it.
    */
   handle: NativeAppActionHandler;
   /**
@@ -39,11 +40,11 @@ type KiloAppActionsModule = InstanceType<typeof NativeModule> & {
   // oxlint-disable-next-line anti-slop/no-unknown-returns -- raw native buffer, normalized on the next line of this module
   registerAppActionDispatcher: (handler: NativeAppActionHandler) => unknown;
   /**
-   * Reports one payload's settled result to the native entry point waiting for
-   * it. Absent where the entry points read the handler's promise directly
-   * (iOS) — only the Android entry points wait on a module call.
+   * Whether a `StartAgent` this platform's entry point delivers asks the user
+   * first. Android declares it; iOS does not, because its intents run with no
+   * screen.
    */
-  completeAppAction?: (payload: string, result: string) => void;
+  startAgentNeedsConfirmation?: () => boolean;
 };
 
 const nativeModule = requireOptionalNativeModule<KiloAppActionsModule>('KiloAppActions');
@@ -52,15 +53,18 @@ const nativeModule = requireOptionalNativeModule<KiloAppActionsModule>('KiloAppA
 export const isNativeAppActionsAvailable = nativeModule !== null;
 
 /**
- * Hand the JS dispatcher to the native module and return the handler the
- * waiting entry points are answered through, plus the payloads that arrived
- * before registration, verbatim in arrival order.
- *
- * The wrapper is what makes a result-expecting caller work: the dispatcher is
- * async, so its own return value is a promise no Android JSI call can await
- * (`expo-modules-jsi` is Apple-only). When a dispatch settles, its result is
- * reported through `completeAppAction` and the waiting entry point answers its
- * caller with the real outcome instead of a timeout.
+ * Whether this binary's entry point asks the user before a `StartAgent` starts:
+ * the platform's own answer, and `false` for a binary that does not declare one.
+ */
+export function startAgentNeedsConfirmation(): boolean {
+  return nativeModule?.startAgentNeedsConfirmation?.() === true;
+}
+
+/**
+ * Hand the JS dispatcher to the native module and return the handler it drives
+ * plus the payloads that arrived before registration, verbatim in arrival
+ * order. The handler is the dispatcher's own: it returns the settled
+ * `AppActionResult` for the run, and the app is what shows that outcome.
  *
  * A missing module registers nothing and is not an error; the in-app path
  * keeps working.
@@ -71,41 +75,10 @@ export async function registerNativeAppActionDispatcher(
   if (nativeModule === null) {
     return { handle: handler, buffered: [] };
   }
-  const handle: NativeAppActionHandler = async payload => {
-    const result = await handler(payload);
-    reportCompletion(payload, result);
-    return result;
-  };
   return {
-    handle,
-    buffered: bufferedPayloads(await nativeModule.registerAppActionDispatcher(handle)),
+    handle: handler,
+    buffered: bufferedPayloads(await nativeModule.registerAppActionDispatcher(handler)),
   };
-}
-
-/**
- * Report one payload's settled result to a waiting native entry point. The
- * payload crosses back exactly as it arrived — the native module keyed its
- * waiter on the same value it handed over — and the result crosses as the
- * settled `AppActionResult` JSON. A reporting failure costs the caller its
- * timeout; it never changes the outcome the app produced.
- */
-function reportCompletion(payload: unknown, result: AppActionResult): void {
-  try {
-    nativeModule?.completeAppAction?.(payloadText(payload), JSON.stringify(result));
-  } catch {
-    // The caller answers from its own timeout instead; the dispatch result is
-    // untouched.
-  }
-}
-
-/**
- * The payload key the native waiter is registered under. The Android JSI hands
- * the payload through as JSON text, so text returns verbatim; an object
- * payload crosses back as its canonical JSON.
- */
-function payloadText(payload: unknown): string {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- bridge boundary: the two forms the native buffer carries, and the text form must return verbatim to match the waiter
-  return typeof payload === 'string' ? payload : JSON.stringify(payload);
 }
 
 /** The raw buffer as an arrival-order array: one payload, an array, or nothing. */

@@ -3552,6 +3552,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Pornește un agent necesită o instrucțiune. Adaugă o instrucțiune și rulează-l din nou.",
+      "confirmTitle": "Pornești agentul?",
+      "confirmMessage": "Kilo va porni o sesiune nouă de agent cu această instrucțiune: {{prompt}}",
       "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",
       "repositoryUnsupported": "{{repository}} este un depozit Bitbucket — Pornește un agent nu îl poate folosi încă. Alege alt depozit în Kilo."
     }

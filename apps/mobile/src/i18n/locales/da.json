@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Start agenten kræver en forespørgsel. Tilføj en forespørgsel, og kør den igen.",
+      "confirmTitle": "Start agenten?",
+      "confirmMessage": "Kilo starter en ny agentsession med denne forespørgsel: {{prompt}}",
       "repositoryUnknown": "Kilo genkender ikke {{repository}} som et GitHub- eller GitLab-kodelager. Vælg et andet kodelager i Kilo.",
       "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan endnu ikke bruge det. Vælg et andet kodelager i Kilo."
     }

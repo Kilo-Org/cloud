@@ -3593,6 +3593,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Na spustenie agenta je potrebné zadanie. Pridaj zadanie a spusť ho znova.",
+      "confirmTitle": "Spustiť agenta?",
+      "confirmMessage": "Kilo spustí novú reláciu agenta s týmto zadaním: {{prompt}}",
       "repositoryUnknown": "Kilo nerozpoznáva {{repository}} ako repozitár na GitHube alebo GitLabe. Vyber iný repozitár v Kile.",
       "repositoryUnsupported": "{{repository}} je repozitár na Bitbuckete — Spustiť agenta ho zatiaľ nemôže použiť. Vyber iný repozitár v Kile."
     }

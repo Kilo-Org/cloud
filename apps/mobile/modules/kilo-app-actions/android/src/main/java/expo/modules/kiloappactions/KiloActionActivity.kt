@@ -4,8 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import org.json.JSONObject
 
 /**
@@ -27,8 +25,6 @@ internal object KiloActionContract {
   const val ACTION_OPEN_SESSION = "com.kilocode.kiloapp.action.OPEN_SESSION"
   const val ACTION_OPEN_PULL_REQUEST = "com.kilocode.kiloapp.action.OPEN_PULL_REQUEST"
 
-  /** Present when the caller wants the dispatcher's result back. */
-  const val EXTRA_RESULT = "com.kilocode.kiloapp.extra.RESULT"
   const val EXTRA_PROMPT = "com.kilocode.kiloapp.extra.PROMPT"
   const val EXTRA_REPOSITORY = "com.kilocode.kiloapp.extra.REPOSITORY"
   const val EXTRA_SESSION_ID = "com.kilocode.kiloapp.extra.SESSION_ID"
@@ -115,18 +111,13 @@ internal object KiloActionContract {
  *
  * It is addressable from outside the app: `adb shell am start`, the Assistant,
  * a launcher shortcut, or any other app. It translates the intent into the
- * contract payload and hands it to the shared JS dispatcher. A caller that
- * passes [KiloActionContract.EXTRA_RESULT] gets the dispatcher's real outcome
- * back through `setResult`, even when the app had to start first: the async
- * result arrives through `completeAppAction`, which this activity waits on
- * instead of a fire-and-forget acknowledgement.
+ * contract payload and hands it to the shared JS dispatcher, which runs the
+ * action and is the surface that reports the outcome in the app.
+ *
+ * A `StartAgent` asks the signed-in user in the app before it starts a session
+ * (`start-agent-confirmation.ts`); the open actions navigate as they always do.
  */
 class KiloActionActivity : Activity() {
-  private val main = Handler(Looper.getMainLooper())
-  private var settled = false
-  private var awaitsResult = false
-  private var waitingFor: String? = null
-
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     handle(intent)
@@ -139,52 +130,19 @@ class KiloActionActivity : Activity() {
   }
 
   private fun handle(intent: Intent?) {
-    settled = false
-    awaitsResult = intent?.hasExtra(KiloActionContract.EXTRA_RESULT) == true
     val payload = intent?.let(KiloActionContract::payload)
     if (payload == null) {
-      finishWith(null)
-      return
-    }
-    if (awaitsResult) {
-      waitingFor = payload
-      AppActionDispatcher.await(payload) { result -> finishWith(result) }
-      main.postDelayed({ finishWith(null) }, RESULT_TIMEOUT_MS)
-    }
-    if (AppActionDispatcher.dispatch(payload)) {
-      if (!awaitsResult) {
-        finish()
-      }
-      return
-    }
-    // The JS runtime is not up yet. The dispatcher buffered the payload, so
-    // bring the app up: registration drains it through the same dispatcher and
-    // answers the waiting caller with `completeAppAction`.
-    packageManager.getLaunchIntentForPackage(packageName)?.let { launched -> startActivity(launched) }
-    if (!awaitsResult) {
       finish()
-    }
-  }
-
-  /** The dispatcher's result, or null when it did not answer in time. */
-  private fun finishWith(result: String?) {
-    if (settled) {
       return
     }
-    settled = true
-    main.removeCallbacksAndMessages(null)
-    waitingFor?.let(AppActionDispatcher::abandon)
-    waitingFor = null
-    if (awaitsResult) {
-      val reply = Intent().putExtra(KiloActionContract.EXTRA_RESULT, result)
-      val code = if (result == null) Activity.RESULT_CANCELED else Activity.RESULT_OK
-      setResult(code, reply)
+    // A false answer means the JS runtime is not up yet and the dispatcher
+    // buffered the payload: bring the app up, and registration drains the same
+    // payload through that same dispatcher.
+    if (!AppActionDispatcher.dispatch(payload)) {
+      packageManager.getLaunchIntentForPackage(packageName)?.let { launched ->
+        startActivity(launched)
+      }
     }
     finish()
-  }
-
-  private companion object {
-    /** A cold start has to boot the app before the dispatcher can answer. */
-    const val RESULT_TIMEOUT_MS = 15_000L
   }
 }

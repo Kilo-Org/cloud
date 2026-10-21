@@ -3675,6 +3675,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Mae angen anogiad i ddechrau asiant. Ychwanega anogiad a'i redeg eto.",
+      "confirmTitle": "Dechrau asiant?",
+      "confirmMessage": "Bydd Kilo'n dechrau sesiwn asiant newydd gyda'r anogiad hwn: {{prompt}}",
       "repositoryUnknown": "Nid yw Kilo'n adnabod {{repository}} fel ystorfa GitHub neu GitLab. Dewiswch ystorfa arall yn Kilo.",
       "repositoryUnsupported": "Ystorfa Bitbucket yw {{repository}} — Nid yw Dechrau asiant yn gallu ei defnyddio eto. Dewiswch ystorfa arall yn Kilo."
     }

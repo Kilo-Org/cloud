@@ -3552,6 +3552,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar agente necesita instrucciones. Añade unas instrucciones y vuelve a ejecutarlo.",
+      "confirmTitle": "¿Iniciar agente?",
+      "confirmMessage": "Kilo iniciará una nueva sesión de agente con estas instrucciones: {{prompt}}",
       "repositoryUnknown": "Kilo no reconoce {{repository}} como un repositorio de GitHub o GitLab. Elige otro repositorio en Kilo.",
       "repositoryUnsupported": "{{repository}} es un repositorio de Bitbucket — Iniciar agente aún no puede usarlo. Elige otro repositorio en Kilo."
     }

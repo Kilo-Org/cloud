@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar un axente necesita unha instrución. Engade unha instrución e execútao de novo.",
+      "confirmTitle": "Iniciar axente?",
+      "confirmMessage": "Kilo iniciará unha nova sesión de axente con esta instrución: {{prompt}}",
       "repositoryUnknown": "Kilo non recoñece {{repository}} como un repositorio de GitHub ou GitLab. Escolle outro repositorio en Kilo.",
       "repositoryUnsupported": "{{repository}} é un repositorio de Bitbucket — Iniciar un axente aínda non pode usalo. Escolle outro repositorio en Kilo."
     }

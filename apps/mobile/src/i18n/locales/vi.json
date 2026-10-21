@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Bắt đầu trợ lý cần một lời nhắc. Thêm lời nhắc và chạy lại.",
+      "confirmTitle": "Khởi chạy trợ lý?",
+      "confirmMessage": "Kilo sẽ khởi chạy phiên trợ lý mới với lời nhắc này: {{prompt}}",
       "repositoryUnknown": "Kilo không nhận diện {{repository}} là kho mã nguồn GitHub hoặc GitLab. Chọn kho mã nguồn khác trong Kilo.",
       "repositoryUnsupported": "{{repository}} là kho mã nguồn Bitbucket — Bắt đầu trợ lý chưa thể dùng nó. Chọn kho mã nguồn khác trong Kilo."
     }

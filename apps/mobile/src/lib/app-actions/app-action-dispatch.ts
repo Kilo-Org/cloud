@@ -2,9 +2,10 @@
 //
 // Both entry points funnel here: the native bridge handler (a payload handed to
 // the registered JS handler) and a request parked by the URL rails
-// (`action-url-handler.ts`) and picked up by the tabs consumer. The handler is
-// async and reports a real outcome — `StartAgent` is the only action that can
-// fail in a way the caller has to hear about.
+// (`action-url-handler.ts`) and picked up by the tabs consumer. `StartAgent`
+// asks the signed-in user before it starts, and is the only action that can
+// fail in a way the caller has to hear about; every outcome belongs to the app,
+// which is the surface that shows it.
 
 import { i18n } from '@/i18n';
 
@@ -13,11 +14,12 @@ import {
   type AppActionRequest,
   type AppActionResult,
   parseAppActionPayload,
+  type StartAgentRequest,
 } from './app-action-contract';
 import { setPendingAppAction } from './pending-app-action';
 
 /** The `StartAgent` request without its discriminant: what `start-agent.ts` takes. */
-type StartAgentInput = Omit<Extract<AppActionRequest, { action: 'StartAgent' }>, 'action'>;
+type StartAgentInput = Omit<StartAgentRequest, 'action'>;
 
 /**
  * The headless create, the native bridge, and Sentry — loaded on demand rather
@@ -32,6 +34,11 @@ type StartAgentInput = Omit<Extract<AppActionRequest, { action: 'StartAgent' }>,
  */
 export type AppActionDispatcherDeps = {
   startAgent: (input: StartAgentInput) => Promise<AppActionResult>;
+  /**
+   * Asks the signed-in user to confirm a `StartAgent` before it starts, and
+   * resolves whether they chose to start it.
+   */
+  confirmStartAgent: (request: StartAgentRequest) => Promise<boolean>;
 };
 
 const defaultDeps: AppActionDispatcherDeps = {
@@ -39,6 +46,23 @@ const defaultDeps: AppActionDispatcherDeps = {
     const { startAgent } = await import('./start-agent');
     return startAgent(input);
   },
+  confirmStartAgent: async request => {
+    const { confirmStartAgent } = await import('./start-agent-confirmation');
+    return confirmStartAgent(request);
+  },
+};
+
+/**
+ * How the request reached the dispatcher.
+ *
+ * `StartAgent` starts a session in the signed-in account, so the app asks the
+ * user before it runs. The default is to ask. A platform entry point that runs
+ * with no screen and passes false is declared by its own native module
+ * (`native-bridge.ts`).
+ */
+export type AppActionDispatchOptions = {
+  /** Ask the user before a `StartAgent` starts. Defaults to true. */
+  requireStartAgentConfirmation?: boolean;
 };
 
 /**
@@ -91,16 +115,26 @@ export function unresolvedOpenActionRefusal(request: AppActionRequest): AppActio
 /**
  * Run one action request and report the outcome the caller shows.
  *
- * `StartAgent` runs the create and parks the session it produced; the open
- * actions park their destination, because the tabs layout — not this pure
- * module — owns the router and the live session list. Never rejects: an OS
- * caller has to get an outcome, even when the app could not produce one.
+ * `StartAgent` asks the user first, then runs the create and parks the session
+ * it produced; the open actions park their destination, because the tabs
+ * layout — not this pure module — owns the router and the live session list.
+ * Never rejects: a caller has to get an outcome, even when the app could not
+ * produce one.
  */
 export async function dispatchAppActionRequest(
   request: AppActionRequest,
-  deps: AppActionDispatcherDeps = defaultDeps
+  deps: AppActionDispatcherDeps = defaultDeps,
+  options: AppActionDispatchOptions = {}
 ): Promise<AppActionResult> {
   if (request.action === 'StartAgent') {
+    if (options.requireStartAgentConfirmation !== false) {
+      const confirmed = await deps.confirmStartAgent(request);
+      if (!confirmed) {
+        // Nothing runs and nothing is parked: the account is untouched, and the
+        // surface that asked reports that the user declined.
+        return { ok: false, action: 'StartAgent', code: 'declined', retryable: false, message: '' };
+      }
+    }
     const result = await runStartAgent(request, deps);
     if (result.ok && result.sessionId !== undefined) {
       // The move the in-app create makes through `replaceWithAgentSession`
@@ -140,7 +174,7 @@ export async function dispatchAppActionRequest(
 
 /** The create, with the outcome a caller can always be given. */
 async function runStartAgent(
-  request: Extract<AppActionRequest, { action: 'StartAgent' }>,
+  request: StartAgentRequest,
   deps: AppActionDispatcherDeps
 ): Promise<AppActionResult> {
   const input: StartAgentInput = {
@@ -180,7 +214,7 @@ export async function registerAppActionDispatcher(): Promise<void> {
     // Replayed in arrival order: a StartAgent has to finish — and park the
     // session it created — before the request behind it acts. Each one runs
     // through the registered handler, so a payload that arrived while the app
-    // was cold answers its waiting caller exactly like a live dispatch.
+    // was cold runs exactly like a live dispatch.
     for (const payload of buffered) {
       try {
         // eslint-disable-next-line no-await-in-loop -- arrival order is the contract
@@ -199,13 +233,18 @@ export async function registerAppActionDispatcher(): Promise<void> {
 /**
  * The handler native code calls for one payload. A payload the contract does not
  * recognize is a caller bug: reject rather than invent an action to report it
- * against — the platform half surfaces the rejection to whoever invoked it.
+ * against.
+ *
+ * Whether a `StartAgent` asks the user first is the platform's own answer, read
+ * from its native module.
  */
 async function handleNativeAppActionPayload(payload: unknown): Promise<AppActionResult> {
   const request = parseAppActionPayload(payload);
   if (request === null) {
     throw new Error('The app action payload does not match the app action contract.');
   }
-  const result = await dispatchAppActionRequest(request);
-  return result;
+  const { startAgentNeedsConfirmation } = await import('./native-bridge');
+  return dispatchAppActionRequest(request, defaultDeps, {
+    requireStartAgentConfirmation: startAgentNeedsConfirmation(),
+  });
 }

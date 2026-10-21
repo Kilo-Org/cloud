@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Ny Atombohy ny mpanampy dia mila toromarika. Manampia toromarika ary avereno indray izy.",
+      "confirmTitle": "Hanomboka ny mpanampy?",
+      "confirmMessage": "Hanomboka sesa vaovao miaraka amin'ity toromarika ity i Kilo: {{prompt}}",
       "repositoryUnknown": "Tsy fantatr'i Kilo ny {{repository}} ho tahirin-kaody GitHub na GitLab. Mifidiana tahirin-kaody hafa ao amin'ny Kilo.",
       "repositoryUnsupported": "Tahirin-kaody Bitbucket ny {{repository}} — Tsy mbola afaka mampiasa azy ny Atombohy ny mpanampy. Mifidiana tahirin-kaody hafa ao amin'ny Kilo."
     }

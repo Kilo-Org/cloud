@@ -3552,6 +3552,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Démarrer un agent nécessite une consigne. Ajoutez une consigne et relancez-le.",
+      "confirmTitle": "Démarrer l'agent ?",
+      "confirmMessage": "Kilo va démarrer une nouvelle session d'agent avec cette consigne : {{prompt}}",
       "repositoryUnknown": "Kilo ne reconnaît pas {{repository}} comme un dépôt GitHub ou GitLab. Choisissez un autre dépôt dans Kilo.",
       "repositoryUnsupported": "{{repository}} est un dépôt Bitbucket — Démarrer un agent ne peut pas encore l'utiliser. Choisissez un autre dépôt dans Kilo."
     }

@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Mulakan ejen memerlukan gesaan. Tambah gesaan dan jalankannya semula.",
+      "confirmTitle": "Mulakan ejen?",
+      "confirmMessage": "Kilo akan memulakan sesi ejen baharu dengan gesaan ini: {{prompt}}",
       "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain dalam Kilo.",
       "repositoryUnsupported": "{{repository}} ialah repositori Bitbucket — Mulakan ejen belum boleh menggunakannya. Pilih repositori lain dalam Kilo."
     }

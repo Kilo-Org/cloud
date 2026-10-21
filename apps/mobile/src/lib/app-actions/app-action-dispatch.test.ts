@@ -3,31 +3,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 
 import { type AppActionRequest, type AppActionResult } from './app-action-contract';
-import {
-  dispatchAppActionRequest,
-  registerAppActionDispatcher,
-  unresolvedOpenActionRefusal,
-} from './app-action-dispatch';
-import {
-  getPendingAppAction,
-  subscribePendingAppAction,
-  takePendingAppAction,
-} from './pending-app-action';
+import { dispatchAppActionRequest, unresolvedOpenActionRefusal } from './app-action-dispatch';
+import { getPendingAppAction, takePendingAppAction } from './pending-app-action';
 
 const mocks = vi.hoisted(() => ({
   registerNativeAppActionDispatcher: vi.fn(),
+  startAgentNeedsConfirmation: vi.fn(),
   captureException: vi.fn(),
   startAgent: vi.fn(),
+  confirmStartAgent: vi.fn(),
 }));
 
 vi.mock('./native-bridge', () => ({
   registerNativeAppActionDispatcher: mocks.registerNativeAppActionDispatcher,
+  startAgentNeedsConfirmation: mocks.startAgentNeedsConfirmation,
 }));
 
 // The registered handler dispatches with the default deps, which import the
-// real action path lazily. This suite stubs that one entry so a run does not
-// load the create graph; the real classification is `start-agent.test.ts`'s.
+// real action path lazily. This suite stubs those entries so a run does not
+// load the create graph or a native dialog; the real classification is
+// `start-agent.test.ts`'s.
 vi.mock('./start-agent', () => ({ startAgent: mocks.startAgent }));
+vi.mock('./start-agent-confirmation', () => ({
+  confirmStartAgent: mocks.confirmStartAgent,
+}));
 
 vi.mock('@sentry/react-native', () => ({ captureException: mocks.captureException }));
 
@@ -37,7 +36,7 @@ beforeEach(() => {
 });
 
 describe('dispatchAppActionRequest', () => {
-  it('runs StartAgent and parks the session it created', async () => {
+  it('asks the user, then runs StartAgent and parks the session it created', async () => {
     const result: AppActionResult = {
       ok: true,
       action: 'StartAgent',
@@ -46,17 +45,65 @@ describe('dispatchAppActionRequest', () => {
       message: 'Agent started',
     };
     const startAgent = vi.fn().mockResolvedValue(result);
+    const confirmStartAgent = vi.fn().mockResolvedValue(true);
     await expect(
       dispatchAppActionRequest(
         { action: 'StartAgent', prompt: 'fix the build', repository: 'o/r' },
-        { startAgent }
+        { startAgent, confirmStartAgent }
       )
     ).resolves.toEqual(result);
+    expect(confirmStartAgent).toHaveBeenCalledExactlyOnceWith({
+      action: 'StartAgent',
+      prompt: 'fix the build',
+      repository: 'o/r',
+    });
     expect(startAgent).toHaveBeenCalledExactlyOnceWith({
       prompt: 'fix the build',
       repository: 'o/r',
     });
     expect(takePendingAppAction()).toEqual({ action: 'OpenSession', sessionId: 'ses_7' });
+  });
+
+  it('starts nothing and parks nothing when the user declines', async () => {
+    const startAgent = vi.fn();
+    const confirmStartAgent = vi.fn().mockResolvedValue(false);
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: 'fix the build' },
+        { startAgent, confirmStartAgent }
+      )
+    ).resolves.toEqual({
+      ok: false,
+      action: 'StartAgent',
+      code: 'declined',
+      retryable: false,
+      message: '',
+    });
+    expect(startAgent).not.toHaveBeenCalled();
+    expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('runs StartAgent without asking on a surface that is not in front of the user', async () => {
+    const result: AppActionResult = {
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_8',
+      href: '/(app)/agent-chat/ses_8',
+      message: 'Agent started',
+    };
+    const startAgent = vi.fn().mockResolvedValue(result);
+    const confirmStartAgent = vi.fn();
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: 'go' },
+        { startAgent, confirmStartAgent },
+        {
+          requireStartAgentConfirmation: false,
+        }
+      )
+    ).resolves.toEqual(result);
+    expect(confirmStartAgent).not.toHaveBeenCalled();
+    expect(startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: 'go' });
   });
 
   it('reports a StartAgent failure without parking a session', async () => {
@@ -69,7 +116,10 @@ describe('dispatchAppActionRequest', () => {
     };
     const startAgent = vi.fn().mockResolvedValue(failure);
     await expect(
-      dispatchAppActionRequest({ action: 'StartAgent', prompt: 'go' }, { startAgent })
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: 'go' },
+        { startAgent, confirmStartAgent: vi.fn().mockResolvedValue(true) }
+      )
     ).resolves.toEqual(failure);
     expect(getPendingAppAction()).toBeNull();
   });
@@ -78,7 +128,7 @@ describe('dispatchAppActionRequest', () => {
     const startAgent = vi.fn().mockRejectedValue(new Error('boom'));
     const result = await dispatchAppActionRequest(
       { action: 'StartAgent', prompt: 'go' },
-      { startAgent }
+      { startAgent, confirmStartAgent: vi.fn().mockResolvedValue(true) }
     );
     expect(result).toEqual({
       ok: false,
@@ -177,111 +227,5 @@ describe('unresolvedOpenActionRefusal', () => {
   it('returns null for the actions no URL can answer', () => {
     expect(unresolvedOpenActionRefusal({ action: 'OpenNeedsInput' })).toBeNull();
     expect(unresolvedOpenActionRefusal({ action: 'StartAgent', prompt: 'go' })).toBeNull();
-  });
-});
-
-describe('registerAppActionDispatcher', () => {
-  /** The mock bridge echoing the dispatcher-registration shape the real one returns. */
-  function mockRegistration(buffered: unknown[]): void {
-    mocks.registerNativeAppActionDispatcher.mockImplementation(
-      (handler: (payload: unknown) => Promise<AppActionResult>) => ({
-        handle: handler,
-        buffered,
-      })
-    );
-  }
-
-  it('replays the buffered payloads in order and keeps dispatching in-app', async () => {
-    const parked: AppActionRequest[] = [];
-    const unsubscribe = subscribePendingAppAction(() => {
-      const request = getPendingAppAction();
-      if (request !== null) {
-        parked.push(request);
-      }
-    });
-    mockRegistration([
-      { action: 'OpenPullRequest', pullRequest: 'https://github.com/o/r/pull/7' },
-      { action: 'OpenSession', sessionId: 'ses_last' },
-    ]);
-    await registerAppActionDispatcher();
-    expect(mocks.registerNativeAppActionDispatcher).toHaveBeenCalledOnce();
-    expect(parked).toEqual([
-      { action: 'OpenPullRequest', pullRequest: 'https://github.com/o/r/pull/7' },
-      { action: 'OpenSession', sessionId: 'ses_last' },
-    ]);
-    unsubscribe();
-  });
-
-  it('drops a buffered payload the contract rejects and still replays the rest', async () => {
-    mockRegistration([{ action: 'NotAnAction' }, { action: 'OpenSession', sessionId: 'ses_2' }]);
-    await registerAppActionDispatcher();
-    expect(takePendingAppAction()).toEqual({ action: 'OpenSession', sessionId: 'ses_2' });
-  });
-
-  it('answers the live payloads the native module hands the registered handler', async () => {
-    const registered: ((payload: unknown) => Promise<AppActionResult>)[] = [];
-    mocks.registerNativeAppActionDispatcher.mockImplementation(
-      async (handler: (payload: unknown) => Promise<AppActionResult>) => {
-        registered.push(handler);
-        await Promise.resolve();
-        return { handle: handler, buffered: [] };
-      }
-    );
-    await registerAppActionDispatcher();
-    const handle = registered[0];
-    expect(handle).toBeDefined();
-    await expect(handle?.({ action: 'OpenNeedsInput' })).resolves.toEqual({
-      ok: true,
-      action: 'OpenNeedsInput',
-      message: '',
-    });
-    await expect(handle?.('not a payload')).rejects.toThrow(
-      'does not match the app action contract'
-    );
-  });
-
-  it('answers a blank StartAgent payload with the empty-prompt refusal', async () => {
-    // The OS caller named START_AGENT, so the payload is a request the action
-    // path classifies — not an unrecognized payload the handler throws on. The
-    // refusal is the real result the native side reports through
-    // `completeAppAction`, instead of the entry point timing out.
-    mocks.startAgent.mockResolvedValue({
-      ok: false,
-      action: 'StartAgent',
-      retryable: false,
-      code: 'empty-prompt',
-      message: i18n.t('appActions.start.promptRequired'),
-    });
-    const registered: ((payload: unknown) => Promise<AppActionResult>)[] = [];
-    mocks.registerNativeAppActionDispatcher.mockImplementation(
-      (handler: (payload: unknown) => Promise<AppActionResult>) => {
-        registered.push(handler);
-        return { handle: handler, buffered: [] };
-      }
-    );
-    await registerAppActionDispatcher();
-    await expect(registered[0]?.({ action: 'start-agent', prompt: '   ' })).resolves.toEqual({
-      ok: false,
-      action: 'StartAgent',
-      retryable: false,
-      code: 'empty-prompt',
-      message: i18n.t('appActions.start.promptRequired'),
-    });
-    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: '   ' });
-  });
-
-  it('works with no native module at all', async () => {
-    mockRegistration([]);
-    await expect(registerAppActionDispatcher()).resolves.toBeUndefined();
-    await expect(
-      dispatchAppActionRequest({ action: 'OpenSession', sessionId: 'ses_1' })
-    ).resolves.toMatchObject({ ok: true });
-    expect(takePendingAppAction()).toEqual({ action: 'OpenSession', sessionId: 'ses_1' });
-  });
-
-  it('reports a registration failure without leaving the boot path rejected', async () => {
-    mocks.registerNativeAppActionDispatcher.mockRejectedValue(new Error('no bridge'));
-    await expect(registerAppActionDispatcher()).resolves.toBeUndefined();
-    expect(mocks.captureException).toHaveBeenCalledOnce();
   });
 });

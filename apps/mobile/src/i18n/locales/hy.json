@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Գործակալը մեկնարկելու համար հուշում է պետք։ Ավելացրու հուշում և նորից գործարկիր այն։",
+      "confirmTitle": "Մեկնարկե՞լ գործակալը:",
+      "confirmMessage": "Kilo-ն կմեկնարկի գործակալի նոր նստաշրջան այս հուշումով՝ {{prompt}}",
       "repositoryUnknown": "Kilo-ն {{repository}}-ը չի ճանաչում որպես GitHub կամ GitLab պահոց։ Ընտրիր մեկ այլ պահոց Kilo-ում։",
       "repositoryUnsupported": "{{repository}}-ը Bitbucket պահոց է — Մեկնարկիր գործակալը դեռ չի կարող օգտագործել այն։ Ընտրիր մեկ այլ պահոց Kilo-ում։"
     }

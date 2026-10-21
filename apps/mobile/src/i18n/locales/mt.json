@@ -3634,6 +3634,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Ibda aġent jeħtieġ istruzzjoni. Żid istruzzjoni u erġa' ħaddmu.",
+      "confirmTitle": "Tibda l-aġent?",
+      "confirmMessage": "Kilo se jibda sessjoni ġdida ta' aġent b'din l-istruzzjoni: {{prompt}}",
       "repositoryUnknown": "Kilo ma jagħrafx lil {{repository}} bħala repożitorju GitHub jew GitLab. Agħżel repożitorju ieħor fil-Kilo.",
       "repositoryUnsupported": "{{repository}} huwa repożitorju Bitbucket — Ibda aġent għadu ma jistax jużah. Agħżel repożitorju ieħor fil-Kilo."
     }

@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "エージェントを開始するにはプロンプトが必要です。プロンプトを追加して、もう一度実行してください。",
+      "confirmTitle": "エージェントを開始しますか？",
+      "confirmMessage": "Kilo はこのプロンプトで新しいエージェントセッションを開始します: {{prompt}}",
       "repositoryUnknown": "Kilo は {{repository}} を GitHub または GitLab のリポジトリとして認識しません。Kilo で別のリポジトリを選択してください。",
       "repositoryUnsupported": "{{repository}} は Bitbucket のリポジトリです — エージェントを開始はまだこれを使用できません。Kilo で別のリポジトリを選択してください。"
     }

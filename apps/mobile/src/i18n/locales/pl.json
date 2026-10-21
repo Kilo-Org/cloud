@@ -3593,6 +3593,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Uruchomienie agenta wymaga polecenia. Dodaj polecenie i uruchom go ponownie.",
+      "confirmTitle": "Uruchomić agenta?",
+      "confirmMessage": "Kilo rozpocznie nową sesję agenta z tym poleceniem: {{prompt}}",
       "repositoryUnknown": "Kilo nie rozpoznaje {{repository}} jako repozytorium GitHub lub GitLab. Wybierz inne repozytorium w Kilo.",
       "repositoryUnsupported": "{{repository}} to repozytorium Bitbucket — Uruchom agenta nie może jeszcze go użyć. Wybierz inne repozytorium w Kilo."
     }

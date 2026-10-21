@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Me whai tohutohu te Tīmata i te kaiāwhina. Tāpirihia he tohutohu ka whakahaere anō.",
+      "confirmTitle": "Tīmata i te kaiāwhina?",
+      "confirmMessage": "Ka tīmata a Kilo i tētahi nohoanga hou a te kaiāwhina me tēnei tohutohu: {{prompt}}",
       "repositoryUnknown": "Kāore a Kilo e āhukahuka i a {{repository}} hei pūranga waehere GitHub, GitLab rānei. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo.",
       "repositoryUnsupported": "He pūranga waehere Bitbucket a {{repository}} — Kāore anō a Tīmata i te kaiāwhina e taea te whakamahi. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo."
     }

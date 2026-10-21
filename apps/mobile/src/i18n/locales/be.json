@@ -3593,6 +3593,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Каб запусціць агента, патрэбен запыт. Дадайце запыт і запусціце зноў.",
+      "confirmTitle": "Запусціць агента?",
+      "confirmMessage": "Kilo запусціць новую сесію агента з гэтым запытам: {{prompt}}",
       "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",
       "repositoryUnsupported": "{{repository}} — гэта рэпазіторый Bitbucket, і Запусціць агента пакуль не можа яго выкарыстоўваць. Выберыце іншы рэпазіторый у Kilo."
     }

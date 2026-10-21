@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Agenti başlatmaq üçün sorğu lazımdır. Sorğu əlavə et və yenidən işə sal.",
+      "confirmTitle": "Agent başlansın?",
+      "confirmMessage": "Kilo bu sorğu ilə yeni agent sessiyası başladacaq: {{prompt}}",
       "repositoryUnknown": "Kilo {{repository}} adını GitHub və ya GitLab repozitoriyası kimi tanımır. Kilo-da başqa repozitoriya seç.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasıdır — Agenti başlat hələ ondan istifadə edə bilmir. Kilo-da başqa repozitoriya seç."
     }

@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Start agenten krever en instruksjon. Legg til en instruksjon og kjør den på nytt.",
+      "confirmTitle": "Starte agenten?",
+      "confirmMessage": "Kilo starter en ny agentøkt med denne instruksjonen: {{prompt}}",
       "repositoryUnknown": "Kilo gjenkjenner ikke {{repository}} som et GitHub- eller GitLab-kodelager. Velg et annet kodelager i Kilo.",
       "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan ennå ikke bruke det. Velg et annet kodelager i Kilo."
     }

@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Η έναρξη πράκτορα απαιτεί μήνυμα. Πρόσθεσε ένα μήνυμα και εκτέλεσέ το ξανά.",
+      "confirmTitle": "Έναρξη πράκτορα;",
+      "confirmMessage": "Το Kilo θα ξεκινήσει μια νέα συνεδρία πράκτορα με αυτό το μήνυμα: {{prompt}}",
       "repositoryUnknown": "Το Kilo δεν αναγνωρίζει το {{repository}} ως αποθετήριο GitHub ή GitLab. Επίλεξε άλλο αποθετήριο στο Kilo.",
       "repositoryUnsupported": "Το {{repository}} είναι αποθετήριο Bitbucket — Η έναρξη πράκτορα δεν μπορεί να το χρησιμοποιήσει ακόμη. Επίλεξε άλλο αποθετήριο στο Kilo."
     }

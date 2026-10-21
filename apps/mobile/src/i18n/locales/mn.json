@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Агент эхлүүлэхэд заавар шаардлагатай. Заавар нэмээд дахин ажиллуулна уу.",
+      "confirmTitle": "Агент эхлүүлэх үү?",
+      "confirmMessage": "Kilo энэ заавар бүхий шинэ агент сесс эхлүүлнэ: {{prompt}}",
       "repositoryUnknown": "Kilo {{repository}}-г GitHub эсвэл GitLab кодын сан гэж хүлээн зөвшөөрөхгүй. Kilo дотор өөр кодын сан сонгоно уу.",
       "repositoryUnsupported": "{{repository}} нь Bitbucket кодын сан — Агент эхлүүлэх үүнийг одоохондоо ашиглаж чадахгүй. Kilo дотор өөр кодын сан сонгоно уу."
     }

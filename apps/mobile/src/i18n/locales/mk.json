@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "За да стартираш агент, потребно е упатство. Додај упатство и стартувај го повторно.",
+      "confirmTitle": "Да се стартува агент?",
+      "confirmMessage": "Kilo ќе стартува нова сесија на агент со ова упатство: {{prompt}}",
       "repositoryUnknown": "Kilo не го препознава {{repository}} како GitHub или GitLab репозиториум. Избери друг репозиториум во Kilo.",
       "repositoryUnsupported": "{{repository}} е Bitbucket репозиториум — Стартирај агент сè уште не може да го користи. Избери друг репозиториум во Kilo."
     }

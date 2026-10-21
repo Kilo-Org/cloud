@@ -262,11 +262,19 @@ describe('the module hand-off', () => {
     expect(MODULE_SOURCE).toMatch(/fun dispatch\(payload: String\): Boolean/);
   });
 
-  it('returns the dispatcher result to a caller that asked for it', () => {
-    expect(MODULE_SOURCE).toContain('Function("completeAppAction")');
+  it('hands the action over instead of answering the caller', () => {
+    // An intent addresses the app: it carries no request for a result, and the
+    // dispatcher's outcome belongs to the app that shows it.
     expect(ACTIVITY_SOURCE).toContain('AppActionDispatcher.dispatch(payload)');
-    expect(ACTIVITY_SOURCE).toContain('AppActionDispatcher.await(payload)');
-    expect(ACTIVITY_SOURCE).toContain('KiloActionContract.EXTRA_RESULT');
-    expect(ACTIVITY_SOURCE).toContain('setResult(');
+    expect(ACTIVITY_SOURCE).not.toContain('setResult(');
+    expect(ACTIVITY_SOURCE).not.toContain('EXTRA_RESULT');
+    expect(MODULE_SOURCE).not.toContain('completeAppAction');
+  });
+
+  it('declares that a StartAgent this entry point delivers asks the user first', () => {
+    // This entry point is exported to every installed app, and an intent
+    // carries no proof of which app sent it, so the shared dispatcher asks in
+    // the app before a session is created.
+    expect(MODULE_SOURCE).toContain('Function("startAgentNeedsConfirmation") { true }');
   });
 });

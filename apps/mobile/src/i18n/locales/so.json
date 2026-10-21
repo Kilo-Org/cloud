@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Bilow wakiilka wuxuu u baahan yahay tilmaan. Ku dar tilmaan kadibna mar kale orod.",
+      "confirmTitle": "Bilow wakiilka?",
+      "confirmMessage": "Kilo wuxuu bilaabi doonaa shir wakiil cusub oo leh tilmaankan: {{prompt}}",
       "repositoryUnknown": "Kilo kama aqoonsado {{repository}} kayd GitHub ama GitLab ah. Dooro kayd kale gudaha Kilo.",
       "repositoryUnsupported": "{{repository}} waa kayd Bitbucket — Bilow wakiilka weli ma isticmaali karo. Dooro kayd kale gudaha Kilo."
     }

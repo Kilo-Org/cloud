@@ -3593,6 +3593,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
+      "confirmTitle": "Paleisti agentą?",
+      "confirmMessage": "Kilo paleis naują agento sesiją su šia užklausa: {{prompt}}",
       "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
       "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
     }

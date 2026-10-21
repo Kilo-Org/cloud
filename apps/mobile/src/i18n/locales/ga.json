@@ -3634,6 +3634,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Teastaíonn leid chun gníomhaire a thosú. Cuir leid leis agus rith arís é.",
+      "confirmTitle": "Tosú gníomhaire?",
+      "confirmMessage": "Tosóidh Kilo seisiún gníomhaire nua leis an leid seo: {{prompt}}",
       "repositoryUnknown": "Ní aithníonn Kilo {{repository}} mar stór GitHub nó GitLab. Roghnaigh stór eile i Kilo.",
       "repositoryUnsupported": "Is stór Bitbucket é {{repository}} — Ní féidir le Tosaigh gníomhaire é a úsáid fós. Roghnaigh stór eile i Kilo."
     }

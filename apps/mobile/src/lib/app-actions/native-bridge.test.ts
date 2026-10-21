@@ -5,7 +5,7 @@ import { type NativeAppActionHandler } from './native-bridge';
 const native = vi.hoisted(() => ({
   requireOptionalNativeModule: vi.fn(),
   registerAppActionDispatcher: vi.fn(),
-  completeAppAction: vi.fn(),
+  startAgentNeedsConfirmation: vi.fn(),
 }));
 
 vi.mock('expo', () => ({ requireOptionalNativeModule: native.requireOptionalNativeModule }));
@@ -39,7 +39,7 @@ describe('native app actions bridge', () => {
     expect(native.registerAppActionDispatcher).not.toHaveBeenCalled();
   });
 
-  it('hands the wrapped handler over and returns the buffer verbatim', async () => {
+  it('hands the dispatcher itself over and returns the buffer verbatim', async () => {
     const buffered = [
       { action: 'OpenNeedsInput' },
       '{"action":"open-session","sessionId":"ses_2"}',
@@ -51,8 +51,10 @@ describe('native app actions bridge', () => {
     const jsHandler = handler();
     const registration = await bridge.registerNativeAppActionDispatcher(jsHandler);
     expect(bridge.isNativeAppActionsAvailable).toBe(true);
-    expect(native.registerAppActionDispatcher).toHaveBeenCalledExactlyOnceWith(registration.handle);
-    expect(registration.handle).not.toBe(jsHandler);
+    expect(native.registerAppActionDispatcher).toHaveBeenCalledExactlyOnceWith(jsHandler);
+    // The handler stays the dispatcher's own: nothing wraps it, and its result
+    // is the app's, not a value the native module reads back.
+    expect(registration.handle).toBe(jsHandler);
     // Verbatim: decoding each payload into the contract is the dispatcher's
     // replay, not the bridge's.
     expect(registration.buffered).toEqual(buffered);
@@ -77,44 +79,30 @@ describe('native app actions bridge', () => {
     expect(buffered).toEqual([]);
   });
 
-  it('reports a settled result to the waiting entry point through completeAppAction', async () => {
-    native.registerAppActionDispatcher.mockReturnValue([]);
+  it('takes the confirmation requirement from the platform that declares one', async () => {
+    native.startAgentNeedsConfirmation.mockReturnValue(true);
     const bridge = await import('./native-bridge');
-    const { handle } = await bridge.registerNativeAppActionDispatcher(handler());
-    await handle('{"action":"open-needs-input"}');
-    expect(native.completeAppAction).toHaveBeenCalledExactlyOnceWith(
-      '{"action":"open-needs-input"}',
-      JSON.stringify(HANDLER_RESULT)
-    );
+    expect(bridge.startAgentNeedsConfirmation()).toBe(true);
   });
 
-  it('reports a non-text payload as its canonical JSON text', async () => {
-    native.registerAppActionDispatcher.mockReturnValue([]);
-    const bridge = await import('./native-bridge');
-    const { handle } = await bridge.registerNativeAppActionDispatcher(handler());
-    await handle({ action: 'OpenNeedsInput' });
-    expect(native.completeAppAction).toHaveBeenCalledExactlyOnceWith(
-      '{"action":"OpenNeedsInput"}',
-      JSON.stringify(HANDLER_RESULT)
-    );
-  });
-
-  it('keeps the dispatch result on a platform whose entry points read the promise', async () => {
-    // iOS registers a dispatcher but has no completeAppAction function.
+  it('asks nothing on a platform that runs its intents without a screen', async () => {
+    // iOS registers a dispatcher and declares no confirmation: its App Intent
+    // hands the request over with the app closed, where no dialog can appear.
     native.requireOptionalNativeModule.mockReturnValue({
       registerAppActionDispatcher: native.registerAppActionDispatcher,
     });
-    native.registerAppActionDispatcher.mockReturnValue([]);
     const bridge = await import('./native-bridge');
-    const { handle } = await bridge.registerNativeAppActionDispatcher(handler());
-    await expect(handle({ action: 'OpenNeedsInput' })).resolves.toEqual(HANDLER_RESULT);
+    expect(bridge.startAgentNeedsConfirmation()).toBe(false);
   });
 
-  it('keeps the dispatch result when reporting the completion throws', async () => {
+  it('asks nothing when the binary has no app-action surface at all', async () => {
+    native.requireOptionalNativeModule.mockReturnValue(null);
+    const bridge = await import('./native-bridge');
+    expect(bridge.startAgentNeedsConfirmation()).toBe(false);
+  });
+
+  it('keeps the dispatch result on a platform whose entry points read the promise', async () => {
     native.registerAppActionDispatcher.mockReturnValue([]);
-    native.completeAppAction.mockImplementation(() => {
-      throw new Error('bridge gone');
-    });
     const bridge = await import('./native-bridge');
     const { handle } = await bridge.registerNativeAppActionDispatcher(handler());
     await expect(handle({ action: 'OpenNeedsInput' })).resolves.toEqual(HANDLER_RESULT);

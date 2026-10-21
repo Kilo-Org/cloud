@@ -133,6 +133,26 @@ describe('usePendingAppAction', () => {
     renderer.unmount();
   });
 
+  it('shows no error when the user declines a parked StartAgent', async () => {
+    mocks.dispatch.mockResolvedValue({
+      ok: false,
+      action: 'StartAgent',
+      code: 'declined',
+      retryable: false,
+      message: '',
+    });
+    setPendingAppAction({ action: 'StartAgent', prompt: 'fix the build' });
+    const renderer = mount(SETTLED);
+    await update(renderer, SETTLED);
+    expect(mocks.dispatch).toHaveBeenCalledExactlyOnceWith({
+      action: 'StartAgent',
+      prompt: 'fix the build',
+    });
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
   it('opens the session a completed StartAgent parked', async () => {
     mocks.dispatch.mockImplementation(() => {
       // What the real dispatcher does with a successful create: park the

@@ -3552,6 +3552,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Avvia agente richiede un prompt. Aggiungi un prompt e rieseguilo.",
+      "confirmTitle": "Avviare l'agente?",
+      "confirmMessage": "Kilo avvierà una nuova sessione dell'agente con questo prompt: {{prompt}}",
       "repositoryUnknown": "Kilo non riconosce {{repository}} come repository GitHub o GitLab. Scegli un altro repository in Kilo.",
       "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
     }

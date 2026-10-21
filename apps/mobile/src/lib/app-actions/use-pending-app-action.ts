@@ -27,11 +27,12 @@ import {
  * A `StartAgent` the OS asked for through a URL runs once the shell is up. A
  * failure is the app's own feedback — `AGENTS.md` has every failed mutation
  * show `result.message` — because this hook owns no screen of its own to show
- * it.
+ * it. A declined request is not a failure: the user answered the confirmation
+ * in the app, so nothing new is reported about it.
  */
 async function runStartAgentRequest(request: AppActionRequest): Promise<void> {
   const result = await dispatchAppActionRequest(request);
-  if (!result.ok) {
+  if (!result.ok && result.code !== 'declined') {
     toast.error(result.message);
   }
 }

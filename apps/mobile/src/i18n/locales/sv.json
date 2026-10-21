@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Starta agenten kräver en prompt. Lägg till en prompt och kör den igen.",
+      "confirmTitle": "Starta agenten?",
+      "confirmMessage": "Kilo startar en ny agentsession med denna prompt: {{prompt}}",
       "repositoryUnknown": "Kilo känner inte igen {{repository}} som ett GitHub- eller GitLab-kodarkiv. Välj ett annat kodarkiv i Kilo.",
       "repositoryUnsupported": "{{repository}} är ett Bitbucket-kodarkiv — Starta agenten kan ännu inte använda det. Välj ett annat kodarkiv i Kilo."
     }

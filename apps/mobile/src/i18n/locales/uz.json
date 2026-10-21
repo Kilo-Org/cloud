@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Agentni ishga tushirish uchun so'rov kerak. So'rov qo'shing va qayta ishga tushiring.",
+      "confirmTitle": "Agentni ishga tushirilsinmi?",
+      "confirmMessage": "Kilo ushbu so'rov bilan yangi agent seansini ishga tushiradi: {{prompt}}",
       "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasi — Agentni ishga tushirish hali undan foydalana olmaydi. Kilo'da boshqa repozitoriy tanlang."
     }

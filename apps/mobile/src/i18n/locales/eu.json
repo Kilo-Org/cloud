@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Agentea hasteko eskaera behar da. Gehitu eskaera bat eta exekutatu berriro.",
+      "confirmTitle": "Agentea hasi?",
+      "confirmMessage": "Kilok eskaera honekin agente-sesio berri bat hasiko du: {{prompt}}",
       "repositoryUnknown": "Kilok ez du {{repository}} GitHub edo GitLab biltegi gisa ezagutzen. Aukeratu beste biltegi bat Kilon.",
       "repositoryUnsupported": "{{repository}} Bitbucket biltegia da — Hasi agentea oraindik ezin du erabili. Aukeratu beste biltegi bat Kilon."
     }

@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "Агентті іске қосу үшін сұрау қажет. Сұрау қосып, қайта іске қосыңыз.",
+      "confirmTitle": "Агентті іске қосу керек пе?",
+      "confirmMessage": "Kilo осы сұраумен агенттің жаңа сессиясын іске қосады: {{prompt}}",
       "repositoryUnknown": "Kilo {{repository}} ны GitHub немесе GitLab репозиторийі ретінде танымайды. Kilo ішінен басқа репозиторий таңдаңыз.",
       "repositoryUnsupported": "{{repository}} — Bitbucket репозиторийі. Агентті іске қосу оны әзірге пайдалана алмайды. Kilo ішінен басқа репозиторий таңдаңыз."
     }

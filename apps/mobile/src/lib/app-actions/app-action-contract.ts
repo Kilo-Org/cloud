@@ -57,6 +57,9 @@ export type AppActionRequest =
   | { action: 'OpenSession'; sessionId: string }
   | { action: 'OpenPullRequest'; pullRequest: string };
 
+/** A `StartAgent` request, without its discriminant. */
+export type StartAgentRequest = Extract<AppActionRequest, { action: 'StartAgent' }>;
+
 /**
  * What a run reports back to its caller. `message` is filled by the caller
  * from the existing catalog keys; this contract never carries copy.
@@ -74,6 +77,7 @@ export type AppActionResult =
         | 'no-repository'
         | 'not-a-pull-request'
         | 'unknown-session'
+        | 'declined'
         | 'start-failed';
       message: string;
     };

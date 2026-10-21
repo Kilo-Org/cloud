@@ -1,7 +1,5 @@
 package expo.modules.kiloappactions
 
-import android.os.Handler
-import android.os.Looper
 import expo.modules.kotlin.jni.JavaScriptFunction
 import expo.modules.kotlin.jni.JavaScriptValue
 import expo.modules.kotlin.modules.Module
@@ -14,7 +12,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * [AppActionDispatcher], and the dispatcher is the JS handler the shared
  * contract installs with `registerAppActionDispatcher`. Nothing here decides
  * what an action does: the native side turns an Intent into the contract
- * payload and carries the result back to the caller.
+ * payload and hands it over.
  */
 class KiloAppActionsModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -36,17 +34,12 @@ class KiloAppActionsModule : Module() {
     }
 
     /**
-     * The outcome of one payload, for a caller that asked for a result.
-     *
-     * The JS dispatcher is async, so its `AppActionResult` is not the value the
-     * native side can read back from the call. Expo's Android API has no JS
-     * promise to await (`expo-modules-jsi` is Apple-only), so the dispatcher
-     * reports the outcome here instead, and the waiting entry point answers its
-     * caller with it.
+     * Whether a `StartAgent` delivered through this entry point asks the user
+     * first. It does: the shared dispatcher shows the prompt and the user
+     * confirms it before a session starts. iOS does not declare it, because its
+     * intents run with no screen.
      */
-    Function("completeAppAction") { payload: String, result: String ->
-      AppActionDispatcher.complete(payload, result)
-    }
+    Function("startAgentNeedsConfirmation") { true }
 
     OnDestroy {
       AppActionDispatcher.clear()
@@ -59,9 +52,9 @@ class KiloAppActionsModule : Module() {
  * dispatcher.
  *
  * A payload that arrives before `registerAppActionDispatcher` buffers here and
- * is returned to JS at registration, so the same handler runs it. A caller that
- * asked for a result waits on [complete], which the dispatcher answers with the
- * real outcome — never a fire-and-forget acknowledgement.
+ * is returned to JS at registration, so the same handler runs it. The outcome
+ * of a run belongs to the app: the entry point hands the request over and
+ * finishes, and no result travels back to whoever started it.
  */
 internal object AppActionDispatcher {
   /** The registered JS dispatcher and the hop that puts a call on its thread. */
@@ -71,10 +64,8 @@ internal object AppActionDispatcher {
   )
 
   private val lock = Any()
-  private val main = Handler(Looper.getMainLooper())
   private var registration: Registration? = null
   private val buffered = mutableListOf<String>()
-  private val waiters = mutableMapOf<String, (String) -> Unit>()
 
   /** Stores the JS dispatcher and returns the payloads that arrived first. */
   fun register(
@@ -91,10 +82,6 @@ internal object AppActionDispatcher {
    * Hands one payload to the JS dispatcher. Returns false, buffering the
    * payload, when the runtime is not up yet: the entry point starts the app,
    * and registration drains the payload through that same dispatcher.
-   *
-   * A dispatcher that answers synchronously returns the result JSON, and the
-   * waiting caller gets it right away. The dispatcher in the app is async
-   * (`native-bridge.ts`), so its outcome arrives through [complete] instead.
    */
   fun dispatch(payload: String): Boolean {
     val active = synchronized(lock) { registration }
@@ -104,41 +91,18 @@ internal object AppActionDispatcher {
     }
     val invoke = {
       // The JS dispatcher owns its own error reporting (`app-action-dispatch.ts`
-      // captures to Sentry), so a throw here only means this payload produced no
-      // result for the caller.
-      runCatching {
-        val returned = active.handler(payload)
-        if (returned.isString()) {
-          complete(payload, returned.getString())
-        }
-      }
+      // captures to Sentry), so a throw here only ends this payload's run.
+      runCatching { active.handler(payload) }
       Unit
     }
     active.queue(invoke)
     return true
   }
 
-  /** Registers the result the caller of an entry point is waiting for. */
-  fun await(payload: String, onResult: (String) -> Unit) {
-    synchronized(lock) { waiters[payload] = onResult }
-  }
-
-  /** Drops a waiter the entry point no longer needs, after its timeout. */
-  fun abandon(payload: String) {
-    synchronized(lock) { waiters.remove(payload) }
-  }
-
-  /** Answers a waiting caller with the dispatcher's result. */
-  fun complete(payload: String, result: String) {
-    val waiter = synchronized(lock) { waiters.remove(payload) } ?: return
-    main.post { waiter(result) }
-  }
-
-  /** Drops the dispatcher and its waiters when the JS runtime goes away. */
+  /** Drops the dispatcher when the JS runtime goes away. */
   fun clear() {
     synchronized(lock) {
       registration = null
-      waiters.clear()
     }
   }
 }

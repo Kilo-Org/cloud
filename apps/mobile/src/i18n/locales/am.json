@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "ወኪል ለመጀመር ጥያቄ ያስፈልጋል። ጥያቄ ያክሉ እና እንደገና ያሂዱ።",
+      "confirmTitle": "ወኪል ይጀምር?",
+      "confirmMessage": "Kilo ከዚህ ጥያቄ ጋር አዲስ የወኪል ክፍለ-ጊዜ ይጀምራል፦ {{prompt}}",
       "repositoryUnknown": "Kilo {{repository}}ን እንደ GitHub ወይም GitLab ማከማቻ አያውቅም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።",
       "repositoryUnsupported": "{{repository}} የBitbucket ማከማቻ ነው — ወኪል ይጀምሩ ገና ሊጠቀምበት አይችልም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።"
     }

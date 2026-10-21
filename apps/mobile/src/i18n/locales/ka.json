@@ -3511,6 +3511,8 @@
   "appActions": {
     "start": {
       "promptRequired": "აგენტის გაშვებას მოთხოვნა სჭირდება. დაამატე მოთხოვნა და კვლავ გაუშვი.",
+      "confirmTitle": "აგენტის გაშვება?",
+      "confirmMessage": "Kilo გაუშვებს აგენტის ახალ სესიას ამ მოთხოვნით: {{prompt}}",
       "repositoryUnknown": "Kilo {{repository}}-ს GitHub-ის ან GitLab-ის რეპოზიტორიად არ ცნობს. აირჩიე სხვა რეპოზიტორია Kilo-ში.",
       "repositoryUnsupported": "{{repository}} Bitbucket-ის რეპოზიტორიაა — აგენტის გაშვება ჯერ ვერ გამოიყენებს მას. აირჩიე სხვა რეპოზიტორია Kilo-ში."
     }

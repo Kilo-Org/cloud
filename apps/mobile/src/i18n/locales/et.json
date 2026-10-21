@@ -3664,7 +3664,7 @@
       "nameRequired": "Sisestage agendi nimi",
       "slugRequired": "Sisestage agent nälkjas",
       "slugInvalid": "Slug peab algama tähega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
-      "slugConflict": "See nälkjas on reserveeritud sisseehitatud agenti poolt",
+      "slugConflict": "Seda slugi kasutab juba sisseehitatud agent või muu agent selles profiilis",
       "edit": "Redigeeri agenti"
     },
     "slashCommands": {

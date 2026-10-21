@@ -3664,7 +3664,7 @@
       "nameRequired": "Ampidiro anarana mpandraharaha",
       "slugRequired": "Ampidiro ny slug mpandraharaha",
       "slugInvalid": "Ny slug dia tsy maintsy manomboka amin'ny litera ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
-      "slugConflict": "Io slug io dia natokana ho an'ny mpandraharaha iray",
+      "slugConflict": "Etra io slug io efa ampiasain'ny azy ao anatiny na azy hafa amin'ity profil ity",
       "edit": "Ahitsio mpandraharaha"
     },
     "slashCommands": {

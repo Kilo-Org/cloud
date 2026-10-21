@@ -3664,7 +3664,7 @@
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agentslak in",
       "slugInvalid": "Slak moet met 'n letter begin en slegs kleinletters, syfers en strepe gebruik",
-      "slugConflict": "Daardie slak word deur 'n ingeboude agent gereserveer",
+      "slugConflict": "Daardie slak word deur 'n ingeboude agent of 'n ander agent in hierdie profiel gebruik",
       "edit": "Wysig agent"
     },
     "slashCommands": {

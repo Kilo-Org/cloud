@@ -3664,7 +3664,7 @@
       "nameRequired": "Agent adını daxil edin",
       "slugRequired": "Agent slug daxil edin",
       "slugInvalid": "Slug hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
-      "slugConflict": "Bu şlak daxili agent tərəfindən qorunur",
+      "slugConflict": "Bu şlak daxili agent və ya bu profildəki başqa bir agent tərəfindən istifadə olunur",
       "edit": "Agenti redaktə edin"
     },
     "slashCommands": {

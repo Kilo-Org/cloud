@@ -3664,7 +3664,7 @@
       "nameRequired": "Maqaa bakka bu'aa galchi",
       "slugRequired": "Slug ergamaa galchi",
       "slugInvalid": "Slug qubee irraa jalqabuu fi qubee xixiqqaa, dijiitota, fi daash qofa fayyadamuu qaba",
-      "slugConflict": "Slug sun ergamaa ijaarameen kan eegamedha",
+      "slugConflict": "slug kana dura dhaabbataa ykn agensiin biraawuzii kana keessatti fayyadamaa jira",
       "edit": "Bakka bu'aa gulaaluu"
     },
     "slashCommands": {

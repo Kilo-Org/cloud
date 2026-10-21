@@ -3746,7 +3746,7 @@
       "nameRequired": "Vnesite ime agenta",
       "slugRequired": "Vnesite polža agenta",
       "slugInvalid": "Polž se mora začeti s črko in uporabljati samo male črke, številke in pomišljaje",
-      "slugConflict": "Ta polž je rezerviran z vgrajenim agentom",
+      "slugConflict": "Ta slug že uporablja vgrajeni agent ali drug agent v tem profilu",
       "edit": "Uredi agenta"
     },
     "slashCommands": {

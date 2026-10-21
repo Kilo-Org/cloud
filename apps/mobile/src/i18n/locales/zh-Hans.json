@@ -3664,7 +3664,7 @@
       "nameRequired": "输入代理名称",
       "slugRequired": "输入代理 slug",
       "slugInvalid": "Slug 必须以字母开头，并且只能使用小写字母、数字和破折号",
-      "slugConflict": "该 slug 由内置代理保留",
+      "slugConflict": "该 slug 已被内置代理或此配置文件中的另一个代理使用",
       "edit": "编辑代理"
     },
     "slashCommands": {

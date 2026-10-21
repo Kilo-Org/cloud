@@ -3705,7 +3705,7 @@
       "nameRequired": "Ingrese el nombre de un agente",
       "slugRequired": "Introduzca una babosa de agente",
       "slugInvalid": "Slug debe comenzar con una letra y usar solo letras minúsculas, dígitos y guiones.",
-      "slugConflict": "Esa babosa está reservada por un agente incorporado.",
+      "slugConflict": "Ese slug ya lo usa un agente integrado u otro agente de este perfil",
       "edit": "Editar agente"
     },
     "slashCommands": {

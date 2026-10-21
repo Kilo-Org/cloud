@@ -3664,7 +3664,7 @@
       "nameRequired": "Anna agentin nimi",
       "slugRequired": "Syötä agentti etana",
       "slugInvalid": "Slugin tulee alkaa kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
-      "slugConflict": "Sisäänrakennettu agentti on varannut tuon etanan",
+      "slugConflict": "Tuo slug on jo käytössä sisäänrakennetulla agentilla tai toisella agentilla tässä profiilissa",
       "edit": "Muokkaa agenttia"
     },
     "slashCommands": {

@@ -3705,7 +3705,7 @@
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite puž agenta",
       "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
-      "slugConflict": "Taj puž je rezervisan od strane ugrađenog agenta",
+      "slugConflict": "Taj slug već koristi ugrađeni agent ili drugi agent u ovom profilu",
       "edit": "Uredi agenta"
     },
     "slashCommands": {

@@ -25,6 +25,7 @@ import { describe, test, expect, beforeEach, afterEach, jest as jestGlobal } fro
 import {
   requireAdmissionPayload,
   countAdmissionCondition,
+  pendingAdmissionCountsForTests,
   resetAdmissionCountersForTests,
   validateAdmissionPayload,
   issueAdmissionChallenge,
@@ -36,7 +37,6 @@ import {
   type AdmissionPayload,
 } from './native-admission';
 import { captureMessage } from '@sentry/nextjs';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { checkRateLimit } from '@vercel/firewall';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
@@ -76,7 +76,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 const mockCaptureMessage = jest.mocked(captureMessage);
-const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockVerifyAppleAttestation = jest.mocked(verifyAppleAttestation);
 const mockVerifyAppleAssertion = jest.mocked(verifyAppleAssertion);
@@ -921,26 +920,23 @@ describe('countAdmissionCondition', () => {
     jestGlobal.restoreAllMocks();
   });
 
-  test('folds refusals into one window line instead of one Sentry event each', () => {
+  test('folds refusals into one window instead of one event per request', () => {
     const now = jestGlobal.spyOn(Date, 'now');
     now.mockReturnValue(1_000_000);
 
     countAdmissionCondition('native_admission_refused');
     countAdmissionCondition('native_admission_refused');
-    expect(mockWarnExceptInTest).not.toHaveBeenCalled();
+
+    // Both refusals are counted in the open window, and neither became an
+    // event of its own.
+    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_refused: 2 });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
 
-    // Next interval: the pending count flushes as one line, not per request.
+    // The next interval flushes the window and starts a fresh count.
     now.mockReturnValue(1_061_000);
     countAdmissionCondition('native_admission_refused');
 
-    expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
-    const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-    expect(line).toMatchObject({
-      event: 'native_admission_aggregate',
-      metric: 'native_admission_refused',
-      count: 2,
-    });
+    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_refused: 1 });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 });

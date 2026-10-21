@@ -78,6 +78,11 @@ export function resetAdmissionCountersForTests(): void {
   admissionCountersWindowStart = 0;
 }
 
+/** Exported for tests: the counts accumulated in the open window. */
+export function pendingAdmissionCountsForTests(): Record<string, number> {
+  return Object.fromEntries(admissionCounters);
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type AdmissionPlatform = 'ios' | 'android';

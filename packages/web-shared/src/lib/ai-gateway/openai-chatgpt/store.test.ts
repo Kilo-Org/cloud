@@ -1,11 +1,12 @@
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: {
+jest.mock('@kilocode/web-shared/lib/drizzle', () => {
+  const db = {
     select: jest.fn(),
     insert: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
-  },
-}));
+  };
+  return { db, readDb: db };
+});
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),

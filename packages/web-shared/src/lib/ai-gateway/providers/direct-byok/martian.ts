@@ -1,5 +1,8 @@
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  faviconIcon,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'martian',
@@ -20,4 +23,14 @@ export default {
       },
     ],
   }),
+  provider_listing: {
+    dataPolicy: {
+      training: true,
+      retainsPrompts: true,
+      canPublish: false,
+      termsOfServiceURL: 'https://withmartian.com/terms-of-service',
+      privacyPolicyURL: 'https://withmartian.com/privacy-policy',
+    },
+    icon: faviconIcon('https://withmartian.com/'),
+  },
 } satisfies DirectByokProvider;

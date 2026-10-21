@@ -33,9 +33,20 @@ describe('deviceSessionLabel', () => {
     ).toBe('Web browser');
   });
 
-  it('keeps the first product token for app and tool user agents', () => {
+  it('keeps the first product token for non-app clients', () => {
     expect(deviceSessionLabel('Kilo-Code/1.2.3 (darwin; arm64)')).toBe('Kilo-Code');
     expect(deviceSessionLabel('axios/1.7.0')).toBe('axios');
+  });
+
+  it('titles a mobile-app session with the localized app name', () => {
+    expect(deviceSessionLabel('Kilo-Code/1.2.3 (android)')).toBe('Kilo app');
+    expect(deviceSessionLabel('Kilo-Code/1.0.4 (ios)')).toBe('Kilo app');
+    expect(deviceSessionLabel('Kilo-Code/ (android)')).toBe('Kilo app');
+  });
+
+  it('titles a legacy Android row that recorded OkHttp with the app name', () => {
+    expect(deviceSessionLabel('okhttp/4.9.2')).toBe('Kilo app');
+    expect(deviceSessionLabel('okhttp')).toBe('Kilo app');
   });
 });
 

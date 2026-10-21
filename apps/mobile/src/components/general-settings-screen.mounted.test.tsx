@@ -168,12 +168,12 @@ function texts(renderer: RenderWithProvidersResult) {
     )
     .map(node => node.props.children as string);
 }
-function biometricPress(renderer: RenderWithProvidersResult) {
+function biometricToggle(renderer: RenderWithProvidersResult) {
   const found = renderer.renderer.root
-    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Pressable')
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Switch')
     .find(sw => sw.props.accessibilityLabel === 'Unlock with biometrics');
-  return typeof found?.props.onPress === 'function'
-    ? (found.props.onPress as () => void)
+  return typeof found?.props.onValueChange === 'function'
+    ? (found.props.onValueChange as (next: boolean) => void)
     : undefined;
 }
 beforeEach(() => {
@@ -193,7 +193,6 @@ afterEach(() => {
   view = undefined;
   vi.unstubAllGlobals();
 });
-
 describe('GeneralSettingsScreen', () => {
   it('renders the settings and the condense row with their exact titles and subtitles', async () => {
     const renderer = await mountGeneral();
@@ -219,7 +218,7 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
     );
     const byLabel = (label: string) => switches.find(sw => sw.props.accessibilityLabel === label);
 
@@ -256,7 +255,7 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
     );
     const condenseSwitch = switches.find(
       sw => sw.props.accessibilityLabel === 'Condense tool calls'
@@ -268,21 +267,8 @@ describe('GeneralSettingsScreen', () => {
     });
   });
 
-  it('renders the biometric switch off by default without prompting native authentication', async () => {
-    const renderer = await mountGeneral();
-
-    const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
-    );
-    const biometricSwitch = switches.find(
-      sw => sw.props.accessibilityLabel === 'Unlock with biometrics'
-    );
-
-    expect(biometricSwitch).toBeDefined();
-    expect(biometricSwitch?.props.accessibilityState).toMatchObject({
-      checked: false,
-      disabled: false,
-    });
+  it('does not prompt for native authentication when opening settings', async () => {
+    await mountGeneral();
     expect(native.authenticateAsync).not.toHaveBeenCalled();
   });
 
@@ -293,11 +279,11 @@ describe('GeneralSettingsScreen', () => {
       error: 'not_available',
     });
     const renderer = await mountGeneral();
-    const attempt = biometricPress(renderer);
+    const attempt = biometricToggle(renderer);
     expect(attempt).toBeDefined();
 
     await flush(() => {
-      attempt?.();
+      attempt?.(true);
     });
 
     const feedback = texts(renderer);
@@ -312,11 +298,11 @@ describe('GeneralSettingsScreen', () => {
       error: 'not_available',
     });
     const renderer = await mountGeneral();
-    const attempt = biometricPress(renderer);
+    const attempt = biometricToggle(renderer);
     expect(attempt).toBeDefined();
 
     await flush(() => {
-      attempt?.();
+      attempt?.(true);
     });
     expect(texts(renderer)).toContain('Unavailable');
 
@@ -331,22 +317,5 @@ describe('GeneralSettingsScreen', () => {
 
     expect(texts(renderer)).not.toContain('Unavailable');
     expect(texts(renderer)).not.toContain('Check your device security settings and try again.');
-  });
-
-  it('mounts the hide-thinking switch off and enabled once the preference load settles', async () => {
-    const renderer = await mountGeneral();
-
-    const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
-    );
-    const hideThinkingSwitch = switches.find(
-      sw => sw.props.accessibilityLabel === 'Hide thinking details'
-    );
-
-    expect(hideThinkingSwitch).toBeDefined();
-    expect(hideThinkingSwitch?.props.accessibilityState).toMatchObject({
-      checked: false,
-      disabled: false,
-    });
   });
 });

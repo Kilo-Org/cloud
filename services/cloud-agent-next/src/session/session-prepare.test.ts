@@ -372,7 +372,10 @@ function runCreate(
   return createSessionWithLedger(request, ctx, CREATE_OPTIONS);
 }
 
-type SettleOptions = { outboxEvent?: { properties?: unknown } };
+type SettleOptions = {
+  outboxEvent?: { properties?: unknown };
+  canonicalResult?: Record<string, unknown>;
+};
 
 /** Returns the options argument of the n-th `settleOperation` call, if any. */
 function settleOptions(index: number): SettleOptions | undefined {
@@ -704,7 +707,7 @@ describe('explicit sandbox session creation', () => {
         ...request,
         runtime: { sandboxAllocation: request.runtime.sandboxAllocation, ...policy },
       })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     expect(doStub.getMetadata).not.toHaveBeenCalled();
   });
@@ -1471,7 +1474,7 @@ describe('explicit sandbox session creation', () => {
         ...request,
         initialTurn: { type: 'prompt', prompt: 'A different prompt' },
       })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
     expect(recordOperationProgressMock).not.toHaveBeenCalled();
     expect(settleOperationMock).not.toHaveBeenCalled();
     expectNoAllocation(doStub);
@@ -1722,6 +1725,115 @@ describe('explicit sandbox session creation', () => {
     expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBeUndefined();
   });
 
+  it('admits a fresh create whose request pins a selectable allocation', async () => {
+    const request = requestForPreset('cloudflare-single');
+    const doStub = makeDoStub();
+    admitOperationMock.mockImplementationOnce(
+      async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+        admission: 'admitted' as const,
+        row: makeLedgerRow({
+          organization_id: orgId,
+          canonical_result: admitted.initialCanonicalResult,
+        }),
+      })
+    );
+
+    await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    expect(admitOperationMock.mock.calls[0]?.[1]).toMatchObject({
+      initialCanonicalResult: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+    });
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
+  });
+
+  it.each([
+    { allocation: 'cloudflare-single' as const, pinned: true },
+    { allocation: 'isolated-standard' as const, pinned: false },
+  ])(
+    'pins a requested $allocation at admission only when selectable',
+    async ({ allocation, pinned }) => {
+      const request = requestForPreset(allocation);
+      const doStub = makeDoStub();
+      admitOperationMock.mockImplementationOnce(
+        async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+          admission: 'admitted' as const,
+          row: makeLedgerRow({
+            organization_id: orgId,
+            canonical_result: admitted.initialCanonicalResult,
+          }),
+        })
+      );
+
+      await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      });
+      const canonical = admitOperationMock.mock.calls[0]?.[1] as {
+        initialCanonicalResult: Record<string, unknown>;
+      };
+      if (pinned) {
+        expect(canonical.initialCanonicalResult).toMatchObject({ sandboxAllocation: allocation });
+      } else {
+        expect(canonical.initialCanonicalResult).not.toHaveProperty('sandboxAllocation');
+      }
+    }
+  );
+
+  it('resolves the saved allocation for a fresh prepare create', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const doStub = makeDoStub();
+    admitOperationMock.mockImplementationOnce(
+      async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+        admission: 'admitted' as const,
+        row: makeLedgerRow({
+          organization_id: orgId,
+          canonical_result: admitted.initialCanonicalResult,
+        }),
+      })
+    );
+
+    await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledOnce();
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe('cloudflare-shared');
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ROW_ID,
+      expect.objectContaining({ [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-shared' })
+    );
+  });
+
+  it('settles the delivered initial message so a replay reports the same delivery', async () => {
+    const request = requestForPreset('cloudflare-single');
+    const doStub = makeDoStub({
+      createSessionWithInitialAdmission: vi.fn().mockResolvedValue({
+        success: true,
+        outcome: 'queued',
+        messageId: INITIAL_MESSAGE_ID,
+        compatibilityDelivery: 'sent',
+      } satisfies SessionMessageAdmissionResult),
+    });
+
+    await createSessionWithLedger(request, selectedContext(doStub), {
+      ...CREATE_OPTIONS,
+      includeInitialMessage: true,
+    });
+
+    expect(settleOptions(0)?.canonicalResult).toMatchObject({
+      initialMessageId: INITIAL_MESSAGE_ID,
+      delivery: 'sent',
+    });
+  });
+
   it('ignores saved settings for a code review and uses a neutral sandbox key', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       contextAllocation: 'cloudflare-single',
@@ -1795,6 +1907,9 @@ describe('createSessionWithLedger admission ladder', () => {
         operationKey: OPERATION_KEY,
         taxonomy: 'safe-retry',
         leaseSeconds: 120,
+        initialCanonicalResult: expect.objectContaining({
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: expect.any(String),
+        }),
       })
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
@@ -1819,10 +1934,10 @@ describe('createSessionWithLedger admission ladder', () => {
         rowId: ROW_ID,
         status: 'completed',
         outcomeCode: 'ok',
-        canonicalResult: {
+        canonicalResult: expect.objectContaining({
           cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
           kiloSessionId: KILO_SESSION_ID,
-        },
+        }),
       })
     );
     expect(settleOptions(0)?.outboxEvent).toMatchObject({
@@ -1981,7 +2096,7 @@ describe('createSessionWithLedger admission ladder', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'auto-triage',
+          createdOnPlatform: 'app-builder',
           kilocodeOrganizationId: orgId,
         },
       })
@@ -1997,7 +2112,7 @@ describe('createSessionWithLedger admission ladder', () => {
     );
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
-        identity: expect.objectContaining({ orgId, createdOnPlatform: 'auto-triage' }),
+        identity: expect.objectContaining({ orgId, createdOnPlatform: 'app-builder' }),
         workspace: expect.objectContaining({
           sandboxId,
           sandboxProvider: 'cloudflare',
@@ -2013,7 +2128,7 @@ describe('createSessionWithLedger admission ladder', () => {
       runtime: { sandboxAllocation: 'isolated-standard' },
       options: {
         operationKey: OPERATION_KEY,
-        createdOnPlatform: 'auto-triage',
+        createdOnPlatform: 'app-builder',
         kilocodeOrganizationId: orgId,
       },
     });
@@ -2254,7 +2369,6 @@ describe('createSessionWithLedger admission ladder', () => {
   it.each([
     ['missing platform', undefined, undefined],
     ['app-builder origin', 'browser', 'app-builder'],
-    ['auto-triage origin', 'browser', 'auto-triage'],
     ['code-review origin', undefined, 'code-review'],
   ] as const)(
     'keeps non-control-plane %s creates on agent_ sessions',
@@ -2711,6 +2825,14 @@ describe('createSessionWithLedger admission ladder', () => {
     // retry reconciles them instead of allocating a second session. The create
     // intent fingerprint travels with the same write so a changed same-key
     // intent is rejected before any replay or reconciliation.
+    expect(admitOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        initialCanonicalResult: expect.objectContaining({
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: expect.any(String),
+        }),
+      })
+    );
     expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
@@ -2864,6 +2986,30 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
     });
+  });
+
+  it('creates under a client-proposed session id and fingerprints it', async () => {
+    const proposed = 'ses_0123456789abABCDEFGHIJKLMN';
+    const request = makeRequest({
+      options: { operationKey: OPERATION_KEY, kiloSessionId: proposed },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ canonical_result: null }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+
+    const result = await runCreate(makeContext(makeDoStub()), request);
+
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: proposed,
+    });
+    expect(generateKiloSessionIdMock).not.toHaveBeenCalled();
+    const unproposed = makeRequest({ options: { operationKey: OPERATION_KEY } });
+    expect(await sessionCreateIntentFingerprint(request)).not.toBe(
+      await sessionCreateIntentFingerprint(unproposed)
+    );
   });
 
   it('(b) runs a fresh create when the ownership row is absent despite recorded IDs', async () => {
@@ -3736,10 +3882,10 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
         expect.objectContaining({
           rowId: ROW_ID,
           status: 'completed',
-          canonicalResult: {
+          canonicalResult: expect.objectContaining({
             cloudAgentSessionId: WORKSPACE_SESSION_ID,
             kiloSessionId: KILO_SESSION_ID,
-          },
+          }),
         })
       );
       expect(deleteCliSessionMock).not.toHaveBeenCalled();
@@ -3779,8 +3925,8 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
           await expect(
             runCreate(ctx, { ...input, finalization: { autoCommit: changedAutoCommit } })
           ).rejects.toMatchObject({
-            code: 'BAD_REQUEST',
-            message: 'session_creation_failed',
+            code: 'CONFLICT',
+            message: 'session_create_intent_conflict',
           });
 
           expect(select).not.toHaveBeenCalled();
@@ -4142,8 +4288,8 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
         initialTurn: { type: 'prompt', prompt: 'Create a different session' },
       })
     ).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'session_creation_failed',
+      code: 'CONFLICT',
+      message: 'session_create_intent_conflict',
     });
 
     expect(createCliSessionMock).toHaveBeenCalledTimes(1);
@@ -4181,8 +4327,8 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       const stub = makeDoStub();
       if (githubAccessPurpose === 'agent') {
         await expect(runCreate(makeContext(stub), request)).rejects.toMatchObject({
-          code: 'BAD_REQUEST',
-          message: 'session_creation_failed',
+          code: 'CONFLICT',
+          message: 'session_create_intent_conflict',
         });
       } else {
         expect(await sessionCreateIntentFingerprint(request)).toBe(legacyFingerprint);
@@ -4251,7 +4397,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     await expect(runCreate(ctx, request)).rejects.toMatchObject(
       identityConflict
         ? { code: 'CONFLICT', message: 'operation_key_reuse_mismatch' }
-        : { code: 'BAD_REQUEST', message: 'session_creation_failed' }
+        : { code: 'CONFLICT', message: 'session_create_intent_conflict' }
     );
 
     // Rejected before replay, reconciliation, or any external effect.
@@ -4324,6 +4470,23 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     );
   });
 
+  it('preserves existing opt-out fingerprints but binds opt-in and authenticated lineage to creation intent', async () => {
+    const request = originalRequest();
+    const original = await sessionCreateIntentFingerprint(request);
+    expect(await sessionCreateIntentFingerprint({ ...request, allowSubagentSessions: false })).toBe(
+      original
+    );
+    expect(
+      await sessionCreateIntentFingerprint({ ...request, allowSubagentSessions: true })
+    ).not.toBe(original);
+    expect(
+      await sessionCreateIntentFingerprint({
+        ...request,
+        parentCloudAgentSessionId: 'workspace_parent',
+      })
+    ).not.toBe(original);
+  });
+
   /**
    * One case per create input covered by the intent fingerprint. Each case
    * changes exactly one input on the retry; every one must reject before any
@@ -4336,6 +4499,17 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     identityConflict?: boolean;
     retry: SessionCreateRequest;
   }> = [
+    {
+      name: 'subagent opt-in',
+      retry: makeRequest({ allowSubagentSessions: true, options: ORIGINAL_OPTIONS }),
+    },
+    {
+      name: 'authenticated parent lineage',
+      retry: makeRequest({
+        parentCloudAgentSessionId: 'workspace_parent',
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
     {
       name: 'the prompt',
       retry: makeRequest({
@@ -4922,7 +5096,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'auto-triage',
+          createdOnPlatform: 'app-builder',
           kilocodeOrganizationId: orgId,
         },
       })

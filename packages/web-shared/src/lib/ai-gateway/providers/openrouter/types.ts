@@ -35,6 +35,9 @@ export type VercelInferenceProviderConfig =
 export type VercelProviderConfig = {
   gateway?: GatewayProviderOptions & {
     byok?: Record<string, VercelInferenceProviderConfig[]>;
+    // https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
+    sessionId?: string;
+    sessionAffinity?: boolean;
   };
   anthropic?: AnthropicProviderOptions;
 };
@@ -67,6 +70,11 @@ export type SharedGatewayRequestProperties = {
   // OpenRouter specific field we do not support
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
+
+  // Messages API fallback models we do not support: OpenRouter tries them when the requested
+  // model fails, not only on Anthropic safety refusals
+  // https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback
+  fallbacks?: unknown;
 
   // Non-standard reasoning configuration
   enable_thinking?: boolean; // Alibaba

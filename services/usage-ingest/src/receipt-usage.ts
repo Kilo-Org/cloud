@@ -3,10 +3,12 @@ import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 export function handleQueue(batch: MessageBatch<unknown>): void {
   for (const message of batch.messages) {
     const result = UsageRecordRequestSchema.safeParse(message.body);
-    console.log(
+    console.info(
       JSON.stringify({
+        level: 'info',
         event: 'usage_ingest_receipt',
         outcome: result.success ? 'received' : 'invalid',
+        queue_action: 'ack',
         queue_message_id: message.id,
         delivery_attempts: message.attempts,
         ...(result.success

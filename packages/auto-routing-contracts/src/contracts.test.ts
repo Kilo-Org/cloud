@@ -18,9 +18,11 @@ import {
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
   BenchmarkProfileStatusesRequestSchema,
+  CustomRoutingTableRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   RegisterBenchmarkProfilesRequestSchema,
+  SyncBenchmarkSubscriptionsRequestSchema,
   resolveBenchmarkIdentity,
 } from './benchmark';
 
@@ -154,6 +156,29 @@ describe('auto routing contracts', () => {
 });
 
 describe('BenchmarkConfigSchema defaults', () => {
+  it.each([
+    ['efficient', '~deepseek/deepseek-flash-latest'],
+    ['frontier', '~openai/gpt-sol-latest'],
+  ] as const)('uses the %s preset only when the pool is omitted', (router, alias) => {
+    const input = {
+      router,
+      classifierModels: ['classifier/model'],
+      minAccuracy: 0.7,
+      benchmarkUserId: null,
+      switchCostFactor: 3,
+      updatedAt: null,
+      updatedBy: null,
+    };
+    expect(BenchmarkConfigSchema.parse(input).deciderModels).toEqual([{ id: alias }]);
+    expect(
+      BenchmarkConfigSchema.parse({
+        ...input,
+        deciderModels: [{ id: 'vendor/explicit-selection' }],
+      }).deciderModels
+    ).toEqual([{ id: 'vendor/explicit-selection' }]);
+    expect(BenchmarkConfigSchema.safeParse({ ...input, deciderModels: [] }).success).toBe(false);
+  });
+
   it('applies config defaults for repetitions, classifier latency, and switch threshold', () => {
     const result = BenchmarkConfigSchema.parse({
       classifierModels: ['model/a'],
@@ -260,17 +285,26 @@ describe('resolveBenchmarkIdentity', () => {
     });
   });
 
-  it('preserves configured benchmark identity overrides', () => {
+  it('preserves configured internal bot identity overrides', () => {
     expect(
       resolveBenchmarkIdentity({
-        benchmarkUserId: 'override-user',
+        benchmarkUserId: 'bot-internal-override',
         benchmarkOrgId: 'override-org',
       })
     ).toEqual({
-      benchmarkUserId: 'override-user',
+      benchmarkUserId: 'bot-internal-override',
       benchmarkOrgId: 'override-org',
     });
   });
+
+  it.each(['override-user', 'bot-code-review-org-1', 'xbot-internal-x'])(
+    'rejects a %s override instead of falling back to the default user',
+    benchmarkUserId => {
+      expect(() => resolveBenchmarkIdentity({ benchmarkUserId, benchmarkOrgId: null })).toThrow(
+        /is not an internal bot user/
+      );
+    }
+  );
 });
 
 describe('BenchmarkConfigSchema duplicate model ids', () => {
@@ -692,5 +726,101 @@ describe('benchmark profile request entry bounds', () => {
       retryEntries: [{ model: 'other/model' }],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('benchmark subscription request contracts', () => {
+  const entries = [{ model: 'provider/model' }];
+
+  it.each(['user', 'org'])('accepts %s subscription replacement and null removal', ownerType => {
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.parse({ ownerType, ownerId: 'owner-1', entries })
+    ).toEqual({ ownerType, ownerId: 'owner-1', entries });
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.parse({
+        ownerType,
+        ownerId: 'owner-1',
+        entries: null,
+      })
+    ).toEqual({ ownerType, ownerId: 'owner-1', entries: null });
+  });
+
+  it('preserves explicit compensation without enabling it for ordinary replacement', () => {
+    const request = { ownerType: 'user', ownerId: 'owner-1', entries };
+    expect(SyncBenchmarkSubscriptionsRequestSchema.parse(request)).not.toHaveProperty(
+      'restorePrevious'
+    );
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.parse({ ...request, restorePrevious: true })
+    ).toEqual({ ...request, restorePrevious: true });
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.safeParse({ ...request, restorePrevious: 'true' })
+        .success
+    ).toBe(false);
+  });
+
+  it.each([
+    { ownerType: 'user' },
+    { ownerId: 'owner-1' },
+    { ownerType: 'team', ownerId: 'owner-1' },
+    { ownerType: 'user', ownerId: '   ' },
+  ])('rejects invalid subscription owner identity %j', owner => {
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.safeParse({ ...owner, entries: null }).success
+    ).toBe(false);
+  });
+
+  it('requires an explicit replacement or removal', () => {
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'owner-1',
+      }).success
+    ).toBe(false);
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'owner-1',
+        entries: [],
+      }).success
+    ).toBe(false);
+  });
+
+  describe.each([
+    ['status', BenchmarkProfileStatusesRequestSchema],
+    ['custom table', CustomRoutingTableRequestSchema],
+  ] as const)('%s owner identity', (_name, schema) => {
+    it('accepts requests without owner identity', () => {
+      expect(schema.safeParse({ entries }).success).toBe(true);
+    });
+
+    it.each(['user', 'org'])('preserves paired %s owner identity', ownerType => {
+      expect(schema.parse({ entries, ownerType, ownerId: ' owner-1 ' })).toMatchObject({
+        ownerType,
+        ownerId: 'owner-1',
+      });
+    });
+
+    it.each([
+      [{ ownerType: 'user' }, 'ownerId'],
+      [{ ownerId: 'owner-1' }, 'ownerType'],
+    ])('rejects unpaired identity %j', (owner, missingField) => {
+      const result = schema.safeParse({ entries, ...owner });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toContainEqual(
+          expect.objectContaining({ path: [missingField] })
+        );
+      }
+    });
+
+    it.each([
+      { ownerType: 'team', ownerId: 'owner-1' },
+      { ownerType: 'user', ownerId: '   ' },
+      { ownerType: null, ownerId: 'owner-1' },
+      { ownerType: 'user', ownerId: null },
+    ])('rejects invalid paired identity %j', owner => {
+      expect(schema.safeParse({ entries, ...owner }).success).toBe(false);
+    });
   });
 });

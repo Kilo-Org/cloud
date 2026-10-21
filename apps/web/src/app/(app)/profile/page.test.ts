@@ -55,7 +55,7 @@ jest.mock('@/components/auto-routing/CustomRoutersCard', () => ({
   CustomRoutersCard: () => null,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
-  isCustomRoutersEnabled: jest.fn(() => false),
+  hasCustomRoutersAccess: jest.fn(() => false),
 }));
 jest.mock('@/components/profile/DeleteAccountDialog', () => ({ DeleteAccountDialog: () => null }));
 jest.mock('@/lib/user', () => ({ getOAuthDisplayNames: jest.fn(() => new Map()) }));

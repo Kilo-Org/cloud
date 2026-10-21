@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "De naam van de vaardigheid moet beginnen met een letter of cijfer en mag alleen kleine letters, cijfers en streepjes bevatten",
     "skillContentRequired": "Vaardigheidsinhoud is vereist",
     "skillSaveFailed": "Kan vaardigheid niet opslaan",
+    "skillSourceCustom": "Aangepast",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Plak een SKILL.md en de naam wordt ingevuld; voeg een vaardigheid toe vanaf je telefoon zonder slepen en neerzetten.",
     "skillEditTitle": "Vaardigheid bewerken",
     "mcp": {

@@ -3819,6 +3819,8 @@
     "skillNameInvalid": "Rhaid i enw sgil ddechrau gyda llythyren neu ddigid a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
     "skillContentRequired": "Mae angen cynnwys sgil",
     "skillSaveFailed": "Methu arbed sgil",
+    "skillSourceCustom": "Personol",
+    "skillSourceMarketplace": "Marchnad",
     "skillsHint": "Gludwch SKILL.md ac mae ei enw yn llenwi; ychwanegu sgil o'ch ffôn heb lusgo a gollwng.",
     "skillEditTitle": "Sgil golygu",
     "mcp": {

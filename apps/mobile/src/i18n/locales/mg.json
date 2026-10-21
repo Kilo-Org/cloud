@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Ny anaran'ny fahaiza-manao dia tsy maintsy manomboka amin'ny litera na tarehimarika ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
     "skillContentRequired": "Ilaina ny votoatin'ny fahaiza-manao",
     "skillSaveFailed": "Tsy nahavonjy fahaizana",
+    "skillSourceCustom": "Namboarinao",
+    "skillSourceMarketplace": "Tsena",
     "skillsHint": "Apetaho ny SKILL.md ary fenoy ny anarany; ampio fahaiza-manao avy amin'ny findainao tsy misy drag and drop.",
     "skillEditTitle": "Ahitsio fahaizana",
     "mcp": {

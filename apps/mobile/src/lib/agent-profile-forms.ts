@@ -28,6 +28,9 @@ export const MAX_SESSION_ENV_VAR_VALUE_LENGTH = 256;
 /** Server pattern: `profile-skills-service.ts`'s `SKILL_NAME_PATTERN`. */
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
+/** Server bound: `contracts/skills.ts`'s `MAX_SKILL_NAME_LENGTH`. */
+const SKILL_NAME_MAX_LENGTH = 100;
+
 export type ProfileNameError = 'empty' | 'too-long';
 
 /**
@@ -90,6 +93,30 @@ export function parseSkillFrontmatter(markdown: string): SkillFrontmatter {
 }
 
 export type SkillInputError = 'empty' | 'bad-name' | 'no-content';
+
+/**
+ * The skill name a pasted SKILL.md offers for the name field: its frontmatter
+ * `name`, reduced to the server's pattern. Case is lowered, each run outside
+ * `[a-z0-9]` becomes one dash, and edge dashes are dropped, so `My Skill` fills
+ * `my-skill`. A name with no ASCII letter or digit left — a name written in
+ * another script — fills nothing, because filling it would only produce a value
+ * `validateSkillInput` rejects.
+ */
+export function skillNameFromMarkdown(markdown: string): string | undefined {
+  const { name } = parseSkillFrontmatter(markdown);
+  if (name === undefined) {
+    return undefined;
+  }
+  const slug = name
+    .normalize('NFKD')
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
+    .slice(0, SKILL_NAME_MAX_LENGTH)
+    .replace(/-+$/, '');
+  return SKILL_NAME_PATTERN.test(slug) ? slug : undefined;
+}
 
 export type SkillInputValidation = { error: SkillInputError | null; description?: string };
 

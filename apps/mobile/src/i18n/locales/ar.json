@@ -3819,6 +3819,8 @@
     "skillNameInvalid": "يجب أن يبدأ اسم المهارة بحرف أو رقم ويستخدم فقط الأحرف الصغيرة والأرقام والشرطات",
     "skillContentRequired": "مطلوب محتوى المهارة",
     "skillSaveFailed": "لا يمكن حفظ المهارة",
+    "skillSourceCustom": "مخصص",
+    "skillSourceMarketplace": "المتجر",
     "skillsHint": "الصق SKILL.md وسيملأ اسمه؛ أضف مهارة من هاتفك دون السحب والإفلات.",
     "skillEditTitle": "تحرير المهارة",
     "mcp": {

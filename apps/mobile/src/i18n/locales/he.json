@@ -3696,6 +3696,8 @@
     "skillNameInvalid": "שם המיומנות חייב להתחיל באות או ספרה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
     "skillContentRequired": "נדרש תוכן מיומנות",
     "skillSaveFailed": "לא ניתן היה לשמור את המיומנות",
+    "skillSourceCustom": "מותאם אישית",
+    "skillSourceMarketplace": "חנות",
     "skillsHint": "הדבק SKILL.md ושמו ימלא; הוסף מיומנות מהטלפון שלך ללא גרירה ושחרור.",
     "skillEditTitle": "ערוך מיומנות",
     "mcp": {

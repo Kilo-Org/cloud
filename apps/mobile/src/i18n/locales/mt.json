@@ -3778,6 +3778,8 @@
     "skillNameInvalid": "L-isem tal-ħiliet għandu jibda b'ittra jew ċifra u juża biss ittri żgħar, ċifri u sings",
     "skillContentRequired": "Il-kontenut tal-ħiliet huwa meħtieġ",
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet",
+    "skillSourceCustom": "Personalizzat",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Pasta SKILL.md u isimha jimla; żid ħila mit-telefon tiegħek mingħajr drag and drop.",
     "skillEditTitle": "Edit ħiliet",
     "mcp": {

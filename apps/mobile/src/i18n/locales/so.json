@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Magaca xirfaddu waa inuu ku bilaabmaa xaraf ama lambar oo waa inuu isticmaalo xarfo yaryar, lambaro, iyo jajab",
     "skillContentRequired": "Waxa loo baahan yahay nuxurka xirfadaha",
     "skillSaveFailed": "Ma badbaadin karin xirfad",
+    "skillSourceCustom": "Gaar ah",
+    "skillSourceMarketplace": "Suuqa",
     "skillsHint": "Ku dheji SKILL.md oo magaciisa ayaa buuxiya; ku dar xirfad taleefankaaga adigoon jiidin oo tuurin.",
     "skillEditTitle": "Xirfadda wax ka beddel",
     "mcp": {

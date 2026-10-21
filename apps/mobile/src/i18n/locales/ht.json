@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Non konpetans yo dwe kòmanse ak yon lèt oswa yon chif epi sèvi ak sèlman lèt miniskil, chif, ak tire",
     "skillContentRequired": "Kontni konpetans obligatwa",
     "skillSaveFailed": "Pa t 'kapab sove konpetans",
+    "skillSourceCustom": "Pèsonalize",
+    "skillSourceMarketplace": "Mache",
     "skillsHint": "Kole yon SKILL.md epi non li ranpli; ajoute yon konpetans nan telefòn ou san yo pa trennen ak gout.",
     "skillEditTitle": "Edit konpetans",
     "mcp": {

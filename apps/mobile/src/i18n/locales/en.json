@@ -3719,6 +3719,8 @@
     "skillNameInvalid": "Skill name must start with a letter or digit and use only lowercase letters, digits, and dashes",
     "skillContentRequired": "Skill content is required",
     "skillSaveFailed": "Couldn't save skill",
+    "skillSourceCustom": "Custom",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Paste a SKILL.md and its name fills in; add a skill from your phone without drag and drop.",
     "skillEditTitle": "Edit skill",
     "mcp": {

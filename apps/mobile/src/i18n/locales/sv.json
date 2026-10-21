@@ -3660,6 +3660,8 @@
     "skillNameInvalid": "Färdighetsnamn måste börja med en bokstav eller siffra och endast använda små bokstäver, siffror och bindestreck",
     "skillContentRequired": "Färdighetsinnehåll krävs",
     "skillSaveFailed": "Det gick inte att spara färdigheten",
+    "skillSourceCustom": "Anpassad",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
     "skillEditTitle": "Redigera färdighet",
     "mcp": {

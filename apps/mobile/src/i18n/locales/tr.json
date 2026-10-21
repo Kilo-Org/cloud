@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
     "skillSaveFailed": "Beceri kaydedilemedi",
+    "skillSourceCustom": "Özel",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Bir SKILL.md yapıştırın ve adı doldurun; Sürükleyip bırakmadan telefonunuzdan bir beceri ekleyin.",
     "skillEditTitle": "Beceriyi düzenle",
     "mcp": {

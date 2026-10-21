@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Bacarıq adı hərf və ya rəqəmlə başlamalı və yalnız kiçik hərflər, rəqəmlər və tirelərdən istifadə etməlidir",
     "skillContentRequired": "Bacarıq məzmunu tələb olunur",
     "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı",
+    "skillSourceCustom": "Fərdi",
+    "skillSourceMarketplace": "Marketpleys",
     "skillsHint": "SKILL.md yapışdırın və onun adı doldurulur; sürükləyib buraxmadan telefonunuzdan bacarıq əlavə edin.",
     "skillEditTitle": "Bacarıqları redaktə edin",
     "mcp": {

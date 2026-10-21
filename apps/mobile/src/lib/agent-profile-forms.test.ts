@@ -9,6 +9,7 @@ import {
   parseSkillFrontmatter,
   removeCommand,
   replaceCommand,
+  skillNameFromMarkdown,
   validateProfileDescription,
   validateProfileName,
   validateSkillInput,
@@ -121,6 +122,42 @@ describe('validateSkillInput', () => {
     expect(validateSkillInput({ name: 'my-skill', content: '   ' })).toEqual({
       error: 'no-content',
     });
+  });
+});
+
+/** A SKILL.md whose frontmatter carries `name`. */
+function skillMarkdown(name: string): string {
+  return ['---', `name: ${name}`, 'description: Does a thing', '---', 'Body'].join('\n');
+}
+
+describe('skillNameFromMarkdown', () => {
+  it('reduces a frontmatter name to the server name rule', () => {
+    expect(skillNameFromMarkdown(skillMarkdown('My Skill'))).toBe('my-skill');
+    expect(skillNameFromMarkdown(skillMarkdown('-leading-dash'))).toBe('leading-dash');
+    expect(skillNameFromMarkdown(skillMarkdown('code_review.v2'))).toBe('code-review-v2');
+  });
+
+  it('keeps a name that already satisfies the rule', () => {
+    expect(skillNameFromMarkdown(skillMarkdown('code-review'))).toBe('code-review');
+  });
+
+  it('fills nothing for a name written in another script', () => {
+    expect(skillNameFromMarkdown(skillMarkdown('مراجعة الجودة'))).toBeUndefined();
+  });
+
+  it('fills nothing without frontmatter or without a name', () => {
+    expect(skillNameFromMarkdown('# Just markdown')).toBeUndefined();
+    expect(
+      skillNameFromMarkdown(['---', 'description: Only a description', '---', 'Body'].join('\n'))
+    ).toBeUndefined();
+  });
+
+  it('accepts the slug it returns', () => {
+    const name = skillNameFromMarkdown(skillMarkdown('Quality Review'));
+    expect(name).toBe('quality-review');
+    expect(
+      validateSkillInput({ name: name ?? '', content: skillMarkdown('Quality Review') })
+    ).toMatchObject({ error: null });
   });
 });
 

@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Aha nka ga-ebidorịrị site na mkpụrụedemede ma ọ bụ mkpụrụọnụọgụgụ ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ na ngwucha",
     "skillContentRequired": "Achọrọ ọdịnaya nka",
     "skillSaveFailed": "Enweghị ike ichekwa nka",
+    "skillSourceCustom": "Nke onwe",
+    "skillSourceMarketplace": "Ahịa",
     "skillsHint": "Tapawa SKILL.md na aha ya juputara; tinye nka na ekwentị gị na-adọkpụrụghị na dobe.",
     "skillEditTitle": "Dezie nka",
     "mcp": {

@@ -3696,6 +3696,8 @@
     "skillNameInvalid": "Le nom de la compétence doit commencer par une lettre ou un chiffre et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
     "skillContentRequired": "Un contenu de compétence est requis",
     "skillSaveFailed": "Impossible de sauvegarder la compétence",
+    "skillSourceCustom": "Personnalisé",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Collez un SKILL.md et son nom est renseigné ; ajoutez une compétence depuis votre téléphone sans glisser-déposer.",
     "skillEditTitle": "Modifier la compétence",
     "mcp": {

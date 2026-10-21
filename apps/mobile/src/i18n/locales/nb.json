@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Ferdighetsnavn må starte med en bokstav eller et siffer og kun bruke små bokstaver, sifre og bindestreker",
     "skillContentRequired": "Ferdighetsinnhold kreves",
     "skillSaveFailed": "Kunne ikke lagre ferdigheter",
+    "skillSourceCustom": "Egendefinert",
+    "skillSourceMarketplace": "Markedsplass",
     "skillsHint": "Lim inn en SKILL.md og navnet fylles ut; legg til en ferdighet fra telefonen din uten å dra og slipp.",
     "skillEditTitle": "Rediger ferdighet",
     "mcp": {

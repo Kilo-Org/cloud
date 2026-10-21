@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "የክህሎት ስም በፊደል ወይም ዲጂት መጀመር አለበት እና ትንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
     "skillContentRequired": "የክህሎት ይዘት ያስፈልጋል",
     "skillSaveFailed": "ችሎታ ማዳን አልተቻለም",
+    "skillSourceCustom": "ብጁ",
+    "skillSourceMarketplace": "መደብር",
     "skillsHint": "SKILL.md ይለጥፉ እና ስሙ ይሞላል; ሳይጎትቱ እና መጣል ሳይኖር ከስልክዎ ላይ ችሎታ ይጨምሩ።",
     "skillEditTitle": "ችሎታን ያርትዑ",
     "mcp": {

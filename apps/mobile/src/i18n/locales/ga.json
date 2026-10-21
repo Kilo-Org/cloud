@@ -3778,6 +3778,8 @@
     "skillNameInvalid": "Ní mór tús a chur le hainm scile le litir nó le digit agus ní mór ach litreacha beaga, digití agus daiseanna a úsáid",
     "skillContentRequired": "Tá ábhar scile ag teastáil",
     "skillSaveFailed": "Níorbh fhéidir an scil a shábháil",
+    "skillSourceCustom": "Saincheaptha",
+    "skillSourceMarketplace": "Margadh",
     "skillsHint": "Greamaigh SKILL.md agus líonann a ainm isteach; cuir scil ó do ghuthán gan tarraing agus scaoil.",
     "skillEditTitle": "Cuir scil in eagar",
     "mcp": {

@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Vaardigheidsnaam moet met 'n letter of syfer begin en slegs kleinletters, syfers en strepies gebruik",
     "skillContentRequired": "Vaardigheidsinhoud word vereis",
     "skillSaveFailed": "Kon nie vaardigheid red nie",
+    "skillSourceCustom": "Pasgemaak",
+    "skillSourceMarketplace": "Markplek",
     "skillsHint": "Plak 'n SKILL.md en sy naam vul in; voeg 'n vaardigheid vanaf jou foon by sonder om te sleep en te laat val.",
     "skillEditTitle": "Wysig vaardigheid",
     "mcp": {

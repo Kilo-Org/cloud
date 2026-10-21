@@ -3696,6 +3696,8 @@
     "skillNameInvalid": "El nombre de la habilidad debe comenzar con una letra o un dígito y usar solo letras minúsculas, dígitos y guiones.",
     "skillContentRequired": "Se requiere contenido de habilidad",
     "skillSaveFailed": "No se pudo guardar la habilidad",
+    "skillSourceCustom": "Personalizada",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Pegue un SKILL.md y su nombre se completará; agregue una habilidad desde su teléfono sin arrastrar y soltar.",
     "skillEditTitle": "Editar habilidad",
     "mcp": {

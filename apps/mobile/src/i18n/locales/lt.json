@@ -3737,6 +3737,8 @@
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
     "skillContentRequired": "Reikalingas įgūdžių turinys",
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
+    "skillSourceCustom": "Pasirinktinis",
+    "skillSourceMarketplace": "Parduotuvė",
     "skillsHint": "Įklijuokite SKILL.md ir užpildysite jo pavadinimą; pridėkite įgūdžių iš savo telefono nevilkdami ir numesdami.",
     "skillEditTitle": "Redaguoti įgūdžius",
     "mcp": {

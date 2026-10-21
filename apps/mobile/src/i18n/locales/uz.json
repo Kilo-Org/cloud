@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
     "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
     "skillSaveFailed": "Mahorat saqlanmadi",
+    "skillSourceCustom": "Maxsus",
+    "skillSourceMarketplace": "Bozor",
     "skillsHint": "SKILL.md-ni joylashtiring va uning nomi kiritiladi; sudrab tashlamasdan telefoningizdan mahorat qo'shing.",
     "skillEditTitle": "Tahrirlash mahorati",
     "mcp": {

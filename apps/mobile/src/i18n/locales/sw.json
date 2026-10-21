@@ -3655,6 +3655,8 @@
     "skillNameInvalid": "Jina la ustadi lazima lianze na herufi au tarakimu na litumie herufi ndogo, tarakimu na deshi pekee.",
     "skillContentRequired": "Maudhui ya ujuzi yanahitajika",
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi",
+    "skillSourceCustom": "Maalum",
+    "skillSourceMarketplace": "Soko",
     "skillsHint": "Bandika SKILL.md na jina lake lijazwe; ongeza ujuzi kutoka kwa simu yako bila kuburuta na kuangusha.",
     "skillEditTitle": "Hariri ujuzi",
     "mcp": {

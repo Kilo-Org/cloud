@@ -3737,6 +3737,8 @@
     "skillNameInvalid": "Názov zručnosti musí začínať písmenom alebo číslicou a používať iba malé písmená, číslice a pomlčky",
     "skillContentRequired": "Vyžaduje sa obsah zručností",
     "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť",
+    "skillSourceCustom": "Vlastné",
+    "skillSourceMarketplace": "Obchod",
     "skillsHint": "Vložte súbor SKILL.md a jeho názov sa vyplní; pridajte zručnosť zo svojho telefónu bez presúvania myšou.",
     "skillEditTitle": "Upraviť zručnosť",
     "mcp": {

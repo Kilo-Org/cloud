@@ -3696,6 +3696,8 @@
     "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
     "skillContentRequired": "Sadržaj vještina je obavezan",
     "skillSaveFailed": "Nije moguće sačuvati vještinu",
+    "skillSourceCustom": "Prilagođeno",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Zalijepite SKILL.md i njegovo ime se popunjava; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
     "mcp": {

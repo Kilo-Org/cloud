@@ -58,7 +58,7 @@ function FolderSelector({
         disabled && 'opacity-50'
       )}
     >
-      <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
+      <Text className="flex-1 text-base text-foreground" numberOfLines={1} ellipsizeMode="middle">
         {label}
       </Text>
       <ChevronDown size={14} color={colors.mutedForeground} />

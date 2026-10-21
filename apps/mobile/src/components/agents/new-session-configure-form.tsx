@@ -1,6 +1,12 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useState } from 'react';
-import { type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +16,7 @@ import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
 import { renderProfileRowBody } from '@/components/agents/new-session-profile-row';
+import { resolveNewSessionFormLayout } from '@/components/agents/new-session-form-layout';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
@@ -174,6 +181,17 @@ export function NewSessionConfigureForm({
   // owes nothing below the card; the corrected pass lands in the same commit
   // chain.
   const [runTargetHeight, setRunTargetHeight] = useState(0);
+  // The prompt column's height in the split layout. The card's own scroll view
+  // is the frame its fit reads, so a keyboard that shrinks the window shrinks
+  // the card to a whole-line height and the column scrolls the rest; the same
+  // `pt-4` the stacked content container carries sits on the row around it, so
+  // the card's top offset inside that frame is zero.
+  const [promptColumnHeight, setPromptColumnHeight] = useState(0);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // A phone held sideways leaves the card a frame no taller than itself, which
+  // hides the Run on row and the repository picker below it; the form splits
+  // into two columns there (see `resolveNewSessionFormLayout`).
+  const isSplit = resolveNewSessionFormLayout(windowWidth, windowHeight) === 'split';
   // The remote surface (launch folder, remote hint, no repository section)
   // covers both a bound computer and the tour's computer target with none
   // connected yet — the target is the computer either way.
@@ -188,55 +206,49 @@ export function NewSessionConfigureForm({
     setFrameHeight(current => (current === next ? current : next));
   }
 
-  const body = (
-    <ScrollView
-      className="flex-1"
-      contentContainerClassName="flex-grow px-4 pt-4"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-      keyboardDismissMode="on-drag"
-      onLayout={handleScrollFrameLayout}
-    >
-      <View
-        onLayout={event => {
-          const nextTop = Math.max(Math.round(event.nativeEvent.layout.y), 0);
-          setComposerTop(current => (current === nextTop ? current : nextTop));
-        }}
-      >
-        <NewSessionPrompt
-          attachments={attachments}
-          attachmentMax={attachmentMax}
-          isCreating={isStarting}
-          isModelsError={isModelsError}
-          isLoadingModels={isLoadingModels}
-          mode={mode}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onChangeText={onChangeText}
-          onModeChange={onModeChange}
-          onModelSelect={onModelSelect}
-          customOptions={customOptions}
-          modelLocked={modelLocked}
-          modelLockLabel={modelLockLabel}
-          onAddAttachment={onAddAttachment}
-          onRemoveAttachment={onRemoveAttachment}
-          onRetryAttachment={onRetryAttachment}
-          onMoveAttachment={onMoveAttachment}
-          onReorderAttachments={onReorderAttachments}
-          onRefetchModels={onRefetchModels}
-          onPrefillAttachments={onPrefillAttachments}
-          shareId={shareId}
-          voiceInputSettlerRef={voiceInputSettlerRef}
-          initialPrompt={initialPrompt}
-          frameHeight={frameHeight}
-          cardTop={composerTop}
-          belowCardHeight={runTargetHeight}
-          onStartSession={isStartDisabled ? undefined : onStartSession}
-          isCloneEntry={isCloneEntry}
-        />
-      </View>
+  // The composer card. In the stacked layout it sits inside the form's scroll
+  // view, so the view reports its top offset and the scroll frame is its frame;
+  // in the split layout it fills the left column and the column is its frame.
+  const renderPrompt = (frame: number, top: number, below: number) => (
+    <NewSessionPrompt
+      attachments={attachments}
+      attachmentMax={attachmentMax}
+      isCreating={isStarting}
+      isModelsError={isModelsError}
+      isLoadingModels={isLoadingModels}
+      mode={mode}
+      model={model}
+      variant={variant}
+      modelOptions={modelOptions}
+      onChangeText={onChangeText}
+      onModeChange={onModeChange}
+      onModelSelect={onModelSelect}
+      customOptions={customOptions}
+      modelLocked={modelLocked}
+      modelLockLabel={modelLockLabel}
+      onAddAttachment={onAddAttachment}
+      onRemoveAttachment={onRemoveAttachment}
+      onRetryAttachment={onRetryAttachment}
+      onMoveAttachment={onMoveAttachment}
+      onReorderAttachments={onReorderAttachments}
+      onRefetchModels={onRefetchModels}
+      onPrefillAttachments={onPrefillAttachments}
+      shareId={shareId}
+      voiceInputSettlerRef={voiceInputSettlerRef}
+      initialPrompt={initialPrompt}
+      frameHeight={frame}
+      cardTop={top}
+      belowCardHeight={below}
+      onStartSession={isStartDisabled ? undefined : onStartSession}
+      isCloneEntry={isCloneEntry}
+    />
+  );
 
+  // Everything under the card: the run target, the launch folder, the repository
+  // and its branch, and the session's own configuration. Both layouts render
+  // this one list, so a rotation only changes which column it scrolls in.
+  const settingRows = (
+    <>
       {/* The block under the card the frame must still show: the Organization
           section when the entry point renders one, then the Run on row and its
           refresh control. Each child's own `mt-*` lives inside this wrapper, so
@@ -341,7 +353,65 @@ export function NewSessionConfigureForm({
           onRepoDefaults={onOpenRepoDefaults}
         />
       ) : null}
+    </>
+  );
+
+  // The portrait layout, and the only one a tall window needs: the card and the
+  // rows under it scroll as one column.
+  const body = (
+    <ScrollView
+      className="flex-1"
+      contentContainerClassName="flex-grow px-4 pt-4"
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
+      onLayout={handleScrollFrameLayout}
+    >
+      <View
+        onLayout={event => {
+          const nextTop = Math.max(Math.round(event.nativeEvent.layout.y), 0);
+          setComposerTop(current => (current === nextTop ? current : nextTop));
+        }}
+      >
+        {renderPrompt(frameHeight, composerTop, runTargetHeight)}
+      </View>
+      {settingRows}
     </ScrollView>
+  );
+
+  // A phone held sideways. The card fills the whole scroll frame there, so the
+  // Run on row and the repository picker open below the fold with nothing on
+  // screen pointing at them. The card keeps the left column and the setting rows
+  // scroll in the right one, which puts the run target and the repository picker
+  // on screen together, as the portrait layout does. The card's own frame is the
+  // column, and nothing sits under it inside that frame.
+  //
+  // The card's column scrolls as well: with the keyboard up the window shrinks
+  // to a fraction of the card's height, and a column that could not scroll would
+  // leave the focused input below its own frame with no way to reach it.
+  const splitBody = (
+    <View className="flex-1 flex-row gap-4 px-4 pt-4">
+      <ScrollView
+        className="min-w-0 flex-1"
+        contentContainerClassName="flex-grow"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        onLayout={event => {
+          const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
+          setPromptColumnHeight(current => (current === next ? current : next));
+        }}
+      >
+        {renderPrompt(promptColumnHeight, 0, 0)}
+      </ScrollView>
+      <ScrollView
+        className="min-w-0 flex-1"
+        contentContainerClassName="pb-1"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        {settingRows}
+      </ScrollView>
+    </View>
   );
 
   // Persistent failure feedback for the cloud create, in the reserved spot
@@ -390,7 +460,7 @@ export function NewSessionConfigureForm({
       behavior="padding"
       keyboardVerticalOffset={keyboardInsetOffset(bottom)}
     >
-      {body}
+      {isSplit ? splitBody : body}
       {footer}
     </KeyboardAvoidingView>
   );

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the form renders many mutually-exclusive target/state branches, each needing its own render case */
 import * as React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
@@ -46,6 +46,9 @@ vi.mock('react', async () => {
 
 // ── react-native ───────────────────────────────────────────────────
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
+// The portrait window unless a case rotates it; `resolveNewSessionFormLayout`
+// reads it to pick the stacked or the split layout.
+const windowState = vi.hoisted(() => ({ width: 411, height: 914 }));
 // The composer-reveal hook arms the did-events through Keyboard.addListener;
 // the captured subscribers let the repro fire `keyboardDidShow` directly.
 const keyboardSubscribers = vi.hoisted(() => ({
@@ -85,6 +88,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useColorScheme: () => 'light',
+  useWindowDimensions: () => windowState,
 }));
 
 // The profile row's loading state is asserted as a `Skeleton` node. The real
@@ -216,6 +220,21 @@ function collectElementsByType(node: Node, typeName: string): Record<string, unk
   const found: Record<string, unknown>[] = type === typeName ? [props] : [];
   for (const child of Array.isArray(children) ? children : [children]) {
     found.push(...collectElementsByType(child as Node, typeName));
+  }
+  return found;
+}
+
+/** Every element node of `typeName`, so a case can look inside each match. */
+function collectElementNodes(node: Node, typeName: string): Node[] {
+  if (node === null || typeof node !== 'object') {
+    return [];
+  }
+  const type = (node as { type?: unknown }).type;
+  const props = node.props ?? {};
+  const children = props.children;
+  const found: Node[] = type === typeName ? [node] : [];
+  for (const child of Array.isArray(children) ? children : [children]) {
+    found.push(...collectElementNodes(child as Node, typeName));
   }
   return found;
 }
@@ -353,6 +372,13 @@ function defaultProps() {
 }
 
 describe('NewSessionConfigureForm', () => {
+  // The layout is a function of the window, so every case starts from the
+  // portrait phone unless it rotates the window itself.
+  beforeEach(() => {
+    windowState.width = 411;
+    windowState.height = 914;
+  });
+
   it.each([false, true])(
     'passes the target state to the run-target block while fetching=%s',
     async isFetchingInstances => {
@@ -1023,5 +1049,67 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
     // The mocked useState holds the initial measurement (0) and never setStates.
     expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
+  });
+  // ── Case 16: a phone held sideways splits the card from the setting rows ──
+  it('keeps the prompt and the repository rows in one column on a portrait window', async () => {
+    windowState.width = 411;
+    windowState.height = 914;
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm(defaultProps()) as Node;
+    const scrollBody = findElement(element, 'ScrollView');
+
+    // The card scrolls with the rows it shares the column with, and the rows
+    // under it are reserved in the card's own frame fit.
+    expect(findElementByType(scrollBody, 'NewSessionPrompt')).not.toBeNull();
+    expect(findElementByType(scrollBody, 'NewSessionRepositorySection')).not.toBeNull();
+  });
+
+  it('keeps the prompt on screen beside a scrolling column of setting rows in landscape', async () => {
+    windowState.width = 914;
+    windowState.height = 411;
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const rows = NewSessionConfigureForm(defaultProps()) as Node;
+    const columns = collectElementNodes(rows, 'ScrollView');
+    const promptColumn = columns.find(column =>
+      Boolean(findElementByType(column, 'NewSessionPrompt'))
+    );
+    const settingsColumn = columns.find(column =>
+      Boolean(findElementByType(column, 'NewSessionRunTarget'))
+    );
+
+    // Two independent columns: the card keeps one, and the run target and the
+    // repository picker scroll in the other, which is what keeps them on screen
+    // without rotating the phone.
+    expect(columns).toHaveLength(2);
+    expect(promptColumn).toBeDefined();
+    expect(settingsColumn).toBeDefined();
+    expect(settingsColumn).not.toBe(promptColumn);
+    expect(findElementByType(settingsColumn, 'NewSessionRepositorySection')).not.toBeNull();
+    // The card's frame is its column, with nothing under it inside that frame.
+    expect(findElementByType(rows, 'NewSessionPrompt')).toMatchObject({
+      belowCardHeight: 0,
+      cardTop: 0,
+    });
+  });
+
+  it('returns to the single column when the window turns back to portrait', async () => {
+    windowState.width = 914;
+    windowState.height = 411;
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const landscapeForm = NewSessionConfigureForm(defaultProps()) as Node;
+    expect(collectElementNodes(landscapeForm, 'ScrollView')).toHaveLength(2);
+
+    windowState.width = 411;
+    windowState.height = 914;
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const portraitForm = NewSessionConfigureForm(defaultProps()) as Node;
+    const portraitScrolls = collectElementNodes(portraitForm, 'ScrollView');
+    expect(portraitScrolls).toHaveLength(1);
+    expect(findElementByType(portraitScrolls[0], 'NewSessionPrompt')).not.toBeNull();
   });
 });

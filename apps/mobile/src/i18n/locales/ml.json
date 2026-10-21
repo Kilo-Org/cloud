@@ -3684,6 +3684,7 @@
       "template": "ടെംപ്ലേറ്റ്",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS വിശദീകരിക്കുക",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "ഉപടാസ്‌കായി പ്രവർത്തിപ്പിക്കുക",
       "edit": "സ്ലാഷ് കമാൻഡ് എഡിറ്റ് ചെയ്യുക",
       "saveFailed": "കമാൻഡ് സംരക്ഷിക്കാനായില്ല",

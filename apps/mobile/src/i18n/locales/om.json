@@ -3684,6 +3684,7 @@
       "template": "Unkaa",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ibsi",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Akka hojii xiqqaatti fiigi",
       "edit": "Ajaja slash gulaali",
       "saveFailed": "Ajaja qusachuu hin dandeenye",

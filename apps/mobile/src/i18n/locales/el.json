@@ -3684,6 +3684,7 @@
       "template": "Περίγραμμα",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Εξηγήστε τα $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Εκτέλεση ως δευτερεύουσα εργασία",
       "edit": "Επεξεργασία εντολής κάθετο",
       "saveFailed": "Δεν ήταν δυνατή η αποθήκευση της εντολής",

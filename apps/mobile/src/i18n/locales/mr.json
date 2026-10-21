@@ -3684,6 +3684,7 @@
       "template": "साचा",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करा",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "सबटास्क म्हणून चालवा",
       "edit": "स्लॅश कमांड संपादित करा",
       "saveFailed": "कमांड सेव्ह करू शकलो नाही",

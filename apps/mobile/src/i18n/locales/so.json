@@ -3684,6 +3684,7 @@
       "template": "Tusaale",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Sharax $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "U orda sidii shaqo-hoosaad",
       "edit": "Tafatir amarka slash",
       "saveFailed": "Way kaydsan kari wayday amarka",

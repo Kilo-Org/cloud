@@ -3684,6 +3684,7 @@
       "template": "Shablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ni tushuntiring",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Quyi vazifa sifatida ishga tushirish",
       "edit": "Slash buyrug'ini tahrirlash",
       "saveFailed": "Buyruq saqlanmadi",

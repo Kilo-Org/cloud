@@ -3684,6 +3684,7 @@
       "template": "டெம்ப்ளேட்",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTSஐ விளக்கவும்",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "துணைப் பணியாக இயக்கவும்",
       "edit": "ஸ்லாஷ் கட்டளையைத் திருத்தவும்",
       "saveFailed": "கட்டளையைச் சேமிக்க முடியவில்லை",

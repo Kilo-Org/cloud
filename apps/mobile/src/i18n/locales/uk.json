@@ -3766,6 +3766,7 @@
       "template": "Шаблон",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Поясніть $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Запуск як підзавдання",
       "edit": "Редагувати команду косої риски",
       "saveFailed": "Не вдалося зберегти команду",

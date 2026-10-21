@@ -3684,6 +3684,7 @@
       "template": "Sniðmát",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",
       "saveFailed": "Ekki tókst að vista skipunina",

@@ -3684,6 +3684,7 @@
       "template": "tauira",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Whakamaramahia $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Whakahaerehia hei mahi iti",
       "edit": "Whakatika whakahau rītaha",
       "saveFailed": "Kāore i taea te tiaki tono",

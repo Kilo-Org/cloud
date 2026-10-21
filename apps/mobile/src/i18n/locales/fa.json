@@ -3684,6 +3684,7 @@
       "template": "الگو",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS را توضیح دهید",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "به عنوان وظیفه فرعی اجرا شود",
       "edit": "ویرایش دستور اسلش",
       "saveFailed": "فرمان ذخیره نشد",

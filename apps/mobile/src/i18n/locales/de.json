@@ -3684,6 +3684,7 @@
       "template": "Vorlage",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Erklären Sie $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Als Unteraufgabe ausführen",
       "edit": "Slash-Befehl bearbeiten",
       "saveFailed": "Der Befehl konnte nicht gespeichert werden",

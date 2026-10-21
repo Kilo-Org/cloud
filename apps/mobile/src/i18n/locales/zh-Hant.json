@@ -3684,6 +3684,7 @@
       "template": "範本",
       "namePlaceholder": "explain",
       "templatePlaceholder": "解釋$ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "作為子任務運行",
       "edit": "編輯斜槓命令",
       "saveFailed": "無法保存命令",

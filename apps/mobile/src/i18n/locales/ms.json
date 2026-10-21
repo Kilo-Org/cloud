@@ -3684,6 +3684,7 @@
       "template": "templat",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Terangkan $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit arahan slash",
       "saveFailed": "Tidak dapat menyimpan arahan",

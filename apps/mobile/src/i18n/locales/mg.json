@@ -3684,6 +3684,7 @@
       "template": "Endrika",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Hazavao ny $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Mihazakazaka toy ny subtask",
       "edit": "Ahitsio slash command",
       "saveFailed": "Tsy afaka mitahiry baiko",

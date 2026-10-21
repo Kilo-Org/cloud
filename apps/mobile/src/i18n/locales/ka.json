@@ -3684,6 +3684,7 @@
       "template": "შაბლონი",
       "namePlaceholder": "explain",
       "templatePlaceholder": "ახსენით $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "გაშვება როგორც ქვეამოცანა",
       "edit": "დახრილი ბრძანების რედაქტირება",
       "saveFailed": "ბრძანების შენახვა ვერ მოხერხდა",

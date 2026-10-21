@@ -3684,6 +3684,7 @@
       "template": "Modèl",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Eksplike $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Kouri kòm subtach",
       "edit": "Edit lòd koupe",
       "saveFailed": "Pa t 'kapab sove lòd",

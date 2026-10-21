@@ -3684,6 +3684,7 @@
       "template": "Templat",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Jelaskan $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit perintah garis miring",
       "saveFailed": "Tidak dapat menyimpan perintah",

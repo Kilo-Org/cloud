@@ -3684,6 +3684,7 @@
       "template": "Kiolezo",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Eleza $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Endesha kama kazi ndogo",
       "edit": "Hariri amri ya kufyeka",
       "saveFailed": "Haikuweza kuhifadhi amri",

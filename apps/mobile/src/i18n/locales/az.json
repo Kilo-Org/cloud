@@ -3684,6 +3684,7 @@
       "template": "Şablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS-i izah edin",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Alt tapşırıq kimi işləyin",
       "edit": "Slash əmrini redaktə edin",
       "saveFailed": "Komandanı saxlamaq mümkün olmadı",

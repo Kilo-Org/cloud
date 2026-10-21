@@ -3684,6 +3684,7 @@
       "template": "Үлгі",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS түсіндіріңіз",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Қосымша тапсырма ретінде іске қосыңыз",
       "edit": "Қиғаш сызықты өңдеу пәрмені",
       "saveFailed": "Пәрменді сақтау мүмкін болмады",

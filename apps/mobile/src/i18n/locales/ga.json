@@ -3807,6 +3807,7 @@
       "template": "Teimpléad",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Mínigh $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Rith mar fhothasc",
       "edit": "Cuir ordú slais in eagar",
       "saveFailed": "Níorbh fhéidir an t-ordú a shábháil",

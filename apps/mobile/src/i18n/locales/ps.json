@@ -3684,6 +3684,7 @@
       "template": "کينډۍ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS تشریح کړئ",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "د فرعي دندې په توګه چلول",
       "edit": "د سلیش کمانډ ایډیټ کړئ",
       "saveFailed": "کمانډ خوندي نشو کړای",

@@ -3684,6 +3684,7 @@
       "template": "ઢાંચો",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS સમજાવો",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "સબટાસ્ક તરીકે ચલાવો",
       "edit": "સ્લેશ આદેશ સંપાદિત કરો",
       "saveFailed": "આદેશ સાચવી શકાયો નથી",

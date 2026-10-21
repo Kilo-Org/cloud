@@ -3684,6 +3684,7 @@
       "template": "แม่แบบ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "อธิบาย $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "ทำงานเป็นงานย่อย",
       "edit": "แก้ไขคำสั่งสแลช",
       "saveFailed": "ไม่สามารถบันทึกคำสั่งได้",

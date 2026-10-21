@@ -102,13 +102,15 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.repoPicker.platformBitbucket',
   'agentChat.prBadge.label',
   // Profile-editor examples that name the value's own syntax, not prose: a
-  // slug the field validator accepts, a server name, a JSON snippet, and
-  // command lines whose tool and package paths must stay literal. Every
-  // catalog keeps them English so the example never contradicts validation.
+  // slug the field validator accepts, a server name, a JSON snippet, command
+  // lines whose tool and package paths must stay literal, and the agent
+  // identifiers a slash command can select. Every catalog keeps them English so
+  // the example never contradicts validation.
   'profiles.mcp.namePlaceholder',
   'profiles.mcp.commandPlaceholder',
   'profiles.mcp.jsonPlaceholder',
   'profiles.agents.slugPlaceholder',
+  'profiles.slashCommands.agentPlaceholder',
   // The sampling parameter's technical name: `top_p` is the knob's own
   // identifier, so every catalog keeps it verbatim.
   'profiles.agents.topP',

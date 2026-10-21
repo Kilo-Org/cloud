@@ -3684,6 +3684,7 @@
       "template": "テンプレート",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS の説明",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "サブタスクとして実行",
       "edit": "スラッシュコマンドの編集",
       "saveFailed": "コマンドを保存できませんでした",

@@ -3684,6 +3684,7 @@
       "template": "ແມ່ແບບ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "ອະທິບາຍ $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "ດໍາເນີນການເປັນວຽກຍ່ອຍ",
       "edit": "ແກ້ໄຂຄໍາສັ່ງ slash",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງໄດ້",

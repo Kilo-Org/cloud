@@ -3684,6 +3684,7 @@
       "template": "ಟೆಂಪ್ಲೇಟ್",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ಅನ್ನು ವಿವರಿಸಿ",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "ಉಪಕಾರ್ಯದಂತೆ ರನ್ ಮಾಡಿ",
       "edit": "ಸ್ಲಾಶ್ ಆಜ್ಞೆಯನ್ನು ಸಂಪಾದಿಸಿ",
       "saveFailed": "ಆಜ್ಞೆಯನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",

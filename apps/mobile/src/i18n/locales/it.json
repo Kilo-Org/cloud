@@ -3725,6 +3725,7 @@
       "template": "Modello",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Spiega $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Esegui come attività secondaria",
       "edit": "Comando Modifica barra",
       "saveFailed": "Impossibile salvare il comando",

@@ -3684,6 +3684,7 @@
       "template": "Կաղապար",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Բացատրեք $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Գործարկել որպես ենթաառաջադրանք",
       "edit": "Խմբագրել շեղ հրամանը",
       "saveFailed": "Չհաջողվեց պահել հրամանը",

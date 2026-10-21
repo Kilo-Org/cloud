@@ -3766,6 +3766,7 @@
       "template": "Шаблон",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Объясните $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Запустить как подзадачу",
       "edit": "Команда редактирования косой черты",
       "saveFailed": "Не удалось сохранить команду",

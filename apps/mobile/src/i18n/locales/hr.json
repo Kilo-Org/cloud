@@ -3725,6 +3725,7 @@
       "template": "Predložak",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",
       "saveFailed": "Nije moguće spremiti naredbu",

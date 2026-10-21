@@ -3684,6 +3684,7 @@
       "template": "Txantiloia",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Azaldu $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Exekutatu azpizeregin gisa",
       "edit": "Editatu barra komandoa",
       "saveFailed": "Ezin izan da gorde komandoa",

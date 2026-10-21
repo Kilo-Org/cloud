@@ -3766,6 +3766,7 @@
       "template": "Šablóna",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Vysvetlite $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Spustiť ako podúlohu",
       "edit": "Príkaz na úpravu lomky",
       "saveFailed": "Príkaz sa nepodarilo uložiť",

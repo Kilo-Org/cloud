@@ -3684,6 +3684,7 @@
       "template": "टेम्प्लेट",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS व्याख्या गर्नुहोस्",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "सबटास्कको रूपमा चलाउनुहोस्",
       "edit": "स्ल्याश आदेश सम्पादन गर्नुहोस्",
       "saveFailed": "आदेश सुरक्षित गर्न सकिएन",

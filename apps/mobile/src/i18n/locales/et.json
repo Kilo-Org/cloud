@@ -3684,6 +3684,7 @@
       "template": "Mall",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Selgitage $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Käivita alamülesandena",
       "edit": "Muuda kaldkriipsu käsku",
       "saveFailed": "Käsku ei saanud salvestada",

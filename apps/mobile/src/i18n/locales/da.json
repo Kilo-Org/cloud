@@ -3684,6 +3684,7 @@
       "template": "Skabelon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Forklar $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Kør som underopgave",
       "edit": "Rediger skråstreg kommando",
       "saveFailed": "Kommandoen kunne ikke gemmes",

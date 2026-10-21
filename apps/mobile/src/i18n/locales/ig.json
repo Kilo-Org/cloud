@@ -3684,6 +3684,7 @@
       "template": "Ụdị",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Kọwaa $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Gbaa ọsọ dị ka obere ọrụ",
       "edit": "Dezie slash iwu",
       "saveFailed": "Enweghị ike ịchekwa iwu",

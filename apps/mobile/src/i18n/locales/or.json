@@ -3684,6 +3684,7 @@
       "template": "ଟେମ୍ପଲେଟ୍।",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ବ୍ୟାଖ୍ୟା କର।",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "ସବଟାସ୍କ ଭାବରେ ଚଲାନ୍ତୁ।",
       "edit": "ସ୍ଲାସ୍ କମାଣ୍ଡ୍ ଏଡିଟ୍ କରନ୍ତୁ।",
       "saveFailed": "କମାଣ୍ଡ୍ ସେଭ୍ କରିପାରିଲା ନାହିଁ।",

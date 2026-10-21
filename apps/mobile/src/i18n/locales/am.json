@@ -3684,6 +3684,7 @@
       "template": "አብነት",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ያብራሩ",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "እንደ ንዑስ ተግባር ያሂዱ",
       "edit": "የጭረት ትእዛዝን ያርትዑ",
       "saveFailed": "ትዕዛዝ ማስቀመጥ አልተቻለም",

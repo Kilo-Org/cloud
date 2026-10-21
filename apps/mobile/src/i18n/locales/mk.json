@@ -3684,6 +3684,7 @@
       "template": "Шаблон",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Објасни $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Стартувај како подзадача",
       "edit": "Уреди команда коса црта",
       "saveFailed": "Не може да се зачува командата",

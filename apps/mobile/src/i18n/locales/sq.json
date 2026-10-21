@@ -3684,6 +3684,7 @@
       "template": "shabllon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Shpjegoni $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Ekzekuto si nëndetyrë",
       "edit": "Redakto komandën e pjerrët",
       "saveFailed": "Komanda nuk mund të ruhej",

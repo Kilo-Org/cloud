@@ -3684,6 +3684,7 @@
       "template": "Padron",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",
       "saveFailed": "Hindi ma-save ang command",

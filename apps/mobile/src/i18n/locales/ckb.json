@@ -3684,6 +3684,7 @@
       "template": "قاڵب",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ڕوون بکەرەوە",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "وەکو ئەرکی لاوەکی کارپێبکە",
       "edit": "فەرمانی دەستکاریکردنی slash",
       "saveFailed": "نەتوانرا فەرمانەکە پاشەکەوت بکرێت",

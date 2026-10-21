@@ -3684,6 +3684,7 @@
       "template": "खाका",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करें",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "उपकार्य के रूप में चलाएँ",
       "edit": "स्लैश कमांड संपादित करें",
       "saveFailed": "आदेश सहेजा नहीं जा सका",

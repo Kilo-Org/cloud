@@ -3725,6 +3725,7 @@
       "template": "תבנית",
       "namePlaceholder": "explain",
       "templatePlaceholder": "הסבר $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "הפעל כתת-מטלת",
       "edit": "ערוך פקודת נטוי",
       "saveFailed": "לא ניתן לשמור את הפקודה",

@@ -3748,6 +3748,7 @@
       "template": "Template",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Explain $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Run as subtask",
       "edit": "Edit slash command",
       "saveFailed": "Couldn't save command",

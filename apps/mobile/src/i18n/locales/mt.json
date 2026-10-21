@@ -3807,6 +3807,7 @@
       "template": "Mudell",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Spjega $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Mexxi bħala subtask",
       "edit": "Editja kmand slash",
       "saveFailed": "Ma setax isalva l-kmand",

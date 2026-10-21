@@ -3684,6 +3684,7 @@
       "template": "සැකිල්ල",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS පැහැදිලි කරන්න",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "උප කාර්යයක් ලෙස ධාවනය කරන්න",
       "edit": "slash විධානය සංස්කරණය කරන්න",
       "saveFailed": "විධානය සුරැකීමට නොහැකි විය",

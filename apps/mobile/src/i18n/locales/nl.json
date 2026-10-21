@@ -3684,6 +3684,7 @@
       "template": "Sjabloon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Leg $ARGUMENTS uit",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Uitvoeren als subtaak",
       "edit": "Bewerk de slash-opdracht",
       "saveFailed": "Kan opdracht niet opslaan",

@@ -3684,6 +3684,7 @@
       "template": "ပုံစံခွက်",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ကိုရှင်းပြပါ။",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "လုပ်ငန်းခွဲအဖြစ် လုပ်ဆောင်ပါ။",
       "edit": "မျဥ်းစောင်းအမိန့်ကို တည်းဖြတ်ပါ။",
       "saveFailed": "အမိန့်ကို သိမ်းဆည်း၍မရပါ။",

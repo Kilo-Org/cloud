@@ -3766,6 +3766,7 @@
       "template": "Šablonas",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",
       "saveFailed": "Nepavyko išsaugoti komandos",

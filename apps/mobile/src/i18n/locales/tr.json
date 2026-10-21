@@ -3684,6 +3684,7 @@
       "template": "Şablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS'ı açıklayın",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Alt görev olarak çalıştır",
       "edit": "Eğik çizgi komutunu düzenle",
       "saveFailed": "Komut kaydedilemedi",

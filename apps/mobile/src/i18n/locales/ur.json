@@ -3684,6 +3684,7 @@
       "template": "سانچہ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "ذیلی کام کے طور پر چلائیں۔",
       "edit": "سلیش کمانڈ میں ترمیم کریں۔",
       "saveFailed": "کمانڈ کو محفوظ نہیں کیا جا سکا",

@@ -3684,6 +3684,7 @@
       "template": "Malli",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Selitä $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Suorita alitehtävänä",
       "edit": "Muokkaa vinoviivakomentoa",
       "saveFailed": "Komentoa ei voitu tallentaa",

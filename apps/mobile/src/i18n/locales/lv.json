@@ -3725,6 +3725,7 @@
       "template": "Veidne",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",
       "saveFailed": "Nevarēja saglabāt komandu",

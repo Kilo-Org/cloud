@@ -3848,6 +3848,7 @@
       "template": "نموذج",
       "namePlaceholder": "explain",
       "templatePlaceholder": "شرح $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "تشغيل كمهمة فرعية",
       "edit": "تحرير أمر الشرطة المائلة",
       "saveFailed": "تعذر حفظ الأمر",

@@ -3684,6 +3684,7 @@
       "template": "Bản mẫu",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Giải thích $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
       "edit": "Chỉnh sửa lệnh gạch chéo",
       "saveFailed": "Không thể lưu lệnh",

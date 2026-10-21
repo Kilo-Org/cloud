@@ -3725,6 +3725,7 @@
       "template": "Modelo",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Explica $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Executar como subtarefa",
       "edit": "Editar comando de barra",
       "saveFailed": "Não foi possível guardar o comando",

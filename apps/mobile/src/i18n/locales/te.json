@@ -3684,6 +3684,7 @@
       "template": "మూస",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTSని వివరించండి",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "సబ్‌టాస్క్‌గా అమలు చేయండి",
       "edit": "స్లాష్ ఆదేశాన్ని సవరించండి",
       "saveFailed": "ఆదేశాన్ని సేవ్ చేయడం సాధ్యపడలేదు",

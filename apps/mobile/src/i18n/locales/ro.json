@@ -3725,6 +3725,7 @@
       "template": "Șablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Explicați $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",
       "saveFailed": "Comanda nu a putut fi salvată",

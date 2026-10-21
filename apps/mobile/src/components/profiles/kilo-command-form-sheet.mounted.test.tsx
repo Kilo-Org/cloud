@@ -1,7 +1,7 @@
 import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
 import { type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -51,6 +51,26 @@ describe('KiloCommandFormSheet server bounds', () => {
     expect(findField(renderer.root, 'Command name').props.maxLength).toBe(50);
     expect(findField(renderer.root, 'Command description').props.maxLength).toBe(2000);
     expect(findField(renderer.root, 'Template').props.maxLength).toBe(100_000);
+
+    unmount();
+  });
+});
+
+describe('KiloCommandFormSheet agent identifier field', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('keeps the agent example an identifier in a non-Latin locale', async () => {
+    await i18n.changeLanguage('km');
+    // The picker's mode label is the localized action phrase in Khmer; the
+    // field's hint must stay the identifier the value has to be.
+    const modeLabel = i18n.t('agentChat.modeOptions.code');
+    const { renderer, unmount } = await mountSheet();
+
+    const field = findField(renderer.root, i18n.t('common.agent'));
+    expect(field.props.placeholder).toBe('e.g. code, architect');
+    expect(field.props.placeholder).not.toBe(modeLabel);
 
     unmount();
   });

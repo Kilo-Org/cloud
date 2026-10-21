@@ -3684,6 +3684,7 @@
       "template": "ਟੈਂਪਲੇਟ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ਦੀ ਵਿਆਖਿਆ ਕਰੋ",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "ਸਬਟਾਸਕ ਵਜੋਂ ਚਲਾਓ",
       "edit": "ਸਲੈਸ਼ ਕਮਾਂਡ ਨੂੰ ਸੋਧੋ",
       "saveFailed": "ਕਮਾਂਡ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",

@@ -3684,6 +3684,7 @@
       "template": "Sablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Magyarázza el $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Futtassa részfeladatként",
       "edit": "Szerkessze a perjel parancsot",
       "saveFailed": "Nem sikerült menteni a parancsot",

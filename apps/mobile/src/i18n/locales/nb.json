@@ -3684,6 +3684,7 @@
       "template": "Mal",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Forklar $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Kjør som deloppgave",
       "edit": "Rediger skråstrek-kommando",
       "saveFailed": "Kunne ikke lagre kommandoen",

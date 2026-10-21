@@ -3684,6 +3684,7 @@
       "template": "Загвар",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS-г тайлбарла",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Дэд даалгавар болгон ажиллуул",
       "edit": "Талуу зураасыг засах команд",
       "saveFailed": "Командыг хадгалж чадсангүй",

@@ -3684,6 +3684,7 @@
       "template": "Isifanekiso",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Chaza $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Qalisa njengomsebenzi ongaphansi",
       "edit": "Hlela umyalo we-slash",
       "saveFailed": "Ayikwazanga ukulondoloza umyalo",

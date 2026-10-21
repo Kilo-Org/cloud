@@ -3684,6 +3684,7 @@
       "template": "Samfura",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Yi bayani $ARGUMENTS",
+      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Gudu azaman ƙaramin aiki",
       "edit": "Gyara umarnin slash",
       "saveFailed": "An kasa ajiye umarni",

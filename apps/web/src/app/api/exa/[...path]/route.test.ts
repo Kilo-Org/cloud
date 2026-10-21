@@ -301,7 +301,8 @@ describe('POST /api/exa/[...path]', () => {
 
       expect(response.status).toBe(200);
       expect(mockedGetExaMonthlyUsage.mock.calls[0][1]).toBe(db);
-      expect(mockedFindUserById).toHaveBeenCalledWith('user-123', db);
+      expect(mockedFindUserById.mock.calls[0][0]).toBe('user-123');
+      expect(mockedFindUserById.mock.calls[0][1]).toBe(db);
       expect(mockedGetBalanceAndOrgSettings.mock.calls[0][0]).toBeUndefined();
       expect(mockedGetBalanceAndOrgSettings.mock.calls[0][2]).toBe(db);
     });

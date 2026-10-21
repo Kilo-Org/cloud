@@ -9,6 +9,7 @@ import {
   StoreCreditProductsError,
 } from './store-products-loader';
 import { type BackendStoreCreditProduct } from './store-products';
+import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 
 const backendProducts: BackendStoreCreditProduct[] = [
   { amountUsd: 10, appleProductId: 'credits.usd10.v1', googleProductId: 'credits_usd10' },
@@ -21,6 +22,14 @@ const backendResponse = {
   appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
   products: backendProducts,
 };
+
+const APPLE_REQUESTED_IDS = [
+  'credits.usd10.v1',
+  'credits.usd50.v1',
+  'credits.usd100.v1',
+  'credits.usd500.v1',
+];
+const PLAY_REQUESTED_IDS = ['credits_usd10', 'credits_usd50', 'credits_usd100', 'credits_usd500'];
 
 function loadBackendProducts() {
   return vi.fn().mockResolvedValue(backendResponse);
@@ -70,44 +79,90 @@ describe('loadStoreCreditProducts', () => {
     ]);
   });
 
-  it('surfaces the App Store key when the store call itself fails', async () => {
-    await expect(
-      loadStoreCreditProducts({
-        storefront: 'app_store',
-        fetchStoreProducts: vi.fn().mockRejectedValue(new Error('Failed to query product for sku')),
-        loadBackendProducts: loadBackendProducts(),
-      })
-    ).rejects.toThrow(NO_MATCHING_CREDIT_PRODUCTS_KEY);
+  it('surfaces the App Store key with the store failure as cause when the store call fails', async () => {
+    const storeError = new Error('Failed to query product for sku');
+
+    const failure = await loadStoreCreditProducts({
+      storefront: 'app_store',
+      fetchStoreProducts: vi.fn().mockRejectedValue(storeError),
+      loadBackendProducts: loadBackendProducts(),
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(StoreCreditProductsError);
+    expect(failure).toMatchObject({ key: NO_MATCHING_CREDIT_PRODUCTS_KEY });
+    expect((failure as StoreCreditProductsError).cause).toBe(storeError);
+    expect((failure as StoreCreditProductsError).diagnostics).toEqual({
+      storefront: 'app_store',
+      backendPackCount: 4,
+      storeListingCount: 0,
+      matchedCount: 0,
+      requestedProductIds: APPLE_REQUESTED_IDS,
+      returnedProductIds: [],
+    });
   });
 
-  it('surfaces the Play key when the store call itself fails', async () => {
-    await expect(
-      loadStoreCreditProducts({
-        storefront: 'play',
-        fetchStoreProducts: vi.fn().mockRejectedValue(new Error('Failed to query product for sku')),
-        loadBackendProducts: loadBackendProducts(),
-      })
-    ).rejects.toThrow(NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY);
+  it('surfaces the Play key with the store failure as cause when the store call fails', async () => {
+    const storeError = new Error('Failed to query product for sku');
+
+    const failure = await loadStoreCreditProducts({
+      storefront: 'play',
+      fetchStoreProducts: vi.fn().mockRejectedValue(storeError),
+      loadBackendProducts: loadBackendProducts(),
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(StoreCreditProductsError);
+    expect(failure).toMatchObject({ key: NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY });
+    expect((failure as StoreCreditProductsError).cause).toBe(storeError);
+    expect((failure as StoreCreditProductsError).diagnostics).toEqual({
+      storefront: 'play',
+      backendPackCount: 4,
+      storeListingCount: 0,
+      matchedCount: 0,
+      requestedProductIds: PLAY_REQUESTED_IDS,
+      returnedProductIds: [],
+    });
   });
 
-  it('surfaces the App Store key when the store prices no pack', async () => {
-    await expect(
-      loadStoreCreditProducts({
-        storefront: 'app_store',
-        fetchStoreProducts: vi.fn().mockResolvedValue([]),
-        loadBackendProducts: loadBackendProducts(),
-      })
-    ).rejects.toThrow(NO_MATCHING_CREDIT_PRODUCTS_KEY);
+  it('surfaces the App Store key with both sides ids when the store prices no pack', async () => {
+    const failure = await loadStoreCreditProducts({
+      storefront: 'app_store',
+      fetchStoreProducts: vi
+        .fn()
+        .mockResolvedValue([{ id: 'credits.usd250.v1', displayPrice: '$249.99' }]),
+      loadBackendProducts: loadBackendProducts(),
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(StoreCreditProductsError);
+    expect(failure).toMatchObject({ key: NO_MATCHING_CREDIT_PRODUCTS_KEY });
+    expect((failure as StoreCreditProductsError).cause).toBeUndefined();
+    expect((failure as StoreCreditProductsError).diagnostics).toEqual({
+      storefront: 'app_store',
+      backendPackCount: 4,
+      storeListingCount: 1,
+      matchedCount: 0,
+      requestedProductIds: APPLE_REQUESTED_IDS,
+      returnedProductIds: ['credits.usd250.v1'],
+    });
   });
 
-  it('surfaces the Play key when the store prices no pack', async () => {
-    await expect(
-      loadStoreCreditProducts({
-        storefront: 'play',
-        fetchStoreProducts: vi.fn().mockResolvedValue([]),
-        loadBackendProducts: loadBackendProducts(),
-      })
-    ).rejects.toThrow(NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY);
+  it('surfaces the Play key with both sides ids when the store prices no pack', async () => {
+    const failure = await loadStoreCreditProducts({
+      storefront: 'play',
+      fetchStoreProducts: vi.fn().mockResolvedValue([]),
+      loadBackendProducts: loadBackendProducts(),
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(StoreCreditProductsError);
+    expect(failure).toMatchObject({ key: NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY });
+    expect((failure as StoreCreditProductsError).cause).toBeUndefined();
+    expect((failure as StoreCreditProductsError).diagnostics).toEqual({
+      storefront: 'play',
+      backendPackCount: 4,
+      storeListingCount: 0,
+      matchedCount: 0,
+      requestedProductIds: PLAY_REQUESTED_IDS,
+      returnedProductIds: [],
+    });
   });
 
   it('keeps a partial store answer instead of erroring', async () => {
@@ -157,10 +212,90 @@ describe('getStoreUnavailableCopyKeys', () => {
   });
 });
 
+describe('StoreCreditProductsError telemetry', () => {
+  it('files a zero-match answer as a warning under the storefront unavailable fingerprint', () => {
+    const error = new StoreCreditProductsError(NO_MATCHING_CREDIT_PRODUCTS_KEY, {
+      storefront: 'play',
+      backendPackCount: 4,
+      storeListingCount: 2,
+      matchedCount: 0,
+      requestedProductIds: PLAY_REQUESTED_IDS,
+      returnedProductIds: ['credits_usd25', 'credits_usd75'],
+    });
+
+    expect(error[TELEMETRY_DESCRIPTION_KEY]).toEqual({
+      level: 'warning',
+      fingerprint: ['credit-catalog-query', 'store-unavailable', 'play'],
+      tags: {
+        'error.subsystem': 'credits',
+        'error.operation': 'load-store-products',
+        'credits.storefront': 'play',
+        'credits.outcome': 'store-unavailable',
+      },
+      contexts: {
+        creditCatalogQuery: {
+          storefront: 'play',
+          backendPackCount: 4,
+          storeListingCount: 2,
+          matchedCount: 0,
+          requestedProductIds: PLAY_REQUESTED_IDS,
+          returnedProductIds: ['credits_usd25', 'credits_usd75'],
+        },
+      },
+    });
+  });
+
+  it('files a store failure as an error under the storefront error fingerprint', () => {
+    const cause = new Error('Failed to query product');
+    const error = new StoreCreditProductsError(
+      NO_MATCHING_CREDIT_PRODUCTS_KEY,
+      {
+        storefront: 'app_store',
+        backendPackCount: 4,
+        storeListingCount: 0,
+        matchedCount: 0,
+        requestedProductIds: APPLE_REQUESTED_IDS,
+        returnedProductIds: [],
+      },
+      { cause }
+    );
+
+    expect(error[TELEMETRY_DESCRIPTION_KEY]).toEqual({
+      level: 'error',
+      fingerprint: ['credit-catalog-query', 'store-error', 'app_store'],
+      tags: {
+        'error.subsystem': 'credits',
+        'error.operation': 'load-store-products',
+        'credits.storefront': 'app_store',
+        'credits.outcome': 'store-error',
+      },
+      contexts: {
+        creditCatalogQuery: {
+          storefront: 'app_store',
+          backendPackCount: 4,
+          storeListingCount: 0,
+          matchedCount: 0,
+          requestedProductIds: APPLE_REQUESTED_IDS,
+          returnedProductIds: [],
+        },
+      },
+    });
+  });
+});
+
 describe('getAuthoredProductsErrorMessageKey', () => {
   it('keeps the catalog key this app wrote', () => {
     expect(
-      getAuthoredProductsErrorMessageKey(new StoreCreditProductsError('credits.noMatchingProducts'))
+      getAuthoredProductsErrorMessageKey(
+        new StoreCreditProductsError('credits.noMatchingProducts', {
+          storefront: 'app_store',
+          backendPackCount: 0,
+          storeListingCount: 0,
+          matchedCount: 0,
+          requestedProductIds: [],
+          returnedProductIds: [],
+        })
+      )
     ).toBe('credits.noMatchingProducts');
   });
 

@@ -375,25 +375,12 @@
       }
     },
     {
-      "files": ["src/components/ui/icons.test.ts"],
-      "rules": {
-        "import/no-nodejs-modules": "off"
-      }
-    },
-    {
-      "files": ["src/lib/chat/store.test.ts"],
-      "rules": {
-        "import/no-nodejs-modules": "off"
-      }
-    },
-    {
-      "files": ["src/lib/expo-router-linking.mounted.test.tsx"],
-      "rules": {
-        "import/no-nodejs-modules": "off"
-      }
-    },
-    {
-      "files": ["src/test/renderer.mounted.test.tsx"],
+      "files": [
+        "src/components/ui/icons.test.ts",
+        "src/lib/chat/store.test.ts",
+        "src/lib/expo-router-linking.mounted.test.tsx",
+        "src/test/renderer.mounted.test.tsx"
+      ],
       "rules": {
         "import/no-nodejs-modules": "off"
       }
@@ -405,8 +392,7 @@
       }
     },
     {
-      // Sanctioned homes for a banned import. These are the only files that may
-      // import a unified element's underlying library directly.
+      // Sanctioned homes for a banned import.
       //   sheet.tsx  — the single home of `@expo/ui` BottomSheet
       //   dialog.tsx — the single home of `@rn-primitives/dialog`
       //   keep-awake.ts — the single home of `expo-keep-awake`
@@ -438,7 +424,7 @@
       }
     },
     {
-      "files": ["src/app/**/_layout.tsx", "src/app/**/*.tsx"],
+      "files": ["src/app/**/*.tsx"],
       "rules": {
         "import/no-default-export": "off"
       }

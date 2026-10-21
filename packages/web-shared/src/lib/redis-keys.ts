@@ -50,3 +50,9 @@ export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
 
 export const githubConnectionPkceRedisKey = (verifierRef: string) =>
   redisKey(`auth-pkce:github-connection:${verifierRef}`);
+
+export const watchPrCiInboxRedisKey = (input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  repositoryId: string;
+}) => redisKey(`watch-pr-ci:v1:${input.installationId}:${input.appType}:${input.repositoryId}`);

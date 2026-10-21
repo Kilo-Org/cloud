@@ -114,6 +114,8 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
+  WatchPrPolicy,
+  WatchPrStatus,
   EnkryptFailureCategory,
   EnkryptSyncCounts,
   EnkryptVerifications,
@@ -6445,6 +6447,99 @@ export const cli_sessions_v2 = pgTable(
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
 
+export const cloud_agent_pr_watches = pgTable(
+  'cloud_agent_pr_watches',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    installation_id: text().notNull(),
+    github_app_type: text().$type<'standard' | 'lite'>().notNull(),
+    repository_id: text().notNull(),
+    repo_url: text().notNull(),
+    pr_number: integer().notNull(),
+    source_session_id: text().notNull(),
+    source_cloud_agent_session_id: text().notNull(),
+    worktree_id: text().notNull(),
+    head_ref: text().notNull(),
+    base_ref: text().notNull(),
+    head_sha: text().notNull(),
+    base_sha: text().notNull(),
+    status: text().$type<WatchPrStatus>().notNull().default('watching'),
+    generation: integer().notNull().default(1),
+    pending_revision: integer().notNull().default(0),
+    policy: jsonb().$type<WatchPrPolicy>().notNull(),
+    projection: jsonb().$type<unknown>().notNull(),
+    lifecycle_reason: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_event_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_pr_watches_live_pr')
+      .on(table.repository_id, table.pr_number)
+      .where(sql`${table.status} != 'finished'`),
+    index('IDX_cloud_agent_pr_watches_owner').on(table.kilo_user_id, table.worktree_id),
+    index('IDX_cloud_agent_pr_watches_updated').on(table.updated_at),
+    index('IDX_cloud_agent_pr_watches_event_identity').on(
+      table.installation_id,
+      table.github_app_type,
+      table.repository_id,
+      table.pr_number
+    ),
+    index('IDX_cloud_agent_pr_watches_head').on(table.repository_id, table.head_sha),
+    check(
+      'cloud_agent_pr_watches_status_check',
+      sql`${table.status} IN ('watching', 'paused', 'finished')`
+    ),
+    check(
+      'cloud_agent_pr_watches_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+    check(
+      'cloud_agent_pr_watches_version_check',
+      sql`${table.generation} > 0 AND ${table.pending_revision} >= 0 AND ${table.pr_number} > 0`
+    ),
+    check(
+      'cloud_agent_pr_watches_repo_url_check',
+      sql`${table.repo_url} = lower(${table.repo_url}) AND ${table.repo_url} ~ '^https://github[.]com/[^/]+/[^/]+$'`
+    ),
+  ]
+);
+
+export type CloudAgentPrWatch = typeof cloud_agent_pr_watches.$inferSelect;
+
+export const cloud_agent_pr_watch_activity = pgTable(
+  'cloud_agent_pr_watch_activity',
+  {
+    id: idPrimaryKeyColumn,
+    watch_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_pr_watches.id, { onDelete: 'cascade' }),
+    generation: integer().notNull(),
+    delivery_id: text(),
+    kind: text().notNull(),
+    reason: text(),
+    data: jsonb().$type<unknown>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_pr_watch_activity_delivery').on(
+      table.watch_id,
+      table.generation,
+      table.delivery_id
+    ),
+    index('IDX_cloud_agent_pr_watch_activity_watch').on(table.watch_id, table.created_at),
+    index('IDX_cloud_agent_pr_watch_activity_created').on(table.created_at),
+  ]
+);
+
 export const todo_lists = pgTable(
   'todo_lists',
   {
@@ -6869,6 +6964,7 @@ export const github_branch_pull_requests = pgTable(
     pr_state: text(),
     pr_title: text(),
     pr_head_sha: text(),
+    pr_observations: jsonb().$type<unknown>(),
     pr_review_decision: text(),
     review_decision_pending: boolean().notNull().default(false),
     review_decision_fetching_at: timestamp({ withTimezone: true, mode: 'string' }),

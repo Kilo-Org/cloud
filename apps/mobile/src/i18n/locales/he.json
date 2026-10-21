@@ -35,6 +35,8 @@
     "connectGithub": "חיבור ל-GitHub",
     "cost": "עלות",
     "discard": "ויתור על השינויים",
+    "discardChangesMessage": "השינויים שלך יאבדו.",
+    "discardChangesTitle": "ויתור על השינויים?",
     "findings": "ממצאים",
     "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",
@@ -946,6 +948,9 @@
       "gateHidden": "מוסתר",
       "gateNone": "אין",
       "noFindings": "לא נמצאו ממצאים.",
+      "findingsUnavailable": "התוצאות אינן זמינות כי הסקירה הזו נכשלה.",
+      "serviceUnavailable": "לא ניתן להתחבר לשירות סקירת הקוד. יש להריץ את הסקירה שוב כשהשירות יהיה זמין.",
+      "reviewFailed": "הסקירה נכשלה. נא לנסות שוב.",
       "retryMessage": "פעולה זו תריץ מחדש את סקירת הקוד.",
       "retryReview": "הרצת הסקירה שוב",
       "retryNeedsSettings": "סוקר הקוד כבוי או שההגדרות שלו דורשות טיפול. יש לתקן את ההגדרות ואז להריץ את הסקירה הזו שוב.",
@@ -1033,7 +1038,8 @@
       "bugs": "באגים",
       "style": "סגנון",
       "testing": "בדיקות",
-      "documentation": "תיעוד"
+      "documentation": "תיעוד",
+      "unknown": "אחר ({{area}})"
     },
     "gateThreshold": {
       "warning": "אזהרה"
@@ -1112,7 +1118,14 @@
       "triageReasoning": "נימוקי המיון הראשוני",
       "watchInCloudAgent": "צפייה בסוכן הענן",
       "whereFound": "מיקומי הממצא ({{displayCount}})",
-      "yes": "כן"
+      "yes": "כן",
+      "action": {
+        "analyzeCodebase": "נתח את בסיס הקוד",
+        "dismiss": "דחייה",
+        "manualReview": "בדיקה ידנית",
+        "monitor": "מעקב",
+        "openPr": "פתיחת בקשת משיכה"
+      }
     },
     "analysisSettings": {
       "analysisModel": "מודל לניתוח",
@@ -1137,7 +1150,24 @@
       "summary": "סיכום הדוח",
       "title": "דוח ביקורת",
       "unavailable": "דוח הביקורת אינו זמין",
-      "unavailableDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לצפות בדוחות ביקורת. בקש מאחד מבעלי הארגון או ממנהל החיוב לתת לך גישה."
+      "unavailableDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לצפות בדוחות ביקורת. בקש מאחד מבעלי הארגון או ממנהל החיוב לתת לך גישה.",
+      "eventActions": {
+        "findingAnalysisCompleted": "הניתוח הושלם",
+        "findingAnalysisFailed": "הניתוח נכשל",
+        "findingAutoDismissed": "נדחה אוטומטית",
+        "findingCreated": "יובא",
+        "findingDeleted": "נמחק",
+        "findingDismissed": "נדחה",
+        "findingSeverityChanged": "החומרה שונתה",
+        "findingStatusChange": "הסטטוס שונה",
+        "findingSuperseded": "הוחלף",
+        "remediationBlocked": "התיקון נחסם",
+        "remediationCancelled": "בוטל",
+        "remediationFailed": "התיקון נכשל",
+        "remediationNoChangesNeeded": "לא נדרשים שינויים",
+        "remediationPrOpened": "נפתחה בקשת משיכה",
+        "remediationQueued": "התקבלה בקשה לתיקון"
+      }
     },
     "auditReportButton": {
       "viewA11y": "צפייה בדוח הביקורת"
@@ -1712,6 +1742,7 @@
       "prefillModelUnavailable": "{{model}} כבר אינו זמין. במקומו ייעשה שימוש במודל ברירת המחדל שלך.",
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא את הסשנים הממתינים. נסה שוב.",
       "failedToCreate": "לא ניתן היה ליצור סשן.",
+      "checkOrganizationAccess": "בדוק את הגישה שלך לארגון הזה, ואז נסה שוב.",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
       "discardDraftTitle": "למחוק את הטיוטה?",
       "discardDraftMessage": "ההנחיה שלך תימחק.",
@@ -2243,6 +2274,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "לא ניתן להציג את החיבורים הפעילים שלך עד לסיום הטעינה.",
     "currentDeviceUnidentified": "לא ניתן היה לזהות את המכשיר הנוכחי.",
+    "kiloApp": "אפליקציית Kilo",
     "noSessions": "אין חיבורים פעילים",
     "noSessionsDescription": "היכנס לאפליקציית Kilo במכשיר אחר, והמכשיר יופיע כאן.",
     "onlyKiloAppSignIns": "כאן מופיעים רק חיבורים לאפליקציית Kilo. חיבורים דרך העורך או ה-CLI אינם מופיעים ברשימה.",
@@ -2396,6 +2428,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "לפני שנתחיל",
+    "summaryTitle": "העדפות שיתוף נתונים",
     "introDescription": "Kilo שולח את ההודעות שלך לספקי AI כדי ליצור תשובות. כאן מפורט אילו נתונים נשלחים ולמי.",
     "required": "נדרש לשימוש ב-Kilo",
     "promptsTitle": "ההנחיות והשיחות שלך",
@@ -2404,7 +2437,6 @@
     "accountDescription": "מזהה החשבון שלך ב-Kilo והמטא-נתונים של הבקשות, שמשמשים לאימות הזהות שלך ולמדידת השימוש.",
     "diagnosticsTitle": "נתוני אבחון של האפליקציה",
     "diagnosticsDescription": "דוחות קריסה ושגיאות שתוכן האפליקציה הוסר מהם, לצורך שמירה על יציבות האפליקציה.",
-    "optional": "לבחירתך",
     "helpImprove": "עזרה בשיפור Kilo",
     "helpImproveDescription": "שתף נתוני שימוש אנונימיים ואת מקור ההתקנה. אפשר לשנות את הבחירה בכל עת בהגדרות.",
     "seeFullDetails": "לפרטים המלאים",
@@ -2530,7 +2562,8 @@
       "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
       "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
-      "bitbucketOrgOnlyDescription": "בחרו ארגון בפרופיל שלכם כדי לסקור את בקשות המשיכה של Bitbucket שלו."
+      "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
+      "contextLine": "עבור {{organization}}"
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
@@ -2972,7 +3005,9 @@
       "reviewNotSubmitted": "לא ניתן לשלוח את הסקירה הזו כפי שהיא. ייתכן שה-PR השתנה, או שזו בקשת משיכה שלך ואינך יכול לסקור אותה.",
       "reviewNotSubmittedTerm": "לא ניתן לשלוח את הסקירה הזו כמות שהיא. ייתכן שה-{{term}} השתנה, או שלא ניתן לסקור את ה-{{term}} שלך בעצמך.",
       "couldNotPostComment": "לא ניתן היה לפרסם תגובה.",
-      "couldNotSubmitReview": "לא ניתן היה לשלוח את הסקירה. בדוק את החיבור ונסה שוב."
+      "couldNotSubmitReview": "לא ניתן היה לשלוח את הסקירה. בדוק את החיבור ונסה שוב.",
+      "rateLimited": "יותר מדי בקשות. נסה שוב מאוחר יותר.",
+      "conflict": "הפריט הזה השתנה בזמן שעבדת עליו. טען אותו מחדש ונסה שוב."
     },
     "operation": {
       "couldNotReply": "לא הצלחנו לשלוח את התשובה.",
@@ -3512,6 +3547,9 @@
     "localModels": {
       "title": "מודלים במכשיר",
       "help": "מודלים במכשיר פועלים בטלפון הזה. ההנחיות והתשובות שלך נשארות במכשיר.",
+      "switchTitle": "לעבור למודל במכשיר?",
+      "switchMessage": "מעבר אל {{name}} יעביר את עיבוד ההנחיות וההקשר של השיחה הזו לטלפון הזה, במקום לשרת מרוחק.",
+      "switchConfirm": "החלפת מודל",
       "systemPurpose": "המודל המובנה במערכת של המכשיר הזה. הוא פועל במכשיר.",
       "apple": "Apple Intelligence (במכשיר)",
       "checking": "בודק זמינות…",
@@ -3608,7 +3646,6 @@
     "personalDefaultDescription": "נטען אוטומטית כאשר לאף מאגר אין פרופיל מוצמד.",
     "organizationDefaultDescription": "נטען אוטומטית עבור חברים שאין להם ברירת מחדל אישית.",
     "setAsDefault": "הגדר כברירת מחדל",
-    "removeDefault": "הסר כברירת מחדל",
     "saveFailed": "לא ניתן לשמור את הפרופיל",
     "deleteTitle": "מחק את הפרופיל",
     "deleteMessage": "פעולה זו מסירה לצמיתות את הפרופיל ואת ההגדרות שלו. לא ניתן לבטל זאת.",
@@ -3634,11 +3671,13 @@
     "commandsTitle": "פקודות הגדרה",
     "addCommand": "הוסף פקודה",
     "commandLabel": "פְּקוּדָה",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "למשל pnpm install",
     "commandsEmpty": "אין עדיין פקודות הגדרה",
     "commandsSaveFailed": "לא ניתן לשמור פקודות הגדרה",
     "moveUp": "לזוז למעלה",
     "moveDown": "לזוז למטה",
+    "moveCommandUp": "העבר את הפקודה {{position}} למעלה",
+    "moveCommandDown": "העבר את הפקודה {{position}} למטה",
     "skillsTitle": "מיומנויות",
     "addSkill": "הוסף מיומנות",
     "skillNameLabel": "שם מיומנות",
@@ -3708,7 +3747,7 @@
       "nameRequired": "הזן שם סוכן",
       "slugRequired": "הזן שבלול סוכן",
       "slugInvalid": "Slug חייב להתחיל באות ולהשתמש רק באותיות קטנות, ספרות ומקפים",
-      "slugConflict": "השבלול הזה שמור על ידי סוכן מובנה",
+      "slugConflict": "הסלאג הזה כבר בשימוש על ידי סוכן מובנה או סוכן אחר בפרופיל הזה",
       "edit": "ערוך סוכן"
     },
     "slashCommands": {

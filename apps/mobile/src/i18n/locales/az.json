@@ -35,6 +35,8 @@
     "connectGithub": "GitHub-u qoş",
     "cost": "Xərc",
     "discard": "Ləğv et",
+    "discardChangesMessage": "Dəyişiklikləriniz itiriləcək.",
+    "discardChangesTitle": "Dəyişiklikləri ləğv et?",
     "findings": "Aşkarlanan problemlər",
     "mergeRequest": "merge sorğusu",
     "notConnected": "Qoşulmayıb",
@@ -661,7 +663,8 @@
       "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş.",
       "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
-      "bitbucketOrgOnlyDescription": "Profilində bir təşkilat seç və onun Bitbucket birləşdirmə sorğularına baxış keçir."
+      "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
+      "contextLine": "{{organization}} üçün"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Bu kod baxışını indiki vəziyyətdə göndərmək mümkün deyil. PR dəyişmiş ola bilər və ya öz birləşdirmə sorğuna kod baxışı göndərməyə çalışırsan.",
       "reviewNotSubmittedTerm": "Bu baxış olduğu kimi göndərilə bilmir. {{term}} dəyişmiş ola bilər və ya öz {{term}}na baxış keçirə bilməzsən.",
       "couldNotPostComment": "Şərhi göndərmək mümkün olmadı.",
-      "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et."
+      "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+      "rateLimited": "Çoxlu sorğu göndərilib. Bir az sonra yenidən cəhd et.",
+      "conflict": "Bu, siz üzərində işləyərkən dəyişildi. Yenidən yükləyin və yenidən cəhd edin."
     },
     "operation": {
       "couldNotReply": "Cavab vermək mümkün olmadı.",
@@ -1413,6 +1418,9 @@
       "couldNotGetLatest": "Ən son məlumatları almaq mümkün olmadı.",
       "byline": "{{repo}} #{{number}} · Müəllif: {{author}}",
       "noFindings": "Tapıntı yoxdur.",
+      "findingsUnavailable": "Bu kod yoxlaması uğursuz olduğu üçün nəticələr əlçatan deyil.",
+      "serviceUnavailable": "Kod yoxlaması xidmətinə qoşulmaq mümkün olmadı. Xidmət əlçatan olduqda yoxlamanı təkrarla.",
+      "reviewFailed": "Kod yoxlaması uğursuz oldu. Zəhmət olmasa, yenidən cəhd et.",
       "showMore": "Daha çox göstər",
       "created": "Yaradılıb",
       "started": "Başlanıb",
@@ -1542,7 +1550,8 @@
       "bugs": "Səhvlər",
       "style": "Stil",
       "testing": "Testlər",
-      "documentation": "Sənədləşdirmə"
+      "documentation": "Sənədləşdirmə",
+      "unknown": "Digər ({{area}})"
     },
     "gateThreshold": {
       "warning": "Xəbərdarlıq"
@@ -1654,7 +1663,14 @@
       "whereFound": "Aşkar edildiyi yerlər ({{displayCount}})",
       "fullReport": "Hazırlanmış tam hesabat",
       "yes": "Bəli",
-      "no": "Xeyr"
+      "no": "Xeyr",
+      "action": {
+        "analyzeCodebase": "Kod bazasını təhlil et",
+        "dismiss": "Rədd et",
+        "manualReview": "Əl ilə kod yoxlaması",
+        "monitor": "İzlə",
+        "openPr": "PR aç"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} tapıntı",
@@ -1876,7 +1892,24 @@
       "title": "Audit hesabatı",
       "unavailable": "Audit hesabatı mövcud deyil",
       "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün təşkilat sahibinə və ya ödəniş menecerinə müraciət et.",
-      "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et."
+      "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz tamamlandı",
+        "findingAnalysisFailed": "Təhlil uğursuz oldu",
+        "findingAutoDismissed": "Avtomatik rədd edildi",
+        "findingCreated": "İdxal edildi",
+        "findingDeleted": "Silindi",
+        "findingDismissed": "Rədd edilib",
+        "findingSeverityChanged": "Ağırlıq dərəcəsi dəyişdirildi",
+        "findingStatusChange": "Status dəyişdirildi",
+        "findingSuperseded": "Əvəz edilib",
+        "remediationBlocked": "Düzəliş bloklandı",
+        "remediationCancelled": "Ləğv edildi",
+        "remediationFailed": "Düzəliş uğursuz oldu",
+        "remediationNoChangesNeeded": "Dəyişiklik lazım deyil",
+        "remediationPrOpened": "PR açıldı",
+        "remediationQueued": "Düzəliş tələb edildi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Bildiriş parametrlərini yükləmək mümkün olmadı.",
@@ -2212,6 +2245,7 @@
       "prefillModelUnavailable": "{{model}} artıq əlçatan deyil. Standart modelindən istifadə olunur.",
       "couldNotReadPendingSessions": "Gözləyən sessiyaları oxumaq mümkün olmadı. Yenidən cəhd et.",
       "failedToCreate": "Sessiya yaratmaq mümkün olmadı.",
+      "checkOrganizationAccess": "Təşkilata giriş icazəni yoxla və yenidən cəhd et.",
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
       "discardDraftMessage": "Sorğun silinəcək.",
@@ -2732,6 +2766,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Məlumatlar yüklənənədək aktiv sessiyaların əlçatan deyil.",
     "currentDeviceUnidentified": "Cari cihazı müəyyən etmək mümkün olmadı.",
+    "kiloApp": "Kilo tətbiqi",
     "noSessions": "Aktiv sessiya yoxdur",
     "noSessionsDescription": "Başqa cihazda Kilo tətbiqində hesabına daxil ol. Həmin cihaz burada görünəcək.",
     "onlyKiloAppSignIns": "Burada yalnız Kilo tətbiqində açılan sessiyalar görünür. Redaktor və CLI sessiyaları siyahıda göstərilmir.",
@@ -2884,6 +2919,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Başlamazdan əvvəl",
+    "summaryTitle": "Məlumat paylaşımı seçimləri",
     "introDescription": "Kilo cavab yaratmaq üçün mesajlarını AI təminatçılarına göndərir. Aşağıda hansı məlumatların kimlərlə paylaşıldığını görə bilərsən.",
     "required": "Kilo-dan istifadə üçün tələb olunanlar",
     "promptsTitle": "Sorğuların və söhbətlərin",
@@ -2892,7 +2928,6 @@
     "accountDescription": "Kilo hesabının identifikatoru və sorğunun metaməlumatları kimliyini təsdiqləmək və istifadəni ölçmək üçün işlədilir.",
     "diagnosticsTitle": "Tətbiq diaqnostikası",
     "diagnosticsDescription": "Tətbiqin sabit işləməsi üçün istifadə olunan çökmə və xəta hesabatları. Tətbiqin məzmunu bu hesabatlardan silinir.",
-    "optional": "İstəyə bağlı",
     "helpImprove": "Kilo-nu yaxşılaşdırmağa kömək et",
     "helpImproveDescription": "Məhsulun istifadəsi haqqında anonim məlumatları və quraşdırma mənbəyini paylaş. Bunu istənilən vaxt parametrlərdə dəyişə bilərsən.",
     "seeFullDetails": "Bütün təfərrüatlara bax",
@@ -3471,6 +3506,9 @@
     "localModels": {
       "title": "Cihazdakı modellər",
       "help": "Cihazdakı modellər bu telefonda işləyir. Sorğularınız və cavablar cihazda qalır.",
+      "switchTitle": "Cihazdakı modelə keçilsin?",
+      "switchMessage": "{{name}} modelinə keçdikdə bu söhbətin sorğuları və konteksti uzaq serverdə deyil, bu telefonda emal olunur.",
+      "switchConfirm": "Modeli dəyiş",
       "systemPurpose": "Bu cihazın sisteminə daxil edilmiş model. O, cihazda işləyir.",
       "apple": "Apple Intelligence (cihazda)",
       "checking": "Əlçatanlıq yoxlanılır…",
@@ -3567,7 +3605,6 @@
     "personalDefaultDescription": "Heç bir repozitorda bərkidilmiş profil olmadıqda avtomatik yüklənir.",
     "organizationDefaultDescription": "Şəxsi defoltu olmayan üzvlər üçün avtomatik yüklənir.",
     "setAsDefault": "Defolt olaraq təyin edin",
-    "removeDefault": "Defolt olaraq silin",
     "saveFailed": "Profili saxlamaq mümkün olmadı",
     "deleteTitle": "Profili silin",
     "deleteMessage": "Bu, profili və onun parametrlərini həmişəlik silir. Bu geri qaytarıla bilməz.",
@@ -3593,11 +3630,13 @@
     "commandsTitle": "Quraşdırma əmrləri",
     "addCommand": "Komanda əlavə edin",
     "commandLabel": "Əmr",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "məs. pnpm install",
     "commandsEmpty": "Hələ quraşdırma əmrləri yoxdur",
     "commandsSaveFailed": "Quraşdırma əmrlərini saxlamaq mümkün olmadı",
     "moveUp": "Yuxarı hərəkət edin",
     "moveDown": "Aşağı hərəkət edin",
+    "moveCommandUp": "{{position}} nömrəli əmri yuxarı köçür",
+    "moveCommandDown": "{{position}} nömrəli əmri aşağı köçür",
     "skillsTitle": "Bacarıqlar",
     "addSkill": "Bacarıq əlavə edin",
     "skillNameLabel": "Bacarıq adı",
@@ -3667,7 +3706,7 @@
       "nameRequired": "Agent adını daxil edin",
       "slugRequired": "Agent slug daxil edin",
       "slugInvalid": "Slug hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
-      "slugConflict": "Bu şlak daxili agent tərəfindən qorunur",
+      "slugConflict": "Bu şlak daxili agent və ya bu profildəki başqa bir agent tərəfindən istifadə olunur",
       "edit": "Agenti redaktə edin"
     },
     "slashCommands": {

@@ -35,6 +35,8 @@
     "connectGithub": "GitHub کو منسلک کریں",
     "cost": "لاگت",
     "discard": "ضائع کریں",
+    "discardChangesMessage": "آپ کی تبدیلیاں ضائع ہو جائیں گی۔",
+    "discardChangesTitle": "تبدیلیاں ضائع کریں؟",
     "findings": "شناخت شدہ مسائل",
     "mergeRequest": "مرج ریکویسٹ",
     "notConnected": "منسلک نہیں",
@@ -661,7 +663,8 @@
       "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
-      "bitbucketOrgOnlyDescription": "اپنے پروفائل میں ایک تنظیم منتخب کریں تاکہ اس کی Bitbucket پل ریکویسٹس کا جائزہ لیا جا سکے۔"
+      "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
+      "contextLine": "{{organization}} کے لیے"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "یہ جائزہ اپنی موجودہ صورت میں جمع نہیں ہو سکتا۔ ممکن ہے PR بدل گئی ہو یا یہ آپ کی اپنی پل ریکویسٹ ہو، جس کا آپ جائزہ نہیں لے سکتے۔",
       "reviewNotSubmittedTerm": "اس جائزے کو یونہی جمع نہیں کیا جا سکتا۔ ہو سکتا ہے {{term}} بدل گیا ہو، یا آپ اپنا خود {{term}} کا جائزہ نہیں لے سکتے۔",
       "couldNotPostComment": "تبصرہ پوسٹ نہیں ہو سکا۔",
-      "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
+      "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "rateLimited": "بہت زیادہ درخواستیں۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
+      "conflict": "آپ اس پر کام کر رہے تھے اس دوران یہ تبدیل ہو گیا۔ براہ کرم اسے دوبارہ لوڈ کریں اور دوبارہ کوشش کریں۔"
     },
     "operation": {
       "couldNotReply": "جواب نہیں بھیجا جا سکا۔",
@@ -1413,6 +1418,9 @@
       "couldNotGetLatest": "تازہ ترین معلومات حاصل نہیں ہو سکیں۔",
       "byline": "{{repo}} #{{number}}، مصنف: {{author}}",
       "noFindings": "کوئی مسئلہ نہیں ملا۔",
+      "findingsUnavailable": "اس جائزے کی ناکامی کی وجہ سے نتائج دستیاب نہیں ہیں۔",
+      "serviceUnavailable": "کوڈ کے جائزے کی سروس سے رابطہ نہیں ہو سکا۔ سروس دستیاب ہونے پر جائزے کی دوبارہ کوشش کریں۔",
+      "reviewFailed": "جائزہ ناکام ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
       "showMore": "مزید دکھائیں",
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
@@ -1542,7 +1550,8 @@
       "bugs": "خرابیاں",
       "style": "انداز",
       "testing": "جانچ",
-      "documentation": "دستاویزات"
+      "documentation": "دستاویزات",
+      "unknown": "دیگر ({{area}})"
     },
     "gateThreshold": {
       "warning": "انتباہ"
@@ -1654,7 +1663,14 @@
       "whereFound": "مسئلہ ملنے کے مقامات ({{displayCount}})",
       "fullReport": "تیار کردہ مکمل رپورٹ",
       "yes": "ہاں",
-      "no": "نہیں"
+      "no": "نہیں",
+      "action": {
+        "analyzeCodebase": "کوڈ بیس کا تجزیہ کریں",
+        "dismiss": "مسترد کریں",
+        "manualReview": "دستی جائزہ",
+        "monitor": "نگرانی کریں",
+        "openPr": "پل ریکوئسٹ کھولیں"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} مسائل",
@@ -1876,7 +1892,24 @@
       "title": "آڈٹ رپورٹ",
       "unavailable": "آڈٹ رپورٹ دستیاب نہیں",
       "unavailableDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر آڈٹ رپورٹس دیکھ سکتے ہیں۔ رسائی دینے کے لیے کسی مالک یا بلنگ مینیجر سے کہیں۔",
-      "queryFailed": "رپورٹ کے لیے ڈیٹا حاصل نہیں ہو سکا۔ دوبارہ کوشش کریں۔"
+      "queryFailed": "رپورٹ کے لیے ڈیٹا حاصل نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "eventActions": {
+        "findingAnalysisCompleted": "تجزیہ مکمل ہوا",
+        "findingAnalysisFailed": "تجزیہ ناکام ہو گیا",
+        "findingAutoDismissed": "خودکار طور پر مسترد کیا گیا",
+        "findingCreated": "درآمد کیا گیا",
+        "findingDeleted": "حذف کر دیا گیا",
+        "findingDismissed": "مسترد کیا گیا",
+        "findingSeverityChanged": "شدت تبدیل ہو گئی",
+        "findingStatusChange": "اسٹیٹس تبدیل ہو گیا",
+        "findingSuperseded": "جگہ لی گئی",
+        "remediationBlocked": "اصلاح روک دی گئی",
+        "remediationCancelled": "منسوخ کر دیا گیا",
+        "remediationFailed": "اصلاح ناکام ہو گئی",
+        "remediationNoChangesNeeded": "کوئی تبدیلی کی ضرورت نہیں",
+        "remediationPrOpened": "پل ریکوئسٹ کھول دیا گیا",
+        "remediationQueued": "اصلاح کی درخواست کی گئی"
+      }
     },
     "notifications": {
       "couldNotLoad": "اطلاعات کی ترتیبات لوڈ نہیں ہو سکیں۔",
@@ -2212,6 +2245,7 @@
       "prefillModelUnavailable": "{{model}} اب دستیاب نہیں ہے۔ آپ کا پہلے سے طے شدہ ماڈل استعمال ہو رہا ہے۔",
       "couldNotReadPendingSessions": "زیر التواء سیشنز نہیں پڑھے جا سکے۔ دوبارہ کوشش کریں۔",
       "failedToCreate": "سیشن نہیں بن سکا۔",
+      "checkOrganizationAccess": "اس تنظیم تک اپنی رسائی چیک کریں، پھر دوبارہ کوشش کریں۔",
       "couldNotRefreshRepositories": "ریپوزٹریوں کی فہرست تازہ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
       "discardDraftTitle": "مسودہ حذف کریں؟",
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
@@ -2732,6 +2766,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "آپ کے فعال سیشن اس وقت تک دستیاب نہیں ہیں جب تک یہ لوڈ نہ ہو۔",
     "currentDeviceUnidentified": "موجودہ ڈیوائس کی شناخت نہیں ہو سکی۔",
+    "kiloApp": "Kilo ایپ",
     "noSessions": "کوئی فعال سیشن نہیں",
     "noSessionsDescription": "کسی دوسری ڈیوائس پر Kilo ایپ سے سائن ان کریں۔ اس کا سیشن یہاں نظر آئے گا۔",
     "onlyKiloAppSignIns": "صرف Kilo ایپ کے سائن ان یہاں ظاہر ہوتے ہیں۔ ایڈیٹر اور CLI سائن ان درج نہیں ہیں۔",
@@ -2884,6 +2919,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "شروع کرنے سے پہلے",
+    "summaryTitle": "ڈیٹا شیئرنگ کی ترجیحات",
     "introDescription": "Kilo جوابات تیار کرنے کے لیے آپ کے پیغامات AI فراہم کنندگان کو بھیجتا ہے۔ یہاں بتایا گیا ہے کہ کون سا ڈیٹا کس کے ساتھ شیئر ہوتا ہے۔",
     "required": "Kilo استعمال کرنے کے لیے ضروری",
     "promptsTitle": "آپ کے پرامپٹس اور گفتگو",
@@ -2892,7 +2928,6 @@
     "accountDescription": "آپ کے Kilo اکاؤنٹ کی ID اور درخواست کا میٹاڈیٹا آپ کی شناخت کی تصدیق اور استعمال کی پیمائش کے لیے استعمال ہوتے ہیں۔",
     "diagnosticsTitle": "ایپ کی تشخیصی معلومات",
     "diagnosticsDescription": "ایپ کو مستحکم رکھنے کے لیے کریش اور خرابی کی رپورٹس استعمال ہوتی ہیں۔ ان سے ایپ کا مواد ہٹا دیا جاتا ہے۔",
-    "optional": "اختیاری",
     "helpImprove": "Kilo کو بہتر بنانے میں مدد کریں",
     "helpImproveDescription": "ایپ کے استعمال کے گمنام اعداد و شمار اور انسٹالیشن کا ذریعہ شیئر کریں۔ آپ یہ انتخاب کسی بھی وقت ترتیبات میں تبدیل کر سکتے ہیں۔",
     "seeFullDetails": "مکمل تفصیلات دیکھیں",
@@ -3471,6 +3506,9 @@
     "localModels": {
       "title": "ڈیوائس پر چلنے والے ماڈلز",
       "help": "ڈیوائس پر چلنے والے ماڈلز اسی فون پر چلتے ہیں۔ آپ کے پرامپٹس اور جوابات ڈیوائس پر ہی رہتے ہیں۔",
+      "switchTitle": "ڈیوائس پر چلنے والے ماڈل پر منتقل ہوں؟",
+      "switchMessage": "{{name}} پر منتقل ہونے سے اس گفتگو کے پرامپٹس اور سیاق کسی ریموٹ سرور کے بجائے اسی فون پر پروسیس ہوں گے۔",
+      "switchConfirm": "ماڈل تبدیل کریں",
       "systemPurpose": "اس ڈیوائس کے سسٹم میں شامل ماڈل۔ یہ ڈیوائس پر ہی چلتا ہے۔",
       "apple": "Apple Intelligence (ڈیوائس پر)",
       "checking": "دستیابی چیک کی جا رہی ہے…",
@@ -3567,7 +3605,6 @@
     "personalDefaultDescription": "جب کسی ریپوزٹری میں پن شدہ پروفائل نہ ہو تو خودکار طور پر لوڈ ہوتا ہے۔",
     "organizationDefaultDescription": "ان اراکین کے لیے خودکار طور پر لوڈ کیا گیا جن کا کوئی ذاتی ڈیفالٹ نہیں ہے۔",
     "setAsDefault": "بطور ڈیفالٹ سیٹ کریں۔",
-    "removeDefault": "بطور ڈیفالٹ ہٹا دیں۔",
     "saveFailed": "پروفائل محفوظ نہیں ہو سکا",
     "deleteTitle": "پروفائل حذف کریں۔",
     "deleteMessage": "یہ پروفائل اور اس کی ترتیبات کو مستقل طور پر ہٹا دیتا ہے۔ اسے کالعدم نہیں کیا جا سکتا۔",
@@ -3593,11 +3630,13 @@
     "commandsTitle": "سیٹ اپ کمانڈز",
     "addCommand": "کمانڈ شامل کریں۔",
     "commandLabel": "حکم",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "مثلاً pnpm install",
     "commandsEmpty": "ابھی تک کوئی سیٹ اپ کمانڈ نہیں ہے۔",
     "commandsSaveFailed": "سیٹ اپ کمانڈز کو محفوظ نہیں کیا جا سکا",
     "moveUp": "اوپر بڑھیں۔",
     "moveDown": "نیچے کی طرف بڑھیں۔",
+    "moveCommandUp": "کمانڈ {{position}} کو اوپر منتقل کریں",
+    "moveCommandDown": "کمانڈ {{position}} کو نیچے منتقل کریں",
     "skillsTitle": "ہنر",
     "addSkill": "مہارت شامل کریں۔",
     "skillNameLabel": "ہنر کا نام",
@@ -3667,7 +3706,7 @@
       "nameRequired": "ایجنٹ کا نام درج کریں۔",
       "slugRequired": "ایک ایجنٹ سلگ درج کریں۔",
       "slugInvalid": "سلگ کا آغاز ایک حرف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
-      "slugConflict": "وہ سلگ ایک بلٹ ان ایجنٹ کے ذریعہ محفوظ ہے۔",
+      "slugConflict": "وہ سلگ پہلے ہی کسی بلٹ ان ایجنٹ یا اس پروفائل میں کسی دوسرے ایجنٹ کے زیر استعمال ہے",
       "edit": "ایجنٹ میں ترمیم کریں۔"
     },
     "slashCommands": {

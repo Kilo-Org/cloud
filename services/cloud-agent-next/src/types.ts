@@ -1,6 +1,7 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
   GitHubRepositoryAuthorizationFailureReason,
   GitHubRepositoryAuthorizationResult,
@@ -561,6 +562,12 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Optional until a downloaded target provisions its private artifact bucket. */
+  RUNTIME_RELEASE_BUCKET?: R2Bucket;
+  RUNTIME_STARTUP_MODE?: string;
+  NATIVE_RUNTIME_IMAGE?: string;
+  /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
+  RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
@@ -581,6 +588,8 @@ export type Env = {
   KILOCODE_BACKEND_BASE_URL?: string;
   /** Base URL override for OpenRouter-compatible Kilo API */
   KILO_OPENROUTER_BASE?: string;
+  /** Local-dev override for the scoped subagent-launch MCP endpoint; never set in deployed config */
+  CLOUD_AGENT_MCP_URL_OVERRIDE?: string;
   /** Kilocode CLI timeout override (seconds) */
   CLI_TIMEOUT_SECONDS?: string;
   /** Experimental default shell-tool timeout (ms) forwarded to the Kilo server */
@@ -610,6 +619,8 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions run on the call-home control plane. `*` includes personal. */
   CODE_REVIEW_CONTROL_PLANE_IDS?: string;
+  /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
+  CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
@@ -668,6 +679,7 @@ export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
 
 /** tRPC context passed to all procedures */
 export type TRPCContext = {
+  cloudAgentAuthority?: CloudAgentAuthority;
   env: Env;
   userId: string;
   request: Request;

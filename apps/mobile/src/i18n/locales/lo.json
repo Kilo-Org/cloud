@@ -35,6 +35,8 @@
     "connectGithub": "ເຊື່ອມຕໍ່ GitHub",
     "cost": "ຄ່າໃຊ້ຈ່າຍ",
     "discard": "ຖິ້ມ",
+    "discardChangesMessage": "ການປ່ຽນແປງຂອງທ່ານຈະສູນໄປ.",
+    "discardChangesTitle": "ຖິ້ມການປ່ຽນແປງບໍ?",
     "findings": "ບັນຫາທີ່ກວດພົບ",
     "mergeRequest": "merge request",
     "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່",
@@ -661,7 +663,8 @@
       "description": "ເຊື່ອມຕໍ່ບັນຊີ GitHub ຂອງທ່ານເພື່ອກວດທານຄຳຂໍລວມໂຄດໃນມືຖື.",
       "gitlabDescription": "ເຊື່ອມຕໍ່ບັນຊີ GitLab ຂອງທ່ານເພື່ອກວດທານ merge request ເທິງມືຖື",
       "bitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ກັບອົງກອນນີ້ເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດເທິງມືຖື",
-      "bitbucketOrgOnlyDescription": "ເລືອກອົງກອນໃນໂປຣຟາຍຂອງທ່ານເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງອົງກອນນັ້ນ"
+      "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
+      "contextLine": "ສຳລັບ {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "ຍັງບໍ່ສາມາດສົ່ງຜົນການກວດທານນີ້ໄດ້. PR ອາດມີການປ່ຽນແປງ ຫຼື ທ່ານບໍ່ມີສິດກວດທານຄຳຂໍລວມໂຄດຂອງຕົນເອງ.",
       "reviewNotSubmittedTerm": "ສົ່ງການກວດທານນີ້ຕາມເດີມບໍ່ໄດ້. {{term}} ອາດປ່ຽນແປງໄປແລ້ວ, ຫຼື ທ່ານກວດທານ {{term}} ຂອງຕົນເອງບໍ່ໄດ້.",
       "couldNotPostComment": "ບໍ່ສາມາດໂພດຄຳເຫັນໄດ້.",
-      "couldNotSubmitReview": "ບໍ່ສາມາດສົ່ງຜົນການກວດທານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ."
+      "couldNotSubmitReview": "ບໍ່ສາມາດສົ່ງຜົນການກວດທານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "rateLimited": "ຄຳຂໍຫຼາຍເກີນໄປ. ກະລຸນາລອງອີກຄັ້ງໃນພາຍຫຼັງ.",
+      "conflict": "ມັນໄດ້ປ່ຽນແປງໄປໃນຂະນະທີ່ທ່ານກຳລັງເຮັດວຽກຢູ່ມັນ. ກະລຸນາໂຫຼດໃໝ່ແລ້ວລອງອີກຄັ້ງ."
     },
     "operation": {
       "couldNotReply": "ບໍ່ສາມາດຕອບໄດ້.",
@@ -1413,6 +1418,9 @@
       "couldNotGetLatest": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນລ່າສຸດໄດ້.",
       "byline": "{{repo}} #{{number}} ໂດຍ {{author}}",
       "noFindings": "ບໍ່ພົບບັນຫາ.",
+      "findingsUnavailable": "ບໍ່ມີຜົນລັບໃຫ້ເບິ່ງ ເພາະການກວດທານນີ້ລົ້ມເຫຼວ.",
+      "serviceUnavailable": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບບໍລິການກວດທານໂຄດໄດ້. ລອງກວດທານໃໝ່ເມື່ອບໍລິການພ້ອມໃຊ້ງານ.",
+      "reviewFailed": "ການກວດທານລົ້ມເຫຼວ. ກະລຸນາລອງອີກຄັ້ງ.",
       "showMore": "ສະແດງເພີ່ມເຕີມ",
       "created": "ສ້າງເມື່ອ",
       "started": "ເລີ່ມເມື່ອ",
@@ -1542,7 +1550,8 @@
       "bugs": "ບັກ",
       "style": "ຮູບແບບການຂຽນໂຄ້ດ",
       "testing": "ການທົດສອບ",
-      "documentation": "ເອກະສານ"
+      "documentation": "ເອກະສານ",
+      "unknown": "ອື່ນໆ ({{area}})"
     },
     "gateThreshold": {
       "warning": "ຄຳເຕືອນ"
@@ -1654,7 +1663,14 @@
       "whereFound": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
       "fullReport": "ລາຍງານທີ່ສ້າງຂຶ້ນສະບັບເຕັມ",
       "yes": "ແມ່ນ",
-      "no": "ບໍ່ແມ່ນ"
+      "no": "ບໍ່ແມ່ນ",
+      "action": {
+        "analyzeCodebase": "ວິເຄາະຖານລະຫັດ",
+        "dismiss": "ປະຕິເສດ",
+        "manualReview": "ການກວດຄືນດ້ວຍມື",
+        "monitor": "ຕິດຕາມ",
+        "openPr": "ເປີດຄຳຮ້ອງຂໍດຶງ"
+      }
     },
     "dashboard": {
       "findingsCount": "ບັນຫາທີ່ກວດພົບ {{displayCount}} ລາຍການ",
@@ -1876,7 +1892,24 @@
       "title": "ລາຍງານການກວດສອບ",
       "unavailable": "ບໍ່ສາມາດເບິ່ງລາຍງານການກວດສອບໄດ້",
       "unavailableDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ເບິ່ງລາຍງານການກວດສອບໄດ້. ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ຈັດການການເກັບເງິນໃຫ້ສິດເຂົ້າເບິ່ງແກ່ເຈົ້າ.",
-      "queryFailed": "ການດຶງຂໍ້ມູນລາຍງານບໍ່ສຳເລັດ. ລອງໃໝ່."
+      "queryFailed": "ການດຶງຂໍ້ມູນລາຍງານບໍ່ສຳເລັດ. ລອງໃໝ່.",
+      "eventActions": {
+        "findingAnalysisCompleted": "ການວິເຄາະສຳເລັດແລ້ວ",
+        "findingAnalysisFailed": "ການວິເຄາະລົ້ມເຫຼວ",
+        "findingAutoDismissed": "ປະຕິເສດອັດຕະໂນມັດແລ້ວ",
+        "findingCreated": "ນຳເຂົ້າແລ້ວ",
+        "findingDeleted": "ລຶບແລ້ວ",
+        "findingDismissed": "ປະຕິເສດແລ້ວ",
+        "findingSeverityChanged": "ປ່ຽນລະດັບຄວາມຮ້າຍແຮງແລ້ວ",
+        "findingStatusChange": "ປ່ຽນສະຖານະແລ້ວ",
+        "findingSuperseded": "ຖືກແທນທີ່ແລ້ວ",
+        "remediationBlocked": "ການແກ້ໄຂຖືກບັອກ",
+        "remediationCancelled": "ຍົກເລີກແລ້ວ",
+        "remediationFailed": "ການແກ້ໄຂລົ້ມເຫຼວ",
+        "remediationNoChangesNeeded": "ບໍ່ຈຳເປັນຕ້ອງປ່ຽນແປງ",
+        "remediationPrOpened": "ເປີດຄຳຮ້ອງຂໍດຶງແລ້ວ",
+        "remediationQueued": "ຂໍການແກ້ໄຂແລ້ວ"
+      }
     },
     "notifications": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າການແຈ້ງເຕືອນໄດ້.",
@@ -2212,6 +2245,7 @@
       "prefillModelUnavailable": "{{model}} ໃຊ້ບໍ່ໄດ້ແລ້ວ. ກຳລັງໃຊ້ໂມເດວມາດຕະຖານຂອງເຈົ້າແທນ.",
       "couldNotReadPendingSessions": "ບໍ່ສາມາດອ່ານເຊດຊັນທີ່ລໍຖ້າຢູ່ໄດ້. ລອງໃໝ່.",
       "failedToCreate": "ບໍ່ສາມາດສ້າງເຊດຊັນໄດ້.",
+      "checkOrganizationAccess": "ກະລຸນາກວດສອບສິດການເຂົ້າເຖິງອົງການນີ້ຂອງທ່ານ ແລ້ວລອງໃໝ່.",
       "couldNotRefreshRepositories": "ບໍ່ສາມາດໂຫຼດລາຍການຄັງໂຄດໃໝ່ໄດ້. ກະລຸນາລອງໃໝ່.",
       "discardDraftTitle": "ລຶບຂໍ້ຄວາມຮ່າງບໍ?",
       "discardDraftMessage": "ຂໍ້ຄວາມທີ່ເຈົ້າຮ່າງໄວ້ຈະຖືກລຶບ.",
@@ -2732,6 +2766,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "ລາຍການເຊສຊັນທີ່ກຳລັງໃຊ້ງານຂອງທ່ານຈະສະແດງໄດ້ເມື່ອໂຫຼດຂໍ້ມູນສຳເລັດແລ້ວເທົ່ານັ້ນ.",
     "currentDeviceUnidentified": "ບໍ່ສາມາດລະບຸອຸປະກອນທີ່ກຳລັງໃຊ້ຢູ່ໄດ້.",
+    "kiloApp": "ແອັບ Kilo",
     "noSessions": "ບໍ່ມີເຊສຊັນທີ່ກຳລັງໃຊ້ງານ",
     "noSessionsDescription": "ເຂົ້າສູ່ລະບົບໃນແອັບ Kilo ຈາກອຸປະກອນອື່ນ ແລ້ວອຸປະກອນນັ້ນຈະສະແດງຢູ່ທີ່ນີ້.",
     "onlyKiloAppSignIns": "ທີ່ນີ້ສະແດງສະເພາະການເຂົ້າສູ່ລະບົບໃນແອັບ Kilo. ບໍ່ລວມການເຂົ້າສູ່ລະບົບໃນໂປຣແກຣມແກ້ໄຂໂຄ້ດ ແລະ CLI.",
@@ -2884,6 +2919,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "ກ່ອນເລີ່ມໃຊ້ງານ",
+    "summaryTitle": "ການຕັ້ງຄ່າການແບ່ງປັນຂໍ້ມູນ",
     "introDescription": "Kilo ສົ່ງຂໍ້ຄວາມຂອງທ່ານໄປຍັງຜູ້ໃຫ້ບໍລິການ AI ເພື່ອສ້າງຄຳຕອບ. ດ້ານລຸ່ມນີ້ແມ່ນຂໍ້ມູນທີ່ເຮົາແບ່ງປັນ ແລະ ຜູ້ທີ່ໄດ້ຮັບຂໍ້ມູນ.",
     "required": "ຈຳເປັນເພື່ອໃຊ້ Kilo",
     "promptsTitle": "ຂໍ້ຄວາມສັ່ງງານ ແລະ ການສົນທະນາຂອງທ່ານ",
@@ -2892,7 +2928,6 @@
     "accountDescription": "ລະຫັດບັນຊີ Kilo ແລະ ຂໍ້ມູນປະກອບຄຳຂໍຂອງທ່ານ ໃຊ້ເພື່ອຢັ້ງຢືນຕົວຕົນ ແລະ ວັດແທກປະລິມານການໃຊ້ງານ.",
     "diagnosticsTitle": "ຂໍ້ມູນກວດສອບບັນຫາແອັບ",
     "diagnosticsDescription": "ລາຍງານແອັບຂັດຂ້ອງ ແລະ ຂໍ້ຜິດພາດທີ່ລຶບເນື້ອຫາໃນແອັບອອກແລ້ວ ໃຊ້ເພື່ອໃຫ້ແອັບເຮັດວຽກໄດ້ຢ່າງສະຖຽນ.",
-    "optional": "ບໍ່ບັງຄັບ",
     "helpImprove": "ຊ່ວຍປັບປຸງ Kilo",
     "helpImproveDescription": "ແບ່ງປັນຂໍ້ມູນວິເຄາະການໃຊ້ແອັບແບບບໍ່ລະບຸຕົວຕົນ ແລະ ແຫຼ່ງທີ່ມາຂອງການຕິດຕັ້ງ. ທ່ານປ່ຽນຕົວເລືອກນີ້ໄດ້ທຸກເວລາໃນການຕັ້ງຄ່າ.",
     "seeFullDetails": "ເບິ່ງລາຍລະອຽດທັງໝົດ",
@@ -3471,6 +3506,9 @@
     "localModels": {
       "title": "ໂມເດວຢູ່ໃນອຸປະກອນ",
       "help": "ໂມເດວຢູ່ໃນອຸປະກອນເຮັດວຽກຢູ່ໃນໂທລະສັບນີ້. ຄຳສັ່ງ ແລະ ຄຳຕອບຂອງທ່ານຈະຢູ່ໃນອຸປະກອນ.",
+      "switchTitle": "ປ່ຽນໄປໃຊ້ໂມເດວຢູ່ໃນອຸປະກອນບໍ?",
+      "switchMessage": "ການປ່ຽນໄປໃຊ້ {{name}} ຈະເຮັດໃຫ້ຄຳສັ່ງ ແລະ ບໍລິບົດຂອງການສົນທະນານີ້ຖືກປະມວນຜົນຢູ່ໃນໂທລະສັບນີ້, ບໍ່ແມ່ນຢູ່ໃນເຊີບເວີທາງໄກ.",
+      "switchConfirm": "ປ່ຽນໂມເດວ",
       "systemPurpose": "ໂມເດວທີ່ມີໃນລະບົບຂອງອຸປະກອນນີ້. ມັນເຮັດວຽກຢູ່ໃນອຸປະກອນ.",
       "apple": "Apple Intelligence (ຢູ່ໃນອຸປະກອນ)",
       "checking": "ກຳລັງກວດສອບວ່າໃຊ້ໄດ້ບໍ່…",
@@ -3567,7 +3605,6 @@
     "personalDefaultDescription": "ໂຫຼດອັດຕະໂນມັດເມື່ອບໍ່ມີບ່ອນເກັບຂໍ້ມູນມີໂປຣໄຟລ໌ທີ່ປັກໝຸດໄວ້.",
     "organizationDefaultDescription": "ໂຫຼດອັດຕະໂນມັດສຳລັບສະມາຊິກທີ່ບໍ່ມີຄ່າເລີ່ມຕົ້ນສ່ວນຕົວ.",
     "setAsDefault": "ຕັ້ງເປັນຄ່າເລີ່ມຕົ້ນ",
-    "removeDefault": "ເອົາອອກເປັນຄ່າເລີ່ມຕົ້ນ",
     "saveFailed": "ບໍ່ສາມາດບັນທຶກໂປຣໄຟລ໌ໄດ້",
     "deleteTitle": "ລຶບໂປຣໄຟລ໌",
     "deleteMessage": "ນີ້ຈະເປັນການລຶບໂປຣໄຟລ໌ ແລະການຕັ້ງຄ່າຂອງມັນອອກຢ່າງຖາວອນ. ອັນນີ້ບໍ່ສາມາດຍົກເລີກໄດ້.",
@@ -3593,11 +3630,13 @@
     "commandsTitle": "ຕັ້ງຄ່າຄໍາສັ່ງ",
     "addCommand": "ເພີ່ມຄໍາສັ່ງ",
     "commandLabel": "ຄໍາສັ່ງ",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "ຕົວຢ່າງ: pnpm install",
     "commandsEmpty": "ບໍ່ມີຄຳສັ່ງຕັ້ງຄ່າເທື່ອ",
     "commandsSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງຕັ້ງຄ່າໄດ້",
     "moveUp": "ຍ້າຍຂຶ້ນ",
     "moveDown": "ຍ້າຍລົງ",
+    "moveCommandUp": "ຍ້າຍຄໍາສັ່ງ {{position}} ຂຶ້ນ",
+    "moveCommandDown": "ຍ້າຍຄໍາສັ່ງ {{position}} ລົງ",
     "skillsTitle": "ທັກສະ",
     "addSkill": "ເພີ່ມທັກສະ",
     "skillNameLabel": "ຊື່ທັກສະ",
@@ -3667,7 +3706,7 @@
       "nameRequired": "ໃສ່ຊື່ຕົວແທນ",
       "slugRequired": "ໃສ່ຕົວແທນ slug",
       "slugInvalid": "Slug ຈະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນ ແລະໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ, ແລະ dashes",
-      "slugConflict": "slug ນັ້ນຖືກສະຫງວນໄວ້ໂດຍຕົວແທນທີ່ສ້າງຂຶ້ນ",
+      "slugConflict": "slug ນັ້ນຖືກໃຊ້ແລ້ວໂດຍ agent ໃນຕົວ ຫຼື agent ອື່ນໃນໂປຼໄຟລ໌ນີ້",
       "edit": "ແກ້ໄຂຕົວແທນ"
     },
     "slashCommands": {

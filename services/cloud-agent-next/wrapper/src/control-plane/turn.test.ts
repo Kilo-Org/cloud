@@ -3129,9 +3129,38 @@ describe('turn answers', () => {
       { questionId: 'q2', directory: DIRECTORY },
     ]);
     expect(h.client(routeSpec()).permissionAnswers).toEqual([
-      { permissionId: 'p1', response: 'always', message: 'ok', directory: DIRECTORY },
+      {
+        permissionId: 'p1',
+        response: 'always',
+        message: 'ok',
+        interactive: true,
+        directory: DIRECTORY,
+      },
     ]);
   });
+
+  it.each(['once', 'always', 'reject'] as const)(
+    'marks a human %s permission reply interactive',
+    async response => {
+      const h = createHarness();
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      await h.manager.answer(SESSION_ID, {
+        action: 'permission',
+        permissionId: 'human-required',
+        response,
+      });
+      expect(h.client(spec).permissionAnswers).toEqual([
+        {
+          permissionId: 'human-required',
+          response,
+          message: undefined,
+          interactive: true,
+          directory: DIRECTORY,
+        },
+      ]);
+    }
+  );
 
   it('ignores an answer for an unknown route', async () => {
     const h = createHarness();

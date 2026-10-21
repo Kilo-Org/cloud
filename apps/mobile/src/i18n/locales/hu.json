@@ -3675,8 +3675,8 @@
       "timeoutInvalid": "Az időtúllépésnek egész számú ezredmásodpercnek kell lennie",
       "edit": "MCP szerver szerkesztése",
       "saveFailed": "Nem sikerült menteni az MCP szervert",
-      "deleteFailed": "Nem sikerült törölni az MCP-kiszolgálót",
-      "updateFailed": "Nem sikerült frissíteni az MCP-kiszolgálót"
+      "deleteFailed": "Nem sikerült törölni az MCP szervert",
+      "updateFailed": "Nem sikerült frissíteni az MCP szervert"
     },
     "agents": {
       "title": "Profil ügynökök",

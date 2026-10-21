@@ -1,6 +1,7 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -966,7 +967,7 @@ export async function rewriteModelResponse({
   responseTransforms,
 }: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
-  const customPricing = getCustomPricing(model);
+  const customPricing = getCustomPricing(model, await getConfiguredCustomPricing());
   // Custom LLMs are always free, so an upstream-reported cost must not reach the user.
   const requiresCostRemoval =
     providerId === 'custom' ||

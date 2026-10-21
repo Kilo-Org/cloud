@@ -7,10 +7,19 @@ import {
   getVercelModelIdOverrides,
   mapResolvedModelIdToVercel,
 } from './providers/vercel/mapModelIdToVercel';
-import { getCustomPricing } from './custom-pricing.constants';
+import { getCustomPricing, type ConfiguredCustomPricing } from './custom-pricing.constants';
+import { getConfiguredCustomPricing } from './configured-custom-pricing';
 import { findKiloExclusiveModel } from './kilo-exclusive-models';
 
-export function textRequestPriceCeiling(metadata: StoredModel) {
+/**
+ * `requestedModel` is the ID the caller sent, which may be a `~` alias of
+ * `metadata`. Billing looks up custom pricing by that ID, so the ceiling includes it.
+ */
+export function textRequestPriceCeiling(
+  metadata: StoredModel,
+  requestedModel: string,
+  configuredCustomPricing: ConfiguredCustomPricing
+) {
   if (metadata.endpoints.length === 0) throw new Error('Model pricing is unavailable');
   let inputRate = 0;
   let outputRate = 0;
@@ -33,7 +42,9 @@ export function textRequestPriceCeiling(metadata: StoredModel) {
     requestCost = Math.max(requestCost, values[2]);
   }
   const billedTiers = [
-    ...(getCustomPricing(metadata.id)?.pricing ?? []),
+    ...[...new Set([requestedModel, metadata.id])].flatMap(
+      modelId => getCustomPricing(modelId, configuredCustomPricing)?.pricing ?? []
+    ),
     ...(findKiloExclusiveModel(metadata.id)?.pricing?.tiers ?? []),
   ];
   for (const { pricing } of billedTiers) {
@@ -119,7 +130,7 @@ export async function enforceRequestCostLimit(
         mapResolvedModelIdToVercel(aliasTarget, await getVercelModelIdOverrides())
     )
       return 'Model alias target changed before bounded spending admission';
-    const price = textRequestPriceCeiling(metadata.data);
+    const price = textRequestPriceCeiling(metadata.data, model, await getConfiguredCustomPricing());
     const inputTokenCeiling = requestTextBytes(body) + 2048;
     const bound = Math.ceil(
       (inputTokenCeiling * price.inputRate +

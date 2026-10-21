@@ -118,6 +118,7 @@ describe('adminGatewayModelListsRouter', () => {
         preferred_models: null,
         unavailable_models: config,
         vercel_model_id_overrides: null,
+        custom_pricing: null,
       },
     ]);
   });

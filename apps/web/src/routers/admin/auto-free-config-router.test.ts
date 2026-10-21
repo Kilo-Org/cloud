@@ -122,6 +122,7 @@ describe('adminAutoFreeConfigRouter', () => {
         preferred_models: null,
         unavailable_models: null,
         vercel_model_id_overrides: null,
+        custom_pricing: null,
       },
     ]);
   });

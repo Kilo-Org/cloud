@@ -1,3 +1,4 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +13,11 @@ const createMutate = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
-const organizationState = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
+const boundaryState = vi.hoisted(() => ({
+  organizationId: 'org-1' as string | null,
+  role: 'owner' as string | undefined,
+  isResolving: false,
+}));
 const mutationState = vi.hoisted(() => ({
   create: { mutateAsync: createMutate, isPending: false },
 }));
@@ -29,11 +34,8 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: routerReplace }),
 }));
 
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({
-    organizationId: organizationState.organizationId,
-    isLoaded: true,
-  }),
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: () => boundaryState,
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
@@ -85,7 +87,18 @@ function typeName(root: ReactTestInstance, name: string): void {
 
 async function mount() {
   const result = await renderWithProviders(createElement(NewProfileScreen));
-  return result;
+  const rerender = () => {
+    act(() => {
+      result.renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: result.queryClient },
+          createElement(NewProfileScreen)
+        )
+      );
+    });
+  };
+  return { ...result, rerender };
 }
 
 async function pressCreate(root: ReactTestInstance): Promise<void> {
@@ -108,7 +121,9 @@ describe('NewProfileScreen', () => {
     toastError.mockReset();
     routerReplace.mockReset();
     createMutate.mockResolvedValue({ id: 'profile-1' });
-    organizationState.organizationId = 'org-1';
+    boundaryState.organizationId = 'org-1';
+    boundaryState.role = 'owner';
+    boundaryState.isResolving = false;
     mutationState.create.isPending = false;
   });
 
@@ -138,32 +153,125 @@ describe('NewProfileScreen', () => {
     unmount();
   });
 
-  it('happy: choosing Organization carries the organization id into the create', async () => {
+  it.each(['owner', 'admin'])(
+    'happy: %s choosing Organization carries the organization id into the create',
+    async role => {
+      boundaryState.role = role;
+      const { renderer, unmount } = await mount();
+
+      act(() => {
+        (findOwnerControl(renderer.root).props as { onChange: (v: string) => void }).onChange(
+          'organization'
+        );
+      });
+      typeName(renderer.root, 'Org profile');
+      await pressCreate(renderer.root);
+
+      await waitFor(() => createMutate.mock.calls.length > 0);
+      expect(createMutate.mock.calls[0]?.[0]).toEqual({
+        name: 'Org profile',
+        organizationId: 'org-1',
+      });
+      expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1?org=org-1');
+
+      unmount();
+    }
+  );
+
+  it('personal context: renders no owner control', async () => {
+    boundaryState.organizationId = null;
     const { renderer, unmount } = await mount();
+
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it.each(['member', 'billing_manager'])(
+    'does not offer organization ownership to a %s and still creates personal profiles',
+    async role => {
+      boundaryState.role = role;
+      const { renderer, unmount } = await mount();
+
+      expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+
+      typeName(renderer.root, 'Backend debugging');
+      await pressCreate(renderer.root);
+
+      await waitFor(() => createMutate.mock.calls.length > 0);
+      expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+      expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
+
+      unmount();
+    }
+  );
+
+  it.each([
+    { name: 'unresolved membership', isResolving: true, role: undefined },
+    { name: 'unresolved membership with a cached role', isResolving: true, role: 'owner' },
+    { name: 'missing membership', isResolving: false, role: undefined },
+  ])(
+    'does not offer organization ownership for $name and still creates personal profiles',
+    async ({ isResolving, role }) => {
+      boundaryState.isResolving = isResolving;
+      boundaryState.role = role;
+      const { renderer, unmount } = await mount();
+
+      expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+
+      typeName(renderer.root, 'Backend debugging');
+      await pressCreate(renderer.root);
+
+      await waitFor(() => createMutate.mock.calls.length > 0);
+      expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+      expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
+
+      unmount();
+    }
+  );
+
+  it('stale role: a selected organization cannot submit after the role drops', async () => {
+    const { renderer, rerender, unmount } = await mount();
 
     act(() => {
       (findOwnerControl(renderer.root).props as { onChange: (v: string) => void }).onChange(
         'organization'
       );
     });
-    typeName(renderer.root, 'Org profile');
+
+    boundaryState.role = 'member';
+    rerender();
+
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+    typeName(renderer.root, 'Backend debugging');
     await pressCreate(renderer.root);
 
     await waitFor(() => createMutate.mock.calls.length > 0);
-    expect(createMutate.mock.calls[0]?.[0]).toEqual({
-      name: 'Org profile',
-      organizationId: 'org-1',
-    });
-    expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1?org=org-1');
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+    expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
 
     unmount();
   });
 
-  it('personal context: renders no owner control', async () => {
-    organizationState.organizationId = null;
-    const { renderer, unmount } = await mount();
+  it('stale context: a selected organization cannot submit its id after the context changes', async () => {
+    const { renderer, rerender, unmount } = await mount();
 
-    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+    act(() => {
+      (findOwnerControl(renderer.root).props as { onChange: (v: string) => void }).onChange(
+        'organization'
+      );
+    });
+
+    boundaryState.organizationId = 'org-2';
+    rerender();
+
+    expect(findOwnerControl(renderer.root).props.value).toBe('personal');
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+    expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
 
     unmount();
   });

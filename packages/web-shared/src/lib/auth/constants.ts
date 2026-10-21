@@ -14,6 +14,7 @@ export type AuthErrorType =
   | 'SIGNUP-STEP-UP'
   | 'SIGNUP-UNAVAILABLE'
   | 'EMAIL-ALREADY-USED'
+  | 'ADMISSION_REQUIRED'
   | 'SSO_ERROR';
 
 /**

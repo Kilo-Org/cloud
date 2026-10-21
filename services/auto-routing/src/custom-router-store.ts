@@ -24,7 +24,7 @@ export function clearCustomRouterCache(): void {
   cache.clear();
 }
 
-function toDefinition(row: AutoRoutingCustomRouter): CustomRouterDefinition {
+export function toCustomRouterDefinition(row: AutoRoutingCustomRouter): CustomRouterDefinition {
   const owner: CustomRouterOwner = row.owned_by_organization_id
     ? { type: 'org', id: row.owned_by_organization_id }
     : { type: 'user', id: row.owned_by_user_id ?? '' };
@@ -38,6 +38,8 @@ function toDefinition(row: AutoRoutingCustomRouter): CustomRouterDefinition {
     mode: row.mode,
     entries: row.entries,
     defaultEntryKey: row.default_entry_key,
+    legacyPool: row.legacy_pool,
+    legacyModeInherited: row.legacy_mode_inherited,
   });
   if (!parsed.success) {
     throw new Error(
@@ -53,7 +55,7 @@ async function queryRouter(
 ): Promise<CustomRouterDefinition | null> {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 2_000 });
   const [row] = await db.select().from(auto_routing_custom_routers).where(where).limit(1);
-  return row ? toDefinition(row) : null;
+  return row ? toCustomRouterDefinition(row) : null;
 }
 
 function cached(
@@ -81,7 +83,7 @@ export function findCustomRouter(
   owner: CustomRouterOwner,
   slug: string
 ): Promise<CustomRouterDefinition | null> {
-  return cached(`${owner.type}:${owner.id}:${slug}`, () =>
+  const load = () =>
     queryRouter(
       env,
       and(
@@ -90,8 +92,8 @@ export function findCustomRouter(
           : eq(auto_routing_custom_routers.owned_by_user_id, owner.id),
         eq(auto_routing_custom_routers.slug, slug)
       )
-    )
-  );
+    );
+  return slug === 'efficient' ? load() : cached(`${owner.type}:${owner.id}:${slug}`, load);
 }
 
 export function findCustomRouterById(
@@ -100,5 +102,20 @@ export function findCustomRouterById(
 ): Promise<CustomRouterDefinition | null> {
   return cached(`id:${routerId}`, () =>
     queryRouter(env, eq(auto_routing_custom_routers.id, routerId))
+  );
+}
+
+export function findLegacyPoolRouter(
+  env: Pick<Env, 'HYPERDRIVE'>,
+  owner: CustomRouterOwner
+): Promise<CustomRouterDefinition | null> {
+  return queryRouter(
+    env,
+    and(
+      owner.type === 'org'
+        ? eq(auto_routing_custom_routers.owned_by_organization_id, owner.id)
+        : eq(auto_routing_custom_routers.owned_by_user_id, owner.id),
+      eq(auto_routing_custom_routers.legacy_pool, true)
+    )
   );
 }

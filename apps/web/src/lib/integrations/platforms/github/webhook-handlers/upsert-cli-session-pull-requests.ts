@@ -1,7 +1,11 @@
 import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
+import {
+  agent_briefing_events,
+  cli_sessions_v2,
+  github_branch_pull_requests,
+} from '@kilocode/db/schema';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
@@ -37,6 +41,7 @@ export type PullRequestSessionEvidence = {
   prNumber: number;
   headRef: string | null;
   headSha: string | null;
+  openedAt?: string;
 };
 
 const UPSERT_ACTIONS: ReadonlySet<string> = new Set([
@@ -177,13 +182,46 @@ export async function markSessionsVerifyingPullRequest(
 
   // Re-apply the gate and pin each checked `pr_url` so a link changed after the
   // read is never marked verified.
-  const marked = await db
-    .update(cli_sessions_v2)
-    .set({ pr_link_verified_at: sql`now()` })
-    .where(and(candidatePredicate, or(...linking)))
-    .returning({ session_id: cli_sessions_v2.session_id });
-
-  return marked.length > 0 ? { kind: 'session' } : { kind: 'no_session' };
+  return db.transaction(async tx => {
+    const marked = await tx
+      .update(cli_sessions_v2)
+      .set({ pr_link_verified_at: sql`now()` })
+      .where(and(candidatePredicate, or(...linking)))
+      .returning({
+        session_id: cli_sessions_v2.session_id,
+        kilo_user_id: cli_sessions_v2.kilo_user_id,
+        organization_id: cli_sessions_v2.organization_id,
+        pr_url: cli_sessions_v2.pr_url,
+      });
+    if (evidence.openedAt && Number.isFinite(Date.parse(evidence.openedAt))) {
+      const openedAt = new Date(evidence.openedAt).toISOString();
+      const events = marked.flatMap(session =>
+        session.pr_url
+          ? [
+              {
+                id: JSON.stringify([
+                  session.kilo_user_id,
+                  session.session_id,
+                  'pull_request',
+                  session.pr_url,
+                ]),
+                kilo_user_id: session.kilo_user_id,
+                session_id: session.session_id,
+                organization_id: session.organization_id,
+                kind: 'pull_request',
+                occurred_at: openedAt,
+                title: `Opened pull request #${evidence.prNumber}`,
+                url: `${evidence.gitUrl}/pull/${evidence.prNumber}`,
+                payload: { openedAt },
+              },
+            ]
+          : []
+      );
+      if (events.length > 0)
+        await tx.insert(agent_briefing_events).values(events).onConflictDoNothing();
+    }
+    return marked.length > 0 ? { kind: 'session' } : { kind: 'no_session' };
+  });
 }
 
 /**
@@ -251,6 +289,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         prNumber: pull_request.number,
         headRef: branch,
         headSha: pull_request.head.sha ?? null,
+        openedAt: pull_request.created_at,
       },
       owner
     );

@@ -104,9 +104,11 @@ export async function getOrganizationGroupPolicyContext(params: {
   /** Organization row the caller already loaded; avoids re-reading it. */
   organization?: Organization;
   tx?: DrizzleTransaction;
+  /** Ignored when `tx` is given. AI gateway callers pass `readDb`. */
+  fromDb?: typeof db;
 }): Promise<OrganizationGroupPolicyContext> {
   if (!params.tx) {
-    return await db.transaction(
+    return await (params.fromDb ?? db).transaction(
       async tx => await getOrganizationGroupPolicyContext({ ...params, tx }),
       { isolationLevel: 'repeatable read', accessMode: 'read only' }
     );

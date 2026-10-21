@@ -1413,6 +1413,9 @@
       "couldNotGetLatest": "Ekki tókst að sækja nýjustu gögnin.",
       "byline": "{{repo}} #{{number}} eftir {{author}}",
       "noFindings": "Engin frávik fundust.",
+      "findingsUnavailable": "Niðurstöður eru ekki tiltækar þar sem þessi yfirferð mistókst.",
+      "serviceUnavailable": "Ekki náðist samband við kóðayfirferðarþjónustuna. Reyndu yfirferðina aftur þegar þjónustan er tiltæk.",
+      "reviewFailed": "Yfirferðin mistókst. Vinsamlegast reyndu aftur.",
       "showMore": "Sýna meira",
       "created": "Búin til",
       "started": "Hófst",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Sláðu inn nafn umboðsmanns",
       "slugRequired": "Sláðu inn umboðssnigl",
       "slugInvalid": "Snigl verður að byrja á bókstaf og nota aðeins lágstafi, tölustafi og strik",
-      "slugConflict": "Sá snigill er frátekinn af innbyggðum umboðsmanni",
+      "slugConflict": "Þetta slug er þegar í notkun hjá innbyggðum umboðsmanni eða öðrum umboðsmanni í þessu prófíli",
       "edit": "Breyta umboðsmanni"
     },
     "slashCommands": {

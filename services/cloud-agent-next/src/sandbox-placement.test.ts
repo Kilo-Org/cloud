@@ -156,6 +156,22 @@ describe('selectControlPlaneSandbox', () => {
     });
   });
 
+  it('routes enrolled code review to Cloudflare Containers without changing its kind', async () => {
+    const decision = await selectControlPlaneSandbox({
+      env: { CODE_REVIEW_CONTAINERS_ORG_IDS: 'org-1' },
+      sessionId: SESSION_ID,
+      userId: 'user-1',
+      orgId: 'org-1',
+      codeReview: true,
+    });
+
+    expect(decision).toEqual({
+      sandboxId: sha256Key(`control-isolated-v1:${SESSION_ID}`),
+      provider: 'cloudflare-containers',
+      sandboxKind: 'code-review',
+    });
+  });
+
   it.each([
     ['cloudflare-single', 'cloudflare', 'isolated'],
     ['isolated-standard', 'cloudflare', 'isolated-standard'],

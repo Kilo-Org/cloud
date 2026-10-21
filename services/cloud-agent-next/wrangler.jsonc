@@ -87,6 +87,7 @@
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
     "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
+    "CODE_REVIEW_CONTAINERS_ORG_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
   },
   "placement": { "mode": "smart" },
   /**
@@ -499,6 +500,7 @@
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
         "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
         "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
+        "CODE_REVIEW_CONTAINERS_ORG_IDS": "",
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
         "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
@@ -545,6 +547,10 @@
         {
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
+        },
+        {
+          "binding": "RUNTIME_RELEASE_BUCKET",
+          "bucket_name": "cloud-agent-runtime-dev",
         },
       ],
       "containers": [

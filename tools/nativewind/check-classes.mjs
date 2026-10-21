@@ -138,6 +138,31 @@ function endOfBraces(text, start) {
 }
 
 /**
+ * Index of the `>` closing the type argument list that starts at `start`
+ * (`<FlashList<Row> ...>`). `=>` inside a function type does not close it,
+ * and `>>` closes two nested lists.
+ */
+function endOfTypeArguments(text, start) {
+  let depth = 0;
+  for (let index = start; index < text.length; index++) {
+    const char = text[index];
+    if (char === '"' || char === "'" || char === '`') {
+      index = endOfQuoted(text, index) - 1;
+    } else if (char === '<') {
+      depth++;
+    } else if (char === '>' && text[index - 1] !== '=') {
+      if (--depth === 0) {
+        return index;
+      }
+    } else if (char === ';' || char === '{' || char === '}') {
+      // Not a type argument list: keep the tag start as-is.
+      return -1;
+    }
+  }
+  return -1;
+}
+
+/**
  * Index of the `>` closing the tag whose attributes start at `start`. A nested
  * JSX value or an arrow function keeps its braces open, so `=>` inside an
  * attribute cannot end the tag early.
@@ -266,11 +291,19 @@ function ownClassStrings(attributes) {
 
 function checkScrollPadding(relative, text) {
   for (const match of text.matchAll(SCROLL_TAG)) {
-    const tagEnd = endOfTag(text, match.index + match[0].length);
+    let attributesStart = match.index + match[0].length;
+    if (text[attributesStart] === '<') {
+      const typeEnd = endOfTypeArguments(text, attributesStart);
+      if (typeEnd === -1) {
+        continue;
+      }
+      attributesStart = typeEnd + 1;
+    }
+    const tagEnd = endOfTag(text, attributesStart);
     if (tagEnd === -1) {
       continue;
     }
-    const padding = ownClassStrings(text.slice(match.index + match[0].length, tagEnd))
+    const padding = ownClassStrings(text.slice(attributesStart, tagEnd))
       .flatMap(classes => classes.split(/\s+/))
       .filter(classes => HORIZONTAL_PADDING.test(classes));
     if (padding.length > 0) {

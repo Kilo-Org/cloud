@@ -126,6 +126,20 @@ test('accepts Intl type references', context => {
   assert.equal(result.status, 0);
 });
 
+test('reads padding from a typed scroll container tag', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      'export const a = (\n' +
+      '  <FlashList<Record<string, Row>>\n' +
+      '    data={data}\n' +
+      "    className={cn('flex-1', 'px-5')}\n" +
+      '  />\n' +
+      ');\n',
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /<FlashList> carries "px-5" on its own className/);
+});
+
 test('flags an opacity modifier on primary-disabled and hair-soft', context => {
   const result = runChecker(context, {
     'apps/mobile/src/panel.ts': 'export const a = "bg-primary-disabled/50 border-hair-soft/50";\n',

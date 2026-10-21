@@ -7,7 +7,10 @@ import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js'
 import { startAttempt, type RouteContext } from '../../src/control-plane/sandbox/routes.js';
 import * as scopeHandleAdoption from '../../src/control-plane/sandbox/scope-handle-adoption.js';
 import { logger } from '../../src/logger.js';
-import { CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH } from '../../src/sandbox-control/diagnostics.js';
+import {
+  CONTROL_DIAGNOSTIC_STRING_CHARSET,
+  CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH,
+} from '../../src/sandbox-control/diagnostics.js';
 import { createGrantDiagnostic } from '../../src/sandbox-control/grant-diagnostic.js';
 import migrations from '../../src/control-plane/sandbox/drizzle/migrations.js';
 import {
@@ -2629,25 +2632,200 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     ).toBe(true);
   });
 
-  it('bounds the twelve-key diagnostic payload at the 1730-byte ceiling', () => {
-    const value = 'a'.repeat(CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
-    const payload = {
-      diagnosticEvent: value,
-      logTag: value,
-      sessionId: value,
-      attemptId: value,
-      reason: value,
-      stage: value,
-      grantPhase: value,
-      grantFailureReason: value,
-      provider: value,
-      containment: value,
-      repositoryKind: value,
-      tokenClass: value,
+  it('bounds the real route_failed diagnostic payload from its producer', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    // An arbitrary broker reason the allowlist cannot name; it must collapse to
+    // `unknown` and never reach the emitted event.
+    const sentinelReason = 'sentinel_reason_not_in_any_allowlist';
+    // A synthetic marker the broker returns alongside its decision. Production
+    // reads only `success`/`reason`, so the raw response must not be echoed.
+    const brokerSecretMarker = 'broker_payload_secret_marker_8675309';
+    let brokerCalls = 0;
+    broker.service.getCloudAgentAuthForRepo = async () => {
+      brokerCalls += 1;
+      return { success: false, reason: sentinelReason, secret: brokerSecretMarker };
     };
-    const serialized = JSON.stringify(payload);
-    expect(serialized.length).toBe(1730);
-    expect(serialized.length).toBeLessThanOrEqual(2048);
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    // A synthetic user secret genuinely carried through the credential source.
+    const source = credentialsSource(SESSION, { userId: USER_SECRET });
+    const containmentOff = {
+      provider: 'cloudflare' as const,
+      containment: { kilocode: false, github: false },
+    };
+    // Past the 128-char production string cap and still all allowed-charset
+    // characters, so only the length cap can bound it.
+    const oversizedSessionId = `workspace_${'a'.repeat(CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH + 64)}`;
+    expect(oversizedSessionId.length).toBeGreaterThan(CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
+
+    const capture = captureRouteFailed();
+    let brokerEvent: Record<string, unknown> | undefined;
+    let oversizedEvent: Record<string, unknown> | undefined;
+    try {
+      // (1) Normal identity: the real Sandbox DO reaches the SCM broker through
+      // the grant owner and the broker rejects.
+      const brokerView = await stub.prepare({
+        ...prepareInput(SESSION, source),
+        sandboxSelection: containmentOff,
+      });
+      expect(brokerView).toEqual({
+        state: 'failed',
+        attemptId: expect.any(String),
+        reason: 'workspace_setup_failed',
+      });
+      const brokerEvents = capture.forAttempt(failedAttemptId(brokerView));
+      expect(brokerEvents).toHaveLength(1);
+      brokerEvent = brokerEvents[0];
+
+      // (2) Oversized session id: the real member validation rejects before any
+      // broker call, and the producer redacts the too-long value.
+      const oversizedView = await stub.prepare({
+        ...prepareInput(SESSION, source, {
+          ...routeSpec(SESSION),
+          sessionId: oversizedSessionId,
+        }),
+        sandboxSelection: containmentOff,
+      });
+      expect(oversizedView).toEqual({
+        state: 'failed',
+        attemptId: expect.any(String),
+        reason: 'workspace_setup_failed',
+      });
+      const oversizedEvents = capture.forAttempt(failedAttemptId(oversizedView));
+      expect(oversizedEvents).toHaveLength(1);
+      oversizedEvent = oversizedEvents[0];
+    } finally {
+      capture.restore();
+    }
+    if (brokerEvent === undefined || oversizedEvent === undefined) {
+      throw new Error('missing captured route_failed events');
+    }
+
+    // (1) The closed twelve-key owner payload: four failRoute keys, the six
+    // pickable grant fields, and the two fixed logger keys. Nothing else.
+    expect(Object.keys(brokerEvent).sort()).toEqual(
+      [
+        'sessionId',
+        'attemptId',
+        'reason',
+        'stage',
+        'grantPhase',
+        'grantFailureReason',
+        'provider',
+        'containment',
+        'repositoryKind',
+        'tokenClass',
+        'logTag',
+        'diagnosticEvent',
+      ].sort()
+    );
+    expect(brokerEvent).toMatchObject({
+      diagnosticEvent: 'route_failed',
+      logTag: 'sandbox_control',
+      reason: 'workspace_setup_failed',
+      stage: 'credential_grant_failed',
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'unknown',
+      provider: 'cloudflare',
+      containment: 'disabled',
+      repositoryKind: 'github',
+      tokenClass: 'legacy',
+    });
+    // The route failure is unchanged: failed state with no armed deadline.
+    const brokerRow = await readRouteRow(stub, SESSION);
+    expect(brokerRow?.state).toBe('failed');
+    expect(brokerRow?.attempt_deadline_at).toBe(0);
+
+    // (2) Ten keys: the earlier member rejection has no repository/token facts,
+    // and the oversized session id is redacted by the cap, never truncated.
+    expect(Object.keys(oversizedEvent).sort()).toEqual(
+      [
+        'sessionId',
+        'attemptId',
+        'reason',
+        'stage',
+        'grantPhase',
+        'grantFailureReason',
+        'provider',
+        'containment',
+        'logTag',
+        'diagnosticEvent',
+      ].sort()
+    );
+    expect(oversizedEvent).toMatchObject({
+      diagnosticEvent: 'route_failed',
+      logTag: 'sandbox_control',
+      reason: 'workspace_setup_failed',
+      stage: 'credential_grant_failed',
+      grantPhase: 'validation',
+      grantFailureReason: 'invalid_member',
+      provider: 'cloudflare',
+      containment: 'disabled',
+      sessionId: 'redacted',
+    });
+    expect(JSON.stringify(oversizedEvent)).not.toContain(oversizedSessionId);
+    const oversizedRow = await readRouteRow(stub, oversizedSessionId);
+    expect(oversizedRow?.state).toBe('failed');
+    expect(oversizedRow?.attempt_deadline_at).toBe(0);
+    // Only the first prepare reached the broker; validation stops the second.
+    expect(brokerCalls).toBe(1);
+
+    // No supplied marker reaches either payload: the collapsed broker reason, the
+    // raw broker response's secret property, and the synthetic user secret
+    // carried through the credential source.
+    for (const marker of [sentinelReason, brokerSecretMarker, USER_SECRET]) {
+      expect(JSON.stringify(brokerEvent)).not.toContain(marker);
+      expect(JSON.stringify(oversizedEvent)).not.toContain(marker);
+    }
+
+    // Per-field cap and charset over the actual captured values: every emitted
+    // string is bounded by the production cap and inside the allowed charset.
+    for (const event of [brokerEvent, oversizedEvent]) {
+      for (const [key, value] of Object.entries(event)) {
+        expect(typeof value).toBe('string');
+        expect(String(value).length, key).toBeLessThanOrEqual(CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
+        expect(CONTROL_DIAGNOSTIC_STRING_CHARSET.test(String(value)), key).toBe(true);
+      }
+    }
+
+    // A conservative byte ceiling derived from the actual captured keys and the
+    // producer's rules: every variable string value is capped at
+    // CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH, and only `logTag`/`diagnosticEvent`
+    // carry the two fixed producer values. It bounds this route_failed payload,
+    // not the surrounding logger envelope (inherited tags/ids are unbounded).
+    const fixedValueLengths: Record<string, number> = {
+      logTag: 'sandbox_control'.length,
+      diagnosticEvent: 'route_failed'.length,
+    };
+    const ceilingFor = (event: Record<string, unknown>): number => {
+      const keys = Object.keys(event);
+      const fieldBytes = keys.reduce(
+        (total, key) =>
+          total + key.length + (fixedValueLengths[key] ?? CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH) + 5,
+        0
+      );
+      return fieldBytes + (keys.length - 1) + 2;
+    };
+    const actualBytes = (event: Record<string, unknown>): number =>
+      new TextEncoder().encode(JSON.stringify(event)).length;
+
+    // Locally derived fixed-literal ceiling per captured key set: each value is
+    // capped at CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH except the two fixed producer
+    // values, so the twelve-key owner payload bounds at 1501 bytes and the
+    // ten-key validation payload at 1209.
+    expect(ceilingFor(brokerEvent)).toBe(1501);
+    expect(ceilingFor(oversizedEvent)).toBe(1209);
+    // Measured UTF-8 bytes of the captured payloads. `attemptId` is a fixed-length
+    // UUID and every other value is pinned above, so these are deterministic.
+    expect(actualBytes(brokerEvent)).toBe(400);
+    expect(actualBytes(oversizedEvent)).toBe(316);
+    expect(actualBytes(brokerEvent)).toBeLessThan(ceilingFor(brokerEvent));
+    expect(actualBytes(brokerEvent)).toBeLessThanOrEqual(2048);
+    expect(actualBytes(oversizedEvent)).toBeLessThan(ceilingFor(oversizedEvent));
+    expect(actualBytes(oversizedEvent)).toBeLessThanOrEqual(2048);
   });
 
   it('seals facts and the decision once the timeout flag is set', () => {

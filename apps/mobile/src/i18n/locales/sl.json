@@ -685,7 +685,8 @@
       "description": "Poveži svoj račun GitHub, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "gitlabDescription": "Poveži svoj račun GitLab, da lahko pregleduješ merge requeste na mobilni napravi.",
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
-      "bitbucketOrgOnlyDescription": "V profilu izberi organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucket."
+      "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
+      "contextLine": "Za {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -801,7 +802,9 @@
       "reviewNotSubmitted": "Tega pregleda ni mogoče oddati v trenutni obliki. PR se je morda spremenil ali pa poskušaš pregledati svoj zahtevek za združitev.",
       "reviewNotSubmittedTerm": "Tega pregleda ni mogoče oddati v trenutni obliki. {{term}} se je morda spremenil ali ne moreš pregledovati svojega {{term}}.",
       "couldNotPostComment": "Komentarja ni bilo mogoče objaviti.",
-      "couldNotSubmitReview": "Pregleda ni bilo mogoče oddati. Preveri povezavo in poskusi znova."
+      "couldNotSubmitReview": "Pregleda ni bilo mogoče oddati. Preveri povezavo in poskusi znova.",
+      "rateLimited": "Preveč zahtev. Poskusi znova pozneje.",
+      "conflict": "To se je spremenilo, medtem ko si delal na njem. Znova ga naloži in poskusi znova."
     },
     "operation": {
       "couldNotReply": "Odgovora ni bilo mogoče poslati.",
@@ -1451,6 +1454,9 @@
       "couldNotGetLatest": "Najnovejših podatkov ni bilo mogoče pridobiti.",
       "byline": "{{repo}} #{{number}} · Avtor: {{author}}",
       "noFindings": "Ni ugotovitev.",
+      "findingsUnavailable": "Rezultati niso na voljo, ker ta pregled ni uspel.",
+      "serviceUnavailable": "Povezave s storitvijo za pregled kode ni bilo mogoče vzpostaviti. Znova zaženi pregled, ko bo storitev na voljo.",
+      "reviewFailed": "Pregled ni uspel. Poskusi znova.",
       "showMore": "Prikaži več",
       "created": "Ustvarjeno",
       "started": "Začeto",
@@ -1580,7 +1586,8 @@
       "bugs": "Hrošči",
       "style": "Slog",
       "testing": "Testiranje",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Drugo ({{area}})"
     },
     "gateThreshold": {
       "warning": "Opozorilo"
@@ -2265,6 +2272,7 @@
       "prefillModelUnavailable": "{{model}} ni več na voljo. Uporabljen je tvoj privzeti model.",
       "couldNotReadPendingSessions": "Čakajočih sej ni bilo mogoče prebrati. Poskusi znova.",
       "failedToCreate": "Seje ni bilo mogoče ustvariti.",
+      "checkOrganizationAccess": "Preveri dostop do te organizacije in poskusi znova.",
       "couldNotRefreshRepositories": "Skladišč ni bilo mogoče osvežiti. Poskusi znova.",
       "discardDraftTitle": "Želiš zavreči osnutek?",
       "discardDraftMessage": "Tvoj poziv se ne bo shranil.",
@@ -2807,6 +2815,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Aktivnih sej ni mogoče prikazati, dokler se podatki ne naložijo.",
     "currentDeviceUnidentified": "Trenutne naprave ni bilo mogoče prepoznati.",
+    "kiloApp": "Aplikacija Kilo",
     "noSessions": "Ni aktivnih sej",
     "noSessionsDescription": "Prijavi se v aplikacijo Kilo na drugi napravi, da se ta prikaže tukaj.",
     "onlyKiloAppSignIns": "Tukaj se prikažejo samo prijave z aplikacijo Kilo. Prijave z urejevalnikom in CLI niso navedene.",
@@ -2961,6 +2970,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Preden začnemo",
+    "summaryTitle": "Nastavitve deljenja podatkov",
     "introDescription": "Kilo pošilja tvoja sporočila ponudnikom umetne inteligence, da ustvarijo odgovore. Spodaj je opisano, katere podatke delimo in s kom.",
     "required": "Obvezno za uporabo aplikacije Kilo",
     "promptsTitle": "Tvoji pozivi in pogovori",
@@ -2969,7 +2979,6 @@
     "accountDescription": "ID tvojega računa Kilo in metapodatki zahtev za preverjanje tvoje pristnosti in merjenje porabe.",
     "diagnosticsTitle": "Diagnostika aplikacije",
     "diagnosticsDescription": "Poročila o sesutjih in napakah brez vsebine aplikacije, ki pomagajo zagotavljati njeno stabilnost.",
-    "optional": "Neobvezno",
     "helpImprove": "Pomagaj izboljšati Kilo",
     "helpImproveDescription": "Deli anonimne podatke o uporabi aplikacije in viru namestitve. To lahko kadar koli spremeniš v nastavitvah.",
     "seeFullDetails": "Prikaži vse podrobnosti",
@@ -3550,6 +3559,9 @@
     "localModels": {
       "title": "Modeli v napravi",
       "help": "Modeli v napravi se izvajajo v tem telefonu. Vaši pozivi in odgovori ostanejo v napravi.",
+      "switchTitle": "Preklopim na model v napravi?",
+      "switchMessage": "Po preklopu na {{name}} se pozivi in kontekst tega pogovora obdelujejo v tem telefonu, ne na oddaljenem strežniku.",
+      "switchConfirm": "Preklopi model",
       "systemPurpose": "Model, vgrajen v sistem te naprave. Izvaja se v napravi.",
       "apple": "Apple Intelligence (v napravi)",
       "checking": "Preverjanje razpoložljivosti …",
@@ -3646,7 +3658,6 @@
     "personalDefaultDescription": "Samodejno naloženo, ko nobeno skladišče nima pripetega profila.",
     "organizationDefaultDescription": "Samodejno naloženo za člane, ki nimajo osebne privzete vrednosti.",
     "setAsDefault": "Nastavi kot privzeto",
-    "removeDefault": "Odstrani kot privzeto",
     "saveFailed": "Profila ni bilo mogoče shraniti",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "S tem trajno odstranite profil in njegove nastavitve. Tega ni mogoče razveljaviti.",
@@ -3672,11 +3683,13 @@
     "commandsTitle": "Ukazi za nastavitev",
     "addCommand": "Dodaj ukaz",
     "commandLabel": "Ukaz",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "npr. pnpm install",
     "commandsEmpty": "Ni še nobenih ukazov za nastavitev",
     "commandsSaveFailed": "Nastavitvenih ukazov ni bilo mogoče shraniti",
     "moveUp": "Premakni se navzgor",
     "moveDown": "Premakni se navzdol",
+    "moveCommandUp": "Premakni ukaz {{position}} navzgor",
+    "moveCommandDown": "Premakni ukaz {{position}} navzdol",
     "skillsTitle": "Spretnosti",
     "addSkill": "Dodajte spretnost",
     "skillNameLabel": "Ime spretnosti",
@@ -3746,7 +3759,7 @@
       "nameRequired": "Vnesite ime agenta",
       "slugRequired": "Vnesite polža agenta",
       "slugInvalid": "Polž se mora začeti s črko in uporabljati samo male črke, številke in pomišljaje",
-      "slugConflict": "Ta polž je rezerviran z vgrajenim agentom",
+      "slugConflict": "Ta slug že uporablja vgrajeni agent ali drug agent v tem profilu",
       "edit": "Uredi agenta"
     },
     "slashCommands": {

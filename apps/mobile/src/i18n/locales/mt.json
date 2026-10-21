@@ -697,7 +697,8 @@
       "description": "Ikkonnetta l-kont ta' GitHub tiegħek biex tirrevedi t-talbiet għall-għaqda fuq il-mowbajl.",
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
-      "bitbucketOrgOnlyDescription": "Agħżel organizzazzjoni fil-profil tiegħek biex tirrevedi l-PRs tagħha fuq Bitbucket."
+      "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
+      "contextLine": "Għal {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -817,7 +818,9 @@
       "reviewNotSubmitted": "Din ir-reviżjoni ma tistax tintbagħat kif inhi. Il-PR seta' nbidel, jew ma tistax tirrevedi t-talba għall-għaqda tiegħek stess.",
       "reviewNotSubmittedTerm": "Din ir-reviżjoni ma tistax tintbagħat hekk kif inhi. Il-{{term}} fori nbidel, jew ma tistax tirrevedi l-{{term}} tiegħek stess.",
       "couldNotPostComment": "Ma setax jiġi ppubblikat il-kumment.",
-      "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
+      "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "rateLimited": "Żżejjed talbiet. Jekk jogħġbok erġa' pprova aktar tard.",
+      "conflict": "Din inbidlet waqt li kont taħdem fuqha. Iċċarġja mill-ġdid u erġa' pprova."
     },
     "operation": {
       "couldNotReply": "Ma stajniex nibagħtu t-tweġiba.",
@@ -1470,6 +1473,9 @@
       "couldNotGetLatest": "Ma setgħetx tinkiseb l-aħħar dejta.",
       "byline": "{{repo}} #{{number}} minn {{author}}",
       "noFindings": "M'hemm l-ebda sejba.",
+      "findingsUnavailable": "Ir-riżultati mhumiex disponibbli għax din ir-reviżjoni falliet.",
+      "serviceUnavailable": "Ma setax isir kuntatt mas-servizz tar-reviżjoni tal-kodiċi. Erġa' pprova r-reviżjoni meta s-servizz ikun disponibbli.",
+      "reviewFailed": "Ir-reviżjoni falliet. Jekk jogħġbok, erġa' pprova.",
       "showMore": "Uri aktar",
       "created": "Maħluqa",
       "started": "Bdiet",
@@ -1599,7 +1605,8 @@
       "bugs": "Żbalji fil-kodiċi",
       "style": "Stil",
       "testing": "Ittestjar",
-      "documentation": "Dokumentazzjoni"
+      "documentation": "Dokumentazzjoni",
+      "unknown": "Ieħor ({{area}})"
     },
     "gateThreshold": {
       "warning": "Twissija"
@@ -2293,6 +2300,7 @@
       "prefillModelUnavailable": "{{model}} m'għadux disponibbli. Qed jintuża l-mudell prestabbilit tiegħek.",
       "couldNotReadPendingSessions": "Ma setgħux jinqraw is-sessjonijiet pendenti. Erġa' pprova.",
       "failedToCreate": "Ma setgħetx tinħoloq is-sessjoni.",
+      "checkOrganizationAccess": "Iċċekkja l-aċċess tiegħek għal din l-organizzazzjoni, imbagħad erġa' pprova.",
       "couldNotRefreshRepositories": "Ma setgħux jiġu aġġornati r-repożitorji. Erġa' pprova.",
       "discardDraftTitle": "Twarrab l-abbozz?",
       "discardDraftMessage": "L-istruzzjoni tiegħek se tintilef.",
@@ -2846,6 +2854,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Is-sessjonijiet attivi tiegħek ma jkunux disponibbli sakemm titgħabba d-dejta.",
     "currentDeviceUnidentified": "L-apparat attwali ma setax jiġi identifikat.",
+    "kiloApp": "Applikazzjoni ta' Kilo",
     "noSessions": "L-ebda sessjoni attiva",
     "noSessionsDescription": "Idħol bl-applikazzjoni ta' Kilo fuq apparat ieħor u s-sessjoni tidher hawn.",
     "onlyKiloAppSignIns": "Hawn jidhru biss is-sessjonijiet tal-applikazzjoni ta' Kilo. Is-sessjonijiet tal-editur u tal-CLI mhumiex elenkati.",
@@ -3001,6 +3010,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Qabel ma nibdew",
+    "summaryTitle": "Preferenzi tal-qsim tad-dejta",
     "introDescription": "Kilo jibgħat il-messaġġi tiegħek lill-fornituri tal-AI biex jiġġeneraw tweġibiet. Hawn tara x'naqsmu u ma' min.",
     "required": "Meħtieġ biex tuża Kilo",
     "promptsTitle": "L-istruzzjonijiet u l-konversazzjonijiet tiegħek",
@@ -3009,7 +3019,6 @@
     "accountDescription": "L-ID tal-kont tiegħek ta' Kilo u l-metadata tat-talbiet, użati biex tiġi vverifikata l-identità tiegħek u jitkejjel l-użu.",
     "diagnosticsTitle": "Dijanjostika tal-applikazzjoni",
     "diagnosticsDescription": "Rapporti ta' waqfien mhux mistenni u żbalji, mingħajr il-kontenut tal-applikazzjoni, użati biex l-applikazzjoni tibqa' stabbli.",
-    "optional": "Mhux obbligatorju",
     "helpImprove": "Għin biex jitjieb Kilo",
     "helpImproveDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni. Tista' tbiddel din l-għażla meta trid fis-settings.",
     "seeFullDetails": "Ara d-dettalji sħaħ",
@@ -3591,6 +3600,9 @@
     "localModels": {
       "title": "Mudelli fuq l-apparat",
       "help": "Il-mudelli fuq l-apparat jaħdmu fuq dan il-mowbajl. Il-messaġġi u t-tweġibiet tiegħek jibqgħu fuq l-apparat.",
+      "switchTitle": "Taqleb għal mudell fuq l-apparat?",
+      "switchMessage": "Meta taqleb għal {{name}}, l-istruzzjonijiet u l-kuntest ta' din il-konversazzjoni jiġu pproċessati fuq dan il-mowbajl, mhux fuq server remot.",
+      "switchConfirm": "Ibdel il-mudell",
       "systemPurpose": "Il-mudell mibni fis-sistema ta' dan l-apparat. Jaħdem fuq l-apparat.",
       "apple": "Apple Intelligence (fuq l-apparat)",
       "checking": "Qed tiġi ċċekkjata d-disponibbiltà…",
@@ -3687,7 +3699,6 @@
     "personalDefaultDescription": "Imgħabba awtomatikament meta l-ebda repożitorju ma jkollu profil ippinjat.",
     "organizationDefaultDescription": "Auto-loaded għal membri li m'għandhom l-ebda default personali.",
     "setAsDefault": "Issettja bħala default",
-    "removeDefault": "Neħħi bħala default",
     "saveFailed": "Ma setax isalva l-profil",
     "deleteTitle": "Ħassar il-profil",
     "deleteMessage": "Dan ineħħi b'mod permanenti l-profil u s-settings tiegħu. Dan ma jistax jitneħħa.",
@@ -3713,11 +3724,13 @@
     "commandsTitle": "Setup kmandi",
     "addCommand": "Żid kmand",
     "commandLabel": "Kmand",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "eż. pnpm install",
     "commandsEmpty": "S'issa l-ebda kmand tas-setup",
     "commandsSaveFailed": "Ma setgħetx tissejvja l-kmandi tas-setup",
     "moveUp": "Nimxu 'l fuq",
     "moveDown": "Nimxu 'l isfel",
+    "moveCommandUp": "Mexxi l-kmand {{position}} 'l fuq",
+    "moveCommandDown": "Mexxi l-kmand {{position}} 'l isfel",
     "skillsTitle": "Ħiliet",
     "addSkill": "Żid il-ħila",
     "skillNameLabel": "Isem tal-ħila",
@@ -3787,7 +3800,7 @@
       "nameRequired": "Daħħal isem ta' aġent",
       "slugRequired": "Daħħal aġent slug",
       "slugInvalid": "Slug għandu jibda b'ittra u juża biss ittri żgħar, ċifri u sings",
-      "slugConflict": "Dik slug hija riservata minn aġent inkorporat",
+      "slugConflict": "Dak is-slug diġà qed jintuża minn aġent integrat jew aġent ieħor f'dan il-profil",
       "edit": "Editja l-aġent"
     },
     "slashCommands": {

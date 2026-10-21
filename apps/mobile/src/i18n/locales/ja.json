@@ -943,6 +943,9 @@
       "gateHidden": "非表示",
       "gateNone": "なし",
       "noFindings": "指摘はありません。",
+      "findingsUnavailable": "このレビューが失敗したため、結果を表示できません。",
+      "serviceUnavailable": "コードレビューサービスに接続できませんでした。サービスが利用可能になったら、レビューを再試行してください。",
+      "reviewFailed": "レビューに失敗しました。もう一度お試しください。",
       "retryMessage": "コードレビューをもう一度実行します。",
       "retryReview": "レビューを再試行",
       "retryNeedsSettings": "コードレビュアーがオフになっているか、設定の確認が必要です。設定を修正してから、このレビューを再試行してください。",
@@ -1030,7 +1033,8 @@
       "bugs": "バグ",
       "style": "スタイル",
       "testing": "テスト",
-      "documentation": "ドキュメント"
+      "documentation": "ドキュメント",
+      "unknown": "その他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"
@@ -1697,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。",
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした。",
+      "checkOrganizationAccess": "この組織へのアクセス権を確認して、もう一度お試しください。",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardDraftMessage": "入力したプロンプトが削除されます。",
@@ -2217,6 +2222,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "読み込みが完了するまで、サインイン中のセッションは表示できません。",
     "currentDeviceUnidentified": "現在のデバイスを特定できませんでした。",
+    "kiloApp": "Kiloアプリ",
     "noSessions": "サインイン中のセッションはありません",
     "noSessionsDescription": "別のデバイスでKiloアプリにサインインすると、ここに表示されます。",
     "onlyKiloAppSignIns": "ここにはKiloアプリのサインインのみ表示されます。エディターとCLIのサインインは表示されません。",
@@ -2369,6 +2375,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "始める前に",
+    "summaryTitle": "データ共有の設定",
     "introDescription": "Kiloは応答を生成するために、メッセージをAIプロバイダーに送信します。共有する内容と共有先は以下のとおりです。",
     "required": "Kiloの利用に必要なデータ共有",
     "promptsTitle": "プロンプトと会話",
@@ -2377,7 +2384,6 @@
     "accountDescription": "KiloのアカウントIDとリクエストのメタデータを、認証と利用量の計測に使用します。",
     "diagnosticsTitle": "アプリの診断情報",
     "diagnosticsDescription": "アプリ内のコンテンツを除いたクラッシュやエラーのレポートを、アプリの安定性を保つために使用します。",
-    "optional": "任意",
     "helpImprove": "Kiloの改善に協力",
     "helpImproveDescription": "匿名の利用状況データとインストール元の情報を共有します。この設定はいつでも変更できます。",
     "seeFullDetails": "詳細を表示",
@@ -2502,7 +2508,8 @@
       "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
-      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
+      "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
+      "contextLine": "{{organization}}用"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
@@ -2929,7 +2936,9 @@
       "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが更新されていないか、自分が作成したプルリクエストではないか確認してください。",
       "reviewNotSubmittedTerm": "このレビューはそのまま送信できません。{{term}}が変更されたか、自分の{{term}}はレビューできません。",
       "couldNotPostComment": "コメントを投稿できませんでした。",
-      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
+      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。",
+      "rateLimited": "リクエストが多すぎます。しばらくしてからもう一度お試しください。",
+      "conflict": "作業中にこれが変更されました。読み込み直してもう一度お試しください。"
     },
     "operation": {
       "couldNotReply": "返信できませんでした。",
@@ -3468,6 +3477,9 @@
     "localModels": {
       "title": "オンデバイスモデル",
       "help": "オンデバイスモデルはこのスマートフォン上で動作します。プロンプトと返信はデバイス内にとどまります。",
+      "switchTitle": "オンデバイスモデルに切り替えますか？",
+      "switchMessage": "{{name}}に切り替えると、この会話のプロンプトとコンテキストがリモートサーバーではなく、このスマートフォン上で処理されます。",
+      "switchConfirm": "モデルを切り替える",
       "systemPurpose": "このデバイスのシステムに組み込まれたモデルです。デバイス上で動作します。",
       "apple": "Apple Intelligence（デバイス上）",
       "checking": "利用可能か確認中…",
@@ -3564,7 +3576,6 @@
     "personalDefaultDescription": "リポジトリに固定プロファイルがない場合に自動ロードされます。",
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
-    "removeDefault": "デフォルトとして削除",
     "saveFailed": "プロフィールを保存できませんでした",
     "deleteTitle": "プロフィールの削除",
     "deleteMessage": "これにより、プロファイルとその設定が完全に削除されます。これを元に戻すことはできません。",
@@ -3590,11 +3601,13 @@
     "commandsTitle": "セットアップコマンド",
     "addCommand": "コマンドの追加",
     "commandLabel": "指示",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "例: pnpm install",
     "commandsEmpty": "セットアップ コマンドはまだありません",
     "commandsSaveFailed": "セットアップコマンドを保存できませんでした",
     "moveUp": "上に移動",
     "moveDown": "下に移動",
+    "moveCommandUp": "コマンド{{position}}を上に移動",
+    "moveCommandDown": "コマンド{{position}}を下に移動",
     "skillsTitle": "スキル",
     "addSkill": "スキルの追加",
     "skillNameLabel": "スキル名",
@@ -3664,7 +3677,7 @@
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",
       "slugInvalid": "スラグは文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
-      "slugConflict": "そのスラッグは組み込みエージェントによって予約されています",
+      "slugConflict": "そのスラッグは組み込みエージェントまたはこのプロファイルの別のエージェントが既に使用しています",
       "edit": "エージェントの編集"
     },
     "slashCommands": {

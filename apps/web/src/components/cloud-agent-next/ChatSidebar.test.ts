@@ -28,7 +28,8 @@ jest.mock('@/components/ui/tooltip', () => {
   return {
     Tooltip: passthrough,
     TooltipTrigger: passthrough,
-    TooltipContent: passthrough,
+    TooltipContent: ({ children, className }: { children?: ReactNode; className?: string }) =>
+      react.createElement('div', { role: 'tooltip', className }, children),
     TooltipProvider: passthrough,
   };
 });
@@ -236,10 +237,40 @@ describe('ChatSidebar row rendering', () => {
     expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).not.toBeNull();
   });
 
+  it('provides the full workspace title in a wrapping tooltip on its open button', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_tooltip' });
+    const title = 'Cloud Agent sidebar session titles should remain readable when truncated';
+    const onOpenSession = jest.fn();
+    renderSidebar({
+      sessions: [session],
+      onOpenSession,
+      worktreeDetails: {
+        worktree_tooltip: { name: title, defaultTitle: null, prSession: null, sessions: [] },
+      },
+    });
+
+    const row = dom.container.querySelector('[data-worktree-id="worktree_tooltip"]');
+    const tooltip = row?.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toBe(title);
+    expect(tooltip?.className).toContain('max-w-xs');
+    expect(tooltip?.className).toContain('break-words');
+
+    const button = row?.querySelector<HTMLButtonElement>(
+      `button[aria-label="Open worktree ${title}"]`
+    );
+    expect(button?.querySelector('.line-clamp-1')?.textContent).toBe(title);
+    act(() => button?.click());
+    expect(onOpenSession).toHaveBeenCalledWith(session.sessionId);
+
+    renderSidebar({ sessions: [session] });
+    expect(row?.querySelector('[role="tooltip"]')?.textContent).toBe(session.repository);
+  });
+
   it('waits for the worktree name instead of flashing a repository label', () => {
     const session = makeSession(0, { worktreeId: 'worktree_loading' });
     renderSidebar({ sessions: [session], loadingWorktreeIds: ['worktree_loading'] });
     const row = dom.container.querySelector('[data-worktree-id="worktree_loading"]');
+    expect(row?.querySelector('[role="tooltip"]')).toBeNull();
     expect(row?.textContent).not.toContain(session.repository);
     expect(
       row?.querySelector('button[aria-label="Open worktree Loading worktree…"]')

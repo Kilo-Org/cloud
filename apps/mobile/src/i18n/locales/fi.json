@@ -2840,7 +2840,7 @@
     "allow": "Salli",
     "start": "Aloita puheentunnistus",
     "stop": "Lopeta puheentunnistus",
-    "restricted": "Puheentunnistuksen käyttöä on rajoitettu tässä laitteessa.",
+    "restricted": "Puheentunnistuksen käyttöä on rajoitettu tällä laitteella.",
     "micRequired": "Puheentunnistus tarvitsee mikrofonin käyttöoikeuden.",
     "micOff": "Mikrofonin käyttö on estetty. Salli se laitteen asetuksissa, jotta voit käyttää puheentunnistusta.",
     "micOffTitle": "Mikrofonin käyttö on estetty",
@@ -2848,8 +2848,8 @@
     "needsConnection": "Puheentunnistus tarvitsee tällä hetkellä verkkoyhteyden. Yritä uudelleen.",
     "busy": "Puheentunnistus on varattu. Yritä uudelleen.",
     "stopped": "Puheentunnistus keskeytyi. Yritä uudelleen napauttamalla mikrofonia.",
-    "unavailableDevice": "Puheentunnistus ei ole käytettävissä tässä laitteessa.",
-    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä laitteen nykyisellä kielellä.",
+    "unavailableDevice": "Puheentunnistus ei ole käytettävissä tällä laitteella.",
+    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä laitteen nykyisellä kielellä. Asenna kielen offline-puhetiedostot tai käytä toista sovelluksen kieltä.",
     "languageNotInstalledTitle": "Puheentunnistus ei ole vielä valmis kielelle {{language}}",
     "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostoja ei ole asennettu tähän puhelimeen. Lataa ne ja kokeile puheentunnistusta uudelleen.",
     "downloadOfflineModel": "Lataa",
@@ -3271,7 +3271,7 @@
     "remoteOptionTitle": "Tietokoneesi",
     "remoteOptionBody": "Suorita Kilo omalla koneellasi `kilo remote` -CLI:n kautta.",
     "skip": "Ohita esittely",
-    "tutorialLabel": "Käyttöopas"
+    "tutorialLabel": "Esittely"
   },
   "modelChat": {
     "offlineFailure": "Tämä malli tarvitsee internetyhteyden. Muodosta yhteys ja yritä uudelleen tai vaihda tämän laitteen malliin.",
@@ -3554,7 +3554,7 @@
   "spendAlerts": {
     "subtitle": "Lähetä laskutusyhteyshenkilöille sähköposti- tai push-varoitus, kun tämän alueen kulutus ylittää rajan tai nousee tavanomaisen tuntitahdin yläpuolelle.",
     "thresholdTitle": "Rajan ylitys",
-    "thresholdSubtitle": "Juokseva kulutus ylittää rajasi",
+    "thresholdSubtitle": "Tämän alueen juokseva kulutus valitulla ajanjaksolla ylittää rajasi",
     "anomalyTitle": "Tunneittainen piikki",
     "anomalySubtitle": "Yksi tunti on selvästi tämän alueen tavanomaista tahtia korkeampi",
     "limitLabel": "Raja (USD)",
@@ -3774,10 +3774,10 @@
       "couldNotLoad": "Listoja ei voitu ladata",
       "noRepository": "Ei koodivarastoa",
       "rowA11y": "{{name}}, {{openCount}}",
-      "openCount_one": "{{count}} avoinna",
-      "openCount_other": "{{count}} avoinna",
+      "openCount_one": "{{count}} avoin",
+      "openCount_other": "{{count}} avointa",
       "archived_one": "Arkistoitu ({{count}})",
-      "archived_other": "Arkistoitu ({{count}})",
+      "archived_other": "Arkistoidut ({{count}})",
       "archive": "Arkistoi",
       "unarchive": "Palauta arkistosta",
       "deleteTitle": "Poistetaanko {{name}}?",
@@ -3787,7 +3787,7 @@
       "title": "Listan asetukset",
       "name": "Nimi",
       "namePlaceholder": "Virheet, ideat, julkaisu…",
-      "emoji": "emoji",
+      "emoji": "Emoji",
       "mode": "Tila",
       "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia."
     },
@@ -3797,7 +3797,7 @@
       "empty": "Ei vielä tehtäviä",
       "setDefaults": "Aseta koodivarasto, tila ja malli",
       "completed_one": "Valmis ({{count}})",
-      "completed_other": "Valmis ({{count}})"
+      "completed_other": "Valmiit ({{count}})"
     },
     "item": {
       "markDone": "Merkitse valmiiksi",

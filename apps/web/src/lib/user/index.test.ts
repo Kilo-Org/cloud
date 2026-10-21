@@ -859,6 +859,232 @@ describe('User', () => {
       jest.restoreAllMocks();
     });
 
+    it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {
+      const email = 'native-admission-refused@example.com';
+      const verifyAdmission = jest.fn().mockResolvedValue(false);
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Unverified',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.68' }),
+        undefined,
+        undefined,
+        true,
+        verifyAdmission
+      );
+
+      expect(result).toEqual({ success: false, error: 'ADMISSION_REQUIRED' });
+      expect(verifyAdmission).toHaveBeenCalledTimes(1);
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, email),
+        })
+      ).toBeUndefined();
+    });
+
+    it('refuses missing native admission before calling the signup bouncer', async () => {
+      const email = 'native-admission-before-bouncer@example.com';
+      mockSignupDecide.mockResolvedValue(null);
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Unverified',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
+        undefined,
+        undefined,
+        true,
+        async () => false
+      );
+
+      expect(result).toEqual({ success: false, error: 'ADMISSION_REQUIRED' });
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+    });
+
+    it('does not require native signup admission for an existing account', async () => {
+      const email = 'native-admission-existing@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Existing',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      };
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.69' });
+      const created = await createOrUpdateUser(args, undefined, true, headers);
+      expect(created.success).toBe(true);
+      const verifyAdmission = jest.fn().mockResolvedValue(false);
+
+      const signedIn = await createOrUpdateUser(
+        args,
+        undefined,
+        true,
+        headers,
+        undefined,
+        undefined,
+        true,
+        verifyAdmission
+      );
+
+      expect(signedIn.success).toBe(true);
+      if (!signedIn.success) return;
+      expect(signedIn.isNew).toBe(false);
+      expect(verifyAdmission).not.toHaveBeenCalled();
+    });
+
+    describe('while email signups are disabled', () => {
+      const emailArgs = (email: string) => ({
+        google_user_email: email,
+        google_user_name: 'Email User',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      });
+      const headers = () => new Headers({ 'x-forwarded-for': '203.0.113.90' });
+
+      afterEach(() => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+      });
+
+      it('refuses a new email account before Bouncer, Stripe, or user creation', async () => {
+        const email = 'email-signup-disabled-new@example.com';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-SIGNUP-DISABLED' });
+        expect(mockSignupDecide).not.toHaveBeenCalled();
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+      });
+
+      it('signs in an existing email user', async () => {
+        const email = 'email-signup-disabled-existing@example.com';
+        const created = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('links email to an existing OAuth user on their first magic link', async () => {
+        const email = 'email-signup-disabled-oauth@example.com';
+        const created = await createOrUpdateUser(
+          {
+            ...emailArgs(email),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled',
+          },
+          undefined,
+          false,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        if (!created.success) return;
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.user.id).toBe(created.user.id);
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('keeps EMAIL-ALREADY-USED for a normalized match of an existing account', async () => {
+        const created = await createOrUpdateUser(
+          emailArgs('emailsignupdisabledalias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('email.signup.disabled.alias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+      });
+
+      it('refuses a case variant of a legacy account without a normalized email', async () => {
+        await insertTestUser({
+          id: 'email-signup-disabled-legacy',
+          google_user_email: 'Legacy.Case@Example.com',
+          normalized_email: null,
+        });
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('legacy.case@example.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, 'legacy.case@example.com'),
+          })
+        ).toBeUndefined();
+      });
+
+      it('still creates a new OAuth account', async () => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          {
+            ...emailArgs('email-signup-disabled-google-new@example.com'),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled-new',
+          },
+          undefined,
+          false,
+          headers()
+        );
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.isNew).toBe(true);
+      });
+    });
+
     it.each([
       { name: 'IP rejection', flags: [{ name: 'signup:burst', source: 'ip' }] },
       { name: 'JA4 rejection', flags: [{ name: 'signup:ja4', source: 'ja4' }] },

@@ -34,9 +34,19 @@ const query = vi.hoisted(() => ({
   isFetching: false,
   refetch: vi.fn(),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: vi.fn() }),
+  useFocusEffect: (effect: () => void): void => {
+    effect();
+  },
+}));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  ScrollView: 'ScrollView',
+  Pressable: 'Pressable',
+  BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
@@ -56,6 +66,10 @@ vi.mock('@/components/ui/radio-group', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Lock: 'Lock' }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.fn() } }));
 vi.mock('@/lib/analytics/posthog', () => ({
@@ -69,14 +83,24 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isActiveOrgMember: (member: { status: string }) => member.status === 'active',
   isMoneyRole: (role: string) => role === 'owner' || role === 'billing_manager',
 }));
-const updateMember = vi.hoisted(() => ({
-  mutate: vi.fn(),
-  isError: false,
-  isPending: false,
-  error: null as Error | null,
-}));
+const mutations = vi.hoisted(() => {
+  const updateMember = {
+    mutate: vi.fn(),
+    isError: false,
+    isPending: false,
+    error: null as Error | null,
+  };
+  return {
+    updateMember,
+    current: {
+      invite: { isPending: false, isError: false, mutate: vi.fn() },
+      updateMember,
+    },
+  };
+});
+const updateMember = mutations.updateMember;
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
-  useOrganizationMutations: () => ({ updateMember }),
+  useOrganizationMutations: () => mutations.current,
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ email: 'test@example.com' }),
@@ -140,6 +164,18 @@ describe('organization sheet surfaces', () => {
       unmount();
     }
   );
+
+  it('keeps Cancel usable on an empty invite, so the sheet can be left', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(InviteMemberSheet));
+    const header = renderer.root.find(node => String(node.type) === 'SheetHeader');
+    // The stub keeps the component's own props untyped; only these two are read.
+    const headerProps = header.props as { disabled?: boolean; doneDisabled?: boolean };
+    // The route no longer dismisses by a swipe, so an empty form must still be
+    // closeable through Cancel.
+    expect(headerProps.disabled).toBe(false);
+    expect(headerProps.doneDisabled).toBe(true);
+    unmount();
+  });
 
   it.each([...sheets, { name: 'invite', element: createElement(InviteMemberSheet) }])(
     'keeps $name permission denial outside a scroller',

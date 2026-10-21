@@ -359,6 +359,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 requireModelInCurrentSnapshot: true,
                 providerAllowList: settingsUpdate.provider_allow_list,
                 modelDenyList: settingsUpdate.model_deny_list ?? [],
+                customLlmGrantee: { organizationId: organization.id, groupIds: [] },
               });
               if (!(await isAllowed(currentSettings.default_model))) {
                 settingsUpdate.default_model = undefined;

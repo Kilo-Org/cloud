@@ -448,7 +448,7 @@ export function buildGlanceableLiveActivityContentState(
     status: snapshot.status,
     running: snapshot.running,
     needsInput: snapshot.needsInput,
-    needsApproval: snapshot.needsApproval ?? 0,
+    needsApproval: snapshot.needsApproval,
     idle: snapshot.idle,
     updatedAt: snapshot.updatedAt,
     needsInputSince: snapshot.needsInputSince,

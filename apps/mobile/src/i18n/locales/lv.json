@@ -2344,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} atbilstība",
       "matchesBadge_other": "{{displayCount}} atbilstības",
       "matchesBadge_zero": "{{displayCount}} atbilstību",
-      "noOutput": "Nav izvades."
+      "noOutput": "Nav izvades.",
+      "translationFailed": "Tulkojums neizdevās"
     },
     "readToolMarkdown": {
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",

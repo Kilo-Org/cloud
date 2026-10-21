@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} បន្ទាត់",
       "matchesBadge_one": "ត្រូវគ្នា {{displayCount}}",
       "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}",
-      "noOutput": "គ្មានលទ្ធផលទេ។"
+      "noOutput": "គ្មានលទ្ធផលទេ។",
+      "translationFailed": "ការបកប្រែបរាជ័យ"
     },
     "readToolMarkdown": {
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",

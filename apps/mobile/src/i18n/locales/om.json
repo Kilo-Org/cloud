@@ -2312,7 +2312,8 @@
       "linesBadge_other": "Sarara {{displayCount}}",
       "matchesBadge_one": "Walsimsiisota {{displayCount}}",
       "matchesBadge_other": "Walsimsiisota {{displayCount}}",
-      "noOutput": "Bu'aan hin jiru."
+      "noOutput": "Bu'aan hin jiru.",
+      "translationFailed": "Hiikkaachuun kufe"
     },
     "readToolMarkdown": {
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",

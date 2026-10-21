@@ -2376,7 +2376,8 @@
       "matchesBadge_other": "atitikčių: {{displayCount}}",
       "matchesBadge_few": "atitiktys: {{displayCount}}",
       "matchesBadge_many": "atitikčių: {{displayCount}}",
-      "noOutput": "Nėra išvesties."
+      "noOutput": "Nėra išvesties.",
+      "translationFailed": "Vertimas nepavyko"
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",

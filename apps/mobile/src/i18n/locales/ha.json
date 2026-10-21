@@ -2312,7 +2312,8 @@
       "linesBadge_other": "layuka {{displayCount}}",
       "matchesBadge_one": "sakamako {{displayCount}}",
       "matchesBadge_other": "sakamako {{displayCount}}",
-      "noOutput": "Babu fitarwa."
+      "noOutput": "Babu fitarwa.",
+      "translationFailed": "Fassarar ta kasa"
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",

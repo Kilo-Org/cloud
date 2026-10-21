@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}}行",
       "matchesBadge_one": "{{displayCount}}件",
       "matchesBadge_other": "{{displayCount}}件",
-      "noOutput": "出力はありません。"
+      "noOutput": "出力はありません。",
+      "translationFailed": "翻訳に失敗しました"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",

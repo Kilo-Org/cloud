@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ਲਾਈਨਾਂ",
       "matchesBadge_one": "{{displayCount}} ਮੇਲ",
       "matchesBadge_other": "{{displayCount}} ਮੇਲ",
-      "noOutput": "ਕੋਈ ਆਉਟਪੁੱਟ ਨਹੀਂ ਹੈ।"
+      "noOutput": "ਕੋਈ ਆਉਟਪੁੱਟ ਨਹੀਂ ਹੈ।",
+      "translationFailed": "ਅਨੁਵਾਦ ਅਸਫਲ ਰਿਹਾ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ਲਾਈਨਾਂ {{start}}–{{end}} (ਪੂਰੀ ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਗਈ)",

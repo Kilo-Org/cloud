@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} வரிகள்",
       "matchesBadge_one": "{{displayCount}} பொருத்தம்",
       "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்",
-      "noOutput": "வெளியீடு இல்லை."
+      "noOutput": "வெளியீடு இல்லை.",
+      "translationFailed": "மொழிபெயர்ப்பு தோல்வியடைந்தது"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} வரிகள் (முழுவதும் காட்டப்படவில்லை)",

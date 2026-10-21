@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} sadar",
       "matchesBadge_one": "{{displayCount}} natiijo",
       "matchesBadge_other": "{{displayCount}} natiijo",
-      "noOutput": "Wax soo saar ma jiro."
+      "noOutput": "Wax soo saar ma jiro.",
+      "translationFailed": "Tarjumaadu fashilantay"
     },
     "readToolMarkdown": {
       "linesTruncated": "sadarrada {{start}}–{{end}} (la soo gaabiyay)",

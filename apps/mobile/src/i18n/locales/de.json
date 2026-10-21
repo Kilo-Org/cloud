@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} Zeilen",
       "matchesBadge_one": "{{displayCount}} Treffer",
       "matchesBadge_other": "{{displayCount}} Treffer",
-      "noOutput": "Keine Ausgabe."
+      "noOutput": "Keine Ausgabe.",
+      "translationFailed": "Übersetzung fehlgeschlagen"
     },
     "readToolMarkdown": {
       "linesTruncated": "zeilen {{start}}–{{end}} (gekürzt)",

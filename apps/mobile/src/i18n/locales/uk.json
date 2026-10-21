@@ -1829,7 +1829,8 @@
       "matchesBadge_other": "збігів: {{displayCount}}",
       "matchesBadge_few": "збіги: {{displayCount}}",
       "matchesBadge_many": "збігів: {{displayCount}}",
-      "noOutput": "Немає виводу."
+      "noOutput": "Немає виводу.",
+      "translationFailed": "Не вдалося перекласти"
     },
     "readToolMarkdown": {
       "linesTruncated": "рядки {{start}}–{{end}} (скорочено)",

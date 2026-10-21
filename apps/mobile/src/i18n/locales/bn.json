@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}}টি লাইন",
       "matchesBadge_one": "{{displayCount}}টি মিল",
       "matchesBadge_other": "{{displayCount}}টি মিল",
-      "noOutput": "কোনো আউটপুট নেই।"
+      "noOutput": "কোনো আউটপুট নেই।",
+      "translationFailed": "অনুবাদ ব্যর্থ হয়েছে"
     },
     "readToolMarkdown": {
       "linesTruncated": "লাইন {{start}}–{{end}} (আংশিক দেখানো হয়েছে)",

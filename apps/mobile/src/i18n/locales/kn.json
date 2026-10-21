@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ಸಾಲುಗಳು",
       "matchesBadge_one": "{{displayCount}} ಹೊಂದಾಣಿಕೆ",
       "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
-      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ."
+      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ.",
+      "translationFailed": "ಅನುವಾದ ವಿಫಲವಾಗಿದೆ"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} ಸಾಲುಗಳು (ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ)",

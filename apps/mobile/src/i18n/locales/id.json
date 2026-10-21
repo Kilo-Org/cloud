@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} baris",
       "matchesBadge_one": "{{displayCount}} kecocokan",
       "matchesBadge_other": "{{displayCount}} kecocokan",
-      "noOutput": "Tidak ada keluaran."
+      "noOutput": "Tidak ada keluaran.",
+      "translationFailed": "Terjemahan gagal"
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",

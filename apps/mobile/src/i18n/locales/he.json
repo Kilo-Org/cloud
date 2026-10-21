@@ -1813,7 +1813,8 @@
       "matchesBadge_one": "{{displayCount}} התאמה",
       "matchesBadge_other": "{{displayCount}} התאמות",
       "matchesBadge_two": "{{displayCount}} התאמות",
-      "noOutput": "אין פלט."
+      "noOutput": "אין פלט.",
+      "translationFailed": "התרגום נכשל"
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",

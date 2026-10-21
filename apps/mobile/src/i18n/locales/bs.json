@@ -2344,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} podudaranje",
       "matchesBadge_other": "{{displayCount}} podudaranja",
       "matchesBadge_few": "{{displayCount}} podudaranja",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prijevod nije uspio"
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",

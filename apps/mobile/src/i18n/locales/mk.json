@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} редови",
       "matchesBadge_one": "{{displayCount}} совпаѓање",
       "matchesBadge_other": "{{displayCount}} совпаѓања",
-      "noOutput": "Нема излез."
+      "noOutput": "Нема излез.",
+      "translationFailed": "Преводот не успеа"
     },
     "readToolMarkdown": {
       "linesTruncated": "редови {{start}}–{{end}} (скратено)",

@@ -1829,7 +1829,8 @@
       "matchesBadge_other": "совпадений: {{displayCount}}",
       "matchesBadge_few": "совпадения: {{displayCount}}",
       "matchesBadge_many": "совпадений: {{displayCount}}",
-      "noOutput": "Нет вывода."
+      "noOutput": "Нет вывода.",
+      "translationFailed": "Не удалось перевести"
     },
     "readToolMarkdown": {
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",

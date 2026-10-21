@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}}줄",
       "matchesBadge_one": "{{displayCount}}건 일치",
       "matchesBadge_other": "{{displayCount}}건 일치",
-      "noOutput": "출력이 없습니다."
+      "noOutput": "출력이 없습니다.",
+      "translationFailed": "번역 실패"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}줄 (일부 생략)",

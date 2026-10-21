@@ -2312,7 +2312,8 @@
       "linesBadge_other": "Andalana {{displayCount}}",
       "matchesBadge_one": "Valiny mifanaraka {{displayCount}}",
       "matchesBadge_other": "Valiny mifanaraka {{displayCount}}",
-      "noOutput": "Tsy misy vokatra."
+      "noOutput": "Tsy misy vokatra.",
+      "translationFailed": "Tsy nahomby ny fandikana"
     },
     "readToolMarkdown": {
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",

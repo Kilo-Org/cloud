@@ -2408,7 +2408,8 @@
       "matchesBadge_two": "{{displayCount}} riżultati",
       "matchesBadge_few": "{{displayCount}} riżultati",
       "matchesBadge_many": "{{displayCount}} riżultati",
-      "noOutput": "M'hemm l-ebda ħruġ."
+      "noOutput": "M'hemm l-ebda ħruġ.",
+      "translationFailed": "It-traduzzjoni falliet"
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",

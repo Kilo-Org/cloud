@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} სტრიქონი",
       "matchesBadge_one": "{{displayCount}} დამთხვევა",
       "matchesBadge_other": "{{displayCount}} დამთხვევა",
-      "noOutput": "გამოსავალი არ არის."
+      "noOutput": "გამოსავალი არ არის.",
+      "translationFailed": "თარგმანი ვერ შესრულდა"
     },
     "readToolMarkdown": {
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",

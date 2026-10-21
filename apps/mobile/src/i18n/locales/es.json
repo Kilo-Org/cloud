@@ -1813,7 +1813,8 @@
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
       "matchesBadge_many": "{{displayCount}} coincidencias",
-      "noOutput": "No hay salida."
+      "noOutput": "No hay salida.",
+      "translationFailed": "Error al traducir"
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",

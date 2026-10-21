@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} na linya",
       "matchesBadge_one": "{{displayCount}} tugma",
       "matchesBadge_other": "{{displayCount}} tugma",
-      "noOutput": "Walang output."
+      "noOutput": "Walang output.",
+      "translationFailed": "Nabigo ang pagsasalin"
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",

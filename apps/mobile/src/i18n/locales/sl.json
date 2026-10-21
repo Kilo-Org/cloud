@@ -2376,7 +2376,8 @@
       "matchesBadge_other": "{{displayCount}} zadetkov",
       "matchesBadge_two": "{{displayCount}} zadetka",
       "matchesBadge_few": "{{displayCount}} zadetki",
-      "noOutput": "Ni izhoda."
+      "noOutput": "Ni izhoda.",
+      "translationFailed": "Prevod ni uspel"
     },
     "readToolMarkdown": {
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",

@@ -2376,7 +2376,8 @@
       "matchesBadge_other": "zhody: {{displayCount}}",
       "matchesBadge_few": "zhody: {{displayCount}}",
       "matchesBadge_many": "zhôd: {{displayCount}}",
-      "noOutput": "Žiadny výstup."
+      "noOutput": "Žiadny výstup.",
+      "translationFailed": "Preklad sa nepodaril"
     },
     "readToolMarkdown": {
       "linesTruncated": "riadky {{start}}–{{end}} (skrátené)",

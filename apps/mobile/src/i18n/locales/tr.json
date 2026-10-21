@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} satır",
       "matchesBadge_one": "{{displayCount}} eşleşme",
       "matchesBadge_other": "{{displayCount}} eşleşme",
-      "noOutput": "Çıktı yok."
+      "noOutput": "Çıktı yok.",
+      "translationFailed": "Çeviri başarısız oldu"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",

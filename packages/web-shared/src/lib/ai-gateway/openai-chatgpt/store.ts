@@ -428,21 +428,6 @@ export async function markOpenAiChatGptConnectionErrored(
 }
 
 /**
- * Terminal-failure write for callers outside a transaction. A missing row is a
- * no-op. The refresh path uses `markOpenAiChatGptConnectionErrored` directly so
- * the write stays inside the row lock.
- */
-export async function markOpenAiChatGptError(
-  owner: OpenAiChatGptOwner,
-  message: string
-): Promise<void> {
-  const connection = await getOpenAiChatGptConnection(owner);
-  if (!connection) return;
-
-  await markOpenAiChatGptConnectionErrored(db, owner, connection, message);
-}
-
-/**
  * Records OpenAI's refusal of the connected account. Only the connection whose
  * access token served the refused request is marked: a reconnect that landed
  * while the request was in flight can hold a different, eligible account, and

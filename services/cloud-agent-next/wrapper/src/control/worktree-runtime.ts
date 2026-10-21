@@ -5,7 +5,10 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
-import type { ControlPlaneRouteSpec } from '../../../src/shared/control-plane-protocol.js';
+import type {
+  ControlPlaneRouteSpec,
+  ControlPlaneSessionCredentialsPayload,
+} from '../../../src/shared/control-plane-protocol.js';
 import {
   GITHUB_REVIEW_MCP_BINARY,
   GITHUB_REVIEW_MCP_SERVER_NAME,
@@ -320,7 +323,9 @@ export function buildWorktreeKiloEnvironment(
   environment: Record<string, string> = {},
   inherited: NodeJS.ProcessEnv = process.env,
   mcp?: SessionAttachPayload['mcp'],
-  runtimeConfig?: Pick<ControlPlaneRouteSpec, 'permission' | 'githubReviewTarget'>
+  runtimeConfig?: Pick<ControlPlaneRouteSpec, 'permission' | 'githubReviewTarget'> & {
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
+  }
 ): Record<string, string> {
   const env: Record<string, string> = {};
   const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
@@ -354,11 +359,25 @@ export function buildWorktreeKiloEnvironment(
         },
       },
     },
-    ...(mcp
+    ...(mcp || runtimeConfig?.cloudAgentMcp
       ? {
-          mcp: Object.fromEntries(
-            Object.entries(mcp).filter(([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME)
-          ),
+          mcp: {
+            ...Object.fromEntries(
+              Object.entries(mcp ?? {}).filter(
+                ([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME && name !== 'kilo-cloud-agent'
+              )
+            ),
+            ...(runtimeConfig?.cloudAgentMcp
+              ? {
+                  'kilo-cloud-agent': {
+                    type: 'remote',
+                    url: runtimeConfig.cloudAgentMcp.url,
+                    oauth: false,
+                    headers: { Authorization: `Bearer ${runtimeConfig.cloudAgentMcp.token}` },
+                  },
+                }
+              : {}),
+          },
         }
       : {}),
   });

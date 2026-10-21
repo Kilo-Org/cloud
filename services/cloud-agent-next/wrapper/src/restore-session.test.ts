@@ -1861,6 +1861,115 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(fs.existsSync(descendantMarker)).toBe(false);
   });
 
+  it('cleans up a CLI that hangs after confirming the requested session import', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stderr', 'unrelated diagnostic');
+        options?.onOutput?.('stdout', 'Imported ses');
+        options?.onOutput?.('stdout', `sion: ${SESSION_ID}\n`);
+        await new Promise<void>(resolve => {
+          options?.signal?.addEventListener('abort', () => resolve(), { once: true });
+        });
+        return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'abort' };
+      }
+    );
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        restoreFiles: false,
+      });
+      expect(result.ok).toBe(true);
+      expect(importProcess).toHaveBeenCalledTimes(1);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it.each(['other_session', `${SESSION_ID}_suffix`])(
+    'does not accept an import confirmation for %s instead of the requested session',
+    async reportedSession => {
+      mockFetchOk(makeSnapshot([]));
+      const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+        async (_command, _args, options) => {
+          options?.onOutput?.('stdout', `Imported session: ${reportedSession}\n`);
+          return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'timeout' };
+        }
+      );
+      try {
+        const result = await restoreSession(SESSION_ID, workspace);
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.subtype).toBe('kilo_import_timeout');
+      } finally {
+        importProcess.mockRestore();
+      }
+    }
+  );
+
+  it('terminates a real import child that stays alive after its committed-session marker', async () => {
+    mockFetchOk(makeSnapshot([]));
+    fs.writeFileSync(
+      path.join(binDir, 'kilo'),
+      `#!/bin/sh\nprintf 'Imported session: ${SESSION_ID}\\n'\nexec sleep 30\n`,
+      { mode: 0o755 }
+    );
+    const runProcess = processUtils.runProcess;
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      (command, args, options) =>
+        command === 'kilo'
+          ? runProcess('/bin/sh', [path.join(binDir, 'kilo'), ...args], options)
+          : runProcess(command, args, options)
+    );
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        restoreFiles: false,
+        importTimeoutMs: 10_000,
+        importTerminationGraceMs: 50,
+      });
+      expect(result.ok).toBe(true);
+      expect(Date.now() - startedAt).toBeLessThan(3_000);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it('does not treat a process cleanup error as a completed import', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stdout', `Imported session: ${SESSION_ID}\n`);
+        throw new Error('cleanup failed');
+      }
+    );
+    try {
+      const error = await restoreSession(SESSION_ID, workspace).catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(Error);
+      expect(String(error)).toContain('cleanup failed');
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it('does not turn caller cancellation into success after an import confirmation', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const controller = new AbortController();
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stdout', `Imported session: ${SESSION_ID}\n`);
+        controller.abort();
+        return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'abort' };
+      }
+    );
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        signal: controller.signal,
+      });
+      expect(result.ok).toBe(false);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
   it('strips transient lifecycle parts from the snapshot before kilo import', async () => {
     const capturePath = path.join(tmpDir, 'import-input.json');
     writeCapturingMockKilo(binDir, capturePath);

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one layout renders the bar, its six tabs and their press behavior; splitting it would scatter the bar's single source of truth */
 import * as Haptics from 'expo-haptics';
 import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
 import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
@@ -13,7 +14,6 @@ import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
-import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -24,6 +24,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { planProfileTabPress, type TabPressNavigation } from '@/lib/tab-press';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import {
   getEffectiveTabBarHeight,
@@ -334,13 +335,34 @@ export default function TabsLayout() {
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
+          listeners={({ navigation }: { navigation: TabPressNavigation }) => ({
             tabPress: event => {
               void Haptics.selectionAsync();
+              const profileStack = navigation
+                .getState()
+                ?.routes.find(route => route.name === '(3_profile)')?.state;
+              // The typed route union does not carry the tab group for every
+              // route; the check is a plain segment membership test.
+              const segmentList: readonly string[] = segments;
+              const plan = planProfileTabPress({
+                profileFocused: segmentList.includes('(3_profile)'),
+                segments: segmentList,
+                profileStackIndex: profileStack?.index,
+              });
+              // A cross-tab press and a sheet re-press are left to the
+              // navigator: the switch keeps the tab's stack and sheet, and a
+              // focused no-op needs no interception. Only the re-press that
+              // moves the tab to its root is ours — a pop, so the shared
+              // unsaved-changes guard can intercept and replay it.
+              if (plan !== 'reset-to-root') {
+                return;
+              }
               event.preventDefault();
-              router.navigate(PROFILE_TAB_ROOT);
+              if (profileStack?.key) {
+                navigation.dispatch({ type: 'POP_TO_TOP', target: profileStack.key });
+              }
             },
-          }}
+          })}
         />
       </Tabs>
     </StateSurfaceInsets>

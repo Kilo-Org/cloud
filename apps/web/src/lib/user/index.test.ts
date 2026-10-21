@@ -859,6 +859,100 @@ describe('User', () => {
       jest.restoreAllMocks();
     });
 
+    it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {
+      const email = 'native-admission-refused@example.com';
+      const verifyAdmission = jest.fn().mockResolvedValue(false);
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Unverified',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.68' }),
+        undefined,
+        undefined,
+        true,
+        verifyAdmission
+      );
+
+      expect(result).toEqual({ success: false, error: 'ADMISSION_REQUIRED' });
+      expect(verifyAdmission).toHaveBeenCalledTimes(1);
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, email),
+        })
+      ).toBeUndefined();
+    });
+
+    it('refuses missing native admission before calling the signup bouncer', async () => {
+      const email = 'native-admission-before-bouncer@example.com';
+      mockSignupDecide.mockResolvedValue(null);
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Unverified',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
+        undefined,
+        undefined,
+        true,
+        async () => false
+      );
+
+      expect(result).toEqual({ success: false, error: 'ADMISSION_REQUIRED' });
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+    });
+
+    it('does not require native signup admission for an existing account', async () => {
+      const email = 'native-admission-existing@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Existing',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      };
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.69' });
+      const created = await createOrUpdateUser(args, undefined, true, headers);
+      expect(created.success).toBe(true);
+      const verifyAdmission = jest.fn().mockResolvedValue(false);
+
+      const signedIn = await createOrUpdateUser(
+        args,
+        undefined,
+        true,
+        headers,
+        undefined,
+        undefined,
+        true,
+        verifyAdmission
+      );
+
+      expect(signedIn.success).toBe(true);
+      if (!signedIn.success) return;
+      expect(signedIn.isNew).toBe(false);
+      expect(verifyAdmission).not.toHaveBeenCalled();
+    });
+
     it.each([
       { name: 'IP rejection', flags: [{ name: 'signup:burst', source: 'ip' }] },
       { name: 'JA4 rejection', flags: [{ name: 'signup:ja4', source: 'ja4' }] },

@@ -28,7 +28,6 @@ import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
   getOpenAiChatGptStoredConnection,
-  markOpenAiChatGptError,
   openAiChatGptSharedServicesOwner,
   recordOpenAiChatGptConnectionPresence,
   saveOpenAiChatGptConnection,
@@ -277,35 +276,22 @@ describe('openai-chatgpt connection store', () => {
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toBeNull();
   });
 
-  it('markOpenAiChatGptError clears the token set and disables the connection', async () => {
-    await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
-
-    await markOpenAiChatGptError(USER_OWNER, 'Your ChatGPT connection has expired.');
-
-    const stored = await getOpenAiChatGptConnection(USER_OWNER);
-    expect(stored).toMatchObject({
+  it('clears a previous error state when the connection is saved again', async () => {
+    const errored = {
+      ...buildConnection(),
       access_token: '',
       expires_at: 0,
-      status: 'error',
-      error_message: 'Your ChatGPT connection has expired.',
+      status: 'error' as const,
+      error_message: 'expired',
+      error_at: new Date().toISOString(),
+    };
+    rows.push({
+      kilo_user_id: TEST_USER_ID,
+      organization_id: null,
+      encrypted_connection: encryptApiKey(JSON.stringify(errored), BYOK_ENCRYPTION_KEY),
+      is_enabled: false,
+      created_by: TEST_USER_ID,
     });
-    expect(stored?.refresh_token).toBeUndefined();
-    // The identity the card renders survives the cleared credential.
-    expect(stored?.email).toBe('user@example.com');
-    expect(stored?.error_at).toBeTruthy();
-    expect(rows[0].is_enabled).toBe(false);
-  });
-
-  it('markOpenAiChatGptError is a no-op when no row exists', async () => {
-    await markOpenAiChatGptError(USER_OWNER, 'Your ChatGPT connection has expired.');
-
-    expect(rows).toHaveLength(0);
-    expect(mockDb.update).not.toHaveBeenCalled();
-  });
-
-  it('clears a previous error state when the connection is saved again', async () => {
-    await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
-    await markOpenAiChatGptError(USER_OWNER, 'expired');
 
     await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
 

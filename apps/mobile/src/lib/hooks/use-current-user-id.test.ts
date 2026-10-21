@@ -12,13 +12,27 @@ const query = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => query }));
+const manager = vi.hoisted(() => ({ online: true }));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: () => query,
+  onlineManager: {
+    isOnline: () => manager.online,
+    subscribe: () => () => undefined,
+  },
+}));
+// The hook subscribes to the manager through `useSyncExternalStore`; this suite
+// calls hooks directly, so the mock reads the current snapshot.
+vi.mock('react', () => ({
+  useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown): unknown => getSnapshot(),
+}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ user: { getMe: { queryOptions: () => ({}) } } }),
 }));
 
 describe('useCurrentUserId', () => {
   beforeEach(() => {
+    manager.online = true;
     Object.assign(query, {
       data: undefined,
       error: null,
@@ -91,8 +105,9 @@ describe('useCurrentUserId', () => {
   });
 
   describe('isUnreachable', () => {
-    it('holds while the device is offline and the request waits for a connection', () => {
-      Object.assign(query, { fetchStatus: 'paused' });
+    it('holds at once when the manager reports offline, before the attempt settles', () => {
+      manager.online = false;
+      Object.assign(query, { isLoading: true, fetchStatus: 'fetching' });
 
       expect(useCurrentUserId().isUnreachable).toBe(true);
     });

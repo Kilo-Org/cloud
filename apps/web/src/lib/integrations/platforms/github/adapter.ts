@@ -187,6 +187,9 @@ const LISTING_PAGE_SIZE = 100;
 // the same bounded-scan convention the capped review scans use.
 const MAX_REPOSITORY_PAGES = 50; // 5,000 repositories
 const MAX_BRANCH_PAGES = 10; // 1,000 branches
+// Same ceiling as the bot's review-comment scan, so the two reads over the same
+// provider endpoint walk the same number of pages at most.
+const MAX_INLINE_COMMENT_PAGES = 5; // 500 inline review comments
 
 type ListingPage<T> = { items: T[]; hasNextPage?: boolean };
 
@@ -723,41 +726,29 @@ export async function fetchPRInlineComments(
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
-  const comments: Array<{
-    id: number;
-    path: string;
-    line: number | null;
-    body: string;
-    isOutdated: boolean;
-    user: { login: string };
-  }> = [];
+  const pages = await collectListingPages({
+    maxPages: MAX_INLINE_COMMENT_PAGES,
+    scope: `inline review comment listing for ${owner}/${repo}#${prNumber}`,
+    fetchPage: async page => {
+      const response = await octokit.pulls.listReviewComments({
+        owner,
+        repo,
+        pull_number: prNumber,
+        per_page: LISTING_PAGE_SIZE,
+        page,
+      });
+      return { items: response.data, hasNextPage: linkHasNextPage(response.headers.link) };
+    },
+  });
 
-  let page = 1;
-  const perPage = 100;
-
-  while (true) {
-    const { data } = await octokit.pulls.listReviewComments({
-      owner,
-      repo,
-      pull_number: prNumber,
-      per_page: perPage,
-      page,
-    });
-
-    comments.push(
-      ...data.map(c => ({
-        id: c.id,
-        path: c.path,
-        line: c.line ?? null,
-        body: c.body,
-        isOutdated: c.position === null, // null position = outdated
-        user: { login: c.user?.login ?? 'unknown' },
-      }))
-    );
-
-    if (data.length < perPage) break;
-    page++;
-  }
+  const comments = pages.map(c => ({
+    id: c.id,
+    path: c.path,
+    line: c.line ?? null,
+    body: c.body,
+    isOutdated: c.position === null, // null position = outdated
+    user: { login: c.user?.login ?? 'unknown' },
+  }));
 
   logExceptInTest('[fetchPRInlineComments] Fetched comments', {
     owner,

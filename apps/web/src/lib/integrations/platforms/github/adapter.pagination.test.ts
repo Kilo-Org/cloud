@@ -5,11 +5,13 @@
 const mockListBranches = jest.fn();
 const mockListReposAccessibleToInstallation = jest.fn();
 const mockGetRepo = jest.fn();
+const mockListReviewComments = jest.fn();
 
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
     apps: { listReposAccessibleToInstallation: mockListReposAccessibleToInstallation },
     repos: { get: mockGetRepo, listBranches: mockListBranches },
+    pulls: { listReviewComments: mockListReviewComments },
   })),
 }));
 jest.mock('@octokit/auth-app', () => ({
@@ -34,6 +36,7 @@ import {
   fetchGitHubBranches,
   fetchGitHubRepositories,
   fetchGitHubRepositoriesForMaintenance,
+  fetchPRInlineComments,
 } from './adapter';
 
 function branchPage(page: number, count: number, link?: string) {
@@ -158,6 +161,86 @@ describe('fetchGitHubRepositories pagination bounds', () => {
 
     expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(50);
     expect(repositories).toHaveLength(5000);
+    expect(warnExceptInTest).toHaveBeenCalledTimes(1);
+  });
+});
+
+function commentPage(page: number, count: number, link?: string) {
+  return {
+    data: Array.from({ length: count }, (_, index) => ({
+      id: page * 1000 + index,
+      path: `src/file-${index}.ts`,
+      line: index % 2 === 0 ? index + 1 : null,
+      body: `comment-${page}-${index}`,
+      position: index % 2 === 0 ? 1 : null,
+      user: { login: 'reviewer' },
+    })),
+    headers: link ? { link } : {},
+  };
+}
+
+describe('fetchPRInlineComments pagination bounds', () => {
+  it('stops at a fixed page count when the provider keeps returning full pages', async () => {
+    mockListReviewComments.mockImplementation(async ({ page }: { page: number }) =>
+      commentPage(page, 100)
+    );
+
+    const comments = await fetchPRInlineComments('123456', 'acme', 'repo', 7);
+
+    expect(mockListReviewComments).toHaveBeenCalledTimes(5);
+    expect(comments).toHaveLength(500);
+    expect(comments[0]).toEqual({
+      id: 1000,
+      path: 'src/file-0.ts',
+      line: 1,
+      body: 'comment-1-0',
+      isOutdated: false,
+      user: { login: 'reviewer' },
+    });
+    expect(comments[1]).toEqual({
+      id: 1001,
+      path: 'src/file-1.ts',
+      line: null,
+      body: 'comment-1-1',
+      isOutdated: true,
+      user: { login: 'reviewer' },
+    });
+    expect(warnExceptInTest).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops on a short page without reaching the ceiling', async () => {
+    mockListReviewComments
+      .mockImplementationOnce(async () => commentPage(1, 100))
+      .mockImplementationOnce(async () => commentPage(2, 4));
+
+    const comments = await fetchPRInlineComments('123456', 'acme', 'repo', 7);
+
+    expect(mockListReviewComments).toHaveBeenCalledTimes(2);
+    expect(comments).toHaveLength(104);
+    expect(warnExceptInTest).not.toHaveBeenCalled();
+  });
+
+  it('warns only when a full page at the ceiling still has a next page', async () => {
+    mockListReviewComments.mockImplementation(async ({ page }: { page: number }) =>
+      commentPage(
+        page,
+        100,
+        page < 5
+          ? `<https://api.github.com/x?page=${page + 1}>; rel="next"`
+          : '<https://api.github.com/x?page=1>; rel="first"'
+      )
+    );
+
+    await fetchPRInlineComments('123456', 'acme', 'repo', 7);
+    expect(mockListReviewComments).toHaveBeenCalledTimes(5);
+    expect(warnExceptInTest).not.toHaveBeenCalled();
+
+    jest.clearAllMocks();
+    mockListReviewComments.mockImplementation(async ({ page }: { page: number }) =>
+      commentPage(page, 100, `<https://api.github.com/x?page=${page + 1}>; rel="next"`)
+    );
+
+    await fetchPRInlineComments('123456', 'acme', 'repo', 7);
     expect(warnExceptInTest).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,54 +1,97 @@
 import type { StoredModel } from '@kilocode/db';
+import type {
+  OpenRouterModel,
+  OpenRouterModelsResponse,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
+  getRawOpenRouterModels: jest.fn(),
+}));
+
+function catalogModel(id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel {
+  return {
+    id,
+    name: id,
+    created: 0,
+    description: '',
+    architecture: { input_modalities: ['text'], output_modalities: ['text'], tokenizer: 'Other' },
+    top_provider: { is_moderated: false },
+    pricing,
+    context_length: 128_000,
+  };
+}
 
 describe('briefing model pricing', () => {
-  const alias: StoredModel = {
-    id: '~deepseek/deepseek-flash-latest',
-    name: 'DeepSeek Flash Latest',
-    alias_target: { slug: 'deepseek/test-flash' },
-    endpoints: [],
-  };
-  const target: StoredModel = {
-    id: 'deepseek/test-flash',
-    name: 'DeepSeek Flash',
-    endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
-  };
-
-  beforeEach(() => {
-    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
-      [alias.id]: alias,
-      [target.id]: target,
-    });
+  const aion = catalogModel('aion-labs/aion-3.5-mini', {
+    prompt: '0.0000007',
+    completion: '0.0000014',
   });
 
-  it('quotes the latest alias using the same spend bound as its priced target', async () => {
-    const quote = await briefingPriceBound(alias.id, 'Overnight activity', 2_000_000);
-    expect(quote).toEqual(await briefingPriceBound(target.id, 'Overnight activity', 2_000_000));
-    expect(quote.inputRate).toBe(0.000001);
-    expect(quote.outputRate).toBe(0.000002);
-    await expect(briefingPriceBound(alias.id, 'Overnight activity', 1)).rejects.toThrow(
+  beforeEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest
+      .mocked(getRawOpenRouterModels)
+      .mockResolvedValue({ data: [aion] } satisfies OpenRouterModelsResponse);
+  });
+
+  it('quotes a model the picker prices even when the snapshot does not carry it', async () => {
+    const quote = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
+
+    expect(quote.inputRate).toBe(0.0000007);
+    expect(quote.outputRate).toBe(0.0000014);
+    expect(quote.estimatedCost).toBeGreaterThan(0);
+    expect(quote.upperBound).toBeLessThanOrEqual(2_000_000);
+    await expect(briefingPriceBound(aion.id, 'Overnight activity', 1)).rejects.toThrow(
       'spend_limit_too_low'
     );
   });
 
-  it.each([undefined, { ...target, endpoints: [] }])(
-    'rejects an alias whose target has no priced routes',
-    async unavailableTarget => {
-      jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
-        [alias.id]: alias,
-        ...(unavailableTarget ? { [target.id]: unavailableTarget } : {}),
-      });
-      await expect(briefingPriceBound(alias.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
-        'model_pricing_unavailable'
-      );
-    }
-  );
+  it('rejects a model the picker does not price', async () => {
+    await expect(
+      briefingPriceBound('vendor/unlisted', 'Overnight activity', 2_000_000)
+    ).rejects.toThrow('model_pricing_unavailable');
+  });
+
+  it('rejects a picker price with unknown rates', async () => {
+    await expect(
+      briefingPriceBound('kilo-auto/frontier', 'Overnight activity', 2_000_000)
+    ).rejects.toThrow('invalid_model_pricing');
+  });
+
+  it('bounds a latest alias by the price of the target it resolves to', async () => {
+    const alias = catalogModel('~deepseek/deepseek-flash-latest', {
+      prompt: '0.000000049',
+      completion: '0.000000375',
+    });
+    const target = catalogModel('deepseek/deepseek-v4.1-flash', {
+      prompt: '0.0000001',
+      completion: '0.0000004',
+    });
+    jest
+      .mocked(getRawOpenRouterModels)
+      .mockResolvedValue({ data: [alias, target] } satisfies OpenRouterModelsResponse);
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [alias.id]: {
+        id: alias.id,
+        name: alias.name,
+        alias_target: { slug: target.id },
+        endpoints: [],
+      } satisfies StoredModel,
+    });
+
+    const quote = await briefingPriceBound(alias.id, 'Overnight activity', 2_000_000);
+
+    expect(quote.inputRate).toBe(0.0000001);
+    expect(quote.outputRate).toBe(0.0000004);
+  });
 });
 it('prioritizes completed outcome excerpts and preserves source links within an explicit untrusted-data boundary', () => {
   const starts = Array.from({ length: 20 }, (_, index) => ({

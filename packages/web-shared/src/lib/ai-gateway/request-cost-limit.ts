@@ -2,7 +2,10 @@ import { desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode/db';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { getModelDisplayPricing } from './providers/openrouter/display-pricing';
+import {
+  getModelDisplayPricing,
+  type EndpointPricing,
+} from './providers/openrouter/display-pricing';
 import {
   getVercelModelIdOverrides,
   mapResolvedModelIdToVercel,
@@ -10,27 +13,46 @@ import {
 import { getCustomPricing } from './custom-pricing.constants';
 import { findKiloExclusiveModel } from './kilo-exclusive-models';
 
+export type TextPricingRates = {
+  inputRate: number;
+  outputRate: number;
+  requestCost: number;
+};
+
+/**
+ * Per-token rates for a text request under one price: the prompt rate plus the
+ * worse of the cache read/write rates for input, the completion rate plus the
+ * reasoning rate for output, and the per-request fee.
+ */
+export function textPricingRates(pricing: EndpointPricing | undefined): TextPricingRates {
+  if (!pricing) throw new Error('Model has an unpriced route');
+  const values = [
+    pricing.prompt,
+    pricing.completion,
+    pricing.request ?? '0',
+    pricing.input_cache_write ?? '0',
+    pricing.input_cache_read ?? '0',
+    pricing.internal_reasoning ?? '0',
+  ].map(Number);
+  if (values.some(value => !Number.isFinite(value) || value < 0))
+    throw new Error('Model has invalid pricing');
+  return {
+    inputRate: values[0] + Math.max(values[3], values[4]),
+    outputRate: values[1] + values[5],
+    requestCost: values[2],
+  };
+}
+
 export function textRequestPriceCeiling(metadata: StoredModel) {
   if (metadata.endpoints.length === 0) throw new Error('Model pricing is unavailable');
   let inputRate = 0;
   let outputRate = 0;
   let requestCost = 0;
   for (const endpoint of metadata.endpoints) {
-    const price = getModelDisplayPricing(endpoint.pricing);
-    if (!price) throw new Error('Model has an unpriced route');
-    const values = [
-      price.prompt,
-      price.completion,
-      price.request ?? '0',
-      price.input_cache_write ?? '0',
-      price.input_cache_read ?? '0',
-      price.internal_reasoning ?? '0',
-    ].map(Number);
-    if (values.some(value => !Number.isFinite(value) || value < 0))
-      throw new Error('Model has invalid pricing');
-    inputRate = Math.max(inputRate, values[0] + Math.max(values[3], values[4]));
-    outputRate = Math.max(outputRate, values[1] + values[5]);
-    requestCost = Math.max(requestCost, values[2]);
+    const rates = textPricingRates(getModelDisplayPricing(endpoint.pricing));
+    inputRate = Math.max(inputRate, rates.inputRate);
+    outputRate = Math.max(outputRate, rates.outputRate);
+    requestCost = Math.max(requestCost, rates.requestCost);
   }
   const billedTiers = [
     ...(getCustomPricing(metadata.id)?.pricing ?? []),

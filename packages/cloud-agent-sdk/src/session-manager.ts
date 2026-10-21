@@ -3071,7 +3071,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       optimisticStorage?.deleteMessage(messageId);
       const mountedStorage = store.get(sessionStorageAtom);
       if (mountedStorage && mountedStorage !== optimisticStorage) {
-        mountedStorage.deleteMessage(messageId);
+        // Only the unconfirmed row is this send's. A confirmed record under the
+        // same id is server history the reopened transcript got from its page,
+        // and a failed response does not disprove it.
+        const mountedRow = mountedStorage.getMessageInfo(messageId);
+        if (mountedRow?.role === 'user' && mountedRow.synthetic === true) {
+          mountedStorage.deleteMessage(messageId);
+        }
       }
       remoteOptimisticIds.delete(messageId);
       if (insertedOptimisticRow && kiloSessionId) {

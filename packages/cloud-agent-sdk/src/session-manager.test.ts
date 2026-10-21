@@ -3148,6 +3148,49 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Draft for A');
     });
 
+    it('keeps a confirmed record under the same id when the chat is reopened mid-send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const storageAtSend = mockSession.storage;
+      expect(storageAtSend).not.toBeNull();
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Delivered', mode: 'code' },
+      });
+      const [messageId] = storageAtSend!.getMessageIds();
+      expect(messageId).toBeDefined();
+
+      // The server accepted the message before the response was lost, so the
+      // reopened chat holds the confirmed record under the id the client sent.
+      await mgr.switchSession(kiloId('ses-2'));
+      await mgr.switchSession(kiloId('ses-1'));
+      const mountedStorage = mockSession.storage;
+      if (!mountedStorage) throw new Error('expected session storage');
+      mountedStorage.upsertMessage(
+        stubUserMessage({
+          id: messageId!,
+          sessionID: 'ses-1',
+          time: { created: 2 },
+          agent: 'test-agent',
+          model: { providerID: 'test-provider', modelID: 'test-model' },
+        })
+      );
+
+      rejectSend!(new Error('ECONNRESET'));
+      await expect(sendPromise).resolves.toBe(false);
+
+      // Server history stays in the transcript; only an unconfirmed row is dropped.
+      expect(mountedStorage.getMessageInfo(messageId!)).toBeDefined();
+    });
+
     it('uses cloud-agent model override on send and clears it on switchSession', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

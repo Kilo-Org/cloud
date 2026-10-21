@@ -195,6 +195,44 @@ describe('GET /api/integrations/slack/callback workspace ownership', () => {
     expect(mockedRevokeSlackToken).toHaveBeenCalledWith(REJECTED_TOKEN);
   });
 
+  test('removes the installation when the recorded integration has no token', async () => {
+    mockAdapter();
+    mockedGetInstallationByTeamId.mockResolvedValue(
+      buildStoredIntegration({ metadata: { bot_user_id: 'U_EXISTING_OWNER' } })
+    );
+    mockedUpsertSlackInstallation.mockRejectedValue(
+      new SlackWorkspaceAlreadyConnectedError(TEAM_NAME)
+    );
+
+    const state = createProviderState();
+    const response = await callSlackCallback(
+      makeRequest(`/api/integrations/slack/callback?code=abc&state=${state}`)
+    );
+
+    expectRedirectLocation(response, '/integrations/slack?error=workspace_already_connected');
+    expect(mockSetInstallation).not.toHaveBeenCalled();
+    expect(mockDeleteInstallation).toHaveBeenCalledWith(TEAM_ID);
+    expect(mockedRevokeSlackToken).toHaveBeenCalledWith(REJECTED_TOKEN);
+  });
+
+  test('revokes the incoming token when removing the installation fails', async () => {
+    mockAdapter();
+    mockDeleteInstallation.mockRejectedValue(new Error('state unavailable'));
+    mockedGetInstallationByTeamId.mockResolvedValue(null);
+    mockedUpsertSlackInstallation.mockRejectedValue(
+      new SlackWorkspaceAlreadyConnectedError(TEAM_NAME)
+    );
+
+    const state = createProviderState();
+    const response = await callSlackCallback(
+      makeRequest(`/api/integrations/slack/callback?code=abc&state=${state}`)
+    );
+
+    expectRedirectLocation(response, '/integrations/slack?error=workspace_already_connected');
+    expect(mockedRevokeSlackToken).toHaveBeenCalledWith(REJECTED_TOKEN);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
   test('removes the installation when the recorded owner cannot be written', async () => {
     mockAdapter();
     mockSetInstallation.mockRejectedValue(new Error('state unavailable'));

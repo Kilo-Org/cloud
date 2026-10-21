@@ -48,11 +48,39 @@ function buildStoredSlackInstallation(integration: PlatformIntegration): SlackIn
 }
 
 /**
+ * Write the workspace installation recorded for the workspace, or remove the
+ * workspace installation when nothing is recorded.
+ */
+async function writeRecordedSlackInstallation({
+  slackAdapter,
+  teamId,
+  recordedInstallation,
+}: {
+  slackAdapter: SlackAdapter;
+  teamId: string;
+  recordedInstallation: SlackInstallation | null;
+}): Promise<void> {
+  if (!recordedInstallation) {
+    await slackAdapter.deleteInstallation(teamId);
+    return;
+  }
+
+  try {
+    await slackAdapter.setInstallation(teamId, recordedInstallation);
+  } catch (error) {
+    captureException(error, {
+      tags: { endpoint: 'slack/callback', source: 'slack_oauth', op: 'restore-installation' },
+      extra: { teamId },
+    });
+    await slackAdapter.deleteInstallation(teamId);
+  }
+}
+
+/**
  * Keep a workspace's Chat SDK installation attached to the owner recorded for
- * it. The workspace installation is rebuilt from the recorded integration and
- * written back; without a recorded integration the installation is removed.
- * A token that no installation is attached to is revoked. Workspace identity
- * links are left as they are.
+ * it, and revoke a token that ends up attached to no installation. Revocation
+ * runs whether or not the installation write succeeds. Workspace identity links
+ * are left as they are.
  */
 async function restoreRecordedSlackInstallation({
   slackAdapter,
@@ -67,23 +95,24 @@ async function restoreRecordedSlackInstallation({
   const recordedInstallation = recordedIntegration
     ? buildStoredSlackInstallation(recordedIntegration)
     : null;
+  const reusesRecordedToken = incomingInstallation.botToken === recordedInstallation?.botToken;
 
-  if (recordedInstallation) {
-    try {
-      await slackAdapter.setInstallation(teamId, recordedInstallation);
-    } catch (error) {
-      captureException(error, {
-        tags: { endpoint: 'slack/callback', source: 'slack_oauth', op: 'restore-installation' },
-        extra: { teamId },
-      });
-      await slackAdapter.deleteInstallation(teamId);
+  try {
+    await writeRecordedSlackInstallation({ slackAdapter, teamId, recordedInstallation });
+  } finally {
+    if (!reusesRecordedToken) {
+      const revoked = await revokeSlackToken(incomingInstallation.botToken);
+      if (!revoked) {
+        captureMessage(
+          'Slack token revocation did not complete while settling a workspace install',
+          {
+            level: 'warning',
+            tags: { endpoint: 'slack/callback', source: 'slack_oauth', op: 'revoke-token' },
+            extra: { teamId },
+          }
+        );
+      }
     }
-  } else {
-    await slackAdapter.deleteInstallation(teamId);
-  }
-
-  if (incomingInstallation.botToken !== recordedInstallation?.botToken) {
-    await revokeSlackToken(incomingInstallation.botToken);
   }
 }
 

@@ -35,6 +35,8 @@
     "connectGithub": "GitHub සම්බන්ධ කරන්න",
     "cost": "පිරිවැය",
     "discard": "ඉවතලන්න",
+    "discardChangesMessage": "ඔබගේ වෙනස්කම් නැති වී යයි.",
+    "discardChangesTitle": "වෙනස්කම් ඉවතලන්න?",
     "findings": "හඳුනාගත් ගැටලු",
     "mergeRequest": "මර්ජ ඉල්ලීම",
     "notConnected": "සම්බන්ධ නැත",
@@ -1661,7 +1663,14 @@
       "whereFound": "මෙය හමු වූ ස්ථාන ({{displayCount}})",
       "fullReport": "සැකසූ සම්පූර්ණ වාර්තාව",
       "yes": "ඔව්",
-      "no": "නැත"
+      "no": "නැත",
+      "action": {
+        "analyzeCodebase": "කේත පදනම විශ්ලේෂණය කරන්න",
+        "dismiss": "ප්‍රතික්ෂේප කරන්න",
+        "manualReview": "අතින් සමාලෝචනය",
+        "monitor": "නිරීක්ෂණය කරන්න",
+        "openPr": "PR විවෘත කරන්න"
+      }
     },
     "dashboard": {
       "findingsCount": "සොයාගැනීම් {{displayCount}} ක්",
@@ -1880,7 +1889,24 @@
       "title": "විගණන වාර්තාව",
       "unavailable": "විගණන වාර්තාව ලබාගත නොහැක",
       "unavailableDescription": "විගණන වාර්තා බැලිය හැක්කේ සංවිධාන හිමිකරුවන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි. ඔබට ප්‍රවේශය ලබා දෙන ලෙස හිමිකරුවෙකුගෙන් හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
-      "queryFailed": "වාර්තා විමසුම අවසන් වූයේ නැත. නැවත උත්සාහ කරන්න."
+      "queryFailed": "වාර්තා විමසුම අවසන් වූයේ නැත. නැවත උත්සාහ කරන්න.",
+      "eventActions": {
+        "findingAnalysisCompleted": "විශ්ලේෂණය සම්පූර්ණ විය",
+        "findingAnalysisFailed": "විශ්ලේෂණය අසාර්ථක විය",
+        "findingAutoDismissed": "ස්වයංක්‍රීයව ප්‍රතික්ෂේප කර ඇත",
+        "findingCreated": "ආයාත කර ඇත",
+        "findingDeleted": "මකා දමා ඇත",
+        "findingDismissed": "ප්‍රතික්ෂේප කර ඇත",
+        "findingSeverityChanged": "බරපතලත්වය වෙනස් විය",
+        "findingStatusChange": "තත්ත්වය වෙනස් විය",
+        "findingSuperseded": "ප්‍රතිස්ථාපනය කර ඇත",
+        "remediationBlocked": "පිළියම් යෙදීම අවහිර කර ඇත",
+        "remediationCancelled": "අවලංගු කර ඇත",
+        "remediationFailed": "පිළියම් යෙදීම අසාර්ථක විය",
+        "remediationNoChangesNeeded": "වෙනස්කම් අවශ්‍ය නොවේ",
+        "remediationPrOpened": "PR විවෘත කර ඇත",
+        "remediationQueued": "පිළියම් යෙදීමට ඉල්ලා ඇත"
+      }
     },
     "notifications": {
       "couldNotLoad": "දැනුම්දීම් සැකසුම් පූරණය කළ නොහැකි විය.",

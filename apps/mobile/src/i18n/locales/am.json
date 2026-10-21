@@ -35,6 +35,8 @@
     "connectGithub": "GitHubን አገናኝ",
     "cost": "ወጪ",
     "discard": "አስወግድ",
+    "discardChangesMessage": "ለውጦችህ ይጠፋሉ።",
+    "discardChangesTitle": "ለውጦችን አስወግድ፧",
     "findings": "ግኝቶች",
     "mergeRequest": "የማዋሃድ ጥያቄ",
     "notConnected": "አልተገናኘም",
@@ -1661,7 +1663,14 @@
       "whereFound": "የተገኘባቸው ቦታዎች ({{displayCount}})",
       "fullReport": "የተዘጋጀው ሙሉ ሪፖርት",
       "yes": "አዎ",
-      "no": "አይ"
+      "no": "አይ",
+      "action": {
+        "analyzeCodebase": "ኮድቤዙን ተንትን",
+        "dismiss": "ተወግድ",
+        "manualReview": "በተጠቃሚ የሚጀመር ግምገማ",
+        "monitor": "ተከታተል",
+        "openPr": "PR ክፈት"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ግኝቶች",
@@ -1880,7 +1889,24 @@
       "title": "የኦዲት ሪፖርት",
       "unavailable": "የኦዲት ሪፖርት አይገኝም",
       "unavailableDescription": "የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ የኦዲት ሪፖርቶችን መመልከት ይችላሉ። የማየት ፈቃድ እንዲሰጥዎ የድርጅት ባለቤትን ወይም የክፍያ አስተዳዳሪን ይጠይቁ።",
-      "queryFailed": "ሪፖርቱን የማምጣት ሂደት አልተጠናቀቀም። እንደገና ይሞክሩ።"
+      "queryFailed": "ሪፖርቱን የማምጣት ሂደት አልተጠናቀቀም። እንደገና ይሞክሩ።",
+      "eventActions": {
+        "findingAnalysisCompleted": "ትንተናው ተጠናቋል",
+        "findingAnalysisFailed": "ትንተናው አልተሳካም",
+        "findingAutoDismissed": "በራስ-ሰር ተወግዷል",
+        "findingCreated": "ተገብሯል",
+        "findingDeleted": "ተሰርዟል",
+        "findingDismissed": "ተወግዷል",
+        "findingSeverityChanged": "ደረጃው ተቀይሯል",
+        "findingStatusChange": "ሁኔታው ተቀይሯል",
+        "findingSuperseded": "ተተክቷል",
+        "remediationBlocked": "ጥገናው ታግዷል",
+        "remediationCancelled": "ተሰርዟል",
+        "remediationFailed": "ጥገናው አልተሳካም",
+        "remediationNoChangesNeeded": "ምንም ለውጥ አያስፈልግም",
+        "remediationPrOpened": "PR ተከፍቷል",
+        "remediationQueued": "ጥገና ተጠይቋል"
+      }
     },
     "notifications": {
       "couldNotLoad": "የማሳወቂያ ቅንብሮችን መጫን አልተቻለም።",

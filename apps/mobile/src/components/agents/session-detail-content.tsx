@@ -134,6 +134,7 @@ import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
 } from '@/components/agents/session-slow-load';
+import { getLanguageSnapshot } from '@/i18n';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   collectTranscriptItemKeysByPart,
@@ -1742,7 +1743,12 @@ export function SessionDetailContent({
         pendingMessages,
         canceledQueuedMessages,
       }),
-    [displayedMessages, messages, pendingMessages, canceledQueuedMessages]
+    // `getLanguageSnapshot()` re-resolves the captured copy (`selectMessageFailure`
+    // resolves titles through module-level `i18n.t`) when the app language
+    // changes while the session is mounted; the failure is otherwise stable on
+    // its message inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- language drives the resolved copy inside selectMessageFailure
+    [displayedMessages, messages, pendingMessages, canceledQueuedMessages, getLanguageSnapshot()]
   );
   const footerStatusIndicator =
     statusIndicator !== null &&

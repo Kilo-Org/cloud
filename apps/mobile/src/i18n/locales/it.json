@@ -35,6 +35,8 @@
     "connectGithub": "Collega GitHub",
     "cost": "Costo",
     "discard": "Scarta",
+    "discardChangesMessage": "Le tue modifiche andranno perse.",
+    "discardChangesTitle": "Scartare le modifiche?",
     "findings": "Problemi rilevati",
     "mergeRequest": "merge request",
     "notConnected": "Non collegato",
@@ -1085,7 +1087,14 @@
       "triageReasoning": "Motivazioni della valutazione preliminare",
       "watchInCloudAgent": "Segui in Cloud Agent",
       "whereFound": "Punti di rilevamento ({{displayCount}})",
-      "yes": "Sì"
+      "yes": "Sì",
+      "action": {
+        "analyzeCodebase": "Analizza codebase",
+        "dismiss": "Ignora",
+        "manualReview": "Revisione manuale",
+        "monitor": "Monitora",
+        "openPr": "Apri richiesta di pull"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modello di analisi",
@@ -1107,7 +1116,24 @@
       "summary": "Riepilogo del report",
       "title": "Report di audit",
       "unavailable": "Report di audit non disponibile",
-      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso."
+      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisi completata",
+        "findingAnalysisFailed": "Analisi non riuscita",
+        "findingAutoDismissed": "Ignorato automaticamente",
+        "findingCreated": "Importato",
+        "findingDeleted": "Eliminato",
+        "findingDismissed": "Ignorato",
+        "findingSeverityChanged": "Gravità modificata",
+        "findingStatusChange": "Stato modificato",
+        "findingSuperseded": "Sostituito",
+        "remediationBlocked": "Correzione bloccata",
+        "remediationCancelled": "Annullato",
+        "remediationFailed": "Correzione non riuscita",
+        "remediationNoChangesNeeded": "Nessuna modifica necessaria",
+        "remediationPrOpened": "Richiesta di pull aperta",
+        "remediationQueued": "Correzione richiesta"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Visualizza il report di audit"

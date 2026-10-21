@@ -83,6 +83,9 @@ type EmailProcessResult = {
  */
 const selfServicePromoRedemptionEnabled: boolean = false;
 
+export const SELF_SERVICE_PROMO_REDEMPTION_DISABLED_MESSAGE =
+  'Promotional code redemption is temporarily unavailable. Please try again later.';
+
 export async function redeemSelfServicePromoCode(
   user: User,
   credit_category: string
@@ -90,7 +93,7 @@ export async function redeemSelfServicePromoCode(
   if (!selfServicePromoRedemptionEnabled) {
     return {
       success: false,
-      message: 'Promotional code redemption is temporarily unavailable. Please try again later.',
+      message: SELF_SERVICE_PROMO_REDEMPTION_DISABLED_MESSAGE,
     };
   }
   return await grantCreditForCategory(user, { credit_category, counts_as_selfservice: true });

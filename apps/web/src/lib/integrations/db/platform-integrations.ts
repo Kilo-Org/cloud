@@ -1061,6 +1061,8 @@ export function personalGitHubIntegrationOrder() {
 /**
  * Gets platform integration for an owner (user or organization).
  * Optionally filters by integration status (e.g. 'active').
+ * Organization GitHub lookups ignore the status argument and return the
+ * healthy primary workflow integration.
  */
 export async function getIntegrationForOwner(
   owner: Owner,

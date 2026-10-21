@@ -145,7 +145,6 @@ export const cloudAgentGetAttachmentUploadUrlSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.extension) {
-      // Relaxed surface: contentType only needs the type/subtype shape.
       if (!CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX.test(data.contentType)) {
         ctx.addIssue({
           code: 'custom',

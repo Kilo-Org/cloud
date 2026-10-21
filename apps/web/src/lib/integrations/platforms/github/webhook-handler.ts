@@ -51,6 +51,7 @@ import {
   materializeGitHubInstallationIdentity,
   releaseGitHubInstallationDelivery,
 } from '@/lib/integrations/db/github-installations';
+import { observeWatchPrWebhook } from '@/lib/cloud-agent/watch-pr-webhook';
 
 /**
  * A retained but unhealthy association (locally disconnected, suspended, or
@@ -156,6 +157,21 @@ export async function handleGitHubWebhook(
         { error: 'Missing x-github-delivery header in GitHub webhook request' },
         { status: 400 }
       );
+    }
+
+    try {
+      await observeWatchPrWebhook({ eventType, payload, deliveryId: eventSignature, appType });
+    } catch (error) {
+      logExceptInTest(`Error observing Watch PR webhook${logSuffix}:`, error);
+      captureException(error, {
+        tags: {
+          source: `${sentryPrefix}watch_pr_observation`,
+          ...(eventType ? { event: eventType } : {}),
+          ...(deliveryId ? { delivery: deliveryId } : {}),
+          ...(deliveryInstallationId ? { installation: deliveryInstallationId } : {}),
+          ...(deliveryAction ? { action: deliveryAction } : {}),
+        },
+      });
     }
 
     const logWebhook = async (

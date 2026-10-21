@@ -5129,6 +5129,149 @@
     ],
     "searchBlob": "cliSessionsV2.deleteWorktree Delete a cloud agent worktree and its associated sessions. Return the deleted session IDs. clisessionsv2 deleteworktree worktreeid organizationid worktreeId organizationId"
   },
+  "cliSessionsV2.enableWatchPr": {
+    "path": "cliSessionsV2.enableWatchPr",
+    "kind": "mutation",
+    "summary": "Start watching a session's open same-repository pull request for a limited time (up to 24 hours) using a chosen GitHub connection, creating an observation-only PR watch.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedRepoUrl": {
+          "type": "string"
+        },
+        "expectedPrNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "integrationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "number",
+              "const": 1
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "profileId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "categories": {
+              "type": "object",
+              "properties": {
+                "reviews": {
+                  "type": "boolean"
+                },
+                "failedChecks": {
+                  "type": "boolean"
+                },
+                "baseUpdates": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "reviews",
+                "failedChecks",
+                "baseUpdates"
+              ]
+            },
+            "branchStrategy": {
+              "type": "string",
+              "enum": [
+                "merge",
+                "rebase"
+              ]
+            },
+            "historyRewriteConsent": {
+              "type": "boolean"
+            },
+            "maxAttemptsPerProblem": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2
+            },
+            "maxTotalAttempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "observationOnlyConsent": {
+              "type": "boolean",
+              "const": true
+            },
+            "futureEventsOnlyConsent": {
+              "type": "boolean",
+              "const": true
+            },
+            "noHardSpendCapConsent": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "version",
+            "model",
+            "profileId",
+            "categories",
+            "branchStrategy",
+            "historyRewriteConsent",
+            "maxAttemptsPerProblem",
+            "maxTotalAttempts",
+            "observationOnlyConsent",
+            "futureEventsOnlyConsent",
+            "noHardSpendCapConsent"
+          ],
+          "additionalProperties": false
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        }
+      },
+      "required": [
+        "sessionId",
+        "expectedRepoUrl",
+        "expectedPrNumber",
+        "integrationId",
+        "policy",
+        "expiresAt"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "enablewatchpr",
+      "sessionid",
+      "expectedrepourl",
+      "expectedprnumber",
+      "integrationid",
+      "policy",
+      "expiresat"
+    ],
+    "searchBlob": "cliSessionsV2.enableWatchPr Start watching a session's open same-repository pull request for a limited time (up to 24 hours) using a chosen GitHub connection, creating an observation-only PR watch. clisessionsv2 enablewatchpr sessionid expectedrepourl expectedprnumber integrationid policy expiresat sessionId expectedRepoUrl expectedPrNumber integrationId policy expiresAt"
+  },
   "cliSessionsV2.get": {
     "path": "cliSessionsV2.get",
     "kind": "query",
@@ -5177,6 +5320,42 @@
       "cloud_agent_session_id"
     ],
     "searchBlob": "cliSessionsV2.getByCloudAgentSessionId Look up a user's CLI session record by the underlying cloud agent session ID. clisessionsv2 getbycloudagentsessionid cloud_agent_session_id cloud_agent_session_id"
+  },
+  "cliSessionsV2.getPrWatchOptions": {
+    "path": "cliSessionsV2.getPrWatchOptions",
+    "kind": "query",
+    "summary": "Check whether PR watch can be enabled for a cloud agent session's linked pull request, returning eligible GitHub connection options, unavailable reason, and defaults before turning monitoring on.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedRepoUrl": {
+          "type": "string"
+        },
+        "expectedPrNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "sessionId",
+        "expectedRepoUrl",
+        "expectedPrNumber"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getprwatchoptions",
+      "sessionid",
+      "expectedrepourl",
+      "expectedprnumber"
+    ],
+    "searchBlob": "cliSessionsV2.getPrWatchOptions Check whether PR watch can be enabled for a cloud agent session's linked pull request, returning eligible GitHub connection options, unavailable reason, and defaults before turning monitoring on. clisessionsv2 getprwatchoptions sessionid expectedrepourl expectedprnumber sessionId expectedRepoUrl expectedPrNumber"
   },
   "cliSessionsV2.getSessionDiff": {
     "path": "cliSessionsV2.getSessionDiff",
@@ -5261,6 +5440,42 @@
       "cursor"
     ],
     "searchBlob": "cliSessionsV2.getSessionMessagesPage Fetch a paginated page of a session's message history for incremental loading, including an event watermark when starting a fresh read. clisessionsv2 getsessionmessagespage session_id limit cursor session_id limit cursor"
+  },
+  "cliSessionsV2.getWatchPr": {
+    "path": "cliSessionsV2.getWatchPr",
+    "kind": "query",
+    "summary": "Get the current PR watch for a session's linked pull request, including its status, projection, and recent watch activity; returns null when no watch exists.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedRepoUrl": {
+          "type": "string"
+        },
+        "expectedPrNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "sessionId",
+        "expectedRepoUrl",
+        "expectedPrNumber"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getwatchpr",
+      "sessionid",
+      "expectedrepourl",
+      "expectedprnumber"
+    ],
+    "searchBlob": "cliSessionsV2.getWatchPr Get the current PR watch for a session's linked pull request, including its status, projection, and recent watch activity; returns null when no watch exists. clisessionsv2 getwatchpr sessionid expectedrepourl expectedprnumber sessionId expectedRepoUrl expectedPrNumber"
   },
   "cliSessionsV2.getWithRuntimeState": {
     "path": "cliSessionsV2.getWithRuntimeState",
@@ -5401,6 +5616,38 @@
     ],
     "searchBlob": "cliSessionsV2.list List the current user's CLI/agent sessions with pagination, filtering by organization, worktree, git URL, platform, shared/public status, version, or recent updates. clisessionsv2 list cursor limit orderby includechildren sharedonly createdonplatform organizationid worktreeid giturl updatedsince version fetchreviewdecision cursor limit orderBy includeChildren sharedOnly createdOnPlatform organizationId worktreeId gitUrl updatedSince version fetchReviewDecision"
   },
+  "cliSessionsV2.pauseWatchPr": {
+    "path": "cliSessionsV2.pauseWatchPr",
+    "kind": "mutation",
+    "summary": "Pause an active PR watch so it temporarily stops tracking changes, keeping it resumable until expiry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "generation"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "pausewatchpr",
+      "watchid",
+      "generation"
+    ],
+    "searchBlob": "cliSessionsV2.pauseWatchPr Pause an active PR watch so it temporarily stops tracking changes, keeping it resumable until expiry. clisessionsv2 pausewatchpr watchid generation watchId generation"
+  },
   "cliSessionsV2.recentRepositories": {
     "path": "cliSessionsV2.recentRepositories",
     "kind": "query",
@@ -5438,6 +5685,38 @@
       "updatedsince"
     ],
     "searchBlob": "cliSessionsV2.recentRepositories Return the user's most recently active git repositories based on session activity since a given timestamp. clisessionsv2 recentrepositories organizationid updatedsince organizationId updatedSince"
+  },
+  "cliSessionsV2.recheckWatchPr": {
+    "path": "cliSessionsV2.recheckWatchPr",
+    "kind": "mutation",
+    "summary": "Manually re-check a watched pull request's identity and lifecycle state now, updating the watch without waiting for the next event.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "generation"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "recheckwatchpr",
+      "watchid",
+      "generation"
+    ],
+    "searchBlob": "cliSessionsV2.recheckWatchPr Manually re-check a watched pull request's identity and lifecycle state now, updating the watch without waiting for the next event. clisessionsv2 recheckwatchpr watchid generation watchId generation"
   },
   "cliSessionsV2.refreshAssociatedPullRequest": {
     "path": "cliSessionsV2.refreshAssociatedPullRequest",
@@ -5538,6 +5817,38 @@
       "name"
     ],
     "searchBlob": "cliSessionsV2.renameWorktree Rename a cloud agent worktree owned by the user or their organization. Return the new worktree name. clisessionsv2 renameworktree worktreeid organizationid name worktreeId organizationId name"
+  },
+  "cliSessionsV2.resumeWatchPr": {
+    "path": "cliSessionsV2.resumeWatchPr",
+    "kind": "mutation",
+    "summary": "Resume a paused PR watch after re-verifying that the watched pull request and its source worktree are unchanged.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "generation"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "resumewatchpr",
+      "watchid",
+      "generation"
+    ],
+    "searchBlob": "cliSessionsV2.resumeWatchPr Resume a paused PR watch after re-verifying that the watched pull request and its source worktree are unchanged. clisessionsv2 resumewatchpr watchid generation watchId generation"
   },
   "cliSessionsV2.search": {
     "path": "cliSessionsV2.search",
@@ -5676,6 +5987,38 @@
       "session_id"
     ],
     "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id session_id"
+  },
+  "cliSessionsV2.stopWatchPr": {
+    "path": "cliSessionsV2.stopWatchPr",
+    "kind": "mutation",
+    "summary": "Stop and finish a PR watch permanently, clearing pending items and attention flags for the watched pull request.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "generation"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "stopwatchpr",
+      "watchid",
+      "generation"
+    ],
+    "searchBlob": "cliSessionsV2.stopWatchPr Stop and finish a PR watch permanently, clearing pending items and attention flags for the watched pull request. clisessionsv2 stopwatchpr watchid generation watchId generation"
   },
   "cliSessionsV2.unshare": {
     "path": "cliSessionsV2.unshare",

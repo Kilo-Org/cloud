@@ -28,6 +28,11 @@ const mockClaimSharedGitHubInstallationDelivery = jest.fn();
 const mockCompleteSharedGitHubInstallationDelivery = jest.fn();
 const mockReleaseSharedGitHubInstallationDelivery = jest.fn();
 const mockMaterializeGitHubInstallationIdentity = jest.fn();
+const mockObserveWatchPrWebhook = jest.fn();
+
+jest.mock('@/lib/cloud-agent/watch-pr-webhook', () => ({
+  observeWatchPrWebhook: (input: unknown) => mockObserveWatchPrWebhook(input),
+}));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -119,6 +124,7 @@ jest.mock('next/server', () => {
 
 import { handleGitHubWebhook } from './webhook-handler';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
+import { normalizeWatchPrEvent } from '@/lib/cloud-agent/watch-pr-events';
 
 const integration = {
   id: 'pi_github',
@@ -236,6 +242,7 @@ async function waitForAfterTask() {
 describe('handleGitHubWebhook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockObserveWatchPrWebhook.mockResolvedValue(undefined);
     mockGetIntegrationForOrganization.mockResolvedValue(integration);
     mockVerifyGitHubWebhookSignature.mockReturnValue(true);
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
@@ -268,6 +275,110 @@ describe('handleGitHubWebhook', () => {
     mockHandleInstallationRepositories.mockResolvedValue(
       Response.json({ message: 'Repositories updated' })
     );
+  });
+
+  it('awaits watch projection before secondary installation suppression and legacy deduplication', async () => {
+    const calls: string[] = [];
+    mockObserveWatchPrWebhook.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      calls.push('watch-durable');
+    });
+    mockFindIntegrationByInstallationId.mockImplementationOnce(async () => {
+      calls.push('legacy-route');
+      return integration;
+    });
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'primary' });
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('check_run', { installation: { id: 98765 } }),
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(calls).toEqual(['watch-durable', 'legacy-route']);
+    expect(mockObserveWatchPrWebhook).toHaveBeenCalledWith({
+      eventType: 'check_run',
+      payload: { installation: { id: 98765 } },
+      deliveryId: 'delivery-check_run',
+      appType: 'standard',
+    });
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('passes the signed raw PR payload to watch normalization before legacy schema stripping', async () => {
+    const headSha = 'a'.repeat(40);
+    const baseSha = 'b'.repeat(40);
+    const payload = pullRequestPayload({
+      before: 'c'.repeat(40),
+      pull_request: {
+        ...pullRequestPayload().pull_request,
+        updated_at: '2026-10-14T12:00:00Z',
+        head: {
+          sha: headSha,
+          ref: 'feature/widgets',
+          repo: { id: 123, full_name: 'acme/widgets' },
+        },
+        base: { sha: baseSha, ref: 'main', repo: { id: 123 } },
+      },
+    });
+    mockObserveWatchPrWebhook.mockImplementationOnce(async ({ eventType, payload: rawPayload }) => {
+      expect(normalizeWatchPrEvent(eventType, rawPayload)).toMatchObject({
+        kind: 'pull_request',
+        installationId: '98765',
+        repositoryId: '123',
+        headRepositoryId: '123',
+        baseRepositoryId: '123',
+        headSha,
+        baseSha,
+        before: 'c'.repeat(40),
+      });
+    });
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', payload),
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(mockObserveWatchPrWebhook).toHaveBeenCalledWith(expect.objectContaining({ payload }));
+  });
+
+  it('continues legacy handling when durable watch projection fails', async () => {
+    mockObserveWatchPrWebhook.mockRejectedValueOnce(new Error('projection database unavailable'));
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'lite'
+    );
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalled();
+    expect(mockLogWebhookEvent).toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ source: 'github_lite_watch_pr_observation' }),
+      })
+    );
+  });
+
+  it('does not admit watch events before signature validation', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue(false);
+    expect(
+      (
+        await handleGitHubWebhook(
+          signedGitHubRequest('pull_request', pullRequestPayload()),
+          'standard'
+        )
+      ).status
+    ).toBe(401);
+    expect(mockObserveWatchPrWebhook).not.toHaveBeenCalled();
+  });
+
+  it('still projects redelivered observations before a legacy duplicate short circuit', async () => {
+    mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: true });
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(mockObserveWatchPrWebhook).toHaveBeenCalledTimes(1);
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
   });
 
   it('routes operational events to the selected workflow association despite shared installation state', async () => {

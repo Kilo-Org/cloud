@@ -78,6 +78,16 @@ import {
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
+import {
+  changeWatchPr,
+  enableWatchPr,
+  getWatchPr,
+  getPrWatchOptions,
+  recheckWatchPr,
+  watchPrEnableSchema,
+  watchPrMutationSchema,
+  watchPrQuerySchema,
+} from '@/lib/cloud-agent/watch-pr';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -958,6 +968,27 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  getPrWatchOptions: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
+  enableWatchPr: baseProcedure
+    .input(watchPrEnableSchema)
+    .mutation(({ ctx, input }) => enableWatchPr(ctx, input)),
+  getWatchPr: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getWatchPr(ctx, input)),
+  pauseWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'pause')),
+  resumeWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'resume')),
+  stopWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'stop')),
+  recheckWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => recheckWatchPr(ctx, input)),
   worktreeDetails: baseProcedure.input(WorktreeDetailsInputSchema).query(async ({ ctx, input }) => {
     const worktrees: Record<string, WorktreeDetail> = {};
     if (input.worktreeIds.length === 0) {

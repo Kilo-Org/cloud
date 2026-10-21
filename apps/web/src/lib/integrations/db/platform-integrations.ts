@@ -1092,6 +1092,64 @@ export async function getIntegrationForOwner(
   return integration || null;
 }
 
+/** Connection-status shape consumed by the reviewer status surfaces. */
+export type GitHubConnectionStatus = {
+  connected: boolean;
+  integration: {
+    accountLogin: string | null;
+    repositorySelection: string | null;
+    installedAt: string | null;
+    isValid: boolean;
+  } | null;
+};
+
+/**
+ * One connection rule for the GitHub reviewer surfaces: the owner's workflow
+ * installation (org owners resolve to their healthy primary row) counts as
+ * connected only when the integration is healthy, matching what the
+ * repository picker, Security Agent, and every operational caller require.
+ *
+ * A user can hold more than one workflow row (a locally disconnected row is
+ * retained on disconnect, and reconnecting a different installation inserts
+ * another), so the user lookup orders healthy rows first — the same rule
+ * `getInstallation` applies — instead of trusting an unordered `limit(1)`.
+ */
+export async function getGitHubConnectionStatusForOwner(
+  owner: Owner
+): Promise<GitHubConnectionStatus> {
+  const integration =
+    owner.type === 'org'
+      ? await getPrimaryGitHubIntegrationForOrganization(owner.id)
+      : ((
+          await db
+            .select()
+            .from(platform_integrations)
+            .where(
+              and(
+                eq(platform_integrations.owned_by_user_id, owner.id),
+                eq(platform_integrations.platform, PLATFORM.GITHUB),
+                eq(platform_integrations.github_connection_role, 'workflow')
+              )
+            )
+            .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
+            .limit(1)
+        )[0] ?? null);
+
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return { connected: false, integration: null };
+  }
+
+  return {
+    connected: true,
+    integration: {
+      accountLogin: integration.platform_account_login,
+      repositorySelection: integration.repository_access,
+      installedAt: integration.installed_at,
+      isValid: !integration.suspended_at,
+    },
+  };
+}
+
 /**
  * Gets all platform integrations for an owner (user or organization)
  */
@@ -1429,10 +1487,6 @@ export async function upsertPlatformIntegrationForOwner(
 }
 
 /**
- * Find GitLab integration by project path
- * GitLab webhooks include the project path, so we need to find the integration
- * that has access to this project (either via 'all' repository access or selected repos)
- *
  * For MVP: We look up by webhook secret token stored in metadata
  */
 export async function findGitLabIntegrationByWebhookToken(webhookToken: string) {
@@ -1459,19 +1513,18 @@ export async function findGitLabIntegrationByWebhookToken(webhookToken: string) 
  * Used when we know the GitLab project ID from the webhook payload
  */
 export async function findGitLabIntegrationByProjectId(projectId: number) {
-  // Find integrations that have this project in their repositories list
   const integrations = await db
     .select()
     .from(platform_integrations)
     .where(eq(platform_integrations.platform, PLATFORM.GITLAB));
 
+  // An integration matches when its access is 'all' or its repositories list
+  // contains this project.
   for (const integration of integrations) {
-    // Check if repository_access is 'all' or if project is in selected repos
     if (integration.repository_access === 'all') {
       return integration;
     }
 
-    // Check if project is in the repositories list
     const repos = integration.repositories;
     if (repos?.some(repo => repo.id === projectId)) {
       return integration;

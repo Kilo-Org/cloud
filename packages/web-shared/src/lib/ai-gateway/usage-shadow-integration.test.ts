@@ -60,9 +60,6 @@ jest.mock('./kilo-exclusive-models', () => ({
   findKiloExclusiveModel: () => undefined,
   shouldRedactModelNameInMicrodollarUsage: () => false,
 }));
-jest.mock('./is-free-model', () => ({
-  isFreeModel: async (model: string) => model.endsWith(':free'),
-}));
 jest.mock('./custom-pricing', () => ({ calculateCustomCost_mUsd: () => undefined }));
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   normalizeJa4: () => null,
@@ -169,6 +166,7 @@ const context: MicrodollarUsageContext = {
   editor_name: null,
   machine_id: null,
   user_byok: false,
+  is_free: false,
   has_tools: false,
   feature: null,
   session_id: null,
@@ -657,6 +655,7 @@ describe('gateway shadow background integration', () => {
       const ctx = {
         ...context,
         user_byok: byok,
+        is_free: !byok,
         requested_model: byok ? 'synthetic-model' : 'synthetic-model:free',
       };
       const record = await lifecycle.run(() => processTokenData({ ...stats }, ctx));
@@ -667,6 +666,7 @@ describe('gateway shadow background integration', () => {
       expect(sent[0].core.cost).toBe(0);
       expect(sent[0].core.cache_discount).toBe(0);
       expect(sent[0].metadata.market_cost).toBe(1234);
+      expect(sent[0].metadata.is_free).toBe(!byok);
       expect(writer).toHaveBeenCalledWith(sent[0]);
     }
   );

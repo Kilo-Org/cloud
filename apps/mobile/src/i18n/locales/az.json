@@ -25,6 +25,7 @@
     "error": "xəta: {{error}}",
     "back": "Geri",
     "somethingWentWrong": "Xəta baş verdi.",
+    "actionNotRecorded": "Bu əməliyyatı qeydə almaq mümkün olmadı. Bir az sonra yenidən cəhd et.",
     "couldNotOpen": "{{label}} açılmadı.",
     "link": "keçid",
     "takingLonger": "Bu, gözləniləndən çox vaxt aparır. Bu ekranı bağlayıb yenidən yoxlaya bilərsən.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub birləşdirməni tamamlamadı.",
       "mergeResultNotCompleted": "{{term}} birləşdirilmədi. Vəziyyətini yoxla və yenidən cəhd et.",
       "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl PR-i yoxla.",
-      "persistenceFailed": "Bu əməliyyatı qeydə almaq mümkün olmadı. Bir az sonra yenidən cəhd et.",
       "forbidden": "İcazə yoxdur."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Kod yoxlaması yaddaşı yüklənir",
       "couldNotLoad": "Kod yoxlaması yaddaşını yükləmək mümkün olmadı.",
       "off": "Kod yoxlaması yaddaşı deaktivdir.",
+      "on": "Kod yoxlaması yaddaşı aktivdir.",
       "offDescription": "Kilo-nun layihəyə cavabdeh şəxslərin cavablarından öyrənməsi və REVIEW.md üçün təlimatlar təklif etməsi üçün yaddaşı aktivləşdir.",
-      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri və ödəniş menecerləri aktivləşdirə bilər.",
+      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
       "enable": "Kod yoxlaması yaddaşını aktivləşdir",
       "loadingProposals": "Təkliflər yüklənir",
       "couldNotLoadProposals": "Təklifləri yükləmək mümkün olmadı.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Audit hesabatına bax"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratoru",
+      "actorMaskedUser": "Maskalı istifadəçi",
+      "actorSystem": "Kilo sistemi",
       "couldNotLoad": "Audit hesabatını yükləmək mümkün olmadı.",
       "events": "Hadisələr",
       "generated": "Hesabat {{generatedAt}} tarixində yaradılıb.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Sinxronlaşdırma tamamlanmamış ola bilər. Vəziyyəti dəqiqləşdirmək üçün yenidən cəhd et və ya ləğv et.",
       "syncInProgress": "Təhlükəsizlik məlumatlarının sinxronlaşdırılması artıq davam edir. Yenidən cəhd et.",
       "dismissalInProgress": "Bu tapıntının rədd edilməsi artıq davam edir. Yenidən cəhd et.",
-      "couldNotReadPendingSyncs": "Gözləyən sinxronlaşdırmaları oxumaq mümkün olmadı. Yenidən cəhd et."
+      "couldNotReadPendingSyncs": "Gözləyən sinxronlaşdırmaları oxumaq mümkün olmadı. Yenidən cəhd et.",
+      "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl təhlükəsizlik icmalını yoxla.",
+      "settleFailed": "İş tamamlandı, lakin nəticəni qeyd edə bilmədik. Yenidən cəhd et.",
+      "replayFailed": "Bu iş tamamlanmadı. Yenidən cəhd et.",
+      "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
+      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
@@ -2773,7 +2782,7 @@
     "webBrowser": "Veb brauzer",
     "viewProfile": "Profilə bax",
     "signOutThisDevice": "Bu cihazdan çıxış et",
-    "signOutThisSession": "Bu sessiyadan çıxış et",
+    "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}",
     "sessionSignedOut": "Sessiyadan çıxıldı.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
@@ -3077,7 +3086,11 @@
       "separateEmailsHint": "Bir neçə e-poçt ünvanını vergüllə ayır.",
       "thresholdLabel": "Xəbərdarlıq həddi (USD)",
       "title": "Aşağı balans xəbərdarlığı",
-      "emailsError": "Ən azı bir düzgün e-poçt ünvanı daxil et. Bir neçə ünvanı vergüllə ayır.",
+      "emailsInvalid": "Bir və ya bir neçə e-poçt ünvanı düzgün deyil.",
+      "emailsRequired": "Ən azı bir e-poçt ünvanı daxil et.",
+      "saveEmailsError": "Bəzi e-poçt ünvanları qəbul edilmədi. Onları yoxlayıb yenidən cəhd et.",
+      "saveError": "Aşağı balans xəbərdarlığını yadda saxlamaq alınmadı.",
+      "thresholdPlaceholder": "Məbləğ daxil et",
       "thresholdError": "0-Dan böyük məbləğ daxil et."
     },
     "memberLimit": {
@@ -3088,6 +3101,7 @@
       "removeLimit": "Limiti götür",
       "title": "Gündəlik istifadə limiti",
       "blankError": "Məbləğ daxil et və ya aşağıdakı «Limiti götür» düyməsindən istifadə et.",
+      "blankWithoutLimitError": "0 İlə {{max}} arasında gündəlik limit daxil et.",
       "rangeError": "0 İlə {{max}} arasında məbləğ daxil et."
     },
     "members": {
@@ -3626,7 +3640,6 @@
     "keyTooLong": "Açar 256 simvol və ya daha az olmalıdır",
     "keyDuplicate": "Bu açar artıq profildə mövcuddur",
     "valueLabel": "Dəyər",
-    "secretLabel": "Gizli",
     "secrets": {
       "markSecret": "Gizli olaraq qeyd edin",
       "masked": "Gizli dəyər",

@@ -114,7 +114,6 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
     .where(buildOwnershipCondition(owner))
     .orderBy(agent_environment_profiles.name);
 
-  // Get var and command counts for each profile
   const profileIds = profiles.map(p => p.id);
 
   if (profileIds.length === 0) {
@@ -214,7 +213,7 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
 }
 
 /**
- * Get a single profile with vars and commands.
+ * Get a single profile with all of its collections.
  * Secret values are masked.
  */
 export async function getProfile(
@@ -287,13 +286,11 @@ export async function setDefaultProfile(
   await verifyProfileOwnership(db, profileId, owner);
 
   await db.transaction(async tx => {
-    // Clear existing default
     await tx
       .update(agent_environment_profiles)
       .set({ is_default: false })
       .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)));
 
-    // Set new default
     await tx
       .update(agent_environment_profiles)
       .set({ is_default: true })

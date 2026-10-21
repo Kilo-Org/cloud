@@ -1,4 +1,4 @@
-import { Effect, Either, Stream } from 'effect';
+import { Effect, Result, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { ApiKind } from '../../core/catalog.js';
 import { fakeFetch, type Reply, sampleRequest, sse } from './fake.js';
@@ -226,12 +226,12 @@ it('fails the stream when the provider reports an error part way through it', as
     Effect.map(client => client.stream(sampleRequest())),
     Stream.unwrap,
     Stream.runCollect,
-    Effect.either,
+    Effect.result,
     Effect.provide(testGateway({ fetch, kinds: ['messages'] })),
     Effect.runPromise
   );
 
-  expect(result).toMatchObject({ left: { reason: 'stream' } });
+  expect(result).toMatchObject({ failure: { reason: 'stream' } });
 });
 
 /** The responses shape puts its failure one level down, inside `response`. */
@@ -247,7 +247,7 @@ const responsesEnding = async (ending: unknown) => {
     Effect.map(client => client.stream(sampleRequest())),
     Stream.unwrap,
     Stream.runCollect,
-    Effect.either,
+    Effect.result,
     Effect.provide(testGateway({ fetch, kinds: ['responses'] })),
     Effect.runPromise
   );
@@ -262,7 +262,7 @@ it('fails the stream when the responses shape reports a failed response', async 
     response: { status: 'failed', error: { code: 'server_error', message: 'went wrong' } },
   });
 
-  expect(result).toMatchObject({ left: { reason: 'stream' } });
+  expect(result).toMatchObject({ failure: { reason: 'stream' } });
 });
 
 it('lets a completed response through, error and all', async () => {
@@ -276,5 +276,5 @@ it('lets a completed response through, error and all', async () => {
   );
   const result = await responsesEnding(completed);
 
-  expect(Either.isRight(result)).toBe(true);
+  expect(Result.isSuccess(result)).toBe(true);
 });

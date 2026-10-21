@@ -25,6 +25,7 @@
     "error": "gabim: {{error}}",
     "back": "Kthehu",
     "somethingWentWrong": "Diçka shkoi keq.",
+    "actionNotRecorded": "Nuk arritëm ta regjistronim këtë veprim. Provo përsëri më vonë.",
     "couldNotOpen": "Nuk u hap {{label}}.",
     "link": "lidhja",
     "takingLonger": "Kjo po zgjat më shumë nga sa pritej. Mund ta mbyllësh dhe të kontrollosh përsëri.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub nuk e përfundoi bashkimin.",
       "mergeResultNotCompleted": "{{term}} nuk u bashkua. Kontrollo gjendjen dhe provo përsëri.",
       "ambiguous": "Nuk u konfirmua — kontrollo PR-në përpara se të provosh përsëri.",
-      "persistenceFailed": "Nuk arritëm ta regjistronim këtë veprim. Provo përsëri më vonë.",
       "forbidden": "Ky veprim nuk lejohet."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Duke ngarkuar kujtesën e shqyrtimit",
       "couldNotLoad": "Nuk u ngarkua kujtesa e shqyrtimit.",
       "off": "Kujtesa e shqyrtimit është e çaktivizuar.",
+      "on": "Kujtesa e shqyrtimit është e aktivizuar.",
       "offDescription": "Aktivizoje që Kilo të mësojë nga përgjigjet e mirëmbajtësve dhe të propozojë udhëzime për REVIEW.md.",
-      "readOnlyDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta aktivizojnë kujtesën e shqyrtimit.",
+      "readOnlyDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta ndryshojnë kujtesën e shqyrtimit.",
       "enable": "Aktivizo kujtesën e shqyrtimit",
       "loadingProposals": "Duke ngarkuar propozimet",
       "couldNotLoadProposals": "Nuk u ngarkuan propozimet.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Shiko raportin e auditimit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administratori Kilo",
+      "actorMaskedUser": "Përdorues i maskuar",
+      "actorSystem": "Sistemi Kilo",
       "couldNotLoad": "Nuk u ngarkua raporti i auditimit.",
       "events": "Ngjarjet",
       "generated": "Raporti u gjenerua më {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Një sinkronizim mund të mos ketë përfunduar. Riprovo për të përputhur gjendjen ose hiq dorë.",
       "syncInProgress": "Një sinkronizim i sigurisë është tashmë në vazhdim. Provo përsëri.",
       "dismissalInProgress": "Kjo hedhje poshtë është tashmë në vazhdim. Provo përsëri.",
-      "couldNotReadPendingSyncs": "Nuk u lexuan sinkronizimet në pritje. Provo përsëri."
+      "couldNotReadPendingSyncs": "Nuk u lexuan sinkronizimet në pritje. Provo përsëri.",
+      "ambiguous": "Nuk u konfirmua — kontrollo rishikimin e sigurisë përpara se të provosh përsëri.",
+      "settleFailed": "Veprimi u krye, por nuk mundëm ta regjistronim rezultatin. Provo përsëri.",
+      "replayFailed": "Ky veprim nuk u krye. Provo përsëri.",
+      "actionFailed": "Ky veprim nuk u përfundua dot. Provo përsëri.",
+      "actionBlocked": "Ky veprim nuk u përfundua dot. Problemi duhet zgjidhur përpara se të provosh përsëri."
     },
     "analysisState": {
       "queued": "Analiza në radhë",
@@ -2772,7 +2781,7 @@
     "thisDevice": "Kjo pajisje",
     "viewProfile": "Shiko profilin",
     "signOutThisDevice": "Dil nga kjo pajisje",
-    "signOutThisSession": "Mbyll këtë seancë",
+    "signOutSessionLabel": "Dil nga {{device}}, hyrja: {{signedIn}}",
     "sessionSignedOut": "Seanca u mbyll.",
     "signOutThisDeviceTitle": "Do të dalësh nga kjo pajisje?",
     "signOutThisSessionTitle": "Të mbyllet kjo seancë?",
@@ -3077,7 +3086,11 @@
       "separateEmailsHint": "Ndaji adresat e emailit me presje.",
       "thresholdLabel": "Njofto kur gjendja bie nën (USD)",
       "title": "Njoftim për gjendje të ulët",
-      "emailsError": "Shkruaj të paktën një adresë të vlefshme emaili. Nëse shkruan disa, ndaji me presje.",
+      "emailsInvalid": "Një ose më shumë adresa emaili nuk janë të vlefshme.",
+      "emailsRequired": "Shkruaj të paktën një adresë emaili.",
+      "saveEmailsError": "Disa adresa emaili nuk u pranuan. Kontrolloji dhe provo sërish.",
+      "saveError": "Njoftimi për gjendje të ulët nuk u ruajt.",
+      "thresholdPlaceholder": "Shkruaj një shumë",
       "thresholdError": "Shkruaj një shumë më të madhe se 0."
     },
     "memberLimit": {
@@ -3088,6 +3101,7 @@
       "removeLimit": "Hiq kufirin",
       "title": "Kufiri ditor i përdorimit",
       "blankError": "Shkruaj një shumë ose përdor «Hiq kufirin» më poshtë.",
+      "blankWithoutLimitError": "Shkruaj një kufi ditor midis 0 dhe {{max}}.",
       "rangeError": "Shkruaj një shumë midis 0 dhe {{max}}."
     },
     "members": {
@@ -3626,7 +3640,6 @@
     "keyTooLong": "Çelësi duhet të ketë 256 karaktere ose më pak",
     "keyDuplicate": "Ky çelës ekziston tashmë në profil",
     "valueLabel": "Vlera",
-    "secretLabel": "Sekret",
     "secrets": {
       "markSecret": "Shënoni si sekret",
       "masked": "Vlera e fshehur",

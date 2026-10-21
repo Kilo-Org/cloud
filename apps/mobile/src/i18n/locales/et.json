@@ -25,6 +25,7 @@
     "error": "viga: {{error}}",
     "back": "Tagasi",
     "somethingWentWrong": "Midagi läks valesti.",
+    "actionNotRecorded": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
     "couldNotOpen": "Avamine ebaõnnestus: {{label}}.",
     "link": "veebilink",
     "takingLonger": "See võtab oodatust kauem aega. Sa võid selle sulgeda ja hiljem uuesti vaadata.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist.",
       "mergeResultNotCompleted": "{{term}} ei liidetud. Kontrolli olekut ja proovi uuesti.",
       "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli PR-i enne uuesti proovimist.",
-      "persistenceFailed": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
       "forbidden": "See toiming pole lubatud."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Ülevaatuste mälu laadimine",
       "couldNotLoad": "Ülevaatuste mälu ei õnnestunud laadida.",
       "off": "Ülevaatuste mälu on välja lülitatud.",
+      "on": "Ülevaatuste mälu on sisse lülitatud.",
       "offDescription": "Lülita see sisse, et Kilo saaks hooldajate vastustest õppida ja pakkuda juhiseid faili REVIEW.md.",
-      "readOnlyDescription": "Ülevaatuste mälu saavad sisse lülitada ainult organisatsiooni omanikud ja arveldushaldurid.",
+      "readOnlyDescription": "Ülevaatuste mälu saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
       "enable": "Luba ülevaatuste mälu",
       "loadingProposals": "Ettepanekute laadimine",
       "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Vaata auditiaruannet"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administraator",
+      "actorMaskedUser": "Varjatud kasutaja",
+      "actorSystem": "Kilo süsteem",
       "couldNotLoad": "Auditiaruannet ei õnnestunud laadida.",
       "events": "Sündmused",
       "generated": "Aruanne on loodud {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Sünkroonimine ei pruukinud lõppeda. Oleku ühtlustamiseks proovi uuesti või loobu.",
       "syncInProgress": "Turbesünkroonimine on juba käimas. Proovi uuesti.",
       "dismissalInProgress": "See kõrvalejätmine on juba käimas. Proovi uuesti.",
-      "couldNotReadPendingSyncs": "Ootel sünkroonimisi ei õnnestunud lugeda. Proovi uuesti."
+      "couldNotReadPendingSyncs": "Ootel sünkroonimisi ei õnnestunud lugeda. Proovi uuesti.",
+      "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli turvalisuse läbivaadet enne uuesti proovimist.",
+      "settleFailed": "Toiming lõppes edukalt, kuid me ei suutnud tulemust salvestada. Proovi uuesti.",
+      "replayFailed": "Toimingut ei lõpetatud. Proovi uuesti.",
+      "actionFailed": "Seda toimingut ei õnnestunud lõpule viia. Proovi uuesti.",
+      "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",
@@ -2772,7 +2781,7 @@
     "thisDevice": "See seade",
     "viewProfile": "Vaata profiili",
     "signOutThisDevice": "Logi sellest seadmest välja",
-    "signOutThisSession": "Logi sellest seansist välja",
+    "signOutSessionLabel": "Logi seadmest {{device}} välja, sisse logitud {{signedIn}}",
     "sessionSignedOut": "Seansist on välja logitud.",
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",
@@ -3077,7 +3086,11 @@
       "separateEmailsHint": "Eralda e-posti aadressid komadega.",
       "thresholdLabel": "Hoiatuse saldopiir (USD)",
       "title": "Madala saldo hoiatus",
-      "emailsError": "Sisesta vähemalt üks kehtiv e-posti aadress. Eralda aadressid komadega.",
+      "emailsInvalid": "Üks või mitu e-posti aadressi ei ole kehtiv.",
+      "emailsRequired": "Sisesta vähemalt üks e-posti aadress.",
+      "saveEmailsError": "Mõned e-posti aadressid ei olnud lubatud. Kontrolli need üle ja proovi uuesti.",
+      "saveError": "Madala saldo hoiatust ei õnnestununud salvestada.",
+      "thresholdPlaceholder": "Sisesta summa",
       "thresholdError": "Sisesta nullist suurem summa."
     },
     "memberLimit": {
@@ -3088,6 +3101,7 @@
       "removeLimit": "Eemalda piirang",
       "title": "Päevane kasutuspiirang",
       "blankError": "Sisesta summa või eemalda piirang alloleva nupuga.",
+      "blankWithoutLimitError": "Sisesta päevane piirang vahemikus 0 kuni {{max}}.",
       "rangeError": "Sisesta summa vahemikus 0 kuni {{max}}."
     },
     "members": {
@@ -3626,7 +3640,6 @@
     "keyTooLong": "Võti võib olla kuni 256 tähemärki",
     "keyDuplicate": "See võti on profiilis juba olemas",
     "valueLabel": "Väärtus",
-    "secretLabel": "Saladus",
     "secrets": {
       "markSecret": "Märgi salajaseks",
       "masked": "Varjatud väärtus",

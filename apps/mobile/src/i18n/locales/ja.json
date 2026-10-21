@@ -25,6 +25,7 @@
     "error": "エラー: {{error}}",
     "back": "戻る",
     "somethingWentWrong": "問題が発生しました。",
+    "actionNotRecorded": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
     "couldNotOpen": "{{label}}を開けませんでした。",
     "link": "リンク",
     "takingLonger": "通常より時間がかかっています。この画面を閉じて、後で確認できます。",
@@ -994,8 +995,9 @@
       "noProposals": "提案はありません",
       "noProposalsDescription": "Kiloがメンテナーの返信を分析すると、レビューメモリの提案がここに表示されます。",
       "off": "レビューメモリはオフです。",
+      "on": "レビューメモリはオンです。",
       "offDescription": "有効にすると、Kiloがメンテナーの返信から学習し、REVIEW.mdに記載する指針を提案します。",
-      "readOnlyDescription": "レビューメモリを有効にできるのは組織のオーナーと請求管理者のみです。",
+      "readOnlyDescription": "レビューメモリを変更できるのは組織のオーナーと請求管理者のみです。",
       "title": "レビューメモリ"
     },
     "scopeList": {
@@ -1133,6 +1135,9 @@
       "triageModel": "トリアージモデル"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo管理者",
+      "actorMaskedUser": "マスク済みユーザー",
+      "actorSystem": "Kiloシステム",
       "couldNotLoad": "監査レポートを読み込めませんでした。",
       "events": "イベント",
       "generated": "{{generatedAt}}に生成しました。",
@@ -1442,7 +1447,12 @@
       "syncMayNotHaveCompleted": "同期が完了していない可能性があります。再試行して状態の整合性を確認するか、破棄してください。",
       "syncInProgress": "セキュリティの同期はすでに実行中です。もう一度お試しください。",
       "dismissalInProgress": "この検出結果の却下はすでに処理中です。もう一度お試しください。",
-      "couldNotReadPendingSyncs": "保留中の同期情報を読み込めませんでした。もう一度お試しください。"
+      "couldNotReadPendingSyncs": "保留中の同期情報を読み込めませんでした。もう一度お試しください。",
+      "ambiguous": "操作の結果を確認できませんでした。再試行する前にセキュリティレビューをご確認ください。",
+      "settleFailed": "操作は完了しましたが、結果を記録できませんでした。もう一度お試しください。",
+      "replayFailed": "この操作は完了しませんでした。もう一度お試しください。",
+      "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
+      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",
@@ -2257,7 +2267,7 @@
     "thisDevice": "このデバイス",
     "viewProfile": "プロフィールを表示",
     "signOutThisDevice": "このデバイスからサインアウト",
-    "signOutThisSession": "このセッションからサインアウト",
+    "signOutSessionLabel": "{{device}}からサインアウト、サインイン：{{signedIn}}",
     "sessionSignedOut": "セッションからサインアウトしました。",
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",
@@ -2973,7 +2983,6 @@
       "mergeResultDefaultError": "GitHubでマージが完了しませんでした。",
       "mergeResultNotCompleted": "{{term}}はマージされませんでした。状態を確認して再試行してください。",
       "ambiguous": "操作の結果を確認できませんでした。再試行する前にPRを確認してください。",
-      "persistenceFailed": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
       "forbidden": "この操作を行う権限がありません。"
     },
     "capabilities": {
@@ -3076,7 +3085,11 @@
       "separateEmailsHint": "複数のメールアドレスはカンマで区切ってください。",
       "thresholdLabel": "通知する残高の下限（USD）",
       "title": "残高アラート",
-      "emailsError": "有効なメールアドレスを1つ以上入力してください。複数ある場合はカンマで区切ってください。",
+      "emailsInvalid": "無効なメールアドレスがあります。",
+      "emailsRequired": "メールアドレスを1つ以上入力してください。",
+      "saveEmailsError": "一部のメールアドレスが受け付けられませんでした。確認して、もう一度お試しください。",
+      "saveError": "残高アラートを保存できませんでした。",
+      "thresholdPlaceholder": "金額を入力",
       "thresholdError": "0より大きい金額を入力してください。"
     },
     "memberLimit": {
@@ -3087,6 +3100,7 @@
       "removeLimit": "上限を解除",
       "title": "1日の利用上限額",
       "blankError": "金額を入力するか、下の「上限を解除」をタップしてください。",
+      "blankWithoutLimitError": "0から{{max}}までの1日の上限額を入力してください。",
       "rangeError": "0から{{max}}までの金額を入力してください。"
     },
     "members": {
@@ -3626,7 +3640,6 @@
     "keyTooLong": "キーは256文字以内で入力してください",
     "keyDuplicate": "このキーはすでにプロファイルに存在します",
     "valueLabel": "価値",
-    "secretLabel": "秘密",
     "secrets": {
       "markSecret": "シークレットとしてマークする",
       "masked": "隠された値",

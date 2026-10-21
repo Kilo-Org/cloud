@@ -26,7 +26,6 @@ import {
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
-import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
 import {
   assertContainerCapacity,
   getContainerCapacityFailureReason,
@@ -2297,14 +2296,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (
       state.kind !== 'stopped' &&
       state.kind !== 'creating' &&
-      this.currentProvider() === 'vercel' &&
-      (this.providerPin?.billing?.enforcementRequested ||
-        isCloudAgentContainerBillingEnabled(this.env, {
-          userId: source.userId,
-          ...(this.providerPin?.billing?.subject.type === 'org'
-            ? { orgId: this.providerPin.billing.subject.id }
-            : {}),
-        }))
+      this.currentProvider() === 'vercel'
     ) {
       const context = await getBillingContext(this.ctx.storage);
       const runtime = await this.ensureVercelBillingRuntime();
@@ -4219,10 +4211,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (pin.provider === 'vercel') {
           let admission: 'admitted' | 'blocked' | 'unavailable' | 'retry' = 'retry';
           let admissionRejected = false;
-          let priorGeneration: string | undefined;
           let admissionStarted = false;
           try {
-            priorGeneration = (await getBillingContext(this.ctx.storage))?.generation;
             admissionStarted = true;
             admission = await withTimeout(
               this.admitVercelCreate(pin).catch((error: unknown) => {
@@ -4233,19 +4223,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               'Vercel billing admission timed out'
             );
           } catch {
-            let safeShadow = false;
-            if (priorGeneration === undefined) {
-              try {
-                safeShadow = await this.admitShadowAfterVercelBillingException(pin);
-              } catch {
-                safeShadow = false;
-              }
-            }
-            admission = safeShadow
-              ? 'admitted'
-              : admissionStarted && !admissionRejected
-                ? 'retry'
-                : 'unavailable';
+            admission = admissionStarted && !admissionRejected ? 'retry' : 'unavailable';
             logger
               .withFields({ sandboxId: this.sandboxId })
               .warn('Vercel billing admission failed');
@@ -5223,10 +5201,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     pin: StoredProviderPin
   ): Promise<'admitted' | 'blocked' | 'unavailable' | 'retry'> {
     return this.billingRuntime.admitCreate(pin);
-  }
-
-  private async admitShadowAfterVercelBillingException(pin: StoredProviderPin): Promise<boolean> {
-    return this.billingRuntime.admitShadow(pin);
   }
 
   private async failCreationRoutes(

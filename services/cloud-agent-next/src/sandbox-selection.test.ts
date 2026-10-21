@@ -48,16 +48,16 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'Vercel with provider-default resources',
+      name: 'containers for a Vercel-enrolled organization',
       overrides: { VERCEL_SANDBOX_ORG_IDS: owner.orgId },
-      expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'Vercel with personal Vercel enrollment',
+      name: 'containers for a wildcard Vercel enrollment',
       overrides: {
         VERCEL_SANDBOX_ORG_IDS: '*',
       },
-      expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
       name: 'isolated Cloudflare outside the former allowlist',
@@ -76,15 +76,6 @@ describe('sandbox selection policy', () => {
       name: 'keeps Cloudflare sandbox small when containment is disabled',
       overrides: { CREDENTIAL_CONTAINMENT_ENABLED: 'false' },
       expected: getSandboxAllocationRequest('cloudflare-single'),
-    },
-    {
-      name: 'enforced default skips Vercel even when explicit Vercel is enrolled',
-      overrides: {
-        VERCEL_SANDBOX_ORG_IDS: owner.orgId,
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
-      },
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
       name: 'Cloudflare containers when the isolated owner is enrolled',
@@ -114,9 +105,7 @@ describe('sandbox selection policy', () => {
     });
     expect(actual.provider).toBe(expected.provider.id);
     if (actual.provider === 'cloudflare') {
-      expect(classifySandboxId(actual.sandboxId)).toBe(
-        expected.instanceType === 'shared' ? 'shared' : 'isolated-small'
-      );
+      expect(classifySandboxId(actual.sandboxId)).toBe('isolated-small');
     }
   });
 
@@ -183,8 +172,6 @@ describe('sandbox selection policy', () => {
     expect(availableOptions(capabilities)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
-      getSandboxAllocationRequest('vercel-small'),
-      getSandboxAllocationRequest('vercel-large'),
     ]);
     expect(
       capabilities.options.some(
@@ -198,8 +185,6 @@ describe('sandbox selection policy', () => {
     expect(availableOptions(getSandboxSelectionCapabilities(missingContainers, owner))).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
-      getSandboxAllocationRequest('vercel-small'),
-      getSandboxAllocationRequest('vercel-large'),
     ]);
 
     const enrolledContainers = {
@@ -210,8 +195,6 @@ describe('sandbox selection policy', () => {
       getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-containers-standard-4'),
-      getSandboxAllocationRequest('vercel-small'),
-      getSandboxAllocationRequest('vercel-large'),
     ]);
   });
 
@@ -219,7 +202,7 @@ describe('sandbox selection policy', () => {
     const env = { ...configured, SANDBOX_SELECTION_IDS: owner.userId } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, { userId: owner.userId });
     expect(capabilities.enabled).toBe(true);
-    expect(availableOptions(capabilities)).toHaveLength(4);
+    expect(availableOptions(capabilities)).toHaveLength(2);
   });
 
   it('enables personal selection for wildcard rollouts', () => {
@@ -246,10 +229,11 @@ describe('sandbox selection policy', () => {
     } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(capabilities.enabled).toBe(true);
-    expect(availableOptions(capabilities)).toHaveLength(5);
+    expect(availableOptions(capabilities)).toHaveLength(3);
     expect(capabilities.options.every(option => !('available' in option))).toBe(true);
     expect(JSON.stringify(capabilities)).not.toContain('test-token');
     for (const preset of sandboxAllocationSchema.options) {
+      if (preset.startsWith('vercel-')) continue;
       expect(() => assertSandboxAllocationAvailable(env, owner, preset)).not.toThrow();
     }
   });
@@ -273,12 +257,12 @@ describe('sandbox selection policy', () => {
     }
   );
 
-  it('fails Vercel closed for enforced organization billing', () => {
-    const env = {
-      ...configured,
-      CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-      CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
-    } as Env;
+  it.each([
+    { VERCEL_SANDBOX_ORG_IDS: undefined },
+    { VERCEL_SANDBOX_ORG_IDS: owner.orgId },
+    { VERCEL_SANDBOX_ORG_IDS: '*' },
+  ])('fails configured Vercel closed for enforced compute billing: %j', overrides => {
+    const env = { ...configured, ...overrides } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(availableOptions(capabilities)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
@@ -350,13 +334,11 @@ describe('sandbox selection policy', () => {
     expect(containers?.unavailableReason).toBeTruthy();
   });
 
-  it('offers Cloudflare containers to an enrolled owner under enforced organization billing', () => {
+  it('offers Cloudflare containers to an enrolled owner', () => {
     const env = {
       ...configured,
       PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
       CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
-      CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-      CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
     } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     const options = capabilities.options.map(option => option.allocation);
@@ -371,21 +353,16 @@ describe('sandbox selection policy', () => {
     );
   });
 
-  it('reports a repository-unavailable reason while keeping a provider-available option listed', () => {
-    const gitlab = getSandboxSelectionCapabilities(configured as Env, owner, {
-      repositoryType: 'gitlab',
+  it('reports a repository-unavailable reason alongside the provider reason', () => {
+    const vercelOption = (repositoryType: 'github' | 'gitlab') =>
+      getSandboxSelectionCapabilities(configured as Env, owner, { repositoryType }).options.find(
+        option => getKiloSandboxAllocation(option.allocation) === 'vercel-small'
+      );
+    expect(vercelOption('gitlab')).toMatchObject({
+      unavailableReason: 'Vercel sandboxes do not support enforced compute billing',
+      repositoryUnavailableReason: 'Vercel sandboxes support GitHub repositories only',
     });
-    const vercel = gitlab.options.find(
-      option => getKiloSandboxAllocation(option.allocation) === 'vercel-small'
-    );
-    expect(vercel?.unavailableReason).toBeUndefined();
-    expect(vercel?.repositoryUnavailableReason).toBeTruthy();
-    expect(isSandboxAllocationAvailable(gitlab, 'vercel-small')).toBe(false);
-
-    const github = getSandboxSelectionCapabilities(configured as Env, owner, {
-      repositoryType: 'github',
-    });
-    expect(isSandboxAllocationAvailable(github, 'vercel-small')).toBe(true);
+    expect(vercelOption('github')?.repositoryUnavailableReason).toBeUndefined();
   });
 
   it('marks Vercel unavailable for review and remediation origins while Cloudflare stays eligible', () => {

@@ -11,7 +11,6 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { parseVercelSandboxRuntimeConfig } from './agent-sandbox/vercel/vercel-runtime-config.js';
 import { isCloudflareContainersEnrolled } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
-import { isCloudAgentContainerBillingEnabled } from './container-billing-rollout.js';
 import {
   credentialContainmentEnabled,
   getDefaultSandboxDestination,
@@ -59,10 +58,7 @@ export function sandboxAllocationUnavailableReason(
       return undefined;
     case 'vercel':
       if (!parseVercelSandboxRuntimeConfig(env)) return 'Vercel sandboxes are not configured';
-      if (isCloudAgentContainerBillingEnabled(env, owner)) {
-        return 'Vercel sandboxes do not support enforced compute billing';
-      }
-      return undefined;
+      return 'Vercel sandboxes do not support enforced compute billing';
     case 'cloudflare-containers':
       if (!isCloudflareContainersEnrolled(env, { orgId: owner.orgId })) {
         return 'Cloudflare containers are not enabled for this account';

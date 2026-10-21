@@ -38,6 +38,11 @@ import {
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import {
+  awaitVercelSettlement,
+  installAckingUsageMeter,
+  vercelSandboxSelection,
+} from './helpers/fake-vercel-billing.js';
 import { waitFor } from './wait-for.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import { routes as routesTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
@@ -227,6 +232,7 @@ async function installSandbox(
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
     });
+    installAckingUsageMeter(instance);
   });
   return sandboxStub;
 }
@@ -258,7 +264,14 @@ async function createVercelSession(input: {
     }),
     message: promptPayload(messageId()),
     sandboxSelection: {
-      provider: input.provider ?? 'vercel',
+      ...(input.provider === undefined || input.provider === 'vercel'
+        ? vercelSandboxSelection({
+            sandboxId: input.sandboxId,
+            sessionId: input.sessionId,
+            userId: USER_ID,
+            orgId: ORG_ID,
+          })
+        : { provider: input.provider }),
       ...(input.contained === undefined
         ? {}
         : {
@@ -518,6 +531,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       await waitFor(async () =>
         expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
       );
+      if (providerName === 'vercel') await awaitVercelSettlement(sandboxStub);
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
       await sessionStub.send(promptPayload(messageId()));
       await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));

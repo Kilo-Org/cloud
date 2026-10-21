@@ -428,6 +428,10 @@ describe('assertSessionOperationIdentity', () => {
   });
 });
 
+const NATIVE_SELECTABLE_ALLOCATIONS = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+  allocation => !allocation.startsWith('vercel-')
+);
+
 describe('explicit sandbox session creation', () => {
   const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
   const vercel = {
@@ -513,7 +517,7 @@ describe('explicit sandbox session creation', () => {
     );
   });
 
-  it.each(['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const)(
+  it.each(['cloudflare-shared', 'isolated-standard'] as const)(
     'rejects egress policy on resolved %s before ownership creation',
     async sandboxAllocation => {
       const doStub = makeDoStub();
@@ -643,7 +647,7 @@ describe('explicit sandbox session creation', () => {
     expectNoAllocation(doStub);
   });
 
-  it.each(['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const)(
+  it.each(['cloudflare-shared', 'isolated-standard'] as const)(
     'allows explicit unrestricted mode on %s',
     async sandboxAllocation => {
       const doStub = makeDoStub();
@@ -772,7 +776,7 @@ describe('explicit sandbox session creation', () => {
   });
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.flatMap(preset => [
+    NATIVE_SELECTABLE_ALLOCATIONS.flatMap(preset => [
       { preset, format: 'legacy' },
       { preset, format: 'structured' },
     ])
@@ -781,10 +785,6 @@ describe('explicit sandbox session creation', () => {
     async ({ preset, format }) => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      if (preset.startsWith('vercel-')) {
-        ctx.env.VERCEL_SANDBOX_ORG_IDS = '';
-        ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '';
-      }
       await runCreate(
         ctx,
         format === 'structured' ? requestFromStructuredAllocation(preset) : requestForPreset(preset)
@@ -832,25 +832,7 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it.each(['vercel-small', 'vercel-large'] as const)(
-    'forces the control plane for %s even when the owner is not enrolled',
-    async preset => {
-      const doStub = makeDoStub();
-      const ctx = selectedContext(doStub);
-      ctx.env.VERCEL_SANDBOX_ORG_IDS = '';
-      await runCreate(ctx, requestForPreset(preset));
-      expect(generateSessionIdMock).toHaveBeenCalledWith();
-      const command = createdMetadata(doStub);
-      expect(command?.workspace).toMatchObject({
-        sandboxAllocation: preset,
-        sandboxProvider: 'vercel',
-        sandboxKind: 'isolated',
-      });
-      expect(command?.workspace?.sandboxId).toMatch(/^sbx-/);
-    }
-  );
-
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+  it.each(NATIVE_SELECTABLE_ALLOCATIONS)(
     'recovers %s on same-key takeover after membership lookup fails before progress',
     async sandboxAllocation => {
       const request = requestForPreset(sandboxAllocation);
@@ -957,13 +939,7 @@ describe('explicit sandbox session creation', () => {
   it.each(['vercel-small', 'vercel-large'] as const)(
     'rejects unavailable %s before creation side effects',
     async preset => {
-      for (const unavailable of [
-        { VERCEL_TOKEN: '' },
-        {
-          CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-          CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: orgId,
-        },
-      ]) {
+      for (const unavailable of [{ VERCEL_TOKEN: '' }, {}]) {
         const doStub = makeDoStub();
         const ctx = selectedContext(doStub);
         Object.assign(ctx.env, unavailable);
@@ -977,7 +953,7 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+  it.each(NATIVE_SELECTABLE_ALLOCATIONS)(
     'creates the first worktree chat with %s and upstream finalization/containment semantics',
     async sandboxAllocation => {
       const doStub = makeDoStub();
@@ -1228,6 +1204,7 @@ describe('explicit sandbox session creation', () => {
         },
       });
       const doStub = makeDoStub();
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
       admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
       const request = {
         ...requestForPreset('vercel-large'),
@@ -1367,7 +1344,8 @@ describe('explicit sandbox session creation', () => {
       },
     });
     const doStub = makeDoStub();
-    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+    // The unavailable Vercel preset makes creation read the admitted ledger row first.
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row], []]));
     admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
     await expect(runCreate(selectedContext(doStub), request)).rejects.toThrow(
       'creation_in_progress'
@@ -1503,25 +1481,35 @@ describe('explicit sandbox session creation', () => {
     expectNoAllocation(doStub);
   });
 
-  it('rejects a fresh explicit Vercel allocation for a GitLab repository before admission', async () => {
-    const doStub = makeDoStub();
-    const ctx = selectedContext(doStub);
-    // Membership recheck passes; the ledger lookup finds no existing row.
-    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
-    const request = makeRequest({
+  it.each([
+    { sandboxAllocation: 'vercel-small', repository: { type: 'github', repo: 'acme/repo' } },
+    { sandboxAllocation: 'vercel-large', repository: { type: 'github', repo: 'acme/repo' } },
+    {
+      sandboxAllocation: 'vercel-small',
       repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
-      runtime: { sandboxAllocation: 'vercel-small' },
-      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
-    });
+    },
+  ] as const)(
+    'rejects a fresh explicit $sandboxAllocation allocation for $repository.type before admission',
+    async ({ sandboxAllocation, repository }) => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      // Membership recheck passes; the ledger lookup finds no existing row.
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+      const request = makeRequest({
+        repository,
+        runtime: { sandboxAllocation },
+        options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+      });
 
-    await expect(runCreate(ctx, request)).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'Vercel sandboxes support GitHub repositories only',
-    });
-    expect(admitOperationMock).not.toHaveBeenCalled();
-    expect(recordOperationProgressMock).not.toHaveBeenCalled();
-    expectNoAllocation(doStub);
-  });
+      await expect(runCreate(ctx, request)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Vercel sandboxes do not support enforced compute billing',
+      });
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expect(recordOperationProgressMock).not.toHaveBeenCalled();
+      expectNoAllocation(doStub);
+    }
+  );
 
   it('rejects a fresh explicit Vercel allocation for a security-remediation origin before admission', async () => {
     const doStub = makeDoStub();

@@ -3588,7 +3588,6 @@
     "keyTooLong": "Kia 256 pūāhua iti iho rānei te kī",
     "keyDuplicate": "Kua noho kē tēnei kī i te kōtaha",
     "valueLabel": "Uara",
-    "secretLabel": "Mea ngaro",
     "secrets": {
       "markSecret": "Tohua hei mea ngaro",
       "masked": "Uara huna",

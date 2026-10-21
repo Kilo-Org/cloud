@@ -3711,7 +3711,6 @@
     "keyTooLong": "Caithfidh an eochair a bheith 256 carachtar nó níos lú",
     "keyDuplicate": "Tá an eochair seo ann cheana sa phróifíl",
     "valueLabel": "Luach",
-    "secretLabel": "Rúnda",
     "secrets": {
       "markSecret": "Marcáil mar rún",
       "masked": "Luach i bhfolach",

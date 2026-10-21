@@ -3588,7 +3588,6 @@
     "keyTooLong": "Tokony tsy mihoatra ny 256 tarehintsoratra ny fanalahidy",
     "keyDuplicate": "Efa ao amin'ny profil ity fanalahidy ity",
     "valueLabel": "Sanda",
-    "secretLabel": "zava-miafina",
     "secrets": {
       "markSecret": "Mariho ho tsiambaratelo",
       "masked": "Sanda miafina",

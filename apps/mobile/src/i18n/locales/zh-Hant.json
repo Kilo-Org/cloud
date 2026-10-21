@@ -3588,7 +3588,6 @@
     "keyTooLong": "鍵不能超過 256 個字元",
     "keyDuplicate": "此鍵已存在於設定檔中",
     "valueLabel": "值",
-    "secretLabel": "秘密",
     "secrets": {
       "markSecret": "標記為秘密",
       "masked": "隱藏值",

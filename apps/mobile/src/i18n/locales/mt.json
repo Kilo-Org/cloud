@@ -3711,7 +3711,6 @@
     "keyTooLong": "L-ewlenin irid ikun 256 karattru jew inqas",
     "keyDuplicate": "Dan l-ewlenin diġà jeżisti fil-profil",
     "valueLabel": "Valur",
-    "secretLabel": "Sigriet",
     "secrets": {
       "markSecret": "Immarka bħala sigriet",
       "masked": "Valur moħbi",

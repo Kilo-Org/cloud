@@ -3588,7 +3588,6 @@
     "keyTooLong": "Nyckeln får innehålla högst 256 tecken",
     "keyDuplicate": "Den här nyckeln finns redan i profilen",
     "valueLabel": "Värde",
-    "secretLabel": "Hemlighet",
     "secrets": {
       "markSecret": "Markera som hemlig",
       "masked": "Dolt värde",

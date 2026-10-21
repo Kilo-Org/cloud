@@ -3588,7 +3588,6 @@
     "keyTooLong": "Gakoak 256 karaktere edo gutxiago izan behar ditu",
     "keyDuplicate": "Gako hau jada badago profilean",
     "valueLabel": "Balioa",
-    "secretLabel": "Sekretua",
     "secrets": {
       "markSecret": "Markatu sekretu gisa",
       "masked": "Ezkutuko balioa",

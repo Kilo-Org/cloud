@@ -3588,7 +3588,6 @@
     "keyTooLong": "Кілт 256 таңбадан аспауы керек",
     "keyDuplicate": "Бұл кілт профильде бұрыннан бар",
     "valueLabel": "Мән",
-    "secretLabel": "Құпия",
     "secrets": {
       "markSecret": "Құпия деп белгілеңіз",
       "masked": "Жасырын мән",

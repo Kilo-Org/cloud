@@ -3670,7 +3670,6 @@
     "keyTooLong": "Klíč musí mít 256 znaků nebo méně",
     "keyDuplicate": "Tento klíč už v profilu existuje",
     "valueLabel": "Hodnota",
-    "secretLabel": "Tajný",
     "secrets": {
       "markSecret": "Označit jako tajné",
       "masked": "Skrytá hodnota",

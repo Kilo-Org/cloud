@@ -3588,7 +3588,6 @@
     "keyTooLong": "Ufunguo lazima uwe na vibambo 256 au chini yake",
     "keyDuplicate": "Ufunguo huu tayari upo katika wasifu",
     "valueLabel": "Thamani",
-    "secretLabel": "Siri",
     "secrets": {
       "markSecret": "Weka alama kuwa siri",
       "masked": "Thamani iliyofichwa",

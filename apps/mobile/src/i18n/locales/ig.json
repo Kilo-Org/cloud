@@ -3588,7 +3588,6 @@
     "keyTooLong": "Igodo ga-abụ mkpụrụedemede 256 ma ọ bụ obere",
     "keyDuplicate": "Igodo a dịworị na profaịlụ",
     "valueLabel": "Uru",
-    "secretLabel": "Nzuzo",
     "secrets": {
       "markSecret": "Kaa akara dị ka nzuzo",
       "masked": "Uru zoro ezo",

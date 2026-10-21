@@ -3670,7 +3670,6 @@
     "keyTooLong": "Klucz może mieć maksymalnie 256 znaków",
     "keyDuplicate": "Ten klucz już istnieje w profilu",
     "valueLabel": "Wartość",
-    "secretLabel": "Sekret",
     "secrets": {
       "markSecret": "Oznacz jako tajne",
       "masked": "Ukryta wartość",

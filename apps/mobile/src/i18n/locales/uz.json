@@ -3588,7 +3588,6 @@
     "keyTooLong": "Kalit 256 ta belgi yoki undan kam bo'lishi kerak",
     "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
     "valueLabel": "Qiymat",
-    "secretLabel": "Sir",
     "secrets": {
       "markSecret": "Sir sifatida belgilang",
       "masked": "Yashirin qiymat",

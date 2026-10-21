@@ -3588,7 +3588,6 @@
     "keyTooLong": "Kle a dwe gen 256 karaktè oswa mwens",
     "keyDuplicate": "Kle sa a deja egziste nan pwofil la",
     "valueLabel": "Valè",
-    "secretLabel": "Sekrè",
     "secrets": {
       "markSecret": "Make kòm sekrè",
       "masked": "Valè kache",

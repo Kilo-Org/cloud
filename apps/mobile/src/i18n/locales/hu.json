@@ -3588,7 +3588,6 @@
     "keyTooLong": "A kulcs legfeljebb 256 karakter lehet",
     "keyDuplicate": "Ez a kulcs már létezik a profilban",
     "valueLabel": "Érték",
-    "secretLabel": "Titkos",
     "secrets": {
       "markSecret": "Jelölje meg titkosként",
       "masked": "Rejtett érték",

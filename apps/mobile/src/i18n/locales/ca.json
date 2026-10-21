@@ -3629,7 +3629,6 @@
     "keyTooLong": "La clau ha de tenir 256 caràcters o menys",
     "keyDuplicate": "Aquesta clau ja existeix al perfil",
     "valueLabel": "Valor",
-    "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Marca com a secret",
       "masked": "Valor ocult",

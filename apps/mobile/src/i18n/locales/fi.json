@@ -3588,7 +3588,6 @@
     "keyTooLong": "Avaimessa saa olla enintään 256 merkkiä",
     "keyDuplicate": "Tämä avain on jo profiilissa",
     "valueLabel": "Arvo",
-    "secretLabel": "Salaisuus",
     "secrets": {
       "markSecret": "Merkitse salaiseksi",
       "masked": "Piilotettu arvo",

@@ -3588,7 +3588,6 @@
     "keyTooLong": "키는 256자 이하여야 합니다",
     "keyDuplicate": "이 키는 이미 프로필에 있습니다.",
     "valueLabel": "값",
-    "secretLabel": "비밀",
     "secrets": {
       "markSecret": "비밀로 표시",
       "masked": "숨겨진 가치",

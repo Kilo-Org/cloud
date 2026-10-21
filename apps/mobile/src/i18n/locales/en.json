@@ -3652,7 +3652,6 @@
     "keyTooLong": "Key must be 256 characters or fewer",
     "keyDuplicate": "This key already exists in the profile",
     "valueLabel": "Value",
-    "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Mark as secret",
       "masked": "Hidden value",

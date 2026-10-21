@@ -3588,7 +3588,6 @@
     "keyTooLong": "Sleutel moet 256 karakters of minder wees",
     "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
     "valueLabel": "Waarde",
-    "secretLabel": "Geheim",
     "secrets": {
       "markSecret": "Merk as geheim",
       "masked": "Versteekte waarde",

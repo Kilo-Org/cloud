@@ -3588,7 +3588,6 @@
     "keyTooLong": "কী 256টি অক্ষর বা তার কম হতে হবে",
     "keyDuplicate": "এই কীটি ইতিমধ্যে প্রোফাইলে বিদ্যমান",
     "valueLabel": "মান",
-    "secretLabel": "গোপন",
     "secrets": {
       "markSecret": "গোপন হিসাবে চিহ্নিত করুন",
       "masked": "লুকানো মান",

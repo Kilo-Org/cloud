@@ -3588,7 +3588,6 @@
     "keyTooLong": "Lykillinn má vera að hámarki 256 stafir",
     "keyDuplicate": "Þessi lykill er þegar til í prófílnum",
     "valueLabel": "Gildi",
-    "secretLabel": "Leyndarmál",
     "secrets": {
       "markSecret": "Merktu sem leyndarmál",
       "masked": "Falið gildi",

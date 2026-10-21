@@ -3588,7 +3588,6 @@
     "keyTooLong": "Anahtar en fazla 256 karakter olmalıdır",
     "keyDuplicate": "Bu anahtar profilde zaten var",
     "valueLabel": "Değer",
-    "secretLabel": "Gizli",
     "secrets": {
       "markSecret": "Gizli olarak işaretle",
       "masked": "Gizli değer",

@@ -54,7 +54,10 @@ describe('Home-only widget policy', () => {
     });
     // A snapshot restored from an older producer may still carry the raw form.
     data.snapshot.scheduledAt = '2026-10-09 09:55:00+00';
-    expect(buildHomeWidgetPresentation(data, now).awaitingUpdate).toBe(true);
+    expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+      scheduledAt: '2026-10-09T09:55:00.000Z',
+      awaitingUpdate: true,
+    });
     expect(homeWidgetRefreshAt(data, now)).toBe(now + 30 * 60 * 1000);
   });
 

@@ -15,6 +15,7 @@ import {
   shouldDiscardGlanceableRevision,
   soonestScheduledAt,
 } from './glanceable-agents-snapshot';
+import { parseTimestamp } from './utils';
 
 const NOW = 1_750_000_000_000;
 
@@ -649,8 +650,13 @@ describe('session timestamp parsing', () => {
     ).toEqual({ kind: 'needsInput', at: '2026-03-16T15:21:40.957Z' });
   });
 
-  it('keeps a date-only wake instead of dropping it', () => {
-    expect(soonestScheduledAt([{ status: 'scheduled', scheduledAt: '2026-03-16' }])).not.toBeNull();
+  it('reports a date-only wake in the canonical ISO form of its parsed instant', () => {
+    // The instant a date-only value denotes is the parser's business (a
+    // separate change moves it to local midnight), so this pins the form: the
+    // helper reports the parsed instant as ISO 8601, never the raw string.
+    expect(soonestScheduledAt([{ status: 'scheduled', scheduledAt: '2026-03-16' }])).toBe(
+      parseTimestamp('2026-03-16').toISOString()
+    );
   });
 
   it('carries PostgreSQL timestamps into the snapshot as ISO 8601', () => {

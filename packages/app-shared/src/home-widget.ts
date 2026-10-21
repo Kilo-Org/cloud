@@ -212,7 +212,7 @@ export function buildHomeWidgetPresentation(
     terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
   const confirmedAt = usableTime(checkedAt);
   const wake = snapshot.scheduled > 0 ? usableTime(snapshot.scheduledAt) : null;
-  const scheduledAt = wake === null ? null : snapshot.scheduledAt;
+  const scheduledAt = wake === null ? null : new Date(wake).toISOString();
   return {
     status: terminal
       ? snapshot.status === 'privacy'

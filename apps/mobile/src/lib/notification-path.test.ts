@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { SECURITY_LIFECYCLE_EVENTS } from '@kilocode/notifications';
+
 import { notificationPathForData, prPathForData } from './notification-path';
 
 describe('prPathForData', () => {
@@ -184,18 +186,7 @@ describe('notificationPathForData', () => {
   });
 
   it('routes every security_lifecycle event value to the finding detail path', () => {
-    const events = [
-      'analysis_completed',
-      'analysis_failed',
-      'remediation_queued',
-      'remediation_pr_opened',
-      'remediation_failed',
-      'remediation_blocked',
-      'remediation_no_changes_needed',
-      'remediation_cancelled',
-    ] as const;
-
-    for (const event of events) {
+    for (const event of SECURITY_LIFECYCLE_EVENTS) {
       expect(
         notificationPathForData({
           type: 'security_lifecycle',

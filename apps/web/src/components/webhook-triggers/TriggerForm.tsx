@@ -35,6 +35,8 @@ import {
   triggerIdSchema,
   triggerIdCreateSchema,
   RESERVED_TRIGGER_IDS,
+  MIN_CREATOR_WEBHOOK_SECRET_LENGTH,
+  CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
 } from '@/lib/webhook-trigger-validation';
 import { TimezoneSelector } from './TimezoneSelector';
 import { ScheduleBuilder } from './ScheduleBuilder';
@@ -245,10 +247,15 @@ export function TriggerForm({
   const trimmedWebhookAuthSecret = webhookAuthSecret.trim();
   const webhookAuthHeaderError =
     webhookAuthEnabled && !trimmedWebhookAuthHeader ? 'Webhook auth header is required' : null;
-  const webhookAuthSecretError =
-    webhookAuthEnabled && !initialWebhookAuthConfigured && !trimmedWebhookAuthSecret
+  const webhookAuthSecretError = !webhookAuthEnabled
+    ? null
+    : !initialWebhookAuthConfigured && !trimmedWebhookAuthSecret
       ? 'Webhook auth secret is required when enabling authentication'
-      : null;
+      : runAsCreator &&
+          trimmedWebhookAuthSecret &&
+          trimmedWebhookAuthSecret.length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH
+        ? CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE
+        : null;
 
   // Trigger ID validation — use stricter schema for new triggers
   const activeTriggerIdSchema = isEditMode ? triggerIdSchema : triggerIdCreateSchema;

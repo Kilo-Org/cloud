@@ -44,7 +44,7 @@ describe('TriggerDO', () => {
           promptTemplate: 'Process {{body}}',
           activationMode,
           ...(activationMode === 'webhook'
-            ? { webhookAuth: { header: 'x-secret', secret: 'secret' } }
+            ? { webhookAuth: { header: 'x-secret', secret: 'creator-secret-0123456789' } }
             : { cronExpression: '* * * * *' }),
         };
         await stub.configure(testOrgNamespace, triggerId, input);
@@ -90,7 +90,7 @@ describe('TriggerDO', () => {
       const input = {
         githubRepo: 'owner/repo',
         promptTemplate: 'test',
-        webhookAuth: { header: 'x-secret', secret: 'secret' },
+        webhookAuth: { header: 'x-secret', secret: 'creator-secret-0123456789' },
       };
       await stub.configure(testOrgNamespace, 'legacy-execution', input);
       expect((await stub.getConfig())?.executionUserId).toBeNull();
@@ -129,6 +129,39 @@ describe('TriggerDO', () => {
         ).rejects.toThrow('Webhook auth is required');
         expect(await instance.getConfig()).toBeNull();
         expect(await state.storage.get('config')).toBeUndefined();
+      });
+    });
+
+    it('requires a strong secret for creator webhooks on create and rotation only', async () => {
+      const triggerId = 'creator-secret-strength';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+      );
+      const input = {
+        executionUserId: 'oauth/creator',
+        githubRepo: 'owner/repo',
+        promptTemplate: 'test',
+      };
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure(testOrgNamespace, triggerId, {
+            ...input,
+            webhookAuth: { header: 'x-secret', secret: ` ${'a'.repeat(15)} ` },
+          })
+        ).rejects.toThrow('at least 16 characters');
+        expect(await instance.getConfig()).toBeNull();
+
+        await instance.configure(testOrgNamespace, triggerId, {
+          ...input,
+          webhookAuth: { header: 'x-secret', secret: 'a'.repeat(16) },
+        });
+        const before = await instance.getConfig();
+        await expect(instance.updateConfig({ webhookAuth: { secret: 'short' } })).rejects.toThrow(
+          'at least 16 characters'
+        );
+        expect(await instance.getConfig()).toEqual(before);
+        await instance.updateConfig({ webhookAuth: { header: 'x-other' } });
+        expect((await instance.getConfig())?.webhookAuthHeader).toBe('x-other');
       });
     });
 
@@ -585,6 +618,76 @@ describe('TriggerDO', () => {
       expect(request.processStatus).toBe('captured');
     });
 
+    it.each([
+      ['personal', testUserNamespace, {}],
+      ['creator-run organization', testOrgNamespace, { executionUserId: 'oauth/creator' }],
+    ] as const)(
+      'rejects public capture for %s scheduled triggers without writing a request',
+      async (_name, namespace, identity) => {
+        const triggerId = 'public-scheduled';
+        const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`${namespace}/${triggerId}`));
+        await stub.configure(namespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          activationMode: 'scheduled',
+          cronExpression: '* * * * *',
+          ...identity,
+        });
+
+        const result = await stub.captureRequest({
+          method: 'POST',
+          path: `/inbound/${namespace}/${triggerId}`,
+          queryString: null,
+          headers: {},
+          body: 'attacker controlled',
+          contentType: 'text/plain',
+          sourceIp: '203.0.113.1',
+        });
+
+        expect(result).toEqual({ success: false, error: 'Trigger not configured or inactive' });
+        expect((await stub.listRequests()).requests).toEqual([]);
+      }
+    );
+
+    it('requires the configured secret before capturing for creator-run webhook triggers', async () => {
+      const triggerId = 'creator-webhook-capture';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+      );
+      const secret = 'creator-secret-0123456789';
+      await stub.configure(testOrgNamespace, triggerId, {
+        executionUserId: 'oauth/creator',
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+        webhookAuth: { header: 'X-Secret', secret },
+      });
+      const capture = (headers: Record<string, string>) =>
+        stub.captureRequest({
+          method: 'POST',
+          path: '/',
+          queryString: null,
+          headers,
+          body: '{}',
+          contentType: 'application/json',
+          sourceIp: null,
+        });
+
+      await expect(capture({})).resolves.toEqual({ success: false, error: 'Unauthorized' });
+      await expect(capture({ 'x-secret': 'wrong' })).resolves.toEqual({
+        success: false,
+        error: 'Unauthorized',
+      });
+      expect((await stub.listRequests()).requests).toEqual([]);
+
+      const accepted = await capture({ 'x-secret': secret });
+      expect(accepted.success).toBe(true);
+      expect((await stub.listRequests()).requests[0]?.headers['x-secret']).toBe('[REDACTED]');
+    });
+
     it('should reject payload exceeding 256KB', async () => {
       const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
       const stub = env.TRIGGER_DO.get(id);
@@ -763,15 +866,7 @@ describe('TriggerDO', () => {
         cronExpression: '* * * * *',
       });
       for (let index = 0; index < 19; index++) {
-        const captured = await stub.captureRequest({
-          method: 'POST',
-          path: `/${index}`,
-          queryString: null,
-          headers: {},
-          body: '{}',
-          contentType: null,
-          sourceIp: null,
-        });
+        const captured = await stub.invokeScheduled();
         if (!captured.success) throw new Error('Expected request to be captured');
         if (index % 2 === 0)
           await stub.updateRequest(captured.requestId, { process_status: 'inprogress' });
@@ -918,15 +1013,7 @@ describe('TriggerDO', () => {
         cronExpression: '* * * * *',
       });
       for (let index = 0; index < 20; index++) {
-        const captured = await stub.captureRequest({
-          method: 'POST',
-          path: `/${index}`,
-          queryString: null,
-          headers: {},
-          body: '{}',
-          contentType: null,
-          sourceIp: null,
-        });
+        const captured = await stub.invokeScheduled();
         if (!captured.success) throw new Error('Expected request to be captured');
         if (index % 2 === 0)
           await stub.updateRequest(captured.requestId, { process_status: 'inprogress' });

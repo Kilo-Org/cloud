@@ -16,7 +16,12 @@ import {
 } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
-import { triggerIdSchema, triggerIdCreateSchema } from '@/lib/webhook-trigger-validation';
+import {
+  triggerIdSchema,
+  triggerIdCreateSchema,
+  MIN_CREATOR_WEBHOOK_SECRET_LENGTH,
+  CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
+} from '@/lib/webhook-trigger-validation';
 import {
   validateCronExpression,
   enforcesMinimumInterval,
@@ -86,6 +91,13 @@ export const WebhookTriggerCreateInput = z
           code: 'custom',
           message: 'Webhook authentication is required when running as the creator',
           path: ['webhookAuth'],
+        });
+      }
+      if (data.webhookAuth && data.webhookAuth.secret.length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH) {
+        ctx.addIssue({
+          code: 'custom',
+          message: CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
+          path: ['webhookAuth', 'secret'],
         });
       }
     }
@@ -252,6 +264,44 @@ async function cleanupOrphanDbRecord(dbTriggerId: string, triggerId: string): Pr
   await db
     .delete(cloud_agent_webhook_triggers)
     .where(eq(cloud_agent_webhook_triggers.id, dbTriggerId));
+}
+
+function assertCanActAsExecutionUser(
+  executionUserId: string | null | undefined,
+  userId: string,
+  action: 'update' | 'run'
+): void {
+  if (executionUserId && executionUserId !== userId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: `Only the creator can ${action} a trigger that runs as its creator`,
+    });
+  }
+}
+
+async function getOrganizationTriggerExecutionUserId(
+  organizationId: string,
+  triggerId: string,
+  dbTriggerId: string
+): Promise<string | null> {
+  const result = await getWorkerTrigger(undefined, organizationId, triggerId);
+  if (result.found === 'error') {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Unable to verify trigger execution identity',
+    });
+  }
+  if (!result.found) {
+    await cleanupOrphanDbRecord(dbTriggerId, triggerId);
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
+  }
+  return result.config.executionUserId ?? null;
+}
+
+function assertCreatorWebhookSecretStrength(secret: string): void {
+  if (secret.trim().length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE });
+  }
 }
 
 /**
@@ -645,28 +695,14 @@ export const webhookTriggersRouter = createTRPCRouter({
     const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
     if (input.organizationId) {
-      const currentTrigger = await getWorkerTrigger(
-        undefined,
+      const executionUserId = await getOrganizationTriggerExecutionUserId(
         input.organizationId,
-        input.triggerId
+        input.triggerId,
+        dbTrigger.id
       );
-      if (currentTrigger.found === 'error') {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Unable to verify trigger execution identity',
-        });
-      }
-      if (!currentTrigger.found) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
-      }
-      if (
-        currentTrigger.config.executionUserId &&
-        currentTrigger.config.executionUserId !== userId
-      ) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Only the creator can update a trigger that runs as its creator',
-        });
+      assertCanActAsExecutionUser(executionUserId, userId, 'update');
+      if (executionUserId && input.webhookAuth?.secret) {
+        assertCreatorWebhookSecretStrength(input.webhookAuth.secret);
       }
     }
 
@@ -792,7 +828,16 @@ export const webhookTriggersRouter = createTRPCRouter({
       await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
     }
 
-    await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+    const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+
+    if (input.organizationId) {
+      const executionUserId = await getOrganizationTriggerExecutionUserId(
+        input.organizationId,
+        input.triggerId,
+        dbTrigger.id
+      );
+      assertCanActAsExecutionUser(executionUserId, userId, 'run');
+    }
 
     const result = await invokeWorkerScheduledTrigger(
       input.organizationId ? undefined : userId,

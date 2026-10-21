@@ -108,6 +108,7 @@ let createAdminCaller: ReturnType<
 >;
 
 const user = { id: 'user-1', is_admin: false } as User;
+const creatorSecret = 'creator-secret-0123456789';
 const createInput = {
   triggerId: 'trigger-id',
   githubRepo: 'owner/repo',
@@ -334,7 +335,7 @@ describe('webhook trigger variant inputs', () => {
       organizationId,
       runAsCreator: true,
       executionUserId: 'another-user',
-      webhookAuth: { header: 'x-secret', secret: 'secret' },
+      webhookAuth: { header: 'x-secret', secret: creatorSecret },
     };
     await createCaller({ user }).create(forgedInput);
     expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
@@ -371,9 +372,63 @@ describe('webhook trigger variant inputs', () => {
         kiloclawInstanceId: organizationId,
         organizationId,
         runAsCreator: true,
-        webhookAuth: { header: 'x-secret', secret: 'secret' },
+        webhookAuth: { header: 'x-secret', secret: creatorSecret },
       }).success
     ).toBe(false);
+  });
+
+  it('requires a strong shared secret for creator webhooks', () => {
+    const input = {
+      ...createInput,
+      organizationId: '00000000-0000-4000-8000-000000000001',
+      runAsCreator: true,
+    };
+    const weak = WebhookTriggerCreateInput.safeParse({
+      ...input,
+      webhookAuth: { header: 'x-secret', secret: `  ${'a'.repeat(15)}  ` },
+    });
+    expect(weak.success).toBe(false);
+    expect(weak.error?.issues[0]?.path).toEqual(['webhookAuth', 'secret']);
+    expect(
+      WebhookTriggerCreateInput.safeParse({
+        ...input,
+        webhookAuth: { header: 'x-secret', secret: 'a'.repeat(16) },
+      }).success
+    ).toBe(true);
+    expect(
+      WebhookTriggerCreateInput.safeParse({
+        ...createInput,
+        webhookAuth: { header: 'x-secret', secret: 'short' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects a weak replacement secret on a creator-run trigger before updating', async () => {
+    mockGetWorkerTrigger.mockResolvedValue({
+      found: true,
+      config: { ...triggerConfig, executionUserId: user.id },
+    });
+    await expect(
+      createCaller({ user }).update({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+        webhookAuth: { secret: 'short' },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('cleans up the PostgreSQL record when the worker no longer has an organization trigger', async () => {
+    mockGetWorkerTrigger.mockResolvedValue({ found: false });
+    await expect(
+      createCaller({ user }).update({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+        promptTemplate: 'Changed prompt',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockDbDelete).toHaveBeenCalledTimes(1);
+    expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
   });
 
   it('rejects inherited or admin-only access for creator execution before inserting a trigger', async () => {
@@ -383,7 +438,7 @@ describe('webhook trigger variant inputs', () => {
         ...createInput,
         organizationId: '00000000-0000-4000-8000-000000000001',
         runAsCreator: true,
-        webhookAuth: { header: 'x-secret', secret: 'secret' },
+        webhookAuth: { header: 'x-secret', secret: creatorSecret },
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockDbInsert).not.toHaveBeenCalled();
@@ -722,10 +777,42 @@ describe('scheduled trigger invocation', () => {
       },
     ]);
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockGetWorkerTrigger.mockResolvedValue({ found: true, config: triggerConfig });
     mockInvokeWorkerScheduledTrigger.mockResolvedValue({
       success: true,
       requestId: '00000000-0000-4000-8000-000000000005',
     });
+  });
+
+  it('allows only the creator to run a creator-run organization trigger', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockGetWorkerTrigger.mockResolvedValue({
+      found: true,
+      config: { ...triggerConfig, executionUserId: 'another-user' },
+    });
+    await expect(
+      createCaller({ user }).invoke({ triggerId: 'trigger-id', organizationId })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockInvokeWorkerScheduledTrigger).not.toHaveBeenCalled();
+
+    mockGetWorkerTrigger.mockResolvedValue({
+      found: true,
+      config: { ...triggerConfig, executionUserId: user.id },
+    });
+    await expect(
+      createCaller({ user }).invoke({ triggerId: 'trigger-id', organizationId })
+    ).resolves.toEqual({ requestId: '00000000-0000-4000-8000-000000000005' });
+  });
+
+  it('fails closed when the organization trigger execution identity cannot be read', async () => {
+    mockGetWorkerTrigger.mockResolvedValue({ found: 'error', error: 'Unavailable', status: 503 });
+    await expect(
+      createCaller({ user }).invoke({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000003',
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(mockInvokeWorkerScheduledTrigger).not.toHaveBeenCalled();
   });
 
   it('invokes an owned personal trigger using the authenticated user namespace', async () => {

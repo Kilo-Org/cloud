@@ -18,6 +18,7 @@ import {
 } from '../util/constants';
 import { enqueueWebhookDelivery, type WebhookDeliveryMessage } from '../util/queue';
 import {
+  assertCreatorWebhookSecretStrength,
   compareWebhookSecret,
   hashWebhookSecret,
   normalizeAuthHeader,
@@ -170,6 +171,9 @@ export class TriggerDO extends DurableObject<Env> {
       !webhookAuth
     ) {
       throw new Error('Webhook auth is required for creator execution');
+    }
+    if (executionUserId !== null) {
+      assertCreatorWebhookSecretStrength(configOverrides.webhookAuth?.secret);
     }
     const existing = this.db.select().from(triggerConfigTable).limit(1).get();
     if (existing && existing.execution_user_id !== executionUserId) {
@@ -345,12 +349,11 @@ export class TriggerDO extends DurableObject<Env> {
     };
 
     const webhookAuth = await this.resolveWebhookAuthOnUpdate(existingConfig, updates.webhookAuth);
-    if (
-      existingConfig.executionUserId &&
-      existingConfig.activationMode !== 'scheduled' &&
-      !webhookAuth
-    ) {
-      throw new Error('Webhook auth is required for creator execution');
+    if (existingConfig.executionUserId) {
+      if (existingConfig.activationMode !== 'scheduled' && !webhookAuth) {
+        throw new Error('Webhook auth is required for creator execution');
+      }
+      assertCreatorWebhookSecretStrength(updates.webhookAuth?.secret);
     }
 
     const updatedConfig: TriggerConfig = {
@@ -537,7 +540,9 @@ export class TriggerDO extends DurableObject<Env> {
     sourceIp: string | null;
   }): Promise<{ success: true; requestId: string } | { success: false; error: string }> {
     const config = await this.getConfig();
-    if (!config?.isActive) {
+    // Scheduled triggers only run from alarms or authenticated invokes; they have no
+    // webhook auth, so public capture would let anyone run them as their principal.
+    if (!config?.isActive || config.activationMode === 'scheduled') {
       return { success: false, error: 'Trigger not configured or inactive' };
     }
 

@@ -366,12 +366,16 @@ describe('TriggerForm variants', () => {
     const secret = container.querySelector<HTMLInputElement>('#webhookAuthSecret');
     if (!header || !secret) throw new Error('authentication inputs missing');
     changeValue(header, 'x-secret');
-    changeValue(secret, 'shared-secret');
+    changeValue(secret, 'short-secret');
+    submit(container);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('at least 16 characters');
+    changeValue(secret, 'shared-secret-0123456789');
     submit(container);
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         runAsCreator: true,
-        webhookAuth: { enabled: true, header: 'x-secret', secret: 'shared-secret' },
+        webhookAuth: { enabled: true, header: 'x-secret', secret: 'shared-secret-0123456789' },
       })
     );
   });

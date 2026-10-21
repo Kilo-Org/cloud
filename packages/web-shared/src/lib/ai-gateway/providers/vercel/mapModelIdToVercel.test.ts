@@ -60,6 +60,12 @@ describe('mapModelIdToVercel', () => {
       );
     });
 
+    it('rewrites the bytedance-seed/ prefix to bytedance/', async () => {
+      await expect(mapModelIdToVercel('bytedance-seed/seed-1.6')).resolves.toBe(
+        'bytedance/seed-1.6'
+      );
+    });
+
     it('rewrites the mistralai/ prefix to mistral/', async () => {
       await expect(mapModelIdToVercel('mistralai/some-new-model')).resolves.toBe(
         'mistral/some-new-model'

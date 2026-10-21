@@ -41,7 +41,7 @@ import {
   buildWorktreeKiloEnvironment,
   type WorktreeKiloAuth,
 } from '../control/worktree-runtime.js';
-import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
+import { createOutputRedactor, createSecretRedactor, redactSecrets } from '../redact-output.js';
 import {
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
@@ -147,7 +147,11 @@ export type PrepareRuntimePort = {
     env: Record<string, string>;
     workload?: ControlWorkload;
   }): Promise<WrapperKiloClient>;
-  installCredentials(key: string, env: Record<string, string>): Promise<void>;
+  installCredentials(
+    key: string,
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** True when the runtime is gone or has spent its restart budget. */
   isUnavailable(key: string): boolean;
   /**
@@ -206,6 +210,7 @@ export type PrepareDeps = {
 };
 
 type PreparedRoute = {
+  cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   key: string;
   spec: ControlPlaneRouteSpec;
   directory: string;
@@ -230,6 +235,12 @@ export type PreparationManager = {
   ): Promise<void>;
   release(sessionId: string): void;
   isPrepared(sessionId: string): boolean;
+  /**
+   * The prepared route's runtime identity, or null while the route is not yet
+   * attached. Live native reads use it to reach the exact runtime and directory
+   * the route was prepared for (spec §10).
+   */
+  preparedRoute(sessionId: string): { runtimeKey: string; directory: string } | null;
   isPreparing(): boolean;
   /** In-flight prepares, for the native status line. */
   preparingCount(): number;
@@ -912,7 +923,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     } catch (error) {
       log(
         `control-plane capture failed session=${spec.sessionId} error=${
-          error instanceof Error ? error.message : 'unknown'
+          error instanceof Error ? createSecretRedactor(env)(error.message) : 'unknown'
         }`
       );
     } finally {
@@ -1287,7 +1298,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           spec.env ?? {},
           inheritedEnv,
           spec.mcp,
-          spec
+          { ...spec, cloudAgentMcp: credentials?.cloudAgentMcp }
         ),
         spec
       );
@@ -1298,6 +1309,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           {
             ...builtEnv,
             ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
+            ...(credentials?.cloudAgentMcp
+              ? { CLOUD_AGENT_MCP_TOKEN: credentials.cloudAgentMcp.token }
+              : {}),
           },
         ],
         spec.secretEnvKeys ?? []
@@ -1397,6 +1411,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         home,
         kilo: kiloAuth,
         env: builtEnv,
+        cloudAgentMcp: credentials?.cloudAgentMcp,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
@@ -1421,9 +1436,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     } catch (error) {
       if (owner.released) return;
       log(
-        `control-plane prepare failed session=${sessionId} step=${currentStep} error=${
-          error instanceof Error ? error.message : String(error)
-        }${
+        `control-plane prepare failed session=${sessionId} step=${currentStep} error=${redactSecrets(
+          error instanceof Error ? error.message : String(error),
+          credentials?.cloudAgentMcp ? [credentials.cloudAgentMcp.token] : []
+        )}${
           error instanceof WrapperBootstrapError && error.gitFailure ? ` ${error.gitFailure}` : ''
         }`
       );
@@ -1440,6 +1456,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
       return;
     }
+    route.cloudAgentMcp = credentials.cloudAgentMcp ?? route.cloudAgentMcp;
     const nextEnv = withRuntimeProfileEnvironment(
       buildWorktreeKiloEnvironment(
         route.directory,
@@ -1452,12 +1469,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         route.spec.env ?? {},
         inheritedEnv,
         route.spec.mcp,
-        route.spec
+        { ...route.spec, cloudAgentMcp: route.cloudAgentMcp }
       ),
       route.spec
     );
     route.env = nextEnv;
-    await deps.runtimes.installCredentials(route.key, nextEnv);
+    await deps.runtimes.installCredentials(route.key, nextEnv, route.cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
       const url = authenticatedGitUrl(
         route.spec.git.url,
@@ -1562,6 +1579,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       });
     },
     isPrepared: sessionId => prepared.has(sessionId),
+    preparedRoute: sessionId => {
+      const route = prepared.get(sessionId);
+      return route === undefined ? null : { runtimeKey: route.key, directory: route.directory };
+    },
     isPreparing: () => preparing.size > 0,
     preparingCount: () => preparing.size,
     sessionCount: () => prepared.size,

@@ -44,4 +44,19 @@ describe('normalizeRemoteMcpUrl', () => {
       'https://remote.example/mcp?base=/'
     );
   });
+
+  it('drops the trailing slash of a root path', () => {
+    expect(normalizeRemoteMcpUrl('https://remote.example/')).toBe('https://remote.example');
+    expect(normalizeRemoteMcpUrl('https://remote.example///')).toBe('https://remote.example');
+    expect(normalizeRemoteMcpUrl('http://localhost:8787/')).toBe('http://localhost:8787');
+  });
+
+  it('normalizes both spellings of a root path with a query to one value', () => {
+    expect(normalizeRemoteMcpUrl('https://remote.example/?base=/')).toBe(
+      normalizeRemoteMcpUrl('https://remote.example?base=/')
+    );
+    expect(normalizeRemoteMcpUrl('https://remote.example/?base=/')).toBe(
+      'https://remote.example?base=/'
+    );
+  });
 });

@@ -110,6 +110,8 @@
     "open": "{{name}} തുറക്കുക",
     "openPullRequest": "തുറന്ന പുൾ റിക്വസ്റ്റ്",
     "pending": "കാത്തിരിക്കുന്നു",
+    "running": "പ്രവർത്തിക്കുന്നു",
+    "completed": "പൂർത്തിയായി",
     "performance": "പ്രവർത്തനക്ഷമത",
     "preferences": "മുൻഗണനകൾ",
     "privacyPolicy": "സ്വകാര്യതാ നയം",
@@ -1531,8 +1533,6 @@
     "updateFailed": "കോഡ് അവലോകന ഏജന്റ് പുതുക്കാൻ കഴിഞ്ഞില്ല.",
     "configSaveFailed": "അവലോകന ക്രമീകരണങ്ങൾ സംരക്ഷിക്കാൻ കഴിഞ്ഞില്ല.",
     "status": {
-      "running": "പ്രവർത്തിക്കുന്നു",
-      "completed": "പൂർത്തിയായി",
       "interrupted": "തടസ്സപ്പെട്ടു"
     },
     "reviewStyle": {

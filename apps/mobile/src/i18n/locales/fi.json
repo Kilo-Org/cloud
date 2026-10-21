@@ -110,6 +110,8 @@
     "open": "Avaa {{name}}",
     "openPullRequest": "Avaa muutospyyntö",
     "pending": "Odottaa",
+    "running": "Käynnissä",
+    "completed": "Valmis",
     "performance": "Suorituskyky",
     "preferences": "Asetukset",
     "privacyPolicy": "Tietosuojakäytäntö",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Koodikatselmoijan päivitys epäonnistui.",
     "configSaveFailed": "Katselmointiasetusten tallennus epäonnistui.",
     "status": {
-      "running": "Käynnissä",
-      "completed": "Valmis",
       "interrupted": "Keskeytynyt"
     },
     "reviewStyle": {

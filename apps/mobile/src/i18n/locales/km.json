@@ -110,6 +110,8 @@
     "open": "បើក {{name}}",
     "openPullRequest": "បើកសំណើបញ្ចូលកូដ",
     "pending": "កំពុងរង់ចាំ",
+    "running": "កំពុងដំណើរការ",
+    "completed": "បានបញ្ចប់",
     "performance": "ប្រសិទ្ធភាព",
     "preferences": "ចំណូលចិត្ត",
     "privacyPolicy": "គោលការណ៍ឯកជនភាព",
@@ -1531,8 +1533,6 @@
     "updateFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពឧបករណ៍ត្រួតពិនិត្យកូដបានទេ។",
     "configSaveFailed": "មិនអាចរក្សាទុកការកំណត់ការត្រួតពិនិត្យបានទេ។",
     "status": {
-      "running": "កំពុងដំណើរការ",
-      "completed": "បានបញ្ចប់",
       "interrupted": "បានផ្អាកកណ្តាលទី"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "Hap {{name}}",
     "openPullRequest": "Hapja e kërkesës së bashkimit",
     "pending": "Në pritje",
+    "running": "Në ekzekutim",
+    "completed": "Përfunduar",
     "performance": "Performanca",
     "preferences": "Preferencat",
     "privacyPolicy": "Politika e privatësisë",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Nuk u përditësua shqyrtuesi.",
     "configSaveFailed": "Nuk u ruajt konfigurimi i shqyrtimit.",
     "status": {
-      "running": "Në ekzekutim",
-      "completed": "Përfunduar",
       "interrupted": "I ndërprerë"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "{{name}} खोलें",
     "openPullRequest": "पुल रिक्वेस्ट खोलें",
     "pending": "लंबित",
+    "running": "चल रहा है",
+    "completed": "पूरा",
     "performance": "प्रदर्शन",
     "preferences": "पसंद",
     "privacyPolicy": "गोपनीयता नीति",
@@ -1019,8 +1021,6 @@
     "updateFailed": "समीक्षक अपडेट नहीं हो सका।",
     "configSaveFailed": "समीक्षा की सेटिंग सहेजी नहीं जा सकीं।",
     "status": {
-      "running": "चल रहा है",
-      "completed": "पूरा",
       "interrupted": "बाधित"
     },
     "reviewStyle": {

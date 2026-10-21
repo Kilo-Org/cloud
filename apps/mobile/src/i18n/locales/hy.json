@@ -110,6 +110,8 @@
     "open": "Բացել {{name}}-ը",
     "openPullRequest": "Բաց միավորման հարցում",
     "pending": "Սպասման մեջ",
+    "running": "Ընթացքում է",
+    "completed": "Ավարտված",
     "performance": "Արտադրողականություն",
     "preferences": "Նախապատվություններ",
     "privacyPolicy": "Գաղտնիության քաղաքականություն",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Չհաջողվեց թարմացնել Կոդի ստուգիչը։",
     "configSaveFailed": "Չհաջողվեց պահպանել ստուգման կարգավորումները։",
     "status": {
-      "running": "Ընթացքում է",
-      "completed": "Ավարտված",
       "interrupted": "Ընդհատված"
     },
     "reviewStyle": {

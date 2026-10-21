@@ -110,6 +110,8 @@
     "open": "Agor {{name}}",
     "openPullRequest": "Agor cais tynnu",
     "pending": "Yn aros",
+    "running": "Yn rhedeg",
+    "completed": "Wedi'i gwblhau",
     "performance": "Perfformiad",
     "preferences": "Dewisiadau",
     "privacyPolicy": "Polisi preifatrwydd",
@@ -1607,8 +1609,6 @@
     "updateFailed": "Ni ellid diweddaru'r adolygydd.",
     "configSaveFailed": "Ni ellid cadw gosodiadau'r adolygiad.",
     "status": {
-      "running": "Yn rhedeg",
-      "completed": "Wedi'i gwblhau",
       "interrupted": "Wedi'i atal"
     },
     "reviewStyle": {

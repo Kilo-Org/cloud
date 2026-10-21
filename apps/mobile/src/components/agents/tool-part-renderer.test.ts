@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/text';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import {
   BashToolCard,
@@ -266,6 +266,14 @@ const activityHistories: [string, StoredMessage[], string][] = [
   ),
 ];
 
+/** The word the card shows for each SDK status; the raw enum never reaches the UI. */
+const STATUS_WORD_KEY = {
+  pending: 'common.pending',
+  running: 'common.running',
+  completed: 'common.completed',
+  error: 'common.failed',
+} as const;
+
 // One executable matrix checks the projection and both production entry points.
 describe.each(['top-level', 'nested'] as const)('%s child-card initial history', entry => {
   describe.each([
@@ -278,6 +286,7 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
       'keeps activity and child access consistent for %s',
       async (_name, messages, activity) => {
         const part = makeToolPart('task', makeTaskState(status));
+        const statusWord = i18n.t(STATUS_WORD_KEY[status]);
         const childMessages = canOpen ? messages : [];
         const activeActivity = canOpen ? activity : 'Waiting for activity';
         const expectedActivity = active ? activeActivity : '';
@@ -305,13 +314,14 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
         const { renderer, unmount } = await renderWithProviders(element);
         try {
           expect(textContent(renderer.root)).toBe(
-            `Generalchild task${modelLabel}${expectedActivity}${status}`
+            `Generalchild task${modelLabel}${expectedActivity}${statusWord}`
           );
           expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(active ? 1 : 0);
           const button = renderer.root.findByType(Pressable);
           expect(button.props.accessibilityRole).toBe('button');
           expect(button.props.accessibilityLabel).toContain('General, child task');
-          expect(button.props.accessibilityLabel).toContain(status);
+          expect(button.props.accessibilityLabel).toContain(statusWord);
+          expect(button.props.accessibilityLabel).not.toContain(status);
           if (modelLabel) {
             expect(button.props.accessibilityLabel).toContain(modelLabel);
           }

@@ -110,6 +110,8 @@
     "open": "Obre {{name}}",
     "openPullRequest": "PR oberta",
     "pending": "Pendent",
+    "running": "En execució",
+    "completed": "Finalitzada",
     "performance": "Rendiment",
     "preferences": "Preferències",
     "privacyPolicy": "Política de privadesa",
@@ -1550,8 +1552,6 @@
     "updateFailed": "No s'ha pogut actualitzar el revisor.",
     "configSaveFailed": "No s'ha pogut desar la configuració de la revisió.",
     "status": {
-      "running": "En execució",
-      "completed": "Finalitzada",
       "interrupted": "Interrompuda"
     },
     "reviewStyle": {

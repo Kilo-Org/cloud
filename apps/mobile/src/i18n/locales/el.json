@@ -110,6 +110,8 @@
     "open": "Άνοιγμα {{name}}",
     "openPullRequest": "Άνοιγμα αιτήματος ενσωμάτωσης",
     "pending": "Σε εκκρεμότητα",
+    "running": "Σε εκτέλεση",
+    "completed": "Ολοκληρώθηκε",
     "performance": "Απόδοση",
     "preferences": "Προτιμήσεις",
     "privacyPolicy": "Πολιτική απορρήτου",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Δεν ήταν δυνατή η ενημέρωση του ελεγκτή κώδικα.",
     "configSaveFailed": "Δεν ήταν δυνατή η αποθήκευση των ρυθμίσεων ελέγχου.",
     "status": {
-      "running": "Σε εκτέλεση",
-      "completed": "Ολοκληρώθηκε",
       "interrupted": "Διακόπηκε"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "Atidaryti {{name}}",
     "openPullRequest": "Atidaryti pakeitimų užklausą",
     "pending": "Laukiama",
+    "running": "Vykdoma",
+    "completed": "Baigta",
     "performance": "Našumas",
     "preferences": "Nuostatos",
     "privacyPolicy": "Privatumo politika",
@@ -1569,8 +1571,6 @@
     "updateFailed": "Nepavyko atnaujinti kodo peržiūros agento.",
     "configSaveFailed": "Nepavyko išsaugoti peržiūros nustatymų.",
     "status": {
-      "running": "Vykdoma",
-      "completed": "Baigta",
       "interrupted": "Nutraukta"
     },
     "reviewStyle": {

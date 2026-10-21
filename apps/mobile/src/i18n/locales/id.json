@@ -110,6 +110,8 @@
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
     "pending": "Menunggu",
+    "running": "Berjalan",
+    "completed": "Selesai",
     "performance": "Kinerja",
     "preferences": "Preferensi",
     "privacyPolicy": "Kebijakan privasi",
@@ -1019,8 +1021,6 @@
     "updateFailed": "Gagal memperbarui peninjau.",
     "configSaveFailed": "Gagal menyimpan konfigurasi tinjauan.",
     "status": {
-      "running": "Berjalan",
-      "completed": "Selesai",
       "interrupted": "Terputus"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "Отвори {{name}}",
     "openPullRequest": "Отворен PR",
     "pending": "На чекање",
+    "running": "Во тек",
+    "completed": "Завршено",
     "performance": "Перформанси",
     "preferences": "Лични поставки",
     "privacyPolicy": "Политика за приватност",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Не успеа ажурирањето на прегледувачот на код.",
     "configSaveFailed": "Не успеа зачувувањето на поставките за преглед.",
     "status": {
-      "running": "Во тек",
-      "completed": "Завршено",
       "interrupted": "Прекинато"
     },
     "reviewStyle": {

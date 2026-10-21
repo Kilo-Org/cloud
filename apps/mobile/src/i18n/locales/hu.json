@@ -110,6 +110,8 @@
     "open": "{{name}} megnyitása",
     "openPullRequest": "PR megnyitása",
     "pending": "Függőben",
+    "running": "Fut",
+    "completed": "Befejezve",
     "performance": "Teljesítmény",
     "preferences": "Beállítások",
     "privacyPolicy": "Adatvédelmi tájékoztató",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Nem sikerült frissíteni a kódellenőrzőt.",
     "configSaveFailed": "Nem sikerült menteni a kódellenőrzési beállításokat.",
     "status": {
-      "running": "Fut",
-      "completed": "Befejezve",
       "interrupted": "Megszakítva"
     },
     "reviewStyle": {

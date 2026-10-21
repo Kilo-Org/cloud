@@ -110,6 +110,8 @@
     "open": "باز کردن {{name}}",
     "openPullRequest": "پول ریکوئست باز",
     "pending": "در انتظار",
+    "running": "در حال اجرا",
+    "completed": "تکمیل‌شده",
     "performance": "عملکرد",
     "preferences": "تنظیمات دلخواه",
     "privacyPolicy": "خط‌مشی حریم خصوصی",
@@ -1531,8 +1533,6 @@
     "updateFailed": "به‌روزرسانی بررسی‌کننده کد ممکن نشد.",
     "configSaveFailed": "ذخیره تنظیمات بررسی ممکن نشد.",
     "status": {
-      "running": "در حال اجرا",
-      "completed": "تکمیل‌شده",
       "interrupted": "قطع شد"
     },
     "reviewStyle": {

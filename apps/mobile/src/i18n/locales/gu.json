@@ -110,6 +110,8 @@
     "open": "{{name}} ખોલો",
     "openPullRequest": "પુલ રિક્વેસ્ટ ખોલો",
     "pending": "બાકી",
+    "running": "ચાલી રહ્યું છે",
+    "completed": "પૂર્ણ",
     "performance": "કાર્યક્ષમતા",
     "preferences": "પસંદગીઓ",
     "privacyPolicy": "ગોપનીયતા નીતિ",
@@ -1531,8 +1533,6 @@
     "updateFailed": "કોડ સમીક્ષક અપડેટ કરી શકાયો નહીં.",
     "configSaveFailed": "સમીક્ષાની ગોઠવણી સાચવી શકાઈ નહીં.",
     "status": {
-      "running": "ચાલી રહ્યું છે",
-      "completed": "પૂર્ણ",
       "interrupted": "અધવચ્ચે અટક્યું"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "ເປີດ {{name}}",
     "openPullRequest": "ເປີດຄຳຂໍລວມໂຄ້ດ",
     "pending": "ລໍຖ້າ",
+    "running": "ກຳລັງເຮັດວຽກ",
+    "completed": "ສຳເລັດແລ້ວ",
     "performance": "ປະສິດທິພາບ",
     "preferences": "ການຕັ້ງຄ່າສ່ວນຕົວ",
     "privacyPolicy": "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ",
@@ -1531,8 +1533,6 @@
     "updateFailed": "ບໍ່ສາມາດອັບເດດເຄື່ອງມືກວດສອບໂຄ້ດໄດ້.",
     "configSaveFailed": "ບໍ່ສາມາດບັນທຶກການຕັ້ງຄ່າການກວດສອບໄດ້.",
     "status": {
-      "running": "ກຳລັງເຮັດວຽກ",
-      "completed": "ສຳເລັດແລ້ວ",
       "interrupted": "ຢຸດກາງຄັນ"
     },
     "reviewStyle": {

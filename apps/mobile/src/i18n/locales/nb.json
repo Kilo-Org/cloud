@@ -110,6 +110,8 @@
     "open": "Åpne {{name}}",
     "openPullRequest": "Åpne PR",
     "pending": "Venter",
+    "running": "Kjører",
+    "completed": "Fullført",
     "performance": "Ytelse",
     "preferences": "Innstillinger",
     "privacyPolicy": "Personvernerklæring",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Kunne ikke oppdatere kodegranskeren.",
     "configSaveFailed": "Kunne ikke lagre innstillingene for kodegjennomgang.",
     "status": {
-      "running": "Kjører",
-      "completed": "Fullført",
       "interrupted": "Avbrutt"
     },
     "reviewStyle": {

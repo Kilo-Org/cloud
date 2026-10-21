@@ -110,6 +110,8 @@
     "open": "{{name}}ను తెరవండి",
     "openPullRequest": "ఓపెన్ పుల్ రిక్వెస్ట్",
     "pending": "వేచి ఉంది",
+    "running": "నడుస్తోంది",
+    "completed": "పూర్తయింది",
     "performance": "పనితీరు",
     "preferences": "ప్రాధాన్యతలు",
     "privacyPolicy": "గోప్యతా విధానం",
@@ -1531,8 +1533,6 @@
     "updateFailed": "కోడ్ సమీక్షకుడిని అప్‌డేట్ చేయలేకపోయాము.",
     "configSaveFailed": "సమీక్ష సెట్టింగ్‌లను సేవ్ చేయలేకపోయాము.",
     "status": {
-      "running": "నడుస్తోంది",
-      "completed": "పూర్తయింది",
       "interrupted": "అంతరాయం కలిగింది"
     },
     "reviewStyle": {

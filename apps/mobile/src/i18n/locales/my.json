@@ -110,6 +110,8 @@
     "open": "{{name}} ကို ဖွင့်ပါ",
     "openPullRequest": "PR ဖွင့်",
     "pending": "စောင့်ဆိုင်းနေ",
+    "running": "လည်ပတ်နေ",
+    "completed": "ပြီးစီးပြီ",
     "performance": "စွမ်းဆောင်ရည်",
     "preferences": "စိတ်ကြိုက်ဆက်တင်များ",
     "privacyPolicy": "ကိုယ်ရေးအချက်အလက် မူဝါဒ",
@@ -1531,8 +1533,6 @@
     "updateFailed": "ကုဒ်စစ်ဆေးသူကို အပ်ဒိတ်လုပ်၍ မရပါ။",
     "configSaveFailed": "စစ်ဆေးမှုဆက်တင်များကို သိမ်း၍ မရပါ။",
     "status": {
-      "running": "လည်ပတ်နေ",
-      "completed": "ပြီးစီးပြီ",
       "interrupted": "ကြားတွင် ရပ်သွား"
     },
     "reviewStyle": {

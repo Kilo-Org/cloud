@@ -110,6 +110,8 @@
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
     "pending": "Menunggu",
+    "running": "Sedang berjalan",
+    "completed": "Selesai",
     "performance": "Prestasi",
     "preferences": "Keutamaan",
     "privacyPolicy": "Dasar privasi",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Gagal mengemas kini penyemak.",
     "configSaveFailed": "Gagal menyimpan konfigurasi semakan.",
     "status": {
-      "running": "Sedang berjalan",
-      "completed": "Selesai",
       "interrupted": "Terganggu"
     },
     "reviewStyle": {

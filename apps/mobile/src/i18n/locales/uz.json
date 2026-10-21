@@ -110,6 +110,8 @@
     "open": "{{name}}ni ochish",
     "openPullRequest": "Ochiq PR",
     "pending": "Kutilmoqda",
+    "running": "Ishlamoqda",
+    "completed": "Yakunlangan",
     "performance": "Unumdorlik",
     "preferences": "Shaxsiy sozlamalar",
     "privacyPolicy": "Maxfiylik siyosati",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Kodni ko'rib chiquvchini yangilab bo'lmadi.",
     "configSaveFailed": "Ko'rib chiqish sozlamalarini saqlab bo'lmadi.",
     "status": {
-      "running": "Ishlamoqda",
-      "completed": "Yakunlangan",
       "interrupted": "Uzildi"
     },
     "reviewStyle": {

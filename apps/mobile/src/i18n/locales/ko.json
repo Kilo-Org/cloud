@@ -110,6 +110,8 @@
     "open": "{{name}} 열기",
     "openPullRequest": "풀 리퀘스트 오픈",
     "pending": "대기 중",
+    "running": "실행 중",
+    "completed": "완료",
     "performance": "성능",
     "preferences": "환경설정",
     "privacyPolicy": "개인정보 처리방침",
@@ -1019,8 +1021,6 @@
     "updateFailed": "리뷰어를 업데이트하지 못했습니다.",
     "configSaveFailed": "리뷰 설정을 저장하지 못했습니다.",
     "status": {
-      "running": "실행 중",
-      "completed": "완료",
       "interrupted": "중단됨"
     },
     "reviewStyle": {

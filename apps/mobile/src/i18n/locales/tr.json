@@ -110,6 +110,8 @@
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
     "pending": "Bekliyor",
+    "running": "Çalışıyor",
+    "completed": "Tamamlandı",
     "performance": "Performans",
     "preferences": "Tercihler",
     "privacyPolicy": "Gizlilik politikası",
@@ -1019,8 +1021,6 @@
     "updateFailed": "Kod inceleyici güncellenemedi.",
     "configSaveFailed": "İnceleme ayarları kaydedilemedi.",
     "status": {
-      "running": "Çalışıyor",
-      "completed": "Tamamlandı",
       "interrupted": "Kesintiye uğradı"
     },
     "reviewStyle": {

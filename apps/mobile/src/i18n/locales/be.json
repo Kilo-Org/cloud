@@ -110,6 +110,8 @@
     "open": "Адкрыць {{name}}",
     "openPullRequest": "Адкрыць запыт на зліццё",
     "pending": "Чакае",
+    "running": "Працуе",
+    "completed": "Завершана",
     "performance": "Прадукцыйнасць",
     "preferences": "Налады",
     "privacyPolicy": "Палітыка прыватнасці",
@@ -1569,8 +1571,6 @@
     "updateFailed": "Не атрымалася абнавіць агента праверкі кода.",
     "configSaveFailed": "Не атрымалася захаваць налады праверкі кода.",
     "status": {
-      "running": "Працуе",
-      "completed": "Завершана",
       "interrupted": "Перапынена"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "{{name}} විවෘත කරන්න",
     "openPullRequest": "විවෘත PR",
     "pending": "පොරොත්තුවෙන්",
+    "running": "ක්‍රියාත්මකයි",
+    "completed": "සම්පූර්ණයි",
     "performance": "කාර්ය සාධනය",
     "preferences": "මනාප",
     "privacyPolicy": "රහස්‍යතා ප්‍රතිපත්තිය",
@@ -1531,8 +1533,6 @@
     "updateFailed": "සමාලෝචකයා යාවත්කාලීන කළ නොහැකි විය.",
     "configSaveFailed": "සමාලෝචන සැකසුම් සුරැකිය නොහැකි විය.",
     "status": {
-      "running": "ක්‍රියාත්මකයි",
-      "completed": "සම්පූර්ණයි",
       "interrupted": "බාධා විය"
     },
     "reviewStyle": {

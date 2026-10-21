@@ -110,6 +110,8 @@
     "open": "Vula {{name}}",
     "openPullRequest": "Vula i-PR",
     "pending": "Kulindile",
+    "running": "Kuyasebenza",
+    "completed": "Kuqediwe",
     "performance": "Ukusebenza",
     "preferences": "Okuncamelayo",
     "privacyPolicy": "Inqubomgomo yobumfihlo",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Asikwazanga ukubuyekeza umhloli wekhodi.",
     "configSaveFailed": "Asikwazanga ukulondoloza izilungiselelo zokuhlola.",
     "status": {
-      "running": "Kuyasebenza",
-      "completed": "Kuqediwe",
       "interrupted": "Kuphazamisekile"
     },
     "reviewStyle": {

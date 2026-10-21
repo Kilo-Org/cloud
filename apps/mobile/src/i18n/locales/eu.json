@@ -110,6 +110,8 @@
     "open": "Ireki {{name}}",
     "openPullRequest": "Ireki bateratze-eskaera",
     "pending": "Zain",
+    "running": "Martxan",
+    "completed": "Amaituta",
     "performance": "Errendimendua",
     "preferences": "Hobespenak",
     "privacyPolicy": "Pribatutasun-politika",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Ezin izan da berrikuslea eguneratu.",
     "configSaveFailed": "Ezin izan da berrikuspenaren konfigurazioa gorde.",
     "status": {
-      "running": "Martxan",
-      "completed": "Amaituta",
       "interrupted": "Etenda"
     },
     "reviewStyle": {

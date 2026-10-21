@@ -110,6 +110,8 @@
     "open": "Odpri {{name}}",
     "openPullRequest": "Odprta zahteva za združitev",
     "pending": "Na čakanju",
+    "running": "V teku",
+    "completed": "Dokončano",
     "performance": "Zmogljivost",
     "preferences": "Nastavitve",
     "privacyPolicy": "Politika zasebnosti",
@@ -1569,8 +1571,6 @@
     "updateFailed": "Pregledovalnika kode ni bilo mogoče posodobiti.",
     "configSaveFailed": "Nastavitev pregleda ni bilo mogoče shraniti.",
     "status": {
-      "running": "V teku",
-      "completed": "Dokončano",
       "interrupted": "Prekinjeno"
     },
     "reviewStyle": {

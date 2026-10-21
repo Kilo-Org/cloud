@@ -110,6 +110,8 @@
     "open": "פתיחת {{name}}",
     "openPullRequest": "PR פתוח",
     "pending": "ממתין",
+    "running": "בהרצה",
+    "completed": "הושלם",
     "performance": "ביצועים",
     "preferences": "העדפות",
     "privacyPolicy": "מדיניות פרטיות",
@@ -1022,8 +1024,6 @@
     "updateFailed": "עדכון סוקר הקוד נכשל.",
     "configSaveFailed": "שמירת הגדרות הסקירה נכשלה.",
     "status": {
-      "running": "בהרצה",
-      "completed": "הושלם",
       "interrupted": "הופסקה"
     },
     "reviewStyle": {

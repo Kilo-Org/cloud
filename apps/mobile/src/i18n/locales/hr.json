@@ -110,6 +110,8 @@
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori zahtjev za spajanje",
     "pending": "Na čekanju",
+    "running": "U tijeku",
+    "completed": "Dovršeno",
     "performance": "Performanse",
     "preferences": "Postavke",
     "privacyPolicy": "Politika privatnosti",
@@ -1550,8 +1552,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće spremiti postavke pregleda.",
     "status": {
-      "running": "U tijeku",
-      "completed": "Dovršeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {

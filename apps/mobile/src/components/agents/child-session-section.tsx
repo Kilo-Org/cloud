@@ -34,6 +34,21 @@ import { useOptionalSessionManager } from './session-manager-context';
 
 const MAX_NESTING_DEPTH = 5;
 
+/** The SDK tool state's lifecycle, kept for colors and logic only. */
+type ToolStatus = ToolPart['state']['status'];
+
+/**
+ * The word the card shows for each status. The SDK enum never reaches the
+ * screen: the badge and the card's accessibility label carry the catalog copy
+ * for the app language, so a translated card has no English status token in it.
+ */
+const STATUS_LABEL_KEY = {
+  pending: 'common.pending',
+  running: 'common.running',
+  completed: 'common.completed',
+  error: 'common.failed',
+} satisfies Record<ToolStatus, string>;
+
 export type RenderPartFn = (props: {
   part: Part;
   getChildMessages?: (sessionId: string) => StoredMessage[];
@@ -65,6 +80,7 @@ export function ChildSessionSection({
   const modelLabel = getChildSessionModelLabel(childMessages, modelOptions ?? []);
 
   const { status } = part.state;
+  const statusLabel = t(STATUS_LABEL_KEY[status]);
   const isRunning = status === 'running' || status === 'pending';
   const sessionId = getTaskToolSessionId(part);
 
@@ -91,7 +107,7 @@ export function ChildSessionSection({
           taskName: shownTaskName,
           modelLabel: modelLabel ? `, ${modelLabel}` : '',
           latestActivityLabel,
-          status,
+          status: statusLabel,
         })}
         accessibilityHint={sessionId ? t('agentChat.childSession.openHint') : undefined}
         accessibilityState={{ disabled: !sessionId }}
@@ -129,7 +145,7 @@ export function ChildSessionSection({
           ) : null}
         </View>
 
-        <StatusBadge status={status} />
+        <StatusBadge status={status} label={statusLabel} />
       </Pressable>
     </Animated.View>
   );
@@ -269,7 +285,7 @@ export function ChildSessionMessage({
   );
 }
 
-function getStatusBorderColor(status: string, colors: ThemeColors): string {
+function getStatusBorderColor(status: ToolStatus, colors: ThemeColors): string {
   if (status === 'error') {
     return colors.destructive;
   }
@@ -279,18 +295,21 @@ function getStatusBorderColor(status: string, colors: ThemeColors): string {
   return colors.info;
 }
 
-function StatusBadge({ status }: Readonly<{ status: string }>) {
+/** Colors come from the SDK status; the visible word is the catalog label. */
+function StatusBadge({ status, label }: Readonly<{ status: ToolStatus; label: string }>) {
   const bgClass = getStatusBgClass(status);
   const textClass = getStatusTextClass(status);
 
   return (
     <View className={`rounded px-1.5 py-0.5 ${bgClass}`}>
-      <Text className={`text-xs ${textClass}`}>{status}</Text>
+      <Text className={`text-xs ${textClass}`} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   );
 }
 
-function getStatusBgClass(status: string): string {
+function getStatusBgClass(status: ToolStatus): string {
   if (status === 'completed') {
     return 'bg-good-tile-bg';
   }
@@ -300,7 +319,7 @@ function getStatusBgClass(status: string): string {
   return 'bg-info-tile-bg';
 }
 
-function getStatusTextClass(status: string): string {
+function getStatusTextClass(status: ToolStatus): string {
   if (status === 'completed') {
     return 'text-good';
   }

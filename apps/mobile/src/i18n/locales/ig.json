@@ -110,6 +110,8 @@
     "open": "Mepee {{name}}",
     "openPullRequest": "Meghe arịrịọ ijikọ koodu",
     "pending": "Na-echere",
+    "running": "Na-arụ ọrụ",
+    "completed": "Emechara",
     "performance": "Arụmọrụ",
     "preferences": "Mmasị",
     "privacyPolicy": "Amụma nzuzo",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Enweghị ike imelite onye nyocha.",
     "configSaveFailed": "Enweghị ike ichekwa nhazi nyocha.",
     "status": {
-      "running": "Na-arụ ọrụ",
-      "completed": "Emechara",
       "interrupted": "A kwụsịrị tupu ọ gwụchaa"
     },
     "reviewStyle": {

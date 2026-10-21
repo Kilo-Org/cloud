@@ -110,6 +110,8 @@
     "open": "{{name}} खोल्नुहोस्",
     "openPullRequest": "खुला पुल रिक्वेस्ट",
     "pending": "प्रतीक्षामा",
+    "running": "चलिरहेको",
+    "completed": "सम्पन्न",
     "performance": "कार्यसम्पादन",
     "preferences": "रुचिहरू",
     "privacyPolicy": "गोपनीयता नीति",
@@ -1531,8 +1533,6 @@
     "updateFailed": "समीक्षक अद्यावधिक गर्न सकिएन।",
     "configSaveFailed": "समीक्षाका सेटिङहरू सेभ गर्न सकिएन।",
     "status": {
-      "running": "चलिरहेको",
-      "completed": "सम्पन्न",
       "interrupted": "बीचमै रोकिएको"
     },
     "reviewStyle": {

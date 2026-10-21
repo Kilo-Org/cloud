@@ -110,6 +110,8 @@
     "open": "Otevřít {{name}}",
     "openPullRequest": "Otevřít PR",
     "pending": "Čeká",
+    "running": "Běží",
+    "completed": "Dokončeno",
     "performance": "Výkon",
     "preferences": "Předvolby",
     "privacyPolicy": "Zásady ochrany osobních údajů",
@@ -1569,8 +1571,6 @@
     "updateFailed": "Agenta pro kontrolu kódu se nepodařilo aktualizovat.",
     "configSaveFailed": "Nastavení kontrol kódu se nepodařilo uložit.",
     "status": {
-      "running": "Běží",
-      "completed": "Dokončeno",
       "interrupted": "Přerušeno"
     },
     "reviewStyle": {

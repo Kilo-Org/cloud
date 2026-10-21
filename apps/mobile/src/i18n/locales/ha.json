@@ -110,6 +110,8 @@
     "open": "Buɗe {{name}}",
     "openPullRequest": "Buɗe buƙatar haɗa canje-canje",
     "pending": "Yana jira",
+    "running": "Ana gudanarwa",
+    "completed": "An kammala",
     "performance": "Ƙarfin aiki",
     "preferences": "Zaɓuɓɓuka",
     "privacyPolicy": "Manufar sirri",
@@ -1531,8 +1533,6 @@
     "updateFailed": "An kasa sabunta mai bita.",
     "configSaveFailed": "An kasa ajiye saitunan bita.",
     "status": {
-      "running": "Ana gudanarwa",
-      "completed": "An kammala",
       "interrupted": "An katse"
     },
     "reviewStyle": {

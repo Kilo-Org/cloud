@@ -110,6 +110,8 @@
     "open": "Ava {{name}}",
     "openPullRequest": "Ava tõmbetaotlus",
     "pending": "Ootel",
+    "running": "Töötab",
+    "completed": "Lõpetatud",
     "performance": "Jõudlus",
     "preferences": "Eelistused",
     "privacyPolicy": "Privaatsuspoliitika",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus.",
     "configSaveFailed": "Ülevaatuse seadete salvestamine ebaõnnestus.",
     "status": {
-      "running": "Töötab",
-      "completed": "Lõpetatud",
       "interrupted": "Katkestatud"
     },
     "reviewStyle": {

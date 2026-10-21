@@ -110,6 +110,8 @@
     "open": "Открыть {{name}}",
     "openPullRequest": "Открыть pull request",
     "pending": "Ожидание",
+    "running": "В работе",
+    "completed": "Завершено",
     "performance": "Производительность",
     "preferences": "Настройки",
     "privacyPolicy": "Политика конфиденциальности",
@@ -1025,8 +1027,6 @@
     "updateFailed": "Не удалось обновить настройки проверки кода.",
     "configSaveFailed": "Не удалось сохранить настройки проверки.",
     "status": {
-      "running": "В работе",
-      "completed": "Завершено",
       "interrupted": "Прервано"
     },
     "reviewStyle": {

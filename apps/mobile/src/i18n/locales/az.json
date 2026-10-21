@@ -110,6 +110,8 @@
     "open": "{{name}} aç",
     "openPullRequest": "Açıq birləşdirmə sorğusu",
     "pending": "Gözləyir",
+    "running": "İşləyir",
+    "completed": "Tamamlanıb",
     "performance": "Məhsuldarlıq",
     "preferences": "Seçimlər",
     "privacyPolicy": "Məxfilik siyasəti",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Kod yoxlayıcısını yeniləmək mümkün olmadı.",
     "configSaveFailed": "Kod yoxlamasının parametrlərini yadda saxlamaq mümkün olmadı.",
     "status": {
-      "running": "İşləyir",
-      "completed": "Tamamlanıb",
       "interrupted": "Yarımçıq qalıb"
     },
     "reviewStyle": {

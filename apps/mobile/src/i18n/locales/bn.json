@@ -110,6 +110,8 @@
     "open": "{{name}} খুলুন",
     "openPullRequest": "খোলা পুল রিকোয়েস্ট",
     "pending": "অপেক্ষমাণ",
+    "running": "চলছে",
+    "completed": "সম্পন্ন",
     "performance": "কর্মদক্ষতা",
     "preferences": "পছন্দের সেটিংস",
     "privacyPolicy": "গোপনীয়তা নীতি",
@@ -1531,8 +1533,6 @@
     "updateFailed": "কোড রিভিউয়ার আপডেট করা যায়নি।",
     "configSaveFailed": "পর্যালোচনার কনফিগারেশন সংরক্ষণ করা যায়নি।",
     "status": {
-      "running": "চলছে",
-      "completed": "সম্পন্ন",
       "interrupted": "বাধাগ্রস্ত"
     },
     "reviewStyle": {

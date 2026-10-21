@@ -110,6 +110,8 @@
     "open": "{{name}} ਖੋਲ੍ਹੋ",
     "openPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
     "pending": "ਉਡੀਕ ਵਿੱਚ",
+    "running": "ਚੱਲ ਰਿਹਾ ਹੈ",
+    "completed": "ਮੁਕੰਮਲ",
     "performance": "ਕਾਰਗੁਜ਼ਾਰੀ",
     "preferences": "ਤਰਜੀਹਾਂ",
     "privacyPolicy": "ਗੋਪਨੀਯਤਾ ਨੀਤੀ",
@@ -1531,8 +1533,6 @@
     "updateFailed": "ਸਮੀਖਿਅਕ ਅੱਪਡੇਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "configSaveFailed": "ਸਮੀਖਿਆ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਸੇਵ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
     "status": {
-      "running": "ਚੱਲ ਰਿਹਾ ਹੈ",
-      "completed": "ਮੁਕੰਮਲ",
       "interrupted": "ਵਿਚਕਾਰ ਰੁਕਿਆ"
     },
     "reviewStyle": {

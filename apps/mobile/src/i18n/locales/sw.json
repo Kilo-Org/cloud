@@ -110,6 +110,8 @@
     "open": "Fungua {{name}}",
     "openPullRequest": "Fungua ombi la kuunganisha",
     "pending": "Inasubiri",
+    "running": "Inaendelea",
+    "completed": "Imekamilika",
     "performance": "Utendaji",
     "preferences": "Mapendeleo",
     "privacyPolicy": "Sera ya faragha",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Imeshindikana kusasisha mkaguzi.",
     "configSaveFailed": "Imeshindikana kuhifadhi usanidi wa ukaguzi.",
     "status": {
-      "running": "Inaendelea",
-      "completed": "Imekamilika",
       "interrupted": "Umekatizwa"
     },
     "reviewStyle": {

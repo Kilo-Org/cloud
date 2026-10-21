@@ -110,6 +110,8 @@
     "open": "เปิด {{name}}",
     "openPullRequest": "เปิดพูลรีเควสต์",
     "pending": "รอดำเนินการ",
+    "running": "กำลังทำงาน",
+    "completed": "เสร็จสิ้น",
     "performance": "ประสิทธิภาพ",
     "preferences": "การตั้งค่า",
     "privacyPolicy": "นโยบายความเป็นส่วนตัว",
@@ -1531,8 +1533,6 @@
     "updateFailed": "อัปเดตตัวตรวจสอบโค้ดไม่สำเร็จ",
     "configSaveFailed": "บันทึกการตั้งค่าการตรวจสอบไม่สำเร็จ",
     "status": {
-      "running": "กำลังทำงาน",
-      "completed": "เสร็จสิ้น",
       "interrupted": "ถูกขัดจังหวะ"
     },
     "reviewStyle": {

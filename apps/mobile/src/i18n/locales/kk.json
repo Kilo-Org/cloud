@@ -110,6 +110,8 @@
     "open": "{{name}} ашу",
     "openPullRequest": "Біріктіру сұрауын ашу",
     "pending": "Күтілуде",
+    "running": "Орындалуда",
+    "completed": "Аяқталды",
     "performance": "Өнімділік",
     "preferences": "Параметрлер",
     "privacyPolicy": "Құпиялылық саясаты",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Код тексерушісін жаңарту мүмкін болмады.",
     "configSaveFailed": "Тексеру баптауларын сақтау мүмкін болмады.",
     "status": {
-      "running": "Орындалуда",
-      "completed": "Аяқталды",
       "interrupted": "Үзілді"
     },
     "reviewStyle": {

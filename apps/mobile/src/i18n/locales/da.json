@@ -110,6 +110,8 @@
     "open": "Åbn {{name}}",
     "openPullRequest": "Åbn PR",
     "pending": "Afventer",
+    "running": "Kører",
+    "completed": "Afsluttet",
     "performance": "Ydeevne",
     "preferences": "Indstillinger",
     "privacyPolicy": "Privatlivspolitik",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Code Reviewer kunne ikke opdateres.",
     "configSaveFailed": "Indstillingerne for gennemgange kunne ikke gemmes.",
     "status": {
-      "running": "Kører",
-      "completed": "Afsluttet",
       "interrupted": "Afbrudt"
     },
     "reviewStyle": {

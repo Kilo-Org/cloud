@@ -110,6 +110,8 @@
     "open": "کردنەوەی {{name}}",
     "openPullRequest": "کردنەوەی داواکاری یەکخستن",
     "pending": "چاوەڕوان",
+    "running": "لە کاردا",
+    "completed": "تەواوکراو",
     "performance": "کارایی",
     "preferences": "ڕێکخستنە کەسییەکان",
     "privacyPolicy": "سیاسەتی تایبەتی",
@@ -1531,8 +1533,6 @@
     "updateFailed": "نەتوانرا پێداچوونەوەکار نوێ بکرێتەوە.",
     "configSaveFailed": "نەتوانرا ڕێکخستنەکانی پێداچوونەوە پاشەکەوت بکرێن.",
     "status": {
-      "running": "لە کاردا",
-      "completed": "تەواوکراو",
       "interrupted": "پچڕاو"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "{{name}} öffnen",
     "openPullRequest": "Pull-Request öffnen",
     "pending": "Ausstehend",
+    "running": "Läuft",
+    "completed": "Abgeschlossen",
     "performance": "Leistung",
     "preferences": "Einstellungen",
     "privacyPolicy": "Datenschutzerklärung",
@@ -1019,8 +1021,6 @@
     "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
     "status": {
-      "running": "Läuft",
-      "completed": "Abgeschlossen",
       "interrupted": "Unterbrochen"
     },
     "reviewStyle": {

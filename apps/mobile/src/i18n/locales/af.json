@@ -110,6 +110,8 @@
     "open": "Maak {{name}} oop",
     "openPullRequest": "Oop trekversoek",
     "pending": "Hangend",
+    "running": "Aktief",
+    "completed": "Voltooi",
     "performance": "Werkverrigting",
     "preferences": "Voorkeure",
     "privacyPolicy": "Privaatheidsbeleid",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Die Kodehersiener kon nie bygewerk word nie.",
     "configSaveFailed": "Die hersieningsinstellings kon nie gestoor word nie.",
     "status": {
-      "running": "Aktief",
-      "completed": "Voltooi",
       "interrupted": "Onderbreek"
     },
     "reviewStyle": {

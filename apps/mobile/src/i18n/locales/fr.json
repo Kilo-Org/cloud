@@ -110,6 +110,8 @@
     "open": "Ouvrir {{name}}",
     "openPullRequest": "Ouverture de la PR",
     "pending": "En attente",
+    "running": "En cours",
+    "completed": "Terminé",
     "performance": "Performances",
     "preferences": "Préférences",
     "privacyPolicy": "Politique de confidentialité",
@@ -991,8 +993,6 @@
     "updateFailed": "Impossible de mettre à jour l'agent de revue de code.",
     "configSaveFailed": "Impossible d'enregistrer la configuration de la revue.",
     "status": {
-      "running": "En cours",
-      "completed": "Terminé",
       "interrupted": "Interrompue"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "Deschide {{name}}",
     "openPullRequest": "Deschidere PR",
     "pending": "În așteptare",
+    "running": "Rulează",
+    "completed": "Finalizat",
     "performance": "Performanță",
     "preferences": "Preferințe",
     "privacyPolicy": "Politica de confidențialitate",
@@ -1550,8 +1552,6 @@
     "updateFailed": "Nu s-a putut actualiza agentul de revizuire a codului.",
     "configSaveFailed": "Nu s-a putut salva configurația revizuirii.",
     "status": {
-      "running": "Rulează",
-      "completed": "Finalizat",
       "interrupted": "Întreruptă"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "Apri {{name}}",
     "openPullRequest": "Apri la PR",
     "pending": "In attesa",
+    "running": "In esecuzione",
+    "completed": "Completata",
     "performance": "Prestazioni",
     "preferences": "Preferenze",
     "privacyPolicy": "Informativa sulla privacy",
@@ -991,8 +993,6 @@
     "updateFailed": "Impossibile aggiornare il revisore.",
     "configSaveFailed": "Impossibile salvare la configurazione della revisione.",
     "status": {
-      "running": "In esecuzione",
-      "completed": "Completata",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {

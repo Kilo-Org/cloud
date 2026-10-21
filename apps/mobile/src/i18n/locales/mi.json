@@ -110,6 +110,8 @@
     "open": "Whakatuwheratia a {{name}}",
     "openPullRequest": "Tuwhera te tono kume",
     "pending": "E tatari ana",
+    "running": "Kei te whakahaere",
+    "completed": "Kua oti",
     "performance": "Mahinga",
     "preferences": "Ngā manakohanga",
     "privacyPolicy": "Kaupapahere tūmataiti",
@@ -1531,8 +1533,6 @@
     "updateFailed": "I rahua te whakahou i te kaiarotake.",
     "configSaveFailed": "I rahua te tiaki i te whirihoranga arotake.",
     "status": {
-      "running": "Kei te whakahaere",
-      "completed": "Kua oti",
       "interrupted": "I haukotia"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "فتح {{name}}",
     "openPullRequest": "فتح طلب السحب",
     "pending": "قيد الانتظار",
+    "running": "قيد التشغيل",
+    "completed": "تم الاكتمال",
     "performance": "الأداء",
     "preferences": "التفضيلات",
     "privacyPolicy": "سياسة الخصوصية",
@@ -1031,8 +1033,6 @@
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
     "status": {
-      "running": "قيد التشغيل",
-      "completed": "تم الاكتمال",
       "interrupted": "متوقفة"
     },
     "reviewStyle": {

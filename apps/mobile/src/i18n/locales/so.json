@@ -110,6 +110,8 @@
     "open": "Fur {{name}}",
     "openPullRequest": "Codsi isku-darid oo furan",
     "pending": "Sugaya",
+    "running": "Socda",
+    "completed": "La dhammeeyay",
     "performance": "Waxqabadka",
     "preferences": "Dookhyada",
     "privacyPolicy": "Siyaasadda asturnaanta",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Dib-u-eegaha lama cusboonaysiin karin.",
     "configSaveFailed": "Dejinta dib-u-eegista lama kaydin karin.",
     "status": {
-      "running": "Socda",
-      "completed": "La dhammeeyay",
       "interrupted": "Waa la hakiyay"
     },
     "reviewStyle": {

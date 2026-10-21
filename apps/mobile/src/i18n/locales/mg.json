@@ -110,6 +110,8 @@
     "open": "Sokafy ny {{name}}",
     "openPullRequest": "Sokafy ny PR",
     "pending": "Miandry",
+    "running": "Mandeha",
+    "completed": "Vita",
     "performance": "Fahombiazana",
     "preferences": "Safidy",
     "privacyPolicy": "Politika momba ny fiainana manokana",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Tsy nahomby ny fanavaozana ny mpanamarina.",
     "configSaveFailed": "Tsy nahomby ny fitahirizana ny fikiran'ny fanamarinana.",
     "status": {
-      "running": "Mandeha",
-      "completed": "Vita",
       "interrupted": "Tapaka"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "Відкрити {{name}}",
     "openPullRequest": "Відкрити запит на злиття",
     "pending": "Очікує",
+    "running": "Виконується",
+    "completed": "Завершено",
     "performance": "Продуктивність",
     "preferences": "Налаштування",
     "privacyPolicy": "Політика конфіденційності",
@@ -1025,8 +1027,6 @@
     "updateFailed": "Не вдалося оновити налаштування перевірки коду.",
     "configSaveFailed": "Не вдалося зберегти налаштування перевірки.",
     "status": {
-      "running": "Виконується",
-      "completed": "Завершено",
       "interrupted": "Перервано"
     },
     "reviewStyle": {

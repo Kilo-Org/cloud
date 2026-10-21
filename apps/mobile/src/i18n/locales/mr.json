@@ -110,6 +110,8 @@
     "open": "{{name}} उघडा",
     "openPullRequest": "पुल रिक्वेस्ट उघडा",
     "pending": "प्रलंबित",
+    "running": "चालू आहे",
+    "completed": "पूर्ण",
     "performance": "कार्यक्षमता",
     "preferences": "प्राधान्ये",
     "privacyPolicy": "गोपनीयता धोरण",
@@ -1531,8 +1533,6 @@
     "updateFailed": "कोड पुनरावलोकक अद्ययावत करता आला नाही.",
     "configSaveFailed": "पुनरावलोकनाच्या सेटिंग्ज जतन करता आल्या नाहीत.",
     "status": {
-      "running": "चालू आहे",
-      "completed": "पूर्ण",
       "interrupted": "व्यत्यय आला"
     },
     "reviewStyle": {

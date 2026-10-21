@@ -110,6 +110,8 @@
     "open": "{{name}}-г нээх",
     "openPullRequest": "Нэгтгэх хүсэлт нээх",
     "pending": "Хүлээгдэж байна",
+    "running": "Ажиллаж байна",
+    "completed": "Дууссан",
     "performance": "Гүйцэтгэл",
     "preferences": "Тохиргоо",
     "privacyPolicy": "Нууцлалын бодлого",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Шалгагчийг шинэчилж чадсангүй.",
     "configSaveFailed": "Шалгалтын тохиргоог хадгалж чадсангүй.",
     "status": {
-      "running": "Ажиллаж байна",
-      "completed": "Дууссан",
       "interrupted": "Тасарсан"
     },
     "reviewStyle": {

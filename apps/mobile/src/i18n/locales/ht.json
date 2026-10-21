@@ -110,6 +110,8 @@
     "open": "Louvri {{name}}",
     "openPullRequest": "Louvri demann fizyon an",
     "pending": "An atant",
+    "running": "Ap fonksyone",
+    "completed": "Fini",
     "performance": "Pèfòmans",
     "preferences": "Preferans",
     "privacyPolicy": "Règleman sou vi prive",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Nou pa t ka mete revizè a ajou.",
     "configSaveFailed": "Nou pa t ka anrejistre konfigirasyon revizyon an.",
     "status": {
-      "running": "Ap fonksyone",
-      "completed": "Fini",
       "interrupted": "Entèwonp"
     },
     "reviewStyle": {

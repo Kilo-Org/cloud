@@ -110,6 +110,8 @@
     "open": "Oscail {{name}}",
     "openPullRequest": "Oscail an t-iarratas tarraingthe",
     "pending": "Ar feitheamh",
+    "running": "Ag rith",
+    "completed": "Críochnaithe",
     "performance": "Feidhmíocht",
     "preferences": "Roghanna",
     "privacyPolicy": "Beartas príobháideachta",
@@ -1588,8 +1590,6 @@
     "updateFailed": "Níorbh fhéidir an t-athbhreithneoir a nuashonrú.",
     "configSaveFailed": "Níorbh fhéidir cumraíocht an athbhreithnithe a shábháil.",
     "status": {
-      "running": "Ag rith",
-      "completed": "Críochnaithe",
       "interrupted": "Idirbhriste"
     },
     "reviewStyle": {

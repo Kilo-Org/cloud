@@ -110,6 +110,8 @@
     "open": "Öppna {{name}}",
     "openPullRequest": "Öppna PR",
     "pending": "Väntar",
+    "running": "Körs",
+    "completed": "Slutförd",
     "performance": "Prestanda",
     "preferences": "Inställningar",
     "privacyPolicy": "Integritetspolicy",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Kunde inte uppdatera granskaren",
     "configSaveFailed": "Kunde inte spara granskningsinställningarna",
     "status": {
-      "running": "Körs",
-      "completed": "Slutförd",
       "interrupted": "Avbruten"
     },
     "reviewStyle": {

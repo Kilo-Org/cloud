@@ -110,6 +110,8 @@
     "open": "Iftaħ {{name}}",
     "openPullRequest": "Ftuħ tal-PR",
     "pending": "Pendenti",
+    "running": "Għaddej",
+    "completed": "Lest",
     "performance": "Prestazzjoni",
     "preferences": "Preferenzi",
     "privacyPolicy": "Politika tal-privatezza",
@@ -1588,8 +1590,6 @@
     "updateFailed": "Ma setax jiġi aġġornat ir-reviżur.",
     "configSaveFailed": "Ma setgħetx tiġi ssejvjata l-konfigurazzjoni tar-reviżjoni.",
     "status": {
-      "running": "Għaddej",
-      "completed": "Lest",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {

@@ -110,6 +110,8 @@
     "open": "Abrir {{name}}",
     "openPullRequest": "PR abierta",
     "pending": "Pendiente",
+    "running": "En ejecución",
+    "completed": "Completado",
     "performance": "Rendimiento",
     "preferences": "Preferencias",
     "privacyPolicy": "Política de privacidad",
@@ -1022,8 +1024,6 @@
     "updateFailed": "No se pudo actualizar el revisor.",
     "configSaveFailed": "No se pudo guardar la configuración de revisión.",
     "status": {
-      "running": "En ejecución",
-      "completed": "Completado",
       "interrupted": "Interrumpida"
     },
     "reviewStyle": {

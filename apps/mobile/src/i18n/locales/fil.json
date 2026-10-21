@@ -110,6 +110,8 @@
     "open": "Buksan ang {{name}}",
     "openPullRequest": "Buksan ang PR",
     "pending": "Nakabinbin",
+    "running": "Tumatakbo",
+    "completed": "Nakumpleto",
     "performance": "Pagganap",
     "preferences": "Mga kagustuhan",
     "privacyPolicy": "Patakaran sa pribasiya",
@@ -1531,8 +1533,6 @@
     "updateFailed": "Hindi na-update ang tagasuri.",
     "configSaveFailed": "Hindi na-save ang mga setting ng pagsusuri.",
     "status": {
-      "running": "Tumatakbo",
-      "completed": "Nakumpleto",
       "interrupted": "Naputol"
     },
     "reviewStyle": {

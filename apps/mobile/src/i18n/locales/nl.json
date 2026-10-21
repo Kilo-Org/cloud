@@ -110,6 +110,8 @@
     "open": "{{name}} openen",
     "openPullRequest": "PR openen",
     "pending": "In afwachting",
+    "running": "Actief",
+    "completed": "Voltooid",
     "performance": "Prestaties",
     "preferences": "Voorkeuren",
     "privacyPolicy": "Privacybeleid",
@@ -1019,8 +1021,6 @@
     "updateFailed": "De beoordelaar kon niet worden bijgewerkt.",
     "configSaveFailed": "De reviewinstellingen konden niet worden opgeslagen.",
     "status": {
-      "running": "Actief",
-      "completed": "Voltooid",
       "interrupted": "Onderbroken"
     },
     "reviewStyle": {

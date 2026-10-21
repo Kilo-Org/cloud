@@ -110,6 +110,8 @@
     "open": "Otwórz {{name}}",
     "openPullRequest": "Otwórz PR",
     "pending": "Oczekuje",
+    "running": "W toku",
+    "completed": "Ukończono",
     "performance": "Wydajność",
     "preferences": "Preferencje",
     "privacyPolicy": "Polityka prywatności",
@@ -1025,8 +1027,6 @@
     "updateFailed": "Nie udało się zaktualizować recenzenta kodu.",
     "configSaveFailed": "Nie udało się zapisać konfiguracji przeglądu.",
     "status": {
-      "running": "W toku",
-      "completed": "Ukończono",
       "interrupted": "Przerwano"
     },
     "reviewStyle": {

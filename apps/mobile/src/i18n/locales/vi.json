@@ -110,6 +110,8 @@
     "open": "Mở {{name}}",
     "openPullRequest": "Mở yêu cầu hợp nhất",
     "pending": "Đang chờ",
+    "running": "Đang chạy",
+    "completed": "Đã hoàn tất",
     "performance": "Hiệu năng",
     "preferences": "Tùy chọn",
     "privacyPolicy": "Chính sách quyền riêng tư",
@@ -1019,8 +1021,6 @@
     "updateFailed": "Không thể cập nhật Trình rà soát mã.",
     "configSaveFailed": "Không thể lưu cấu hình rà soát.",
     "status": {
-      "running": "Đang chạy",
-      "completed": "Đã hoàn tất",
       "interrupted": "Bị gián đoạn"
     },
     "reviewStyle": {

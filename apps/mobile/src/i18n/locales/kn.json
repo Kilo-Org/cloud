@@ -110,6 +110,8 @@
     "open": "{{name}} ತೆರೆಯಿರಿ",
     "openPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
     "pending": "ಬಾಕಿ ಇದೆ",
+    "running": "ಚಾಲನೆಯಲ್ಲಿದೆ",
+    "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
     "performance": "ಕಾರ್ಯಕ್ಷಮತೆ",
     "preferences": "ಆದ್ಯತೆಗಳು",
     "privacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
@@ -1531,8 +1533,6 @@
     "updateFailed": "ಕೋಡ್ ಪರಿಶೀಲಕವನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "configSaveFailed": "ಪರಿಶೀಲನೆಯ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "status": {
-      "running": "ಚಾಲನೆಯಲ್ಲಿದೆ",
-      "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
       "interrupted": "ಮಧ್ಯದಲ್ಲಿ ನಿಂತಿದೆ"
     },
     "reviewStyle": {

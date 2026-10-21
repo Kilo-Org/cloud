@@ -2448,31 +2448,37 @@ describe('shouldRefuseSilentAttachmentDrop', () => {
 // These tests run in the existing detail suite with the DOM-free renderer.
 // Request order and rendered state are deterministic; native paint timing is not.
 describe('child transcript requests', () => {
+  /** The catalog entry each SDK status renders as; the raw enum never reaches the card. */
+  const STATUS_WORD_KEY = {
+    pending: 'common.pending',
+    running: 'common.running',
+    completed: 'common.completed',
+    error: 'common.failed',
+  } as const;
+
   it.each([
     {
       sessionId: SELECTED_ID,
       status: 'completed',
-      text: 'Researcher\nTask ses-selected\ncompleted',
       textRows: 3,
       activity: null,
     },
     {
       sessionId: kiloId('ses-sibling-0'),
       status: 'running',
-      text: 'Researcher\nTask ses-sibling-0\nThinking\nrunning',
       textRows: 4,
       activity: 'Thinking',
     },
     {
       sessionId: kiloId('ses-sibling-1'),
       status: 'error',
-      text: 'Researcher\nTask ses-sibling-1\nerror',
       textRows: 3,
       activity: null,
     },
   ] as const)(
     'renders the $status card without fetching a child transcript for labels',
-    async ({ sessionId, status, text, textRows, activity }) => {
+    async ({ sessionId, status, textRows, activity }) => {
+      const statusWord = i18n.t(STATUS_WORD_KEY[status]);
       const view = await mountDetails();
       const card = cardFor(view.renderer, sessionId);
       const button = card.findByProps({ accessibilityRole: 'button' }).props as ComponentProps<
@@ -2480,7 +2486,9 @@ describe('child transcript requests', () => {
       >;
 
       expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
-      expect(renderedText(card)).toBe(text);
+      expect(renderedText(card)).toBe(
+        ['Researcher', `Task ${sessionId}`, ...(activity ? [activity] : []), statusWord].join('\n')
+      );
       expect(card.findAll(node => (node.type as string) === 'Text')).toHaveLength(textRows);
       expect(button).toMatchObject({
         disabled: false,
@@ -2489,7 +2497,8 @@ describe('child transcript requests', () => {
       });
       expect(button.accessibilityLabel).toContain('Researcher');
       expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
-      expect(button.accessibilityLabel).toContain(status);
+      expect(button.accessibilityLabel).toContain(statusWord);
+      expect(button.accessibilityLabel).not.toContain(status);
       expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
       if (activity) {
         expect(button.accessibilityLabel).toContain(activity);
@@ -2537,8 +2546,9 @@ describe('child transcript requests', () => {
       expect(selectedButton.accessibilityLabel?.includes('Writing response')).toBe(isRunning);
       expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
       const nestedCard = cardFor(view.renderer, nestedId);
+      const statusWord = i18n.t(STATUS_WORD_KEY[status]);
       expect(renderedText(nestedCard)).toBe(
-        `Researcher\nTask ${nestedId}${isRunning ? '\nThinking' : ''}\n${status}`
+        `Researcher\nTask ${nestedId}${isRunning ? '\nThinking' : ''}\n${statusWord}`
       );
       expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(
         isRunning ? 4 : 3
@@ -2551,7 +2561,8 @@ describe('child transcript requests', () => {
         accessibilityHint: i18n.t('agentChat.childSession.openHint'),
       });
       expect(nestedButton.accessibilityLabel).toContain(`Task ${nestedId}`);
-      expect(nestedButton.accessibilityLabel).toContain(status);
+      expect(nestedButton.accessibilityLabel).toContain(statusWord);
+      expect(nestedButton.accessibilityLabel).not.toContain(status);
       expect(nestedButton.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
       if (isRunning) {
         expect(nestedButton.accessibilityLabel).toContain('Thinking');

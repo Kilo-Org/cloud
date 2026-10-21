@@ -110,6 +110,8 @@
     "open": "Atvērt {{name}}",
     "openPullRequest": "Atvērt izmaiņu pieprasījumu",
     "pending": "Gaida",
+    "running": "Darbojas",
+    "completed": "Pabeigts",
     "performance": "Veiktspēja",
     "preferences": "Lietotāja iestatījumi",
     "privacyPolicy": "Privātuma politika",
@@ -1550,8 +1552,6 @@
     "updateFailed": "Neizdevās atjaunināt koda pārskatītāju.",
     "configSaveFailed": "Neizdevās saglabāt koda pārskatīšanas iestatījumus.",
     "status": {
-      "running": "Darbojas",
-      "completed": "Pabeigts",
       "interrupted": "Pārtraukta"
     },
     "reviewStyle": {

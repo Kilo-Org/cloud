@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { type ReactNode, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +9,7 @@ import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { Button } from '@/components/ui/button';
 import { ListTodo } from '@/components/ui/icons';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
@@ -15,6 +17,7 @@ import { i18n } from '@/i18n';
 import { invalidateTodoQueries, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { todoFromDraft } from '@/lib/todos/todo-model';
+import { todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -40,11 +43,26 @@ export function SaveDraftAsTodoSheet({
 }: Readonly<SaveDraftAsTodoSheetProps>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const lists = useTodoLists(organizationId, visible);
   const [savingListId, setSavingListId] = useState<string | null>(null);
+  // The create-list route is a formSheet, and the native sheet stacks above a
+  // formSheet route: with the sheet up, the form would render behind it. Drop
+  // the sheet while the form is open and restore it on return, so the picker
+  // the user comes back to is the one they left.
+  const [hiddenForCreate, setHiddenForCreate] = useState(false);
+  const openCreateList = useCallback(() => {
+    setHiddenForCreate(true);
+    router.push(todoListSettingsPath({ organizationId }));
+  }, [organizationId, router]);
+  useFocusEffect(
+    useCallback(() => {
+      setHiddenForCreate(false);
+    }, [])
+  );
   const activeLists = (lists.data ?? []).filter(list => list.archivedAt === null);
 
   async function save(list: TodoList) {
@@ -84,9 +102,16 @@ export function SaveDraftAsTodoSheet({
     );
   } else if (activeLists.length === 0) {
     body = (
-      <Text className="px-5 py-8 text-center text-sm text-muted-foreground">
-        {t('todos.lists.empty')}
-      </Text>
+      <View className="gap-4 px-5 py-8">
+        <Text className="text-center text-sm text-muted-foreground">{t('todos.lists.empty')}</Text>
+        <Button
+          variant="outline"
+          onPress={openCreateList}
+          accessibilityLabel={t('todos.lists.newList')}
+        >
+          <Text>{t('todos.lists.newList')}</Text>
+        </Button>
+      </View>
     );
   } else {
     body = activeLists.map(list => (
@@ -115,7 +140,19 @@ export function SaveDraftAsTodoSheet({
   }
 
   return (
-    <Sheet visible={visible} onClose={onClose} snapPoints={['60%']}>
+    <Sheet
+      visible={visible && !hiddenForCreate}
+      onClose={() => {
+        // The hide-for-create flip arms the native sheet's own dismissal, which
+        // reports through `onClose`; that report is not the user closing the
+        // sheet, so only a dismissal while the sheet is actually shown reaches
+        // the caller.
+        if (!hiddenForCreate) {
+          onClose();
+        }
+      }}
+      snapPoints={['60%']}
+    >
       <View className="flex-1 pt-4">
         <Text accessibilityRole="header" className="px-5 pb-2 text-base font-semibold">
           {t('todos.saveSheet.title')}

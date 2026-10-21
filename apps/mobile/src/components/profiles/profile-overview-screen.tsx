@@ -5,7 +5,6 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import {
-  defaultControlLabel,
   defaultDescriptionKey,
   deleteErrorMessage,
   metadataFormKey,
@@ -248,7 +247,6 @@ export function ProfileOverviewScreen({
               value={profile.isDefault}
               disabled={defaultPending}
               busy={defaultPending}
-              switchAccessibilityLabel={t(defaultControlLabel(profile.isDefault))}
               onValueChange={next => {
                 if (next) {
                   setAsDefault.mutate({ profileId });

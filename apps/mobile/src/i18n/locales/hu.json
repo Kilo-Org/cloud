@@ -211,7 +211,7 @@
     "preferencesSubtitle": "Megjelenés, értesítések, gondolkodás és a képernyő működése",
     "deviceSessionsSubtitle": "Más eszközök áttekintése és kijelentkeztetése",
     "feedback": "Visszajelzés",
-    "privacyChoices": "Adatvédelmi beállítások",
+    "privacyChoices": "Adatvédelmi lehetőségek",
     "deleteAccount": "Fiók törlése",
     "confirmationCode": "Megerősítő kód",
     "confirmationCodePlaceholder": "6 jegyű kód",
@@ -856,10 +856,10 @@
       "kiloclawActivityUnavailable": "Indíts el egy KiloClaw-példányt, hogy KiloClaw-tevékenységet kapj.",
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
       "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy egyenleg-figyelmeztetéseket kapj.",
-      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
-      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörön, hogy biztonsági problémákat kapj.",
+      "securityFindingsSubtitle": "új biztonsági találatok és SLA-emlékeztetők",
+      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörön, hogy biztonsági találatokat kapj.",
       "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
-      "spendAlertsToggle": "Költésfigyelmeztetések kategória"
+      "spendAlertsToggle": "Költésfigyelmeztetések kategóriája"
     },
     "action": {
       "openSession": "Munkamenet megnyitása"
@@ -867,7 +867,7 @@
     "needsInputAction": {
       "approved": "Kérelem jóváhagyva",
       "replied": "Válasz elküldve",
-      "failed": "Nem sikerült válaszolni. Koppintson újra az újrapróbálkozáshoz.",
+      "failed": "Nem sikerült válaszolni. Koppints újra az újrapróbálkozáshoz.",
       "unavailable": "Ez a kérelem már nem várakozik."
     }
   },
@@ -3052,7 +3052,7 @@
       "sharingUnavailable": "A megosztás nem érhető el ezen az eszközön.",
       "status": {
         "paid": "Fizetve",
-        "open": "Megnyitás",
+        "open": "Nyitott",
         "void": "Érvénytelen",
         "uncollectible": "Behajthatatlan"
       },
@@ -3120,7 +3120,7 @@
       "lowBalanceBelow": "{{amount}} alatt"
     },
     "kiloPass": {
-      "activating": "Aktiválás",
+      "activating": "Aktiválás folyamatban",
       "canceling": "Lemondás folyamatban",
       "couldNotLoadStatus": "Nem sikerült betölteni az állapotot",
       "creditProcessingDelayed": "A kreditek feldolgozása késik · automatikus újrapróbálás",
@@ -3128,8 +3128,8 @@
       "notSubscribed": "Nincs előfizetés",
       "overallocated": "A kiosztott Pass-előfizetések száma meghaladja a fizetett férőhelyek számát",
       "paidSeat_one": "{{displayCount}} fizetett férőhely",
-      "paidSeat": "{{displayCount}} fizetős felhasználói hely",
-      "paidSeat_other": "{{displayCount}} fizetős felhasználói hely",
+      "paidSeat": "{{displayCount}} fizetett férőhely",
+      "paidSeat_other": "{{displayCount}} fizetett férőhely",
       "paymentNeedsAttention": "A fizetés intézkedést igényel",
       "paymentPending": "A fizetés függőben",
       "processingBlocked": "A feldolgozás blokkolva",
@@ -3171,7 +3171,7 @@
       "efficient": "Automatikus Hatékony",
       "small": "Automatikus Kicsi",
       "free": "Automatikus Ingyenes",
-      "organization": "Szervezeti automatikus"
+      "organization": "Szervezeti Automatikus"
     },
     "dataCollected": "Adatgyűjtés",
     "free": "Ingyenes",
@@ -3273,7 +3273,7 @@
     "tutorialLabel": "Oktatóprogram"
   },
   "modelChat": {
-    "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozzon, és próbálja újra, vagy váltson egy ezen az eszközön lévő modellre.",
+    "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozz, és próbáld újra, vagy válts egy ezen az eszközön lévő modellre.",
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
@@ -3286,7 +3286,7 @@
     "rename": {
       "title": "Csevegés átnevezése",
       "accessibility": "Csevegés átnevezése: {{title}}",
-      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg az átnevezéshez vagy a törléshez."
+      "openHint": "Megnyitja a csevegést. Hosszan nyomd meg az átnevezéshez vagy a törléshez."
     },
     "beta": "Béta",
     "details": {
@@ -3359,7 +3359,7 @@
       "serverNeedsSignIn": "Jelentkezz be a szerver használatához",
       "signIn": "Bejelentkezés",
       "signInA11y": "Bejelentkezés ebbe a szerverbe: {{name}}",
-      "signInFailed": "Nem sikerült bejelentkezni ide: {{name}}. Próbáld újra."
+      "signInFailed": "Nem sikerült bejelentkezni a(z) {{name}} szerverre. Próbáld újra."
     },
     "backends": {
       "title": "Csevegési háttérrendszerek",
@@ -3440,7 +3440,7 @@
       "advanced": "Speciális",
       "localPurpose": "Ezen az eszközön fut a llama.cpp-vel. A bemenetek és a válaszok az eszközön maradnak.",
       "deleteTitle": "Törli ezt a modellt?",
-      "deleteMessage": "Törli a(z) {{name}} modellt erről az eszközről? A beszélgetéseknek, amelyek használják, másik modellre van szükségük a folytatáshoz.",
+      "deleteMessage": "Törli a(z) {{name}} modellt erről az eszközről? A csevegéseknek, amelyek használják, másik modellre van szükségük a folytatáshoz.",
       "errors": {
         "invalidUrl": "Adjon meg érvényes hivatkozást.",
         "insecureUrl": "Használjon HTTPS-hivatkozást. A modellek nem tölthetők le HTTP-n keresztül.",
@@ -3512,7 +3512,7 @@
       "ready": "Használatra kész",
       "notAvailable": "Nem érhető el",
       "reasons": {
-        "appleIntelligenceDisabled": "A modell használatához kapcsolja be az Apple Intelligence funkciót a Beállítások appban.",
+        "appleIntelligenceDisabled": "A modell használatához kapcsolja be az Apple Intelligence funkciót a Beállítások alkalmazásban.",
         "deviceNotEligible": "Ez az eszköz nem támogatja az Apple Intelligence funkciót.",
         "modelNotReady": "A modell letöltése vagy előkészítése még folyamatban van. Próbálja újra később.",
         "unsupportedOs": "Ehhez a modellhez iOS 26 vagy újabb szükséges.",

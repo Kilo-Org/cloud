@@ -42,6 +42,7 @@ export function isStrippedGitConfigEnvVar(key: string): boolean {
 }
 
 export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
+  'KILO_RUNTIME_CLI_PATH',
   'SANDBOX_CONTROL_CREDENTIAL',
   'SANDBOX_CONTROL_URL',
   'PROVIDER_INSTANCE_ID',

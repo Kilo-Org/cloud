@@ -94,10 +94,6 @@ jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   UNSCOPED_TARGET: 'unscoped',
 }));
 
-jest.mock('@/lib/webhook-trigger-ownership', () => ({
-  verifyWebhookTriggerAccess: jest.fn(),
-}));
-
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchPullRequestByNumber: jest.fn(),
   fetchPullRequestReviewDecision: jest.fn(),
@@ -150,6 +146,7 @@ const ownershipRow = {
   pr_link_verified_at: null,
   status: null,
   status_updated_at: null,
+  status_transition_id: null,
   last_activity_at: null,
   total_cost_microdollars: null,
   live_summary: null,

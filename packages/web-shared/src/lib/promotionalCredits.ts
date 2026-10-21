@@ -76,10 +76,26 @@ type EmailProcessResult = {
   message: string;
 };
 
+/**
+ * Kill switch for every user-typed promo code. While false, a redeem attempt
+ * fails before any credit is granted or counted. Set to true to restore
+ * redemption.
+ */
+const selfServicePromoRedemptionEnabled: boolean = false;
+
+export const SELF_SERVICE_PROMO_REDEMPTION_DISABLED_MESSAGE =
+  'Promotional code redemption is temporarily unavailable. Please try again later.';
+
 export async function redeemSelfServicePromoCode(
   user: User,
   credit_category: string
 ): Promise<EmailProcessResult> {
+  if (!selfServicePromoRedemptionEnabled) {
+    return {
+      success: false,
+      message: SELF_SERVICE_PROMO_REDEMPTION_DISABLED_MESSAGE,
+    };
+  }
   return await grantCreditForCategory(user, { credit_category, counts_as_selfservice: true });
 }
 

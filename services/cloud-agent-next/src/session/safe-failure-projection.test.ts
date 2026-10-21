@@ -20,6 +20,8 @@ import {
   projectSafeFailure,
 } from './safe-failure-projection.js';
 
+const NESTED_PROVIDER_TIMEOUT_BODY = '{"type":"error","error":{"type":"timeout","code":504}}';
+
 describe('projectSafeAssistantError', () => {
   it.each([
     [
@@ -1023,6 +1025,278 @@ describe('classifyAssistantFailure', () => {
     const safeError = projectSafeAssistantError(error);
     expect(safeError).toBe(assistantFailureMessage(reason));
     expect(classifyAssistantFailure(safeError)).toEqual(failure);
+  });
+
+  // Production provider timeouts arrive as an `APIError` with no `statusCode`,
+  // only a body whose cause is nested: the root `type` is "error" and the inner
+  // `error` carries `type` "timeout" and `code` 504 (numeric or string). The
+  // result must be identical to an explicit numeric 504 status, survive the safe
+  // projection, and classify identically downstream.
+  it('classifies the nested provider timeout envelope exactly like a numeric 504 status', () => {
+    const baseline = classifyAssistantFailure({
+      name: 'APIError',
+      data: { statusCode: 504, message: 'opaque provider failure' },
+    });
+
+    expect(baseline).toEqual({
+      reason: 'timeout',
+      safeMessage: 'Assistant request timed out',
+      providerOwnership: 'unknown',
+    });
+
+    for (const responseBody of [
+      '{"type":"error","error":{"type":"timeout","code":504}}',
+      '{"type":"error","error":{"type":"timeout","code":"504"}}',
+    ]) {
+      const error = {
+        name: 'APIError',
+        data: { message: 'opaque provider failure', responseBody },
+      };
+      const failure = classifyAssistantFailure(error);
+
+      expect(failure).toEqual(baseline);
+
+      const safeError = projectSafeAssistantError(error);
+      expect(safeError).toBe('Assistant request timed out');
+      expect(classifyAssistantFailure(safeError)).toEqual(failure);
+
+      expect(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: failure.terminalCode ?? 'assistant_error',
+          assistantReason: failure.reason,
+          providerOwnership: failure.providerOwnership,
+        })
+      ).toEqual(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: baseline.terminalCode ?? 'assistant_error',
+          assistantReason: baseline.reason,
+          providerOwnership: baseline.providerOwnership,
+        })
+      );
+    }
+  });
+
+  it.each([
+    ['a missing root type', '{"error":{"type":"timeout","code":504}}'],
+    ['a non-error root type', '{"type":"response","error":{"type":"timeout","code":504}}'],
+    ['a missing nested type', '{"type":"error","error":{"code":504}}'],
+    [
+      'a non-timeout nested type',
+      '{"type":"error","error":{"type":"invalid_request_error","code":504}}',
+    ],
+    ['a missing nested code', '{"type":"error","error":{"type":"timeout"}}'],
+    ['an unrelated nested code', '{"type":"error","error":{"type":"timeout","code":429}}'],
+    ['an unrelated string nested code', '{"type":"error","error":{"type":"timeout","code":"500"}}'],
+    ['a non-object nested error', '{"type":"error","error":"timeout"}'],
+    ['a null nested error', '{"type":"error","error":null}'],
+    ['a root string code without the nested envelope', '{"type":"error","code":"504"}'],
+    ['truncated JSON', '{"type":"error","error":{"type":"timeout","code":504}'],
+  ])('does not infer a timeout from %s', (_label, responseBody) => {
+    const error = {
+      name: 'APIError',
+      data: { message: 'opaque provider failure', responseBody },
+    };
+
+    expect(classifyAssistantFailure(error)).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
+      providerOwnership: 'unknown',
+    });
+    expect(projectSafeAssistantError(error)).toBe('Assistant request failed');
+  });
+
+  it('keeps independently parsed origin and status signals when the nested envelope is malformed', () => {
+    // The gateway origin tag survives a malformed nested code field.
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody:
+            '{"error_type":"upstream_disconnect","type":"error","error":{"type":"timeout","code":{}}}',
+        },
+      }).reason
+    ).toBe('provider_disconnect');
+    // The body status survives a malformed nested code field.
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody: '{"type":"error","status":429,"error":{"type":"timeout","code":{}}}',
+        },
+      }).reason
+    ).toBe('rate_limited');
+    // The body error name survives a malformed nested type field.
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody:
+            '{"name":"ContentFilterError","type":"error","error":{"type":{},"code":504}}',
+        },
+      }).reason
+    ).toBe('content_filter');
+  });
+
+  it.each(['status', 'statusCode', 'code'] as const)(
+    'keeps the body %s numeric status ahead of the nested timeout envelope',
+    field => {
+      const responseBody = JSON.stringify({
+        type: 'error',
+        [field]: 429,
+        error: { type: 'timeout', code: 504 },
+      });
+
+      expect(
+        classifyAssistantFailure({
+          name: 'APIError',
+          data: { message: 'opaque provider failure', responseBody },
+        }).reason
+      ).toBe('rate_limited');
+    }
+  );
+
+  it('keeps a well-formed direct status outside the mapped range authoritative', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          statusCode: 200,
+          message: 'opaque provider failure',
+          responseBody: NESTED_PROVIDER_TIMEOUT_BODY,
+        },
+      })
+    ).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  it.each([
+    [400, 'invalid_request'],
+    [401, 'provider_authentication'],
+    [403, 'provider_authentication'],
+    [429, 'rate_limited'],
+    [503, 'provider_unavailable'],
+  ] as const)(
+    'keeps direct APIError status %s ahead of the nested timeout envelope',
+    (statusCode, reason) => {
+      expect(
+        classifyAssistantFailure({
+          name: 'APIError',
+          data: {
+            statusCode,
+            message: 'opaque provider failure',
+            responseBody: NESTED_PROVIDER_TIMEOUT_BODY,
+          },
+        }).reason
+      ).toBe(reason);
+    }
+  );
+
+  it('keeps the gateway origin tag and body error name ahead of the nested timeout envelope', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody:
+            '{"error_type":"upstream_disconnect","type":"error","error":{"type":"timeout","code":504}}',
+        },
+      }).reason
+    ).toBe('provider_disconnect');
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody:
+            '{"name":"ContextOverflowError","type":"error","error":{"type":"timeout","code":504}}',
+        },
+      }).reason
+    ).toBe('context_limit');
+  });
+
+  it.each(['managed', 'byok', 'unknown'] as const)(
+    'preserves %s provider ownership for the nested timeout envelope',
+    providerOwnership => {
+      const error = {
+        name: 'APIError',
+        data: { message: 'opaque provider failure', responseBody: NESTED_PROVIDER_TIMEOUT_BODY },
+      };
+      const failure = classifyAssistantFailure(error, providerOwnership);
+
+      expect(failure).toEqual({
+        reason: 'timeout',
+        safeMessage: 'Assistant request timed out',
+        providerOwnership,
+      });
+      expect(projectSafeAssistantError(error)).toBe('Assistant request timed out');
+    }
+  );
+
+  it('does not overwrite structured BYOK ownership with the nested timeout cause', () => {
+    const error = {
+      name: 'APIError',
+      data: {
+        message: 'opaque provider failure',
+        responseBody:
+          '{"error_type":"byok_error","type":"error","error":{"type":"timeout","code":504}}',
+      },
+    };
+
+    expect(classifyAssistantFailure(error, 'managed')).toEqual({
+      reason: 'timeout',
+      safeMessage: 'Assistant request timed out',
+      providerOwnership: 'byok',
+    });
+    expect(projectSafeAssistantError(error)).toBe('[BYOK] Assistant request timed out');
+  });
+
+  it('ignores a nested timeout envelope larger than the 64 KiB response-body cap', () => {
+    const responseBody = JSON.stringify({
+      type: 'error',
+      error: { type: 'timeout', code: 504 },
+      padding: 'x'.repeat(64 * 1024),
+    });
+    expect(responseBody.length).toBeGreaterThan(64 * 1024);
+
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: { message: 'opaque provider failure', responseBody },
+      })
+    ).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  it('does not retain nested timeout envelope text in the safe projection', () => {
+    const responseBody = JSON.stringify({
+      type: 'error',
+      error: { type: 'timeout', code: 504, message: 'poison-provider-detail' },
+      message: 'poison-root-detail',
+    });
+    const error = {
+      name: 'APIError',
+      data: { message: 'opaque provider failure', responseBody },
+    };
+    const failure = classifyAssistantFailure(error);
+    const safeError = projectSafeAssistantError(error);
+
+    expect(failure.reason).toBe('timeout');
+    expect(safeError).toBe('Assistant request timed out');
+    expect(safeError).not.toContain('poison');
+    expect(JSON.stringify(failure)).not.toContain('poison');
   });
 
   it('keeps a valid error_type when a sibling field is malformed', () => {

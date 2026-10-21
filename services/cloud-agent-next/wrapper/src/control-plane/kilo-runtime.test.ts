@@ -1482,6 +1482,18 @@ describe('Kilo observation recovery', () => {
   async function fixture(healthRequestMs = CONTROL_PLANE_TIMERS.wrapper.healthRequestMs) {
     const spawner = createSpawner();
     const scheduler = createScheduler();
+    const runtimeNow = scheduler.scheduler.now.bind(scheduler.scheduler);
+    let awaitingPostProbeRead = false;
+    let onPostProbeRead: (() => void) | undefined;
+    scheduler.scheduler.now = () => {
+      const value = runtimeNow();
+      if (awaitingPostProbeRead) {
+        awaitingPostProbeRead = false;
+        onPostProbeRead?.();
+        onPostProbeRead = undefined;
+      }
+      return value;
+    };
     const feed = createFeedFactory();
     const probe = createProbe(true);
     const frames: ControlPlaneWrapperFrame[] = [];
@@ -1570,6 +1582,19 @@ describe('Kilo observation recovery', () => {
       event,
       progress,
       outcomes: () => frames.filter(frame => frame.type === 'session.outcome'),
+      /**
+       * `checkObservation` reads `scheduler.now()` after the awaited probe
+       * resolves, so the next clock read proves the probe settled. The microtask
+       * drains let the single-flight owner clear before the next tick.
+       */
+      async probeSettlement(): Promise<void> {
+        await new Promise<void>(resolve => {
+          awaitingPostProbeRead = true;
+          onPostProbeRead = resolve;
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+      },
       async tick(ms = 5_000, progressing = true) {
         scheduler.advance(ms);
         if (progressing) progress();
@@ -1643,7 +1668,7 @@ describe('Kilo observation recovery', () => {
         },
       });
       h.scheduler.fire();
-      await Bun.sleep(30);
+      await h.probeSettlement();
       expect(h.probe.calls.count).toBe(1);
       expect(h.spawner.processes[0]!.stopped).toBe(0);
       expect(h.spawner.spawnCount()).toBe(1);
@@ -1661,8 +1686,8 @@ describe('Kilo observation recovery', () => {
           },
         });
         h.scheduler.fire();
-        await waitFor(() => h.probe.calls.count === index + 2);
-        await Bun.sleep(30);
+        await h.probeSettlement();
+        expect(h.probe.calls.count).toBe(index + 2);
         expect(h.spawner.processes[0]!.stopped).toBe(0);
       }
       expect(h.outcomes()).toEqual([]);
@@ -1717,8 +1742,8 @@ describe('Kilo observation recovery', () => {
         },
       });
       h.scheduler.fire();
-      await waitFor(() => h.probe.calls.count === 1);
-      await Bun.sleep(30);
+      await h.probeSettlement();
+      expect(h.probe.calls.count).toBe(1);
       expect(h.spawner.processes[0]!.stopped).toBe(0);
       expect(h.outcomes()).toEqual([]);
 
@@ -1733,6 +1758,45 @@ describe('Kilo observation recovery', () => {
       await h.dispose();
     }
   });
+
+  it.each([0, 30_000])(
+    'keeps the activity-observation restart owner when the pending probe settles %d ms past the observation bound',
+    async overshootMs => {
+      const h = await fixture(20);
+      try {
+        h.probe.set(() => new Promise(() => undefined));
+        h.scheduler.advance(120_000);
+        h.scheduler.fire();
+        await waitFor(() => h.probe.calls.count === 1);
+        expect(h.outcomes()).toEqual([]);
+
+        h.scheduler.advance(120_000 + overshootMs);
+        h.event('message.part.updated', {
+          part: {
+            id: 'tool-late',
+            sessionID: 'ses_observation',
+            messageID: 'assistant',
+            type: 'tool',
+            state: { status: 'running', output: 'late' },
+          },
+        });
+        await h.probeSettlement();
+
+        await waitFor(() => h.outcomes().length === 1);
+        expect(h.spawner.processes[0]!.stopped).toBe(1);
+        expect(h.spawner.spawnCount()).toBe(2);
+        expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_restarted' });
+        expect(h.logs.some(message => message.includes('"trigger":"activity_observation"'))).toBe(
+          true
+        );
+        expect(h.logs.some(message => message.includes('"trigger":"health_probe_false"'))).toBe(
+          false
+        );
+      } finally {
+        await h.dispose();
+      }
+    }
+  );
 
   it('bounds permanent observation failure at four minutes despite healthy progress', async () => {
     const h = await fixture();

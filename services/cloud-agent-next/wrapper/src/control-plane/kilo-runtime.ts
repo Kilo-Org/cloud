@@ -826,7 +826,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         observedActivity.hasRecentProgress(timers.sseSilenceMs)
       )
         return;
-      if (!answered) {
+      if (!answered && now - unhealthySince < 2 * timers.sseReconnectWindowMs) {
         await restartHung('health_probe_false', decisionResolution);
         return;
       }

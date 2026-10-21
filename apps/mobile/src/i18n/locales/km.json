@@ -955,7 +955,7 @@
       "limit_other": "អ្នកអាចភ្ជាប់ឯកសារបានរហូតដល់ {{displayCount}}។"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}} {{status}}",
+      "accessibility": "{{filename}}, {{status}}",
       "retryUploading": "ព្យាយាមផ្ទុក {{filename}} ឡើងម្តងទៀត",
       "remove": "ដក {{filename}} ចេញ"
     },
@@ -1426,7 +1426,7 @@
       "showMore": "បង្ហាញបន្ថែម",
       "created": "បានបង្កើត",
       "started": "បានចាប់ផ្តើម",
-      "tokens": "ថូខិន",
+      "tokens": "តូខេន",
       "tokensInOut": "{{input}} ចូល / {{output}} ចេញ",
       "council": "ក្រុមប្រឹក្សា",
       "decision": "ការសម្រេចចិត្ត",
@@ -2072,7 +2072,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "មិនអាចផ្ទុកវគ្គសកម្មបានទេ។",
-      "couldNotRefresh": "មិនអាចផ្ទុកឡើងវិញបានទេ",
+      "couldNotRefresh": "មិនអាចផ្ទុកឡើងវិញបានទេ។",
       "noSessionsYetDescription": "ចាប់ផ្តើមកិច្ចការសរសេរកូដពីទូរស័ព្ទរបស់អ្នក។ វគ្គរបស់អ្នកនឹងបង្ហាញនៅទីនេះ។",
       "viewHistory": "ប្រវត្តិវគ្គ",
       "noMatches": "គ្មានវគ្គដែលត្រូវគ្នា",
@@ -2136,7 +2136,7 @@
       "backToSessions": "ត្រឡប់ទៅបញ្ជីវគ្គ",
       "follow": "តាមដាននៅលើអេក្រង់ចាក់សោ",
       "unfollow": "ឈប់តាមដាននៅលើអេក្រង់ចាក់សោ",
-      "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
+      "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ",
       "failedToLoadDetails": "មិនអាចផ្ទុកព័ត៌មានលម្អិតនៃវគ្គបានទេ។",
       "failedToStopExecution": "មិនអាចបញ្ឈប់ការដំណើរការបានទេ។",
       "stopped": "វគ្គត្រូវបានបញ្ឈប់",
@@ -2153,7 +2153,7 @@
       "emptyTitle": "មិនទាន់មានសារទេ",
       "renameAccessibility": "ប្តូរឈ្មោះវគ្គ: {{title}}",
       "cloningSession": "កំពុងចម្លងវគ្គ",
-      "couldNotLoadThisSession": "មិនអាចផ្ទុកវគ្គនេះបានទេ។",
+      "couldNotLoadThisSession": "មិនអាចផ្ទុកវគ្គនេះបានទេ",
       "cloneFailedRetry": "មិនអាចចម្លងវគ្គនេះបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "notEnoughCredits": "ឥណទានមិនគ្រប់គ្រាន់ដើម្បីដំណើរការ Cloud Agent ទេ។ បន្ថែមឥណទាន ហើយព្យាយាមម្តងទៀត។",
       "previousTaskFinishing": "កិច្ចការមុនមិនទាន់បញ្ចប់ទេ។ សូមរង់ចាំបន្តិច។",
@@ -2204,8 +2204,8 @@
     },
     "tasks": {
       "progress": "{{completed}}/{{total}}",
-      "progressAccessibility": "គោលដៅ៖ បានបញ្ចប់ {{completed}} ក្នុងចំណោម {{total}}",
-      "rowAccessibility": "គោលដៅ៖ បានបញ្ចប់ {{completed}} ក្នុងចំណោម {{total}}។ គោលដៅបច្ចុប្បន្ន៖ {{task}}"
+      "progressAccessibility": "ភារកិច្ច៖ បានបញ្ចប់ {{completed}} ក្នុងចំណោម {{total}}",
+      "rowAccessibility": "ភារកិច្ច៖ បានបញ្ចប់ {{completed}} ក្នុងចំណោម {{total}}។ ភារកិច្ចបច្ចុប្បន្ន៖ {{task}}"
     },
     "newSession": {
       "recentlyUsed": "បានប្រើថ្មីៗនេះ",
@@ -2257,7 +2257,7 @@
       "discardDraftMessage": "សេចក្តីណែនាំដែលអ្នកបានសរសេរនឹងបាត់បង់។",
       "discardWithUploadsMessage": "សេចក្តីណែនាំរបស់អ្នក និងឯកសារដែលបានផ្ទុកឡើង តែមិនទាន់ភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវលុប។",
       "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "remoteHint": "ដំណើរការ `kilo remote` នៅលើកុំព្យូទ័ររបស់អ្នក ឬ `/remote` នៅក្នុងវគ្គ CLI ដែលកំពុងដំណើរការ ដើម្បីគ្រប់គ្រងដំណើរការ kilo ក្នុងមូលដ្ឋាន។",
+      "remoteHint": "ដើម្បីដំណើរការនៅលើកុំព្យូទ័ររបស់អ្នក សូមចាប់ផ្តើម Kilo នៅទីនោះ ហើយទុកវាដំណើរការ។",
       "continueFrom": "កំពុងបន្តវគ្គ {{title}}។",
       "importingSession": "កំពុងនាំចូលវគ្គ",
       "cliCannotContinue": "CLI នេះមិនអាចបន្តវគ្គបានទេ។ ជ្រើសរើស Cloud Agent ឬ CLI ផ្សេងទៀត។",
@@ -2266,31 +2266,31 @@
       "forkCutNotSynced": "សារនេះមិនទាន់បានរក្សាទុកនៅឡើយទេ។ សូមព្យាយាមម្ដងទៀតបន្តិចទៀត។",
       "forkFilesFromBaseBranch": "ឯកសារចាប់ផ្ដើមពីសាខាមូលដ្ឋាន។",
       "forkFilesUnchangedOnComputer": "ឯកសារនៅលើកុំព្យូទ័រនេះមិនត្រូវបានផ្លាស់ប្ដូរទេ។",
-      "pickProfile": "ជ្រើសរើសប្រវត្តិរូប",
-      "noProfile": "គ្មានប្រវត្តិរូប",
-      "manageProfiles": "គ្រប់គ្រងទម្រង់",
-      "noProfiles": "មិនទាន់មានប្រវត្តិរូបទេ។ បង្កើតមួយដើម្បីបន្ថែមអថេរបរិស្ថាន ម៉ាស៊ីនមេ MCP និងជំនាញ។",
+      "pickProfile": "ជ្រើសរើសកម្រងព័ត៌មាន",
+      "noProfile": "គ្មានកម្រងព័ត៌មាន",
+      "manageProfiles": "គ្រប់គ្រងកម្រងព័ត៌មាន",
+      "noProfiles": "មិនទាន់មានកម្រងព័ត៌មានទេ។ បង្កើតមួយដើម្បីបន្ថែមអថេរបរិស្ថាន ម៉ាស៊ីនមេ MCP និងជំនាញ។",
       "advancedConfig": "ការកំណត់រចនាសម្ព័ន្ធកម្រិតខ្ពស់",
-      "advancedConfigDescription": "ជ្រើសរើសទម្រង់ដើម្បីផ្ទុកការកំណត់រចនាសម្ព័ន្ធដែលបានរក្សាទុក ហើយកំណត់រចនាសម្ព័ន្ធអថេរបរិស្ថានបន្ថែម និងពាក្យបញ្ជាដំឡើងដោយដៃ",
+      "advancedConfigDescription": "ជ្រើសរើសកម្រងព័ត៌មានដើម្បីផ្ទុកការកំណត់រចនាសម្ព័ន្ធដែលបានរក្សាទុក ហើយកំណត់រចនាសម្ព័ន្ធអថេរបរិស្ថានបន្ថែម និងពាក្យបញ្ជាដំឡើងដោយដៃ",
       "saveAsProfile": "រក្សាទុកជាកម្រងព័ត៌មាន",
-      "saveProfileDescription": "រក្សាទុកអថេរបរិស្ថានបច្ចុប្បន្ន និងពាក្យបញ្ជាដំឡើងជាទម្រង់ដែលអាចប្រើឡើងវិញបាន។",
+      "saveProfileDescription": "រក្សាទុកអថេរបរិស្ថានបច្ចុប្បន្ន និងពាក្យបញ្ជាដំឡើងជាកម្រងព័ត៌មានដែលអាចប្រើឡើងវិញបាន។",
       "profileSummary": "អថេរបរិស្ថាន {{vars}} · ពាក្យបញ្ជាដំឡើង {{commands}}",
-      "profileSaved": "បានរក្សាទុកប្រវត្តិរូប \"{{name}}\"។",
-      "organizationProfiles": "ទម្រង់អង្គការ",
-      "personalProfiles": "ប្រវត្តិរូបផ្ទាល់ខ្លួន",
-      "yourProfiles": "ប្រវត្តិរូបរបស់អ្នក។",
+      "profileSaved": "បានរក្សាទុកកម្រងព័ត៌មាន \"{{name}}\"។",
+      "organizationProfiles": "កម្រងព័ត៌មានអង្គការ",
+      "personalProfiles": "កម្រងព័ត៌មានផ្ទាល់ខ្លួន",
+      "yourProfiles": "កម្រងព័ត៌មានរបស់អ្នក",
       "nameTooLong": "ឈ្មោះកម្រងព័ត៌មានវែងពេក",
       "descriptionTooLong": "ការពិពណ៌នាគឺវែងពេក",
       "secretsEncrypted": "អាថ៌កំបាំងត្រូវបានអ៊ិនគ្រីបមុនពេលផ្ទុក។",
       "profileActive": "កម្រងព័ត៌មានសកម្ម",
       "profilesActive": "កម្រងព័ត៌មានសកម្ម",
       "customConfigActive": "ការកំណត់ផ្ទាល់ខ្លួនសកម្ម",
-      "configNeedsAttention": "Config ត្រូវការការយកចិត្តទុកដាក់",
+      "configNeedsAttention": "ការកំណត់ត្រូវការការយកចិត្តទុកដាក់",
       "repoProfile": "កម្រងព័ត៌មាន Repo",
       "selectedProfile": "កម្រងព័ត៌មានដែលបានជ្រើសរើស",
-      "manualOverrides": "ការបដិសេធដោយដៃ",
+      "manualOverrides": "ការជំនួសដោយដៃ",
       "openSettingsToReview": "បើកការកំណត់ដើម្បីពិនិត្យ",
-      "profileSelection": "ការជ្រើសរើសប្រវត្តិរូប"
+      "profileSelection": "ការជ្រើសរើសកម្រងព័ត៌មាន"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារចំនួន {{displayCount}}។",
@@ -2305,8 +2305,8 @@
       "toolEdit": "កែសម្រួល",
       "toolWrite": "សរសេរ",
       "toolBash": "bash",
-      "toolGlob": "ស្វែងរកឯកសារតាមលំនាំ",
-      "toolGrep": "ស្វែងរកអត្ថបទ",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
       "toolList": "រាយបញ្ជី",
       "toolPatch": "អនុវត្តបំណះ",
       "toolTask": "កិច្ចការ",
@@ -2314,13 +2314,13 @@
       "updateTodos": "ធ្វើបច្ចុប្បន្នភាពផែនការ",
       "linesBadge": "{{displayCount}} បន្ទាត់",
       "filesBadge": "ឯកសារ {{displayCount}}",
-      "matchesBadge": "ត្រូវគ្នា {{displayCount}}",
+      "matchesBadge": "{{displayCount}} ត្រូវគ្នា",
       "filesBadge_one": "ឯកសារ {{displayCount}}",
       "filesBadge_other": "ឯកសារ {{displayCount}}",
       "linesBadge_one": "{{displayCount}} បន្ទាត់",
       "linesBadge_other": "{{displayCount}} បន្ទាត់",
-      "matchesBadge_one": "ត្រូវគ្នា {{displayCount}}",
-      "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}",
+      "matchesBadge_one": "{{displayCount}} ត្រូវគ្នា",
+      "matchesBadge_other": "{{displayCount}} ត្រូវគ្នា",
       "noOutput": "គ្មានលទ្ធផលទេ។",
       "translationFailed": "ការបកប្រែបរាជ័យ"
     },
@@ -2335,7 +2335,7 @@
     "instancePicker": {
       "runOn": "ដំណើរការលើ",
       "runOnAccessibility": "ដំណើរការលើ: {{label}}",
-      "couldNotLoad": "មិនអាចផ្ទុកបញ្ជីដំណើរការបានទេ",
+      "couldNotLoad": "មិនអាចផ្ទុកអ៊ីនស្តង់បានទេ",
       "cloudAgent": "Cloud Agent",
       "cloudAgentDescription": "ដំណើរការក្នុងបរិស្ថានដាច់ដោយឡែកលើក្លោដរបស់ Kilo",
       "noCliInstances": "គ្មានដំណើរការ CLI បានភ្ជាប់ទេ",
@@ -2344,7 +2344,7 @@
       "instanceOnProjectSuffix": "{{name}} នៅលើ {{project}} ({{suffix}})",
       "runOnCloudAgent": "ដំណើរការលើ Cloud Agent",
       "terminals": "ស្ថានីយបញ្ជា",
-      "remotes": "ដំណើរការពីចម្ងាយ"
+      "remotes": "ម៉ាស៊ីនពីចម្ងាយ"
     },
     "modePicker": {
       "title": "ជ្រើសរើសរបៀប",
@@ -2397,7 +2397,7 @@
       "cacheWrite": "ការសរសេរទៅឃ្លាំងបណ្ដោះអាសន្ន",
       "total": "សរុប",
       "reportAiResponseFailedRetryable": "មិនអាចរាយការណ៍ចម្លើយនេះបានទេ។",
-      "reportAiResponseFailedTerminal": "មិនអាចរាយការណ៍ចម្លើយនេះបានទេ។"
+      "reportAiResponseFailedTerminal": "ចម្លើយនេះមិនអាចរាយការណ៍បានទេ។"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2450,7 +2450,7 @@
     },
     "preparation": {
       "exitCode": "កូដបញ្ចប់ដំណើរការ: {{code}}",
-      "earlierOutputOmitted": "លទ្ធផលមុនៗមិនត្រូវបានបង្ហាញទេ។",
+      "earlierOutputOmitted": "លទ្ធផលមុនៗមិនត្រូវបានបង្ហាញទេ",
       "preparingEnvironment": "កំពុងរៀបចំបរិស្ថានដំណើរការ",
       "preparationComplete": "ការរៀបចំបានបញ្ចប់",
       "preparationFailed": "ការរៀបចំបានបរាជ័យ",
@@ -2461,7 +2461,7 @@
       "title": "ត្រូវការការអនុញ្ញាត",
       "allowQuestion": "តើអ្នកអនុញ្ញាត {{permission}} ទេ?",
       "appliesTo": "អនុវត្តចំពោះ:",
-      "denyPermission": "បដិសេធការផ្តល់សិទ្ធិ",
+      "denyPermission": "បដិសេធការអនុញ្ញាត",
       "deny": "បដិសេធ",
       "allowOnce": "អនុញ្ញាតតែម្តង",
       "allowOnceAccessibility": "អនុញ្ញាតតែម្តង",
@@ -2470,7 +2470,7 @@
       "retrying": "កំពុងព្យាយាមម្តងទៀត…"
     },
     "questionCard": {
-      "title": "ភ្នាក់ងារត្រូវការចម្លើយរបស់អ្នក",
+      "title": "ភ្នាក់ងារត្រូវការការបញ្ចូលពីអ្នក",
       "skipQuestionsTitle": "រំលងសំណួរ?",
       "skipQuestionsMessage": "ភ្នាក់ងារនឹងរំលងជំហាននេះ។",
       "answerProgress": "បានឆ្លើយ {{answered}} ក្នុងចំណោម {{total}}",
@@ -2478,7 +2478,7 @@
       "option": "{{label}}",
       "optionSelected": "{{label}}, បានជ្រើសរើស",
       "typeYourOwnAnswer": "សរសេរចម្លើយផ្ទាល់ខ្លួន",
-      "typeYourOwnAnswerPlaceholder": "ចម្លើយផ្ទាល់ខ្លួនរបស់អ្នក…",
+      "typeYourOwnAnswerPlaceholder": "សរសេរចម្លើយផ្ទាល់ខ្លួនរបស់អ្នក…",
       "skip": "រំលង",
       "retrySkip": "ព្យាយាមរំលងម្តងទៀត",
       "submitting": "កំពុងដាក់ស្នើ…",
@@ -2486,10 +2486,10 @@
     },
     "blockingCard": {
       "questionUnavailable": "សំណួរនេះលែងមានទៀតហើយ។",
-      "permissionUnavailable": "ការស្នើសុំសិទ្ធិនេះលែងមានទៀតហើយ។",
+      "permissionUnavailable": "ការស្នើសុំការអនុញ្ញាតនេះលែងមានទៀតហើយ។",
       "failedToSkipQuestion": "មិនអាចរំលងសំណួរបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "failedToSubmitAnswer": "មិនអាចដាក់ស្នើចម្លើយបានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "failedToRespondToPermission": "មិនអាចឆ្លើយតបនឹងសំណើសុំសិទ្ធិបានទេ។ សូមព្យាយាមម្តងទៀត។",
+      "failedToRespondToPermission": "មិនអាចឆ្លើយតបនឹងសំណើសុំការអនុញ្ញាតបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "submissionFailed": "ការដាក់ស្នើបានបរាជ័យ។ សូមព្យាយាមម្តងទៀត។",
       "questionAnnouncement": "ភ្នាក់ងារត្រូវការចម្លើយរបស់អ្នក។ ប្រអប់សរសេរសារត្រូវបានផ្អាក ខណៈពេលអ្នកឆ្លើយសំណួរ។",
       "permissionAnnouncement": "ភ្នាក់ងារត្រូវការការអនុញ្ញាតដើម្បីបន្ត។ ប្រអប់សរសេរសារត្រូវបានផ្អាក ខណៈពេលអ្នកសម្រេចចិត្ត។",
@@ -2642,7 +2642,7 @@
       "contextCompacted": "បរិបទបានបង្រួម"
     },
     "computeStatus": {
-      "exploring": "កំពុងស្វែងរក",
+      "exploring": "កំពុងរុករក",
       "searchingCodebase": "កំពុងស្វែងរកក្នុងកូដគម្រោង",
       "makingEdits": "កំពុងកែសម្រួល",
       "runningCommands": "កំពុងដំណើរការពាក្យបញ្ជា",
@@ -2696,7 +2696,7 @@
       "olderActivity": "សកម្មភាពមុនៗ",
       "olderActivityDescription": "ថ្លៃចំណាយដែលមិនរាប់បញ្ចូលក្នុងប្រវត្តិដែលបានផ្ទុក",
       "ofWindowTokens": "ក្នុងចំណោមតូខេន {{window}}",
-      "tokens": "ថូខិន",
+      "tokens": "តូខេន",
       "tokensWithPercentage": "តូខេន ({{percentage}})",
       "stepsCount_one": "{{steps}} ជំហាន",
       "stepsCount": "ជំហាន {{steps}}",
@@ -2713,11 +2713,11 @@
     },
     "autoApprove": {
       "title": "ការអនុម័តស្វ័យប្រវត្តិ",
-      "description": "អនុម័តសំណើសុំការអនុញ្ញាតសម្រាប់សេសសិននេះដោយស្វ័យប្រវត្តិ។ បន្ទាប់មក ឧបករណ៍នឹងដំណើរការដោយគ្មានការជំរុញ។",
-      "unavailable": "សេសសិននេះមិនអាចទទួលសំណើសុំការអនុញ្ញាតបានទេ។"
+      "description": "អនុម័តសំណើសុំការអនុញ្ញាតសម្រាប់វគ្គនេះដោយស្វ័យប្រវត្តិ។ បន្ទាប់មក ឧបករណ៍នឹងដំណើរការដោយគ្មានការជំរុញ។",
+      "unavailable": "វគ្គនេះមិនអាចទទួលសំណើសុំការអនុញ្ញាតបានទេ។"
     },
     "prBadge": {
-      "open": "បើកសំណើបញ្ចូលកូដ",
+      "open": "សំណើបញ្ចូលកូដដែលបានបើក",
       "closed": "សំណើបញ្ចូលកូដដែលបានបិទ",
       "merged": "សំណើបញ្ចូលកូដដែលបានបញ្ចូលរួច",
       "draft": "សេចក្តីព្រាងសំណើបញ្ចូលកូដ",
@@ -2727,7 +2727,7 @@
     "markdownImage": {
       "load": "ផ្ទុក",
       "loadWithHost": "ផ្ទុក {{host}}",
-      "httpsOnly": "អាចផ្ទុកបានតែរូបភាពតាម HTTPS ប៉ុណ្ណោះ។",
+      "httpsOnly": "រូបភាព HTTPS ប៉ុណ្ណោះ",
       "trustTitle": "ផ្ទុករូបភាពពី {{host}}?",
       "trustMessage": "ការជឿទុកចិត្តលើ {{host}} នឹងផ្ទុករូបភាពរបស់វាដោយមិនសួររាល់ដង។ អ្នកអាចដកវានៅពេលក្រោយក្នុងដែនគេហទំព័រដែលជឿទុកចិត្ត។",
       "loadOnce": "ផ្ទុកម្តង"
@@ -2748,7 +2748,7 @@
       "retryableTitle": "មិនអាចបង្ហាញបញ្ជីថតបានទេ",
       "tapToListHint": "ប៉ះថតមួយ ដើម្បីបង្ហាញអ្វីដែលមាននៅក្នុងថតនោះ។",
       "unsupportedDescription": "CLI នេះមិនអាចបង្ហាញបញ្ជីថតបានទេ។ ប៉ះ រួចរាល់ ដើម្បីរក្សាថតដែលបានប្រើពេលបើក CLI ហើយប៉ះ ចាប់ផ្តើមវគ្គ ដើម្បីចាប់ផ្តើមក្នុងថតនោះ។",
-      "unsupportedTitle": "មិនអាចបង្ហាញបញ្ជីថតបានទេ"
+      "unsupportedTitle": "CLI នេះមិនអាចបង្ហាញបញ្ជីថតបានទេ"
     },
     "toolRun": {
       "sheetTitle": "ការហៅឧបករណ៍",
@@ -3164,20 +3164,20 @@
     "differentOauth": "មានគណនីប្រើអ៊ីមែលនេះរួចហើយ ជាមួយវិធីចូលគណនីផ្សេង។ សាកល្បងវិធីផ្សេង ឬប្រើ '$t(login.moreSignInOptions)'។",
     "ssoError": "អង្គការរបស់អ្នកតម្រូវឱ្យប្រើ SSO។ ប្រើ '$t(login.moreSignInOptions)'។",
     "blocked": "គណនីនេះត្រូវបានរារាំង។ សូមទាក់ទងផ្នែកគាំទ្រ។",
-    "signupRateLimited": "ការព្យាយាមច្រើនពេកហើយ។ សូមព្យាយាមម្ដងទៀតនៅពេលក្រោយ។",
+    "signupRateLimited": "ការព្យាយាមច្រើនពេកហើយ។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
     "signupStepUp": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.moreSignInOptions)'។",
     "signupStepUpApple": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithApple)'។",
     "signupStepUpGoogle": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithGoogle)'។",
-    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវទេ។ សូមព្យាយាមម្ដងទៀត។",
-    "codeInProgress": "លេខកូដរបស់អ្នកកំពុងត្រូវបានដំណើរការ។ រង់ចាំមួយភ្លែត ហើយព្យាយាមម្ដងទៀត។",
+    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវទេ។ សូមព្យាយាមម្តងទៀត។",
+    "codeInProgress": "លេខកូដរបស់អ្នកកំពុងត្រូវបានដំណើរការ។ រង់ចាំមួយភ្លែត ហើយព្យាយាមម្តងទៀត។",
     "tooManyAttempts": "ការព្យាយាមច្រើនពេកហើយ។ សូមស្នើសុំលេខកូដថ្មី។",
     "invalidToken": "មិនអាចចូលគណនីបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "invalidEmail": "មិនអាចផ្ញើអ៊ីមែលទៅអាសយដ្ឋាននេះបានទេ។ សូមប្រើអាសយដ្ឋានអ៊ីមែលផ្សេង។",
-    "invalidRequest": "ពិនិត្យអាសយដ្ឋានអ៊ីមែលរបស់អ្នក ហើយព្យាយាមម្ដងទៀត។",
-    "emailDeliveryFailed": "ការផ្ញើអ៊ីមែលមិនអាចប្រើបានជាបណ្ដោះអាសន្នទេ។ សូមព្យាយាមម្ដងទៀតនៅពេលក្រោយ។",
+    "invalidRequest": "ពិនិត្យអាសយដ្ឋានអ៊ីមែលរបស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+    "emailDeliveryFailed": "ការផ្ញើអ៊ីមែលមិនអាចប្រើបានជាបណ្ដោះអាសន្នទេ។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
     "admissionRequired": "មិនអាចផ្ទៀងផ្ទាត់ឧបករណ៍របស់អ្នកបានទេ។ ប្រើ '$t(login.moreSignInOptions)' ដើម្បីចូលគណនីនៅលើឧបករណ៍ផ្សេង ឬតាមគេហទំព័រ។",
     "default": "មានបញ្ហាកើតឡើង។ សូមព្យាយាមម្តងទៀត។",
-    "retryableAdmission": "យើងមិនអាចផ្ទៀងផ្ទាត់ឧបករណ៍នេះបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្ដងទៀត។",
+    "retryableAdmission": "យើងមិនអាចផ្ទៀងផ្ទាត់ឧបករណ៍នេះបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
     "startSignInFailed": "មិនអាចចាប់ផ្តើមការចូលគណនីបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "couldNotOpenBrowser": "មិនអាចបើកកម្មវិធីរុករកបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "signInTimedOut": "ការចូលគណនីបានអស់ពេលកំណត់។ សូមព្យាយាមម្តងទៀត។",

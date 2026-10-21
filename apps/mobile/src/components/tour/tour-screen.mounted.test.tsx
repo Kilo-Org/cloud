@@ -274,19 +274,21 @@ describe('TourScreen', () => {
     unmount();
   });
 
-  it('hands off to the new-session page with no preselect when the computer card is chosen', async () => {
+  it('hands off to the new-session page with the computer target preselected when the computer card is chosen', async () => {
     const { renderer, unmount } = await mountTour();
 
     pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
 
     // The computer card records the decision and hands straight to the form
-    // too. It passes no run-on param, so the form restores the stored run-on
-    // preference and the person picks their computer there.
+    // too. It preselects the computer target: the form binds the first
+    // connected computer and never restores the stored run-on preference.
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(stackSafeReplace).toHaveBeenCalledTimes(1);
-    // No run-on param so the form restores the stored preference; the
-    // organization still scopes the form.
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?organizationId=org-1');
+    // Cloud Agent stays the preselected target, and the organization still
+    // scopes the form.
+    expect(stackSafeReplace).toHaveBeenCalledWith(
+      '/(app)/agent-chat/new?organizationId=org-1&preselectRunOn=computer'
+    );
     expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
 
@@ -306,7 +308,10 @@ describe('TourScreen', () => {
       1,
       '/(app)/agent-chat/new?preselectRunOn=cloud'
     );
-    expect(stackSafeReplace).toHaveBeenNthCalledWith(2, '/(app)/agent-chat/new');
+    expect(stackSafeReplace).toHaveBeenNthCalledWith(
+      2,
+      '/(app)/agent-chat/new?preselectRunOn=computer'
+    );
 
     unmount();
   });
@@ -405,7 +410,9 @@ describe('TourScreen', () => {
 
     pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
     expect(recordCompleted).toHaveBeenCalledTimes(1);
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?organizationId=org-1');
+    expect(stackSafeReplace).toHaveBeenCalledWith(
+      '/(app)/agent-chat/new?organizationId=org-1&preselectRunOn=computer'
+    );
 
     unmount();
   });

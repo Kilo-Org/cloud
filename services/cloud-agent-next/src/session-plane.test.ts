@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   generateSessionId,
+  isCodeReviewContainersOwner,
   isCodeReviewControlPlaneOwner,
   isCodeReviewSession,
   isControlPlaneOrigin,
@@ -16,6 +17,7 @@ import {
 import { PROVIDER_CAPABILITIES, sessionHasTerminal } from './agent-sandbox/capabilities.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
 import { sessionIdSchema } from './types.js';
+import { isInteractiveSessionOrigin } from './shared/control-plane-permission.js';
 
 describe('session plane identity', () => {
   it('classifies workspace_ as control and everything else as legacy', () => {
@@ -66,6 +68,7 @@ describe('session plane identity', () => {
 
     for (const createdOnPlatform of [
       'cloud-agent-web',
+      'desktop',
       'slack',
       'github',
       'linear',
@@ -149,6 +152,47 @@ describe('session plane identity', () => {
     ).toBe('control');
   });
 
+  it('routes Cloudflare Containers code-review owners to the control plane', () => {
+    const origin = { createdOnPlatform: 'code-review', billingOrigin: 'code-review' };
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'org-1' },
+        { userId: 'user-2', orgId: 'org-1' },
+        origin
+      )
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'user-1' },
+        { userId: 'user-1' },
+        origin
+      )
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'other' },
+        { userId: 'user-1' },
+        origin
+      )
+    ).toBe('legacy');
+  });
+
+  it('recognizes only enrolled Cloudflare Containers code-review owners', () => {
+    expect(
+      isCodeReviewContainersOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'user-1, org-1' },
+        { userId: 'user-2', orgId: 'org-1' }
+      )
+    ).toBe(true);
+    expect(
+      isCodeReviewContainersOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'user-1' },
+        { userId: 'user-2' }
+      )
+    ).toBe(false);
+    expect(isCodeReviewContainersOwner({}, { userId: 'user-1' })).toBe(false);
+  });
+
   it('does not route a spoofed code-review platform string to the control plane', () => {
     expect(
       sessionPlaneForNewOwner(
@@ -177,11 +221,18 @@ describe('session plane identity', () => {
 
   it('recognizes only the control-plane session origins', () => {
     expect(isControlPlaneOrigin({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
+    expect(isControlPlaneOrigin({ createdOnPlatform: 'desktop' })).toBe(true);
     expect(isControlPlaneOrigin({ createdOnPlatform: 'slack' })).toBe(true);
     expect(isControlPlaneOrigin({ createdOnPlatform: 'webhook' })).toBe(true);
     expect(isControlPlaneOrigin({ createdOnPlatform: 'app-builder' })).toBe(false);
     expect(isControlPlaneOrigin({})).toBe(false);
     expect(isControlPlaneOrigin()).toBe(false);
+  });
+
+  it('treats desktop sessions as interactive', () => {
+    expect(isInteractiveSessionOrigin('cloud-agent-web')).toBe(true);
+    expect(isInteractiveSessionOrigin('desktop')).toBe(true);
+    expect(isInteractiveSessionOrigin('slack')).toBe(false);
   });
 
   it('supports control-plane terminals independently of legacy provider capabilities', () => {

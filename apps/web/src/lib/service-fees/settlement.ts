@@ -122,6 +122,7 @@ export async function settleKiloPassInvoiceServiceFee(params: {
       stripeInvoiceId: invoiceId,
       stripePaymentIntentId: stripeIds.stripePaymentIntentId,
       stripeChargeId: stripeIds.stripeChargeId,
+      livemode: params.invoice.livemode,
       eligibleSubtotalMinor: productOnlyMinor,
       expectedFeeMinor: 0,
       failureCode: SERVICE_FEE_FAILURE_MISSING_ASSESSMENT,
@@ -206,6 +207,7 @@ export async function settleKiloPassInvoiceServiceFee(params: {
     assessment: settled,
     settledProductMinor: settled.settledProductMinor,
     chargedFeeMinor: settled.chargedFeeMinor,
+    livemode: params.invoice.livemode,
     deps,
     now,
   });
@@ -258,6 +260,7 @@ async function recordEffectiveRateDeviation(params: {
   assessment: ServiceFeeAssessmentRecord;
   settledProductMinor: number;
   chargedFeeMinor: number;
+  livemode?: boolean;
   deps: KiloPassServiceFeeSettlementDependencies;
   now: Date;
 }): Promise<ServiceFeeAssessmentRecord> {
@@ -287,6 +290,7 @@ async function recordEffectiveRateDeviation(params: {
     stripeInvoiceId: params.assessment.stripeInvoiceId,
     stripePaymentIntentId: params.assessment.stripePaymentIntentId,
     stripeChargeId: params.assessment.stripeChargeId,
+    livemode: params.livemode,
     eligibleSubtotalMinor: params.settledProductMinor,
     expectedFeeMinor: expectedFromSettled,
     failureCode: SERVICE_FEE_FAILURE_RATE_DEVIATION,
@@ -442,6 +446,7 @@ async function alertSafely(params: {
   stripeInvoiceId?: string | null;
   stripePaymentIntentId?: string | null;
   stripeChargeId?: string | null;
+  livemode?: boolean;
   eligibleSubtotalMinor: number;
   expectedFeeMinor: number;
   failureCode: string;
@@ -458,6 +463,7 @@ async function alertSafely(params: {
       stripeInvoiceId: params.stripeInvoiceId,
       stripePaymentIntentId: params.stripePaymentIntentId,
       stripeChargeId: params.stripeChargeId,
+      livemode: params.livemode,
       eligibleSubtotalMinor: params.eligibleSubtotalMinor,
       expectedFeeMinor: params.expectedFeeMinor,
       currency: SERVICE_FEE_SUPPORTED_CURRENCY,

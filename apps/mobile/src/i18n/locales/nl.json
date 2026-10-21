@@ -35,6 +35,8 @@
     "connectGithub": "GitHub koppelen",
     "cost": "Kosten",
     "discard": "Verwerpen",
+    "discardChangesMessage": "Je wijzigingen gaan verloren.",
+    "discardChangesTitle": "Wijzigingen verwerpen?",
     "findings": "Bevindingen",
     "mergeRequest": "merge request",
     "notConnected": "Niet gekoppeld",
@@ -109,7 +111,9 @@
     "online": "Verbonden",
     "open": "{{name}} openen",
     "openPullRequest": "PR openen",
+    "completed": "Voltooid",
     "pending": "In afwachting",
+    "running": "Actief",
     "performance": "Prestaties",
     "preferences": "Voorkeuren",
     "privacyPolicy": "Privacybeleid",
@@ -943,6 +947,9 @@
       "gateHidden": "Verborgen",
       "gateNone": "Geen",
       "noFindings": "Er zijn geen bevindingen.",
+      "findingsUnavailable": "De resultaten zijn niet beschikbaar omdat deze review is mislukt.",
+      "serviceUnavailable": "De codereviewservice kon niet worden bereikt. Probeer de review opnieuw wanneer de service beschikbaar is.",
+      "reviewFailed": "De review is mislukt. Probeer het opnieuw.",
       "retryMessage": "Dit voert de codereview opnieuw uit.",
       "retryReview": "Review opnieuw proberen",
       "retryNeedsSettings": "De Codebeoordelaar staat uit of de instellingen vragen aandacht. Herstel de instellingen en probeer deze review daarna opnieuw.",
@@ -1016,8 +1023,6 @@
     "updateFailed": "De beoordelaar kon niet worden bijgewerkt.",
     "configSaveFailed": "De reviewinstellingen konden niet worden opgeslagen.",
     "status": {
-      "running": "Actief",
-      "completed": "Voltooid",
       "interrupted": "Onderbroken"
     },
     "reviewStyle": {
@@ -1030,7 +1035,8 @@
       "bugs": "Programmeerfouten",
       "style": "Stijl",
       "testing": "Testen",
-      "documentation": "Documentatie"
+      "documentation": "Documentatie",
+      "unknown": "Overig ({{area}})"
     },
     "gateThreshold": {
       "warning": "Waarschuwing"
@@ -1109,7 +1115,14 @@
       "triageReasoning": "Onderbouwing van de eerste beoordeling",
       "watchInCloudAgent": "Bekijken in Cloud Agent",
       "whereFound": "Gevonden op deze locaties ({{displayCount}})",
-      "yes": "Ja"
+      "yes": "Ja",
+      "action": {
+        "analyzeCodebase": "Codebasis analyseren",
+        "dismiss": "Negeren",
+        "manualReview": "Handmatige beoordeling",
+        "monitor": "Monitoren",
+        "openPr": "Pull request openen"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analysemodel",
@@ -1131,7 +1144,24 @@
       "summary": "Rapportsamenvatting",
       "title": "Auditrapport",
       "unavailable": "Auditrapport niet beschikbaar",
-      "unavailableDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen auditrapporten bekijken. Vraag een eigenaar of factureringsbeheerder om je toegang te geven."
+      "unavailableDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen auditrapporten bekijken. Vraag een eigenaar of factureringsbeheerder om je toegang te geven.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse voltooid",
+        "findingAnalysisFailed": "Analyse mislukt",
+        "findingAutoDismissed": "Automatisch genegeerd",
+        "findingCreated": "Geïmporteerd",
+        "findingDeleted": "Verwijderd",
+        "findingDismissed": "Genegeerd",
+        "findingSeverityChanged": "Ernst gewijzigd",
+        "findingStatusChange": "Status gewijzigd",
+        "findingSuperseded": "Vervangen",
+        "remediationBlocked": "Herstel geblokkeerd",
+        "remediationCancelled": "Geannuleerd",
+        "remediationFailed": "Herstel mislukt",
+        "remediationNoChangesNeeded": "Geen wijzigingen nodig",
+        "remediationPrOpened": "Pull request geopend",
+        "remediationQueued": "Herstel aangevraagd"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Auditrapport bekijken"
@@ -1351,7 +1381,6 @@
       "installApp": "GitHub-app installeren",
       "reauthorizeButton": "GitHub-app opnieuw toegang geven",
       "reauthorizeDescription": "Security Agent heeft het recht vulnerability_alerts nodig om Dependabot-waarschuwingen te bekijken. Geef de GitHub-app opnieuw toegang om dit recht te verlenen.",
-      "reauthorizeFailed": "Het opnieuw verlenen van toegang kon niet worden gestart. Probeer het opnieuw.",
       "reauthorizeTitle": "Extra rechten vereist",
       "setupFailed": "Het instellen van GitHub kon niet worden gestart. Probeer het opnieuw."
     },
@@ -1374,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "Wijzigingen opslaan",
       "unsavedMessage": "Je wijzigingen opslaan voordat je dit scherm verlaat?",
+      "unsavedInvalidMessage": "Deze wijzigingen kunnen nog niet worden opgeslagen. Corrigeer ze om op te slaan, of verwerp ze om te vertrekken.",
       "unsavedTitle": "Niet-opgeslagen wijzigingen"
     },
     "setup": {
@@ -1697,6 +1727,7 @@
       "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt.",
       "couldNotReadPendingSessions": "De wachtende sessies konden niet worden uitgelezen. Probeer het opnieuw.",
       "failedToCreate": "De sessie kon niet worden aangemaakt.",
+      "checkOrganizationAccess": "Controleer je toegang tot deze organisatie en probeer het opnieuw.",
       "couldNotRefreshRepositories": "De repositories konden niet worden vernieuwd. Probeer het opnieuw.",
       "discardDraftTitle": "Concept verwijderen?",
       "discardDraftMessage": "Je prompt gaat verloren.",
@@ -1766,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} regels",
       "matchesBadge_one": "{{displayCount}} treffer",
       "matchesBadge_other": "{{displayCount}} treffers",
-      "noOutput": "Geen uitvoer."
+      "noOutput": "Geen uitvoer.",
+      "translationFailed": "Vertaling mislukt"
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",
@@ -2217,6 +2249,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Je actieve sessies zijn pas beschikbaar nadat de gegevens zijn geladen.",
     "currentDeviceUnidentified": "Het huidige apparaat kon niet worden herkend.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Geen actieve sessies",
     "noSessionsDescription": "Meld je in de Kilo-app aan op een ander apparaat. Dat apparaat verschijnt dan hier.",
     "onlyKiloAppSignIns": "Alleen aanmeldingen van de Kilo-app verschijnen hier. Editor- en CLI-aanmeldingen worden niet vermeld.",
@@ -2369,6 +2402,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Voordat we beginnen",
+    "summaryTitle": "Voorkeuren voor gegevensdeling",
     "introDescription": "Kilo stuurt je berichten naar AI-aanbieders om antwoorden te genereren. Hieronder zie je welke gegevens we delen en met wie.",
     "required": "Vereist om Kilo te gebruiken",
     "promptsTitle": "Je prompts en gesprekken",
@@ -2377,7 +2411,6 @@
     "accountDescription": "Je Kilo-account-ID en metadata van verzoeken om je identiteit te controleren en het gebruik te meten.",
     "diagnosticsTitle": "Diagnostische appgegevens",
     "diagnosticsDescription": "Crash- en foutrapporten zonder app-inhoud om de app stabiel te houden.",
-    "optional": "Optioneel",
     "helpImprove": "Kilo helpen verbeteren",
     "helpImproveDescription": "Deel anonieme gebruiksstatistieken en de installatiebron. Je kunt dit op elk moment wijzigen in de instellingen.",
     "seeFullDetails": "Volledige details bekijken",
@@ -2502,7 +2535,8 @@
       "description": "Koppel je GitHub-account om PR's op je telefoon te beoordelen.",
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
-      "bitbucketOrgOnlyDescription": "Selecteer een organisatie in je profiel om de PR's van die organisatie op Bitbucket te beoordelen."
+      "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
+      "contextLine": "Voor {{organization}}"
     },
     "connectionExpired": "De GitHub-koppeling is verlopen.",
     "couldNotLoadPullRequest": "De PR kon niet worden geladen.",
@@ -2929,7 +2963,9 @@
       "reviewNotSubmitted": "Deze beoordeling kan in de huidige vorm niet worden verzonden. Mogelijk is de PR gewijzigd of probeer je je eigen PR te beoordelen.",
       "reviewNotSubmittedTerm": "Deze beoordeling kan niet in de huidige vorm worden verzonden. Mogelijk is de {{term}} gewijzigd, of kun je je eigen {{term}} niet beoordelen.",
       "couldNotPostComment": "De opmerking kon niet worden geplaatst.",
-      "couldNotSubmitReview": "De beoordeling kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw."
+      "couldNotSubmitReview": "De beoordeling kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw.",
+      "rateLimited": "Te veel verzoeken. Probeer het later opnieuw.",
+      "conflict": "Dit is gewijzigd terwijl je ermee bezig was. Laad het opnieuw en probeer het nog eens."
     },
     "operation": {
       "couldNotReply": "Het antwoord kon niet worden verzonden.",
@@ -3468,6 +3504,9 @@
     "localModels": {
       "title": "Modellen op het apparaat",
       "help": "Modellen op het apparaat draaien op deze telefoon. Je prompts en antwoorden blijven op het apparaat.",
+      "switchTitle": "Overschakelen naar een model op het apparaat?",
+      "switchMessage": "Als je overschakelt naar {{name}}, worden de prompts en context van dit gesprek op deze telefoon verwerkt, niet op een externe server.",
+      "switchConfirm": "Van model wisselen",
       "systemPurpose": "Het model dat in het systeem van dit apparaat is ingebouwd. Het draait op het apparaat.",
       "apple": "Apple Intelligence (op het apparaat)",
       "checking": "Beschikbaarheid controleren…",
@@ -3564,7 +3603,6 @@
     "personalDefaultDescription": "Automatisch geladen wanneer geen enkele repository een vastgezet profiel heeft.",
     "organizationDefaultDescription": "Automatisch geladen voor leden die geen persoonlijke standaard hebben.",
     "setAsDefault": "Als standaard instellen",
-    "removeDefault": "Standaard verwijderen",
     "saveFailed": "Kan profiel niet opslaan",
     "deleteTitle": "Profiel verwijderen",
     "deleteMessage": "Hierdoor worden het profiel en de instellingen ervan permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
@@ -3590,11 +3628,13 @@
     "commandsTitle": "Instelopdrachten",
     "addCommand": "Commando toevoegen",
     "commandLabel": "Commando",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "bijv. pnpm install",
     "commandsEmpty": "Nog geen installatieopdrachten",
     "commandsSaveFailed": "Kan installatieopdrachten niet opslaan",
     "moveUp": "Ga omhoog",
     "moveDown": "Ga naar beneden",
+    "moveCommandUp": "Commando {{position}} omhoog verplaatsen",
+    "moveCommandDown": "Commando {{position}} omlaag verplaatsen",
     "skillsTitle": "Vaardigheden",
     "addSkill": "Vaardigheid toevoegen",
     "skillNameLabel": "Vaardigheidsnaam",
@@ -3664,7 +3704,7 @@
       "nameRequired": "Voer een agentnaam in",
       "slugRequired": "Voer een agentenslak in",
       "slugInvalid": "Slug moet beginnen met een letter en mag alleen kleine letters, cijfers en streepjes gebruiken",
-      "slugConflict": "Die naaktslak wordt gereserveerd door een ingebouwde agent",
+      "slugConflict": "Die slug is al in gebruik door een ingebouwde agent of een andere agent in dit profiel",
       "edit": "Agent bewerken"
     },
     "slashCommands": {
@@ -3675,6 +3715,7 @@
       "description": "Beschrijving van de opdracht",
       "template": "Sjabloon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Leg $ARGUMENTS uit",
       "subtask": "Uitvoeren als subtaak",
       "edit": "Bewerk de slash-opdracht",

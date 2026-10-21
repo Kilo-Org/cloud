@@ -612,6 +612,9 @@ export function getOutputHeaders(response: Response) {
   }
   outputHeaders.set('Content-Encoding', 'identity');
   // Content-Encoding: identity is here because Vercel modifies encoding/compression and causes issues
+  // no-transform keeps a proxy in front of the gateway, such as the web app's rewrite to the
+  // ai-gateway app in local dev, from compressing a stream and holding it until the end.
+  outputHeaders.set('Cache-Control', 'no-cache, no-transform');
 
   return outputHeaders;
 }
@@ -1121,7 +1124,7 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1258,7 +1261,7 @@ export function countAndStoreEditUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1415,10 +1418,10 @@ export function countAndStoreEmbeddingUsage(
         return;
       }
 
-      // Preserve the real upstream cost for analytics before zeroing for BYOK
+      // Preserve the real upstream cost before free-model or BYOK zeroing.
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
       }
 

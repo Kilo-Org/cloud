@@ -24,6 +24,8 @@ export const SESSION_FILTERS_KEY = 'agent-session-filters';
 /** Filter record for the live sessions page. Separate: the pages filter separate lists. */
 export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
+/** The user chose Not now on the iOS install-attribution pre-prompt; do not ask again. */
+export const TRACKING_PROMPT_DISMISSED_KEY = 'tracking-prompt-dismissed';
 export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 /** Last "Run on" destination on the new-agent screen. Empty means Cloud Agent. */
 export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';
@@ -156,6 +158,13 @@ export const USER_SESSION_TITLES_KEY = 'user-session-titles';
  * secret, but it is mirrored through SecureStore like every other record.
  */
 export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
+
+/**
+ * Durable "last focused in-app route" record behind the relaunch restore.
+ * Holds `{ href, userId, storedAt }`; the account id scopes the record so one
+ * account never restores another account's route (see `lib/last-route.ts`).
+ */
+export const LAST_ROUTE_KEY = 'last-route';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,

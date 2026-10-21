@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The screen body wires the form, draft, model, and provider hooks end-to-end from the thin route. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -28,9 +28,11 @@ import {
   mergeProfileAndRuntimeModeOptions,
   resolvePinnedAgentModel,
 } from '@/components/agents/mode-normalize';
+import { cloudPrepareFailureMessage } from '@/components/agents/cloud-prepare-error-display';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { useNewSessionModelState } from '@/components/agents/new-session-model-provider';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import {
   useNewSessionPrefill,
@@ -43,12 +45,15 @@ import {
   readForkPrefillText,
   readForkSourceIsCloudAgent,
 } from '@/components/agents/new-session-prefill';
+import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
@@ -79,6 +84,7 @@ import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
+  flushDraft,
   NEW_SESSION_DRAFT_KEY,
   resolvePrefillOverDraft,
   saveDraft,
@@ -89,6 +95,7 @@ import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/pi
 import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import {
   PRESELECT_CLOUD_RUN_ON,
+  PRESELECT_COMPUTER_RUN_ON,
   readPreselectRunOn,
   resolvePersistedRunOn,
   shouldRestorePersistedRunOn,
@@ -141,12 +148,11 @@ export function NewSessionScreenBody() {
     forkSourceIsCloudAgent?: string;
     preselectRunOn?: string;
   }>();
-  const organizationId = searchParams.organizationId;
+  const { organizationId, isCloneEntry } = useNewSessionOrganization();
   const shareIdParam = searchParams.shareId;
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
   const cloneSourceTitle = readCloneSourceTitle(searchParams);
-  const isCloneEntry = cloneFromKiloSessionId !== '';
   // "Fork from here": the inclusive cut, and a forked user message's text for
   // the new session's composer. Both empty for a full Continue.
   const cloneUpToMessageId = isCloneEntry ? readCloneUpToMessageId(searchParams) : '';
@@ -154,12 +160,25 @@ export function NewSessionScreenBody() {
   const forkSourceIsCloudAgent =
     cloneUpToMessageId !== '' && readForkSourceIsCloudAgent(searchParams);
   // The route's explicit Run-on preselection: the tour's cloud path names the
-  // Cloud Agent sentinel, the computer path names the tapped connection id.
+  // Cloud Agent sentinel, the computer path names the computer sentinel, and
+  // an in-app computer entry names the tapped connection id.
   const preselectRunOn = readPreselectRunOn(searchParams.preselectRunOn);
   const preselectConnectionId =
-    preselectRunOn !== null && preselectRunOn !== PRESELECT_CLOUD_RUN_ON ? preselectRunOn : null;
+    preselectRunOn !== null &&
+    preselectRunOn !== PRESELECT_CLOUD_RUN_ON &&
+    preselectRunOn !== PRESELECT_COMPUTER_RUN_ON
+      ? preselectRunOn
+      : null;
+  // The tour's computer path: the computer target is selected from the first
+  // frame; the restore effect below binds the first connected computer.
+  const preselectComputer = preselectRunOn === PRESELECT_COMPUTER_RUN_ON;
 
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
+  // The computer target selected with no instance bound yet (the tour's
+  // computer path, before the instance list resolves a computer or while none
+  // is connected). Cleared only by an explicit in-form pick of Cloud Agent;
+  // the route param never re-arms it.
+  const [computerTargetSelected, setComputerTargetSelected] = useState(preselectComputer);
   const [remoteOverride, setRemoteOverride] = useState<RemoteModelOverride | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -197,6 +216,65 @@ export function NewSessionScreenBody() {
   // mount reaches it only through the remount keyed on `promptSeed` below, and
   // that remount happens only while the user has typed nothing.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+
+  // The Organization section above Run on. The account it names is the one the
+  // create is attributed to and every org-scoped pick reads
+  // (`useNewSessionOrganization`): an explicit ?organizationId, else the active
+  // account, so an entry that carries no organization (the tour hand-off, the
+  // launcher "New Agent" shortcut) starts in the account Home shows. Switching
+  // the account switches the whole screen with it: the org-scoped picks
+  // (repositories, models, profiles) belong to the previous one, so the body
+  // remounts through a stack-safe replace carrying the new ?organizationId. The
+  // durable text draft survives — the pending debounced write flushes before
+  // the replace, so the remount's draft load reads the newest text (the
+  // replace's push lands before the old screen's unmount flush would run). A
+  // clone entry is locked to its source session's org: a read-only row (an
+  // explicit scope never inherits the active account). The entry's own params
+  // (share prefill, clone/fork ids, run-on preselect) stay in the URL so the
+  // remount keeps the same entry.
+  const stackSafeRouter = useStackSafeReplace();
+  const handleOrganizationSwitch = useCallback(
+    (nextOrganizationId: string | null) => {
+      // See ModelSelector: the sheet never re-anchors after the keyboard
+      // hides, so the keyboard must be down before this push.
+      Keyboard.dismiss();
+      void (async () => {
+        if (userId && !isCloneEntry) {
+          await flushDraft(userId, NEW_SESSION_DRAFT_KEY);
+        }
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(searchParams)) {
+          // The typed `useLocalSearchParams` shape above makes every entry a
+          // string; empty params are dropped so the route keeps no bare key.
+          if (key !== 'organizationId' && value !== '') {
+            params.set(key, value);
+          }
+        }
+        if (nextOrganizationId) {
+          params.set('organizationId', nextOrganizationId);
+        }
+        const query = params.size > 0 ? `?${params.toString()}` : '';
+        stackSafeRouter.replace(`/(app)/agent-chat/new${query}` as Href);
+      })();
+    },
+    [stackSafeRouter, searchParams, userId, isCloneEntry]
+  );
+  const organizationSection = (
+    <View className="mt-5">
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('common.organization')}
+      </Text>
+      {isCloneEntry ? (
+        <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
+      ) : (
+        <ContextControl
+          value={organizationId ?? null}
+          onSelectionChange={handleOrganizationSwitch}
+        />
+      )}
+    </View>
+  );
+
   // Clone entry never touches the shared new-session draft: pass an undefined
   // identity so `useFencedDraftLoad` performs no fetch (its entity key is
   // typed non-optional, unlike `useDraftFlushOnBackground` below). The
@@ -239,7 +317,10 @@ export function NewSessionScreenBody() {
   const modelView = useMemo(
     () =>
       resolveNewSessionModelView({
-        isRemoteTarget: runOnInstance !== null,
+        // The unbound computer target shares the remote model surface: the
+        // catalog is empty (no connection id yet) and the view falls back to
+        // the gateway-shaped options until a computer binds.
+        isRemoteTarget: runOnInstance !== null || computerTargetSelected,
         catalog: instanceCatalog.catalog,
         catalogLoading: instanceCatalog.isLoading,
         gatewayModels: models,
@@ -250,6 +331,7 @@ export function NewSessionScreenBody() {
       }),
     [
       runOnInstance,
+      computerTargetSelected,
       instanceCatalog.catalog,
       instanceCatalog.isLoading,
       models,
@@ -441,6 +523,19 @@ export function NewSessionScreenBody() {
       setRunOnInstance(resolvePersistedRunOn(preselectConnectionId, instanceList));
       return;
     }
+    // The tour's computer path: bind the first connected computer (either
+    // instance kind is a computer) once the list arrives; zero connected
+    // leaves the target selected but unbound — Start stays disabled with the
+    // setup hint and the Cloud Agent is never substituted. The stored
+    // preference is never consulted or written.
+    if (preselectComputer) {
+      if (instancesData === undefined) {
+        return;
+      }
+      runOnRestoredRef.current = true;
+      setRunOnInstance(instanceList[0] ?? null);
+      return;
+    }
     // The tour's cloud path asks for the Cloud Agent target explicitly: start
     // with no remote target so the form opens on Cloud Agent, and never restore
     // the stored preference (which the tour must not touch). `runOnUserPickedRef`
@@ -459,6 +554,7 @@ export function NewSessionScreenBody() {
     instanceList,
     instancesData,
     storedConnectionId,
+    preselectComputer,
     preselectConnectionId,
     preselectRunOn,
   ]);
@@ -488,17 +584,27 @@ export function NewSessionScreenBody() {
   // failed spawn keeps the screen mounted (draft preserved for retry); a
   // blocked admission or cancelled voice submit never arms the marker, so
   // the unmount flush preserves the draft.
-  const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({
+  const { markRemoteSpawnAttempted, markRemoteSpawnFailed } = useRemoteSpawnDraftCleanup({
     userId: isCloneEntry ? undefined : userId,
   });
 
   // A committed remote spawn arms the discard-confirm bypass alongside the
   // draft-clearing marker. The bypass is reset when the spawn settles without
-  // navigating (a failed spawn), so an abandon after a failure still confirms.
+  // navigating (a failed spawn), so an abandon after a failure still confirms,
+  // and the failure also disarms the draft-clearing marker so the draft
+  // survives leaving to Home. The ready callback re-arms the marker for the
+  // same attempt: a success that lands late (after the deadline flipped the
+  // form to the inline failure and the user pressed Retry) has consumed the
+  // prompt, so the unmount must still clear the draft instead of flushing it
+  // back into the composer for the next visit.
   const handleSpawnAdmitted = useCallback(() => {
     markRemoteSpawnAttempted();
     skipDiscardGuardRef.current = true;
   }, [markRemoteSpawnAttempted]);
+  const handleSpawnFailed = useCallback(() => {
+    markRemoteSpawnFailed();
+    skipDiscardGuardRef.current = false;
+  }, [markRemoteSpawnFailed]);
 
   // Clone entry never touches the shared draft. The inline "Run on" reason is
   // a delivered clone/import failure (or an incapable CLI, derived below) and
@@ -513,6 +619,10 @@ export function NewSessionScreenBody() {
   const armCloneNavigateBypass = useCallback(() => {
     cloneNavigateBypassRef.current = true;
   }, []);
+  const handleSpawnReady = useCallback(() => {
+    markRemoteSpawnAttempted();
+    armCloneNavigateBypass();
+  }, [markRemoteSpawnAttempted, armCloneNavigateBypass]);
 
   // A to-do start can target a remote instance instead of Cloud Agent; the
   // spawned session links to the to-do the same way the cloud path links it.
@@ -624,17 +734,17 @@ export function NewSessionScreenBody() {
     // a blocked admission or cancelled voice submit never clears the draft.
     onSpawnAdmitted: handleSpawnAdmitted,
     // A committed spawn that settles without navigating (retryable or
-    // non-retryable) must re-arm the discard confirm, so an abandon after a
-    // failed spawn still asks. A successful spawn replaces the screen before
-    // this can run, so the bypass stays armed and the guard consumes it.
-    onSpawnFailed: () => {
-      skipDiscardGuardRef.current = false;
-    },
+    // non-retryable) disarms the draft-clearing marker (the draft survives
+    // the failure and the leave to Home) and re-arms the discard confirm, so
+    // an abandon after a failed spawn still asks. A successful spawn replaces
+    // the screen before this can run, so the bypass stays armed and the guard
+    // consumes it.
+    onSpawnFailed: handleSpawnFailed,
     cloneFromKiloSessionId: isCloneEntry ? cloneFromKiloSessionId : null,
     cloneUpToMessageId: cloneUpToMessageId || null,
     forkPrefillText: forkPrefillText || null,
     onCloneImportFailure: handleCloneImportFailure,
-    onSpawnReady: armCloneNavigateBypass,
+    onSpawnReady: handleSpawnReady,
     onSpawnSucceeded: handleSpawnSucceeded,
   });
   const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);
@@ -655,12 +765,42 @@ export function NewSessionScreenBody() {
     [organizationId, saveModel, persistServerLastSelected, setModel, setVariant]
   );
 
+  // The tour's computer target with no connected computer yet: bind the first
+  // one the moment a CLI connects (poll tick, Refresh, or focus refetch). The
+  // one-shot restore above cannot do this — it seals after the first resolved
+  // list, which may have been empty. A deliberate in-form pick wins and stops
+  // the auto-bind (`runOnUserPickedRef`); binding here is transient and never
+  // touches the stored preference. A retryable spawn failure that reset the
+  // selection shows the disconnected note: the note asks the person to pick
+  // again, so the auto-bind stays off until a deliberate choice clears it.
+  useEffect(() => {
+    if (!computerTargetSelected || runOnUserPickedRef.current) {
+      return;
+    }
+    if (remoteSpawn.showInstanceDisconnectedNote) {
+      return;
+    }
+    const first = instanceList[0];
+    if (runOnInstance !== null || first === undefined) {
+      return;
+    }
+    setRunOnInstance(first);
+  }, [
+    computerTargetSelected,
+    instanceList,
+    runOnInstance,
+    remoteSpawn.showInstanceDisconnectedNote,
+  ]);
+
   const handleRunOnChange = useCallback(
     (next: InstancePickerInstance | null) => {
       runOnUserPickedRef.current = true;
       saveRunOn(next?.connectionId ?? null);
       setRemoteOverride(null);
       setCloneImportFailureKey(null);
+      // An explicit Cloud Agent pick is the one thing that leaves the tour's
+      // computer target: from here the form behaves like the ordinary entry.
+      setComputerTargetSelected(false);
       // The inline cloud-create failure belongs to the previous target: it
       // would render stale above Start after switching to a computer. A fresh
       // cloud attempt clears it again at press time.
@@ -669,7 +809,6 @@ export function NewSessionScreenBody() {
     },
     [handleRunOnInstanceChange, saveRunOn]
   );
-
   function handlePromptChange(text: string) {
     promptEditedRef.current = true;
     promptRef.current = text;
@@ -791,7 +930,7 @@ export function NewSessionScreenBody() {
     [retryAttachment]
   );
 
-  const isRemoteTargetSelected = runOnInstance !== null;
+  const isRemoteTargetSelected = runOnInstance !== null || computerTargetSelected;
   // Clone CLI-capability gate: a full clone is optimistic (only an explicit
   // `sessionClone: false` refuses it); a fork cut needs
   // `sessionCloneAtMessage: true`. A refused CLI shows its inline reason
@@ -833,6 +972,12 @@ export function NewSessionScreenBody() {
       });
     }
     if (isRemoteTargetSelected) {
+      // The computer target with no connected computer yet cannot start: the
+      // spawn has no live instance to fire on. The visible blocked reason
+      // below names the setup hint.
+      if (runOnInstance === null) {
+        return true;
+      }
       return (
         remoteSpawn.isSpawningRemote ||
         isSubmitting ||
@@ -906,7 +1051,11 @@ export function NewSessionScreenBody() {
   );
 
   let startBlockedReason: string | null = null;
-  if (startBlockedReasonKey === 'connect-provider') {
+  if (runOnInstance === null && computerTargetSelected) {
+    startBlockedReason = stripInlineCodeMarkers(
+      t('agentChat.instancePicker.noCliInstancesDescription')
+    );
+  } else if (startBlockedReasonKey === 'connect-provider') {
     startBlockedReason = t('agentChat.newSession.connectProviderToStart');
   } else if (startBlockedReasonKey === 'refresh-repositories') {
     startBlockedReason = t('agentChat.newSession.refreshRepositories');
@@ -945,12 +1094,8 @@ export function NewSessionScreenBody() {
           if (error instanceof Error && error.message === CLONE_CUT_NOT_FOUND_CODE) {
             // The cut message is not in the saved source yet: say so, Start stays enabled.
             message = i18n.t(FORK_CUT_NOT_SYNCED_KEY);
-          } else if (
-            error instanceof Error &&
-            error.message &&
-            !isCloudPrepareRetryableError(error)
-          ) {
-            message = error.message;
+          } else if (!isCloudPrepareRetryableError(error)) {
+            message = cloudPrepareFailureMessage(error);
           }
           toast.error(message);
         } finally {
@@ -959,7 +1104,13 @@ export function NewSessionScreenBody() {
       })();
       return;
     }
-    if (runOnInstance !== null) {
+    if (isRemoteTargetSelected) {
+      // The computer target with no connected computer yet cannot spawn: the
+      // gate above keeps Start disabled, so this is a defensive guard, never
+      // a cloud-create fall-through.
+      if (runOnInstance === null) {
+        return;
+      }
       void submitWithVoiceSettled(async () => {
         remoteSpawn.onStart();
         await Promise.resolve();
@@ -972,6 +1123,7 @@ export function NewSessionScreenBody() {
     void submitWithVoiceSettled(createSessionFromDraft);
   }, [
     isCloneEntry,
+    isRemoteTargetSelected,
     runOnInstance,
     cloneFromKiloSessionId,
     cloneUpToMessageId,
@@ -1043,6 +1195,7 @@ export function NewSessionScreenBody() {
         isFetchingInstances={isFetchingInstances}
         onRefreshInstances={() => void refetchInstances()}
         onChangeRunOnInstance={handleRunOnChange}
+        pendingComputer={computerTargetSelected && runOnInstance === null}
         showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
         folderPath={folderPath}
         onChangeFolderPath={setFolderPath}
@@ -1070,6 +1223,7 @@ export function NewSessionScreenBody() {
         onManualVarsChange={setManualVars}
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
+        organizationSection={organizationSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
@@ -1078,6 +1232,8 @@ export function NewSessionScreenBody() {
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
+        remoteSpawnFailure={remoteSpawn.remoteSpawnFailure}
+        onRetryRemoteSpawn={handleStartSession}
       />
       {/* The discard confirm: a Modal overlay, so the composer behind it keeps
           its layout while the destructive choice keeps its red fill. */}

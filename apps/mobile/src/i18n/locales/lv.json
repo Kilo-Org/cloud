@@ -35,6 +35,8 @@
     "connectGithub": "Pievienot GitHub",
     "cost": "Izmaksas",
     "discard": "Atmest",
+    "discardChangesMessage": "Jūsu izmaiņas tiks zaudētas.",
+    "discardChangesTitle": "Atmest izmaiņas?",
     "findings": "Konstatējumi",
     "mergeRequest": "merge request",
     "notConnected": "Nav pievienots",
@@ -109,7 +111,9 @@
     "online": "Tiešsaistē",
     "open": "Atvērt {{name}}",
     "openPullRequest": "Atvērt izmaiņu pieprasījumu",
+    "completed": "Pabeigts",
     "pending": "Gaida",
+    "running": "Darbojas",
     "performance": "Veiktspēja",
     "preferences": "Lietotāja iestatījumi",
     "privacyPolicy": "Privātuma politika",
@@ -673,7 +677,8 @@
       "description": "Pievieno savu GitHub kontu, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
       "gitlabDescription": "Pievieno savu GitLab kontu, lai pārskatītu merge requests mobilajā ierīcē.",
       "bitbucketDescription": "Pievieno Bitbucket šai organizācijai, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
-      "bitbucketOrgOnlyDescription": "Profilā izvēlies organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus."
+      "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
+      "contextLine": "Priekš {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +790,9 @@
       "reviewNotSubmitted": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, PR ir mainījies vai arī tu mēģini vērtēt savu izmaiņu pieprasījumu.",
       "reviewNotSubmittedTerm": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, {{term}} ir mainījies, vai arī tu nevar vērtēt savu {{term}}.",
       "couldNotPostComment": "Neizdevās publicēt komentāru.",
-      "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz."
+      "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "rateLimited": "Pārāk daudz pieprasījumu. Lūdzu, mēģini vēlāk vēlreiz.",
+      "conflict": "Tas ir mainījies, kamēr tu ar to strādāji. Ielādē to no jauna un mēģini vēlreiz."
     },
     "operation": {
       "couldNotReply": "Neizdevās atbildēt.",
@@ -1432,6 +1439,9 @@
       "couldNotGetLatest": "Neizdevās iegūt jaunākos datus.",
       "byline": "{{repo}} #{{number}} autors: {{author}}",
       "noFindings": "Nav konstatējumu.",
+      "findingsUnavailable": "Rezultāti nav pieejami, jo šī koda pārskatīšana neizdevās.",
+      "serviceUnavailable": "Neizdevās izveidot savienojumu ar koda pārskatīšanas pakalpojumu. Atkārtojiet koda pārskatīšanu, kad pakalpojums būs pieejams.",
+      "reviewFailed": "Koda pārskatīšana neizdevās. Lūdzu, mēģiniet vēlreiz.",
       "showMore": "Rādīt vairāk",
       "created": "Izveidota",
       "started": "Sākta",
@@ -1547,8 +1557,6 @@
     "updateFailed": "Neizdevās atjaunināt koda pārskatītāju.",
     "configSaveFailed": "Neizdevās saglabāt koda pārskatīšanas iestatījumus.",
     "status": {
-      "running": "Darbojas",
-      "completed": "Pabeigts",
       "interrupted": "Pārtraukta"
     },
     "reviewStyle": {
@@ -1561,7 +1569,8 @@
       "bugs": "Kļūdas",
       "style": "Stils",
       "testing": "Testēšana",
-      "documentation": "Dokumentācija"
+      "documentation": "Dokumentācija",
+      "unknown": "Cits ({{area}})"
     },
     "gateThreshold": {
       "warning": "Brīdinājums"
@@ -1674,7 +1683,14 @@
       "whereFound": "Konstatējuma atrašanās vietas ({{displayCount}})",
       "fullReport": "Pilns sagatavotais ziņojums",
       "yes": "Jā",
-      "no": "Nē"
+      "no": "Nē",
+      "action": {
+        "analyzeCodebase": "Analizēt koda bāzi",
+        "dismiss": "Noraidīt",
+        "manualReview": "Manuāla pārskatīšana",
+        "monitor": "Uzraudzīt",
+        "openPr": "Atvērt PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Konstatējumi: {{displayCount}}",
@@ -1879,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Saglabāt izmaiņas",
       "unsavedTitle": "Nesaglabātas izmaiņas",
-      "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?"
+      "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?",
+      "unsavedInvalidMessage": "Šīs izmaiņas vēl nevar saglabāt. Izlabojiet tās, lai saglabātu, vai atmetiet, lai aizietu."
     },
     "auditReportButton": {
       "viewA11y": "Skatīt audita ziņojumu"
@@ -1896,7 +1913,24 @@
       "title": "Audita ziņojums",
       "unavailable": "Audita ziņojums nav pieejams",
       "unavailableDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var skatīt audita ziņojumus. Lūdz īpašnieku vai norēķinu pārvaldnieku piešķirt tev piekļuvi.",
-      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz."
+      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analīze pabeigta",
+        "findingAnalysisFailed": "Analīze neizdevās",
+        "findingAutoDismissed": "Automātiski noraidīts",
+        "findingCreated": "Importēts",
+        "findingDeleted": "Izdzēsts",
+        "findingDismissed": "Noraidīts",
+        "findingSeverityChanged": "Mainīta smaguma pakāpe",
+        "findingStatusChange": "Mainīts statuss",
+        "findingSuperseded": "Aizstāts",
+        "remediationBlocked": "Labošana bloķēta",
+        "remediationCancelled": "Atcelta",
+        "remediationFailed": "Labošana neizdevās",
+        "remediationNoChangesNeeded": "Izmaiņas nav nepieciešamas",
+        "remediationPrOpened": "Atvērts PR",
+        "remediationQueued": "Labošana pieprasīta"
+      }
     },
     "notifications": {
       "couldNotLoad": "Neizdevās ielādēt paziņojumu iestatījumus.",
@@ -1928,7 +1962,6 @@
       "installApp": "Instalēt GitHub lietotni",
       "reauthorizeButton": "Atkārtoti autorizēt GitHub lietotni",
       "reauthorizeDescription": "Drošības aģentam vajadzīga atļauja vulnerability_alerts, lai piekļūtu Dependabot brīdinājumiem. Atkārtoti autorizē GitHub lietotni, lai piešķirtu šo atļauju.",
-      "reauthorizeFailed": "Neizdevās sākt atkārtotu autorizāciju. Lūdzu, mēģini vēlreiz.",
       "reauthorizeTitle": "Nepieciešamas papildu atļaujas",
       "setupFailed": "Neizdevās sākt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz."
     },
@@ -2237,6 +2270,7 @@
       "prefillModelUnavailable": "{{model}} vairs nav pieejams. Tiek izmantots tavs noklusējuma modelis.",
       "couldNotReadPendingSessions": "Neizdevās nolasīt gaidošās sesijas. Mēģini vēlreiz.",
       "failedToCreate": "Neizdevās izveidot sesiju.",
+      "checkOrganizationAccess": "Pārbaudi savu piekļuvi šai organizācijai un mēģini vēlreiz.",
       "couldNotRefreshRepositories": "Neizdevās atsvaidzināt repozitorijus. Lūdzu, mēģini vēlreiz.",
       "discardDraftTitle": "Atmest melnrakstu?",
       "discardDraftMessage": "Tava uzvedne tiks dzēsta.",
@@ -2310,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} atbilstība",
       "matchesBadge_other": "{{displayCount}} atbilstības",
       "matchesBadge_zero": "{{displayCount}} atbilstību",
-      "noOutput": "Nav izvades."
+      "noOutput": "Nav izvades.",
+      "translationFailed": "Tulkojums neizdevās"
     },
     "readToolMarkdown": {
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",
@@ -2768,6 +2803,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tavas aktīvās sesijas būs pieejamas pēc datu ielādes.",
     "currentDeviceUnidentified": "Neizdevās identificēt pašreizējo ierīci.",
+    "kiloApp": "Kilo lietotne",
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
     "onlyKiloAppSignIns": "Šeit ir redzamas tikai Kilo lietotnes sesijas. Redaktora un CLI sesijas nav iekļautas.",
@@ -2921,6 +2957,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Pirms sākam",
+    "summaryTitle": "Datu kopīgošanas preferences",
     "introDescription": "Kilo nosūta tavus ziņojumus AI pakalpojumu sniedzējiem, lai sagatavotu atbildes. Tālāk ir norādīts, kādi dati tiek kopīgoti un ar ko.",
     "required": "Nepieciešams Kilo lietošanai",
     "promptsTitle": "Tavas uzvednes un sarunas",
@@ -2929,7 +2966,6 @@
     "accountDescription": "Tavs Kilo konta ID un pieprasījumu metadati, ko izmanto autentifikācijai un lietojuma mērīšanai.",
     "diagnosticsTitle": "Lietotnes diagnostika",
     "diagnosticsDescription": "Avāriju un kļūdu ziņojumi, no kuriem ir izņemts lietotnes saturs un kuri palīdz nodrošināt lietotnes stabilitāti.",
-    "optional": "Pēc izvēles",
     "helpImprove": "Palīdzēt uzlabot Kilo",
     "helpImproveDescription": "Kopīgo anonīmus datus par lietotnes lietošanu un instalēšanas avotu. To vari jebkurā laikā mainīt iestatījumos.",
     "seeFullDetails": "Skatīt visu informāciju",
@@ -3509,6 +3545,9 @@
     "localModels": {
       "title": "Ierīces modeļi",
       "help": "Ierīces modeļi darbojas šajā tālrunī. Jūsu uzvednes un atbildes paliek ierīcē.",
+      "switchTitle": "Pārslēgties uz ierīces modeli?",
+      "switchMessage": "Pārslēdzoties uz {{name}}, šīs sarunas uzvednes un konteksts tiks apstrādāti šajā tālrunī, nevis attālā serverī.",
+      "switchConfirm": "Pārslēgt modeli",
       "systemPurpose": "Šīs ierīces sistēmā iebūvētais modelis. Tas darbojas ierīcē.",
       "apple": "Apple Intelligence (ierīcē)",
       "checking": "Pārbauda pieejamību…",
@@ -3605,7 +3644,6 @@
     "personalDefaultDescription": "Automātiski ielādēts, ja nevienai krātuvei nav piesprausta profila.",
     "organizationDefaultDescription": "Automātiski ielādēts dalībniekiem, kuriem nav personisku noklusējuma.",
     "setAsDefault": "Iestatīt kā noklusējumu",
-    "removeDefault": "Noņemt kā noklusējumu",
     "saveFailed": "Nevarēja saglabāt profilu",
     "deleteTitle": "Dzēst profilu",
     "deleteMessage": "Tādējādi profils un tā iestatījumi tiek neatgriezeniski noņemti. Šo darbību nevar atsaukt.",
@@ -3631,11 +3669,13 @@
     "commandsTitle": "Iestatīšanas komandas",
     "addCommand": "Pievienot komandu",
     "commandLabel": "Pavēli",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "piem. pnpm install",
     "commandsEmpty": "Vēl nav nevienas iestatīšanas komandas",
     "commandsSaveFailed": "Nevarēja saglabāt iestatīšanas komandas",
     "moveUp": "Pārvietojieties uz augšu",
     "moveDown": "Pārvietojieties uz leju",
+    "moveCommandUp": "Pārvietot komandu {{position}} uz augšu",
+    "moveCommandDown": "Pārvietot komandu {{position}} uz leju",
     "skillsTitle": "Prasmes",
     "addSkill": "Pievienojiet prasmi",
     "skillNameLabel": "Prasmes nosaukums",
@@ -3705,7 +3745,7 @@
       "nameRequired": "Ievadiet aģenta nosaukumu",
       "slugRequired": "Ievadiet aģenta lodes",
       "slugInvalid": "Slug jāsākas ar burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
-      "slugConflict": "Šo sliņķi rezervē iebūvētais aģents",
+      "slugConflict": "Šo slug jau izmanto iebūvēts aģents vai cits aģents šajā profilā",
       "edit": "Rediģēt aģentu"
     },
     "slashCommands": {
@@ -3716,6 +3756,7 @@
       "description": "Komandas apraksts",
       "template": "Veidne",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",

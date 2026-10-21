@@ -35,6 +35,8 @@
     "connectGithub": "Prijungti GitHub",
     "cost": "Kaina",
     "discard": "Atmesti",
+    "discardChangesMessage": "Jūsų pakeitimai bus prarasti.",
+    "discardChangesTitle": "Atmesti pakeitimus?",
     "findings": "Problemos",
     "mergeRequest": "merge request",
     "notConnected": "Neprijungta",
@@ -109,7 +111,9 @@
     "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",
     "openPullRequest": "Atidaryti pakeitimų užklausą",
+    "completed": "Baigta",
     "pending": "Laukiama",
+    "running": "Vykdoma",
     "performance": "Našumas",
     "preferences": "Nuostatos",
     "privacyPolicy": "Privatumo politika",
@@ -685,7 +689,8 @@
       "description": "Prijunk savo GitHub paskyrą, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
-      "bitbucketOrgOnlyDescription": "Profilyje pasirink organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas."
+      "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
+      "contextLine": "Skirta {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -801,7 +806,9 @@
       "reviewNotSubmitted": "Dabartinės peržiūros pateikti negalima. PR galėjo pasikeisti arba bandai peržiūrėti savo paties pakeitimų užklausą.",
       "reviewNotSubmittedTerm": "Šios peržiūros pateikti negalima. {{term}} galėjo pasikeisti arba negali peržiūrėti savo {{term}}.",
       "couldNotPostComment": "Nepavyko paskelbti komentaro.",
-      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą."
+      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą.",
+      "rateLimited": "Gauta per daug užklausų. Bandykite vėliau dar kartą.",
+      "conflict": "Tai pasikeitė, kol dirbote. Įkelkite iš naujo ir bandykite dar kartą."
     },
     "operation": {
       "couldNotReply": "Nepavyko atsakyti.",
@@ -1451,6 +1458,9 @@
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
       "byline": "{{repo}} #{{number}} · Autorius: {{author}}",
       "noFindings": "Radinių nerasta.",
+      "findingsUnavailable": "Rezultatai nepasiekiami, nes ši peržiūra nepavyko.",
+      "serviceUnavailable": "Nepavyko prisijungti prie kodo peržiūros paslaugos. Pakartokite peržiūrą, kai paslauga bus pasiekiama.",
+      "reviewFailed": "Peržiūra nepavyko. Bandykite dar kartą.",
       "showMore": "Rodyti daugiau",
       "created": "Sukurta",
       "started": "Pradėta",
@@ -1566,8 +1576,6 @@
     "updateFailed": "Nepavyko atnaujinti kodo peržiūros agento.",
     "configSaveFailed": "Nepavyko išsaugoti peržiūros nustatymų.",
     "status": {
-      "running": "Vykdoma",
-      "completed": "Baigta",
       "interrupted": "Nutraukta"
     },
     "reviewStyle": {
@@ -1580,7 +1588,8 @@
       "bugs": "Klaidos",
       "style": "Stilius",
       "testing": "Testavimas",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Kita ({{area}})"
     },
     "gateThreshold": {
       "warning": "Įspėjimas"
@@ -1694,7 +1703,14 @@
       "whereFound": "Kur tai rasta ({{displayCount}})",
       "fullReport": "Visa sugeneruota ataskaita",
       "yes": "Taip",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analizuoti kodų bazę",
+        "dismiss": "Atmesti",
+        "manualReview": "Rankinis peržiūrėjimas",
+        "monitor": "Stebėti",
+        "openPr": "Atidaryti traukimo užklausą"
+      }
     },
     "dashboard": {
       "findingsCount": "Radinių: {{displayCount}}",
@@ -1902,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Išsaugoti pakeitimus",
       "unsavedTitle": "Neišsaugoti pakeitimai",
-      "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?"
+      "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?",
+      "unsavedInvalidMessage": "Šių pakeitimų dar negalima išsaugoti. Ištaisykite juos, kad išsaugotumėte, arba atmeskite juos, kad išeitumėte."
     },
     "auditReportButton": {
       "viewA11y": "Peržiūrėti audito ataskaitą"
@@ -1919,7 +1936,24 @@
       "title": "Audito ataskaita",
       "unavailable": "Audito ataskaita nepasiekiama",
       "unavailableDescription": "Audito ataskaitas gali peržiūrėti tik organizacijos savininkai ir atsiskaitymų administratoriai. Paprašyk savininko arba atsiskaitymų administratoriaus suteikti tau prieigą.",
-      "queryFailed": "Nepavyko užbaigti ataskaitos užklausos. Bandyk dar kartą."
+      "queryFailed": "Nepavyko užbaigti ataskaitos užklausos. Bandyk dar kartą.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analizė atlikta",
+        "findingAnalysisFailed": "Analizė nesėkminga",
+        "findingAutoDismissed": "Atmesta automatiškai",
+        "findingCreated": "Importuota",
+        "findingDeleted": "Ištrinta",
+        "findingDismissed": "Atmesta",
+        "findingSeverityChanged": "Pakeistas sunkumo lygis",
+        "findingStatusChange": "Pakeista būsena",
+        "findingSuperseded": "Išstumta",
+        "remediationBlocked": "Taisymas užblokuotas",
+        "remediationCancelled": "Atšaukta",
+        "remediationFailed": "Taisymas nesėkmingas",
+        "remediationNoChangesNeeded": "Pakeitimų nereikia",
+        "remediationPrOpened": "Atidaryta traukimo užklausa",
+        "remediationQueued": "Pateikta taisymo užklausa"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nepavyko įkelti pranešimų nustatymų.",
@@ -1951,7 +1985,6 @@
       "installApp": "Įdiegti GitHub programėlę",
       "reauthorizeButton": "Iš naujo suteikti teises GitHub programėlei",
       "reauthorizeDescription": "Saugos agentui reikia vulnerability_alerts teisės, kad galėtų pasiekti Dependabot įspėjimus. Iš naujo suteik teises GitHub programėlei, kad pridėtum šią teisę.",
-      "reauthorizeFailed": "Nepavyko pradėti pakartotinio teisių suteikimo. Bandyk dar kartą.",
       "reauthorizeTitle": "Reikia papildomų teisių",
       "setupFailed": "Nepavyko pradėti GitHub sąrankos. Bandyk dar kartą."
     },
@@ -2265,6 +2298,7 @@
       "prefillModelUnavailable": "Modelis „{{model}}“ nebepasiekiamas. Naudojamas numatytasis modelis.",
       "couldNotReadPendingSessions": "Nepavyko nuskaityti laukiančių sesijų. Bandykite dar kartą.",
       "failedToCreate": "Nepavyko sukurti sesijos.",
+      "checkOrganizationAccess": "Patikrinkite prieigą prie šios organizacijos ir bandykite dar kartą.",
       "couldNotRefreshRepositories": "Nepavyko atnaujinti saugyklų. Bandykite dar kartą.",
       "discardDraftTitle": "Atmesti juodraštį?",
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",
@@ -2342,7 +2376,8 @@
       "matchesBadge_other": "atitikčių: {{displayCount}}",
       "matchesBadge_few": "atitiktys: {{displayCount}}",
       "matchesBadge_many": "atitikčių: {{displayCount}}",
-      "noOutput": "Nėra išvesties."
+      "noOutput": "Nėra išvesties.",
+      "translationFailed": "Vertimas nepavyko"
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",
@@ -2807,6 +2842,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kol duomenys neįkelti, aktyvių sesijų peržiūrėti negalima.",
     "currentDeviceUnidentified": "Nepavyko atpažinti šio įrenginio.",
+    "kiloApp": "Kilo programėlė",
     "noSessions": "Nėra aktyvių sesijų",
     "noSessionsDescription": "Prisijunkite prie Kilo programėlės kitame įrenginyje, ir jis bus rodomas čia.",
     "onlyKiloAppSignIns": "Čia rodomi tik prisijungimai prie Kilo programėlės. Prisijungimai per redaktorių ir CLI nerodomi.",
@@ -2961,6 +2997,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Prieš pradedant",
+    "summaryTitle": "Duomenų bendrinimo nuostatos",
     "introDescription": "Kilo siunčia jūsų žinutes AI teikėjams, kad jie sugeneruotų atsakymus. Toliau nurodome, kokius duomenis perduodame ir kam.",
     "required": "Būtina norint naudotis Kilo",
     "promptsTitle": "Jūsų užklausos ir pokalbiai",
@@ -2969,7 +3006,6 @@
     "accountDescription": "Jūsų Kilo paskyros ID ir užklausų metaduomenys, naudojami jūsų tapatybei patvirtinti ir naudojimo apskaitai.",
     "diagnosticsTitle": "Programėlės diagnostika",
     "diagnosticsDescription": "Strigčių ir klaidų ataskaitos be programėlės turinio, naudojamos stabiliam programėlės veikimui užtikrinti.",
-    "optional": "Pasirenkama",
     "helpImprove": "Padėti tobulinti Kilo",
     "helpImproveDescription": "Bendrinkite anoniminius naudojimo duomenis ir įdiegimo šaltinį. Šią parinktį bet kada galite pakeisti nustatymuose.",
     "seeFullDetails": "Peržiūrėti visą informaciją",
@@ -3550,6 +3586,9 @@
     "localModels": {
       "title": "Įrenginio modeliai",
       "help": "Įrenginio modeliai veikia šiame telefone. Jūsų užklausos ir atsakymai lieka įrenginyje.",
+      "switchTitle": "Perjungti į įrenginio modelį?",
+      "switchMessage": "Perjungus į {{name}}, šio pokalbio užklausos ir kontekstas bus apdorojami šiame telefone, o ne nuotoliniame serveryje.",
+      "switchConfirm": "Pakeisti modelį",
       "systemPurpose": "Į šio įrenginio sistemą integruotas modelis. Jis veikia įrenginyje.",
       "apple": "Apple Intelligence (įrenginyje)",
       "checking": "Tikrinamas pasiekiamumas…",
@@ -3646,7 +3685,6 @@
     "personalDefaultDescription": "Automatiškai įkeliama, kai jokia saugykla neturi prisegto profilio.",
     "organizationDefaultDescription": "Automatiškai įkeliama nariams, kurie neturi asmeninių įsipareigojimų.",
     "setAsDefault": "Nustatyti kaip numatytąjį",
-    "removeDefault": "Pašalinti kaip numatytąjį",
     "saveFailed": "Nepavyko išsaugoti profilio",
     "deleteTitle": "Ištrinti profilį",
     "deleteMessage": "Tai visam laikui pašalins profilį ir jo nustatymus. To negalima anuliuoti.",
@@ -3672,11 +3710,13 @@
     "commandsTitle": "Sąrankos komandos",
     "addCommand": "Pridėti komandą",
     "commandLabel": "komandą",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "pvz. pnpm install",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
     "moveUp": "Judėti aukštyn",
     "moveDown": "Judėti žemyn",
+    "moveCommandUp": "Perkelti komandą {{position}} aukštyn",
+    "moveCommandDown": "Perkelti komandą {{position}} žemyn",
     "skillsTitle": "Įgūdžiai",
     "addSkill": "Pridėkite įgūdžių",
     "skillNameLabel": "Įgūdžio pavadinimas",
@@ -3746,7 +3786,7 @@
       "nameRequired": "Įveskite agento pavadinimą",
       "slugRequired": "Įveskite agento šliužą",
       "slugInvalid": "Slug turi prasidėti raide ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
-      "slugConflict": "Tą šliužą rezervuoja įmontuotas agentas",
+      "slugConflict": "Tą slug jau naudoja įmontuotas agentas arba kitas agentas šiame profilyje",
       "edit": "Redaguoti agentą"
     },
     "slashCommands": {
@@ -3757,6 +3797,7 @@
       "description": "Komandos aprašymas",
       "template": "Šablonas",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",

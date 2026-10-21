@@ -35,6 +35,8 @@
     "connectGithub": "Yhdistä GitHub-tili",
     "cost": "Kustannus",
     "discard": "Hylkää",
+    "discardChangesMessage": "Muutokset menetetään.",
+    "discardChangesTitle": "Hylätäänkö muutokset?",
     "findings": "Havainnot",
     "mergeRequest": "yhdistämispyyntö",
     "notConnected": "Ei yhdistetty",
@@ -109,7 +111,9 @@
     "online": "Verkossa",
     "open": "Avaa {{name}}",
     "openPullRequest": "Avaa muutospyyntö",
+    "completed": "Valmis",
     "pending": "Odottaa",
+    "running": "Käynnissä",
     "performance": "Suorituskyky",
     "preferences": "Asetukset",
     "privacyPolicy": "Tietosuojakäytäntö",
@@ -661,7 +665,8 @@
       "description": "Yhdistä GitHub-tilisi, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
-      "bitbucketOrgOnlyDescription": "Valitse profiilissasi organisaatio, niin voit katselmoida sen Bitbucket-muutospyyntöjä."
+      "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
+      "contextLine": "{{organization}}-organisaatiolle"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Tätä katselmointia ei voi lähettää sellaisenaan. PR on voinut muuttua tai kyseessä on oma muutospyyntösi, jota et voi katselmoida.",
       "reviewNotSubmittedTerm": "Tätä katselmointia ei voi lähettää sellaisenaan. {{term}} on voinut muuttua, tai kyseessä on oma {{term}}, jota et voi katselmoida.",
       "couldNotPostComment": "Kommenttia ei voitu julkaista.",
-      "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen."
+      "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen.",
+      "rateLimited": "Liian monta pyyntöä. Yritä myöhemmin uudelleen.",
+      "conflict": "Tämä muuttui, kun työstit sitä. Lataa se uudelleen ja yritä uudelleen."
     },
     "operation": {
       "couldNotReply": "Vastaaminen epäonnistui.",
@@ -1413,6 +1420,9 @@
       "couldNotGetLatest": "Uusimpia tietoja ei voitu hakea.",
       "byline": "{{repo}} #{{number}}, tekijä {{author}}",
       "noFindings": "Havaintoja ei ole.",
+      "findingsUnavailable": "Tulokset eivät ole saatavilla, koska tämä katselmointi epäonnistui.",
+      "serviceUnavailable": "Koodin katselmointipalveluun ei saatu yhteyttä. Yritä katselmointia uudelleen, kun palvelu on käytettävissä.",
+      "reviewFailed": "Katselmointi epäonnistui. Yritä uudelleen.",
       "showMore": "Näytä lisää",
       "created": "Luotu",
       "started": "Aloitettu",
@@ -1528,8 +1538,6 @@
     "updateFailed": "Koodikatselmoijan päivitys epäonnistui.",
     "configSaveFailed": "Katselmointiasetusten tallennus epäonnistui.",
     "status": {
-      "running": "Käynnissä",
-      "completed": "Valmis",
       "interrupted": "Keskeytynyt"
     },
     "reviewStyle": {
@@ -1542,7 +1550,8 @@
       "bugs": "Ohjelmavirheet",
       "style": "Tyyli",
       "testing": "Testaus",
-      "documentation": "Dokumentaatio"
+      "documentation": "Dokumentaatio",
+      "unknown": "Muu ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varoitus"
@@ -1654,7 +1663,14 @@
       "whereFound": "Havainnon sijainnit ({{displayCount}})",
       "fullReport": "Luotu raportti kokonaisuudessaan",
       "yes": "Kyllä",
-      "no": "Ei"
+      "no": "Ei",
+      "action": {
+        "analyzeCodebase": "Analysoi koodikanta",
+        "dismiss": "Ohita",
+        "manualReview": "Manuaalinen tarkistus",
+        "monitor": "Valvo",
+        "openPr": "Avaa PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} havaintoa",
@@ -1856,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Tallenna muutokset",
       "unsavedTitle": "Tallentamattomia muutoksia",
-      "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?"
+      "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?",
+      "unsavedInvalidMessage": "Näitä muutoksia ei voi vielä tallentaa. Korjaa ne tallentaaksesi tai hylkää ne poistuaksesi."
     },
     "auditReportButton": {
       "viewA11y": "Näytä tarkastusraportti"
@@ -1873,7 +1890,24 @@
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",
       "unavailableDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat tarkastella tarkastusraportteja. Pyydä käyttöoikeus omistajalta tai laskutusvastaavalta.",
-      "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen."
+      "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyysi valmistui",
+        "findingAnalysisFailed": "Analyysi epäonnistui",
+        "findingAutoDismissed": "Ohitettu automaattisesti",
+        "findingCreated": "Tuotu",
+        "findingDeleted": "Poistettu",
+        "findingDismissed": "Ohitettu",
+        "findingSeverityChanged": "Vakavuus muuttui",
+        "findingStatusChange": "Tila muuttui",
+        "findingSuperseded": "Korvattu",
+        "remediationBlocked": "Korjaus estetty",
+        "remediationCancelled": "Peruutettu",
+        "remediationFailed": "Korjaus epäonnistui",
+        "remediationNoChangesNeeded": "Muutoksia ei tarvita",
+        "remediationPrOpened": "PR avattu",
+        "remediationQueued": "Korjausta pyydetty"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ilmoitusasetuksia ei voitu ladata.",
@@ -1905,7 +1939,6 @@
       "installApp": "Asenna GitHub-sovellus",
       "reauthorizeButton": "Valtuuta GitHub-sovellus uudelleen",
       "reauthorizeDescription": "Tietoturva-agentti tarvitsee vulnerability_alerts-käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
-      "reauthorizeFailed": "Uudelleenvaltuutusta ei voitu aloittaa. Yritä uudelleen.",
       "reauthorizeTitle": "Lisäkäyttöoikeuksia tarvitaan",
       "setupFailed": "GitHubin käyttöönottoa ei voitu aloittaa. Yritä uudelleen."
     },
@@ -2209,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} ei ole enää käytettävissä. Käytetään oletusmalliasi.",
       "couldNotReadPendingSessions": "Odottavia istuntoja ei voitu lukea. Yritä uudelleen.",
       "failedToCreate": "Istunnon luonti epäonnistui.",
+      "checkOrganizationAccess": "Tarkista oikeutesi tähän organisaatioon ja yritä uudelleen.",
       "couldNotRefreshRepositories": "Repositorioita ei voitu päivittää. Yritä uudelleen.",
       "discardDraftTitle": "Hylätäänkö luonnos?",
       "discardDraftMessage": "Kehotteesi poistetaan.",
@@ -2278,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} riviä",
       "matchesBadge_one": "{{displayCount}} osuma",
       "matchesBadge_other": "{{displayCount}} osumaa",
-      "noOutput": "Ei tulostetta."
+      "noOutput": "Ei tulostetta.",
+      "translationFailed": "Käännös epäonnistui"
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",
@@ -2729,6 +2764,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Aktiiviset istuntosi eivät ole käytettävissä, ennen kuin niiden tiedot on ladattu.",
     "currentDeviceUnidentified": "Nykyistä laitetta ei voitu tunnistaa.",
+    "kiloApp": "Kilo-sovellus",
     "noSessions": "Ei aktiivisia istuntoja",
     "noSessionsDescription": "Kirjaudu Kilo-sovellukseen toisella laitteella, niin laite näkyy tässä.",
     "onlyKiloAppSignIns": "Täällä näkyvät vain Kilo-sovelluksen kirjautumiset. Editorin ja CLI:n kirjautumisia ei luetella.",
@@ -2881,6 +2917,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Ennen kuin aloitamme",
+    "summaryTitle": "Tietojen jakamisen asetukset",
     "introDescription": "Kilo lähettää viestisi AI-palveluntarjoajille vastausten tuottamista varten. Alla näet, mitä tietoja jaetaan ja kenelle.",
     "required": "Kilon käytön edellytykset",
     "promptsTitle": "Kehotteesi ja keskustelusi",
@@ -2889,7 +2926,6 @@
     "accountDescription": "Kilo-tilisi tunnusta ja pyyntöjen metatietoja käytetään tunnistamiseesi ja käytön mittaamiseen.",
     "diagnosticsTitle": "Sovelluksen diagnostiikka",
     "diagnosticsDescription": "Kaatumis- ja virheraportteja käytetään sovelluksen vakauden ylläpitämiseen. Sovelluksen sisältö poistetaan raporteista.",
-    "optional": "Valinnainen",
     "helpImprove": "Auta parantamaan Kiloa",
     "helpImproveDescription": "Jaa anonyymejä tietoja sovelluksen käytöstä ja asennuksen lähteestä. Voit muuttaa asetusta milloin tahansa asetuksissa.",
     "seeFullDetails": "Näytä täydet tiedot",
@@ -3468,6 +3504,9 @@
     "localModels": {
       "title": "Laitteessa toimivat mallit",
       "help": "Laitteessa toimivat mallit toimivat tässä puhelimessa. Kehotteesi ja vastaukset pysyvät laitteessa.",
+      "switchTitle": "Vaihdetaanko laitteessa toimivaan malliin?",
+      "switchMessage": "Kun vaihdat malliin {{name}}, tämän keskustelun kehotteet ja konteksti käsitellään tässä puhelimessa, ei etäpalvelimella.",
+      "switchConfirm": "Vaihda mallia",
       "systemPurpose": "Tämän laitteen järjestelmään sisäänrakennettu malli. Se toimii laitteessa.",
       "apple": "Apple Intelligence (laitteessa)",
       "checking": "Tarkistetaan saatavuutta…",
@@ -3564,7 +3603,6 @@
     "personalDefaultDescription": "Ladataan automaattisesti, kun missään arkistossa ei ole kiinnitettyä profiilia.",
     "organizationDefaultDescription": "Ladataan automaattisesti jäsenille, joilla ei ole henkilökohtaista oletusarvoa.",
     "setAsDefault": "Aseta oletukseksi",
-    "removeDefault": "Poista oletuksena",
     "saveFailed": "Profiilia ei voitu tallentaa",
     "deleteTitle": "Poista profiili",
     "deleteMessage": "Tämä poistaa profiilin ja sen asetukset pysyvästi. Tätä ei voi kumota.",
@@ -3590,11 +3628,13 @@
     "commandsTitle": "Asennuskomennot",
     "addCommand": "Lisää komento",
     "commandLabel": "Komento",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "esim. pnpm install",
     "commandsEmpty": "Ei vielä asennuskomentoja",
     "commandsSaveFailed": "Asennuskomentoja ei voitu tallentaa",
     "moveUp": "Siirrä ylös",
     "moveDown": "Siirry alas",
+    "moveCommandUp": "Siirrä komento {{position}} ylös",
+    "moveCommandDown": "Siirrä komento {{position}} alas",
     "skillsTitle": "Taidot",
     "addSkill": "Lisää taitoa",
     "skillNameLabel": "Taidon nimi",
@@ -3664,7 +3704,7 @@
       "nameRequired": "Anna agentin nimi",
       "slugRequired": "Syötä agentti etana",
       "slugInvalid": "Slugin tulee alkaa kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
-      "slugConflict": "Sisäänrakennettu agentti on varannut tuon etanan",
+      "slugConflict": "Tuo slug on jo käytössä sisäänrakennetulla agentilla tai toisella agentilla tässä profiilissa",
       "edit": "Muokkaa agenttia"
     },
     "slashCommands": {
@@ -3675,6 +3715,7 @@
       "description": "Komennon kuvaus",
       "template": "Malli",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Selitä $ARGUMENTS",
       "subtask": "Suorita alitehtävänä",
       "edit": "Muokkaa vinoviivakomentoa",

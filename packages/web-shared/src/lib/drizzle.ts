@@ -72,7 +72,6 @@ export function selectReplicaUrl({
  * - Falls back to primary if no replica URL is configured for the region
  */
 function getReplicaUrl(): string {
-  if (NODE_ENV === 'development') return postgresUrl;
   return selectReplicaUrl({
     primaryUrl: postgresUrl,
     nodeEnv: NODE_ENV,

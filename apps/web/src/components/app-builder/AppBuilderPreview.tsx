@@ -1,11 +1,3 @@
-/**
- * App Builder Preview
- *
- * Preview pane component with iframe.
- * Uses ProjectSession context hooks for state and actions.
- * Shows different states: idle, building, running, error.
- */
-
 'use client';
 
 import { useState, useCallback, useEffect, useRef, memo } from 'react';
@@ -92,9 +84,6 @@ function ErrorState({ onRetry }: { onRetry?: () => void }) {
   );
 }
 
-/**
- * Loading overlay shown while iframe content is loading
- */
 function IframeLoadingOverlay() {
   return (
     <div className="bg-background/80 absolute inset-0 z-10 flex flex-col items-center justify-center backdrop-blur-sm">
@@ -127,9 +116,6 @@ type PreviewFrameProps = {
   onOpenExternal: () => void;
 };
 
-/**
- * Preview frame controls bar
- */
 function PreviewControls({
   currentPath,
   isAtRoot,
@@ -143,7 +129,6 @@ function PreviewControls({
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear timeout on unmount to prevent setState on unmounted component
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) {
@@ -194,9 +179,6 @@ function PreviewControls({
   );
 }
 
-/**
- * Preview iframe with controls - renders dev or production iframe based on environment
- */
 function PreviewFrame(props: PreviewFrameProps) {
   const {
     url,
@@ -212,7 +194,6 @@ function PreviewFrame(props: PreviewFrameProps) {
   } = props;
   const [isIframeLoading, setIsIframeLoading] = useState(true);
 
-  // Reset loading state when URL changes
   useEffect(() => {
     setIsIframeLoading(true);
   }, [url]);
@@ -364,7 +345,6 @@ function DeploymentControls({
   }
 }
 
-/** Extract pathname from URL, stripping query params */
 function getPathFromUrl(url: string): string {
   try {
     return new URL(url).pathname;
@@ -373,13 +353,9 @@ function getPathFromUrl(url: string): string {
   }
 }
 
-/**
- * Main preview component
- */
 export const AppBuilderPreview = memo(function AppBuilderPreview({
   organizationId,
 }: AppBuilderPreviewProps) {
-  // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
   const { previewUrl, previewStatus, deploymentId, currentIframeUrl, gitRepoFullName } = state;
   const projectId = manager.projectId;
@@ -390,7 +366,6 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
   const [isCreatingDeployment, setIsCreatingDeployment] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Derive current path from tracked URL or fall back to previewUrl
   const currentPath = currentIframeUrl
     ? getPathFromUrl(currentIframeUrl)
     : previewUrl
@@ -398,7 +373,6 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
       : '/';
   const isAtRoot = currentPath === '/';
 
-  // Listen for postMessage navigation events from the preview iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Validate origin: only accept messages from the preview iframe's origin
@@ -431,16 +405,12 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
     return () => window.removeEventListener('message', handleMessage);
   }, [manager, previewUrl]);
 
-  // Reset currentIframeUrl when previewUrl changes
   useEffect(() => {
     manager.setCurrentIframeUrl(null);
   }, [previewUrl, manager]);
 
-  // Get tRPC for queries
   const trpc = useTRPC();
 
-  // Poll deployment status when we have a deploymentId
-  // Use org-specific or personal query based on context
   const personalDeploymentQuery = useQuery({
     ...trpc.deployments.getDeployment.queryOptions({ id: deploymentId ?? '' }),
     enabled: !!deploymentId && !organizationId,
@@ -540,7 +510,6 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
     return false;
   }, [currentIframeUrl, previewUrl]);
 
-  // Handle deploy using ProjectManager
   const handleDeploy = useCallback(async () => {
     setIsCreatingDeployment(true);
     try {

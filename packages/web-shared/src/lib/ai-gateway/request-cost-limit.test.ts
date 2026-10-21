@@ -2,6 +2,7 @@ import type { StoredModel } from '@kilocode/db';
 import { enforceRequestCostLimit, textRequestPriceCeiling } from './request-cost-limit';
 import { addCacheBreakpoints } from './providers/openrouter/request-helpers';
 import type { GatewayRequest } from './providers/openrouter/types';
+import { getVercelModelIdOverrides } from './providers/vercel/mapModelIdToVercel';
 
 const mockCatalogLimit = jest.fn();
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
@@ -12,6 +13,10 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
       }),
     }),
   },
+}));
+jest.mock('./providers/vercel/mapModelIdToVercel', () => ({
+  ...jest.requireActual('./providers/vercel/mapModelIdToVercel'),
+  getVercelModelIdOverrides: jest.fn(async () => new Map()),
 }));
 const model: StoredModel = {
   id: 'test/bounded',
@@ -32,6 +37,7 @@ const model: StoredModel = {
 const body = { messages: [{ role: 'user', content: 'Evidence' }], max_tokens: 64, stream: false };
 beforeEach(() => {
   mockCatalogLimit.mockResolvedValue([{ models: { [model.id]: model } }]);
+  jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
 });
 describe('request cost admission', () => {
   it('bounds every route including cache, reasoning and per-request fees', () => {
@@ -53,6 +59,103 @@ describe('request cost admission', () => {
     await expect(enforceRequestCostLimit('2000000', model.id, body, 1)).resolves.toMatch(/balance/);
     await expect(enforceRequestCostLimit('2000000', model.id, body, 2_000_000)).resolves.toBeNull();
   });
+  it('admits a latest alias using its target prices and still enforces spend and balance limits', async () => {
+    const alias: StoredModel = {
+      id: '~test/bounded-latest',
+      name: 'Bounded latest',
+      endpoints: [],
+      alias_target: { slug: model.id },
+    };
+    mockCatalogLimit.mockResolvedValue([{ models: { [alias.id]: alias, [model.id]: model } }]);
+    await expect(
+      enforceRequestCostLimit('2000000', alias.id, { ...body, model: alias.id }, 2_000_000)
+    ).resolves.toBeNull();
+    await expect(
+      enforceRequestCostLimit('1', alias.id, { ...body, model: alias.id }, 2_000_000)
+    ).resolves.toMatch(/spend safeguard/);
+    await expect(
+      enforceRequestCostLimit('2000000', alias.id, { ...body, model: alias.id }, 1)
+    ).resolves.toMatch(/balance/);
+  });
+  it('refuses a stale transformed alias target instead of admitting it at a cheaper target price', async () => {
+    const cheaper: StoredModel = {
+      id: 'test/cheaper',
+      name: 'Cheaper model',
+      endpoints: [{ pricing: { prompt: '0', completion: '0.000001' } }],
+    };
+    const alias: StoredModel = {
+      id: '~test/bounded-latest',
+      name: 'Bounded latest',
+      endpoints: [],
+      alias_target: { slug: cheaper.id },
+    };
+    mockCatalogLimit.mockResolvedValue([
+      { models: { [alias.id]: alias, [model.id]: model, [cheaper.id]: cheaper } },
+    ]);
+    await expect(
+      enforceRequestCostLimit('1000', alias.id, { ...body, model: model.id }, 2_000_000)
+    ).resolves.toMatch(/alias target changed/);
+    await expect(
+      enforceRequestCostLimit('1000', alias.id, { ...body, model: cheaper.id }, 2_000_000)
+    ).resolves.toBeNull();
+    await expect(
+      enforceRequestCostLimit('1000', alias.id, { ...body, model: alias.id }, 2_000_000)
+    ).resolves.toBeNull();
+  });
+  it.each([
+    { overrides: new Map<string, string>(), transformed: 'alibaba/bounded' },
+    { overrides: new Map([['qwen/bounded', 'custom/bounded']]), transformed: 'custom/bounded' },
+  ])(
+    'accepts a target with the configured Vercel model mapping',
+    async ({ overrides, transformed }) => {
+      const target = { ...model, id: 'qwen/bounded' };
+      const alias: StoredModel = {
+        id: '~qwen/bounded-latest',
+        name: 'Bounded latest',
+        endpoints: [],
+        alias_target: { slug: target.id },
+      };
+      jest.mocked(getVercelModelIdOverrides).mockResolvedValue(overrides);
+      mockCatalogLimit.mockResolvedValue([{ models: { [alias.id]: alias, [target.id]: target } }]);
+      await expect(
+        enforceRequestCostLimit('2000000', alias.id, { ...body, model: transformed }, 2_000_000)
+      ).resolves.toBeNull();
+    }
+  );
+  it('rejects an alias attempt without a transformed model', async () => {
+    const alias: StoredModel = {
+      id: '~test/bounded-latest',
+      name: 'Bounded latest',
+      endpoints: [],
+      alias_target: { slug: model.id },
+    };
+    mockCatalogLimit.mockResolvedValue([{ models: { [alias.id]: alias, [model.id]: model } }]);
+    await expect(enforceRequestCostLimit('2000000', alias.id, body, 2_000_000)).resolves.toMatch(
+      /alias target changed/
+    );
+  });
+  it.each([undefined, { ...model, endpoints: [] }, { ...model, endpoints: [{}] }])(
+    'rejects an alias whose target has no usable pricing',
+    async unavailableTarget => {
+      const alias: StoredModel = {
+        id: '~test/bounded-latest',
+        name: 'Bounded latest',
+        endpoints: [],
+        alias_target: { slug: model.id },
+      };
+      mockCatalogLimit.mockResolvedValue([
+        {
+          models: {
+            [alias.id]: alias,
+            ...(unavailableTarget ? { [model.id]: unavailableTarget } : {}),
+          },
+        },
+      ]);
+      await expect(
+        enforceRequestCostLimit('2000000', alias.id, { ...body, model: alias.id }, 2_000_000)
+      ).resolves.toMatch(/pric/);
+    }
+  );
   it('accepts and counts the actual Claude cache-breakpoint text transform', async () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',

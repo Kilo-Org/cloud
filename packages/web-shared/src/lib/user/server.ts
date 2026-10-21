@@ -40,6 +40,10 @@ import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  isCloudAgentAuthorityHttpPathAllowed,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   isKiloCredentialExchangeEligible,
@@ -108,6 +112,9 @@ export type RequiredPermissions = {
   adminOnly: boolean;
   DANGEROUS_allowBlockedUsers?: boolean;
   expectedAudience?: string;
+  // Derive from an actual Request URL or fixed route path, never a request header.
+  requestPathname?: string;
+  requestHeaders?: Headers;
 };
 
 type GetAuthResponse =
@@ -130,6 +137,7 @@ type GetAuthResponse =
       botId?: undefined;
       tokenSource?: undefined;
       deviceSessionId?: undefined;
+      cloudAgentAuthority?: undefined;
     }
   | {
       user: User;
@@ -141,10 +149,11 @@ type GetAuthResponse =
       botId?: string;
       tokenSource?: string;
       deviceSessionId?: string;
+      cloudAgentAuthority?: CloudAgentAuthority;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
-  const headersList = await headers();
+  const headersList = opts.requestHeaders ?? (await headers());
   const result = await resolveUserFromAuth(opts, headersList);
 
   // Admin audit trail: emit exactly one identity-attributed event per authorized
@@ -283,6 +292,7 @@ async function resolveUserFromAuth(
     const authorizationValidationResult = validateAuthorizationHeader(headersList, {
       expectedAudience: opts.expectedAudience,
       runtimeProxyAttestationVerified,
+      requestPathname: opts.requestPathname,
     });
     if (authorizationValidationResult.error != undefined) {
       return authError(401, authorizationValidationResult.error, '?', {
@@ -290,24 +300,42 @@ async function resolveUserFromAuth(
       });
     }
 
+    const scope = authorizationValidationResult.cloudAgentAuthority;
+    if (scope && opts.adminOnly) {
+      return authError(403, 'Scoped credentials cannot access admin APIs', scope.ownerId, {
+        credentialsRejected: true,
+      });
+    }
     const user = await findUserById(authorizationValidationResult.kiloUserId, db);
 
     if (
       user &&
-      !isApiTokenPepperCurrent(user.api_token_pepper, authorizationValidationResult.apiTokenPepper)
+      (scope
+        ? user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
+        : !isApiTokenPepperCurrent(
+            user.api_token_pepper,
+            authorizationValidationResult.apiTokenPepper
+          ))
     ) {
       return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
     }
-    const organizationId = requestOrganizationId(
-      authorizationValidationResult.organizationId,
-      headersList.get(ORGANIZATION_ID_HEADER)
-    );
+    // A token-bound organization is signed; the request header is mutable.
+    // Legacy and personal tokens intentionally continue to use the header.
+    const headerOrganizationId = headersList.get(ORGANIZATION_ID_HEADER);
+    if (scope && headerOrganizationId !== null && headerOrganizationId !== scope.organizationId) {
+      return authError(403, 'Scoped organization mismatch', scope.ownerId, {
+        credentialsRejected: true,
+      });
+    }
+    const organizationId = scope
+      ? (scope.organizationId ?? undefined)
+      : requestOrganizationId(authorizationValidationResult.organizationId, headerOrganizationId);
     const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;
     const tokenSource = authorizationValidationResult.tokenSource;
     const deviceSessionId = authorizationValidationResult.deviceSessionId;
 
-    return await validateUserAuthorization(
+    const result = await validateUserAuthorization(
       authorizationValidationResult.kiloUserId,
       user,
       opts,
@@ -318,6 +346,12 @@ async function resolveUserFromAuth(
       tokenSource,
       deviceSessionId
     );
+    if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
+      return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
+        credentialsRejected: true,
+      });
+    }
+    return result.user ? { ...result, cloudAgentAuthority: scope } : result;
   }
 
   return resolveUserFromSession(opts);

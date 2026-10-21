@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { generateText } from 'ai';
-import { COMPATIBLE_USER_AGENT } from './types';
+import { COMPATIBLE_USER_AGENT, type DirectByokModel } from './types';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
-  getBYOKforOrganization: jest.fn(),
+  getUserByokProviderIds: jest.fn(),
+  getOrganizationByokProviderIds: jest.fn(),
   getBYOKforUser: jest.fn(),
+  getBYOKforOrganization: jest.fn(),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
@@ -136,9 +138,15 @@ describe('createAiSdkProvider session headers', () => {
 
 async function loadDirectByokModule() {
   const directByokProviders = (await import('./direct-byok-definitions')).default;
-  const { getDirectByokModel, getDirectByokModelsForUser } = await import('.');
+  const { getDirectByokModel, getDirectByokModelsForOrganization, getDirectByokModelsForUser } =
+    await import('.');
 
-  return { directByokProviders, getDirectByokModel, getDirectByokModelsForUser };
+  return {
+    directByokProviders,
+    getDirectByokModel,
+    getDirectByokModelsForOrganization,
+    getDirectByokModelsForUser,
+  };
 }
 
 describe('getDirectByokModel', () => {
@@ -171,10 +179,8 @@ describe('getDirectByokModel', () => {
 
   test('advertises only the reasoning parameter for reasoning models', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
 
     const models = await getDirectByokModelsForUser('user-id');
 
@@ -195,12 +201,10 @@ describe('getDirectByokModel', () => {
 
   test('uses the default AI SDK provider unless a model-specific provider applies', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
     const { getAiSdkProvider } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
     jest.mocked(getAiSdkProvider).mockReturnValueOnce('anthropic').mockReturnValueOnce(undefined);
 
     const models = await getDirectByokModelsForUser('user-id');
@@ -210,12 +214,10 @@ describe('getDirectByokModel', () => {
 
   test('does not fall back to model-name variants when reasoning is unsupported', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
     const { getFallbackReasoningOptions } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options');
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
     jest.mocked(getFallbackReasoningOptions).mockReturnValue([{ type: 'toggle' }]);
 
     const models = await getDirectByokModelsForUser('user-id');
@@ -226,5 +228,106 @@ describe('getDirectByokModel', () => {
     expect(models[1].opencode.variants).toBeUndefined();
     expect(models[1].opencode.reasoning_options).toBeUndefined();
     expect(getFallbackReasoningOptions).not.toHaveBeenCalled();
+  });
+
+  test('lists models from enabled provider ids without reading stored key material', async () => {
+    const { getDirectByokModelsForUser, getDirectByokModelsForOrganization } =
+      await loadDirectByokModule();
+    const {
+      getUserByokProviderIds,
+      getOrganizationByokProviderIds,
+      getBYOKforUser,
+      getBYOKforOrganization,
+    } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+    const userModels = await getDirectByokModelsForUser('user-id');
+
+    jest.mocked(getOrganizationByokProviderIds).mockResolvedValueOnce(['orcarouter']);
+    const organizationModels = await getDirectByokModelsForOrganization('organization-id');
+
+    expect(getUserByokProviderIds).toHaveBeenCalledWith(expect.anything(), 'user-id');
+    expect(getOrganizationByokProviderIds).toHaveBeenCalledWith(
+      expect.anything(),
+      'organization-id'
+    );
+    expect(userModels.map(model => model.id)).toEqual([
+      'chutes-byok/supported-model',
+      'chutes-byok/non-reasoning-model',
+    ]);
+    expect(organizationModels.map(model => model.id)).toEqual(['orcarouter/other-model']);
+    expect(getBYOKforUser).not.toHaveBeenCalled();
+    expect(getBYOKforOrganization).not.toHaveBeenCalled();
+  });
+});
+
+function deferred<T>() {
+  const { promise, resolve } = Promise.withResolvers<T>();
+  return { promise, resolve };
+}
+
+/** Lets every pending promise continuation run, however many links the chain has. */
+const flushPromiseChain = () => new Promise<void>(resolveFlush => setImmediate(resolveFlush));
+
+describe('direct BYOK preferred indexes', () => {
+  const providerModels = [
+    [recommendedModel('first'), recommendedModel('second')],
+    [recommendedModel('third')],
+  ];
+
+  function recommendedModel(id: string): DirectByokModel {
+    return {
+      id,
+      name: id,
+      flags: ['recommended'],
+      context_length: 1000,
+      max_completion_tokens: 100,
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('numbers recommended models in declared provider order whatever the settle order', async () => {
+    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getPreferredModels } =
+      await import('@kilocode/web-shared/lib/ai-gateway/preferred-models');
+
+    async function listModels(settleOrder: 'declared' | 'reversed') {
+      const pending = directByokProviders.map(() => deferred<ReadonlyArray<DirectByokModel>>());
+      directByokProviders.forEach((provider, index) => {
+        const modelsMock = provider.models as unknown as jest.Mock<
+          () => Promise<ReadonlyArray<DirectByokModel>>
+        >;
+        modelsMock.mockImplementationOnce(() => pending[index].promise);
+      });
+      jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['orcarouter', 'chutes-byok']);
+      jest.mocked(getPreferredModels).mockResolvedValueOnce(['gateway/one', 'gateway/two']);
+
+      const listing = getDirectByokModelsForUser('user-id');
+      await flushPromiseChain();
+      const resolutionOrder = settleOrder === 'declared' ? [0, 1] : [1, 0];
+      for (const index of resolutionOrder) {
+        pending[index].resolve(providerModels[index]);
+        await flushPromiseChain();
+      }
+
+      return (await listing).map(model => ({
+        id: model.id,
+        preferredIndex: model.preferredIndex,
+      }));
+    }
+
+    const declaredSettleOrder = await listModels('declared');
+    const reversedSettleOrder = await listModels('reversed');
+
+    expect(reversedSettleOrder).toEqual(declaredSettleOrder);
+    expect(declaredSettleOrder).toEqual([
+      { id: 'chutes-byok/first', preferredIndex: 2 },
+      { id: 'chutes-byok/second', preferredIndex: 3 },
+      { id: 'orcarouter/third', preferredIndex: 4 },
+    ]);
   });
 });

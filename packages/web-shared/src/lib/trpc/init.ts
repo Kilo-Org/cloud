@@ -5,6 +5,10 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import {
+  validateCloudAgentAuthorityRequest,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   emitAdminAccessEvent,
@@ -34,6 +38,7 @@ export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 export type TRPCContext = {
   user: User;
   deviceSessionId?: string;
+  cloudAgentAuthority?: CloudAgentAuthority;
   // Admin audit signals threaded from the auth layer so `adminProcedure` can
   // emit IP-independent, identity-attributed access telemetry. Optional so the
   // many existing `{ user }` context constructors (tests, scripts) keep working;
@@ -76,11 +81,16 @@ export type CreateTRPCContextOpts = {
 export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<TRPCContext> => {
   const headersList = opts?.req?.headers ?? (await headers());
   const startedAt = performance.now();
-  const { user, deviceSessionId, tokenSource } = await withControlPlaneBudget({
+  const { user, deviceSessionId, tokenSource, cloudAgentAuthority } = await withControlPlaneBudget({
     path: controlPlanePathFromInfo(opts?.info),
     type: controlPlaneTypeFromInfo(opts?.info),
     headersList,
-    next: () => getUserFromAuth({ adminOnly: false }),
+    next: () =>
+      getUserFromAuth({
+        adminOnly: false,
+        requestHeaders: headersList,
+        requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
+      }),
     startedAt,
     surface: 'context',
   });
@@ -98,6 +108,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
   return {
     user,
     deviceSessionId,
+    cloudAgentAuthority,
     authViaToken: authViaTokenFromHeaders(headersList),
     tokenSource: tokenSource ?? null,
     ip: clientIpFromHeaders(headersList),
@@ -209,7 +220,22 @@ const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
 // Base router and procedure helpers
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
+const cloudAgentAuthorityMiddleware = t.middleware(
+  async ({ ctx, path, type, getRawInput, next }) => {
+    if (ctx.cloudAgentAuthority === undefined) return next();
+    try {
+      if (type !== 'mutation' || ctx.cloudAgentAuthority.ownerId !== ctx.user.id) {
+        throw new Error('Invalid scoped caller');
+      }
+      validateCloudAgentAuthorityRequest(ctx.cloudAgentAuthority, path, await getRawInput());
+    } catch {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent authority denied' });
+    }
+    return next();
+  }
+);
 export const baseProcedure = t.procedure
+  .use(cloudAgentAuthorityMiddleware)
   .use(timingMiddleware)
   .use(controlPlaneBudgetMiddleware)
   .use(sentryMiddleware)

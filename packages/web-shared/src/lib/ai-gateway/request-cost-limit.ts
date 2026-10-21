@@ -16,14 +16,17 @@ export type TextRequestPriceCeiling = {
   requestCost: number;
 };
 
+/** The stored catalog cannot produce usable prices for this model. */
+export class ModelPricingError extends Error {}
+
 export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPriceCeiling {
-  if (metadata.endpoints.length === 0) throw new Error('Model pricing is unavailable');
+  if (metadata.endpoints.length === 0) throw new ModelPricingError('Model pricing is unavailable');
   let inputRate = 0;
   let outputRate = 0;
   let requestCost = 0;
   for (const endpoint of metadata.endpoints) {
     const price = getModelDisplayPricing(endpoint.pricing);
-    if (!price) throw new Error('Model has an unpriced route');
+    if (!price) throw new ModelPricingError('Model has an unpriced route');
     const values = [
       price.prompt,
       price.completion,
@@ -33,7 +36,7 @@ export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPrice
       price.internal_reasoning ?? '0',
     ].map(Number);
     if (values.some(value => !Number.isFinite(value) || value < 0))
-      throw new Error('Model has invalid pricing');
+      throw new ModelPricingError('Model has invalid pricing');
     inputRate = Math.max(inputRate, values[0] + Math.max(values[3], values[4]));
     outputRate = Math.max(outputRate, values[1] + values[5]);
     requestCost = Math.max(requestCost, values[2]);
@@ -51,7 +54,7 @@ export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPrice
       ) / 1_000_000;
     const output = pricing.completion_per_million / 1_000_000;
     if (![input, output].every(value => Number.isFinite(value) && value >= 0))
-      throw new Error('Model has invalid billed pricing');
+      throw new ModelPricingError('Model has invalid billed pricing');
     inputRate = Math.max(inputRate, input);
     outputRate = Math.max(outputRate, output);
   }
@@ -82,9 +85,9 @@ export function systemOneRequestCostBound(
   let price: TextRequestPriceCeiling;
   try {
     price = textRequestPriceCeiling(metadata);
-  } catch {
-    // A model with no endpoints or no route pricing has no bound to offer this request.
-    return null;
+  } catch (error) {
+    if (error instanceof ModelPricingError) return null;
+    throw error;
   }
   const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
   const inputTokenCeiling =

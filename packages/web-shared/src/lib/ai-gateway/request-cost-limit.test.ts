@@ -334,4 +334,16 @@ describe('System One request cost bound', () => {
       systemOneRequestCostBound({ ...model, endpoints: [{}] }, { state: null, questions })
     ).toBeNull();
   });
+
+  it('propagates failures that are not about catalog pricing', () => {
+    const broken = {
+      id: 'typesafe/broken',
+      name: 'Broken',
+      get endpoints(): never {
+        throw new TypeError('unexpected');
+      },
+    } as unknown as StoredModel;
+
+    expect(() => systemOneRequestCostBound(broken, { state: null, questions })).toThrow(TypeError);
+  });
 });

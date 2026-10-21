@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "최대 50개의 항목(키는 128자, 값은 4096자까지)을 사용하세요.",
       "timeoutInvalid": "제한시간은 정수 밀리초여야 합니다.",
       "edit": "MCP 서버 편집",
-      "saveFailed": "MCP 서버를 저장할 수 없습니다."
+      "saveFailed": "MCP 서버를 저장할 수 없습니다.",
+      "deleteFailed": "MCP 서버를 삭제할 수 없습니다.",
+      "updateFailed": "MCP 서버를 업데이트할 수 없습니다."
     },
     "agents": {
       "title": "프로필 에이전트",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "하위 에이전트 — 다른 사람에게서만 호출 가능",
       "visibilityAll": "모두 — 둘 다",
       "saveFailed": "에이전트를 저장할 수 없습니다.",
+      "deleteFailed": "에이전트를 삭제할 수 없습니다.",
       "nameRequired": "상담사 이름을 입력하세요.",
       "slugRequired": "에이전트 슬러그를 입력하세요",
       "slugInvalid": "슬러그는 문자로 시작해야 하며 소문자, 숫자, 대시만 사용해야 합니다.",
@@ -3720,6 +3723,7 @@
       "subtask": "하위 작업으로 실행",
       "edit": "슬래시 명령 편집",
       "saveFailed": "명령을 저장할 수 없습니다",
+      "deleteFailed": "명령을 삭제할 수 없습니다",
       "nameRequired": "명령 이름을 입력하세요.",
       "nameInvalid": "이름은 소문자로 시작해야 하며 소문자, 숫자, 대시만 사용할 수 있습니다.",
       "templateRequired": "명령 템플릿을 입력하세요.",

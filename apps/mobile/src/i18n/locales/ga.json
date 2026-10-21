@@ -3797,7 +3797,9 @@
       "jsonTooLarge": "Úsáid 50 iontráil ar a mhéad, eochracha suas le 128 agus luachanna suas le 4096 carachtar",
       "timeoutInvalid": "Caithfidh teorainn ama a bheith ina iomlán de na milleasoicindí",
       "edit": "Cuir freastalaí MCP in eagar",
-      "saveFailed": "Níorbh fhéidir an freastalaí MCP a shábháil"
+      "saveFailed": "Níorbh fhéidir an freastalaí MCP a shábháil",
+      "deleteFailed": "Níorbh fhéidir an freastalaí MCP a scriosadh",
+      "updateFailed": "Níorbh fhéidir an freastalaí MCP a nuashonrú"
     },
     "agents": {
       "title": "Gníomhairí próifíl",
@@ -3824,6 +3826,7 @@
       "visibilitySubagent": "Fo-ghníomhaire — inghlaoite ó dhaoine eile amháin",
       "visibilityAll": "Gach - araon",
       "saveFailed": "Níorbh fhéidir an gníomhaire a shábháil",
+      "deleteFailed": "Níorbh fhéidir an gníomhaire a scriosadh",
       "nameRequired": "Cuir isteach ainm gníomhaire",
       "slugRequired": "Cuir isteach seilide gníomhaire",
       "slugInvalid": "Caithfidh sluga tosú le litir agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
@@ -3843,6 +3846,7 @@
       "subtask": "Rith mar fhothasc",
       "edit": "Cuir ordú slais in eagar",
       "saveFailed": "Níorbh fhéidir an t-ordú a shábháil",
+      "deleteFailed": "Níorbh fhéidir an t-ordú a scriosadh",
       "nameRequired": "Cuir isteach ainm ordaithe",
       "nameInvalid": "Caithfidh an t-ainm tosú le litir chás íochtair agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
       "templateRequired": "Cuir isteach teimpléad ordaithe",

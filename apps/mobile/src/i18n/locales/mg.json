@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "Ampiasao farafahabetsany 50 fidirana, fanalahidy hatramin'ny 128 ary sanda hatramin'ny 4096 tarehintsoratra",
       "timeoutInvalid": "Tokony ho milisegondra iray manontolo ny fotoana fiatoana",
       "edit": "Ahitsio MCP server",
-      "saveFailed": "Tsy afaka nitahiry mpizara MCP"
+      "saveFailed": "Tsy afaka nitahiry mpizara MCP",
+      "deleteFailed": "Tsy afaka namafa mpizara MCP",
+      "updateFailed": "Tsy afaka nanavao mpizara MCP"
     },
     "agents": {
       "title": "Mpampiasa mombamomba",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "Subagent - azo antsoina amin'ny hafa ihany",
       "visibilityAll": "Rehetra - izy roa",
       "saveFailed": "Tsy afaka namonjy mpandraharaha",
+      "deleteFailed": "Tsy afaka namafa mpandraharaha",
       "nameRequired": "Ampidiro anarana mpandraharaha",
       "slugRequired": "Ampidiro ny slug mpandraharaha",
       "slugInvalid": "Ny slug dia tsy maintsy manomboka amin'ny litera ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
@@ -3720,6 +3723,7 @@
       "subtask": "Mihazakazaka toy ny subtask",
       "edit": "Ahitsio slash command",
       "saveFailed": "Tsy afaka mitahiry baiko",
+      "deleteFailed": "Tsy afaka namafa baiko",
       "nameRequired": "Ampidiro anarana baiko",
       "nameInvalid": "Ny anarana dia tsy maintsy manomboka amin'ny litera kely ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
       "templateRequired": "Ampidiro môdely baiko",

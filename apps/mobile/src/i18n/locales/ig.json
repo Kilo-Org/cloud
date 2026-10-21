@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "Ejila ihe karịrị ndenye 50, igodo ruo 128 na uru ruo mkpụrụedemede 4096",
       "timeoutInvalid": "Oge ngwụcha ga-abụrịrị ọnụ ọgụgụ millisekọnd dum",
       "edit": "Dezie ihe nkesa MCP",
-      "saveFailed": "Enweghị ike ichekwa ihe nkesa MCP"
+      "saveFailed": "Enweghị ike ichekwa ihe nkesa MCP",
+      "deleteFailed": "Enweghị ike ihichapụ ihe nkesa MCP",
+      "updateFailed": "Enweghị ike melite ihe nkesa MCP"
     },
     "agents": {
       "title": "Ndị ọrụ profaịlụ",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "Subagent - naanị ndị ọzọ nwere ike ịkpọ",
       "visibilityAll": "All - abụọ",
       "saveFailed": "Enweghị ike ichekwa onye nnọchi anya",
+      "deleteFailed": "Enweghị ike ihichapụ onye nnọchi anya",
       "nameRequired": "Tinye aha onye nnọchi anya",
       "slugRequired": "Tinye ihe nnọchite slug",
       "slugInvalid": "Slug ga-eji mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na ngwucha",
@@ -3720,6 +3723,7 @@
       "subtask": "Gbaa ọsọ dị ka obere ọrụ",
       "edit": "Dezie slash iwu",
       "saveFailed": "Enweghị ike ịchekwa iwu",
+      "deleteFailed": "Enweghị ike ihichapụ iwu",
       "nameRequired": "Tinye aha iwu",
       "nameInvalid": "Aha ga-eji obere mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na akara akara",
       "templateRequired": "Tinye ndebiri iwu",

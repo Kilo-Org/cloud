@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "En fazla 50 giriş, 128'e kadar anahtar ve 4096 karaktere kadar değer kullanın",
       "timeoutInvalid": "Zaman aşımı tam sayı milisaniye olmalıdır",
       "edit": "MCP sunucusunu düzenle",
-      "saveFailed": "MCP sunucusu kaydedilemedi"
+      "saveFailed": "MCP sunucusu kaydedilemedi",
+      "deleteFailed": "MCP sunucusu silinemedi",
+      "updateFailed": "MCP sunucusu güncellenemedi"
     },
     "agents": {
       "title": "Profil aracıları",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
       "visibilityAll": "Hepsi - ikisi de",
       "saveFailed": "Temsilci kaydedilemedi",
+      "deleteFailed": "Temsilci silinemedi",
       "nameRequired": "Bir temsilci adı girin",
       "slugRequired": "Bir temsilci bilgisi girin",
       "slugInvalid": "Bilgi bir harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
@@ -3720,6 +3723,7 @@
       "subtask": "Alt görev olarak çalıştır",
       "edit": "Eğik çizgi komutunu düzenle",
       "saveFailed": "Komut kaydedilemedi",
+      "deleteFailed": "Komut silinemedi",
       "nameRequired": "Bir komut adı girin",
       "nameInvalid": "Ad küçük harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
       "templateRequired": "Bir komut şablonu girin",

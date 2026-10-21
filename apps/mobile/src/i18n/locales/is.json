@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "Notaðu að hámarki 50 færslur, lyklar upp að 128 og gildi upp að 4096 stafir",
       "timeoutInvalid": "Tímamörk verða að vera heil tala af millisekúndum",
       "edit": "Breyta MCP miðlara",
-      "saveFailed": "Gat ekki vistað MCP þjón"
+      "saveFailed": "Gat ekki vistað MCP þjón",
+      "deleteFailed": "Gat ekki eytt MCP þjóni",
+      "updateFailed": "Gat ekki uppfært MCP þjón"
     },
     "agents": {
       "title": "Umboðsmenn prófíla",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
       "visibilityAll": "Allt - bæði",
       "saveFailed": "Ekki tókst að vista umboðsmann",
+      "deleteFailed": "Ekki tókst að eyða umboðsmanni",
       "nameRequired": "Sláðu inn nafn umboðsmanns",
       "slugRequired": "Sláðu inn umboðssnigl",
       "slugInvalid": "Snigl verður að byrja á bókstaf og nota aðeins lágstafi, tölustafi og strik",
@@ -3720,6 +3723,7 @@
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",
       "saveFailed": "Ekki tókst að vista skipunina",
+      "deleteFailed": "Ekki tókst að eyða skipuninni",
       "nameRequired": "Sláðu inn heiti skipunar",
       "nameInvalid": "Nafn verður að byrja á lágstöfum og nota aðeins lágstafi, tölustafi og bandstrik",
       "templateRequired": "Sláðu inn skipanasniðmát",

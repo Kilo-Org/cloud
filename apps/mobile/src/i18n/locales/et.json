@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "Kasuta kõige rohkem 50 kirjet, võtmed kuni 128 ja väärtused kuni 4096 tähemärki",
       "timeoutInvalid": "Aegumine peab olema täisarv millisekundeid",
       "edit": "Redigeeri MCP-serverit",
-      "saveFailed": "MCP-serverit ei saanud salvestada"
+      "saveFailed": "MCP-serverit ei saanud salvestada",
+      "deleteFailed": "MCP-serverit ei õnnestunud kustutada",
+      "updateFailed": "MCP-serverit ei õnnestunud värskendada"
     },
     "agents": {
       "title": "Profiiliagendid",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "Subagent — ainult teistelt helistatav",
       "visibilityAll": "Kõik - mõlemad",
       "saveFailed": "Agenti ei õnnestunud salvestada",
+      "deleteFailed": "Agenti ei õnnestunud kustutada",
       "nameRequired": "Sisestage agendi nimi",
       "slugRequired": "Sisestage agent nälkjas",
       "slugInvalid": "Slug peab algama tähega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
@@ -3720,6 +3723,7 @@
       "subtask": "Käivita alamülesandena",
       "edit": "Muuda kaldkriipsu käsku",
       "saveFailed": "Käsku ei saanud salvestada",
+      "deleteFailed": "Käsku ei õnnestunud kustutada",
       "nameRequired": "Sisestage käsu nimi",
       "nameInvalid": "Nimi peab algama väiketähtedega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
       "templateRequired": "Sisestage käsumall",

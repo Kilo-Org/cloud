@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "Gebruik maximaal 50 vermeldingen, sleutels tot 128 en waarden tot 4096 tekens",
       "timeoutInvalid": "De time-out moet een geheel aantal milliseconden bedragen",
       "edit": "MCP-server bewerken",
-      "saveFailed": "Kan MCP-server niet opslaan"
+      "saveFailed": "Kan MCP-server niet opslaan",
+      "deleteFailed": "Kan MCP-server niet verwijderen",
+      "updateFailed": "Kan MCP-server niet bijwerken"
     },
     "agents": {
       "title": "Profiel agenten",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "Subagent — alleen opvraagbaar door anderen",
       "visibilityAll": "Allemaal – allebei",
       "saveFailed": "Kan agent niet opslaan",
+      "deleteFailed": "Kan agent niet verwijderen",
       "nameRequired": "Voer een agentnaam in",
       "slugRequired": "Voer een agentenslak in",
       "slugInvalid": "Slug moet beginnen met een letter en mag alleen kleine letters, cijfers en streepjes gebruiken",
@@ -3720,6 +3723,7 @@
       "subtask": "Uitvoeren als subtaak",
       "edit": "Bewerk de slash-opdracht",
       "saveFailed": "Kan opdracht niet opslaan",
+      "deleteFailed": "Kan opdracht niet verwijderen",
       "nameRequired": "Voer een opdrachtnaam in",
       "nameInvalid": "De naam moet beginnen met een kleine letter en mag alleen kleine letters, cijfers en streepjes bevatten",
       "templateRequired": "Voer een opdrachtsjabloon in",

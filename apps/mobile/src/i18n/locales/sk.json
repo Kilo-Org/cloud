@@ -3756,7 +3756,9 @@
       "jsonTooLarge": "Použite najviac 50 položiek, kľúče do 128 a hodnoty do 4096 znakov",
       "timeoutInvalid": "Časový limit musí byť celý počet milisekúnd",
       "edit": "Upravte server MCP",
-      "saveFailed": "Server MCP sa nepodarilo uložiť"
+      "saveFailed": "Server MCP sa nepodarilo uložiť",
+      "deleteFailed": "Server MCP sa nepodarilo vymazať",
+      "updateFailed": "Server MCP sa nepodarilo aktualizovať"
     },
     "agents": {
       "title": "Profiloví agenti",
@@ -3783,6 +3785,7 @@
       "visibilitySubagent": "Subagent — volateľný iba od ostatných",
       "visibilityAll": "Všetky — oboje",
       "saveFailed": "Agenta sa nepodarilo uložiť",
+      "deleteFailed": "Agenta sa nepodarilo vymazať",
       "nameRequired": "Zadajte meno agenta",
       "slugRequired": "Zadajte agenta slimáka",
       "slugInvalid": "Slug musí začínať písmenom a používať iba malé písmená, číslice a pomlčky",
@@ -3802,6 +3805,7 @@
       "subtask": "Spustiť ako podúlohu",
       "edit": "Príkaz na úpravu lomky",
       "saveFailed": "Príkaz sa nepodarilo uložiť",
+      "deleteFailed": "Príkaz sa nepodarilo vymazať",
       "nameRequired": "Zadajte názov príkazu",
       "nameInvalid": "Názov musí začínať malým písmenom a používať iba malé písmená, číslice a pomlčky",
       "templateRequired": "Zadajte šablónu príkazu",

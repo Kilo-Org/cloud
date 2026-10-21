@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "Verwenden Sie höchstens 50 Einträge, Schlüssel bis 128 und Werte bis 4096 Zeichen",
       "timeoutInvalid": "Das Zeitlimit muss eine ganze Zahl von Millisekunden betragen",
       "edit": "Bearbeiten Sie den MCP-Server",
-      "saveFailed": "Der MCP-Server konnte nicht gespeichert werden"
+      "saveFailed": "Der MCP-Server konnte nicht gespeichert werden",
+      "deleteFailed": "Der MCP-Server konnte nicht gelöscht werden",
+      "updateFailed": "Der MCP-Server konnte nicht aktualisiert werden"
     },
     "agents": {
       "title": "Profilagenten",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "Subagent – nur von anderen aufrufbar",
       "visibilityAll": "Alle – beides",
       "saveFailed": "Der Agent konnte nicht gespeichert werden",
+      "deleteFailed": "Der Agent konnte nicht gelöscht werden",
       "nameRequired": "Geben Sie einen Agentennamen ein",
       "slugRequired": "Geben Sie einen Agenten-Slug ein",
       "slugInvalid": "Slug muss mit einem Buchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche verwenden",
@@ -3720,6 +3723,7 @@
       "subtask": "Als Unteraufgabe ausführen",
       "edit": "Slash-Befehl bearbeiten",
       "saveFailed": "Der Befehl konnte nicht gespeichert werden",
+      "deleteFailed": "Der Befehl konnte nicht gelöscht werden",
       "nameRequired": "Geben Sie einen Befehlsnamen ein",
       "nameInvalid": "Der Name muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
       "templateRequired": "Geben Sie eine Befehlsvorlage ein",

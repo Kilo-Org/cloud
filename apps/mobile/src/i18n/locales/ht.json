@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "Sèvi ak pa plis pase 50 antre, kle jiska 128 ak valè jiska 4096 karaktè",
       "timeoutInvalid": "Timeout dwe yon kantite antye milisgond",
       "edit": "Edit sèvè MCP",
-      "saveFailed": "Pa t 'kapab sove sèvè MCP"
+      "saveFailed": "Pa t 'kapab sove sèvè MCP",
+      "deleteFailed": "Pa t 'kapab efase sèvè MCP",
+      "updateFailed": "Pa t 'kapab mete sèvè MCP ajou"
     },
     "agents": {
       "title": "Ajan pwofil yo",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "Subagent - sèlman rele nan men lòt moun",
       "visibilityAll": "Tout - tou de",
       "saveFailed": "Pa t 'kapab sove ajan",
+      "deleteFailed": "Pa t 'kapab efase ajan",
       "nameRequired": "Antre yon non ajan",
       "slugRequired": "Antre yon slug ajan",
       "slugInvalid": "Slug dwe kòmanse ak yon lèt epi sèvi ak sèlman lèt miniskil, chif, ak tire",
@@ -3720,6 +3723,7 @@
       "subtask": "Kouri kòm subtach",
       "edit": "Edit lòd koupe",
       "saveFailed": "Pa t 'kapab sove lòd",
+      "deleteFailed": "Pa t 'kapab efase lòd",
       "nameRequired": "Antre yon non kòmand",
       "nameInvalid": "Non yo dwe kòmanse ak yon lèt miniskil epi itilize sèlman lèt miniskil, chif ak tire",
       "templateRequired": "Antre yon modèl lòd",

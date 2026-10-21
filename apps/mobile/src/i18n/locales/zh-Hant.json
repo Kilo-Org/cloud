@@ -3674,7 +3674,9 @@
       "jsonTooLarge": "最多使用 50 個項目，鍵最多 128 個字元，值最多 4096 個字元",
       "timeoutInvalid": "超時必須是整數毫秒",
       "edit": "編輯 MCP 伺服器",
-      "saveFailed": "無法保存 MCP 伺服器"
+      "saveFailed": "無法保存 MCP 伺服器",
+      "deleteFailed": "無法刪除 MCP 伺服器",
+      "updateFailed": "無法更新 MCP 伺服器"
     },
     "agents": {
       "title": "設定檔代理",
@@ -3701,6 +3703,7 @@
       "visibilitySubagent": "子代理程式——只能從其他人調用",
       "visibilityAll": "全部 — 兩者",
       "saveFailed": "無法保存代理",
+      "deleteFailed": "無法刪除代理",
       "nameRequired": "輸入代理名稱",
       "slugRequired": "輸入代理 slug",
       "slugInvalid": "Slug 必須以字母開頭，且只能使用小寫字母、數字和破折號",
@@ -3720,6 +3723,7 @@
       "subtask": "作為子任務運行",
       "edit": "編輯斜槓命令",
       "saveFailed": "無法保存命令",
+      "deleteFailed": "無法刪除命令",
       "nameRequired": "輸入命令名稱",
       "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和破折號",
       "templateRequired": "輸入命令模板",

@@ -3715,7 +3715,9 @@
       "jsonTooLarge": "Utilisez au maximum 50 entrées, des clés jusqu'à 128 et des valeurs jusqu'à 4096 caractères",
       "timeoutInvalid": "Le délai d'attente doit être un nombre entier de millisecondes",
       "edit": "Modifier le serveur MCP",
-      "saveFailed": "Impossible de sauvegarder le serveur MCP"
+      "saveFailed": "Impossible de sauvegarder le serveur MCP",
+      "deleteFailed": "Impossible de supprimer le serveur MCP",
+      "updateFailed": "Impossible de mettre à jour le serveur MCP"
     },
     "agents": {
       "title": "Agents de profil",
@@ -3742,6 +3744,7 @@
       "visibilitySubagent": "Sous-agent – appelable uniquement par d'autres",
       "visibilityAll": "Tous — les deux",
       "saveFailed": "Impossible de sauvegarder l'agent",
+      "deleteFailed": "Impossible de supprimer l'agent",
       "nameRequired": "Entrez un nom d'agent",
       "slugRequired": "Entrez un slug d'agent",
       "slugInvalid": "Slug doit commencer par une lettre et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
@@ -3761,6 +3764,7 @@
       "subtask": "Exécuter en tant que sous-tâche",
       "edit": "Modifier la commande barre oblique",
       "saveFailed": "Impossible d'enregistrer la commande",
+      "deleteFailed": "Impossible de supprimer la commande",
       "nameRequired": "Entrez un nom de commande",
       "nameInvalid": "Le nom doit commencer par une lettre minuscule et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
       "templateRequired": "Entrez un modèle de commande",

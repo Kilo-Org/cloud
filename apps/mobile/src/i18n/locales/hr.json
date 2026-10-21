@@ -3715,7 +3715,9 @@
       "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrijednosti do 4096 znakova",
       "timeoutInvalid": "Istek mora biti cijeli broj milisekundi",
       "edit": "Uredi MCP poslužitelj",
-      "saveFailed": "Nije moguće spremiti MCP poslužitelj"
+      "saveFailed": "Nije moguće spremiti MCP poslužitelj",
+      "deleteFailed": "Nije moguće izbrisati MCP poslužitelj",
+      "updateFailed": "Nije moguće ažurirati MCP poslužitelj"
     },
     "agents": {
       "title": "Agenti profila",
@@ -3742,6 +3744,7 @@
       "visibilitySubagent": "Subagent — samo poziv od drugih",
       "visibilityAll": "Sve — oboje",
       "saveFailed": "Nije moguće spremiti agenta",
+      "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite agenta",
       "slugInvalid": "Puž mora započeti slovom i koristiti samo mala slova, znamenke i crtice",
@@ -3761,6 +3764,7 @@
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",
       "saveFailed": "Nije moguće spremiti naredbu",
+      "deleteFailed": "Nije moguće izbrisati naredbu",
       "nameRequired": "Unesite naziv naredbe",
       "nameInvalid": "Ime mora započeti malim slovom i koristiti samo mala slova, znamenke i crtice",
       "templateRequired": "Unesite predložak naredbe",

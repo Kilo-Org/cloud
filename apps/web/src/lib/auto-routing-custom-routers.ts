@@ -53,10 +53,9 @@ import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-p
 
 const BENCHMARK_REGISTER_BATCH_SIZE = 10;
 const BENCHMARK_ADMISSION_TIMEOUT_MS = 10_000;
-// A maximal contract-valid router (20 entries at every entry bound, where the bounds count UTF-16
-// code units but this limit counts UTF-8 bytes) serializes to about 64 KiB, so this leaves 4x
-// headroom for multi-byte names.
-const MAX_CUSTOM_ROUTER_BODY_BYTES = 256 * 1024;
+// The entry bounds count UTF-16 code units while this limit counts UTF-8 bytes, so it carries
+// headroom above the ASCII size of a maximal router.
+export const MAX_CUSTOM_ROUTER_BODY_BYTES = 1024 * 1024;
 // 400 bodies from benchmark workers that cannot benchmark the requested base router: a worker
 // that predates frontier owner profiles, or one without a saved config for that router.
 const UNSUPPORTED_BASE_ROUTER_ERRORS = [

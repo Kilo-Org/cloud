@@ -35,7 +35,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { NextRequest, type NextResponse } from 'next/server';
-import { lockOwner } from '@/lib/auto-routing-custom-routers';
+import { MAX_CUSTOM_ROUTER_BODY_BYTES, lockOwner } from '@/lib/auto-routing-custom-routers';
 import { GET as listRouters, POST as createRouter } from './route';
 import {
   DELETE as deleteRouter,
@@ -852,32 +852,68 @@ describe('/api/auto-routing/custom-routers', () => {
     });
 
     test.each(['create', 'update'] as const)(
-      'rejects an oversized %s body without admitting benchmarks',
+      'rejects a %s body over the byte limit',
       async route => {
         if (route === 'update') await create(routerBody());
         mockedRegister.mockClear();
-        const oversizedName = 'x'.repeat(300 * 1024);
+        const padding = 'x'.repeat(MAX_CUSTOM_ROUTER_BODY_BYTES + 1);
 
         const result =
           route === 'create'
-            ? await create(routerBody({ name: oversizedName }))
+            ? await create(routerBody({ padding }))
             : await errorOf(
                 await updateRouter(
-                  request('/user/coding', {
-                    method: 'PATCH',
-                    body: { name: oversizedName },
-                  }),
+                  request('/user/coding', { method: 'PATCH', body: { padding } }),
                   params('user', 'coding')
                 )
               );
 
         expect(result.status).toBe(400);
-        expect(result.body).toMatchObject({ error: { code: 'invalid_request' } });
+        expect(result.body).toMatchObject({
+          error: {
+            code: 'invalid_request',
+            message: `Request body must be at most ${MAX_CUSTOM_ROUTER_BODY_BYTES} bytes`,
+          },
+        });
         expect(mockedRegister).not.toHaveBeenCalled();
         const rows = await db.select().from(auto_routing_custom_routers);
         expect(rows.map(row => row.name)).toEqual(route === 'update' ? ['Coding'] : []);
       }
     );
+
+    test('accepts a body whose entries sit at every bound', async () => {
+      const fill = (units: number, index: number) =>
+        `${'a'.repeat(units - 3)}${index.toString().padStart(2, '0')}`;
+      const entries = Array.from({ length: 20 }, (_, index) => ({
+        kind: 'client' as const,
+        provider: fill(100, index),
+        model: fill(200, index),
+        variants: Array.from({ length: 20 }, (_, variant) => fill(100, variant)),
+        capabilities: {
+          contextLength: 10_000_000,
+          inputModalities: Array.from({ length: 10 }, (_, modality) => fill(50, modality)),
+          toolCall: true,
+          reasoning: true,
+        },
+        pricing: {
+          inputPerMTokUsd: 1_000_000,
+          outputPerMTokUsd: 1_000_000,
+          cacheReadPerMTokUsd: 1_000_000,
+        },
+      }));
+      const body = routerBody({
+        slug: 'wide-chars',
+        entries,
+        defaultEntryKey: customRouterEntryKey(entries[0]),
+      });
+
+      expect(Buffer.byteLength(JSON.stringify(body))).toBeGreaterThan(60 * 1024);
+
+      const created = await create(body);
+
+      expect(created.status).toBe(201);
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
+    });
 
     test('maps an unreadable request body to invalid_request', async () => {
       const broken = request('', { method: 'POST', body: {} });

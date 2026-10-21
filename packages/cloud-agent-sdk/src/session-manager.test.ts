@@ -3105,6 +3105,49 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
     });
 
+    it('clears the row and restores the draft when the chat is reopened before the send settles', async () => {
+      const cached = new Map<string, CachedSessionSnapshotPage>();
+      const config = createMockConfig({
+        writeCachedSnapshotPage: page => cached.set(page.info.id, page),
+        readCachedSnapshotPage: async id => cached.get(id) ?? null,
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Draft for A', mode: 'code' },
+      });
+
+      // Leaving caches the pending row, and coming back repaints it into the
+      // reopened transcript before the send has settled.
+      await mgr.switchSession(kiloId('ses-2'));
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
+
+      rejectSend!(new Error('ECONNREFUSED'));
+      await expect(sendPromise).resolves.toBe(false);
+
+      // The chat the user is looking at drops the row and keeps the prompt as
+      // its draft; reopening replaced the session, not the chat.
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Draft for A');
+      expect(cached.get('ses-1')?.messages ?? []).toEqual([]);
+
+      // A later switch away must not re-cache the row.
+      await mgr.switchSession(kiloId('ses-2'));
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Draft for A');
+    });
+
     it('uses cloud-agent model override on send and clears it on switchSession', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

@@ -3057,22 +3057,28 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return true;
     } catch (err) {
-      // The optimistic row belongs to the session that sent it, not to whichever
-      // session is active by the time the send settles: a switch mid-send must
-      // not leave the row behind in the transcript that received it. The
-      // composer cleared its draft when the row was inserted, so the text goes
-      // back to the sending session as well. Both are owner-scoped; the atom
-      // writes and the callback below speak for the active session and stay
-      // behind the retarget guard.
-      const stillOnSendingSession =
-        currentSession === sessionAtSend && activeSessionId === kiloSessionId;
+      // The optimistic row belongs to the chat that sent it, not to whichever
+      // chat is active by the time the send settles: a switch mid-send must not
+      // leave the row behind. The chat may also have been reopened while the
+      // send was in flight, so the mounted storage is cleaned too — its row can
+      // come back from the page cached on the way out. The composer cleared its
+      // draft when the row was inserted, so the text goes back to the sending
+      // chat as well. The atom writes and the callback speak for the chat the
+      // user is looking at, so they need that chat to still be the sending one;
+      // the session object identity is deliberately not part of that test,
+      // because reopening a chat replaces it.
+      const stillOnSendingChat = activeSessionId === kiloSessionId;
       optimisticStorage?.deleteMessage(messageId);
+      const mountedStorage = store.get(sessionStorageAtom);
+      if (mountedStorage && mountedStorage !== optimisticStorage) {
+        mountedStorage.deleteMessage(messageId);
+      }
       remoteOptimisticIds.delete(messageId);
       if (insertedOptimisticRow && kiloSessionId) {
         recordFailedPrompt(kiloSessionId, messageText);
-        if (!stillOnSendingSession) forgetCachedOptimisticRow(kiloSessionId, messageId);
+        forgetCachedOptimisticRow(kiloSessionId, messageId);
       }
-      if (!stillOnSendingSession) return false;
+      if (!stillOnSendingChat) return false;
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const detail = formatErrorDetail(err);

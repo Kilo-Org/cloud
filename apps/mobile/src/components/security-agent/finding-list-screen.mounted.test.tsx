@@ -23,6 +23,11 @@ const findings = vi.hoisted(() => ({
   refetch: vi.fn(),
   fetchNextPage: vi.fn(),
 }));
+const repositories = vi.hoisted(() => ({
+  isLoading: false,
+  isError: false,
+  refetch: vi.fn(),
+}));
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   push: vi.fn(),
@@ -61,7 +66,7 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentConfig: () => ({ data: { repositorySelectionMode: 'all' } }),
-  useSecurityAgentRepositories: () => ({ data: [], isLoading: false, isError: false }),
+  useSecurityAgentRepositories: () => repositories,
   useSecurityAnalysisCapacity: () => ({ runningCount: 0, concurrencyLimit: 3 }),
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
@@ -107,6 +112,9 @@ beforeEach(() => {
   findings.isFetchNextPageError = false;
   findings.hasNextPage = false;
   findings.refetch.mockResolvedValue({ isError: false });
+  repositories.isLoading = false;
+  repositories.isError = false;
+  repositories.refetch.mockResolvedValue({});
 });
 afterEach(() => {
   mounted?.unmount();
@@ -151,6 +159,48 @@ describe('Security Agent list surfaces', () => {
     act(error.props.onRetry as () => void);
     await refresh(error.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
     expect(findings.refetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('disables the filter and shows a repositories retry while the repositories fetch failed', async () => {
+    repositories.isError = true;
+    const root = await mount();
+    const filter = root.findByType(ScreenHeader).props.headerRight as ReactElement<{
+      onPress: () => void;
+      disabled: boolean;
+    }>;
+    expect(filter.props.disabled).toBe(true);
+
+    const errors = root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.message).toBe('common.couldNotLoadRepositories');
+    expect(errors[0]?.props.placement).toBe('top');
+
+    // The press stays a no-op while the repositories error stands.
+    act(filter.props.onPress as () => void);
+    expect(mocks.bridge).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+
+    act(errors[0]?.props.onRetry as () => void);
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the filter enabled and no repositories error once the fetch succeeds', async () => {
+    const root = await mount();
+    const filter = root.findByType(ScreenHeader).props.headerRight as ReactElement<{
+      onPress: () => void;
+      disabled: boolean;
+    }>;
+
+    expect(filter.props.disabled).toBe(false);
+    expect(root.findAllByType(QueryError)).toHaveLength(0);
+  });
+
+  it('retries the repositories query on pull-to-refresh', async () => {
+    const root = await mount();
+    const empty = root.findByType(EmptyState);
+
+    await refresh(empty.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
   });
 
   it('keeps loading ahead of errors and empty content', async () => {

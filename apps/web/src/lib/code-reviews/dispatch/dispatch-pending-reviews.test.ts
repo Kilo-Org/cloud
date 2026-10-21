@@ -61,6 +61,7 @@ import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
+  organization_memberships,
   organizations,
   platform_integrations,
   type User,
@@ -165,6 +166,15 @@ describe('tryDispatchPendingReviews', () => {
     }
     userIntegrationId = userIntegration.id;
     organizationIntegrationId = organizationIntegration.id;
+
+    // The organization balance read resolves the paying member's allowance. An
+    // organization-owned review runs as its code-review bot member, so the test
+    // user joins the test organization to model that.
+    await db.insert(organization_memberships).values({
+      organization_id: testOrganizationId,
+      kilo_user_id: testUser.id,
+      role: 'member',
+    });
   });
 
   beforeEach(() => {
@@ -214,6 +224,12 @@ describe('tryDispatchPendingReviews', () => {
     mockSetCommitStatus.mockReset();
     mockCreateMRNote.mockReset();
     mockHasMRNoteWithMarker.mockReset();
+
+    await setTestUserBalance(0);
+    await db
+      .update(organizations)
+      .set({ settings: {}, total_microdollars_acquired: 0, microdollars_used: 0 })
+      .where(eq(organizations.id, testOrganizationId));
   });
 
   afterAll(async () => {
@@ -253,6 +269,7 @@ describe('tryDispatchPendingReviews', () => {
     platform = 'github',
     manualConfig = null,
     checkRunId = null,
+    reviewType = 'standard',
   }: {
     owner: ReviewOwner;
     status: ReviewStatus;
@@ -262,6 +279,7 @@ describe('tryDispatchPendingReviews', () => {
     platform?: 'github' | 'bitbucket';
     manualConfig?: ManualCodeReviewConfig | null;
     checkRunId?: number | null;
+    reviewType?: 'standard' | 'council';
   }) {
     const sequence = reviewSequence++;
 
@@ -281,6 +299,7 @@ describe('tryDispatchPendingReviews', () => {
       platform,
       status,
       check_run_id: checkRunId,
+      review_type: reviewType,
       started_at: startedAt,
       created_at: createdAt,
       updated_at: updatedAt,
@@ -589,6 +608,7 @@ describe('tryDispatchPendingReviews', () => {
   it('disables Code Reviewer for pre-worker GitHub installation failures', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
     const agentConfig = await insertAgentConfigForUser();
     mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
     mockPrepareReviewPayload.mockRejectedValue(
@@ -636,6 +656,7 @@ describe('tryDispatchPendingReviews', () => {
   it('disables Code Reviewer for selected-model worker status failures', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
     const errorMessage =
       'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session"}}';
     const agentConfig = await insertAgentConfigForUser();
@@ -2133,6 +2154,70 @@ describe('tryDispatchPendingReviews', () => {
     expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
     expect(mockDispatchReview).toHaveBeenCalledWith(
       expect.objectContaining({ reviewId: review.id, skipBalanceCheck: true })
+    );
+  });
+
+  it('refuses a council review when any specialist model is paid and the payer has no credits', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(0);
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-council-config',
+      config: {
+        model_slug: 'kilo-auto/free',
+        council: {
+          enabled: true,
+          aggregation_strategy: 'advisory',
+          specialists: [
+            {
+              id: 'security-review',
+              role: 'security',
+              name: 'Security',
+              enabled: true,
+              required: false,
+              lens: 'Security issues',
+              model_slug: 'kilo-auto/free',
+            },
+            {
+              id: 'performance-review',
+              role: 'performance',
+              name: 'Performance',
+              enabled: true,
+              required: false,
+              lens: 'Performance issues',
+              model_slug: 'anthropic/claude-sonnet-4.6',
+            },
+          ],
+        },
+      },
+      is_enabled: true,
+      runtime_state: {},
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          reviewType: 'council',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    expect(result).toEqual({ dispatched: 0, notDispatched: 1, activeCount: 0 });
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalled();
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(await getStoredReview(review.id)).toEqual(
+      expect.objectContaining({ status: 'failed', terminalReason: 'billing' })
     );
   });
 

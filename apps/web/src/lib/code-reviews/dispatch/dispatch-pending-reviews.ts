@@ -36,6 +36,7 @@ import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '../core/schemas';
 import { DEFAULT_CODE_REVIEW_MODEL } from '../core/constants';
 import { resolveEffectiveModel } from '../core/model-selection';
+import { enabledSpecialists, isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
 import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
@@ -119,6 +120,24 @@ class CodeReviewInsufficientCreditsDispatchError extends Error {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Collect the models a review will actually run. A council review pins each
+ * enabled specialist sub-agent to its own model (falling back to the review's
+ * standard model), and every one of them can bill inference.
+ */
+function collectCouncilReviewModels(
+  councilConfig: CodeReviewAgentConfig['council'] | undefined | null,
+  reviewType: string,
+  defaultModel: string,
+  models: string[]
+): void {
+  if (reviewType !== 'council') return;
+  if (!councilConfig || !isCouncilActive(councilConfig)) return;
+  for (const specialist of enabledSpecialists(councilConfig)) {
+    models.push(specialist.model_slug ?? defaultModel);
+  }
 }
 
 /**
@@ -617,10 +636,17 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
 
   let agentConfig: Parameters<typeof prepareReviewPayload>[0]['agentConfig'];
   let reviewModel: string;
+  const councilModels: string[] = [];
 
   if (manualConfig) {
     agentConfig = { config: manualConfig.agentConfig };
     reviewModel = manualConfig.agentConfig.model_slug || DEFAULT_CODE_REVIEW_MODEL;
+    collectCouncilReviewModels(
+      manualConfig.agentConfig.council,
+      review.review_type,
+      reviewModel,
+      councilModels
+    );
   } else {
     const persistedAgentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
     if (!persistedAgentConfig) {
@@ -652,6 +678,12 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       DEFAULT_CODE_REVIEW_MODEL
     );
     reviewModel = effectiveModel.modelSlug;
+    collectCouncilReviewModels(
+      persistedConfig.council,
+      review.review_type,
+      reviewModel,
+      councilModels
+    );
     if (effectiveModel.source === 'repository_override') {
       logExceptInTest('[dispatchReview] Applying per-repository model override', {
         reviewId: review.id,
@@ -671,12 +703,15 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     }
   }
 
-  const billing = await resolveCodeReviewDispatchBilling({ owner, model: reviewModel });
+  const billing = await resolveCodeReviewDispatchBilling({
+    owner,
+    models: [reviewModel, ...councilModels],
+  });
   if (!billing.skipBalanceCheck && !billing.canAfford) {
     logExceptInTest('[dispatchReview] Review requires more credits than the payer has', {
       reviewId: review.id,
       owner,
-      model: reviewModel,
+      models: [reviewModel, ...councilModels],
       balanceMicrodollars: billing.balanceMicrodollars,
     });
     throw new CodeReviewInsufficientCreditsDispatchError();

@@ -1,5 +1,5 @@
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
-import { escapeHtml, RawHtml, renderTemplate, subjects } from '@kilocode/web-shared/lib/email';
+import { escapeHtml, RawHtml, renderTemplate } from '@kilocode/web-shared/lib/email';
 import type { SendResult } from '@kilocode/web-shared/lib/email';
 import {
   getEmailVerificationRecipient,
@@ -12,6 +12,17 @@ export type AutoRoutingPoolNoticeRouter = {
   modelId: string;
   organization: { id: string; name: string } | null;
 };
+
+function ordinalDay(day: number): string {
+  if (day >= 11 && day <= 13) return `${day}th`;
+  return `${day}${['th', 'st', 'nd', 'rd'][day % 10] ?? 'th'}`;
+}
+
+export function autoRoutingPoolNoticeSubject(cutoverAt: string): string {
+  const date = new Date(cutoverAt);
+  const month = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'UTC' }).format(date);
+  return `Change Required: Your Auto model pool has a new model ID on ${month} ${ordinalDay(date.getUTCDate())}, ${date.getUTCFullYear()}`;
+}
 
 export async function sendAutoRoutingPoolNoticeEmail(params: {
   to: string;
@@ -45,7 +56,7 @@ export async function sendAutoRoutingPoolNoticeEmail(params: {
   });
   const sent = await sendViaMailgun({
     to: params.to,
-    subject: subjects.autoRoutingPoolNotice,
+    subject: autoRoutingPoolNoticeSubject(params.cutoverAt),
     html,
     category: 'autoRoutingPoolNotice',
   });

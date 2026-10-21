@@ -22,26 +22,23 @@
                   line-height: 24px;
                 "
               >
-                <h1 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; line-height: 32px">
-                  Your Auto pool has a new model ID
-                </h1>
+                <p style="margin: 0 0 18px">Hello,</p>
                 <p style="margin: 0 0 18px">
-                  We moved your saved Auto Efficient pool to its own model ID. Your models and
-                  settings are the same.
+                  We have moved your customized Auto Efficient model pool to its own model ID. Your
+                  users will need to update the model they use in order to continue using this pool.
                 </p>
                 <ul style="margin: 0 0 18px; padding-left: 20px">
                   {{ routers }}
                 </ul>
                 <p style="margin: 0 0 18px">
-                  <strong>What to do:</strong> switch to the new model ID above before
-                  <strong>{{ cutover_at }}</strong>.
+                  Switch to the new model ID above before <strong>{{ cutover_at }}</strong>. If
+                  users continue to use the old model ID after that date, the default model pool
+                  will be used instead of yours.
                 </p>
                 <p style="margin: 0 0 18px">
-                  <strong>What happens if you don't:</strong> after that date,
-                  <code>kilo-auto/efficient</code> uses Kilo's own model pool instead of yours.
-                </p>
-                <p style="margin: 0 0 18px">
-                  If this is an organization pool, share the new ID with your team.
+                  We are making this change in order to bring significant improvements to auto model
+                  routing, primarily the ability to define multiple auto model IDs, each with their
+                  own custom pool of models.
                 </p>
                 <p style="margin: 0 0 22px">Questions? Just reply to this email.</p>
               </td>

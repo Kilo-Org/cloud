@@ -148,6 +148,18 @@ test('completes an image-shape fixture', async ({ page, host }) => {
   expect(host.requests).toEqual([]);
 });
 
+test('renders an HTML label fixture', async ({ page, host }) => {
+  const imageUrl = `${host.recorderUrl}/label.svg`;
+  await renderDiagram(page, `flowchart TD\n  A["<img src='${imageUrl}' width='24' height='24'>"]`);
+  await expect
+    .poll(() => page.evaluate(() => (window as HostWindow).policyViolations))
+    .toContainEqual({
+      directive: 'img-src',
+      blockedURI: expect.stringContaining(host.recorderUrl),
+    });
+  expect(host.requests).toEqual([]);
+});
+
 test('renders a data image shape', async ({ page, host }) => {
   await renderDiagram(
     page,

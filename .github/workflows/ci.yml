@@ -34,6 +34,8 @@ jobs:
       ai_gateway: ${{ steps.filter.outputs.ai_gateway || steps.filter_retry.outputs.ai_gateway }}
       # Detected by its own step pair for the same reason as harness_sdk.
       ai_gateway_secure_proxy: ${{ steps.filter_secure_proxy.outputs.ai_gateway_secure_proxy || steps.filter_secure_proxy_retry.outputs.ai_gateway_secure_proxy }}
+      # The diagram host document and its browser checks, also their own pair.
+      mobile_diagram_host: ${{ steps.filter_diagram.outputs.mobile_diagram_host || steps.filter_diagram_retry.outputs.mobile_diagram_host }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
       # JSON from scripts/affected-workspaces.mjs, and the typecheck and lint
       # groups it needs.
@@ -192,6 +194,34 @@ jobs:
               - 'packages/ai-gateway-secure-proxy-contracts/**'
               - '.github/workflows/ci.yml'
               - 'package.json'
+              - 'pnpm-lock.yaml'
+      - name: Detect diagram host changes
+        id: filter_diagram
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            mobile_diagram_host:
+              - 'apps/mobile/src/components/agents/markdown-mermaid*'
+              - 'apps/mobile/assets/vendor/mermaid-*'
+              - 'apps/web/tests/mobile-mermaid-host/**'
+              - 'apps/web/playwright.mobile-mermaid.config.ts'
+              - 'apps/web/package.json'
+              - '.github/workflows/ci.yml'
+              - 'pnpm-lock.yaml'
+      - name: Detect diagram host changes (retry)
+        id: filter_diagram_retry
+        if: steps.filter_diagram.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            mobile_diagram_host:
+              - 'apps/mobile/src/components/agents/markdown-mermaid*'
+              - 'apps/mobile/assets/vendor/mermaid-*'
+              - 'apps/web/tests/mobile-mermaid-host/**'
+              - 'apps/web/playwright.mobile-mermaid.config.ts'
+              - 'apps/web/package.json'
+              - '.github/workflows/ci.yml'
               - 'pnpm-lock.yaml'
       - name: Detect changed workspaces with tests
         id: workspaces
@@ -648,6 +678,7 @@ jobs:
       - workspace-tests
       - drizzle-check
       - harness-sdk
+      - mobile-diagram-host
       - build-ai-gateway
       - build-ai-gateway-secure-proxy
     if: ${{ !cancelled() }}
@@ -937,6 +968,37 @@ jobs:
       # inlined copy stops matching the schema.
       - name: Check harness-sdk
         run: pnpm --filter @kilocode/harness-sdk check:ci
+
+  mobile-diagram-host:
+    needs: changes
+    if: needs.changes.outputs.mobile_diagram_host == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No --with-deps: the runner image already ships the Chromium system
+      # libraries, and the apt-get behind --with-deps can hang until the job
+      # timeout when the fleet's apt egress degrades.
+      - name: Install Playwright Chromium
+        run: pnpm --filter web exec playwright install chromium
+
+      - name: Check the diagram host page in a browser
+        run: pnpm --filter web run test:mobile-mermaid
 
   workspace-tests:
     needs: changes

@@ -78,6 +78,8 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 Mermaid uses a packaged renderer and a shared HTML host document.
 Run `pnpm --filter web exec playwright install chromium`, then
 `pnpm --filter web run test:mobile-mermaid` for its browser regression suite.
+CI runs the same command when the host document, its renderer asset, or the
+suite changes.
 The suite needs no backend or signed-in account and includes flowcharts and
 data-image diagrams.
 

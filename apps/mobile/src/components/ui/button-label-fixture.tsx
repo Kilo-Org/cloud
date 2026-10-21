@@ -1,5 +1,4 @@
 /* eslint-disable no-literal-copy/no-literal-copy -- Development-only native layout fixture. */
-import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
@@ -11,13 +10,11 @@ import en from '@/i18n/locales/en.json';
 import hi from '@/i18n/locales/hi.json';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-// Native label layout cases behind the dev button-label-fixture link. No API calls or account needed.
-export default function ButtonLabelFixtureRoute() {
+// Development-only label layout cases opened through the dev fixture link.
+// No API call, account or stored state.
+export function ButtonLabelFixture() {
   const colors = useThemeColors();
   const [loading, setLoading] = useState(false);
-  if (!__DEV__) {
-    return <Redirect href="/(auth)/login" />;
-  }
 
   return (
     <View className="flex-1 bg-background">

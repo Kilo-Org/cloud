@@ -38,7 +38,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   }
   if (__DEV__) {
     if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/button-label-fixture';
+      return '/(auth)/button-label-fixture';
     }
     if (/(?:^|\/)dev\/session-row-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/session-row-fixture';

@@ -948,7 +948,7 @@
       "limit_other": "អ្នកអាចភ្ជាប់ឯកសារបានរហូតដល់ {{displayCount}}។"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}، {{status}}",
+      "accessibility": "{{filename}}, {{status}}",
       "retryUploading": "ព្យាយាមផ្ទុក {{filename}} ឡើងម្តងទៀត",
       "remove": "ដក {{filename}} ចេញ"
     },

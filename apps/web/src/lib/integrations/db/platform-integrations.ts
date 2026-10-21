@@ -1487,10 +1487,6 @@ export async function upsertPlatformIntegrationForOwner(
 }
 
 /**
- * Find GitLab integration by project path
- * GitLab webhooks include the project path, so we need to find the integration
- * that has access to this project (either via 'all' repository access or selected repos)
- *
  * For MVP: We look up by webhook secret token stored in metadata
  */
 export async function findGitLabIntegrationByWebhookToken(webhookToken: string) {
@@ -1517,19 +1513,18 @@ export async function findGitLabIntegrationByWebhookToken(webhookToken: string) 
  * Used when we know the GitLab project ID from the webhook payload
  */
 export async function findGitLabIntegrationByProjectId(projectId: number) {
-  // Find integrations that have this project in their repositories list
   const integrations = await db
     .select()
     .from(platform_integrations)
     .where(eq(platform_integrations.platform, PLATFORM.GITLAB));
 
+  // An integration matches when its access is 'all' or its repositories list
+  // contains this project.
   for (const integration of integrations) {
-    // Check if repository_access is 'all' or if project is in selected repos
     if (integration.repository_access === 'all') {
       return integration;
     }
 
-    // Check if project is in the repositories list
     const repos = integration.repositories;
     if (repos?.some(repo => repo.id === projectId)) {
       return integration;

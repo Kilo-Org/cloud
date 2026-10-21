@@ -35,6 +35,8 @@
     "connectGithub": "GitHubni ulash",
     "cost": "Xarajat",
     "discard": "Bekor qilish",
+    "discardChangesMessage": "O'zgarishlaringiz yo'qoladi.",
+    "discardChangesTitle": "O'zgarishlar bekor qilinsinmi?",
     "findings": "Aniqlangan muammolar",
     "mergeRequest": "merge so‘rovi",
     "notConnected": "Ulanmagan",
@@ -109,7 +111,9 @@
     "online": "Onlayn",
     "open": "{{name}}ni ochish",
     "openPullRequest": "Ochiq PR",
+    "completed": "Yakunlangan",
     "pending": "Kutilmoqda",
+    "running": "Ishlamoqda",
     "performance": "Unumdorlik",
     "preferences": "Shaxsiy sozlamalar",
     "privacyPolicy": "Maxfiylik siyosati",
@@ -661,7 +665,8 @@
       "description": "Mobil qurilmada PRlarni ko'rib chiqish uchun GitHub hisobingizni ulang.",
       "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
-      "bitbucketOrgOnlyDescription": "Profilida tashkilot tanlang va uning Bitbucket PRlarini ko‘rib chiqing."
+      "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
+      "contextLine": "{{organization}} uchun"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Ko'rib chiqish natijasini hozirgi holatida yuborib bo'lmaydi. PR o'zgargan bo'lishi mumkin yoki siz o'zingiz ochgan PRni ko'rib chiqishga urinyapsiz.",
       "reviewNotSubmittedTerm": "Ushbu ko'rib chiqish hozirgi holatida yuborilmaydi. {{term}} o'zgargan bo'lishi mumkin yoki o'zingiz yaratgan {{term}}ni ko'rib chiqa olmaysiz.",
       "couldNotPostComment": "Izoh joylashtirib bo'lmadi.",
-      "couldNotSubmitReview": "Ko'rib chiqish natijasini yuborib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring."
+      "couldNotSubmitReview": "Ko'rib chiqish natijasini yuborib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+      "rateLimited": "Juda ko'p so'rovlar yuborildi. Iltimos, keyinroq qayta urinib ko'ring.",
+      "conflict": "Bu siz uni tahrir qilayotganingizda o'zgardi. Uni qayta yuklab, qayta urinib ko'ring."
     },
     "operation": {
       "couldNotReply": "Javob yuborib bo‘lmadi.",
@@ -1531,8 +1538,6 @@
     "updateFailed": "Kodni ko'rib chiquvchini yangilab bo'lmadi.",
     "configSaveFailed": "Ko'rib chiqish sozlamalarini saqlab bo'lmadi.",
     "status": {
-      "running": "Ishlamoqda",
-      "completed": "Yakunlangan",
       "interrupted": "Uzildi"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "Xatolar",
       "style": "Uslub",
       "testing": "Testlash",
-      "documentation": "Hujjatlar"
+      "documentation": "Hujjatlar",
+      "unknown": "Boshqa ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ogohlantirish"
@@ -1657,7 +1663,14 @@
       "whereFound": "Aniqlangan joylar ({{displayCount}})",
       "fullReport": "Yaratilgan hisobotning to'liq matni",
       "yes": "Ha",
-      "no": "Yo'q"
+      "no": "Yo'q",
+      "action": {
+        "analyzeCodebase": "Kod bazasini tahlil qilish",
+        "dismiss": "Rad etish",
+        "manualReview": "Qoʻlda tekshirish",
+        "monitor": "Kuzatish",
+        "openPr": "Pull request ochish"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ta muammo",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "O'zgarishlarni saqlash",
       "unsavedTitle": "Saqlanmagan o'zgarishlar",
-      "unsavedMessage": "Bu ekrandan chiqishdan oldin o'zgarishlar saqlansinmi?"
+      "unsavedMessage": "Bu ekrandan chiqishdan oldin o'zgarishlar saqlansinmi?",
+      "unsavedInvalidMessage": "Bu o'zgarishlarni hali saqlab bo'lmaydi. Saqlash uchun ularni tuzating yoki chiqish uchun bekor qiling."
     },
     "auditReportButton": {
       "viewA11y": "Audit hisobotini ko'rish"
@@ -1876,7 +1890,24 @@
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",
       "unavailableDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi yoki hisob-kitob menejeridan sizga kirish huquqini berishni so'rang.",
-      "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring."
+      "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Tahlil yakunlandi",
+        "findingAnalysisFailed": "Tahlil amalga oshmadi",
+        "findingAutoDismissed": "Avtomatik rad etildi",
+        "findingCreated": "Import qilindi",
+        "findingDeleted": "Oʻchirildi",
+        "findingDismissed": "Rad etildi",
+        "findingSeverityChanged": "Muhimlik darajasi oʻzgardi",
+        "findingStatusChange": "Holat oʻzgardi",
+        "findingSuperseded": "Almashtirildi",
+        "remediationBlocked": "Tuzatish bloklandi",
+        "remediationCancelled": "Bekor qilindi",
+        "remediationFailed": "Tuzatish amalga oshmadi",
+        "remediationNoChangesNeeded": "Oʻzgarish kerak emas",
+        "remediationPrOpened": "Pull request ochildi",
+        "remediationQueued": "Tuzatish so'raldi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Bildirishnoma sozlamalarini yuklab bo'lmadi.",
@@ -1908,7 +1939,6 @@
       "installApp": "GitHub ilovasini o'rnatish",
       "reauthorizeButton": "GitHub ilovasiga qayta ruxsat berish",
       "reauthorizeDescription": "Xavfsizlik agentiga Dependabot ogohlantirishlarini olish uchun vulnerability_alerts ruxsati kerak. Bu ruxsatni berish uchun GitHub ilovasiga qayta ruxsat bering.",
-      "reauthorizeFailed": "Qayta ruxsat berishni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "reauthorizeTitle": "Qo'shimcha ruxsatlar talab qilinadi",
       "setupFailed": "GitHubni sozlashni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} endi mavjud emas. Standart modelingiz ishlatilmoqda.",
       "couldNotReadPendingSessions": "Kutilayotgan sessiyalarni o'qib bo'lmadi. Qayta urinib ko'ring.",
       "failedToCreate": "Sessiyani yaratib bo'lmadi.",
+      "checkOrganizationAccess": "Ushbu tashkilotga kirish huquqingizni tekshirib ko'ring, so'ng qayta urinib ko'ring.",
       "couldNotRefreshRepositories": "Repozitoriyalarni yangilab bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "discardDraftTitle": "Qoralama bekor qilinsinmi?",
       "discardDraftMessage": "Yozgan so'rovingiz yo'qoladi.",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} qator",
       "matchesBadge_one": "{{displayCount}} natija",
       "matchesBadge_other": "{{displayCount}} natija",
-      "noOutput": "Chiqish yo'q."
+      "noOutput": "Chiqish yo'q.",
+      "translationFailed": "Tarjima muvaffaqiyatsiz"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}-qatorlar (qisqartirilgan)",
@@ -2978,12 +3010,23 @@
     "boundary": {
       "backToProfile": "Profilga qaytish",
       "loadErrorMessage": "Internetga ulanishni tekshiring va qayta urinib ko‘ring.",
+
+      "chooseAccount": "Hisobni tanlang",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
       "membershipLostNotice": "Sizda ushbu tashkilotga kirish huquqi endi yo'q. {{target}} ga o'tkazildi.",
+      "noOrganization": "Tashkilot yo'q",
+
+      "noOrganizationDescription": "Bu hisob hech qanday tashkilotga tegishli emas. A'zolarni taklif qilish va kam balans haqidagi ogohlantirishlar kabi tashkilot funksiyalaridan foydalanish uchun saytda tashkilot yarating yoki unga qo'shiling.",
+
+      "openWebOrganizations": "Tashkilotlarni saytda ochish",
+
       "organizationUnavailable": "Tashkilot mavjud emas.",
-      "selectDescription": "Davom etish uchun profilingizdan tashkilotni tanlang.",
+      "selectDescriptionWithOrganizations": "Siz bir yoki bir nechta tashkilotga a'zosiz. Bu ekran foydalanishi kerak bo'lgan hisobni tanlang.",
+
       "selectOrganization": "Tashkilotni tanlang",
       "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan boshqa tashkilotni tanlang.",
+
+      "unavailableSessionsDescription": "Bu tashkilot endi mavjud emas. Uning sessiyalarini yuklab bo'lmaydi.",
       "accessDeniedDescription": "Sizda ushbu tashkilotga kirish huquqi yo'q."
     },
     "creditActivity": {
@@ -3643,7 +3686,9 @@
       "jsonTooLarge": "Ko'pi bilan 50 ta yozuv, kalitlar 128 tagacha va qiymatlar 4096 belgigacha foydalaning",
       "timeoutInvalid": "Vaqt tugashi butun son millisekund bo'lishi kerak",
       "edit": "MCP serverini tahrirlash",
-      "saveFailed": "MCP serverini saqlab boʻlmadi"
+      "saveFailed": "MCP serverini saqlab boʻlmadi",
+      "deleteFailed": "MCP serverini oʻchirib boʻlmadi",
+      "updateFailed": "MCP serverini yangilab boʻlmadi"
     },
     "agents": {
       "title": "Profil agentlari",
@@ -3670,6 +3715,7 @@
       "visibilitySubagent": "Subagent - faqat boshqalar tomonidan chaqirilishi mumkin",
       "visibilityAll": "Hammasi - ikkalasi ham",
       "saveFailed": "Agentni saqlab boʻlmadi",
+      "deleteFailed": "Agentni oʻchirib boʻlmadi",
       "nameRequired": "Agent nomini kiriting",
       "slugRequired": "Agent slug'ini kiriting",
       "slugInvalid": "Slug harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
@@ -3684,10 +3730,12 @@
       "description": "Buyruq tavsifi",
       "template": "Shablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ni tushuntiring",
       "subtask": "Quyi vazifa sifatida ishga tushirish",
       "edit": "Slash buyrug'ini tahrirlash",
       "saveFailed": "Buyruq saqlanmadi",
+      "deleteFailed": "Buyruq oʻchirilmadi",
       "nameRequired": "Buyruq nomini kiriting",
       "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
       "templateRequired": "Buyruq shablonini kiriting",
@@ -3834,7 +3882,7 @@
     "view": "Brifingni o‘qish",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Jonli holatni ko‘rsatish",
+    "dismiss": "Brifingni e’tiborsiz qoldirish",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan hisobot · yangilab bo‘lmaydi",
     "revised": "Tahrirlangan · {{revision}}",

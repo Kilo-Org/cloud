@@ -35,6 +35,8 @@
     "connectGithub": "Connecta GitHub",
     "cost": "Import",
     "discard": "Descarta",
+    "discardChangesMessage": "Es perdran els canvis.",
+    "discardChangesTitle": "Descartar els canvis?",
     "findings": "Problemes",
     "mergeRequest": "sol·licitud de fusió",
     "notConnected": "No connectat",
@@ -109,7 +111,9 @@
     "online": "En línia",
     "open": "Obre {{name}}",
     "openPullRequest": "PR oberta",
+    "completed": "Finalitzada",
     "pending": "Pendent",
+    "running": "En execució",
     "performance": "Rendiment",
     "preferences": "Preferències",
     "privacyPolicy": "Política de privadesa",
@@ -673,7 +677,8 @@
       "description": "Connecta el teu compte de GitHub per revisar sol·licituds d'integració al mòbil.",
       "gitlabDescription": "Connecta el teu compte de GitLab per revisar sol·licituds de fusió des del mòbil.",
       "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",
-      "bitbucketOrgOnlyDescription": "Selecciona una organització al teu perfil per revisar-ne les sol·licituds d'integració de Bitbucket."
+      "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
+      "contextLine": "Per a {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +790,9 @@
       "reviewNotSubmitted": "Aquesta revisió no es pot enviar tal com està. Pot ser que la PR hagi canviat o que estiguis intentant revisar la teva pròpia sol·licitud d'integració.",
       "reviewNotSubmittedTerm": "Aquesta revisió no es pot enviar tal com està. Pot ser que la {{term}} hagi canviat o que no puguis revisar la teva pròpia {{term}}.",
       "couldNotPostComment": "No s'ha pogut publicar el comentari.",
-      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar."
+      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar.",
+      "rateLimited": "S'han rebut massa sol·licituds. Torna-ho a provar més tard.",
+      "conflict": "Això ha canviat mentre hi treballaves. Torna-ho a carregar i torna-ho a provar."
     },
     "operation": {
       "couldNotReply": "No s'ha pogut respondre.",
@@ -1550,8 +1557,6 @@
     "updateFailed": "No s'ha pogut actualitzar el revisor.",
     "configSaveFailed": "No s'ha pogut desar la configuració de la revisió.",
     "status": {
-      "running": "En execució",
-      "completed": "Finalitzada",
       "interrupted": "Interrompuda"
     },
     "reviewStyle": {
@@ -1564,7 +1569,8 @@
       "bugs": "Errors",
       "style": "Estil",
       "testing": "Proves",
-      "documentation": "Documentació"
+      "documentation": "Documentació",
+      "unknown": "Altres ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avís"
@@ -1677,7 +1683,14 @@
       "whereFound": "On s'ha trobat ({{displayCount}})",
       "fullReport": "Informe complet generat",
       "yes": "Sí",
-      "no": "Negatiu"
+      "no": "Negatiu",
+      "action": {
+        "analyzeCodebase": "Analitza la base de codi",
+        "dismiss": "Descarta",
+        "manualReview": "Revisió manual",
+        "monitor": "Supervisa",
+        "openPr": "Obre una sol·licitud d'extracció"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} incidències",
@@ -1882,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Desa els canvis",
       "unsavedTitle": "Canvis sense desar",
-      "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?"
+      "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?",
+      "unsavedInvalidMessage": "Aquests canvis encara no es poden desar. Corregeix-los per desar-los o descarta'ls per sortir."
     },
     "auditReportButton": {
       "viewA11y": "Consulta l'informe d'auditoria"
@@ -1899,7 +1913,24 @@
       "title": "Informe d'auditoria",
       "unavailable": "Informe d'auditoria no disponible",
       "unavailableDescription": "Només els propietaris de l'organització i els gestors de facturació poden veure informes d'auditoria. Demana a un propietari o gestor de facturació que et concedeixi l'accés.",
-      "queryFailed": "La consulta de l'informe no ha acabat. Torna-ho a provar."
+      "queryFailed": "La consulta de l'informe no ha acabat. Torna-ho a provar.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Anàlisi completada",
+        "findingAnalysisFailed": "L'anàlisi ha fallat",
+        "findingAutoDismissed": "Descartat automàticament",
+        "findingCreated": "Importat",
+        "findingDeleted": "Suprimit",
+        "findingDismissed": "Descartat",
+        "findingSeverityChanged": "S'ha canviat la gravetat",
+        "findingStatusChange": "S'ha canviat l'estat",
+        "findingSuperseded": "Substituït",
+        "remediationBlocked": "Correcció bloquejada",
+        "remediationCancelled": "Cancel·lat",
+        "remediationFailed": "La correcció ha fallat",
+        "remediationNoChangesNeeded": "No calen canvis",
+        "remediationPrOpened": "Sol·licitud d'extracció oberta",
+        "remediationQueued": "Correcció sol·licitada"
+      }
     },
     "notifications": {
       "couldNotLoad": "No s'ha pogut carregar la configuració de les notificacions.",
@@ -1931,7 +1962,6 @@
       "installApp": "Instal·la l'aplicació de GitHub",
       "reauthorizeButton": "Torna a autoritzar l'aplicació de GitHub",
       "reauthorizeDescription": "L'agent de seguretat necessita el permís vulnerability_alerts per accedir a les alertes de Dependabot. Torna a autoritzar l'aplicació de GitHub per concedir aquest permís.",
-      "reauthorizeFailed": "No s'ha pogut iniciar la reautorització. Torna-ho a provar.",
       "reauthorizeTitle": "Calen permisos addicionals",
       "setupFailed": "No s'ha pogut iniciar la configuració de GitHub. Torna-ho a provar."
     },
@@ -2240,6 +2270,7 @@
       "prefillModelUnavailable": "{{model}} ja no està disponible. S'està utilitzant el teu model predeterminat.",
       "couldNotReadPendingSessions": "No s'han pogut llegir les sessions pendents. Torna-ho a provar.",
       "failedToCreate": "No s'ha pogut crear la sessió.",
+      "checkOrganizationAccess": "Comproveu el vostre accés a aquesta organització i torneu-ho a provar.",
       "couldNotRefreshRepositories": "No s'han pogut actualitzar els repositoris. Torna-ho a provar.",
       "discardDraftTitle": "Vols descartar l'esborrany?",
       "discardDraftMessage": "Es perdrà el teu missatge.",
@@ -2313,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} coincidència",
       "matchesBadge_other": "{{displayCount}} coincidències",
       "matchesBadge_many": "{{displayCount}} coincidències",
-      "noOutput": "No hi ha cap sortida."
+      "noOutput": "No hi ha cap sortida.",
+      "translationFailed": "La traducció ha fallat"
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
@@ -3018,12 +3050,23 @@
     "boundary": {
       "backToProfile": "Torna al perfil",
       "loadErrorMessage": "Comprova la connexió i torna-ho a provar.",
+
+      "chooseAccount": "Selecciona un compte",
       "loadErrorTitle": "No s'han pogut carregar les teves organitzacions.",
       "membershipLostNotice": "Ja no tens accés a aquesta organització. Canviat a {{target}}.",
+      "noOrganization": "Sense organització",
+
+      "noOrganizationDescription": "Aquest compte no forma part de cap organització. Crea'n una o uneix-te'n a una al web per utilitzar funcions d'organització com les invitacions de membres i les alertes de saldo baix.",
+
+      "openWebOrganizations": "Obre les organitzacions al web",
+
       "organizationUnavailable": "L'organització no està disponible.",
-      "selectDescription": "Tria una organització des del teu perfil per continuar.",
+      "selectDescriptionWithOrganizations": "Pertanys a una o més organitzacions. Tria el compte que ha d'utilitzar aquesta pantalla.",
+
       "selectOrganization": "Selecciona una organització",
       "unavailableDescription": "Aquesta organització ja no està disponible. Tria'n una des del teu perfil per continuar.",
+
+      "unavailableSessionsDescription": "Aquesta organització ja no està disponible. No es poden carregar les seves sessions.",
       "accessDeniedDescription": "No tens accés a aquesta organització."
     },
     "creditActivity": {
@@ -3684,7 +3727,9 @@
       "jsonTooLarge": "Utilitzeu com a màxim 50 entrades, claus de fins a 128 i valors de fins a 4096 caràcters",
       "timeoutInvalid": "El temps d'espera ha de ser un nombre sencer de mil·lisegons",
       "edit": "Edita el servidor MCP",
-      "saveFailed": "No s'ha pogut desar el servidor MCP"
+      "saveFailed": "No s'ha pogut desar el servidor MCP",
+      "deleteFailed": "No s'ha pogut suprimir el servidor MCP",
+      "updateFailed": "No s'ha pogut actualitzar el servidor MCP"
     },
     "agents": {
       "title": "Agents de perfil",
@@ -3711,6 +3756,7 @@
       "visibilitySubagent": "Subagent: només es pot trucar des d'altres",
       "visibilityAll": "Tots, tots dos",
       "saveFailed": "No s'ha pogut desar l'agent",
+      "deleteFailed": "No s'ha pogut suprimir l'agent",
       "nameRequired": "Introduïu un nom d'agent",
       "slugRequired": "Introduïu un llimac d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
@@ -3725,10 +3771,12 @@
       "description": "Descripció de l'ordre",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar com a subtasca",
       "edit": "Edita l'ordre de barra inclinada",
       "saveFailed": "No s'ha pogut desar l'ordre",
+      "deleteFailed": "No s'ha pogut suprimir l'ordre",
       "nameRequired": "Introduïu un nom d'ordre",
       "nameInvalid": "El nom ha de començar amb una lletra minúscula i utilitzar només lletres minúscules, dígits i guions",
       "templateRequired": "Introduïu una plantilla d'ordres",
@@ -3879,7 +3927,7 @@
     "view": "Llegeix el resum",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra l'estat en directe",
+    "dismiss": "Descarta el resum",
     "offline": "Sense connexió · resum desat",
     "cached": "Informe desat · no es pot actualitzar",
     "revised": "Revisat · {{revision}}",

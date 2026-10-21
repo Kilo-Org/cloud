@@ -14,7 +14,9 @@
  * measures every other catalog: for each family and each language it looks for
  * the categories that language's own plural rules require, and prints one line
  * per language with the number of families the language is missing. That is
- * the report the translation pass works from.
+ * the report the translation pass works from, so the app's `check:plurals`
+ * passes `--source-only`; the locale categories are gated in CI by
+ * `check:i18n` (`check-catalogs.mjs`).
  *
  * A counted message whose copy owns no word whose form the count changes — a
  * participle, a bare number in parentheses, a label — needs no family, because
@@ -358,19 +360,19 @@ function run() {
   const problems = [];
   const english = readEnglishCatalog();
 
-  for (const key of collectCountedKeys()) {
-    if (NO_AGREEMENT.has(key)) {
-      continue;
-    }
-    if (!hasFamily(english, key)) {
-      problems.push(
-        `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
-      );
-    }
+  for (const key of findCountlessFamilies()) {
+    problems.push(
+      `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
+    );
   }
 
   if (!sourceOnly) {
     const families = englishPluralFamilies(english);
+    const countedBases = new Set(
+      [...english]
+        .filter(([, value]) => /{{\s*count\s*}}/.test(value))
+        .map(([key]) => pluralFamilyBase(key) ?? key)
+    );
     const report = [];
     let totalKeys = 0;
     for (const tag of localeTags()) {
@@ -381,6 +383,15 @@ function run() {
       const categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
       let flagged = 0;
       for (const family of families) {
+        // A locale may keep the flat counted key and fall back to it when the
+        // copy inflects no word of its own; it only owes categories once it
+        // (or the audit's own rule) declares the family.
+        const localeDeclared = [...catalog.keys()].some(key => pluralFamilyBase(key) === family);
+        const mandatory =
+          localeDeclared || (hasFamily(english, family) && !countedBases.has(family));
+        if (!mandatory) {
+          continue;
+        }
         if (categories.some(category => !catalog.has(`${family}_${category}`))) {
           flagged++;
         }

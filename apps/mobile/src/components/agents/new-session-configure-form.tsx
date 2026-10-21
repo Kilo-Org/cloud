@@ -15,6 +15,7 @@ import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
+import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -53,6 +54,12 @@ type NewSessionProfileOverrideProps = {
   onManualCommandsChange: (next: string[]) => void;
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
+  /**
+   * The Organization section above Run on: the active account the create is
+   * attributed to. The body renders it for every entry point — switchable on
+   * the ordinary entry, a read-only scope row on the clone entry.
+   */
+  organizationSection?: React.ReactNode;
 };
 
 /**
@@ -122,6 +129,7 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
+  organizationSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -130,6 +138,8 @@ export function NewSessionConfigureForm({
   onStartSession,
   cloudCreateError = null,
   onRetryCloudCreate,
+  remoteSpawnFailure = null,
+  onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
@@ -217,6 +227,7 @@ export function NewSessionConfigureForm({
         />
       </View>
 
+      {organizationSection}
       <NewSessionRunTarget
         showRunOnSelector={showRunOnSelector}
         runOnInstance={runOnInstance}
@@ -326,6 +337,14 @@ export function NewSessionConfigureForm({
         <NewSessionCloudCreateError
           failure={cloudCreateError}
           onRetry={onRetryCloudCreate}
+          isRetryDisabled={isStartDisabled}
+        />
+      ) : null}
+
+      {isRemote && remoteSpawnFailure !== null ? (
+        <NewSessionRemoteSpawnFailure
+          failure={remoteSpawnFailure}
+          onRetry={onRetryRemoteSpawn}
           isRetryDisabled={isStartDisabled}
         />
       ) : null}

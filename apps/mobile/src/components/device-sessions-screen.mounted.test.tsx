@@ -1,3 +1,4 @@
+import { act } from '@/test/renderer';
 import type * as ReactQuery from '@tanstack/react-query';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,12 +18,13 @@ const query = vi.hoisted(() => ({
 }));
 const hosts = vi.hoisted(() => ({ trustedHosts: [] as string[], hasLoaded: true }));
 const imageHosts = vi.hoisted(() => ({ trustedImageHosts: [] as string[], hasLoaded: true }));
+const router = vi.hoisted(() => ({ back: vi.fn(), dismissTo: vi.fn() }));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQuery: () => query,
   useMutation: () => ({ isPending: false, mutate: vi.fn() }),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
+vi.mock('expo-router', () => ({ useRouter: () => router }));
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   View: 'View',
@@ -75,6 +77,8 @@ beforeEach(() => {
   query.isPending = false;
   query.isError = false;
   query.refetch.mockClear();
+  router.back.mockClear();
+  router.dismissTo.mockClear();
   hosts.hasLoaded = true;
   hosts.trustedHosts = [];
   imageHosts.hasLoaded = true;
@@ -169,6 +173,20 @@ describe('account surface states', () => {
       0
     );
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
+    unmount();
+  });
+
+  // The empty-state escape names the Preferences hub, so it must land there,
+  // not one row short on Account (where the screen is pushed from).
+  it('sends the empty-state escape to the Preferences hub', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(TrustedHostsScreen));
+    const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
+    const action = emptyState.props.action as { props: { onPress: () => void } };
+    act(() => {
+      action.props.onPress();
+    });
+    expect(router.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/preferences');
+    expect(router.back).not.toHaveBeenCalled();
     unmount();
   });
 

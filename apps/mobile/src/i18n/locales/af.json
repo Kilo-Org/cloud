@@ -35,6 +35,8 @@
     "connectGithub": "Koppel GitHub",
     "cost": "Koste",
     "discard": "Gooi weg",
+    "discardChangesMessage": "Jou wysigings sal verlore gaan.",
+    "discardChangesTitle": "Gooi wysigings weg?",
     "findings": "Bevindings",
     "mergeRequest": "merge request",
     "notConnected": "Nie gekoppel nie",
@@ -109,7 +111,9 @@
     "online": "Aanlyn",
     "open": "Maak {{name}} oop",
     "openPullRequest": "Oop trekversoek",
+    "completed": "Voltooi",
     "pending": "Hangend",
+    "running": "Aktief",
     "performance": "Werkverrigting",
     "preferences": "Voorkeure",
     "privacyPolicy": "Privaatheidsbeleid",
@@ -661,7 +665,8 @@
       "description": "Koppel jou GitHub-rekening om trekversoeke op jou foon te hersien.",
       "gitlabDescription": "Koppel jou GitLab-rekening om merge requests op jou foon te hersien.",
       "bitbucketDescription": "Koppel Bitbucket aan hierdie organisasie om trekversoeke op jou foon te hersien.",
-      "bitbucketOrgOnlyDescription": "Kies 'n organisasie in jou profiel om sy Bitbucket-trekversoeke te hersien."
+      "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
+      "contextLine": "Vir {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die PR het dalk verander, of jy probeer dalk jou eie trekversoek hersien, wat nie toegelaat word nie.",
       "reviewNotSubmittedTerm": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die {{term}} het dalk verander, of jy kan nie jou eie {{term}} hersien nie.",
       "couldNotPostComment": "Kon nie kommentaar plaas nie.",
-      "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer."
+      "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer.",
+      "rateLimited": "Te veel versoeke. Probeer asseblief later weer.",
+      "conflict": "Dit het verander terwyl jy daaraan gewerk het. Laai dit weer en probeer asseblief weer."
     },
     "operation": {
       "couldNotReply": "Die antwoord kon nie gestuur word nie.",
@@ -1531,8 +1538,6 @@
     "updateFailed": "Die Kodehersiener kon nie bygewerk word nie.",
     "configSaveFailed": "Die hersieningsinstellings kon nie gestoor word nie.",
     "status": {
-      "running": "Aktief",
-      "completed": "Voltooi",
       "interrupted": "Onderbreek"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "Foute",
       "style": "Styl",
       "testing": "Toetsing",
-      "documentation": "Dokumentasie"
+      "documentation": "Dokumentasie",
+      "unknown": "Ander ({{area}})"
     },
     "gateThreshold": {
       "warning": "Waarskuwing"
@@ -1657,7 +1663,14 @@
       "whereFound": "Waar dit gevind is ({{displayCount}})",
       "fullReport": "Volledige gegenereerde verslag",
       "yes": "Ja",
-      "no": "Nee"
+      "no": "Nee",
+      "action": {
+        "analyzeCodebase": "Analiseer kodebasis",
+        "dismiss": "Wys af",
+        "manualReview": "Handmatige hersiening",
+        "monitor": "Monitor",
+        "openPr": "Maak PR oop"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} bevindings",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Stoor veranderinge",
       "unsavedTitle": "Ongestoorde veranderinge",
-      "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?"
+      "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?",
+      "unsavedInvalidMessage": "Hierdie veranderinge kan nog nie gestoor word nie. Maak dit reg om te stoor, of gooi dit weg om te verlaat."
     },
     "auditReportButton": {
       "viewA11y": "Bekyk ouditverslag"
@@ -1876,7 +1890,24 @@
       "title": "Ouditverslag",
       "unavailable": "Ouditverslag onbeskikbaar",
       "unavailableDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan ouditverslae bekyk. Vra 'n eienaar of faktureringsbestuurder om jou toegang te gee.",
-      "queryFailed": "Die verslagnavraag is nie voltooi nie. Probeer weer."
+      "queryFailed": "Die verslagnavraag is nie voltooi nie. Probeer weer.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Ontleding voltooi",
+        "findingAnalysisFailed": "Ontleding misluk",
+        "findingAutoDismissed": "Outomaties afgewys",
+        "findingCreated": "Geïmporteer",
+        "findingDeleted": "Geskrap",
+        "findingDismissed": "Verwerp",
+        "findingSeverityChanged": "Ernstigheid verander",
+        "findingStatusChange": "Status verander",
+        "findingSuperseded": "Vervang",
+        "remediationBlocked": "Regstelling geblokkeer",
+        "remediationCancelled": "Gekanselleer",
+        "remediationFailed": "Regstelling misluk",
+        "remediationNoChangesNeeded": "Geen veranderinge nodig nie",
+        "remediationPrOpened": "PR geopen",
+        "remediationQueued": "Regstelling versoek"
+      }
     },
     "notifications": {
       "couldNotLoad": "Die kennisgewinginstellings kon nie gelaai word nie.",
@@ -1908,7 +1939,6 @@
       "installApp": "Installeer die GitHub-app",
       "reauthorizeButton": "Magtig die GitHub-app weer",
       "reauthorizeDescription": "Die Sekuriteitsagent benodig die vulnerability_alerts-toestemming vir toegang tot Dependabot-waarskuwings. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
-      "reauthorizeFailed": "Die hernuwing van magtiging kon nie begin word nie. Probeer asseblief weer.",
       "reauthorizeTitle": "Bykomende toestemmings vereis",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} is nie meer beskikbaar nie. Jou standaardmodel word gebruik.",
       "couldNotReadPendingSessions": "Die hangende sessies kon nie gelees word nie. Probeer weer.",
       "failedToCreate": "Die sessie kon nie geskep word nie.",
+      "checkOrganizationAccess": "Kontroleer jou toegang tot hierdie organisasie en probeer asseblief weer.",
       "couldNotRefreshRepositories": "Die bewaarplekke kon nie verfris word nie. Probeer asseblief weer.",
       "discardDraftTitle": "Konsep weggooi?",
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
       "matchesBadge_other": "{{displayCount}} treffers",
-      "noOutput": "Geen uitset nie."
+      "noOutput": "Geen uitset nie.",
+      "translationFailed": "Vertaling het misluk"
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -2978,12 +3010,23 @@
     "boundary": {
       "backToProfile": "Terug na profiel",
       "loadErrorMessage": "Kontroleer jou verbinding en probeer weer.",
+
+      "chooseAccount": "Kies 'n rekening",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
       "membershipLostNotice": "Jy het nie meer toegang tot hierdie organisasie nie. Oorgeskakel na {{target}}.",
+      "noOrganization": "Geen organisasie",
+
+      "noOrganizationDescription": "Hierdie rekening is nie deel van 'n organisasie nie. Skep of sluit by een aan op die web om organisasiefunksies soos lede-uitnodigings en waarskuwings oor lae saldo te gebruik.",
+
+      "openWebOrganizations": "Maak organisasies op die web oop",
+
       "organizationUnavailable": "Die organisasie is nie beskikbaar nie.",
-      "selectDescription": "Kies 'n organisasie uit jou profiel om voort te gaan.",
+      "selectDescriptionWithOrganizations": "Jy behoort aan een of meer organisasies. Kies die rekening wat hierdie skerm moet gebruik.",
+
       "selectOrganization": "Kies 'n organisasie",
       "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
+
+      "unavailableSessionsDescription": "Hierdie organisasie is nie meer beskikbaar nie. Sessies daarvoor kan nie gelaai word nie.",
       "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
     },
     "creditActivity": {
@@ -3643,7 +3686,9 @@
       "jsonTooLarge": "Gebruik hoogstens 50 inskrywings, sleutels tot 128 en waardes tot 4096 karakters",
       "timeoutInvalid": "Uitteltyd moet 'n hele aantal millisekondes wees",
       "edit": "Wysig MCP-bediener",
-      "saveFailed": "Kon nie MCP-bediener stoor nie"
+      "saveFailed": "Kon nie MCP-bediener stoor nie",
+      "deleteFailed": "Kon nie MCP-bediener verwyder nie",
+      "updateFailed": "Kon nie MCP-bediener opdateer nie"
     },
     "agents": {
       "title": "Profiel agente",
@@ -3670,6 +3715,7 @@
       "visibilitySubagent": "Subagent - slegs oproepbaar vanaf ander",
       "visibilityAll": "Almal - albei",
       "saveFailed": "Kon nie agent stoor nie",
+      "deleteFailed": "Kon nie agent verwyder nie",
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agentslak in",
       "slugInvalid": "Slak moet met 'n letter begin en slegs kleinletters, syfers en strepe gebruik",
@@ -3684,10 +3730,12 @@
       "description": "Opdrag beskrywing",
       "template": "Sjabloon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Verduidelik $ARGUMENTS",
       "subtask": "Hardloop as subtaak",
       "edit": "Wysig skuinsstreep opdrag",
       "saveFailed": "Kon nie opdrag stoor nie",
+      "deleteFailed": "Kon nie opdrag verwyder nie",
       "nameRequired": "Voer 'n opdragnaam in",
       "nameInvalid": "Naam moet met 'n kleinletter begin en slegs kleinletters, syfers en strepe gebruik",
       "templateRequired": "Voer 'n opdragsjabloon in",
@@ -3834,7 +3882,7 @@
     "view": "Lees verslag",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Wys regstreekse status",
+    "dismiss": "Verwerp verslag",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfris nie beskikbaar nie",
     "revised": "Hersien · {{revision}}",

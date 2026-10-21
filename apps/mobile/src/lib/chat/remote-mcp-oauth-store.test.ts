@@ -97,3 +97,38 @@ describe('writing a remote MCP server OAuth state', () => {
     expect(await store.readRemoteMcpOAuth(SERVER.id, SERVER.url)).toBeUndefined();
   });
 });
+
+describe('matching a remote MCP server OAuth state to its endpoint', () => {
+  it('reads the state an older spelling of one endpoint saved', async () => {
+    const { store } = await fresh();
+    heldDiskRead(JSON.stringify({ demo: { url: 'https://demo.example/', tokens: TOKENS } }))();
+
+    expect(await store.readRemoteMcpOAuth('demo', 'https://demo.example')).toEqual({
+      url: 'https://demo.example/',
+      tokens: TOKENS,
+    });
+  });
+
+  it('merges a field into the state an older spelling saved', async () => {
+    const { store, epoch } = await fresh();
+    heldDiskRead(JSON.stringify({ demo: { url: 'https://demo.example/', tokens: TOKENS } }))();
+
+    await store.writeRemoteMcpOAuth(
+      { id: 'demo', url: 'https://demo.example', epoch: epoch.currentAuthEpoch() },
+      { client: CLIENT }
+    );
+
+    expect(await store.readRemoteMcpOAuth('demo', 'https://demo.example')).toEqual({
+      url: 'https://demo.example',
+      tokens: TOKENS,
+      client: CLIENT,
+    });
+  });
+
+  it('reads nothing for a state saved for another endpoint', async () => {
+    const { store } = await fresh();
+    heldDiskRead(JSON.stringify({ demo: { url: 'https://demo.example/', tokens: TOKENS } }))();
+
+    expect(await store.readRemoteMcpOAuth('demo', 'https://other.example')).toBeUndefined();
+  });
+});

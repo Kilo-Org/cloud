@@ -35,6 +35,8 @@
     "connectGithub": "連結 GitHub",
     "cost": "費用",
     "discard": "捨棄",
+    "discardChangesMessage": "您的變更將會遺失。",
+    "discardChangesTitle": "捨棄變更？",
     "findings": "問題",
     "mergeRequest": "合併請求",
     "notConnected": "未連結",
@@ -109,7 +111,9 @@
     "online": "在線上",
     "open": "開啟 {{name}}",
     "openPullRequest": "開啟提取要求",
+    "completed": "已完成",
     "pending": "待處理",
+    "running": "執行中",
     "performance": "效能",
     "preferences": "偏好設定",
     "privacyPolicy": "隱私權政策",
@@ -1019,8 +1023,6 @@
     "updateFailed": "無法更新審查員。",
     "configSaveFailed": "無法儲存審查設定。",
     "status": {
-      "running": "執行中",
-      "completed": "已完成",
       "interrupted": "已中斷"
     },
     "reviewStyle": {
@@ -1033,7 +1035,8 @@
       "bugs": "程式錯誤",
       "style": "程式碼風格",
       "testing": "測試",
-      "documentation": "文件"
+      "documentation": "文件",
+      "unknown": "其他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"
@@ -1112,7 +1115,14 @@
       "triageReasoning": "初步評估依據",
       "watchInCloudAgent": "在雲端代理中檢視",
       "whereFound": "發現位置（{{displayCount}}）",
-      "yes": "是"
+      "yes": "是",
+      "action": {
+        "analyzeCodebase": "分析程式碼庫",
+        "dismiss": "忽略",
+        "manualReview": "人工審查",
+        "monitor": "監控",
+        "openPr": "開啟提取要求"
+      }
     },
     "analysisSettings": {
       "analysisModel": "分析模型",
@@ -1134,7 +1144,24 @@
       "summary": "報告摘要",
       "title": "稽核報告",
       "unavailable": "無法取得稽核報告",
-      "unavailableDescription": "只有組織擁有者與帳單管理員可以檢視稽核報告。請向組織擁有者或帳單管理員申請存取權限。"
+      "unavailableDescription": "只有組織擁有者與帳單管理員可以檢視稽核報告。請向組織擁有者或帳單管理員申請存取權限。",
+      "eventActions": {
+        "findingAnalysisCompleted": "分析已完成",
+        "findingAnalysisFailed": "分析失敗",
+        "findingAutoDismissed": "已自動忽略",
+        "findingCreated": "已匯入",
+        "findingDeleted": "已刪除",
+        "findingDismissed": "已忽略",
+        "findingSeverityChanged": "嚴重性已變更",
+        "findingStatusChange": "狀態已變更",
+        "findingSuperseded": "已被取代",
+        "remediationBlocked": "修復遭封鎖",
+        "remediationCancelled": "已取消",
+        "remediationFailed": "修復失敗",
+        "remediationNoChangesNeeded": "無需變更",
+        "remediationPrOpened": "已開啟提取要求",
+        "remediationQueued": "已提出修復要求"
+      }
     },
     "auditReportButton": {
       "viewA11y": "檢視稽核報告"
@@ -1354,7 +1381,6 @@
       "installApp": "安裝 GitHub App",
       "reauthorizeButton": "重新授權 GitHub App",
       "reauthorizeDescription": "資安代理需要 vulnerability_alerts 權限才能存取 Dependabot 警報。請重新授權 GitHub App 以授予此權限。",
-      "reauthorizeFailed": "無法開始重新授權。請再試一次。",
       "reauthorizeTitle": "需要額外權限",
       "setupFailed": "無法開始 GitHub 設定。請再試一次。"
     },
@@ -1377,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "儲存變更",
       "unsavedMessage": "離開此畫面前，要儲存變更嗎？",
+      "unsavedInvalidMessage": "這些變更尚無法儲存。請修正後再儲存，或捨棄變更以離開。",
       "unsavedTitle": "未儲存的變更"
     },
     "setup": {
@@ -1700,6 +1727,7 @@
       "prefillModelUnavailable": "{{model}} 已無法使用。目前使用你的預設模型。",
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
       "failedToCreate": "無法建立工作階段。",
+      "checkOrganizationAccess": "請檢查您對此組織的存取權限，然後再試一次。",
       "couldNotRefreshRepositories": "無法重新整理儲存庫。請再試一次。",
       "discardDraftTitle": "捨棄草稿？",
       "discardDraftMessage": "你輸入的提示詞將不會保留。",
@@ -1769,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 筆相符結果",
       "matchesBadge_other": "{{displayCount}} 筆相符結果",
-      "noOutput": "沒有輸出。"
+      "noOutput": "沒有輸出。",
+      "translationFailed": "翻譯失敗"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -2506,7 +2535,8 @@
       "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
       "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
       "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
-      "bitbucketOrgOnlyDescription": "在你的個人資料中選取一個組織，以審查其 Bitbucket 提取請求。"
+      "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
+      "contextLine": "適用於 {{organization}}"
     },
     "connectionExpired": "GitHub 連線已過期。",
     "couldNotLoadPullRequest": "無法載入提取請求。",
@@ -2933,7 +2963,9 @@
       "reviewNotSubmitted": "目前無法送出此審查。可能是 PR 已更新，或你正在審查自己的提取請求。",
       "reviewNotSubmittedTerm": "此審查無法依現況提交。{{term}}可能已變更，或者你不能審查自己的{{term}}。",
       "couldNotPostComment": "無法發佈留言。",
-      "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。"
+      "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。",
+      "rateLimited": "要求過多。請稍後再試一次。",
+      "conflict": "此項目在您編輯時已變更。請重新載入並再試一次。"
     },
     "operation": {
       "couldNotReply": "無法回覆。",
@@ -2970,12 +3002,23 @@
     "boundary": {
       "backToProfile": "返回個人資料",
       "loadErrorMessage": "請檢查網路連線後再試一次。",
+
+      "chooseAccount": "選取帳戶",
       "loadErrorTitle": "無法載入你的組織清單。",
       "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
+      "noOrganization": "沒有組織",
+
+      "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
+
+      "openWebOrganizations": "在網頁版開啟組織",
+
       "organizationUnavailable": "無法存取組織。",
-      "selectDescription": "請到個人資料頁面選取組織，即可繼續。",
+      "selectDescriptionWithOrganizations": "您屬於一個或多個組織。請選取此畫面應使用的帳戶。",
+
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
+
+      "unavailableSessionsDescription": "此組織已無法存取。無法載入其工作階段。",
       "accessDeniedDescription": "你沒有存取此組織的權限。"
     },
     "creditActivity": {
@@ -3643,7 +3686,9 @@
       "jsonTooLarge": "最多使用 50 個項目，鍵最多 128 個字元，值最多 4096 個字元",
       "timeoutInvalid": "超時必須是整數毫秒",
       "edit": "編輯 MCP 伺服器",
-      "saveFailed": "無法保存 MCP 伺服器"
+      "saveFailed": "無法保存 MCP 伺服器",
+      "deleteFailed": "無法刪除 MCP 伺服器",
+      "updateFailed": "無法更新 MCP 伺服器"
     },
     "agents": {
       "title": "設定檔代理",
@@ -3670,6 +3715,7 @@
       "visibilitySubagent": "子代理程式——只能從其他人調用",
       "visibilityAll": "全部 — 兩者",
       "saveFailed": "無法保存代理",
+      "deleteFailed": "無法刪除代理",
       "nameRequired": "輸入代理名稱",
       "slugRequired": "輸入代理 slug",
       "slugInvalid": "Slug 必須以字母開頭，且只能使用小寫字母、數字和破折號",
@@ -3684,10 +3730,12 @@
       "description": "命令說明",
       "template": "範本",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "解釋$ARGUMENTS",
       "subtask": "作為子任務運行",
       "edit": "編輯斜槓命令",
       "saveFailed": "無法保存命令",
+      "deleteFailed": "無法刪除命令",
       "nameRequired": "輸入命令名稱",
       "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和破折號",
       "templateRequired": "輸入命令模板",
@@ -3834,7 +3882,7 @@
     "view": "閱讀簡報",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
-    "dismiss": "顯示即時狀態",
+    "dismiss": "忽略簡報",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的報告 · 無法重新整理",
     "revised": "已修訂 · {{revision}}",

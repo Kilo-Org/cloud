@@ -153,7 +153,7 @@ async function discover(
         onFailure: (error: RemoteMcpError) => ({ ok: false as const, error }),
         onSuccess: (tools: readonly Tool[]) => ({ ok: true as const, tools }),
       }),
-      Effect.catchAllCause(cause =>
+      Effect.catchCause(cause =>
         Effect.succeed({
           ok: false as const,
           error: new RemoteMcpError({ serverId: server.id, kind: 'unreachable', cause }),

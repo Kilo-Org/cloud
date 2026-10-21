@@ -232,14 +232,17 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
   // The rest of the retryability matrix belongs to `isSecuritySyncRetryable`
   // (tested in use-security-agent-mutations.test.ts); the hook only needs one
   // retryable and one terminal case.
-  it('regenerates the key on a non-retryable failure (bad-request ends the intent)', async () => {
+  it('regenerates the key on a non-retryable failure and shows the generic copy', async () => {
     const badRequest = new Error('Invalid dismissal reason');
     Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
     personalDismissMutateMock.mockRejectedValueOnce(badRequest);
     useDismissSecurityFinding('personal');
 
+    // The server's English reason is not a catalog string, so the surface reads
+    // the localized terminal-fallback sentence while the raw rejection stays as
+    // `cause`.
     await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
-      message: 'Invalid dismissal reason',
+      message: 'Could not complete this action. The problem needs fixing before you can retry.',
     });
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });

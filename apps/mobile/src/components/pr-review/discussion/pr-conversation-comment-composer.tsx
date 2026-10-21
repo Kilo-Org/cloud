@@ -145,7 +145,7 @@ export function PrConversationCommentComposer({
     // The ledger persistence-failure marker is retry-blocking: the same
     // operation key must not be retried.
     if (isPrOperationPersistenceFailed(addComment.error)) {
-      setInlineError(i18n.t('prReview.operation.persistenceFailed'));
+      setInlineError(i18n.t('common.actionNotRecorded'));
       setInlineErrorKind('bad-request');
       setRetryBlocked(true);
       return;

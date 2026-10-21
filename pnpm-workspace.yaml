@@ -28,9 +28,9 @@ catalog:
   '@tanstack/query-async-storage-persister': 5.100.10
   '@tanstack/react-query': 5.100.10
   '@tanstack/react-query-persist-client': 5.100.10
-  '@trpc/client': 11.17.0
-  '@trpc/server': 11.17.0
-  '@trpc/tanstack-react-query': 11.17.0
+  '@trpc/client': 11.19.0
+  '@trpc/server': 11.19.0
+  '@trpc/tanstack-react-query': 11.19.0
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260514.1
@@ -51,7 +51,7 @@ catalog:
   vitest: 4.1.11
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
-  zod: 4.4.3
+  zod: 4.6.7
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
@@ -114,6 +114,10 @@ minimumReleaseAgeExclude:
   # enough on its own.
   - react-native-reanimated@4.7.1
 overrides:
+  # One pg client in the tree: drizzle-orm's optional peers include pg, so two
+  # pg versions split drizzle-orm into two packages and their SQL types stop
+  # being assignable to each other across workspace imports.
+  pg: 8.23.1
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
   # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)
   # requires ^2.58.5 and calls @sentry/cli through its Node API. v3 replaced the
@@ -330,3 +334,4 @@ allowBuilds:
   tree-sitter-bash: false
   geckodriver: true
   '@scarf/scarf': false
+  '@parcel/watcher': false

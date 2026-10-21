@@ -508,6 +508,7 @@ describe('GET /api/v1/models', () => {
       new Map([
         ['acme/public-model', customLlm('acme/public-model', true)],
         ['acme/private-model', customLlm('acme/private-model', false)],
+        ['acme/claude-review', customLlm('acme/claude-review', true)],
         [exclusiveModel.public_id, customLlm(exclusiveModel.public_id, true)],
       ])
     );
@@ -526,6 +527,11 @@ describe('GET /api/v1/models', () => {
       mayTrainOnYourPrompts: true,
     });
     expect(responseData.data.some(item => item.id === 'acme/private-model')).toBe(false);
+    // Routing serves a definition without opencode settings over Chat Completions,
+    // so the catalog must not guess a protocol from the id.
+    expect(responseData.data.find(item => item.id === 'acme/claude-review')?.opencode).toBe(
+      undefined
+    );
     const sameIdModels = responseData.data.filter(item => item.id === exclusiveModel.public_id);
     expect(sameIdModels).toHaveLength(1);
     expect(sameIdModels[0].name).toBe(`Custom ${exclusiveModel.public_id}`);

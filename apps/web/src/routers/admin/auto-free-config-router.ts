@@ -8,6 +8,7 @@ import { ai_gateway_config } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import * as z from 'zod';
 
 const SetAutoFreeConfigSchema = z.object({
@@ -25,11 +26,20 @@ export const adminAutoFreeConfigRouter = createTRPCRouter({
   }),
 
   set: adminProcedure.input(SetAutoFreeConfigSchema).mutation(async ({ input }) => {
-    const ineligibleModelIds = input.config ? getIneligibleAutoFreeModelIds(input.config) : [];
+    const configuredModelIds = input.config?.models.map(({ model }) => model) ?? [];
+    const customLlmModelIds = (
+      await Promise.all(
+        configuredModelIds.map(async model => ((await isCustomLlm(model)) ? [model] : []))
+      )
+    ).flat();
+    const ineligibleModelIds = [
+      ...(input.config ? getIneligibleAutoFreeModelIds(input.config) : []),
+      ...customLlmModelIds,
+    ];
     if (ineligibleModelIds.length > 0) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider): ${ineligibleModelIds.join(', ')}`,
+        message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider and is not a custom LLM): ${ineligibleModelIds.join(', ')}`,
       });
     }
 

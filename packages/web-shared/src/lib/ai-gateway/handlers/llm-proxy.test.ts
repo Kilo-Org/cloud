@@ -2998,4 +2998,54 @@ describe('custom LLM requests', () => {
     );
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
+
+  function setOrganizationAuth() {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', google_user_email: 'test@example.com', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'allow' },
+      plan: 'enterprise',
+    });
+  }
+
+  it('checks organization policy against the trimmed model id', async () => {
+    setOrganizationAuth();
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: false,
+      denialSource: 'organization_model',
+    });
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('  acme/public-model  ')) as never
+    );
+
+    expect(response.status).toBe(404);
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      'acme/public-model'
+    );
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps the request provider exclusions when organization policy replaces the provider config', async () => {
+    setOrganizationAuth();
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['acme']),
+    });
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody('acme/public-model'), provider: { ignore: ['acme'] } }) as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
 });

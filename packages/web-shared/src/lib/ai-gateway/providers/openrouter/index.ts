@@ -195,9 +195,11 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         .filter(m => !unavailableModelIds.has(m.public_id) && !isShadowedByCustomLlm(m.public_id))
         .map(model => convertFromKiloExclusiveModel(model))
     )
-    .concat(publicCustomLlmModels)
     .concat(autoModels)
-    .map(applyCustomPricingToModel);
+    .map(applyCustomPricingToModel)
+    // Public custom LLMs are complete as defined; id-based pricing, PDF, and
+    // protocol guesses below would describe a model routing does not serve.
+    .concat(publicCustomLlmModels);
   const exclusiveById = new Map(
     kiloExclusiveModels
       .filter(entry => !isShadowedByCustomLlm(entry.public_id))
@@ -218,11 +220,15 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       const inferenceProviderIds = [
         ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),
       ];
+      const isPublicCustomLlmModel = publicCustomLlmProviders.has(model.id);
       const addPdf =
-        isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
-      const description = isFreeNemotronModel(model.id)
-        ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
-        : model.description;
+        !isPublicCustomLlmModel &&
+        isPdfSupportingModel(model.id) &&
+        !model.architecture.input_modalities.includes('pdf');
+      const description =
+        !isPublicCustomLlmModel && isFreeNemotronModel(model.id)
+          ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
+          : model.description;
       const isFree = await isFreeModel(model.id);
       return {
         ...model,
@@ -233,12 +239,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         isFree: model.isFree ?? isFree,
         mayTrainOnYourPrompts:
           model.mayTrainOnYourPrompts ?? (isFree || dataCollectionRequiredModelIds.has(model.id)),
-        opencode:
-          model.opencode ??
-          (await getGatewayOpenCodeSettings(
-            model.id,
-            model.supported_parameters?.includes('reasoning') ?? false
-          )),
+        // A custom LLM's protocol comes only from its definition, as in routing.
+        opencode: isPublicCustomLlmModel
+          ? model.opencode
+          : (model.opencode ??
+            (await getGatewayOpenCodeSettings(
+              model.id,
+              model.supported_parameters?.includes('reasoning') ?? false
+            ))),
         architecture: addPdf
           ? {
               ...model.architecture,

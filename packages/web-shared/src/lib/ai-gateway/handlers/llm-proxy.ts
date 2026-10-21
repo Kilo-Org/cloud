@@ -312,7 +312,9 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  const requestedModel = requestBodyParsed.body.model.trim();
+  // Canonicalize once so routing, policy, and the upstream request all see the same id.
+  requestBodyParsed.body.model = requestBodyParsed.body.model.trim();
+  const requestedModel = requestBodyParsed.body.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
   const feature = validateFeatureHeader(
@@ -999,12 +1001,18 @@ export async function handleLlmProxyRequest(
     return dataCollectionRequiredResponse();
   }
 
+  // Organization policy replaces the request's provider object, so the caller's
+  // own only/ignore lists are checked separately from the effective config.
   const providerNotAllowedError = customLlm
     ? customLlm.definition.public
-      ? checkInferenceProvidersAllowed(
+      ? (checkInferenceProvidersAllowed(
+          customLlm.definition.public.inference_providers,
+          requestProvider
+        ) ??
+        checkInferenceProvidersAllowed(
           customLlm.definition.public.inference_providers,
           requestBodyParsed.body.provider
-        )
+        ))
       : null
     : checkExclusiveModelProviderAllowed(
         effectiveModelIdLowerCased,

@@ -36,6 +36,7 @@ import {
   usePathname,
   useRouter,
   useSegments,
+  useUnstableGlobalHref,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
@@ -132,6 +133,7 @@ import {
   subscribeLastRoute,
 } from '@/lib/last-route';
 import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
+import { lastRouteHrefFrom } from '@/lib/last-route-recordable';
 import { useRecordLastRoute } from '@/lib/hooks/use-record-last-route';
 import {
   clearSharePayload,
@@ -230,6 +232,7 @@ function RootLayoutNav({
   });
   const segments = useSegments();
   const pathname = usePathname();
+  const globalHref = useUnstableGlobalHref();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
   // The root navigation container's readiness. `store.assertIsReady()` throws
@@ -892,6 +895,12 @@ function RootLayoutNav({
         return;
       }
       case 'settle-app': {
+        // The relaunch repair navigates to the recorded screen in this same
+        // flush. Revealing the tree before the root navigator accepts
+        // navigation would paint the restored route first.
+        if (!navigationReady) {
+          return;
+        }
         markStartupComplete('app');
         setStartupFinished(true);
         // Deep-link navigation is owned by the pendingDeepLink effect below.
@@ -947,7 +956,15 @@ function RootLayoutNav({
     // cold start's first commit (the base Intent's restored route) cannot
     // overwrite the persisted record before it is read here.
     const recordedHref = consumeLastRouteForRepair(accountUserId ?? null);
-    if (!shouldRepairRestoredRoute({ recordedHref, restoredPathname: pathname })) {
+    if (
+      !shouldRepairRestoredRoute({
+        recordedHref,
+        // The tab group is part of the destination: `/profiles` and `/` are the
+        // same path once groups are stripped, so the resolved href of the route
+        // actually on screen is the comparison, not the bare pathname.
+        restoredRoute: lastRouteHrefFrom(globalHref, pathname, segments) ?? pathname,
+      })
+    ) {
       return;
     }
     // The launch-captured link is the stale replay this repair undoes: the
@@ -967,7 +984,16 @@ function RootLayoutNav({
     // `navigate` (not `replace`): replacing the stack root leaves the target
     // screen with no back stack, the same reasoning as resolvePendingNavigation.
     router.navigate(recordedHref as Href, { withAnchor: true });
-  }, [decision, accountUserId, pathname, router, navigationReady, lastRouteHydratedVersion]);
+  }, [
+    decision,
+    accountUserId,
+    pathname,
+    segments,
+    globalHref,
+    router,
+    navigationReady,
+    lastRouteHydratedVersion,
+  ]);
 
   // Declared after the auth effect so that on the same flush a pending
   // deep-link navigate runs first and the share gate opens on top.

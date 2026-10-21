@@ -48,7 +48,7 @@ export function useRecordLastRoute({ userId }: RecordLastRouteInput): void {
     if (userId === undefined || !isRecordableLastRoute(pathname, segments)) {
       return;
     }
-    const href = lastRouteHrefFrom(globalHref, pathname);
+    const href = lastRouteHrefFrom(globalHref, pathname, segments);
     if (href === null || lastRecorded.current === href) {
       return;
     }

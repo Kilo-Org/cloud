@@ -79,8 +79,8 @@ describe('useRecordLastRoute (mounted)', () => {
   it('records the focused in-app route for the account', async () => {
     await mountProbe('u1');
 
-    expect(getLastRouteSnapshot()?.href).toBe('/agent-chat/ses_gone');
-    expect(getLastRoute('u1')).toBe('/agent-chat/ses_gone');
+    expect(getLastRouteSnapshot()?.href).toBe('/(app)/agent-chat/ses_gone');
+    expect(getLastRoute('u1')).toBe('/(app)/agent-chat/ses_gone');
   });
 
   it('records nothing while the account is unknown', async () => {
@@ -99,7 +99,7 @@ describe('useRecordLastRoute (mounted)', () => {
 
   it('a navigation commit replaces the record with the new path', async () => {
     await mountProbe('u1');
-    expect(getLastRouteSnapshot()?.href).toBe('/agent-chat/ses_gone');
+    expect(getLastRouteSnapshot()?.href).toBe('/(app)/agent-chat/ses_gone');
 
     routerState.pathname = '/profiles/p1/variables';
     routerState.segments = [
@@ -143,7 +143,7 @@ describe('useRecordLastRoute (mounted)', () => {
     await _hydrateLastRouteForTests();
 
     // A fresh read from the mirror reproduces the same route for the account.
-    expect(getLastRoute('u1')).toBe('/agent-chat/ses_gone');
+    expect(getLastRoute('u1')).toBe('/(app)/agent-chat/ses_gone');
   });
 });
 
@@ -152,7 +152,7 @@ describe('useRecordLastRoute (mounted)', () => {
 describe('useRecordLastRoute with an explicit clear (mounted)', () => {
   it('a clear between commits keeps the record dropped until the next commit', async () => {
     await mountProbe('u1');
-    expect(getLastRouteSnapshot()?.href).toBe('/agent-chat/ses_gone');
+    expect(getLastRouteSnapshot()?.href).toBe('/(app)/agent-chat/ses_gone');
 
     clearLastRoute();
     expect(getLastRouteSnapshot()).toBeNull();
@@ -164,6 +164,6 @@ describe('useRecordLastRoute with an explicit clear (mounted)', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(getLastRouteSnapshot()?.href).toBe('/');
+    expect(getLastRouteSnapshot()?.href).toBe('/(app)/(tabs)/(0_home)');
   });
 });

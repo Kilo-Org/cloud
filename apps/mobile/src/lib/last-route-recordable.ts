@@ -58,33 +58,51 @@ export function isConcreteLastRouteHref(href: string): boolean {
 /** expo-router's own launch flag on the global href, not screen state. */
 const ROUTER_INTERNAL_PARAM = 'initial=';
 
+/** A query value that never resolved past a route pattern (`[profileId]`). */
+function isPlaceholderPair(pair: string): boolean {
+  const separator = pair.indexOf('=');
+  const value = separator === -1 ? '' : pair.slice(separator + 1);
+  return value.includes('[') || value.includes('%5B');
+}
+
 /**
  * The href `router.navigate` reopens the focused screen with.
  *
- * The router's global href carries the concrete path and the query the screen
- * was opened with (`/profiles/p1/variables?organizationId=o1`). The route
- * pattern is not usable here: `useSegments()` keeps dynamic segments as their
- * pattern (`profiles/[profileId]/variables`), and `usePathname()` reports the
- * pattern too on a commit the router could not resolve, so an href built from
- * either restores a literal placeholder. `initial` is expo-router's launch
- * flag and is dropped so the record stays screen state.
+ * The path comes from the segment list when every segment is concrete: it is
+ * the only source that keeps the tab-group identity (`/(app)/(tabs)/(3_profile)`
+ * rather than `/`), so the app reopens on the tab the person left. Dynamic
+ * segments stay a pattern (`profiles/[profileId]/variables`) and read as
+ * unusable here, so the router's global href — the concrete path it resolved,
+ * with the query the screen was opened with — supplies the path then.
  *
- * Returns null when there is no concrete href to record (the layout can commit
- * before any route resolves).
+ * The query comes from the global href, minus expo-router's own launch flag and
+ * minus pairs that still carry a route pattern. Returns null when no source
+ * names a concrete route (the layout can commit before any route resolves).
  */
-export function lastRouteHrefFrom(globalHref: string, pathname: string): string | null {
-  const source = globalHref.length > 0 ? globalHref : pathname;
-  if (!isConcreteLastRouteHref(source)) {
+export function lastRouteHrefFrom(
+  globalHref: string,
+  pathname: string,
+  segments: readonly string[]
+): string | null {
+  const grouped = segments.filter(part => part.length > 0);
+  const fromSegments = grouped.length > 0 ? `/${grouped.join('/')}` : '';
+  const queryStart = globalHref.indexOf('?');
+  const globalPath = queryStart === -1 ? globalHref : globalHref.slice(0, queryStart);
+  const path = [fromSegments, globalPath, pathname].find(candidate =>
+    isConcreteLastRouteHref(candidate)
+  );
+  if (path === undefined) {
     return null;
   }
-  const queryStart = source.indexOf('?');
-  if (queryStart === -1) {
-    return source;
-  }
-  const kept = source
-    .slice(queryStart + 1)
-    .split('&')
-    .filter(pair => pair.length > 0 && !pair.startsWith(ROUTER_INTERNAL_PARAM));
-  const path = source.slice(0, queryStart);
+  const kept =
+    queryStart === -1
+      ? []
+      : globalHref
+          .slice(queryStart + 1)
+          .split('&')
+          .filter(
+            pair =>
+              pair.length > 0 && !pair.startsWith(ROUTER_INTERNAL_PARAM) && !isPlaceholderPair(pair)
+          );
   return kept.length > 0 ? `${path}?${kept.join('&')}` : path;
 }

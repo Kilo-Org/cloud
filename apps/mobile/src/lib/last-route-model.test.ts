@@ -20,38 +20,76 @@ describe('isConcreteLastRouteHref', () => {
 });
 
 describe('lastRouteHrefFrom', () => {
-  it('prefers the resolved global href over the pathname', () => {
-    expect(lastRouteHrefFrom('/profiles/p1/variables', '/profiles/[profileId]/variables')).toBe(
-      '/profiles/p1/variables'
-    );
+  it('keeps the tab-group identity from concrete segments', () => {
+    // `usePathname()` reports `/` for a tab root and the global href repeats it;
+    // only the segment list names the tab the person left.
+    expect(
+      lastRouteHrefFrom('/?profileId=%5BprofileId%5D&initial=false', '/', [
+        '(app)',
+        '(tabs)',
+        '(3_profile)',
+      ])
+    ).toBe('/(app)/(tabs)/(3_profile)');
+  });
+
+  it('uses the resolved global href when a segment is a route pattern', () => {
+    expect(
+      lastRouteHrefFrom('/profiles/p1/variables?initial=false', '/profiles/p1/variables', [
+        '(app)',
+        '(tabs)',
+        '(3_profile)',
+        'profiles',
+        '[profileId]',
+        'variables',
+      ])
+    ).toBe('/profiles/p1/variables');
   });
 
   it('keeps the query the screen was opened with', () => {
     expect(
-      lastRouteHrefFrom('/profiles/p1/variables?organizationId=o1', '/profiles/p1/variables')
+      lastRouteHrefFrom('/profiles/p1/variables?organizationId=o1', '/profiles/p1/variables', [
+        '(app)',
+        '(tabs)',
+        '(3_profile)',
+        'profiles',
+        '[profileId]',
+        'variables',
+      ])
     ).toBe('/profiles/p1/variables?organizationId=o1');
   });
 
-  it("drops expo-router's launch flag and an emptied query", () => {
-    expect(lastRouteHrefFrom('/agent-chat/ses_1?initial=false', '/agent-chat/ses_1')).toBe(
-      '/agent-chat/ses_1'
-    );
+  it('drops the launch flag and query values that never resolved', () => {
+    expect(
+      lastRouteHrefFrom('/agent-chat/ses_1?initial=false', '/agent-chat/ses_1', [
+        '(app)',
+        'agent-chat',
+        'ses_1',
+      ])
+    ).toBe('/(app)/agent-chat/ses_1');
     expect(
       lastRouteHrefFrom(
         '/profiles/p1/variables?initial=false&organizationId=o1',
-        '/profiles/p1/variables'
+        '/profiles/p1/variables',
+        ['(app)', '(tabs)', '(3_profile)', 'profiles', '[profileId]', 'variables']
       )
     ).toBe('/profiles/p1/variables?organizationId=o1');
   });
 
-  it('falls back to the pathname when the global href is empty', () => {
-    expect(lastRouteHrefFrom('', '/agent-chat/ses_1')).toBe('/agent-chat/ses_1');
+  it('falls back to the pathname when nothing else resolved', () => {
+    expect(lastRouteHrefFrom('', '/agent-chat/ses_1', [])).toBe('/agent-chat/ses_1');
   });
 
-  it('returns null when neither names a concrete route', () => {
-    expect(lastRouteHrefFrom('', '')).toBeNull();
+  it('returns null when no source names a concrete route', () => {
+    expect(lastRouteHrefFrom('', '', [])).toBeNull();
     expect(
-      lastRouteHrefFrom('/profiles/[profileId]/variables', '/profiles/[profileId]/variables')
+      lastRouteHrefFrom('/profiles/[profileId]/variables', '/profiles/[profileId]/variables', [
+        '(app)',
+        '(tabs)',
+        '(3_profile)',
+        'profiles',
+        '[profileId]',
+        'variables',
+      ])
     ).toBeNull();
   });
 });
@@ -100,7 +138,7 @@ describe('shouldRepairRestoredRoute', () => {
     expect(
       shouldRepairRestoredRoute({
         recordedHref: '/(app)/(tabs)/(3_profile)/profiles/p1/variables',
-        restoredPathname: '/agent-chat/ses_gone',
+        restoredRoute: '/agent-chat/ses_gone',
       })
     ).toBe(true);
   });
@@ -109,7 +147,27 @@ describe('shouldRepairRestoredRoute', () => {
     expect(
       shouldRepairRestoredRoute({
         recordedHref: '/(app)/agent-chat/ses_1',
-        restoredPathname: '/agent-chat/ses_1',
+        restoredRoute: '/agent-chat/ses_1',
+      })
+    ).toBe(false);
+  });
+
+  it('repairs a tab the OS restore did not reopen', () => {
+    // Both are `/` once the root layout groups are stripped; the tab group is
+    // the destination and must keep them apart.
+    expect(
+      shouldRepairRestoredRoute({
+        recordedHref: '/(app)/(tabs)/(3_profile)',
+        restoredRoute: '/(app)/(tabs)/(0_home)',
+      })
+    ).toBe(true);
+  });
+
+  it('does not repair when the recorded tab is already focused', () => {
+    expect(
+      shouldRepairRestoredRoute({
+        recordedHref: '/(app)/(tabs)/(3_profile)',
+        restoredRoute: '/(app)/(tabs)/(3_profile)',
       })
     ).toBe(false);
   });
@@ -118,14 +176,14 @@ describe('shouldRepairRestoredRoute', () => {
     expect(
       shouldRepairRestoredRoute({
         recordedHref: '/(app)/agent-chat/ses_1?via=push',
-        restoredPathname: '/agent-chat/ses_2',
+        restoredRoute: '/agent-chat/ses_2',
       })
     ).toBe(true);
   });
 
   it('does not repair without a record', () => {
     expect(
-      shouldRepairRestoredRoute({ recordedHref: null, restoredPathname: '/agent-chat/ses_gone' })
+      shouldRepairRestoredRoute({ recordedHref: null, restoredRoute: '/agent-chat/ses_gone' })
     ).toBe(false);
   });
 });

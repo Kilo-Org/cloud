@@ -12,7 +12,7 @@ type PrLinkPasteDecision =
  * Decide how a paste-button tap should treat clipboard contents.
  * Trims first; empty → no insertion; a GitHub, GitLab (any host, including
  * self-managed) or Bitbucket review URL → replace + navigate; anything else
- * → replace + invalid toast at the call site.
+ * → replace + inline validation at the call site.
  */
 export function decidePrLinkPaste(clipboard: string | null | undefined): PrLinkPasteDecision {
   const text = (clipboard ?? '').trim();
@@ -56,11 +56,4 @@ export function selectPrLinkClearButtonVisible(input: PrLinkClearButtonInput): b
 /** Toast copy when paste finds an empty clipboard. */
 export function prLinkToastClipboardEmptyCopy(): string {
   return i18n.t('prReview.linkPasteClipboardEmpty');
-}
-/** Toast copy when paste or Open gets a link no provider serves. */
-export function prLinkToastInvalidCopy(): string {
-  // Reuses the pre-s7 key: it exists in all 86 catalogs, and renaming it in
-  // en.json alone would make every catalog an "extra key" failure. s9
-  // retranslates the changed English value.
-  return i18n.t('prReview.linkPasteNotAPullRequest');
 }

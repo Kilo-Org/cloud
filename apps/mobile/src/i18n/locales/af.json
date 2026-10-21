@@ -1413,6 +1413,9 @@
       "couldNotGetLatest": "Die jongste data kon nie verkry word nie.",
       "byline": "{{repo}} #{{number}} deur {{author}}",
       "noFindings": "Daar is geen bevindings nie.",
+      "findingsUnavailable": "Resultate is nie beskikbaar nie omdat hierdie hersiening misluk het.",
+      "serviceUnavailable": "Die kodehersieningsdiens kon nie bereik word nie. Probeer die hersiening weer wanneer die diens beskikbaar is.",
+      "reviewFailed": "Die hersiening het misluk. Probeer asseblief weer.",
       "showMore": "Wys meer",
       "created": "Geskep",
       "started": "Begin",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agentslak in",
       "slugInvalid": "Slak moet met 'n letter begin en slegs kleinletters, syfers en strepe gebruik",
-      "slugConflict": "Daardie slak word deur 'n ingeboude agent gereserveer",
+      "slugConflict": "Daardie slak word deur 'n ingeboude agent of 'n ander agent in hierdie profiel gebruik",
       "edit": "Wysig agent"
     },
     "slashCommands": {

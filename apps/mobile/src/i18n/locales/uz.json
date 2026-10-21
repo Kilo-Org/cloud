@@ -1413,6 +1413,9 @@
       "couldNotGetLatest": "Eng so'nggi ma'lumotlarni olib bo'lmadi.",
       "byline": "{{repo}} #{{number}}, muallif: {{author}}",
       "noFindings": "Muammolar topilmadi.",
+      "findingsUnavailable": "Bu ko'rib chiqish muvaffaqiyatsiz tugagani uchun natijalar mavjud emas.",
+      "serviceUnavailable": "Kodni ko'rib chiqish xizmatiga ulanib bo'lmadi. Xizmat mavjud bo'lganda ko'rib chiqishni qayta urinib ko'ring.",
+      "reviewFailed": "Ko'rib chiqish muvaffaqiyatsiz tugadi. Iltimos, qayta urinib ko'ring.",
       "showMore": "Ko'proq ko'rsatish",
       "created": "Yaratilgan",
       "started": "Boshlangan",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Agent nomini kiriting",
       "slugRequired": "Agent slug'ini kiriting",
       "slugInvalid": "Slug harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
-      "slugConflict": "Bu slug o'rnatilgan agent tomonidan zahiralangan",
+      "slugConflict": "Bu slug allaqachon ichki agent yoki bu profildagi boshqa agent tomonidan ishlatilgan",
       "edit": "Agentni tahrirlash"
     },
     "slashCommands": {

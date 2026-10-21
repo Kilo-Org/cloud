@@ -1413,6 +1413,9 @@
       "couldNotGetLatest": "Kāore i taea te tiki i ngā mōhiohio hou rawa.",
       "byline": "{{repo}} #{{number}} nā {{author}}",
       "noFindings": "Kāore he kitenga.",
+      "findingsUnavailable": "Kāore ngā hua i te wātea nā te mea i rahua tēnei arotake.",
+      "serviceUnavailable": "Kāore i taea te hono atu ki te ratonga arotake waehere. Whakamātau anō i te arotake ina wātea te ratonga.",
+      "reviewFailed": "I rahua te arotake. Tēnā, whakamātau anō.",
       "showMore": "Whakaaturia ētahi atu",
       "created": "I waihangatia",
       "started": "I tīmata",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Whakauruhia he ingoa māngai",
       "slugRequired": "Whakauruhia he slug māngai",
       "slugInvalid": "Me timata te Slug ki te reta me te whakamahi i nga reta iti, nga mati me nga tohu",
-      "slugConflict": "Ka rahuitia taua maaka e tetahi māngai whakauru",
+      "slugConflict": "Kei te whakamahia tērā slug e tētahi ahatanga o roto, e tētahi ahatanga kē rānei o tēnei kōtaha",
       "edit": "Whakatikatika māngai"
     },
     "slashCommands": {

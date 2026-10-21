@@ -1413,6 +1413,9 @@
       "couldNotGetLatest": "Nuk u morën të dhënat më të fundit.",
       "byline": "{{repo}} #{{number}} nga {{author}}",
       "noFindings": "Nuk ka gjetje.",
+      "findingsUnavailable": "Rezultatet nuk janë të disponueshme sepse ky shqyrtim dështoi.",
+      "serviceUnavailable": "Nuk u arrit lidhja me shërbimin e shqyrtimit të kodit. Riprovo shqyrtimin kur shërbimi të jetë i disponueshëm.",
+      "reviewFailed": "Shqyrtimi dështoi. Provo përsëri.",
       "showMore": "Shfaq më shumë",
       "created": "Krijuar",
       "started": "Filluar",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Futni një emër agjenti",
       "slugRequired": "Fut një slug agjenti",
       "slugInvalid": "Slug duhet të fillojë me një shkronjë dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
-      "slugConflict": "Ai slug është i rezervuar nga një agjent i integruar",
+      "slugConflict": "Ai slug është tashmë në përdorim nga një agjent i integruar ose një agjent tjetër në këtë profil",
       "edit": "Përpunoni agjent"
     },
     "slashCommands": {

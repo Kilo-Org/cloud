@@ -49,6 +49,18 @@ configuration, unknown modes, and unavailable writes retry under the queue polic
 then reach the DLQ. Processing logs contain the usage ID when valid, queue message
 ID, delivery attempt count, and categorical outcome/reason.
 
+Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
+batch have been handled. Each successful message keeps its explicit ACK; failed
+messages keep their explicit retry using the configured delay and retry/DLQ budget.
+There is no extra writer attempt within an invocation. Other failures retain
+per-message retries without being classified as overload. Overload retry logs add
+`writer_status` and `invocation_failure: "writer_overloaded"`.
+An uncaught queue rejection supplies Cloudflare's invocation failure signal;
+`retry()` alone does not. Autoscaling considers that signal alongside backlog and
+the concurrency cap; no particular scale-down amount or timing is guaranteed.
+See [consumer concurrency](https://developers.cloudflare.com/queues/configuration/consumer-concurrency/)
+and [explicit ACK/retry behavior](https://developers.cloudflare.com/queues/configuration/batching-retries/).
+
 Both `usage_ingest_receipt` and `usage_ingest_processing` include an explicit
 `level` and `queue_action` (`ack` or `retry`). Receipts (including discarded invalid
 bodies) and recorded/duplicate processing outcomes use `console.info`; retryable
@@ -166,7 +178,7 @@ Both environments use the following consumer settings:
 |---|---|---|
 | `max_batch_size` | `1` | One message per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | Production: `1`; staging: `10` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
+| `max_concurrency` | Production: `1`; staging: `100` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
 | `max_retries` | `3` | Initial delivery plus up to three retries. |
 | `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |

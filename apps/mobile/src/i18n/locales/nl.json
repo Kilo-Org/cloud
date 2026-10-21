@@ -943,6 +943,9 @@
       "gateHidden": "Verborgen",
       "gateNone": "Geen",
       "noFindings": "Er zijn geen bevindingen.",
+      "findingsUnavailable": "De resultaten zijn niet beschikbaar omdat deze review is mislukt.",
+      "serviceUnavailable": "De codereviewservice kon niet worden bereikt. Probeer de review opnieuw wanneer de service beschikbaar is.",
+      "reviewFailed": "De review is mislukt. Probeer het opnieuw.",
       "retryMessage": "Dit voert de codereview opnieuw uit.",
       "retryReview": "Review opnieuw proberen",
       "retryNeedsSettings": "De Codebeoordelaar staat uit of de instellingen vragen aandacht. Herstel de instellingen en probeer deze review daarna opnieuw.",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Voer een agentnaam in",
       "slugRequired": "Voer een agentenslak in",
       "slugInvalid": "Slug moet beginnen met een letter en mag alleen kleine letters, cijfers en streepjes gebruiken",
-      "slugConflict": "Die naaktslak wordt gereserveerd door een ingebouwde agent",
+      "slugConflict": "Die slug is al in gebruik door een ingebouwde agent of een andere agent in dit profiel",
       "edit": "Agent bewerken"
     },
     "slashCommands": {

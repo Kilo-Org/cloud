@@ -2,9 +2,12 @@ import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudfla
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
+import { resolveSecret } from '../../src/auth.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { sessionDoName } from '../../src/session-plane.js';
+import { verifySandboxLaunchCredential } from '../../src/sandbox-control/credential.js';
+import { validateControlLogUploadGrant } from '../../src/sandbox-control/log-upload-grant.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
@@ -38,6 +41,7 @@ const NOT_ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '' };
 // The Durable Object shares one env object across tests, so every test states the env it
 // needs and the Worker secret a previous test removed is put back.
 const WORKER_SECRET = (env as unknown as { NEXTAUTH_SECRET: unknown }).NEXTAUTH_SECRET;
+const WORKER_URL = (env as unknown as { WORKER_URL?: string }).WORKER_URL;
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
@@ -440,55 +444,98 @@ describe('repository snapshot launch', () => {
     }
   );
 
-  it('cleans up a failed snapshot and launches the image on the same allocation and deadline', async () => {
-    const sandboxId = 'sbx__repo_launch_fallback';
-    const provider = createFakeProvider({
-      launches: [{ startSource: 'repository', snapshotFailed: true }, { startSource: 'image' }],
-    });
-    const { stub } = await setup(sandboxId, provider, {
-      ...ENROLLED,
-      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-    });
-    await stub.prepare({
-      ...prepareInput(),
-      sandboxSelection: { provider: 'cloudflare-containers' },
-    });
-    const key = await repoKeyOf(stub);
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    const launchDeadline = (await stub.getAllocationState()).createDeadlineAt;
-    const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
+  it.each([
+    { workerUrl: '', logUploads: false },
+    { workerUrl: 'https://worker.example.test/', logUploads: true },
+  ])(
+    'cleans up a failed snapshot and launches the image on the same allocation and deadline with log uploads=$logUploads',
+    async ({ workerUrl, logUploads }) => {
+      const sandboxId = 'sbx__repo_launch_fallback';
+      const provider = createFakeProvider({
+        launches: [{ startSource: 'repository', snapshotFailed: true }, { startSource: 'image' }],
+      });
+      const { stub } = await setup(sandboxId, provider, {
+        ...ENROLLED,
+        SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+        WORKER_URL: workerUrl,
+      });
+      await stub.prepare({
+        ...prepareInput(),
+        sandboxSelection: { provider: 'cloudflare-containers' },
+      });
+      const key = await repoKeyOf(stub);
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+      const launchDeadline = (await stub.getAllocationState()).createDeadlineAt;
+      const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
 
-    expect(provider.launchOptions).toEqual([
-      { repoKey: key },
-      { repoKey: key, skipRepository: true },
-    ]);
-    expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
-    expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-    const stableEnv = (env: Record<string, string>) =>
-      Object.fromEntries(
-        Object.entries(env).filter(
-          ([key]) =>
-            key !== 'SANDBOX_CONTROL_CREDENTIAL' &&
-            !key.startsWith('CONTROL_LOG_') &&
-            key !== 'CONTROL_WRAPPER_INSTANCE_ID'
-        )
+      expect(provider.launchOptions).toEqual([
+        { repoKey: key },
+        { repoKey: key, skipRepository: true },
+      ]);
+      expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
+      expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
+      const signingSecret = await runInDurableObject(stub, instance =>
+        resolveSecret(instance.env.NEXTAUTH_SECRET)
       );
-    expect(stableEnv(provider.launchEnvs[1])).toEqual(stableEnv(provider.launchEnvs[0]));
-    expect(
-      provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL !==
-        provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
-    ).toBe(true);
-    expect(provider.launchDeadlines[0]).toEqual(expect.any(Number));
-    expect(provider.launchDeadlines[0]).toBe(launchDeadline);
-    expect(provider.launchDeadlines[1]).toBe(launchDeadline);
-    await prepareFrameOf(wrapper);
-    expect(await readLaunchRecord(stub)).toEqual({
-      allocationId,
-      startupMode: 'preinstalled',
-      startSource: 'image',
-      confirmed: true,
-    });
-  });
+      if (!signingSecret) throw new Error('Test signing secret unavailable');
+      const launches = provider.launchEnvs.map(
+        ({
+          SANDBOX_CONTROL_CREDENTIAL: credential,
+          CONTROL_LOG_UPLOAD_GRANT: uploadGrant,
+          CONTROL_WRAPPER_INSTANCE_ID: wrapperInstanceId,
+          CONTROL_LOG_UPLOAD_URL: uploadUrl,
+          ...stableEnv
+        }) => {
+          const launchClaims = verifySandboxLaunchCredential(credential, signingSecret);
+          if (!launchClaims) throw new Error('Invalid wrapper launch credential');
+          expect({
+            sandboxId: launchClaims.sandboxId,
+            allocationId: launchClaims.allocationId,
+          }).toEqual({
+            sandboxId,
+            allocationId,
+          });
+          if (logUploads) {
+            expect(validateControlLogUploadGrant(`Bearer ${uploadGrant}`, signingSecret)).toEqual({
+              sandboxId,
+              allocationId,
+              wrapperInstanceId,
+            });
+            expect(uploadUrl).toBe(
+              `${workerUrl.replace(/\/$/, '')}/sandbox-logs/${sandboxId}/${allocationId}/${wrapperInstanceId}`
+            );
+          } else {
+            expect(uploadGrant === undefined).toBe(true);
+            expect(wrapperInstanceId).toBeUndefined();
+            expect(uploadUrl).toBeUndefined();
+          }
+          return { credential, uploadGrant, wrapperInstanceId, uploadUrl, stableEnv };
+        }
+      );
+      expect(launches[1].stableEnv).toEqual(launches[0].stableEnv);
+      expect(launches[0].stableEnv).toMatchObject({
+        CONTROL_PLANE_ALLOCATION_ID: allocationId,
+        PROVIDER_INSTANCE_ID: sandboxId,
+        CONTROL_SANDBOX_PROVIDER: 'cloudflare-containers',
+      });
+      expect(launches[1].credential !== launches[0].credential).toBe(true);
+      if (logUploads) {
+        expect(launches[1].uploadGrant !== launches[0].uploadGrant).toBe(true);
+        expect(launches[1].wrapperInstanceId).not.toBe(launches[0].wrapperInstanceId);
+        expect(launches[1].uploadUrl).not.toBe(launches[0].uploadUrl);
+      }
+      expect(provider.launchDeadlines[0]).toEqual(expect.any(Number));
+      expect(provider.launchDeadlines[0]).toBe(launchDeadline);
+      expect(provider.launchDeadlines[1]).toBe(launchDeadline);
+      await prepareFrameOf(wrapper);
+      expect(await readLaunchRecord(stub)).toEqual({
+        allocationId,
+        startupMode: 'preinstalled',
+        startSource: 'image',
+        confirmed: true,
+      });
+    }
+  );
 
   it('reports a snapshot fallback when a failed snapshot start retries from the image', async () => {
     const sandboxId = 'sbx__repo_launch_fallback_notice';

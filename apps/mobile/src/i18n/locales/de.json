@@ -943,6 +943,9 @@
       "gateHidden": "Ausgeblendet",
       "gateNone": "Ohne",
       "noFindings": "Es liegen keine Befunde vor.",
+      "findingsUnavailable": "Die Ergebnisse sind nicht verfügbar, weil dieses Review fehlgeschlagen ist.",
+      "serviceUnavailable": "Der Code-Review-Dienst konnte nicht erreicht werden. Führe das Review erneut aus, wenn der Dienst verfügbar ist.",
+      "reviewFailed": "Das Review ist fehlgeschlagen. Bitte versuche es erneut.",
       "retryMessage": "Das Code-Review wird erneut ausgeführt.",
       "retryReview": "Review erneut ausführen",
       "retryNeedsSettings": "Der Code-Prüfer ist ausgeschaltet oder seine Einstellungen erfordern Aufmerksamkeit. Korrigiere die Einstellungen und führe dieses Review dann erneut aus.",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Geben Sie einen Agentennamen ein",
       "slugRequired": "Geben Sie einen Agenten-Slug ein",
       "slugInvalid": "Slug muss mit einem Buchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche verwenden",
-      "slugConflict": "Dieser Slug wird von einem integrierten Agenten reserviert",
+      "slugConflict": "Dieser Slug wird bereits von einem integrierten Agenten oder einem anderen Agenten in diesem Profil verwendet",
       "edit": "Agent bearbeiten"
     },
     "slashCommands": {

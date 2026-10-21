@@ -943,6 +943,9 @@
       "gateHidden": "已隐藏",
       "gateNone": "无",
       "noFindings": "未发现问题。",
+      "findingsUnavailable": "由于本次审查失败，结果不可用。",
+      "serviceUnavailable": "无法连接到代码审查服务。请在服务可用时重试审查。",
+      "reviewFailed": "审查失败。请重试。",
       "retryMessage": "这将重新执行代码审查。",
       "retryReview": "重试审查",
       "retryNeedsSettings": "代码审查助手已关闭，或其设置需要处理。请修复设置，然后重试此审查。",
@@ -3664,7 +3667,7 @@
       "nameRequired": "输入代理名称",
       "slugRequired": "输入代理 slug",
       "slugInvalid": "Slug 必须以字母开头，并且只能使用小写字母、数字和破折号",
-      "slugConflict": "该 slug 由内置代理保留",
+      "slugConflict": "该 slug 已被内置代理或此配置文件中的另一个代理使用",
       "edit": "编辑代理"
     },
     "slashCommands": {

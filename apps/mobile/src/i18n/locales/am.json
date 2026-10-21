@@ -1413,6 +1413,9 @@
       "couldNotGetLatest": "የቅርብ ጊዜ መረጃውን ማግኘት አልተቻለም።",
       "byline": "{{repo}} #{{number}} በ{{author}}",
       "noFindings": "ምንም ግኝቶች የሉም።",
+      "findingsUnavailable": "ይህ ግምገማ ስላልተሳካ ውጤቶች አይገኙም።",
+      "serviceUnavailable": "ከኮድ ግምገማ አገልግሎቱ ጋር መገናኘት አልተቻለም። አገልግሎቱ ሲገኝ ግምገማውን እንደገና ይሞክሩ።",
+      "reviewFailed": "ግምገማው አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
       "showMore": "ተጨማሪ ያሳዩ",
       "created": "የተፈጠረበት ጊዜ",
       "started": "የተጀመረበት ጊዜ",
@@ -3664,7 +3667,7 @@
       "nameRequired": "የወኪል ስም አስገባ",
       "slugRequired": "የወኪል ማሰሪያ አስገባ",
       "slugInvalid": "ስሉግ በፊደል መጀመር እና ትንንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
-      "slugConflict": "ያ ስሉግ አብሮ በተሰራ ወኪል የተጠበቀ ነው።",
+      "slugConflict": "ያ ስሉግ በአንድ አብሮ በተሰራ ወኪል ወይም በሌላ ወኪል በዚህ መገለጫ ውስጥ ጥቅም ላይ ውሏል።",
       "edit": "ወኪል አርትዕ"
     },
     "slashCommands": {

@@ -173,6 +173,7 @@ import {
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
+  controlPlaneKiloRequestInputSchema,
   controlPlanePrepareInputSchema,
   controlPlaneRouteSpecSchema,
   controlPlaneSessionCredentialsPayloadSchema,
@@ -189,6 +190,7 @@ import {
   type ControlPlaneDispatchResult,
   type ControlPlaneEventsNotification,
   type ControlPlaneFailureReason,
+  type ControlPlaneKiloRequestInput,
   type ControlPlaneOutcome,
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
@@ -544,6 +546,27 @@ function controlRequestFailure(
   retryable: boolean
 ): ControlPlaneControlResult {
   return { ok: false, error: { code, message, retryable } };
+}
+
+/**
+ * The wrapper result frames that answer a correlated control request. Kept as
+ * one list so a new request kind cannot be registered without its reply being
+ * resolvable (spec §10).
+ */
+const CORRELATED_RESULT_FRAME_TYPES = new Set<string>([
+  'worktree.result',
+  'terminal.result',
+  'kilo.result',
+]);
+
+type CorrelatedResultFrame = Extract<
+  ControlPlaneWrapperFrame,
+  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' }
+>;
+
+function isCorrelatedResultFrame(frame: unknown): frame is CorrelatedResultFrame {
+  if (!isRecord(frame)) return false;
+  return typeof frame.type === 'string' && CORRELATED_RESULT_FRAME_TYPES.has(frame.type);
 }
 
 /** Maps one terminal request to its wrapper frame, preserving the operation. */
@@ -1177,6 +1200,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Session DO -> Sandbox DO (spec §10). Forwards one allowlisted native Kilo
+   * read to the live wrapper. It never starts or wakes an allocation: only a
+   * bound wrapper socket answers, so a stopped session returns `not_ready`
+   * without any provider call. The socket binding is the allocation and
+   * connection fence, so a superseded wrapper cannot answer for its successor.
+   */
+  async kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneKiloRequestInputSchema.parse(input);
+    const handoff = await this.enqueue(() => this.beginKiloRequest(parsed));
+    return 'error' in handoff ? handoff.error : handoff.promise;
+  }
+
+  private async beginKiloRequest(
+    input: ControlPlaneKiloRequestInput
+  ): Promise<ControlRequestHandoff> {
+    const frame: ControlPlaneWrapperFrame = {
+      type: 'kilo.request',
+      requestId: crypto.randomUUID(),
+      session: input.session,
+      operation: input.operation,
+    };
+    return this.beginWrapperControlRequest(frame);
+  }
+
+  /**
    * Off-queue read the Session DO uses to resolve one preview's provider
    * coordinates. It never enqueues, so a preview never waits behind the control
    * operation queue. The allocation and route are two separate reads, not one
@@ -1277,17 +1326,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return;
     }
-    if (
-      !isRecord(parsed) ||
-      (parsed.type !== 'worktree.result' && parsed.type !== 'terminal.result')
-    ) {
+    if (!isCorrelatedResultFrame(parsed)) {
       return;
     }
     const result = controlPlaneWrapperFrameSchema.safeParse(parsed);
-    if (
-      !result.success ||
-      (result.data.type !== 'worktree.result' && result.data.type !== 'terminal.result')
-    ) {
+    if (!result.success || !isCorrelatedResultFrame(result.data)) {
       return;
     }
     const frame = result.data;

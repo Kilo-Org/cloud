@@ -71,11 +71,7 @@ describe('PreferenceRow', () => {
         seen.push(next);
       },
     });
-    const label = root.find(
-      node =>
-        Object.is(node.type, 'Pressable') &&
-        node.props.accessibilityLabel === 'Let Kilo change app settings'
-    );
+    const label = root.find(node => Object.is(node.type, 'Pressable'));
 
     act(() => {
       (label.props.onPress as () => void)();
@@ -84,23 +80,28 @@ describe('PreferenceRow', () => {
     expect(seen).toEqual([false]);
   });
 
-  it('leaves the native switch as its own control, so a tap on it does not fire twice', () => {
-    const seen: boolean[] = [];
+  it('exposes the row as one switch carrying the title, subtitle and state', () => {
     const root = renderRow({
       value: true,
-      onValueChange: next => {
-        seen.push(next);
-      },
-    });
-    const toggle = root.find(node => Object.is(node.type, 'Switch'));
-
-    act(() => {
-      (toggle.props.onValueChange as (next: boolean) => void)(false);
+      onValueChange: () => undefined,
     });
 
-    expect(seen).toEqual([false]);
-    expect(toggle.props.accessibilityLabel).toBeUndefined();
-    expect(toggle.props.accessible).toBe(false);
+    const switches = root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Switch' &&
+        node.props.accessibilityLabel === 'Let Kilo change app settings'
+    );
+
+    expect(switches).toHaveLength(1);
+    expect(switches[0]?.props.accessibilityHint).toBe(
+      'Applies to theme, language, notifications, models and the rest of Preferences.'
+    );
+    expect(switches[0]?.props.accessibilityState).toEqual({
+      disabled: false,
+      busy: false,
+      checked: true,
+    });
   });
 
   it('flips the newest requested value, not the rendered one, on either control', () => {
@@ -116,11 +117,7 @@ describe('PreferenceRow', () => {
         requested = next;
       },
     });
-    const label = root.find(
-      node =>
-        Object.is(node.type, 'Pressable') &&
-        node.props.accessibilityLabel === 'Let Kilo change app settings'
-    );
+    const label = root.find(node => Object.is(node.type, 'Pressable'));
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
 
     act(() => {
@@ -130,26 +127,5 @@ describe('PreferenceRow', () => {
     });
 
     expect(seen).toEqual([true, false, true]);
-  });
-
-  it('names only the pressable, so a tap on the title is one control not two', () => {
-    const root = renderRow({
-      value: true,
-      onValueChange: () => undefined,
-    });
-    const named = root.findAll(
-      node => node.props.accessibilityLabel === 'Let Kilo change app settings'
-    );
-
-    expect(named).toHaveLength(1);
-    expect(named[0]?.props.accessibilityRole).toBe('switch');
-    expect(named[0]?.props.accessibilityHint).toBe(
-      'Applies to theme, language, notifications, models and the rest of Preferences.'
-    );
-    expect(named[0]?.props.accessibilityState).toEqual({
-      disabled: false,
-      busy: false,
-      checked: true,
-    });
   });
 });

@@ -205,8 +205,16 @@ export type AgentFormError = 'slug-required' | 'slug-invalid' | 'slug-conflict' 
  * valid. Mirrors the server's `agentSlugSchema`/`agentNameSchema`: a non-empty
  * display name, and a slug that starts with a lowercase letter, stays in
  * `[a-z0-9-]`, and does not collide with a built-in agent.
+ *
+ * `otherSlugs` carries the slugs of the profile's other agents. The server also
+ * holds one agent per slug per profile (`UQ_agent_env_profile_agents_profile_slug`),
+ * so a slug another agent already uses fails the insert; the form refuses it
+ * first with the same inline conflict message.
  */
-export function validateAgentForm(state: AgentFormState): AgentFormError | null {
+export function validateAgentForm(
+  state: AgentFormState,
+  otherSlugs: readonly string[] = []
+): AgentFormError | null {
   const slug = state.slug.trim();
   if (slug.length === 0) {
     return 'slug-required';
@@ -214,7 +222,7 @@ export function validateAgentForm(state: AgentFormState): AgentFormError | null 
   if (!AGENT_SLUG_PATTERN.test(slug)) {
     return 'slug-invalid';
   }
-  if (BUILTIN_AGENT_SLUGS.has(slug)) {
+  if (BUILTIN_AGENT_SLUGS.has(slug) || otherSlugs.some(item => item.toLowerCase() === slug)) {
     return 'slug-conflict';
   }
   if (state.name.trim().length === 0) {

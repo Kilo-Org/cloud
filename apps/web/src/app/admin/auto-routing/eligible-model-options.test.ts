@@ -5,7 +5,7 @@ describe('toEligibleModelOptions', () => {
   it('excludes kilo-auto, custom LLM, and direct-BYOK-only models', () => {
     const options = toEligibleModelOptions([
       { id: 'kilo-auto/efficient', name: 'Efficient' },
-      { id: 'kilo-internal/custom', name: 'Custom' },
+      { id: 'acme/custom', name: 'Custom', isCustomLlm: true },
       { id: 'chutes-byok/direct-only', name: 'Direct BYOK', hasUserByokAvailable: true },
       {
         id: 'anthropic/claude-sonnet-4',

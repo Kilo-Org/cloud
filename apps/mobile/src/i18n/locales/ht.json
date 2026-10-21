@@ -35,6 +35,8 @@
     "connectGithub": "Konekte GitHub",
     "cost": "Pri",
     "discard": "Jete",
+    "discardChangesMessage": "Chanjman ou yo pral pèdi.",
+    "discardChangesTitle": "Jete chanjman yo?",
     "findings": "Pwoblèm detekte",
     "mergeRequest": "merge request",
     "notConnected": "Pa konekte",
@@ -661,7 +663,8 @@
       "description": "Konekte kont GitHub ou a pou revize demann fizyon sou mobil.",
       "gitlabDescription": "Konekte kont GitLab ou pou w revize merge request sou mobil ou.",
       "bitbucketDescription": "Konekte Bitbucket ak òganizasyon sa a pou w revize demann fizyon sou mobil ou.",
-      "bitbucketOrgOnlyDescription": "Chwazi yon òganizasyon nan pwofil ou pou w revize demann fizyon Bitbucket li yo."
+      "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
+      "contextLine": "Pou {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Pa ka soumèt revizyon sa a jan li ye a. Petèt PR a chanje, oswa ou pa ka revize pwòp demann fizyon ou a.",
       "reviewNotSubmittedTerm": "Yo pa ka voye revizyon sa a jan l ye a. Petèt {{term}} lan chanje, oswa ou pa ka revize pwòp {{term}} ou.",
       "couldNotPostComment": "Pa t ka pibliye kòmantè a.",
-      "couldNotSubmitReview": "Pa t ka soumèt revizyon an. Tcheke koneksyon ou epi eseye ankò."
+      "couldNotSubmitReview": "Pa t ka soumèt revizyon an. Tcheke koneksyon ou epi eseye ankò.",
+      "rateLimited": "Twòp demann. Tanpri eseye ankò pita.",
+      "conflict": "Sa a te chanje pandan w t ap travay sou li. Tanpri rechaje l epi eseye ankò."
     },
     "operation": {
       "couldNotReply": "Nou pa t kapab voye repons lan.",
@@ -1413,6 +1418,9 @@
       "couldNotGetLatest": "Nou pa t ka jwenn dènye done yo.",
       "byline": "{{repo}} #{{number}} pa {{author}}",
       "noFindings": "Pa gen okenn konsta.",
+      "findingsUnavailable": "Rezilta yo pa disponib paske revizyon sa a echwe.",
+      "serviceUnavailable": "Nou pa t ka konekte ak sèvis revizyon kòd la. Eseye revizyon an ankò lè sèvis la disponib.",
+      "reviewFailed": "Revizyon an echwe. Tanpri eseye ankò.",
       "showMore": "Montre plis",
       "created": "Kreye",
       "started": "Kòmanse",
@@ -1542,7 +1550,8 @@
       "bugs": "Defo lojisyèl",
       "style": "Estil",
       "testing": "Tès",
-      "documentation": "Dokimantasyon"
+      "documentation": "Dokimantasyon",
+      "unknown": "Lòt ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avètisman"
@@ -1654,7 +1663,14 @@
       "whereFound": "Kote yo jwenn sa ({{displayCount}})",
       "fullReport": "Rapò konplè ki pwodui a",
       "yes": "Wi",
-      "no": "Non"
+      "no": "Non",
+      "action": {
+        "analyzeCodebase": "Analize baz kòd la",
+        "dismiss": "Rejte",
+        "manualReview": "Revizyon manyèl",
+        "monitor": "Siveye",
+        "openPr": "Ouvri PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} konsta",
@@ -1873,7 +1889,24 @@
       "title": "Rapò odit",
       "unavailable": "Rapò odit la pa disponib",
       "unavailableDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka wè rapò odit yo. Mande yon pwopriyetè oswa yon responsab faktirasyon pou ba ou aksè.",
-      "queryFailed": "Rekèt pou rapò a pa t fini. Eseye ankò."
+      "queryFailed": "Rekèt pou rapò a pa t fini. Eseye ankò.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz la konplè",
+        "findingAnalysisFailed": "Analiz la echwe",
+        "findingAutoDismissed": "Rejte otomatikman",
+        "findingCreated": "Enpòte",
+        "findingDeleted": "Efase",
+        "findingDismissed": "Rejte",
+        "findingSeverityChanged": "Gravite a chanje",
+        "findingStatusChange": "Estati a chanje",
+        "findingSuperseded": "Ranplase",
+        "remediationBlocked": "Koreksyon an bloke",
+        "remediationCancelled": "Anile",
+        "remediationFailed": "Koreksyon an echwe",
+        "remediationNoChangesNeeded": "Pa gen chanjman nesesè",
+        "remediationPrOpened": "PR ouvè",
+        "remediationQueued": "Koreksyon mande"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nou pa t ka chaje paramèt notifikasyon yo.",
@@ -2209,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} pa disponib ankò. Nou ap itilize modèl pa defo ou a.",
       "couldNotReadPendingSessions": "Nou pa t ka li sesyon annatant yo. Eseye ankò.",
       "failedToCreate": "Nou pa t ka kreye sesyon an.",
+      "checkOrganizationAccess": "Verifye si ou gen aksè a òganizasyon sa a, epi eseye ankò.",
       "couldNotRefreshRepositories": "Nou pa t ka rafrechi depo yo. Tanpri eseye ankò.",
       "discardDraftTitle": "Jete bouyon an?",
       "discardDraftMessage": "Ou ap pèdi enstriksyon ou yo.",
@@ -2729,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesyon aktif ou yo pa disponib toutotan done yo poko chaje.",
     "currentDeviceUnidentified": "Nou pa t ka idantifye aparèy aktyèl la.",
+    "kiloApp": "Aplikasyon Kilo",
     "noSessions": "Pa gen sesyon aktif",
     "noSessionsDescription": "Konekte nan aplikasyon Kilo sou yon lòt aparèy pou li parèt isit la.",
     "onlyKiloAppSignIns": "Se sèlman koneksyon nan aplikasyon Kilo ki parèt isit la. Koneksyon nan editè a ak CLI pa nan lis la.",
@@ -2881,6 +2916,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Anvan nou kòmanse",
+    "summaryTitle": "Preferans pataje done",
     "introDescription": "Kilo voye mesaj ou yo bay founisè AI pou jenere repons. Men sa Kilo pataje ak moun ki resevwa li yo.",
     "required": "Obligatwa pou sèvi ak Kilo",
     "promptsTitle": "Enstriksyon ak konvèsasyon ou yo",
@@ -2889,7 +2925,6 @@
     "accountDescription": "ID kont Kilo ou a ak metadone demann yo sèvi pou verifye idantite ou epi mezire itilizasyon ou.",
     "diagnosticsTitle": "Diyagnostik aplikasyon",
     "diagnosticsDescription": "Rapò pann ak erè ede kenbe aplikasyon an estab. Yo pa gen kontni aplikasyon an ladan yo.",
-    "optional": "Opsyonèl",
     "helpImprove": "Ede amelyore Kilo",
     "helpImproveDescription": "Pataje done anonim sou itilizasyon aplikasyon an ak sous enstalasyon an. Ou ka chanje sa nenpòt lè nan Paramèt.",
     "seeFullDetails": "Gade tout detay yo",
@@ -3468,6 +3503,9 @@
     "localModels": {
       "title": "Modèl sou aparèy la",
       "help": "Modèl sou aparèy la mache sou telefòn sa a. Mesaj ou voye ak repons yo rete sou aparèy la.",
+      "switchTitle": "Chanje pou yon modèl sou aparèy la?",
+      "switchMessage": "Lè ou chanje pou {{name}}, enstriksyon ak kontèks konvèsasyon sa a ap trete sou telefòn sa a, pa sou yon sèvè adistans.",
+      "switchConfirm": "Chanje modèl",
       "systemPurpose": "Modèl ki entegre nan sistèm aparèy sa a. Li mache sou aparèy la.",
       "apple": "Apple Intelligence (sou aparèy la)",
       "checking": "N ap verifye disponiblite…",
@@ -3564,7 +3602,6 @@
     "personalDefaultDescription": "Oto-chaje lè pa gen okenn depo ki gen yon pwofil kole.",
     "organizationDefaultDescription": "Oto-chaje pou manm ki pa gen okenn default pèsonèl.",
     "setAsDefault": "Mete kòm default",
-    "removeDefault": "Retire kòm default",
     "saveFailed": "Pa t 'kapab sove pwofil la",
     "deleteTitle": "Efase pwofil",
     "deleteMessage": "Sa a pou tout tan retire pwofil la ak paramèt li yo. Sa a pa ka defèt.",
@@ -3590,11 +3627,13 @@
     "commandsTitle": "Enstalasyon kòmandman yo",
     "addCommand": "Ajoute lòd",
     "commandLabel": "Kòmandman",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "pa ekzanp pnpm install",
     "commandsEmpty": "Pa gen lòd konfigirasyon ankò",
     "commandsSaveFailed": "Pa t 'kapab sove lòd konfigirasyon",
     "moveUp": "Deplase moute",
     "moveDown": "Deplase desann",
+    "moveCommandUp": "Deplase kòmandman {{position}} anwo",
+    "moveCommandDown": "Deplase kòmandman {{position}} anba",
     "skillsTitle": "Konpetans",
     "addSkill": "Ajoute konpetans",
     "skillNameLabel": "Non konpetans",
@@ -3664,7 +3703,7 @@
       "nameRequired": "Antre yon non ajan",
       "slugRequired": "Antre yon slug ajan",
       "slugInvalid": "Slug dwe kòmanse ak yon lèt epi sèvi ak sèlman lèt miniskil, chif, ak tire",
-      "slugConflict": "Slug sa rezève pa yon ajan entegre",
+      "slugConflict": "Slug sa a deja yon ajan entegre oswa yon lòt ajnan nan pwofil sa a ap itilize",
       "edit": "Edit ajan"
     },
     "slashCommands": {

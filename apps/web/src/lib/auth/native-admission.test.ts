@@ -21,9 +21,10 @@ jest.mock('./native-admission-google', () => ({
   verifyPlayIntegrity: jest.fn(),
 }));
 
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import { describe, test, expect, beforeEach, jest as jestGlobal } from '@jest/globals';
 import {
   checkNativeAdmission,
+  resetAdmissionCountersForTests,
   validateAdmissionPayload,
   issueAdmissionChallenge,
   verifyAdmissionAsync,
@@ -34,6 +35,7 @@ import {
   type AdmissionPayload,
 } from './native-admission';
 import { captureMessage } from '@sentry/nextjs';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { checkRateLimit } from '@vercel/firewall';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
@@ -68,7 +70,12 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: jest.fn(),
+}));
+
 const mockCaptureMessage = jest.mocked(captureMessage);
+const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockVerifyAppleAttestation = jest.mocked(verifyAppleAttestation);
 const mockVerifyAppleAssertion = jest.mocked(verifyAppleAssertion);
@@ -354,13 +361,19 @@ describe('checkNativeAdmission', () => {
       expect(checkNativeAdmission({})).toEqual({ admission: { ok: true }, verifyAsync: false });
     });
 
-    test('admits with malformed admission and logs', () => {
+    test('admits with malformed admission and counts the condition', () => {
       setMode('report');
-      expect(checkNativeAdmission({ admission: 'garbage' })).toEqual({
-        admission: { ok: true },
-        verifyAsync: false,
-      });
-      expect(mockCaptureMessage).toHaveBeenCalledWith('native_admission_invalid_shape');
+      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      resetAdmissionCountersForTests();
+      try {
+        expect(checkNativeAdmission({ admission: 'garbage' })).toEqual({
+          admission: { ok: true },
+          verifyAsync: false,
+        });
+        expect(mockCaptureMessage).not.toHaveBeenCalled();
+      } finally {
+        jestGlobal.restoreAllMocks();
+      }
     });
 
     test('sets verifyAsync true for valid admission payload', () => {
@@ -398,10 +411,10 @@ describe('checkNativeAdmission', () => {
       setMode('enforce');
     });
 
-    test('absent admission field admits and logs legacy counter', () => {
+    test('absent admission field admits and counts the condition', () => {
       const result = checkNativeAdmission({ provider: 'google', idToken: 'abc' });
       expect(result).toEqual({ admission: { ok: true }, verifyAsync: false });
-      expect(mockCaptureMessage).toHaveBeenCalledWith('native_admission_legacy_count: 1');
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
     });
 
     test('well-formed ios attestation passes sync check', () => {
@@ -464,6 +477,100 @@ describe('checkNativeAdmission', () => {
 });
 
 // ── Challenge issuance ─────────────────────────────────────────────────────
+
+describe('admission condition aggregation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetAdmissionCountersForTests();
+  });
+
+  test('counts occurrences and emits one structured line per interval with the running count', () => {
+    setMode('enforce');
+    jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    try {
+      checkNativeAdmission({ provider: 'google', idToken: 'a' });
+      checkNativeAdmission({ provider: 'google', idToken: 'b' });
+      checkNativeAdmission({ provider: 'google', idToken: 'c' });
+      // Still inside the same interval: nothing flushed yet.
+      expect(mockWarnExceptInTest).not.toHaveBeenCalled();
+
+      // Next interval boundary flushes the accumulated count.
+      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000 + 60_001);
+      checkNativeAdmission({ provider: 'google', idToken: 'd' });
+
+      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
+      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
+      expect(line).toMatchObject({
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_legacy_count',
+        count: 3,
+        intervalMs: 60_000,
+      });
+    } finally {
+      jestGlobal.restoreAllMocks();
+    }
+  });
+
+  test('report-mode invalid shapes aggregate under their own metric', () => {
+    setMode('report');
+    jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000);
+    try {
+      checkNativeAdmission({ admission: 'garbage' });
+      checkNativeAdmission({ admission: null });
+
+      jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000 + 60_001);
+      checkNativeAdmission({ admission: 'garbage' });
+
+      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
+      expect(line).toMatchObject({
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_invalid_shape',
+        count: 2,
+      });
+    } finally {
+      jestGlobal.restoreAllMocks();
+    }
+  });
+
+  test('final window flushes on later traffic even without a new counted condition', () => {
+    setMode('enforce');
+    jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000);
+    try {
+      checkNativeAdmission({ provider: 'google', idToken: 'a' });
+      // Window elapses; the next request has an admission field, so nothing
+      // new is counted, but the pending window must still flush.
+      jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000 + 60_001);
+      checkNativeAdmission({
+        provider: 'google',
+        idToken: 'b',
+        admission: {
+          platform: 'android',
+          kind: 'assertion',
+          challenge: 'ch1',
+          payload: 'base64data',
+          keyId: 'key1',
+        },
+      });
+
+      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
+      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
+      expect(line).toMatchObject({
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_legacy_count',
+        count: 1,
+        windowStart: new Date(3_000_000).toISOString(),
+      });
+    } finally {
+      jestGlobal.restoreAllMocks();
+    }
+  });
+
+  test('per-request captureMessage stays silent for expected conditions', () => {
+    setMode('enforce');
+    checkNativeAdmission({ provider: 'google', idToken: 'a' });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+});
 
 describe('issueAdmissionChallenge', () => {
   beforeEach(() => {

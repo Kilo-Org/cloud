@@ -1,12 +1,13 @@
-import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  createAiGatewayConfigSelector,
+  readAiGatewayConfigSnapshot,
+} from '@kilocode/web-shared/lib/ai-gateway/ai-gateway-config-snapshot';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type { AutoFreeModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
-import { ai_gateway_config } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
-import { eq } from 'drizzle-orm';
 
 export const AUTO_FREE_FALLBACK_MODEL: AutoFreeModel = {
   model: 'openrouter/free',
@@ -34,16 +35,10 @@ export function getIneligibleAutoFreeModelIds(config: AutoFreeConfig): string[] 
   return config.models.map(({ model }) => model).filter(model => !isAutoFreeEligibleModelId(model));
 }
 
-/** Returns the configured auto-free models, or null when none are stored or the stored value is invalid. */
-export async function readConfiguredAutoFreeModels(): Promise<ReadonlyArray<AutoFreeModel> | null> {
-  const [row] = await readDb
-    .select({ auto_free: ai_gateway_config.auto_free })
-    .from(ai_gateway_config)
-    .where(eq(ai_gateway_config.id, 1))
-    .limit(1);
-  if (!row?.auto_free) return null;
+function parseConfiguredAutoFreeModels(autoFree: unknown): ReadonlyArray<AutoFreeModel> | null {
+  if (!autoFree) return null;
 
-  const parsed = AutoFreeConfigSchema.safeParse(row.auto_free);
+  const parsed = AutoFreeConfigSchema.safeParse(autoFree);
   if (!parsed.success) {
     console.warn('[auto-free] ignoring invalid auto-free configuration', parsed.error.message);
     return null;
@@ -51,8 +46,13 @@ export async function readConfiguredAutoFreeModels(): Promise<ReadonlyArray<Auto
   return parsed.data.models;
 }
 
-export const getConfiguredAutoFreeModels = createCachedFetch(
-  readConfiguredAutoFreeModels,
-  60_000,
+/** Returns the configured auto-free models, or null when none are stored or the stored value is invalid. */
+export async function readConfiguredAutoFreeModels(): Promise<ReadonlyArray<AutoFreeModel> | null> {
+  const snapshot = await readAiGatewayConfigSnapshot(readDb);
+  return parseConfiguredAutoFreeModels(snapshot?.auto_free);
+}
+
+export const getConfiguredAutoFreeModels = createAiGatewayConfigSelector(
+  snapshot => parseConfiguredAutoFreeModels(snapshot.auto_free),
   null
 );

@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { publishAiGatewayConfigSnapshot } from '@kilocode/web-shared/lib/ai-gateway/ai-gateway-config-snapshot';
 import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
@@ -46,6 +47,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
       target: ai_gateway_config.id,
       set: { config },
     });
+    await publishAiGatewayConfigSnapshot();
     return config;
   }),
 });

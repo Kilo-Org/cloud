@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { publishAiGatewayConfigSnapshot } from '@kilocode/web-shared/lib/ai-gateway/ai-gateway-config-snapshot';
 import {
   AUTO_FREE_FALLBACK_CONFIG,
   getIneligibleAutoFreeModelIds,
@@ -40,6 +41,7 @@ export const adminAutoFreeConfigRouter = createTRPCRouter({
         target: ai_gateway_config.id,
         set: { auto_free: input.config },
       });
+    await publishAiGatewayConfigSnapshot();
     return { config: input.config };
   }),
 });

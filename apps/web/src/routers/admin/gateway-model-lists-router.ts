@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { publishAiGatewayConfigSnapshot } from '@kilocode/web-shared/lib/ai-gateway/ai-gateway-config-snapshot';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { GatewayModelListConfigSchema } from '@kilocode/db/schema-types';
@@ -34,6 +35,7 @@ export const adminGatewayModelListsRouter = createTRPCRouter({
           target: ai_gateway_config.id,
           set: { [input.list]: input.config },
         });
+      await publishAiGatewayConfigSnapshot();
       return { config: input.config };
     }),
 });

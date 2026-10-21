@@ -94,10 +94,6 @@ jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   UNSCOPED_TARGET: 'unscoped',
 }));
 
-jest.mock('@/lib/webhook-trigger-ownership', () => ({
-  verifyWebhookTriggerAccess: jest.fn(),
-}));
-
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchPullRequestByNumber: jest.fn(),
   fetchPullRequestReviewDecision: jest.fn(),

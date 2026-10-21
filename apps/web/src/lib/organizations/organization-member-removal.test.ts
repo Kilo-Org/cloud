@@ -7,7 +7,9 @@ import {
   organization_membership_removals,
   organization_seats_purchases,
   organization_user_limits,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { createOrganizationUsage } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
@@ -52,6 +54,8 @@ describe('removeUserFromOrganization', () => {
   });
 
   afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(cli_sessions_v2);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_user_limits);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -169,6 +173,57 @@ describe('removeUserFromOrganization', () => {
 
     expect(ownerOrgs[0].role).toBe('owner');
     expect(member2Orgs[0].role).toBe('owner');
+  });
+
+  test('clears v2 public shares for the removed member organization only', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createOrganization('Removal share Org', owner.id);
+    const otherOrganization = await createOrganization('Other share Org', member.id);
+    await addUserToOrganization(organization.id, member.id, 'member');
+
+    const orgSessionId = `ses_share_${crypto.randomUUID()}`;
+    const personalSessionId = `ses_share_${crypto.randomUUID()}`;
+    const otherOrgSessionId = `ses_share_${crypto.randomUUID()}`;
+    const orgPublicId = crypto.randomUUID();
+    const personalPublicId = crypto.randomUUID();
+    const otherOrgPublicId = crypto.randomUUID();
+
+    await db.insert(cli_sessions_v2).values([
+      {
+        session_id: orgSessionId,
+        kilo_user_id: member.id,
+        organization_id: organization.id,
+        public_id: orgPublicId,
+      },
+      {
+        session_id: personalSessionId,
+        kilo_user_id: member.id,
+        organization_id: null,
+        public_id: personalPublicId,
+      },
+      {
+        session_id: otherOrgSessionId,
+        kilo_user_id: member.id,
+        organization_id: otherOrganization.id,
+        public_id: otherOrgPublicId,
+      },
+    ]);
+
+    await removeUserFromOrganization(organization.id, member.id);
+
+    const shares = await db
+      .select({
+        sessionId: cli_sessions_v2.session_id,
+        publicId: cli_sessions_v2.public_id,
+      })
+      .from(cli_sessions_v2)
+      .where(eq(cli_sessions_v2.kilo_user_id, member.id));
+    const bySession = new Map(shares.map(share => [share.sessionId, share.publicId]));
+
+    expect(bySession.get(orgSessionId)).toBeNull();
+    expect(bySession.get(personalSessionId)).toBe(personalPublicId);
+    expect(bySession.get(otherOrgSessionId)).toBe(otherOrgPublicId);
   });
 
   test('should allow removing owner (though this might be restricted in business logic)', async () => {

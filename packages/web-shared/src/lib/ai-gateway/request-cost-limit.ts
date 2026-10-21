@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode/db';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getModelDisplayPricing } from './providers/openrouter/display-pricing';
+import {
+  getVercelModelIdOverrides,
+  mapResolvedModelIdToVercel,
+} from './providers/vercel/mapModelIdToVercel';
 import { getCustomPricing } from './custom-pricing.constants';
 import { findKiloExclusiveModel } from './kilo-exclusive-models';
 
@@ -65,6 +69,7 @@ export async function enforceRequestCostLimit(
   if (!Number.isSafeInteger(maximum) || maximum <= 0) return 'Invalid request spend safeguard';
   const parsed = z
     .object({
+      model: z.string().optional(),
       max_tokens: z.number().int().positive(),
       stream: z.literal(false),
       messages: z.array(
@@ -97,9 +102,23 @@ export async function enforceRequestCostLimit(
     .from(modelsByProvider)
     .orderBy(desc(modelsByProvider.id))
     .limit(1);
-  const metadata = StoredModelSchema.safeParse(catalog?.models?.[model]);
+  const requestedMetadata = StoredModelSchema.safeParse(catalog?.models?.[model]);
+  const aliasTarget =
+    model.startsWith('~') && requestedMetadata.success
+      ? requestedMetadata.data.alias_target?.slug
+      : undefined;
+  const metadata = aliasTarget
+    ? StoredModelSchema.safeParse(catalog?.models?.[aliasTarget])
+    : requestedMetadata;
   if (!metadata.success) return 'Current model pricing is unavailable for bounded spending';
   try {
+    if (
+      aliasTarget &&
+      parsed.data.model !== model &&
+      parsed.data.model !==
+        mapResolvedModelIdToVercel(aliasTarget, await getVercelModelIdOverrides())
+    )
+      return 'Model alias target changed before bounded spending admission';
     const price = textRequestPriceCeiling(metadata.data);
     const inputTokenCeiling = requestTextBytes(body) + 2048;
     const bound = Math.ceil(

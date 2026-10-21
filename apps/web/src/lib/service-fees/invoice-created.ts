@@ -195,6 +195,7 @@ export async function handleKiloPassInvoiceCreated(params: {
         store: params.store,
         assessmentKey,
         stripeIds,
+        livemode: params.invoice.livemode,
         failureCode: 'invoice_not_draft',
         record,
         deps,
@@ -214,6 +215,7 @@ export async function handleKiloPassInvoiceCreated(params: {
         store: params.store,
         assessmentKey,
         stripeIds,
+        livemode: params.invoice.livemode,
         failureCode: SERVICE_FEE_FAILURE_APPLICATION,
         record,
         deps,
@@ -225,6 +227,7 @@ export async function handleKiloPassInvoiceCreated(params: {
         store: params.store,
         assessmentKey,
         stripeIds,
+        livemode: params.invoice.livemode,
         failureCode: SERVICE_FEE_FAILURE_APPLICATION,
         record,
         deps,
@@ -258,6 +261,7 @@ export async function handleKiloPassInvoiceCreated(params: {
         store: params.store,
         assessmentKey,
         stripeIds,
+        livemode: params.invoice.livemode,
         failureCode: failureCodeFromUnknown(error, SERVICE_FEE_FAILURE_APPLICATION),
         record,
         deps,
@@ -276,6 +280,7 @@ export async function handleKiloPassInvoiceCreated(params: {
       kiloUserId: organization?.kiloUserId ?? personal?.kiloUserId,
       organizationId: organization?.organizationId,
       stripeInvoiceId: params.invoice.id,
+      livemode: params.invoice.livemode,
       eligibleSubtotalMinor: 0,
       expectedFeeMinor: 0,
       failureCode: failureCodeFromUnknown(error, SERVICE_FEE_FAILURE_APPLICATION),
@@ -404,6 +409,7 @@ async function persistMissed(params: {
   stripeIds: ServiceFeeStripeIds;
   failureCode: string;
   record: ServiceFeeAssessmentRecord;
+  livemode?: boolean;
   deps: KiloPassInvoiceCreatedDependencies;
   now: Date;
 }): Promise<KiloPassInvoiceCreatedResult> {
@@ -421,6 +427,7 @@ async function persistMissed(params: {
       kiloUserId: missed.kiloUserId,
       organizationId: missed.organizationId,
       stripeInvoiceId: missed.stripeInvoiceId,
+      livemode: params.livemode,
       eligibleSubtotalMinor: missed.eligibleSubtotalMinor,
       expectedFeeMinor: missed.expectedFeeMinor,
       failureCode: missed.failureCode ?? params.failureCode,
@@ -435,6 +442,7 @@ async function persistMissed(params: {
       kiloUserId: params.record.kiloUserId,
       organizationId: params.record.organizationId,
       stripeInvoiceId: params.stripeIds.stripeInvoiceId,
+      livemode: params.livemode,
       eligibleSubtotalMinor: params.record.eligibleSubtotalMinor,
       expectedFeeMinor: params.record.expectedFeeMinor,
       failureCode: failureCodeFromUnknown(error, params.failureCode),
@@ -451,6 +459,7 @@ async function alertSafely(params: {
   kiloUserId?: string | null;
   organizationId?: string | null;
   stripeInvoiceId?: string | null;
+  livemode?: boolean;
   eligibleSubtotalMinor: number;
   expectedFeeMinor: number;
   failureCode: string;
@@ -465,6 +474,7 @@ async function alertSafely(params: {
       kiloUserId: params.kiloUserId,
       organizationId: params.organizationId,
       stripeInvoiceId: params.stripeInvoiceId,
+      livemode: params.livemode,
       eligibleSubtotalMinor: params.eligibleSubtotalMinor,
       expectedFeeMinor: params.expectedFeeMinor,
       currency: SERVICE_FEE_SUPPORTED_CURRENCY,

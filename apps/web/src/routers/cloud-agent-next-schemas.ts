@@ -4,6 +4,7 @@ import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits'
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  clientKiloSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
@@ -413,6 +414,17 @@ const PrepareSessionSharedFields = {
     })
     .strict()
     .optional(),
+  /**
+   * Local-development only: clone a public repository by URL when no
+   * source-control integration is configured. Mirrors the E2E harness's
+   * `E2E_GIT_URL` path, which clones anonymously as `type: 'git'`. The
+   * prepareSession handlers reject it outside development.
+   */
+  publicRepoUrl: z
+    .string()
+    .url('Enter a valid repository URL')
+    .refine(value => /^https:\/\//i.test(value), 'Must be an https git URL')
+    .optional(),
 
   // Execution params (required)
   mode: preparedSessionModeSchema,
@@ -452,6 +464,8 @@ const PrepareSessionNonCloneVariant = z.object({
   autoInitiate: z.boolean().optional(),
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey: z.string().uuid().optional(),
+  /** Client-proposed Kilo session ID, so the client can show the session before prepare returns. */
+  kiloSessionId: clientKiloSessionIdSchema.optional(),
   /**
    * Optional source Kilo session to clone into this Cloud Agent session.
    * Old callers omit the field and create an empty destination session.
@@ -482,7 +496,7 @@ export const basePrepareSessionNextSchema = z
   .and(egressPolicySchema)
   .refine(
     data =>
-      [data.githubRepo, data.gitlabProject, data.bitbucketRepo].filter(
+      [data.githubRepo, data.gitlabProject, data.bitbucketRepo, data.publicRepoUrl].filter(
         repository => repository !== undefined
       ).length === 1,
     {
@@ -538,6 +552,8 @@ export const baseCreateWorktreeChatNextSchema = z
   .object({
     sourceKiloSessionId: kiloSessionIdSchema,
     operationKey: z.uuid(),
+    /** Client-proposed id for the new chat, so the client can show it before this returns. */
+    kiloSessionId: clientKiloSessionIdSchema.optional(),
   })
   .strict();
 

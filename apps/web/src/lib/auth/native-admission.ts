@@ -196,9 +196,10 @@ type LegacyGraceState = 'active' | 'expired' | 'invalid' | 'unset';
  * A full ISO-8601 instant with an explicit offset: `2026-11-01T00:00:00Z`.
  * Date.parse alone accepts many other forms (`2026`, `11/01/2026`), whose
  * meaning depends on the reader's locale and could close the window on a day
- * nobody intended.
+ * nobody intended. RFC 3339 allows the `t`/`z` designators in either case, so
+ * the pattern matches them case-insensitively.
  */
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/i;
 
 /**
  * Normalize the configured mode. The setting is a raw env string, so case and

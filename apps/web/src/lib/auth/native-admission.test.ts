@@ -473,6 +473,22 @@ describe('checkNativeAdmission', () => {
       }
     });
 
+    test.each(['1970-01-01t00:17:00z', '1970-01-01T01:17:00+01:00', '1970-01-01T00:17:00.000Z'])(
+      'accepts the full instant spelling %s',
+      value => {
+        jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
+        process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = value;
+        try {
+          expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
+            admission: { ok: true },
+            verifyAsync: false,
+          });
+        } finally {
+          jestGlobal.restoreAllMocks();
+        }
+      }
+    );
+
     test('refuses a request at the legacy grace deadline', () => {
       jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
       process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(1_000_000).toISOString();

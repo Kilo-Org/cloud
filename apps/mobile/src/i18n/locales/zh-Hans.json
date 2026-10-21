@@ -1381,7 +1381,6 @@
       "installApp": "安装 GitHub 应用",
       "reauthorizeButton": "重新授权 GitHub 应用",
       "reauthorizeDescription": "安全智能体需要 vulnerability_alerts 权限才能访问 Dependabot 警报。请重新授权 GitHub 应用以授予此权限。",
-      "reauthorizeFailed": "无法开始重新授权。请重试。",
       "reauthorizeTitle": "需要额外权限",
       "setupFailed": "无法启动 GitHub 配置流程。请重试。"
     },
@@ -1404,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "保存更改",
       "unsavedMessage": "离开此页面前，要保存更改吗？",
+      "unsavedInvalidMessage": "这些更改暂时无法保存。请修正后再保存，或放弃更改以离开。",
       "unsavedTitle": "未保存的更改"
     },
     "setup": {
@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 项匹配",
       "matchesBadge_other": "{{displayCount}} 项匹配",
-      "noOutput": "没有输出。"
+      "noOutput": "没有输出。",
+      "translationFailed": "翻译失败"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",

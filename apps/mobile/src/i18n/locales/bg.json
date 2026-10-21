@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Запази промените",
       "unsavedTitle": "Незапазени промени",
-      "unsavedMessage": "Да се запазят ли промените, преди да напуснеш този екран?"
+      "unsavedMessage": "Да се запазят ли промените, преди да напуснеш този екран?",
+      "unsavedInvalidMessage": "Тези промени все още не могат да се запазят. Коригирай ги, за да запазиш, или ги отхвърли, за да напуснеш."
     },
     "auditReportButton": {
       "viewA11y": "Прегледай одитния доклад"
@@ -1938,7 +1939,6 @@
       "installApp": "Инсталирай приложението за GitHub",
       "reauthorizeButton": "Поднови правата на приложението за GitHub",
       "reauthorizeDescription": "Агентът за сигурност изисква правото vulnerability_alerts за достъп до сигналите от Dependabot. Поднови правата на приложението за GitHub, за да предоставиш това право.",
-      "reauthorizeFailed": "Не успяхме да започнем подновяването на правата. Опитай отново.",
       "reauthorizeTitle": "Изискват се допълнителни права",
       "setupFailed": "Не може да се започне настройката на GitHub. Моля, опитай отново."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} реда",
       "matchesBadge_one": "{{displayCount}} съвпадение",
       "matchesBadge_other": "{{displayCount}} съвпадения",
-      "noOutput": "Няма изход."
+      "noOutput": "Няма изход.",
+      "translationFailed": "Преводът не бе успешен"
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
@@ -3651,7 +3652,7 @@
       "empty": "Все още няма MCP сървъри",
       "name": "Име на сървъра",
       "type": "Тип сървър",
-      "localType": "Местен",
+      "localType": "Локален",
       "remoteType": "Дистанционно",
       "command": "Команден ред",
       "url": "URL адрес",

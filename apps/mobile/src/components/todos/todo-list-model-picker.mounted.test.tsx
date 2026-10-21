@@ -35,8 +35,7 @@ vi.mock('expo-router', async () => {
 vi.mock('react-native', async () => {
   const { NativeTextInput } = await import('./todo-list-model-picker.mounted.test-helpers');
   return {
-    // The settings sheet keeps its form open on the Android hardware back key.
-    BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
+    BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
     I18nManager: { isRTL: false },
     Keyboard: { dismiss: vi.fn() },
     Pressable: 'Pressable',

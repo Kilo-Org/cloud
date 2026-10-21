@@ -1941,7 +1941,8 @@
     "settingsSave": {
       "saveChanges": "Issejvja l-bidliet",
       "unsavedTitle": "Bidliet mhux issejvjati",
-      "unsavedMessage": "Trid tissejvja l-bidliet tiegħek qabel ma titlaq minn dan l-iskrin?"
+      "unsavedMessage": "Trid tissejvja l-bidliet tiegħek qabel ma titlaq minn dan l-iskrin?",
+      "unsavedInvalidMessage": "Dawn il-bidliet għadhom ma jistgħux jiġu ssejvjati. Sejjibhom biex tissejvja, jew warrabhom biex titlaq."
     },
     "auditReportButton": {
       "viewA11y": "Ara r-rapport tal-awditjar"
@@ -2007,7 +2008,6 @@
       "installApp": "Installa l-app ta' GitHub",
       "reauthorizeButton": "Erġa' awtorizza l-app ta' GitHub",
       "reauthorizeDescription": "L-aġent tas-sigurtà jeħtieġ il-permess vulnerability_alerts biex jaċċessa l-allerti ta' Dependabot. Erġa' awtorizza l-app ta' GitHub biex tagħti dan il-permess.",
-      "reauthorizeFailed": "Ma setgħetx tinbeda r-awtorizzazzjoni mill-ġdid. Jekk jogħġbok erġa' pprova.",
       "reauthorizeTitle": "Permessi addizzjonali meħtieġa",
       "setupFailed": "Ma setgħetx tinbeda l-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova."
     },
@@ -2408,7 +2408,8 @@
       "matchesBadge_two": "{{displayCount}} riżultati",
       "matchesBadge_few": "{{displayCount}} riżultati",
       "matchesBadge_many": "{{displayCount}} riżultati",
-      "noOutput": "M'hemm l-ebda ħruġ."
+      "noOutput": "M'hemm l-ebda ħruġ.",
+      "translationFailed": "It-traduzzjoni falliet"
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",

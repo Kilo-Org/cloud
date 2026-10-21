@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Desa els canvis",
       "unsavedTitle": "Canvis sense desar",
-      "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?"
+      "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?",
+      "unsavedInvalidMessage": "Aquests canvis encara no es poden desar. Corregeix-los per desar-los o descarta'ls per sortir."
     },
     "auditReportButton": {
       "viewA11y": "Consulta l'informe d'auditoria"
@@ -1961,7 +1962,6 @@
       "installApp": "Instal·la l'aplicació de GitHub",
       "reauthorizeButton": "Torna a autoritzar l'aplicació de GitHub",
       "reauthorizeDescription": "L'agent de seguretat necessita el permís vulnerability_alerts per accedir a les alertes de Dependabot. Torna a autoritzar l'aplicació de GitHub per concedir aquest permís.",
-      "reauthorizeFailed": "No s'ha pogut iniciar la reautorització. Torna-ho a provar.",
       "reauthorizeTitle": "Calen permisos addicionals",
       "setupFailed": "No s'ha pogut iniciar la configuració de GitHub. Torna-ho a provar."
     },
@@ -2344,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} coincidència",
       "matchesBadge_other": "{{displayCount}} coincidències",
       "matchesBadge_many": "{{displayCount}} coincidències",
-      "noOutput": "No hi ha cap sortida."
+      "noOutput": "No hi ha cap sortida.",
+      "translationFailed": "La traducció ha fallat"
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",

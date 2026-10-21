@@ -1,6 +1,7 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, it, expect } from 'vitest';
 import { registerReadySession } from '../helpers/session-setup.js';
+import { createSseDataReader } from './helpers/sse-reader.js';
 
 const userId = 'user_facade_runtime';
 const cloudAgentSessionId = 'agent_facade_runtime';
@@ -12,45 +13,6 @@ type WrapperIdentity = {
   wrapperGeneration: number;
   wrapperConnectionId: string;
 };
-
-type SseDataReader = {
-  next(): Promise<unknown>;
-  cancel(): Promise<void>;
-};
-
-function createSseDataReader(response: Response): SseDataReader {
-  if (!response.body) {
-    throw new Error('Expected an SSE response body');
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  return {
-    async next(): Promise<unknown> {
-      for (;;) {
-        const delimiter = buffer.indexOf('\n\n');
-        if (delimiter >= 0) {
-          const frame = buffer.slice(0, delimiter);
-          buffer = buffer.slice(delimiter + 2);
-          const data = frame
-            .split('\n')
-            .filter(line => line.startsWith('data:'))
-            .map(line => line.slice('data:'.length).trimStart())
-            .join('\n');
-          if (data) return JSON.parse(data) as unknown;
-          continue;
-        }
-        const chunk = await reader.read();
-        if (chunk.done) throw new Error('Expected another SSE data frame');
-        buffer += decoder.decode(chunk.value, { stream: true });
-      }
-    },
-    async cancel(): Promise<void> {
-      await reader.cancel();
-    },
-  };
-}
 
 async function configureCurrentProducer(identity: WrapperIdentity): Promise<void> {
   const session = sessionStub(userId, cloudAgentSessionId);

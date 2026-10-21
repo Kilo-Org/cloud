@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "වෙනස්කම් සුරකින්න",
       "unsavedTitle": "සුරැකී නැති වෙනස්කම්",
-      "unsavedMessage": "මෙම තිරයෙන් ඉවත්වීමට පෙර ඔබේ වෙනස්කම් සුරකින්නද?"
+      "unsavedMessage": "මෙම තිරයෙන් ඉවත්වීමට පෙර ඔබේ වෙනස්කම් සුරකින්නද?",
+      "unsavedInvalidMessage": "මෙම වෙනස්කම් තවම සුරැකිය නොහැක. සුරැකීමට ඒවා නිවැරදි කරන්න, නැතහොත් ඉවත්වීමට ඒවා ඉවතලන්න."
     },
     "auditReportButton": {
       "viewA11y": "විගණන වාර්තාව බලන්න"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub යෙදුම ස්ථාපනය කරන්න",
       "reauthorizeButton": "GitHub යෙදුමට නැවත අවසර දෙන්න",
       "reauthorizeDescription": "Dependabot ඇඟවීම් වෙත ප්‍රවේශ වීමට ආරක්ෂක නියෝජිතයාට vulnerability_alerts අවසරය අවශ්‍යයි. එම අවසරය ලබා දීමට GitHub යෙදුමට නැවත අවසර දෙන්න.",
-      "reauthorizeFailed": "නැවත අවසර දීම ආරම්භ කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "reauthorizeTitle": "අමතර අවසර අවශ්‍යයි",
       "setupFailed": "GitHub සැකසීම ආරම්භ කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "පේළි {{displayCount}}",
       "matchesBadge_one": "ගැළපීම් {{displayCount}}",
       "matchesBadge_other": "ගැළපීම් {{displayCount}}",
-      "noOutput": "ප්රතිදානයක් නැත."
+      "noOutput": "ප්රතිදානයක් නැත.",
+      "translationFailed": "පරිවර්තනය අසාර්ථක විය"
     },
     "readToolMarkdown": {
       "linesTruncated": "පේළි {{start}}–{{end}} (කෙටි කර ඇත)",

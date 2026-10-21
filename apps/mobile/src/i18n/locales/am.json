@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ለውጦችን ያስቀምጡ",
       "unsavedTitle": "ያልተቀመጡ ለውጦች",
-      "unsavedMessage": "ከዚህ ማያ ገጽ ከመውጣትዎ በፊት ለውጦችዎ ይቀመጡ?"
+      "unsavedMessage": "ከዚህ ማያ ገጽ ከመውጣትዎ በፊት ለውጦችዎ ይቀመጡ?",
+      "unsavedInvalidMessage": "እነዚህ ለውጦች እስካሁን ሊቀመጡ አይችሉም። ለመቀመጥ ያስተካክሏቸው፣ ወይም ለመውጣት አስወግዷቸው።"
     },
     "auditReportButton": {
       "viewA11y": "የኦዲት ሪፖርት ይመልከቱ"
@@ -1938,7 +1939,6 @@
       "installApp": "የGitHub መተግበሪያን ይጫኑ",
       "reauthorizeButton": "ለGitHub መተግበሪያ እንደገና ፈቃድ ይስጡ",
       "reauthorizeDescription": "የደህንነት ወኪሉ የDependabot ማስጠንቀቂያዎችን ለማግኘት የvulnerability_alerts ፈቃድ ያስፈልገዋል። ይህን ፈቃድ ለመስጠት የGitHub መተግበሪያን እንደገና ይፍቀዱ።",
-      "reauthorizeFailed": "እንደገና ፈቃድ የመስጠት ሂደቱን መጀመር አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "reauthorizeTitle": "ተጨማሪ ፈቃዶች ያስፈልጋሉ",
       "setupFailed": "GitHubን የማዋቀር ሂደት መጀመር አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} መስመሮች",
       "matchesBadge_one": "{{displayCount}} ተዛማጅ",
       "matchesBadge_other": "{{displayCount}} ተዛማጆች",
-      "noOutput": "ምንም ውጤት የለም።"
+      "noOutput": "ምንም ውጤት የለም።",
+      "translationFailed": "ትርጉም አልተሳካም"
     },
     "readToolMarkdown": {
       "linesTruncated": "መስመሮች {{start}}–{{end}} (በከፊል የታዩ)",

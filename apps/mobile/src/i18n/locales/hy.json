@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Պահպանել փոփոխությունները",
       "unsavedTitle": "Չպահպանված փոփոխություններ",
-      "unsavedMessage": "Պահպանե՞լ փոփոխությունները՝ այս էկրանից դուրս գալուց առաջ։"
+      "unsavedMessage": "Պահպանե՞լ փոփոխությունները՝ այս էկրանից դուրս գալուց առաջ։",
+      "unsavedInvalidMessage": "Այս փոփոխությունները դեռ հնարավոր չէ պահպանել։ Ուղղիր դրանք պահպանելու համար, կամ հրաժարվիր դրանցից՝ դուրս գալու համար։"
     },
     "auditReportButton": {
       "viewA11y": "Դիտել աուդիտի հաշվետվությունը"
@@ -1938,7 +1939,6 @@
       "installApp": "Տեղադրել GitHub հավելվածը",
       "reauthorizeButton": "Կրկին լիազորել GitHub հավելվածը",
       "reauthorizeDescription": "Անվտանգության գործակալին անհրաժեշտ է vulnerability_alerts թույլտվությունը՝ Dependabot-ի ահազանգերին հասանելիություն ստանալու համար։ Կրկին լիազորիր GitHub հավելվածը՝ այս թույլտվությունը տրամադրելու համար։",
-      "reauthorizeFailed": "Չհաջողվեց սկսել կրկնակի լիազորումը։ Կրկին փորձիր։",
       "reauthorizeTitle": "Լրացուցիչ թույլտվություններ են պահանջվում",
       "setupFailed": "Չհաջողվեց սկսել GitHub-ի կարգավորումը։ Կրկին փորձիր։"
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} տող",
       "matchesBadge_one": "{{displayCount}} համընկնում",
       "matchesBadge_other": "{{displayCount}} համընկնում",
-      "noOutput": "Ելք չկա։"
+      "noOutput": "Ելք չկա։",
+      "translationFailed": "Թարգմանությունը ձախողվեց"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",

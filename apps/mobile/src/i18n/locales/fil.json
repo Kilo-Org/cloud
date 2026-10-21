@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "I-save ang mga pagbabago",
       "unsavedTitle": "Mga hindi na-save na pagbabago",
-      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?"
+      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?",
+      "unsavedInvalidMessage": "Hindi pa ma-save ang mga pagbabagong ito. Ayusin ang mga ito para ma-save, o itapon ang mga ito para umalis."
     },
     "auditReportButton": {
       "viewA11y": "Tingnan ang ulat ng audit"
@@ -1938,7 +1939,6 @@
       "installApp": "I-install ang GitHub App",
       "reauthorizeButton": "Pahintulutan muli ang GitHub App",
       "reauthorizeDescription": "Kailangan ng Security Agent ang pahintulot na vulnerability_alerts para ma-access ang mga alerto ng Dependabot. Pahintulutan muli ang GitHub App para ibigay ito.",
-      "reauthorizeFailed": "Hindi masimulan ang muling pagbibigay ng pahintulot. Pakisubukang muli.",
       "reauthorizeTitle": "Kailangan ng mga karagdagang pahintulot",
       "setupFailed": "Hindi masimulan ang setup ng GitHub. Pakisubukang muli."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} na linya",
       "matchesBadge_one": "{{displayCount}} tugma",
       "matchesBadge_other": "{{displayCount}} tugma",
-      "noOutput": "Walang output."
+      "noOutput": "Walang output.",
+      "translationFailed": "Nabigo ang pagsasalin"
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",

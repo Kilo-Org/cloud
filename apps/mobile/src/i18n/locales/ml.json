@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "മാറ്റങ്ങൾ സംരക്ഷിക്കുക",
       "unsavedTitle": "സംരക്ഷിക്കാത്ത മാറ്റങ്ങൾ",
-      "unsavedMessage": "ഈ സ്ക്രീനിൽ നിന്ന് പോകുന്നതിന് മുമ്പ് മാറ്റങ്ങൾ സംരക്ഷിക്കണോ?"
+      "unsavedMessage": "ഈ സ്ക്രീനിൽ നിന്ന് പോകുന്നതിന് മുമ്പ് മാറ്റങ്ങൾ സംരക്ഷിക്കണോ?",
+      "unsavedInvalidMessage": "ഈ മാറ്റങ്ങൾ ഇപ്പോൾ സംരക്ഷിക്കാൻ കഴിയില്ല. സംരക്ഷിക്കാൻ അവ തിരുത്തുക, അല്ലെങ്കിൽ പോകാൻ അവ ഉപേക്ഷിക്കുക."
     },
     "auditReportButton": {
       "viewA11y": "ഓഡിറ്റ് റിപ്പോർട്ട് കാണുക"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
       "reauthorizeButton": "GitHub ആപ്പിന് വീണ്ടും അനുമതി നൽകുക",
       "reauthorizeDescription": "Dependabot അറിയിപ്പുകൾ ലഭിക്കാൻ സുരക്ഷാ ഏജന്റിന് vulnerability_alerts അനുമതി ആവശ്യമാണ്. ഈ അനുമതി നൽകാൻ GitHub ആപ്പിന് വീണ്ടും അനുമതി നൽകുക.",
-      "reauthorizeFailed": "വീണ്ടും അനുമതി നൽകുന്ന പ്രക്രിയ ആരംഭിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "reauthorizeTitle": "കൂടുതൽ അനുമതികൾ ആവശ്യമാണ്",
       "setupFailed": "GitHub സജ്ജീകരണം ആരംഭിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} വരികൾ",
       "matchesBadge_one": "{{displayCount}} പൊരുത്തം",
       "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ",
-      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല."
+      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല.",
+      "translationFailed": "പരിഭാഷ പരാജയപ്പെട്ടു"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} വരികൾ (ഭാഗികം)",

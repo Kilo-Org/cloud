@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Gorde aldaketak",
       "unsavedTitle": "Gorde gabeko aldaketak",
-      "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?"
+      "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?",
+      "unsavedInvalidMessage": "Aldaketa hauek ezin dira oraindik gorde. Zuzendu itzazu gordetzeko, edo baztertu irteteko."
     },
     "auditReportButton": {
       "viewA11y": "Ikusi auditoria-txostena"
@@ -1938,7 +1939,6 @@
       "installApp": "Instalatu GitHub aplikazioa",
       "reauthorizeButton": "Baimendu berriro GitHub aplikazioa",
       "reauthorizeDescription": "Segurtasun-agenteak vulnerability_alerts baimena behar du Dependabot-en abisuak atzitzeko. Baimendu berriro GitHub aplikazioa baimen hori emateko.",
-      "reauthorizeFailed": "Ezin izan da berriro baimentzeko prozesua hasi. Saiatu berriro.",
       "reauthorizeTitle": "Baimen gehigarriak behar dira",
       "setupFailed": "Ezin izan da GitHub konfiguratzeko prozesua hasi. Saiatu berriro."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
       "matchesBadge_other": "{{displayCount}} bat etortze",
-      "noOutput": "Irteerarik ez."
+      "noOutput": "Irteerarik ez.",
+      "translationFailed": "Itzulpena huts egin du"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",

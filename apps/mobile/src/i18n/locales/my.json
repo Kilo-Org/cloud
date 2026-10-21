@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "အပြောင်းအလဲများ သိမ်းရန်",
       "unsavedTitle": "မသိမ်းဆည်းရသေးသော အပြောင်းအလဲများ",
-      "unsavedMessage": "ဤမျက်နှာပြင်မှ မထွက်မီ အပြောင်းအလဲများကို သိမ်းမလား။"
+      "unsavedMessage": "ဤမျက်နှာပြင်မှ မထွက်မီ အပြောင်းအလဲများကို သိမ်းမလား။",
+      "unsavedInvalidMessage": "ဤအပြောင်းအလဲများကို ယခုတော့ မသိမ်းဆည်းနိုင်သေးပါ။ သိမ်းဆည်းရန် ၎င်းတို့ကို ပြင်ဆင်ပါ၊ သို့မဟုတ် ထွက်ရန် ၎င်းတို့ကို ပယ်ဖျက်ပါ။"
     },
     "auditReportButton": {
       "viewA11y": "စစ်ဆေးမှုအစီရင်ခံစာ ကြည့်ရှုပါ"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub အက်ပ် ထည့်သွင်းရန်",
       "reauthorizeButton": "GitHub အက်ပ်ကို ပြန်လည်ခွင့်ပြုရန်",
       "reauthorizeDescription": "Dependabot သတိပေးချက်များကို ရယူရန် လုံခြုံရေးအေးဂျင့်သည် vulnerability_alerts ခွင့်ပြုချက် လိုအပ်သည်။ ဤခွင့်ပြုချက်ကို ပေးရန် GitHub အက်ပ်ကို ပြန်လည်ခွင့်ပြုပါ။",
-      "reauthorizeFailed": "ပြန်လည်ခွင့်ပြုခြင်းကို စတင်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
       "reauthorizeTitle": "ထပ်ဆောင်း ခွင့်ပြုချက်များ လိုအပ်သည်",
       "setupFailed": "GitHub ပြင်ဆင်မှုကို စတင်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ကြောင်း",
       "matchesBadge_one": "ကိုက်ညီမှု {{displayCount}} ခု",
       "matchesBadge_other": "ကိုက်ညီမှု {{displayCount}} ခု",
-      "noOutput": "အထွက် မရှိပါ။"
+      "noOutput": "အထွက် မရှိပါ။",
+      "translationFailed": "ဘာသာပြန်မှု မအောင်မြင်ပါ"
     },
     "readToolMarkdown": {
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အပြည့်အစုံမဟုတ်)",

@@ -230,13 +230,10 @@ export function buildControlPlaneSessionRegistration(
   if (sandboxProvider === 'vercel' && !containment.kilocode && !containment.github) {
     throw new Error('Vercel requires credential containment');
   }
-  if (!containment.kilocode && !containment.github && !hasModernRuntimeAuthorization(metadata)) {
-    // Direct sandboxes have no broker boundary for Kilo credentials. A session
-    // without modern runtime authorization cannot be prepared safely.
+  if (!hasModernRuntimeAuthorization(metadata)) {
     throw new SessionCredentialUpgradeRequiredError();
   }
   if (
-    hasModernRuntimeAuthorization(metadata) &&
     runtimeConfiguration &&
     (!runtimeConfiguration.workerUrl ||
       !runtimeCredentialProxyFacadeBaseUrl(runtimeConfiguration.workerUrl))

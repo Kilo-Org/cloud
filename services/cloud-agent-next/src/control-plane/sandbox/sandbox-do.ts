@@ -73,8 +73,7 @@ import {
 import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
 import type { GrantDiagnostic } from '../../sandbox-control/grant-diagnostic.js';
 import {
-  hasSafeKiloCredentialPath,
-  kiloTokenHasRuntimeAuthorization,
+  hasRuntimeCredentialProxy,
   prepareCredentialGrant,
   resolveSessionCredential,
   SessionCredentialUpgradeRequiredError,
@@ -2505,10 +2504,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.git ? { git: spec.git } : {}),
     };
     const scopeId = source.scopeId ?? spec.sessionId;
-    const modern = kiloTokenHasRuntimeAuthorization(source.kiloToken);
     const scopes = listScopeGrants(this.db);
     const existing = scopes.find(
-      grant => grant.scopeId === scopeId && (grant.kilo.runtimeProxy !== undefined) === modern
+      grant => grant.scopeId === scopeId && hasRuntimeCredentialProxy(grant)
     );
     if (
       runtimeContract !== 'legacy' &&
@@ -2622,7 +2620,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.refreshVercelNetworkPolicy([
       ...listScopeGrants(this.db).filter(
         grant =>
-          hasSafeKiloCredentialPath(grant) &&
+          hasRuntimeCredentialProxy(grant) &&
           scopeGrantId(grant) !== scopeGrantId(candidate) &&
           grant.expiresAt > now
       ),
@@ -2680,6 +2678,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'not_ready';
+    if (route.grant === null || !hasRuntimeCredentialProxy(route.grant)) {
+      await onRouteFailed(
+        this.routeContext(state),
+        payload.sessionId,
+        'credential_upgrade_required',
+        undefined,
+        true
+      );
+      return 'not_ready';
+    }
 
     // Proactive maintenance runs whenever the shared canonical handle is within
     // the threshold, independent of the grant re-issue clock: it converges every
@@ -3179,7 +3187,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async activeGrants(now: number): Promise<SessionCredentialGrant[]> {
     return listScopeGrants(this.db).filter(
-      grant => hasSafeKiloCredentialPath(grant) && grant.expiresAt > now
+      grant => hasRuntimeCredentialProxy(grant) && grant.expiresAt > now
     );
   }
 
@@ -3470,7 +3478,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // A route without a grant never reaches `preparing` (issuance failure marks
     // it `failed`), so never send a spec that could carry raw issuer material.
     if (route.grant === null) return;
-    if (!hasSafeKiloCredentialPath(route.grant)) {
+    if (!hasRuntimeCredentialProxy(route.grant)) {
       this.ctx.waitUntil(
         this.failPrepareAttempt(
           route.sessionId,
@@ -3489,42 +3497,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       );
       return;
     }
-    if (route.grant.kilo.runtimeProxy !== undefined) {
-      // R1: minting the runtime credential proxy handle is a Session DO call that
-      // must stay off this DO's serial queue; the frame is sent once the handle
-      // is minted and bound. A mint failure fails the attempt closed.
-      this.ctx.waitUntil(this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId));
-      return;
-    }
-    let spec: ControlPlaneRouteSpec;
-    try {
-      spec = this.materializePrepareFrame(route, socket);
-    } catch (error) {
-      this.logPrepareFrameMaterializationFailure(route, error);
-      this.ctx.waitUntil(
-        this.failPrepareAttempt(
-          route.sessionId,
-          route.attemptId,
-          materializationStage(error)
-        ).catch(() => {
-          logger
-            .withFields({
-              sandboxId: this.sandboxId,
-              sessionId: route.sessionId,
-              attemptId: route.attemptId,
-            })
-            .warn('Could not persist frame materialization failure');
-        })
-      );
-      return;
-    }
-    // The frame carries the wrapper-safe spec plus the issued credential
-    // material only; the credential source stays DO-private.
-    this.trySendFrame(socket, {
-      type: 'session.prepare',
-      spec,
-      credentials: this.prepareCredentials(route.grant, route.sessionId),
-    });
+    // Minting calls the Session DO and must stay outside this serial queue.
+    this.ctx.waitUntil(this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId));
   }
 
   /** Whether the bound wrapper advertised that it redacts named secret keys. */

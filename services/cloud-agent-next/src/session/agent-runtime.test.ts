@@ -57,7 +57,7 @@ function createMetadata(provider: 'cloudflare' | 'vercel' = 'cloudflare'): Sessi
     },
     auth: {
       kiloSessionId: 'kilo_runtime',
-      kilocodeToken: 'kilo_token',
+      kilocodeToken: 'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln',
     },
     lifecycle: {
       version: 1,
@@ -501,6 +501,10 @@ describe('AgentRuntime', () => {
       storage,
       env: {
         WORKER_URL: 'https://worker.example.com',
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn(),
+          get: () => ({ issueRuntimeCredentialProxyGrant: async () => 'runtime-proxy-handle' }),
+        },
         NEXTAUTH_SECRET: 'test-secret',
         SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
         SandboxSmallContainment: {
@@ -570,6 +574,10 @@ describe('AgentRuntime', () => {
       storage,
       env: {
         WORKER_URL: 'https://worker.example.com',
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn(),
+          get: () => ({ issueRuntimeCredentialProxyGrant: async () => 'runtime-proxy-handle' }),
+        },
         NEXTAUTH_SECRET: 'test-secret',
         SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
         SandboxSmallContainment: {
@@ -637,6 +645,10 @@ describe('AgentRuntime', () => {
       storage,
       env: {
         WORKER_URL: 'https://worker.example.com',
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn(),
+          get: () => ({ issueRuntimeCredentialProxyGrant: async () => 'runtime-proxy-handle' }),
+        },
         NEXTAUTH_SECRET: 'test-secret',
         SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
         SandboxSmallContainment: {

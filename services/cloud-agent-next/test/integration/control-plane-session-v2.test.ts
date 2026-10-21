@@ -53,10 +53,13 @@ import {
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
 
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
+const NATIVE_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
+const registeredKiloSessions = new Map<string, string>();
 /** The session owner; the Session DO name is `ownerId:sessionId` (spec §3). */
 const SESSION_OWNER_ID = 'user_123';
 const QUEUED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.queuedBackstopMs;
@@ -130,6 +133,7 @@ function routeSpec(sessionId: string): ControlPlaneRouteSpec {
 
 function registration(sandboxId: string, sessionId: string) {
   const kiloId = kiloSessionId();
+  registeredKiloSessions.set(sessionId, kiloId);
   return {
     sandboxId,
     spec: { ...routeSpec(sessionId), kiloSessionId: kiloId },
@@ -1601,6 +1605,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
         installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+          const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+          const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+          return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+        });
         Object.assign(instance, {
           createProviderAdapter: () => provider.adapter,
           provider: provider.adapter,
@@ -1870,6 +1879,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
         installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+          const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+          const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+          return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+        });
         Object.assign(instance, {
           createProviderAdapter: () => provider.adapter,
           provider: provider.adapter,
@@ -2081,6 +2095,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
         installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+          const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+          const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+          return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+        });
         Object.assign(instance, {
           createProviderAdapter: () => provider.adapter,
           provider: provider.adapter,
@@ -2215,6 +2234,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -2281,6 +2305,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -2349,6 +2378,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -2419,6 +2453,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -2467,6 +2506,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,

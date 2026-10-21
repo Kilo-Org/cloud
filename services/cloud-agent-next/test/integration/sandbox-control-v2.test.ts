@@ -3016,8 +3016,9 @@ describe('SandboxControlV2 allocation egress policy', () => {
           const minting = mintsRuntimeProxy(sessionId);
           return {
             ...recording,
-            getRuntimeProxyDelegationExpiresAt: minting.getRuntimeProxyDelegationExpiresAt,
-            issueRuntimeCredentialProxyGrant: minting.issueRuntimeCredentialProxyGrant,
+            getRuntimeProxyDelegationExpiresAt: () => minting.getRuntimeProxyDelegationExpiresAt(),
+            issueRuntimeCredentialProxyGrant: fence =>
+              minting.issueRuntimeCredentialProxyGrant(fence),
           };
         },
       });
@@ -3425,7 +3426,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
       credentials: {
         userId: 'owner-1',
         kiloSessionId,
-        kiloToken: 'native-kilo-token',
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
         orgId: 'org-1',
         repository: { type: 'github', repo: 'acme/widgets' },
         scopeId: sessionId,
@@ -3440,6 +3441,10 @@ describe('SandboxControlV2 prepare frame secrets', () => {
     peer: FakeSessionPeer
   ): Promise<DurableObjectStub<SandboxControlV2>> {
     const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    const mint = createRuntimeProxyMintingPeer(env, () => ({
+      userId: 'owner-1',
+      kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
@@ -3448,7 +3453,11 @@ describe('SandboxControlV2 prepare frame secrets', () => {
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
-        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+        sessionPeerFor: (_ownerId: string, sessionId: string) => ({
+          ...peer.forSession(sessionId),
+          issueRuntimeCredentialProxyGrant: fence =>
+            mint(sessionId).issueRuntimeCredentialProxyGrant(fence),
+        }),
       });
     });
     return stub;

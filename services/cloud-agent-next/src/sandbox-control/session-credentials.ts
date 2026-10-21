@@ -15,7 +15,6 @@ import {
   issueCloudAgentBitbucketSessionCapability,
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
-  issueCloudAgentKiloSessionCapability,
   authorizeCloudAgentGitHubRepo,
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
@@ -45,11 +44,7 @@ import {
 } from '../types.js';
 import { brokerGrantFailure, type GrantDiagnostic } from './grant-diagnostic.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
-import {
-  buildKiloCredentialInjectionRules,
-  buildVercelCredentialNetworkPolicy,
-  findMatchingCredentialInjectionRule,
-} from './vercel-network-policy.js';
+import { buildVercelCredentialNetworkPolicy } from './vercel-network-policy.js';
 
 const WORKTREE_LEASE_MS = 4 * 60 * 60 * 1000;
 const CAPABILITY_CACHE_MS = 3 * 60 * 60 * 1000;
@@ -209,10 +204,9 @@ const sessionCredentialGrantShape = z
   })
   .strict();
 
-function refineSessionCredentialGrant(
+function refinePersistedSessionCredentialGrant(
   grant: z.infer<typeof sessionCredentialGrantShape>,
-  context: z.RefinementCtx,
-  options: { allowLegacyDirect: boolean }
+  context: z.RefinementCtx
 ): void {
   const reject = () => context.addIssue({ code: 'custom', message: 'Invalid credential grant' });
   if (
@@ -232,7 +226,6 @@ function refineSessionCredentialGrant(
     // containment there is no outbound broker boundary for a Kilo capability,
     // and a native user token must never be projected into a sandbox.
     const legacyDirect =
-      options.allowLegacyDirect &&
       grant.kilo.alias === undefined &&
       grant.kilo.runtimeProxy === undefined &&
       Object.keys(grant.kilo.capabilities).length === 0;
@@ -338,22 +331,20 @@ function refineSessionCredentialGrant(
   }
 }
 
-export const sessionCredentialGrantSchema = sessionCredentialGrantShape.superRefine(
-  (grant, context) => refineSessionCredentialGrant(grant, context, { allowLegacyDirect: false })
+/** Old grants remain readable for session inspection and cleanup. */
+export const persistedSessionCredentialGrantSchema = sessionCredentialGrantShape.superRefine(
+  refinePersistedSessionCredentialGrant
 );
 
-/**
- * Read schema for grants persisted before the direct containment-off fallback
- * was removed. Such a grant has no alias and no runtime proxy; it is never
- * usable for a sandbox, but must remain readable so cleanup and route reads do
- * not fail for unrelated sessions on the same sandbox.
- */
-export const persistedSessionCredentialGrantSchema = sessionCredentialGrantShape.superRefine(
-  (grant, context) => refineSessionCredentialGrant(grant, context, { allowLegacyDirect: true })
+export const sessionCredentialGrantSchema = persistedSessionCredentialGrantSchema.superRefine(
+  (grant, context) => {
+    if (!hasRuntimeCredentialProxy(grant)) {
+      context.addIssue({ code: 'custom', message: 'Runtime credential proxy required' });
+    }
+  }
 );
 
 export type SessionCredentialGrant = z.infer<typeof sessionCredentialGrantSchema>;
-type CredentialMember = z.infer<typeof memberSchema>;
 type CredentialRepository = z.infer<typeof repositorySchema>;
 type ScmGrant = z.infer<typeof scmSchema>;
 type CachedCapability = z.infer<typeof capabilitySchema>;
@@ -368,13 +359,11 @@ export function isContainedSessionCredentialGrant(
   return grant.containmentEnabled !== false;
 }
 
-/**
- * Whether the grant can back a sandbox at all: contained broker credentials or
- * the session-bound runtime proxy. A persisted legacy containment-off grant has
- * neither and may only be read for cleanup and upgrade handling.
- */
-export function hasSafeKiloCredentialPath(grant: SessionCredentialGrant): boolean {
-  return isContainedSessionCredentialGrant(grant) || grant.kilo.runtimeProxy !== undefined;
+/** Only modern grants can authorize execution; old grants are cleanup-only. */
+export function hasRuntimeCredentialProxy(grant: SessionCredentialGrant): boolean {
+  return (
+    grant.kilo.runtimeProxy !== undefined && kiloTokenHasRuntimeAuthorization(grant.kilo.token)
+  );
 }
 
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
@@ -403,9 +392,8 @@ function invalidCredentials(): never {
 }
 
 /**
- * The persisted session carries no safe Kilo credential path: its sandbox is
- * not contained and it has no modern runtime authorization. Callers must deny
- * the start/restore instead of projecting the session's native user token.
+ * The session has no modern runtime authorization. Execution requires a new
+ * session; persisted metadata and grants remain available for cleanup.
  */
 export { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE };
 
@@ -664,47 +652,6 @@ function isCapabilityCurrent(
   );
 }
 
-async function refreshKiloCapability(
-  env: CredentialEnv,
-  grant: SessionCredentialGrant,
-  member: CredentialMember,
-  outboundContainerId: string,
-  now: number,
-  diagnostic?: GrantDiagnostic
-): Promise<SessionCredentialGrant> {
-  if (isCapabilityCurrent(grant.kilo.capabilities[member.sessionId], outboundContainerId, now)) {
-    return grant;
-  }
-  const issued = await issueCloudAgentKiloSessionCapability(env, {
-    userId: grant.userId,
-    cloudAgentSessionId: member.sessionId,
-    kiloSessionId: member.kiloSessionId,
-    outboundContainerId,
-    userToken: grant.kilo.token,
-    targets: grant.kilo.targets,
-  });
-  if (!issued.success) {
-    diagnostic?.record(brokerGrantFailure('broker_issuance', issued.error.reason));
-    throw new Error('Kilo capability issuance is unavailable');
-  }
-  return {
-    ...grant,
-    kilo: {
-      ...grant.kilo,
-      capabilities: {
-        ...grant.kilo.capabilities,
-        [member.sessionId]: cachedCapability(
-          issued.value.capability,
-          'kka1.',
-          outboundContainerId,
-          now,
-          diagnostic
-        ),
-      },
-    },
-  };
-}
-
 async function refreshScmCapability(
   env: CredentialEnv,
   grant: SessionCredentialGrant,
@@ -878,7 +825,7 @@ function preparedPayload(input: {
   // token. The emitted `git` comes only from the issued grant below (B3 review 2, N3).
   const { git: _inputGit, ...payloadWithoutGit } = payload;
   const contained = isContainedSessionCredentialGrant(grant);
-  if (!hasSafeKiloCredentialPath(grant)) throw new SessionCredentialUpgradeRequiredError();
+  if (!hasRuntimeCredentialProxy(grant)) throw new SessionCredentialUpgradeRequiredError();
   const kiloToken = grant.kilo.alias ?? invalidCredentials();
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   let githubReviewTarget: GitHubReviewTarget | undefined;
@@ -1156,23 +1103,6 @@ export function kiloTokenHasRuntimeAuthorization(token: string): boolean {
   );
 }
 
-function sameKiloBackingAuthorization(first: string, second: string): boolean {
-  if (first === second) return true;
-  const authorization = (token: string) => {
-    const decoded = jwt.decode(token);
-    if (decoded === null || typeof decoded !== 'object') return null;
-    return JSON.stringify(
-      Object.fromEntries(
-        Object.entries(decoded)
-          .filter(([key]) => key !== 'iat' && key !== 'exp')
-          .sort(([a], [b]) => a.localeCompare(b))
-      )
-    );
-  };
-  const firstAuthorization = authorization(first);
-  return firstAuthorization !== null && firstAuthorization === authorization(second);
-}
-
 /**
  * The metadata-free grant core. Both the legacy `prepareSessionCredentials`
  * (below) and the V2 Sandbox DO feed it the same minimal inputs, so issuance,
@@ -1224,6 +1154,13 @@ export async function prepareCredentialGrant(
     });
     invalidCredentials();
   }
+  const modernRuntimeAuthorization = kiloTokenHasRuntimeAuthorization(token.data);
+  diagnostic?.fact({
+    tokenClass: modernRuntimeAuthorization ? 'runtime_authorized' : 'legacy',
+  });
+  if (!modernRuntimeAuthorization) {
+    throw new SessionCredentialUpgradeRequiredError();
+  }
   const provider = input.provider;
   const containmentEnabled = input.containmentEnabled;
   const targets = deriveKiloSandboxTargets(env, token.data, {
@@ -1235,6 +1172,9 @@ export async function prepareCredentialGrant(
   }
   const existing =
     input.existing === undefined ? undefined : validatePersistedGrant(input.existing, diagnostic);
+  if (existing && !hasRuntimeCredentialProxy(existing)) {
+    throw new SessionCredentialUpgradeRequiredError();
+  }
   const directory = input.directory;
   if (!directory) {
     diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_directory' });
@@ -1295,34 +1235,13 @@ export async function prepareCredentialGrant(
     });
     invalidCredentials();
   }
-  const modernRuntimeAuthorization = kiloTokenHasRuntimeAuthorization(token.data);
-  diagnostic?.fact({
-    tokenClass: modernRuntimeAuthorization ? 'runtime_authorized' : 'legacy',
-  });
-  if (
-    existing &&
-    ((existing.kilo.runtimeProxy !== undefined) !== modernRuntimeAuthorization ||
-      (!modernRuntimeAuthorization &&
-        !sameKiloBackingAuthorization(existing.kilo.token, token.data)))
-  ) {
-    diagnostic?.record({
-      grantPhase: 'compatibility',
-      grantFailureReason: 'backing_authorization_mismatch',
-    });
-    invalidCredentials();
-  }
-  const modernRuntimeProxy = modernRuntimeAuthorization ? runtimeProxyTargets(env) : null;
-  if (modernRuntimeAuthorization && !modernRuntimeProxy) {
+  const modernRuntimeProxy = runtimeProxyTargets(env);
+  if (!modernRuntimeProxy) {
     diagnostic?.record({
       grantPhase: 'configuration',
       grantFailureReason: 'runtime_proxy_targets_unavailable',
     });
     invalidCredentials();
-  }
-  if (!containmentEnabled && !modernRuntimeProxy) {
-    // Direct containment has no broker boundary to hold a raw user token. Only
-    // the session-bound runtime proxy may back an uncontained grant.
-    throw new SessionCredentialUpgradeRequiredError();
   }
   const kiloToken = token.data;
   let grant: SessionCredentialGrant = {
@@ -1340,23 +1259,14 @@ export async function prepareCredentialGrant(
       : [...members, member.data],
     ...(repository ? { repository } : {}),
     kilo: {
-      ...(containmentEnabled || modernRuntimeProxy
-        ? { alias: existing?.kilo.alias ?? createControlPlaneCredential(sandboxId, 'kilo') }
-        : {}),
+      alias: existing?.kilo.alias ?? createControlPlaneCredential(sandboxId, 'kilo'),
       token: kiloToken,
       targets: targets.targets,
-      ...(modernRuntimeProxy
-        ? {
-            runtimeProxy: {
-              targets: modernRuntimeProxy,
-              members: existing?.kilo.runtimeProxy?.members ?? [],
-            },
-          }
-        : {}),
-      capabilities:
-        !input.refreshBacking && !modernRuntimeProxy && existing?.kilo.token === kiloToken
-          ? existing.kilo.capabilities
-          : {},
+      runtimeProxy: {
+        targets: modernRuntimeProxy,
+        members: existing?.kilo.runtimeProxy?.members ?? [],
+      },
+      capabilities: {},
     },
     ...(existing?.scm ? { scm: existing.scm } : {}),
     preparedAt: now,
@@ -1375,16 +1285,6 @@ export async function prepareCredentialGrant(
         grantFailureReason: 'outbound_container_unavailable',
       });
       invalidCredentials();
-    }
-    if (!modernRuntimeProxy) {
-      grant = await refreshKiloCapability(
-        env,
-        grant,
-        member.data,
-        outboundContainerId,
-        now,
-        diagnostic
-      );
     }
     grant = await refreshScmCapability(
       env,
@@ -1428,18 +1328,6 @@ export async function prepareCredentialGrant(
     };
   }
   if (provider === 'vercel') buildControlNetworkPolicy([grant]);
-  else {
-    buildKiloCredentialInjectionRules(
-      {
-        token: grant.kilo.token,
-        placeholder: grant.kilo.alias,
-        targets: grant.kilo.targets,
-        rootSessionIds: grant.members.map(current => current.kiloSessionId),
-        organizationId: grant.orgId,
-      },
-      { requireHttps: false }
-    );
-  }
   return {
     grant,
     payload: preparedPayload({
@@ -1597,7 +1485,7 @@ export function sessionCredentialsPayloadFromGrant(
   };
 } {
   const contained = isContainedSessionCredentialGrant(grant);
-  if (!hasSafeKiloCredentialPath(grant)) throw new SessionCredentialUpgradeRequiredError();
+  if (!hasRuntimeCredentialProxy(grant)) throw new SessionCredentialUpgradeRequiredError();
   const kiloToken = grant.kilo.alias ?? invalidCredentials();
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   // The runtime credential proxy facade and the route's handle (the scope's
@@ -1737,66 +1625,18 @@ export async function resolveSessionCredential(input: {
   ) {
     return null;
   }
-  const expected = alias.purpose === 'kilo' ? grant.kilo.alias : grant.scm?.alias;
   if (
-    input.credential !== expected ||
-    (alias.purpose !== 'kilo' && alias.purpose !== grant.scm?.purpose)
+    alias.purpose === 'kilo' ||
+    input.credential !== grant.scm?.alias ||
+    alias.purpose !== grant.scm?.purpose
   ) {
     return null;
   }
   const url = safeUrl(input.url);
-  if (!url) return null;
+  if (!url || url.protocol !== 'https:') return null;
   try {
-    if (alias.purpose !== 'kilo') {
-      if (url.protocol !== 'https:') return null;
-      grant = await refreshScmCapability(input.env, grant, input.outboundContainerId, now);
-      return grant.scm?.capability ? { grant, credential: grant.scm.capability.credential } : null;
-    }
-    if (grant.kilo.runtimeProxy) return null;
-    if (!Object.values(grant.kilo.targets).some(target => new URL(target).origin === url.origin)) {
-      return null;
-    }
-    const rules = buildKiloCredentialInjectionRules(
-      {
-        token: grant.kilo.token,
-        placeholder: grant.kilo.alias,
-        targets: grant.kilo.targets,
-        rootSessionIds: grant.members.map(member => member.kiloSessionId),
-        organizationId: grant.orgId,
-      },
-      { requireHttps: false }
-    );
-    const rule = findMatchingCredentialInjectionRule(rules, {
-      url,
-      method: input.method,
-      headers: new Headers({ authorization: `Bearer ${input.credential}` }),
-    });
-    if (
-      rule?.headers.authorization !== `Bearer ${grant.kilo.token}` ||
-      rule.headers.host !== url.host
-    ) {
-      return null;
-    }
-    const ingest = new URL(grant.kilo.targets.sessionIngestBaseUrl);
-    const member =
-      grant.members.find(
-        current =>
-          url.origin === ingest.origin &&
-          (url.pathname ===
-            `${ingest.pathname.replace(/\/+$/, '')}/api/session/${current.kiloSessionId}/export` ||
-            url.pathname ===
-              `${ingest.pathname.replace(/\/+$/, '')}/api/session/${current.kiloSessionId}/ingest`)
-      ) ?? grant.members[0];
-    if (!member) return null;
-    grant = await refreshKiloCapability(input.env, grant, member, input.outboundContainerId, now);
-    const capability = grant.kilo.capabilities[member.sessionId];
-    return capability
-      ? {
-          grant,
-          credential: capability.credential,
-          ...(grant.orgId ? { organizationId: grant.orgId } : {}),
-        }
-      : null;
+    grant = await refreshScmCapability(input.env, grant, input.outboundContainerId, now);
+    return grant.scm?.capability ? { grant, credential: grant.scm.capability.credential } : null;
   } catch {
     return null;
   }

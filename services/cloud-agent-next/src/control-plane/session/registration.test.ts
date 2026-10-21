@@ -31,6 +31,11 @@ beforeAll(() => {
   ({ privateKey: wrongPrivateKey } = generateKeyPair());
 });
 
+const MODERN_KILO_TOKEN = jwt.sign(
+  { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+  'test'
+);
+
 function metadata(overrides: Record<string, unknown> = {}) {
   return CurrentSessionMetadataSchema.parse({
     metadataSchemaVersion: 2,
@@ -41,7 +46,7 @@ function metadata(overrides: Record<string, unknown> = {}) {
     },
     auth: {
       kiloSessionId: 'ses_12345678901234567890123456',
-      kilocodeToken: 'native-kilo-token',
+      kilocodeToken: MODERN_KILO_TOKEN,
     },
     agent: { mode: 'code', model: 'kilo/fake-deterministic' },
     workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'cloudflare' },
@@ -314,14 +319,20 @@ describe('runtime authorization admission', () => {
     });
   });
 
-  it('rejects an old uncontained session without modern runtime authorization', () => {
-    const legacy = metadata();
+  it.each([
+    { kilocode: false, github: false },
+    { kilocode: true, github: true },
+    { kilocode: false, github: true },
+  ])('rejects legacy authorization with containment %j', containment => {
+    const legacy = metadata({
+      auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'legacy-token' },
+    });
     expect(() =>
       buildControlPlaneSessionRegistration(
         legacy,
-        { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+        { provider: 'cloudflare', containment },
         undefined,
-        { containmentEnabled: false, workerUrl: undefined }
+        { containmentEnabled: true, workerUrl: 'https://worker.test' }
       )
     ).toThrow(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
   });
@@ -597,7 +608,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
     );
 
     expect(registration.spec.env?.USER_SETTING).toBeUndefined();
-    expect(registration.credentials.kiloToken).toBe('native-kilo-token');
+    expect(registration.credentials.kiloToken).toBe(MODERN_KILO_TOKEN);
     expect(registration.credentials.encryptedSecrets).toBeUndefined();
     expect(registration.spec.runtimeSkills).toEqual([
       { name: 'bitbucket-cloud-review', rawMarkdown: 'Review' },

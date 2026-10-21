@@ -552,8 +552,8 @@ type SessionManager = {
    * only per-child pagination state, and never touches the root session's
    * cursor or atoms. No-op when `fetchSnapshotPage` is absent, the child is
    * not ready, or the child has no cursor. A terminal older-page failure
-   * clears the child's cursor, so later calls are no-ops until
-   * `hydrateChildSession` rehydrates it.
+   * clears the child's cursor, so later calls are no-ops until the next
+   * `switchSession` resets the per-child hydration state.
    */
   loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void>;
   /**
@@ -1613,7 +1613,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (!state || state.status !== 'ready') return;
     // A terminal older-page outcome clears the cursor and `hasOlder`, so a
     // later call is a no-op instead of refetching a page already known to be
-    // unavailable. `hydrateChildSession` is the only way back.
+    // unavailable. Like the root transcript's terminal latch, it holds until
+    // the next switchSession resets the per-child state.
     if (state.cursor === null || !state.hasOlder) return;
     if (state.isLoadingOlder) return;
 
@@ -1678,7 +1679,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // `hydrateChildSession`). `retryable_failure` keeps the cursor so a retry
     // continues from the same page. `invalid_data` and `too_large` are
     // terminal for this child: clear the cursor and `hasOlder` so a later call
-    // is a no-op, and leave recovery to `hydrateChildSession`.
+    // is a no-op until the next switchSession resets the per-child state.
     if (outcome.kind === 'retryable_failure') {
       setChildSessionHydrationState(childSessionId, {
         ...current,

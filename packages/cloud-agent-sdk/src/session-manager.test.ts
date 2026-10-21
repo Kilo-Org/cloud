@@ -5291,6 +5291,41 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('re-arms child paging after the root session is switched', async () => {
+      let olderOutcome: 'terminal' | 'success' = 'terminal';
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });
+        if (!options.cursor) return makePage({ kiloSessionId: id, nextCursor: 'cursor-A' });
+        return olderOutcome === 'terminal'
+          ? { kind: 'invalid_data' as const }
+          : makePage({ kiloSessionId: id, nextCursor: null });
+      });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-rearm'));
+      await mgr.loadOlderChildMessages(kiloId('child-rearm'));
+
+      // Reopening the child does not clear the latch: the hydration state is
+      // still ready, so the manager does not refetch the page it gave up on.
+      await mgr.hydrateChildSession(kiloId('child-rearm'));
+      await mgr.loadOlderChildMessages(kiloId('child-rearm'));
+      expect(
+        fetchSnapshotPage.mock.calls.filter(([, options]) => options.cursor === 'cursor-A')
+      ).toHaveLength(1);
+
+      // The next root switch resets the per-child state, which re-arms paging.
+      await mgr.switchSession(kiloId('ses-root'));
+      olderOutcome = 'success';
+      await mgr.hydrateChildSession(kiloId('child-rearm'));
+      await mgr.loadOlderChildMessages(kiloId('child-rearm'));
+      expect(
+        fetchSnapshotPage.mock.calls.filter(([, options]) => options.cursor === 'cursor-A')
+      ).toHaveLength(2);
+    });
+
     it('loadOlderChildMessages accumulates omittedItemCount across pages', async () => {
       const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
         if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });

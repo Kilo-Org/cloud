@@ -59,6 +59,7 @@ import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
+import { clearTrackingPromptDismissed } from '@/lib/hooks/use-tracking-permission-prompt';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
@@ -619,6 +620,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearHideThinkingPreference();
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();
+          clearTrackingPromptDismissed();
           clearSessionScopedState();
           // The remote MCP connection and the servers stored behind it (which
           // hold bearer tokens) belong to the account that is leaving. The

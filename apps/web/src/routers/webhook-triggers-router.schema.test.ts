@@ -10,6 +10,7 @@ import type {
   createWorkerTrigger as createWorkerTriggerType,
   updateWorkerTrigger as updateWorkerTriggerType,
   invokeWorkerScheduledTrigger as invokeWorkerScheduledTriggerType,
+  listWorkerRequests as listWorkerRequestsType,
   TriggerConfigResponse,
 } from '@/lib/webhook-agent/webhook-agent-client';
 import type {
@@ -39,8 +40,10 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
 const mockCreateWorkerTrigger = jest.fn<typeof createWorkerTriggerType>();
 const mockUpdateWorkerTrigger = jest.fn<typeof updateWorkerTriggerType>();
 const mockInvokeWorkerScheduledTrigger = jest.fn<typeof invokeWorkerScheduledTriggerType>();
+const mockListWorkerRequests = jest.fn<typeof listWorkerRequestsType>();
 const mockDbInsert = jest.fn();
 const mockDbUpdate = jest.fn();
+const mockDbDelete = jest.fn();
 const mockFindAdmin = jest.fn<() => Promise<Partial<User> | undefined>>();
 const mockSelectWhere = jest.fn<
   () => Promise<
@@ -74,6 +77,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     update: mockDbUpdate.mockImplementation(() => ({
       set: () => ({ where: () => Promise.resolve() }),
     })),
+    delete: mockDbDelete.mockImplementation(() => ({
+      where: () => Promise.resolve(),
+    })),
   },
 }));
 
@@ -82,6 +88,7 @@ jest.mock('@/lib/webhook-agent/webhook-agent-client', () => ({
   createWorkerTrigger: mockCreateWorkerTrigger,
   updateWorkerTrigger: mockUpdateWorkerTrigger,
   invokeWorkerScheduledTrigger: mockInvokeWorkerScheduledTrigger,
+  listWorkerRequests: mockListWorkerRequests,
 }));
 
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
@@ -159,6 +166,7 @@ describe('webhook trigger variant inputs', () => {
   it('authorizes personal request logs before reading the worker', async () => {
     mockGetWebhookRequestLogs.mockResolvedValue({
       logs: [],
+      transcript: null,
       processStatus: 'captured',
       logsReady: false,
     });
@@ -682,5 +690,45 @@ describe('scheduled trigger invocation', () => {
     await expect(createCaller({ user }).invoke({ triggerId: 'trigger-id' })).rejects.toMatchObject({
       code,
     });
+  });
+});
+
+describe('webhook trigger request listing', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSelectWhere.mockResolvedValue([
+      {
+        id: '00000000-0000-4000-8000-000000000002',
+        activation_mode: 'webhook',
+        target_type: 'cloud_agent',
+      },
+    ]);
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListWorkerRequests.mockResolvedValue({ success: true, requests: [] });
+  });
+
+  it('returns captured requests for a paused trigger without changing the trigger record', async () => {
+    await expect(createCaller({ user }).listRequests({ triggerId: 'trigger-id' })).resolves.toEqual(
+      []
+    );
+
+    expect(mockListWorkerRequests).toHaveBeenCalledWith('user-1', undefined, 'trigger-id', 50);
+    expect(mockDbDelete).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not delete the PostgreSQL record when the worker reports a missing trigger', async () => {
+    mockListWorkerRequests.mockResolvedValueOnce({
+      success: false,
+      error: 'Trigger not found',
+      status: 404,
+      isNotFound: true,
+    });
+
+    await expect(
+      createCaller({ user }).listRequests({ triggerId: 'trigger-id' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+    expect(mockDbDelete).not.toHaveBeenCalled();
   });
 });

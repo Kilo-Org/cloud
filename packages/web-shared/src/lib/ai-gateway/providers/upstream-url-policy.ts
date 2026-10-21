@@ -10,7 +10,7 @@
 import { lookup } from 'node:dns/promises';
 import { captureMessage } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { isIpAddress, isPublicIp } from '@kilocode/mcp-gateway';
+import { isIpAddress, isPublicIp } from './ip-address';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -45,14 +45,13 @@ const REJECTION_MESSAGES = {
 } as const satisfies Record<UpstreamUrlRejection, string>;
 
 /**
- * Enforced on the deployed staging gateway only. Enable it for production
- * (`VERCEL_TARGET_ENV === 'production'`) once testing on staging is complete.
- * Local development reaches the fake LLM over plain HTTP on localhost, so it
- * stays exempt. `NODE_ENV` is `production` on previews too, so it cannot be
- * used here.
+ * Enforced on the deployed production and staging gateways. Local development
+ * reaches the fake LLM over plain HTTP on localhost, so it stays exempt.
+ * `NODE_ENV` is `production` on previews too, so it cannot be used here.
  */
 export function isUpstreamUrlPolicyEnforced(): boolean {
-  return process.env.VERCEL_TARGET_ENV === 'staging';
+  const targetEnv = process.env.VERCEL_TARGET_ENV;
+  return targetEnv === 'production' || targetEnv === 'staging';
 }
 
 async function resolveWithSystemResolver(hostname: string): Promise<string[]> {

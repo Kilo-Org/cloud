@@ -55,7 +55,6 @@
     "@kilocode/kilo-chat-hooks": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
-    "@kilocode/mcp-gateway": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/organization-entitlement": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",

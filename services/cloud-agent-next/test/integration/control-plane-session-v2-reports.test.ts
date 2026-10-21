@@ -122,7 +122,7 @@ async function readAlarm(stub: DurableObjectStub<SandboxSessionV2>): Promise<num
   return await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
 }
 
-async function setup(): Promise<{
+async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   sessionId: string;
   stub: DurableObjectStub<SandboxSessionV2>;
   peer: FakeSandboxPeer;
@@ -130,8 +130,10 @@ async function setup(): Promise<{
   const sessionId = newSessionId();
   const sandboxId = unique('sbx__reports');
   const stub = sessions.getByName(sessionId);
+  const sessionMetadata = metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId });
+  sessionMetadata.callback = { target: { url: callbackUrl } };
   await stub.registerSessionFromMetadata({
-    metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
+    metadata: sessionMetadata,
     sandboxSelection: { provider: 'cloudflare' },
   });
   const peer = new FakeSandboxPeer();
@@ -494,6 +496,32 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect(await messageStatus(stub, 'm1')).toBe('running');
   });
 
+  it('persists parent delivery identity and deduplicates its admitted parent turn', async () => {
+    const { sessionId, stub } = await setup('session:parent');
+    const captured = await installCapturedQueues(stub);
+    await stub.send(promptPayload('child-task'));
+    await waitFor(async () => expect(await messageStatus(stub, 'child-task')).toBe('running'));
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'child-task' });
+    await flush(stub);
+    expect(captured.callbacks).toHaveLength(1);
+    const callback = captured.callbacks[0];
+    expect(callback.parentSession).toMatchObject({
+      userId: 'user_123',
+      messageId: expect.stringMatching(/^msg_/),
+    });
+    if (!callback.parentSession) throw new Error('Missing parent delivery identity');
+    const { stub: parent } = await setup();
+    await installCapturedQueues(parent);
+    const intent = promptPayload(callback.parentSession.messageId, 'Child task completed');
+    await parent.send(intent);
+    await parent.send(intent);
+    const rows = await runInDurableObject(parent, (_instance, state) =>
+      drizzle(state.storage).select().from(controlPlaneMessages).all()
+    );
+    expect(rows.filter(row => row.message_id === callback.parentSession?.messageId)).toHaveLength(
+      1
+    );
+  });
   it('writes one report per terminal message and one batch callback under the session id', async () => {
     const { sessionId, stub } = await setup();
     const captured = await installCapturedQueues(stub);
@@ -533,7 +561,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
   });
 
   it('writes a failed report with its stage/code and one callback for a failure batch', async () => {
-    const { sessionId, stub, peer } = await setup();
+    const { stub, peer } = await setup();
     const captured = await installCapturedQueues(stub);
 
     await stub.send(promptPayload('m1'));
@@ -565,7 +593,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
   });
 
   it('writes interrupted reports and one callback for a Stop batch', async () => {
-    const { sessionId, stub } = await setup();
+    const { stub } = await setup();
     const captured = await installCapturedQueues(stub);
 
     await stub.send(promptPayload('m1'));
@@ -689,7 +717,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     await runInDurableObject(stub, async (_instance, state) => {
       for (const [key, value] of state.storage.kv.list({ prefix: 'report_outbox:' })) {
         const entry = value as { report: CloudAgentQueueReport; attempts: number; dueAt: number };
-        await state.storage.kv.put(key, { ...entry, dueAt: Date.now() - 1 });
+        state.storage.kv.put(key, { ...entry, dueAt: Date.now() - 1 });
       }
     });
     await flush(stub);
@@ -723,7 +751,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     await runInDurableObject(stub, async (_instance, state) => {
       for (const [key, value] of state.storage.kv.list({ prefix: 'callback_outbox:' })) {
         const entry = value as { job: CallbackJob; attempts: number; dueAt: number };
-        await state.storage.kv.put(key, { ...entry, dueAt: Date.now() - 1 });
+        state.storage.kv.put(key, { ...entry, dueAt: Date.now() - 1 });
       }
     });
     await flush(stub);

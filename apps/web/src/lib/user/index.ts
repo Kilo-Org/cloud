@@ -64,7 +64,6 @@ import {
   security_remediation_attempts,
   security_remediations,
   security_audit_log,
-  auto_triage_tickets,
   slack_bot_requests,
   bot_requests,
   cloud_agent_pending_uploads,
@@ -183,7 +182,6 @@ import {
   type ParsedImpactReferralTouch,
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
-import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
@@ -459,7 +457,8 @@ export async function createOrUpdateUser(
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
-  deferSignInAnalytics?: boolean
+  deferSignInAnalytics?: boolean,
+  verifyNewAccountAdmission?: () => Promise<boolean>
 ): Promise<CreateOrUpdateUserResult> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -613,6 +612,14 @@ export async function createOrUpdateUser(
   const signupIp = getSignupIp(requestHeaders);
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
+  if (verifyNewAccountAdmission && !(await verifyNewAccountAdmission())) {
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: 'rejected',
+      reason: 'native_admission',
+    });
+    return failureResult('ADMISSION_REQUIRED');
+  }
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
   if (!IS_DEVELOPMENT) {
     // Subdomains of one registrable domain share Bouncer's domain counter.
@@ -1001,7 +1008,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   security_remediation_attempts actor references,
  *   security_finding_notifications addressed to the user,
  *   security_analysis_queue (via cascade when security_findings are deleted),
- *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
+ *   slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, review memory feedback/proposals,
  *   device_auth_requests, auto_top_up_configs, auto_routing_custom_routers,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
@@ -1076,9 +1083,6 @@ export async function anonymizeCloudUserData(
       normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
     });
   }
-
-  // ── Gateway cleanup ───────────────────────────────────────────────────
-  await revokeGatewayStateForUser(tx, userId);
 
   // Remove recipient-addressed Security Agent notifications before user
   // anonymization and org membership removal. Org-owned findings can remain.
@@ -1497,7 +1501,6 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(security_remediations).where(eq(security_remediations.owned_by_user_id, userId));
   await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
-  await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
   await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
   await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
   // Delete the private objects first: the ledger rows are the only handle the

@@ -203,6 +203,7 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
+  useNavigation: () => ({ addListener: () => () => undefined }),
   usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => route.segments,

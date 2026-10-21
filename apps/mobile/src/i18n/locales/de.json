@@ -984,16 +984,16 @@
       "title": "Letzte Reviews"
     },
     "reviewMemory": {
-      "couldNotLoad": "Der Review-Speicher konnte nicht geladen werden.",
+      "couldNotLoad": "Die gespeicherten Prüfhinweise konnten nicht geladen werden.",
       "couldNotLoadProposals": "Die Vorschläge konnten nicht geladen werden.",
-      "enable": "Review-Speicher aktivieren",
-      "loading": "Review-Speicher wird geladen",
+      "enable": "Gespeicherte Prüfhinweise aktivieren",
+      "loading": "Gespeicherte Prüfhinweise werden geladen",
       "loadingProposals": "Vorschläge werden geladen",
       "noProposals": "Keine Vorschläge",
-      "noProposalsDescription": "Hier erscheinen Vorschläge aus dem Review-Speicher, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
-      "off": "Der Review-Speicher ist deaktiviert.",
-      "offDescription": "Aktiviere ihn, damit Kilo aus Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
-      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können den Review-Speicher aktivieren.",
+      "noProposalsDescription": "Hier erscheinen Vorschläge zu den gespeicherten Prüfhinweisen, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
+      "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
+      "offDescription": "Aktiviere sie, damit Kilo aus den Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
+      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können gespeicherte Prüfhinweise aktivieren.",
       "title": "Gespeicherte Prüfhinweise"
     },
     "scopeList": {

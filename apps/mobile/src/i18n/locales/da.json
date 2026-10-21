@@ -35,6 +35,8 @@
     "connectGithub": "Tilknyt GitHub",
     "cost": "Pris",
     "discard": "Kassér",
+    "discardChangesMessage": "Dine ændringer går tabt.",
+    "discardChangesTitle": "Kassér ændringer?",
     "findings": "Fund",
     "mergeRequest": "merge request",
     "notConnected": "Ikke tilknyttet",
@@ -109,7 +111,9 @@
     "online": "Forbundet",
     "open": "Åbn {{name}}",
     "openPullRequest": "Åbn PR",
+    "completed": "Afsluttet",
     "pending": "Afventer",
+    "running": "Kører",
     "performance": "Ydeevne",
     "preferences": "Indstillinger",
     "privacyPolicy": "Privatlivspolitik",
@@ -661,7 +665,8 @@
       "description": "Tilslut din GitHub-konto for at gennemgå pull requests på mobilen.",
       "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
-      "bitbucketOrgOnlyDescription": "Vælg en organisation i din profil for at gennemgå dens Bitbucket-pull requests."
+      "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
+      "contextLine": "Til {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Denne gennemgang kan ikke sendes, som den er. PR'en kan være ændret, eller fejlen skyldes, at du ikke kan gennemgå din egen pull request.",
       "reviewNotSubmittedTerm": "Denne gennemgang kan ikke sendes, som den er. {{term}} kan være ændret, eller også kan du ikke gennemgå din egen {{term}}.",
       "couldNotPostComment": "Kunne ikke sende kommentaren.",
-      "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen."
+      "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen.",
+      "rateLimited": "For mange anmodninger. Prøv igen senere.",
+      "conflict": "Dette blev ændret, mens du arbejdede på det. Genindlæs det og prøv igen."
     },
     "operation": {
       "couldNotReply": "Svaret kunne ikke sendes.",
@@ -1531,8 +1538,6 @@
     "updateFailed": "Code Reviewer kunne ikke opdateres.",
     "configSaveFailed": "Indstillingerne for gennemgange kunne ikke gemmes.",
     "status": {
-      "running": "Kører",
-      "completed": "Afsluttet",
       "interrupted": "Afbrudt"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "Fejl",
       "style": "Stil",
       "testing": "Test",
-      "documentation": "Dokumentation"
+      "documentation": "Dokumentation",
+      "unknown": "Andet ({{area}})"
     },
     "gateThreshold": {
       "warning": "Advarsel"
@@ -1657,7 +1663,14 @@
       "whereFound": "Fundsteder ({{displayCount}})",
       "fullReport": "Den fulde genererede rapport",
       "yes": "Ja",
-      "no": "Nej"
+      "no": "Nej",
+      "action": {
+        "analyzeCodebase": "Analysér kodebasen",
+        "dismiss": "Afvis",
+        "manualReview": "Manuel gennemsyn",
+        "monitor": "Overvåg",
+        "openPr": "Åbn PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} fund",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Gem ændringer",
       "unsavedTitle": "Ugemte ændringer",
-      "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?"
+      "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?",
+      "unsavedInvalidMessage": "Disse ændringer kan ikke gemmes endnu. Ret dem for at gemme, eller kassér dem for at forlade."
     },
     "auditReportButton": {
       "viewA11y": "Vis revisionsrapport"
@@ -1876,7 +1890,24 @@
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapport utilgængelig",
       "unavailableDescription": "Kun organisationsejere og faktureringsadministratorer kan se revisionsrapporter. Bed en ejer eller faktureringsadministrator om at give dig adgang.",
-      "queryFailed": "Forespørgslen om rapporten blev ikke fuldført. Prøv igen."
+      "queryFailed": "Forespørgslen om rapporten blev ikke fuldført. Prøv igen.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse fuldført",
+        "findingAnalysisFailed": "Analyse mislykkedes",
+        "findingAutoDismissed": "Afvist automatisk",
+        "findingCreated": "Importeret",
+        "findingDeleted": "Slettet",
+        "findingDismissed": "Afvist",
+        "findingSeverityChanged": "Alvorlighed ændret",
+        "findingStatusChange": "Status ændret",
+        "findingSuperseded": "Erstattet",
+        "remediationBlocked": "Udbedring blokeret",
+        "remediationCancelled": "Annulleret",
+        "remediationFailed": "Udbedring mislykkedes",
+        "remediationNoChangesNeeded": "Ingen ændringer nødvendige",
+        "remediationPrOpened": "PR åbnet",
+        "remediationQueued": "Anmodet om udbedring"
+      }
     },
     "notifications": {
       "couldNotLoad": "Indstillingerne for notifikationer kunne ikke indlæses.",
@@ -1908,7 +1939,6 @@
       "installApp": "Installér GitHub-appen",
       "reauthorizeButton": "Godkend GitHub-appen igen",
       "reauthorizeDescription": "Security Agent kræver tilladelsen vulnerability_alerts for at få adgang til Dependabot-advarsler. Godkend GitHub-appen igen for at give denne tilladelse.",
-      "reauthorizeFailed": "En ny godkendelse kunne ikke startes. Prøv igen.",
       "reauthorizeTitle": "Yderligere tilladelser påkrævet",
       "setupFailed": "Opsætningen af GitHub kunne ikke startes. Prøv igen."
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} er ikke længere tilgængelig. Din standardmodel bruges i stedet.",
       "couldNotReadPendingSessions": "Kunne ikke læse de ventende sessioner. Prøv igen.",
       "failedToCreate": "Kunne ikke oprette en session.",
+      "checkOrganizationAccess": "Tjek din adgang til denne organisation, og prøv igen.",
       "couldNotRefreshRepositories": "Kunne ikke opdatere listen over kodelagre. Prøv igen.",
       "discardDraftTitle": "Kassér kladde?",
       "discardDraftMessage": "Din forespørgsel går tabt.",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} resultat",
       "matchesBadge_other": "{{displayCount}} resultater",
-      "noOutput": "Ingen output."
+      "noOutput": "Ingen output.",
+      "translationFailed": "Oversættelse mislykkedes"
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",
@@ -2978,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Tilbage til profil",
       "loadErrorMessage": "Tjek din forbindelse og prøv igen.",
+
+      "chooseAccount": "Vælg en konto",
       "loadErrorTitle": "Kunne ikke indlæse dine organisationer.",
+      "noOrganization": "Ingen organisation",
+
+      "noOrganizationDescription": "Denne konto er ikke en del af en organisation. Opret eller tilslut dig en organisation på hjemmesiden for at bruge organisationsfunktioner som medlemsinvitationer og advarsler om lav saldo.",
+
+      "openWebOrganizations": "Åbn organisationer på hjemmesiden",
+
       "organizationUnavailable": "Organisationen er ikke tilgængelig.",
-      "selectDescription": "Vælg en organisation på din profil for at fortsætte.",
+      "selectDescriptionWithOrganizations": "Du tilhører en eller flere organisationer. Vælg den konto, som denne skærm skal bruge.",
+
       "selectOrganization": "Vælg en organisation",
       "unavailableDescription": "Denne organisation er ikke længere tilgængelig. Vælg en organisation på din profil for at fortsætte.",
+
+      "unavailableSessionsDescription": "Denne organisation er ikke længere tilgængelig. Dens sessioner kan ikke indlæses.",
       "accessDeniedDescription": "Du har ikke adgang til denne organisation."
     },
     "creditActivity": {
@@ -3642,7 +3685,9 @@
       "jsonTooLarge": "Brug højst 50 poster, nøgler op til 128 og værdier op til 4096 tegn",
       "timeoutInvalid": "Timeout skal være et helt antal millisekunder",
       "edit": "Rediger MCP-server",
-      "saveFailed": "MCP-serveren kunne ikke gemmes"
+      "saveFailed": "MCP-serveren kunne ikke gemmes",
+      "deleteFailed": "MCP-serveren kunne ikke slettes",
+      "updateFailed": "MCP-serveren kunne ikke opdateres"
     },
     "agents": {
       "title": "Profilagenter",
@@ -3669,6 +3714,7 @@
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
       "visibilityAll": "Alle - begge",
       "saveFailed": "Agenten kunne ikke gemmes",
+      "deleteFailed": "Agenten kunne ikke slettes",
       "nameRequired": "Indtast et agentnavn",
       "slugRequired": "Indtast en agentsnegl",
       "slugInvalid": "Slug skal starte med et bogstav og kun bruge små bogstaver, cifre og bindestreger",
@@ -3683,10 +3729,12 @@
       "description": "Kommandobeskrivelse",
       "template": "Skabelon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Forklar $ARGUMENTS",
       "subtask": "Kør som underopgave",
       "edit": "Rediger skråstreg kommando",
       "saveFailed": "Kommandoen kunne ikke gemmes",
+      "deleteFailed": "Kommandoen kunne ikke slettes",
       "nameRequired": "Indtast et kommandonavn",
       "nameInvalid": "Navnet skal starte med et lille bogstav og kun bruge små bogstaver, cifre og bindestreger",
       "templateRequired": "Indtast en kommandoskabelon",
@@ -3833,7 +3881,7 @@
     "view": "Læs briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Vis live-status",
+    "dismiss": "Afvis briefing",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt rapport · kan ikke opdateres",
     "revised": "Revideret · {{revision}}",

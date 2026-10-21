@@ -30,13 +30,12 @@ const EXPLORER = {
 } as const;
 
 /**
- * The long-draft geometry of the Run on finding, measured on the Android
- * emulator (1080x2400 at 420dpi), in points: a 3000-character draft with the
- * keyboard up. The frame is 339dp tall and the card starts 16dp down; the card
- * chrome measures 98dp, and the Run on block directly under it (`mt-5` 20 +
- * label 18 + `mb-2` 8 + the 44dp selector) is 89dp. The window-only cap put the
- * input at its 160dp maximum (six lines), which filled the frame and cut the
- * selector to the ~22dp sliver the finding reported.
+ * The long-draft geometry of the Run on finding, in points, for the Run on row
+ * alone: the card starts 16dp below the frame top, its chrome measures 98dp,
+ * and the row (`mt-5` 20 + label 18 + `mb-2` 8 + the 44dp selector) is 89dp.
+ * The 339dp frame is the Android emulator's with the keyboard up. The window
+ * cap put the input at its 160dp maximum, which fills the frame and cuts the
+ * selector when the block under the card is only this row.
  */
 const LONG_DRAFT = {
   frameHeight: 339,
@@ -44,6 +43,7 @@ const LONG_DRAFT = {
   cardChromeHeight: 98,
   belowCardHeight: 89,
 } as const;
+
 const WINDOW_MAX_HEIGHT = 160;
 /** One line of air the fit keeps under the Run on block. */
 const CLEARANCE = LINE_HEIGHT;

@@ -9,16 +9,23 @@
  * the floor to whole lines keeps the entire card inside the frame, and whole
  * lines only, so the input never shows a clipped line.
  *
- * The frame also carries the block directly under the card — the Run on
- * selector and its refresh control — which should stay readable and tappable
- * while the keyboard is up. A long draft grows the input to its cap, and a cap
- * taken from the window alone then fills the whole frame and cuts that row at
- * the frame's bottom edge. So the cap is taken from the room the frame leaves
- * after the card's own chrome, that block, and a line of air under it, and the
- * block is reserved only while the input can still keep its floor beside it:
- * whole lines only, a frame too short for both (a phone with the keyboard up)
- * would otherwise cost the composer two of its three lines, and the block then
- * scrolls into view instead.
+ * The frame also carries the block directly under the card — the Organization
+ * section when the entry renders one, then the Run on selector and its refresh
+ * control — which should stay readable and tappable while the keyboard is up. A
+ * long draft grows the input to its cap, and a cap taken from the window alone
+ * then fills the whole frame and cuts that row at the frame's bottom edge. So
+ * the cap is taken from the room the frame leaves after the card's own chrome,
+ * that block, and a line of air under it, and the block is reserved only while
+ * the input can still keep its floor beside it: whole lines only, a frame too
+ * short for both would otherwise cost the composer most of its lines, and the
+ * block then comes into view with the form's own drag instead.
+ *
+ * Both guards matter on the shipped form, where the block measures 167pt with
+ * the keyboard up (Organization 80pt, Run on row 89pt): reserving it beside the
+ * three-line floor needs a 395pt frame. The Android emulator reports 339pt with
+ * its keyboard up, so there the cap falls back to the room the card alone needs
+ * and the row is reached with the drag; a shorter keyboard, or a taller window,
+ * leaves the frame the reserve needs and keeps the row inside it.
  *
  * Pure: it reads no layout and mutates nothing, so the caller can recompute it
  * on every frame change without shifting layout on load, refresh, or retry.
@@ -172,13 +179,13 @@ export type ResolveNewSessionPromptMaxHeightInput = {
  *
  * The Run on block under the card is reserved — the cap keeps the card's
  * chrome, the block, and one line of air under it inside the frame — but only
- * while the input can still keep `minHeight` beside it. On a frame where whole
- * lines cannot hold both (a phone with the keyboard up: 256pt of frame against
- * a 101pt card chrome and an 86pt block leaves one line), reserving the block
- * would cost the composer two of its three lines for every draft, so the floor
- * wins and the cap falls back to the room the card alone needs. The block then
- * scrolls into view, which is the behaviour the Run on finding accepts
- * alongside "stays fully visible".
+ * while the input can still keep `minHeight` beside it. Where whole lines
+ * cannot hold both (the Android emulator with its keyboard up: 339pt of frame,
+ * 14pt card top, 101.33pt card chrome and the 167pt block leave one line),
+ * reserving the block would cost the composer most of its lines for every
+ * draft, so the floor wins and the cap falls back to the room the card alone
+ * needs. The block then comes into view with the form's own drag, which is the
+ * behaviour the Run on finding accepts alongside "stays fully visible".
  *
  * Never below `minHeight`, and an unknown or non-positive measurement returns
  * `preferredMaxHeight` unchanged, which keeps the window-only cap until the

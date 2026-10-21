@@ -31,6 +31,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { isPlausibleKiloSessionId } from '@/lib/session-id-shape';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
@@ -61,13 +62,14 @@ export default function SessionDetailScreen() {
     via?: string;
     /**
      * C3b: set to `'1'` by the new-agent screen's `kilo remote` happy
-     * path. When present, a transient `NOT_FOUND` from
-     * `cliSessionsV2.get` (the parent ingest row has not been written
-     * yet) is retried up to 8 times at 1s each before falling through
-     * to the permanent not-found screen. When absent — the regression
-     * case — behavior is byte-identical to pre-C3b: `retry: false`
-     * everywhere, so a stale or deleted session in history still
-     * shows the same permanent state it always did.
+     * path. A transient `NOT_FOUND` from `cliSessionsV2.get` (the
+     * ingest row has not been written yet) is retried up to 8 times at
+     * 1s each before falling through to the permanent not-found screen —
+     * whether or not this param is present. The param only marks the
+     * spawn flow itself; every other open gets the same window through
+     * the young-route retry, except an open that began on the restored
+     * identity, whose denial must stay immediate (the retry callback
+     * below owns that skip).
      */
     spawned?: string;
     /** `'1'` when the spawn cloned a session onto a remote CLI; its first page waits for the sync. */
@@ -264,7 +266,7 @@ export default function SessionDetailScreen() {
     // the New-session screen instead — the composer the user asked for — with
     // the route's organization context carried through, exactly as
     // `agent-chat/new` renders it.
-    return <NewSessionRoute organizationId={routeOrganizationId} />;
+    return <NewSessionRoute />;
   }
 
   if (
@@ -286,7 +288,7 @@ export default function SessionDetailScreen() {
           title={t('agentChat.session.title')}
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+          backFallback={AGENTS_SESSIONS_HREF}
           headerRight={
             <View className="min-w-0 shrink flex-row items-center gap-2">
               <SessionContextMetrics
@@ -369,7 +371,7 @@ export default function SessionDetailScreen() {
           title={t('agentChat.session.title')}
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+          backFallback={AGENTS_SESSIONS_HREF}
         />
         <CenteredState>
           <View className="items-center gap-3 px-6">
@@ -395,7 +397,10 @@ export default function SessionDetailScreen() {
               <Button
                 variant="ghost"
                 onPress={() => {
-                  router.replace('/(app)/(tabs)/(2_agents)' as Href);
+                  // POP_TO reuses the `(tabs)` route under this screen and
+                  // truncates every `agent-chat` route above it, so a composer
+                  // still on the stack under a missing session is gone with it.
+                  router.dismissTo(AGENTS_SESSIONS_HREF);
                 }}
               >
                 <Text>{t('agentChat.session.backToSessions')}</Text>

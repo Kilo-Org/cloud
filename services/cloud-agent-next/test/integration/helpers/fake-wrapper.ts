@@ -23,6 +23,12 @@ export type FakeWrapperHelloInput = {
   redactsNamedSecrets?: boolean;
 };
 
+export type FakeNativeEvent = {
+  type: string;
+  properties: Record<string, unknown>;
+  timestamp?: string;
+};
+
 /**
  * A synthetic peer for the control-plane wrapper socket. It speaks the V2 frame
  * protocol directly so integration tests can drive the Sandbox DO without a
@@ -32,6 +38,8 @@ export class FakeWrapper {
   private readonly messages: ControlPlaneWrapperFrame[] = [];
   private readonly frameWaiters: Array<(frame: ControlPlaneWrapperFrame | null) => void> = [];
   private readonly closeWaiters: Array<(code: number) => void> = [];
+  private readonly listeners = new Set<(frame: ControlPlaneWrapperFrame) => void>();
+  private readonly unparsed: string[] = [];
   private closeCode: number | null = null;
   private received = 0;
 
@@ -42,9 +50,13 @@ export class FakeWrapper {
       try {
         frame = controlPlaneWrapperFrameSchema.parse(JSON.parse(text));
       } catch {
+        // A frame the Worker produced outside the protocol would otherwise
+        // vanish. Keep it so a test can assert the Worker never did that.
+        this.unparsed.push(text);
         return;
       }
       this.received += 1;
+      for (const listener of this.listeners) listener(frame);
       const waiter = this.frameWaiters.shift();
       if (waiter) waiter(frame);
       else this.messages.push(frame);
@@ -83,6 +95,24 @@ export class FakeWrapper {
   /** How many frames this wrapper has received, consumed or queued. */
   receivedFrames(): number {
     return this.received;
+  }
+
+  /** Raw frames the Worker sent that did not match the protocol schema. */
+  unparsedFrames(): readonly string[] {
+    return [...this.unparsed];
+  }
+
+  /** Observe every parsed inbound frame without consuming the queue. */
+  onFrame(listener: (frame: ControlPlaneWrapperFrame) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /** Pushes one native event batch for a session, as the real wrapper does. */
+  sendSessionEvents(sessionId: string, events: readonly FakeNativeEvent[]): void {
+    this.send({ type: 'session.events', sessionId, events });
   }
 
   sendRaw(data: string): void {

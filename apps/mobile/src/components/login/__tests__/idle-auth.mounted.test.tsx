@@ -45,7 +45,7 @@ const providers = vi.hoisted(() => ({ appleAvailable: false, googleConfigured: f
 // of state the busy treatment depends on.
 const nativeAuth = vi.hoisted(() => ({
   busy: undefined as 'apple' | 'otp-send' | 'passkey' | undefined,
-  emailError: undefined as string | undefined,
+  emailErrorKey: undefined as 'authErrors.invalidRequest' | 'authErrors.invalidEmail' | undefined,
   clearEmailError: vi.fn(),
   requestEmailCode: vi.fn(),
   signInWithApple: vi.fn(),
@@ -59,7 +59,7 @@ vi.mock('@/lib/auth/passkey-client', () => ({
 vi.mock('@/lib/auth/use-native-auth', () => ({
   useNativeAuth: () => ({
     busy: nativeAuth.busy,
-    emailError: nativeAuth.emailError,
+    emailErrorKey: nativeAuth.emailErrorKey,
     clearEmailError: nativeAuth.clearEmailError,
     googleConfigured: providers.googleConfigured,
     signInWithApple: nativeAuth.signInWithApple,
@@ -781,7 +781,7 @@ describe('IdleAuth new-attempt notification', () => {
   beforeEach(() => {
     ssoRecovery.value = null;
     nativeAuth.busy = undefined;
-    nativeAuth.emailError = undefined;
+    nativeAuth.emailErrorKey = undefined;
     nativeAuth.signInWithApple.mockClear();
     nativeAuth.signInWithPasskey.mockClear();
     nativeAuth.requestEmailCode.mockReset();
@@ -943,16 +943,18 @@ describe('IdleAuth email validation layout', () => {
   beforeEach(() => {
     ssoRecovery.value = null;
     nativeAuth.busy = undefined;
-    nativeAuth.emailError = undefined;
+    nativeAuth.emailErrorKey = undefined;
     nativeAuth.clearEmailError.mockClear();
     nativeAuth.requestEmailCode.mockReset();
   });
 
   it('keeps validation in the field before an enabled Continue, then accepts a correction', async () => {
-    nativeAuth.emailError = 'Check your email address and try again.';
+    nativeAuth.emailErrorKey = 'authErrors.invalidRequest';
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
     const field = renderer.root.findByType('FormField');
-    expect(field.props.error).toBe(nativeAuth.emailError);
+    // The hook stores a key; the field receives the catalog message translated
+    // at render, so a language switch re-renders the error in that language.
+    expect(field.props.error).toBe(i18n.t(nativeAuth.emailErrorKey));
     // The message renders in the field's own flow: no zero-opacity reserve, so
     // no empty hole under the input on the happy path.
     expect(field.props.reserveErrorMessages).toBeUndefined();
@@ -967,7 +969,7 @@ describe('IdleAuth email validation layout', () => {
       (field.props.onChangeText as (value: string) => void)('user@example.com');
     });
     expect(nativeAuth.clearEmailError).toHaveBeenCalledOnce();
-    nativeAuth.emailError = undefined;
+    nativeAuth.emailErrorKey = undefined;
     nativeAuth.requestEmailCode.mockResolvedValue(true);
     await act(async () => {
       await (button.props.onPress as () => Promise<void>)();
@@ -977,13 +979,13 @@ describe('IdleAuth email validation layout', () => {
     nativeAuth.requestEmailCode.mockResolvedValue(false);
     await act(async () => {
       (renderer.root.findByType('EmailOtpForm').props.onResend as () => void)();
-      nativeAuth.emailError =
-        'Unable to deliver email to this address. Please use a different email.';
+      nativeAuth.emailErrorKey = 'authErrors.invalidEmail';
       renderer.update(createElement(IdleAuth, { start: vi.fn<StartFn>() }));
       await Promise.resolve();
     });
     const remounted = renderer.root.findByType('FormField');
-    expect(remounted.props.error).toBe(nativeAuth.emailError);
+    const invalidEmailKey = 'authErrors.invalidEmail' as const;
+    expect(remounted.props.error).toBe(i18n.t(invalidEmailKey));
     // The field remounted when the view returned from OTP: it must show the
     // rejected address, not blank out while `emailRef` still holds it.
     expect(remounted.props.defaultValue).toBe('user@example.com');
@@ -1015,13 +1017,41 @@ describe('IdleAuth email validation layout', () => {
     expect(nativeAuth.requestEmailCode).toHaveBeenCalledWith('');
     expect(renderer.root.findByType('FormField')).toBeTruthy();
   });
+
+  // The hook stores a catalog key, so flipping the i18n instance under a
+  // mounted field must re-read the message in the new language — the reported
+  // defect was exactly an inline error that stayed Portuguese after the picker
+  // switched the app to English. The German string is read after the flip:
+  // the de catalog loads lazily, so a `lng: 'de'` lookup before changeLanguage
+  // falls back to English.
+  it('re-translates the inline validation error after changeLanguage', async () => {
+    nativeAuth.emailErrorKey = 'authErrors.invalidRequest';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    expect(renderer.root.findByType('FormField').props.error).toBe(
+      'Check your email address and try again.'
+    );
+
+    await act(async () => {
+      await i18n.changeLanguage('de');
+    });
+    try {
+      expect(renderer.root.findByType('FormField').props.error).toBe(
+        'Prüfe deine E-Mail-Adresse und versuche es erneut.'
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+    expect(renderer.root.findByType('FormField').props.error).toBe(
+      'Check your email address and try again.'
+    );
+  });
 });
 
 describe('IdleAuth layout repairs', () => {
   beforeEach(() => {
     ssoRecovery.value = null;
     nativeAuth.busy = undefined;
-    nativeAuth.emailError = undefined;
+    nativeAuth.emailErrorKey = undefined;
     passkeySupport.supported = true;
     providers.appleAvailable = true;
     providers.googleConfigured = true;

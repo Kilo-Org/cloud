@@ -6,6 +6,25 @@ A Cloudflare Worker that provides a secure, scalable API for running [Kilocode](
 
 ## Development Setup
 
+### Child session callbacks
+
+An opted-in Cloud Agent can request a callback when it launches a child through
+`cloudAgentNext.prepareSession` (or the organization equivalent):
+
+```json
+{ "callbackTarget": { "url": "session:parent" } }
+```
+
+The server resolves the parent from the authenticated spawn authority. Completion,
+failure, or interruption sends a queued message with the child's IDs, status,
+branch, and up to 12,000 characters of output. An idle parent resumes; an active
+parent receives a queued follow-up. The parent uses its current authorization.
+Delivery uses the existing five-attempt callback retry policy and one persisted
+message ID per callback. Missing or inaccessible parents reject delivery.
+
+Omit `callbackTarget` for no callback. Arbitrary session destinations are not
+supported. Existing HTTP callback targets remain available to trusted integrations.
+
 ### Building the Development Docker Image
 
 The `Dockerfile.dev` is used for local development and testing. It requires a pre-built `kilo` binary from the [kilo-cli](https://github.com/kilocode/kilo-cli) repository.

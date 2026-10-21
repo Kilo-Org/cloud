@@ -3023,6 +3023,88 @@ describe('createSessionManager', () => {
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
     });
 
+    it('removes the optimistic row from the storage that sent it when a switch lands mid-send', async () => {
+      const cached = new Map<string, CachedSessionSnapshotPage>();
+      const config = createMockConfig({
+        writeCachedSnapshotPage: page => cached.set(page.info.id, page),
+        readCachedSnapshotPage: async id => cached.get(id) ?? null,
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const storageAtSend = mockSession.storage;
+      expect(storageAtSend).not.toBeNull();
+
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Draft for A', mode: 'code' },
+      });
+      const [optimisticId] = storageAtSend!.getMessageIds();
+      expect(optimisticId).toBeDefined();
+
+      // Leaving the chat caches its page while the send is still pending.
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(mockSession.storage).not.toBe(storageAtSend);
+      expect(cached.get('ses-1')?.messages.map(message => message.info.id)).toEqual([optimisticId]);
+
+      rejectSend!(new Error('ECONNREFUSED'));
+      await expect(sendPromise).resolves.toBe(false);
+
+      // The row belongs to the session that sent it, not to the one now active.
+      expect(storageAtSend!.getMessageInfo(optimisticId!)).toBeUndefined();
+      expect(cached.get('ses-1')?.messages ?? []).toEqual([]);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+
+      // Returning to the chat paints no prompt the server never received.
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+    });
+
+    it('records the failed prompt for the session that owned it when a switch lands mid-send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Draft for A', mode: 'code' },
+      });
+
+      await mgr.switchSession(kiloId('ses-2'));
+      config.store.set(mgr.atoms.failedPrompt, 'Session B');
+
+      rejectSend!(new Error('ECONNREFUSED'));
+      await expect(sendPromise).resolves.toBe(false);
+
+      // The active session keeps its own draft.
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Session B');
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Draft for A');
+
+      // An accepted send from that session consumes the draft.
+      mockSession.send.mockResolvedValueOnce(undefined);
+      await expect(
+        mgr.send({ payload: { type: 'prompt', prompt: 'Draft for A', mode: 'code' } })
+      ).resolves.toBe(true);
+      await mgr.switchSession(kiloId('ses-2'));
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+    });
+
     it('uses cloud-agent model override on send and clears it on switchSession', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

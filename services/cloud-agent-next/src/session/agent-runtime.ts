@@ -1,5 +1,5 @@
 import { ExecutionError } from '../execution/errors.js';
-import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import { ExecutionOrchestrator } from '../execution/orchestrator.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import {
@@ -190,7 +190,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
           : resolveAgentSandbox(plan.workspace.metadata).discoverSessionWrappers());
         if (
           observation.status === 'inspection-failed' &&
-          isContainerConcurrencyLimitError(observation.error)
+          getContainerCapacityFailureReason(observation.error)
         ) {
           throw new Error(observation.error);
         }
@@ -479,7 +479,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       return buildRuntimeAcceptanceResult(turn.messageId, wrapperRuntimeState.wrapperRunId);
     } catch (error) {
       await clearWrapperDispatchingMessage(storage, wrapperRuntimeState, turn.messageId);
-      if (isContainerConcurrencyLimitError(error)) {
+      if (getContainerCapacityFailureReason(error)) {
         if (allocatedPhysicalInstance && !wrapperReady) {
           const physicalLease = await getWrapperLease(storage);
           await putWrapperLease(

@@ -18,6 +18,13 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## Organization hub connectivity
+
+Usage tiles retain labels and show cached totals or em dash placeholders.
+Unavailable usage and low-balance settings expose Retry. The low-balance row
+retries its settings read until data is available, then opens configuration.
+Cached settings remain visible during offline pauses and refresh failures.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

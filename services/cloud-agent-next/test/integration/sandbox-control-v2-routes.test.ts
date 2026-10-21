@@ -85,7 +85,7 @@ function createFakeProvider(
       provider.refs.push(ref);
       return { providerRef: ref };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -284,7 +284,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     'publishes %s allocation metadata and rejects stale delivery',
     async startSource => {
       const provider = createFakeProvider();
-      provider.adapter.launch = async (_ref, launchEnv) => {
+      provider.adapter.launch = async (_ref, { env: launchEnv }) => {
         provider.launchEnvs.push({ ...launchEnv });
         return { startSource };
       };
@@ -1294,8 +1294,6 @@ describe('SandboxControlV2 routes and forwarding', () => {
     'security-agent',
     'security-remediation',
     'webhook',
-    'auto-triage',
-    'autofix',
     'cli',
     'unrecognized-origin',
     'cloud-agent-web',

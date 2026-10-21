@@ -1,11 +1,11 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import {
-  BlacklistDomainsConfigSchema,
   BlacklistDomainsInputSchema,
   DEFAULT_BLACKLIST_DOMAINS_CONFIG,
   getBlacklistedDomains,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-access';
 import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { TRPCError } from '@trpc/server';

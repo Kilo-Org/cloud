@@ -2,7 +2,7 @@
 // filled, a rejected save names itself in localized copy on the field that
 // caused it, and correcting the field drops the line while Save stays usable.
 
-import { createElement } from 'react';
+import { createElement, useEffect, useState } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -25,6 +25,7 @@ const query = vi.hoisted(() => ({
 }));
 const reset = vi.hoisted(() => vi.fn());
 const saveMutate = vi.hoisted(() => vi.fn());
+const bump = vi.hoisted((): { render: () => void } => ({ render: () => undefined }));
 type SaveMutation = {
   isPending: boolean;
   isError: boolean;
@@ -97,10 +98,30 @@ beforeEach(() => {
     mutate: saveMutate,
     reset,
   };
+  // The real hook's `reset` clears the mutation error, which re-renders the
+  // sheet; the mock does the same so the discarded line is observable.
+  reset.mockImplementation(() => {
+    save.value = { ...save.value, isError: false, error: null };
+    bump.render();
+  });
 });
 
+/**
+ * Re-renders the sheet when the mocked mutation state changes. The sheet's own
+ * state is untouched, so the draft survives a rejected save.
+ */
+function Harness() {
+  const [, setVersion] = useState(0);
+  useEffect(() => {
+    bump.render = () => {
+      setVersion(version => version + 1);
+    };
+  }, []);
+  return createElement(LowBalanceAlertSheet);
+}
+
 async function mountSheet() {
-  const view = await renderWithProviders(createElement(LowBalanceAlertSheet));
+  const view = await renderWithProviders(createElement(Harness));
   return view;
 }
 
@@ -173,6 +194,9 @@ describe('low balance alert sheet', () => {
       error: Object.assign(new Error(EMOJI_REJECTION), { data: { code: 'BAD_REQUEST' } }),
     };
     const { renderer, unmount } = await mountSheet();
+    expect(statusMessages(renderer)).toContain(
+      i18n.t('organization.lowBalanceAlert.saveEmailsError')
+    );
     const recipients = fieldByLabel(
       renderer,
       i18n.t('organization.lowBalanceAlert.notifyEmailsLabel')
@@ -183,6 +207,12 @@ describe('low balance alert sheet', () => {
     });
 
     expect(reset).toHaveBeenCalledOnce();
+    expect(statusMessages(renderer)).not.toContain(
+      i18n.t('organization.lowBalanceAlert.saveEmailsError')
+    );
+    // Correcting the field leaves Save usable.
+    const button = renderer.root.find(node => String(node.type) === 'Button');
+    expect(button.props.disabled).toBe(false);
     unmount();
   });
 

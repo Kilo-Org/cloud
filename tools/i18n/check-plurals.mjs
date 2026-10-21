@@ -358,15 +358,10 @@ function run() {
   const problems = [];
   const english = readEnglishCatalog();
 
-  for (const key of collectCountedKeys()) {
-    if (NO_AGREEMENT.has(key)) {
-      continue;
-    }
-    if (!hasFamily(english, key)) {
-      problems.push(
-        `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
-      );
-    }
+  for (const key of findCountlessFamilies()) {
+    problems.push(
+      `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
+    );
   }
 
   if (!sourceOnly) {

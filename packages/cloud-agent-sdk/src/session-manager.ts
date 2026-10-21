@@ -2276,6 +2276,34 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  /**
+   * Whether the chat's cached first page holds the confirmed record of a
+   * message. `switchSession` clears the storage of the session it leaves, so
+   * after a mid-send switch the cached page is the only place a confirmation
+   * that landed before the switch survives.
+   */
+  async function pageShowsConfirmedUserMessage(
+    kiloSessionId: KiloSessionId,
+    messageId: string
+  ): Promise<boolean> {
+    const read = config.readCachedSnapshotPage;
+    if (!read) return false;
+    try {
+      const page = await read(kiloSessionId);
+      return (
+        page?.messages.some(
+          message =>
+            message.info.id === messageId &&
+            message.info.role === 'user' &&
+            message.info.synthetic !== true
+        ) ?? false
+      );
+    } catch {
+      // An unreadable cache is a miss, never a failed send.
+      return false;
+    }
+  }
+
   /** Caches the loaded session's page before it is left, so a return paints at once. */
   function cacheActiveSessionPage(): void {
     if (
@@ -3070,14 +3098,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       const stillOnSendingChat = activeSessionId === kiloSessionId;
       const mountedStorage = store.get(sessionStorageAtom);
       const mountedRow = mountedStorage?.getMessageInfo(messageId);
-      const sendingRow = optimisticStorage?.getMessageInfo(messageId);
       // A confirmed record under this id is server history: the server accepted
       // the prompt and only the response was lost, so there is nothing to retry.
-      // The record lands in the storage that sent the prompt, and in the mounted
-      // one when the chat was reopened in the meantime.
+      // `switchSession` clears the storage it leaves, so after a switch the
+      // confirmation survives only in the page cached on the way out.
       const delivered =
-        (sendingRow?.role === 'user' && sendingRow.synthetic !== true) ||
-        (stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true);
+        (stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true) ||
+        (!stillOnSendingChat &&
+          kiloSessionId !== null &&
+          (await pageShowsConfirmedUserMessage(kiloSessionId, messageId)));
       if (optimisticStorage && optimisticStorage !== mountedStorage && !delivered) {
         optimisticStorage.deleteMessage(messageId);
       }

@@ -3194,8 +3194,13 @@ describe('createSessionManager', () => {
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
     });
 
-    it('does not record a draft when the server confirmed the prompt after the user switched away', async () => {
-      const config = createMockConfig();
+    it('does not record a draft when the server confirmed the prompt before the user switched away', async () => {
+      const cached = new Map<string, CachedSessionSnapshotPage>();
+      const config = createMockConfig({
+        writeCachedSnapshotPage: page => cached.set(page.info.id, page),
+        readCachedSnapshotPage: async id => cached.get(id) ?? null,
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
 
@@ -3223,8 +3228,7 @@ describe('createSessionManager', () => {
       const messageId = storageAtSend.getMessageIds().at(-1);
       expect(messageId).toBeDefined();
 
-      await mgr.switchSession(kiloId('ses-2'));
-      // The server accepted the second prompt before the response was lost.
+      // The server accepted the prompt before the response was lost.
       storageAtSend.upsertMessage(
         stubUserMessage({
           id: messageId!,
@@ -3234,6 +3238,13 @@ describe('createSessionManager', () => {
           model: { providerID: 'test-provider', modelID: 'test-model' },
         })
       );
+
+      // Leaving caches the page and then destroys the session, which clears its
+      // storage, so only the cached page still holds the confirmation.
+      await mgr.switchSession(kiloId('ses-2'));
+      storageAtSend.clear();
+      expect(storageAtSend.getMessageInfo(messageId!)).toBeUndefined();
+      expect(cached.get('ses-1')?.messages.map(message => message.info.id)).toContain(messageId);
 
       rejectSend!(new Error('ECONNRESET'));
       await expect(sendPromise).resolves.toBe(false);

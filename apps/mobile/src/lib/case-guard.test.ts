@@ -73,6 +73,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/agents/tool-card-image-cache.ts': 'mime-subtype normalization',
   'components/agents/tool-list-model.ts': 'status-note comparison',
   'components/profiles/agent-form-sheet.tsx': 'agent-slug normalization',
+  'components/profiles/profile-agents-model.ts': 'agent-slug comparison',
   'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
   'components/todos/todo-link-session-sheet.tsx': 'repository full-name comparison',

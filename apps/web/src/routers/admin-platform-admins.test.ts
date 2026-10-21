@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import { eq, and, isNull } from 'drizzle-orm';
-import { kilocode_users, user_admin_notes } from '@kilocode/db/schema';
+import { admin_action_audit_logs, kilocode_users, user_admin_notes } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -769,4 +769,71 @@ test('user_admin_notes rows are scoped to the target user, not the actor', async
     ),
   });
   expect(targetNotes).toHaveLength(1);
+});
+
+describe('admin role change audit logging', () => {
+  async function getRoleAudits(targetId: string) {
+    return db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(
+        and(
+          eq(admin_action_audit_logs.target_type, 'user'),
+          eq(admin_action_audit_logs.target_id, targetId)
+        )
+      );
+  }
+
+  test('granting and revoking platform admin access records the previous roles', async () => {
+    const superadmin = await insertQualifyingAdmin();
+    const candidate = await insertEligibleCandidate();
+    const caller = await createCallerForUser(superadmin.id);
+
+    await caller.admin.users.setPlatformAdminAccess({ userId: candidate.id, isAdmin: true });
+    await caller.admin.users.setAdminPermissions({
+      userId: candidate.id,
+      permissions: { canViewSessions: true },
+    });
+    await caller.admin.users.setPlatformAdminAccess({ userId: candidate.id, isAdmin: false });
+
+    const audits = await getRoleAudits(candidate.id);
+    expect(audits.every(audit => audit.actor_id === superadmin.id)).toBe(true);
+
+    const accessAudits = audits
+      .filter(audit => audit.action === 'admin.platform_access.set')
+      .map(audit => audit.metadata);
+    expect(accessAudits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          isAdmin: true,
+          previous: expect.objectContaining({ isAdmin: false }),
+        }),
+        expect.objectContaining({
+          isAdmin: false,
+          previous: expect.objectContaining({ isAdmin: true, canViewSessions: true }),
+        }),
+      ])
+    );
+
+    const permissionAudit = audits.find(audit => audit.action === 'admin.permissions.set');
+    expect(permissionAudit?.message).toBe('Granted session viewer access.');
+    expect(permissionAudit?.metadata).toMatchObject({
+      changes: { can_view_sessions: true },
+      previous: { canViewSessions: false },
+    });
+  });
+
+  test('no-op role changes are not recorded', async () => {
+    const superadmin = await insertQualifyingAdmin();
+    const admin = await insertQualifyingAdmin({ is_super_admin: false });
+    const caller = await createCallerForUser(superadmin.id);
+
+    await caller.admin.users.setPlatformAdminAccess({ userId: admin.id, isAdmin: true });
+    await caller.admin.users.setAdminPermissions({
+      userId: admin.id,
+      permissions: { isSuperadmin: false },
+    });
+
+    expect(await getRoleAudits(admin.id)).toHaveLength(0);
+  });
 });

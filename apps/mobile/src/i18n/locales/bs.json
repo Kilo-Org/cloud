@@ -1432,6 +1432,9 @@
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",
       "byline": "{{repo}} #{{number}} · Autor: {{author}}",
       "noFindings": "Nema nalaza.",
+      "findingsUnavailable": "Rezultati nisu dostupni jer ovaj pregled nije uspio.",
+      "serviceUnavailable": "Nije moguće povezati se s uslugom za pregled koda. Ponovi pregled kada usluga bude dostupna.",
+      "reviewFailed": "Pregled nije uspio. Molimo te, pokušaj ponovo.",
       "showMore": "Prikaži više",
       "created": "Kreirano",
       "started": "Započeto",
@@ -3705,7 +3708,7 @@
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite puž agenta",
       "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
-      "slugConflict": "Taj puž je rezervisan od strane ugrađenog agenta",
+      "slugConflict": "Taj slug već koristi ugrađeni agent ili drugi agent u ovom profilu",
       "edit": "Uredi agenta"
     },
     "slashCommands": {

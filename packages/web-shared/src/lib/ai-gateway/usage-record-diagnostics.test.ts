@@ -2,16 +2,223 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   pool: { totalCount: 4, idleCount: 1, waitingCount: 0, options: { max: 10 } },
 }));
 
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 
 import {
   createPhaseTimer,
   describeDatabaseError,
   isUsageRowConflict,
+  observeUsageRecordCompletion,
   readPoolGauges,
   shouldEmitUsageRecordTiming,
   stackFramesUnderHeader,
 } from './usage-record-diagnostics';
+
+describe('shared usage completion observations', () => {
+  const usage = {
+    id: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
+    created_at: '2026-04-29T01:16:12.945Z',
+    user_prompt_prefix: 'sensitive-prompt',
+    secret: 'sensitive-secret',
+  };
+  const recorded = {
+    usageId: usage.id,
+    createdAt: usage.created_at,
+    newMicrodollarsUsed: 1234,
+    wasRedelivery: false,
+  };
+  let info: jest.SpiedFunction<typeof console.info>;
+  let warn: jest.SpiedFunction<typeof console.warn>;
+  beforeEach(() => {
+    info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      NODE_ENV: 'test',
+      VERCEL_ENV: undefined,
+      VERCEL_TARGET_ENV: undefined,
+      VERCEL_REGION: 'fra1',
+    });
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test.each([false, true])(
+    'logs every nonproduction completion, including duplicate=%s',
+    async wasRedelivery => {
+      const result = { ...recorded, wasRedelivery };
+      jest.spyOn(Math, 'random').mockReturnValue(1);
+      expect(await observeUsageRecordCompletion(usage, async () => result)).toBe(result);
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(info.mock.calls[0][0])).toEqual({
+        level: 'info',
+        event: 'usage_record_completion',
+        sample_rate: 1,
+        usage_id: usage.id,
+        outcome: wasRedelivery ? 'duplicate' : 'recorded',
+        entrypoint: 'unknown',
+        writer_caller: 'unknown',
+        duration_ms: expect.any(Number),
+        event_age_ms: expect.any(Number),
+        execution_region: 'fra1',
+      });
+      expect(warn).not.toHaveBeenCalled();
+      expect(JSON.stringify(info.mock.calls)).not.toContain('sensitive');
+    }
+  );
+
+  test.each([
+    { random: 0, emitted: true },
+    { random: 0.009999, emitted: true },
+    { random: 0.01, emitted: false },
+  ])('samples production successes at the 1% boundary: %j', async ({ random, emitted }) => {
+    process.env.VERCEL_ENV = 'production';
+    jest.spyOn(Math, 'random').mockReturnValue(random);
+    for (const wasRedelivery of [false, true]) {
+      const result = { ...recorded, wasRedelivery };
+      const write = jest.fn(async () => result);
+      expect(await observeUsageRecordCompletion(usage, write)).toBe(result);
+      expect(write).toHaveBeenCalledTimes(1);
+    }
+    expect(info).toHaveBeenCalledTimes(emitted ? 2 : 0);
+    expect(warn).not.toHaveBeenCalled();
+    if (emitted) {
+      expect(info.mock.calls.map(([value]) => JSON.parse(value))).toEqual([
+        expect.objectContaining({ outcome: 'recorded', sample_rate: 0.01 }),
+        expect.objectContaining({ outcome: 'duplicate', sample_rate: 0.01 }),
+      ]);
+    }
+  });
+
+  test.each([
+    { node: 'production', vercel: 'production', target: undefined, rate: 0.01 },
+    { node: 'production', vercel: 'production', target: 'staging', rate: 0.01 },
+    { node: 'test', vercel: 'production', target: 'staging', rate: 0.01 },
+    { node: 'production', vercel: undefined, target: 'staging', rate: 1 },
+    { node: 'production', vercel: 'preview', target: undefined, rate: 1 },
+    { node: 'production', vercel: 'development', target: undefined, rate: 1 },
+    { node: 'production', vercel: undefined, target: undefined, rate: 0.01 },
+    { node: 'test', vercel: undefined, target: undefined, rate: 1 },
+    { node: 'development', vercel: undefined, target: undefined, rate: 1 },
+    { node: undefined, vercel: undefined, target: undefined, rate: 1 },
+  ] as const)(
+    'uses deployment context for success sampling: %j',
+    async ({ node, vercel, target, rate }) => {
+      jest.replaceProperty(process, 'env', {
+        ...process.env,
+        NODE_ENV: node ?? 'test',
+        VERCEL_ENV: vercel,
+        VERCEL_TARGET_ENV: target,
+      });
+      if (node === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
+      const random = jest.spyOn(Math, 'random').mockReturnValue(0.005);
+      expect(await observeUsageRecordCompletion(usage, async () => recorded)).toBe(recorded);
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(info.mock.calls[0][0]).sample_rate).toBe(rate);
+      expect(random).toHaveBeenCalledTimes(rate === 1 ? 0 : 1);
+    }
+  );
+
+  test('retains finite caller context without changing the write result', async () => {
+    expect(
+      await observeUsageRecordCompletion(usage, async () => recorded, {
+        entrypoint: 'writer_endpoint',
+        writer_caller: 'queue',
+      })
+    ).toBe(recorded);
+    expect(JSON.parse(info.mock.calls[0][0])).toMatchObject({
+      entrypoint: 'writer_endpoint',
+      writer_caller: 'queue',
+    });
+  });
+
+  test('waits for the full operation and measures monotonic elapsed time', async () => {
+    let now = 100;
+    jest.spyOn(performance, 'now').mockImplementation(() => now);
+    jest.spyOn(Date, 'now').mockReturnValue(Date.parse(usage.created_at) + 2000);
+    const delayed = Promise.withResolvers<typeof recorded>();
+    const work = observeUsageRecordCompletion(usage, () => delayed.promise);
+    expect(info).not.toHaveBeenCalled();
+    now = 375;
+    delayed.resolve(recorded);
+    expect(await work).toBe(recorded);
+    expect(JSON.parse(info.mock.calls[0][0])).toMatchObject({
+      duration_ms: 275,
+      event_age_ms: 2000,
+    });
+  });
+
+  test('distinguishes null outcomes from thrown failures without exposing errors', async () => {
+    process.env.VERCEL_ENV = 'production';
+    const random = jest.spyOn(Math, 'random').mockReturnValue(1);
+    expect(await observeUsageRecordCompletion(usage, async () => null)).toBeNull();
+    const failure = new Error('sensitive exception with SQL and credentials');
+    await expect(
+      observeUsageRecordCompletion(usage, async () => {
+        throw failure;
+      })
+    ).rejects.toBe(failure);
+    expect(
+      warn.mock.calls.map(([value]) => {
+        const log = JSON.parse(value);
+        return { outcome: log.outcome, sample_rate: log.sample_rate };
+      })
+    ).toEqual([
+      { outcome: 'not_recorded', sample_rate: 1 },
+      { outcome: 'error', sample_rate: 1 },
+    ]);
+    expect(random).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('sensitive');
+  });
+
+  test.each([0, 0.5])(
+    'preserves results/errors with broken console and random=%s',
+    async random => {
+      process.env.VERCEL_ENV = 'production';
+      jest.spyOn(Math, 'random').mockReturnValue(random);
+      info.mockImplementation(() => {
+        throw new Error('synthetic log failure');
+      });
+      warn.mockImplementation(() => {
+        throw new Error('synthetic log failure');
+      });
+      expect(await observeUsageRecordCompletion(usage, async () => recorded)).toBe(recorded);
+      const duplicate = { ...recorded, wasRedelivery: true };
+      expect(await observeUsageRecordCompletion(usage, async () => duplicate)).toBe(duplicate);
+      expect(info).toHaveBeenCalledTimes(random === 0 ? 2 : 0);
+      expect(await observeUsageRecordCompletion(usage, async () => null)).toBeNull();
+      const failure = new Error('original write failure');
+      await expect(
+        observeUsageRecordCompletion(usage, async () => {
+          throw failure;
+        })
+      ).rejects.toBe(failure);
+    }
+  );
+
+  test('handles database-shaped timestamps, clock skew and unknown timestamps/regions safely', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(Date.parse(usage.created_at) + 2000);
+    await observeUsageRecordCompletion(
+      { ...usage, created_at: '2026-04-29 01:16:12.945+00' },
+      async () => recorded
+    );
+    expect(JSON.parse(info.mock.calls[0][0]).event_age_ms).toBe(2000);
+    jest.spyOn(Date, 'now').mockReturnValue(0);
+    await observeUsageRecordCompletion(usage, async () => recorded);
+    expect(JSON.parse(info.mock.calls[1][0]).event_age_ms).toBe(0);
+    process.env.VERCEL_REGION = 'sensitive-unexpected-value';
+    await observeUsageRecordCompletion(
+      { ...usage, created_at: 'sensitive-invalid-timestamp' },
+      async () => recorded
+    );
+    const log = JSON.parse(info.mock.calls[2][0]);
+    expect(log).not.toHaveProperty('event_age_ms');
+    expect(log.execution_region).toBe('unknown');
+    expect(JSON.stringify(info.mock.calls)).not.toContain('sensitive');
+  });
+});
 
 /** Shape of the drizzle wrapper: a message carrying the statement, plus a cause. */
 function drizzleError(cause: Record<string, unknown>) {

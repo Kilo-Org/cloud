@@ -1413,6 +1413,9 @@
       "couldNotGetLatest": "Odeeffannoo ammaa argachuun hin danda'amne.",
       "byline": "{{repo}} #{{number}} kan {{author}}",
       "noFindings": "Argamni hin jiru.",
+      "findingsUnavailable": "Sakatta'i kun waan hin milkoofneef bu'aawwan hin argaman.",
+      "serviceUnavailable": "Tajaajila sakatta'a koodii qunnamuun hin danda'amne. Yeroo tajaajilichi argamutti sakatta'a irra deebi'ii yaali.",
+      "reviewFailed": "Sakatta'i hin milkoofne. Maaloo irra deebi'ii yaali.",
       "showMore": "Dabalataa agarsiisi",
       "created": "Uumame",
       "started": "Jalqabame",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Maqaa bakka bu'aa galchi",
       "slugRequired": "Slug ergamaa galchi",
       "slugInvalid": "Slug qubee irraa jalqabuu fi qubee xixiqqaa, dijiitota, fi daash qofa fayyadamuu qaba",
-      "slugConflict": "Slug sun ergamaa ijaarameen kan eegamedha",
+      "slugConflict": "slug kana dura dhaabbataa ykn agensiin biraawuzii kana keessatti fayyadamaa jira",
       "edit": "Bakka bu'aa gulaaluu"
     },
     "slashCommands": {

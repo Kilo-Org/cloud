@@ -24,6 +24,8 @@ import { useIdentityConfirmation } from '@/components/agents/user-web-connection
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { NewSessionModelProvider } from '@/components/agents/new-session-model-provider';
+import { NewSessionScreenBody } from '@/components/agents/new-session-screen-body';
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -31,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { isPlausibleKiloSessionId } from '@/lib/session-id-shape';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
@@ -150,7 +153,14 @@ export default function SessionDetailScreen() {
       owner.generation,
       owner.userId,
     ]),
-    enabled: isAuthenticatedOwner(owner) && routeOrganizationId === undefined && sessionId !== null,
+    // A param that cannot be a real session id never starts a metadata read:
+    // the composer fallback above renders instead, so the doomed id can never
+    // fire the read even when the route was opened without an organization.
+    enabled:
+      isAuthenticatedOwner(owner) &&
+      routeOrganizationId === undefined &&
+      sessionId !== null &&
+      isPlausibleKiloSessionId(sessionId),
   });
 
   // The account that owns this device's persisted transcript. The live
@@ -197,6 +207,22 @@ export default function SessionDetailScreen() {
 
   if (sessionId === null) {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
+  }
+
+  if (!isPlausibleKiloSessionId(sessionId)) {
+    // The param can only be a real Kilo session id when it matches the
+    // server-side shape (`ses_` + 26 chars, `sessionIdSchema`); a malformed or
+    // hand-built deep link can deliver a segment that can never resolve to a
+    // session (an all-zeros UUID was observed in the wild), and mounting it
+    // here would land on the permanent "Not found" screen. Such an id renders
+    // the New-session screen instead — the composer the user asked for — with
+    // the route's organization context carried through, exactly as
+    // `agent-chat/new` renders it.
+    return (
+      <NewSessionModelProvider organizationId={routeOrganizationId}>
+        <NewSessionScreenBody />
+      </NewSessionModelProvider>
+    );
   }
 
   if (

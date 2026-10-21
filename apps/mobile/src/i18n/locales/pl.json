@@ -949,6 +949,9 @@
       "gateHidden": "Ukryta",
       "gateNone": "Brak",
       "noFindings": "Nie wykryto problemów.",
+      "findingsUnavailable": "Wyniki są niedostępne, ponieważ ten przegląd się nie powiódł.",
+      "serviceUnavailable": "Nie udało się połączyć z usługą przeglądu kodu. Ponów przegląd, gdy usługa będzie dostępna.",
+      "reviewFailed": "Przegląd się nie powiódł. Spróbuj ponownie.",
       "retryMessage": "Spowoduje to ponowne uruchomienie przeglądu kodu.",
       "retryReview": "Ponów przegląd",
       "retryNeedsSettings": "Asystent przeglądu kodu jest wyłączony albo jego ustawienia wymagają uwagi. Popraw ustawienia, a następnie ponów ten przegląd.",
@@ -3746,7 +3749,7 @@
       "nameRequired": "Wprowadź nazwę agenta",
       "slugRequired": "Wprowadź ślimak agenta",
       "slugInvalid": "Ślimak musi zaczynać się od litery i używać tylko małych liter, cyfr i myślników",
-      "slugConflict": "Ten ślimak jest zarezerwowany przez wbudowanego agenta",
+      "slugConflict": "Ten slug jest już używany przez wbudowanego agenta lub innego agenta w tym profilu",
       "edit": "Edytuj agenta"
     },
     "slashCommands": {

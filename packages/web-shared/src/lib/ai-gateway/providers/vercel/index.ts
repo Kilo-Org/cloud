@@ -295,12 +295,17 @@ export async function applyVercelSettings(
       Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
 
     // Pass request-scoped credentials and restrict routing to the corresponding providers.
+    // Request-level data handling preferences travel with the request on every routing path,
+    // so upstream providers receive the caller's retention and training choices consistently.
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),
         sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
         models: requestToMutate.body.models,
+        zeroDataRetention: requestToMutate.body.provider?.zdr,
+        disallowPromptTraining:
+          requestToMutate.body.provider?.data_collection === 'deny' || undefined,
         ...getSessionAffinityOptions(requestToMutate),
       },
     };

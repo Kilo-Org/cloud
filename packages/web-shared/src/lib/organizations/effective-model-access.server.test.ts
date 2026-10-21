@@ -1,4 +1,9 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
@@ -151,7 +156,63 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
+    const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+    const organization = { ...context().organization, id: ORG_ID };
+
+    beforeAll(async () => {
+      await insertCustomLlmForTest(
+        'acme/org-model',
+        customLlmDefinition({ organization_ids: [ORG_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/group-model',
+        customLlmDefinition({ organization_ids: [], group_ids: [GROUP_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/other-org-model',
+        customLlmDefinition({ organization_ids: ['00000000-0000-4000-8000-0000000000a2'] })
+      );
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/org-model');
+      await deleteCustomLlmForTest('acme/group-model');
+      await deleteCustomLlmForTest('acme/other-org-model');
+    });
+
+    it('exempts a custom LLM granted to the organization', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(context({ organization }));
+
+      await expect(
+        getEffectiveModelDecision(policy, 'acme/org-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    });
+
+    it('exempts a custom LLM granted to one of the member groups', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(
+        context({ organization, groupIds: [GROUP_ID] })
+      );
+
+      await expect(
+        getEffectiveModelDecision(policy, 'acme/group-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    });
+
+    it.each(['acme/other-org-model', 'acme/group-model'])(
+      'applies organization policy to %s when it is not granted',
+      async modelId => {
+        const policy = evaluateEffectiveModelAccessPolicy(context({ organization }));
+
+        await expect(
+          getEffectiveModelDecision(policy, modelId, async () => new Set())
+        ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+      }
+    );
+  });
+
+  it.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from effective Enterprise restrictions',
     async modelId => {
       const policy = evaluateEffectiveModelAccessPolicy(context());

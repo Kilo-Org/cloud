@@ -561,6 +561,12 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Optional until a downloaded target provisions its private artifact bucket. */
+  RUNTIME_RELEASE_BUCKET?: R2Bucket;
+  RUNTIME_STARTUP_MODE?: string;
+  NATIVE_RUNTIME_IMAGE?: string;
+  /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
+  RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
@@ -610,6 +616,8 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions run on the call-home control plane. `*` includes personal. */
   CODE_REVIEW_CONTROL_PLANE_IDS?: string;
+  /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
+  CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;

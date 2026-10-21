@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- the spectator describe adds a transcript-state suite on top of the existing outcome-first contract; they share one mock harness */
 
-// Outcome-first detail-screen contract: the screen leads with the conclusion
-// (status + error), then findings, council, gate, and metadata. A null council
-// result renders "No findings" (not a success checkmark). A permanent error
-// (NOT_FOUND/FORBIDDEN/UNAUTHORIZED) shows no Retry; a transient error does.
+// Outcome-first detail-screen contract: conclusion, findings, council, gate,
+// then metadata. Failed reviews must not imply a clean result or expose raw
+// failures. Permanent query errors have no Retry; transient errors do.
 
 import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -11,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MetaRow } from '@/components/code-reviewer/review-detail-sections';
 import { i18n } from '@/i18n';
+import { openExternalUrl } from '@/lib/external-link';
 import { ReviewDetailScreen } from './review-detail-screen';
 
 const detail = vi.hoisted(() => ({
@@ -142,9 +142,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: ({ children }: { children?: unknown }) => children,
 }));
-vi.mock('@/lib/code-reviewer-open-pr-destination', () => ({
-  resolveCodeReviewerOpenPrDestination: () => ({ kind: 'browser' }),
-}));
 vi.mock('@/lib/code-reviewer-config', () => ({
   reviewerPlatformLabel: () => 'GitHub',
 }));
@@ -264,11 +261,11 @@ function openTranscriptSheet() {
   act(open.onPress);
 }
 
-function mountScreen(openTranscript = false) {
+function mountScreen(openTranscript = false, scope = 'personal') {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-1' })
+      createElement(ReviewDetailScreen, { scope, reviewId: 'rev-1' })
     );
   });
   const renderer = ref.current;
@@ -307,6 +304,7 @@ beforeEach(() => {
   reviewConfig.query = { isPending: false, data: undefined };
   reviewConfig.calls = [];
   routerMock.push.mockClear();
+  vi.mocked(openExternalUrl).mockClear();
   nativePlatform.OS = 'ios';
   sessionListRenders.list = [];
   composerRenders.list = [];
@@ -369,24 +367,28 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(texts).toContain('$123.00');
   });
 
-  it('shows the error message inside the conclusion', () => {
+  it.each([
+    ['unrecognized internal failure', 'codeReviewer.reviewDetail.reviewFailed'],
+    [
+      'Dispatch failed: could not reach the code review service. ' +
+        'It may be offline — retry the review once it is running.',
+      'codeReviewer.reviewDetail.serviceUnavailable',
+    ],
+  ] as const)('localizes persisted failure %s inside the conclusion', (errorMessage, key) => {
     detail.data = {
       success: true,
-      review: makeReview({ error_message: 'review crashed' }),
+      review: makeReview({ status: 'failed', error_message: errorMessage }),
       tokenUsage: { input: 0, output: 0 },
     };
 
     const texts = renderScreen();
-
-    expect(texts).toContain('review crashed');
-    expect(texts.indexOf('Completed')).toBeLessThan(texts.indexOf('review crashed'));
+    expect(texts).toContain(i18n.t(key));
+    expect(texts).not.toContain(errorMessage);
+    expect(texts).toContain('failed');
+    expect(texts.indexOf('failed')).toBeLessThan(texts.indexOf(i18n.t(key)));
   });
 
-  it('clamps a multi-kilobyte failure dump so the retry action stays mounted', () => {
-    // A failed admission stores the raw upstream error (a serialized TRPC
-    // stack) in `error_message`. Rendered unclamped it filled the screen and
-    // pushed "Retry review" below the fold (e1-review-status.png), leaving no
-    // visible way out. The failure block must keep a bounded height.
+  it('replaces a failure dump while keeping retry mounted', () => {
     statusHelpers.retriggerable = true;
     const dump = `Dispatch failed: ${'at Object.<anonymous> (worker.js:1:1234)\n'.repeat(60)}`;
     detail.data = {
@@ -395,18 +397,49 @@ describe('ReviewDetailScreen outcome-first order', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    const renderer = mountScreen();
-    const texts = collectText(renderer.toJSON());
+    const texts = renderScreen();
     expect(texts).toContain('Retry review');
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(texts.join(' ')).not.toContain('worker.js');
+  });
 
-    const errorNode = renderer.root.findAll(
-      node =>
-        (node.type as string) === 'Text' &&
-        collectText([node.props.children]).some(text => text.includes('Dispatch failed:'))
-    )[0];
-    expect(errorNode).toBeDefined();
-    expect(typeof errorNode?.props.numberOfLines).toBe('number');
-    expect(errorNode?.props.numberOfLines).toBeLessThanOrEqual(4);
+  it('shows generic failure copy when a failed review has no persisted message', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    expect(renderScreen()).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+  });
+
+  it.each(['cancelled', 'interrupted'])('preserves the reason for a %s review', status => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status,
+        terminal_reason: 'superseded',
+        error_message: 'Superseded by new push',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain('Superseded by new push');
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+  });
+
+  it('uses existing localized copy for a typed action-required failure', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'failed',
+        terminal_reason: 'byok_invalid_key',
+        error_message: 'Raw diagnostic',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain(i18n.t('codeReviewer.actionRequired.byokInvalidKey.description'));
+    expect(texts).not.toContain('Raw diagnostic');
   });
 });
 
@@ -501,6 +534,49 @@ describe('ReviewDetailScreen empty council', () => {
 
     expect(texts).toContain('No findings');
   });
+
+  it.each([
+    null,
+    {
+      decision: null,
+      specialists: [{ findings: [], name: 'Security', id: 'sec', vote: null }],
+    },
+  ])('shows unavailable results for an empty failed review', councilResult => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', council_result: councilResult }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+  });
+
+  it.each(['failed', 'completed'])('preserves findings from a %s review', status => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status,
+        council_result: {
+          decision: null,
+          specialists: [
+            {
+              id: 'sec',
+              name: 'Security',
+              vote: null,
+              findings: [{ path: 'a.ts', severity: 'warning', rationale: 'Preserved finding' }],
+            },
+            { id: 'other', name: 'Other', vote: null, findings: [] },
+          ],
+        },
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain('Preserved finding');
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+  });
 });
 
 describe('ReviewDetailScreen redacted check run', () => {
@@ -515,6 +591,83 @@ describe('ReviewDetailScreen redacted check run', () => {
 
     expect(texts).toContain('Hidden');
     expect(texts).not.toContain('None');
+  });
+});
+
+describe('ReviewDetailScreen gate threshold', () => {
+  it.each([
+    ['off', 'codeReviewer.gate.off'],
+    ['all', 'codeReviewer.gate.all'],
+    ['critical', 'codeReviewer.gate.critical'],
+    ['warning', 'codeReviewer.gate.warning'],
+    ['future-threshold', 'common.unknown'],
+  ] as const)('localizes %s', (threshold, key) => {
+    detail.data = {
+      success: true,
+      review: makeReview({ manual_config: { agentConfig: { gate_threshold: threshold } } }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const renderer = mountScreen();
+    const row = renderer.root.findAll(
+      node =>
+        node.type === MetaRow && node.props.label === i18n.t('codeReviewer.reviewDetail.threshold')
+    );
+    expect(row).toHaveLength(1);
+    expect(collectText(row[0]?.children ?? [])).toEqual([
+      i18n.t('codeReviewer.reviewDetail.threshold'),
+      i18n.t(key),
+    ]);
+  });
+});
+
+describe('ReviewDetailScreen pull request destination', () => {
+  it.each([
+    ['github', 'https://github.com/org/repo/pull/42'],
+    ['gitlab', 'https://gitlab.com/org/repo/-/merge_requests/42'],
+    ['bitbucket', 'https://bitbucket.org/org/repo/pull-requests/42'],
+  ])('opens organization %s reviews at their persisted URL', (platform, prUrl) => {
+    detail.data = {
+      success: true,
+      review: makeReview({ platform, pr_url: prUrl }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    mountScreen(false, 'org-1');
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(openExternalUrl).toHaveBeenCalledWith(prUrl, { label: i18n.t('common.pullRequest') });
+    expect(routerMock.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps personal GitHub reviews in app', () => {
+    detail.data = { success: true, review: makeReview(), tokenUsage: { input: 0, output: 0 } };
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/pr-review/org/repo/42');
+    expect(openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('keeps the personal browser fallback for unrecognized URLs', () => {
+    const prUrl = 'https://github.example.com/org/repo/pull/42';
+    detail.data = {
+      success: true,
+      review: makeReview({ pr_url: prUrl }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(openExternalUrl).toHaveBeenCalledWith(prUrl, { label: i18n.t('common.pullRequest') });
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 });
 

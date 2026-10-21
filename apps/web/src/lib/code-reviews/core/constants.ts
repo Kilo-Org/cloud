@@ -27,6 +27,10 @@ export const CODE_REVIEW_MD_CONVERSION_FLAG = 'code-review-md-conversion';
 export const REVIEW_MD_CONVERSION_RATE_LIMIT = 30;
 export const REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS = 60 * 60;
 
+/** Max review fix sessions a single actor may start per rolling window (abuse cap). */
+export const REVIEW_FIX_SESSION_RATE_LIMIT = 30;
+export const REVIEW_FIX_SESSION_RATE_WINDOW_SECONDS = 60 * 60;
+
 // ============================================================================
 // Pagination
 // ============================================================================

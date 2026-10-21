@@ -26,8 +26,8 @@ export type ModelRestrictions = {
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
 /**
- * A custom LLM is exempt only for a grantee it is granted to: a Kilo admin
- * allowlisted that organization or group, which overrides organization policy.
+ * Kilo's own routing models need no provider route. A custom LLM is available
+ * only to a grantee allowlisted by a Kilo admin for that organization or group.
  */
 export async function isModelRestrictionExempt(
   modelId: string,
@@ -38,17 +38,22 @@ export async function isModelRestrictionExempt(
     return true;
   }
   const customLlm = await findCustomLlm(requestedModelId);
-  if (customLlm) {
-    return (
-      customLlmGrantee !== undefined &&
-      hasCustomLlmAccess(
-        customLlm.definition,
-        customLlmGrantee.organizationId,
-        customLlmGrantee.groupIds
-      )
-    );
+  if (!customLlm) {
+    return false;
   }
-  const directByokModel = await getDirectByokModel(requestedModelId);
+  return (
+    customLlmGrantee !== undefined &&
+    hasCustomLlmAccess(
+      customLlm.definition,
+      customLlmGrantee.organizationId,
+      customLlmGrantee.groupIds
+    )
+  );
+}
+
+/** A model of a provider the organization configured directly. */
+export async function isDirectByokModel(modelId: string): Promise<boolean> {
+  const directByokModel = await getDirectByokModel(modelId.trim().toLowerCase());
   return directByokModel.provider !== null && directByokModel.model !== null;
 }
 
@@ -72,6 +77,7 @@ export function createAllowPredicateFromProviderAllowList(
     if (modelDenySet.has(normalizedModelId)) {
       return false;
     }
+    if (await isDirectByokModel(modelId)) return true;
     const providerSlugs =
       getKiloExclusiveInferenceProviders(modelId) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;

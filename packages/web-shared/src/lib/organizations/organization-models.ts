@@ -6,6 +6,7 @@ import {
 import {
   getEffectiveModelDecision,
   evaluateEffectiveModelAccessPolicy,
+  type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -48,6 +49,20 @@ function chatGptByokOwner(
   return null;
 }
 
+async function getPolicyAllowedDirectByokModels(
+  policy: EffectiveOrganizationModelPolicy,
+  organizationId: string
+) {
+  const models = await getDirectByokModelsForOrganization(organizationId);
+  const allowed = [];
+  for (const model of models) {
+    if ((await getEffectiveModelDecision(policy, model.id)).allowed) {
+      allowed.push(model);
+    }
+  }
+  return allowed;
+}
+
 export async function getAvailableModelsForOrganization(
   organizationId: string,
   subject: OrganizationPolicySubject,
@@ -81,7 +96,7 @@ export async function getAvailableModelsForOrganization(
     availableModels.push(buildAutoModelCatalogEntry(ORG_AUTO_MODEL));
   }
 
-  availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
+  availableModels.push(...(await getPolicyAllowedDirectByokModels(policy, organizationId)));
   availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
 
   const chatGptOwner = chatGptByokOwner(organizationId, subject, audience);

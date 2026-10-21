@@ -355,7 +355,9 @@ describe('organization model producer publication', () => {
       expect.arrayContaining(mockCatalog.data.map(model => ({ policy: mockPolicy, id: model.id })))
     );
     expect(
-      mockDecision.mock.calls.every(([, id]) => mockCatalog.data.some(model => model.id === id))
+      mockDecision.mock.calls.every(
+        ([, id]) => mockCatalog.data.some(model => model.id === id) || id === 'morph-byok/private'
+      )
     ).toBe(true);
     for (const result of results) {
       expect(result.data.map(model => model.id)).toEqual([
@@ -369,6 +371,15 @@ describe('organization model producer publication', () => {
       expect(result.data[2]).not.toHaveProperty('enkrypt');
     }
     expect(mockReadRows).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits organization provider models the policy denies', async () => {
+    mockByok.mockResolvedValue([catalogModel('provider/blocked')]);
+
+    const result = await resultFor();
+
+    expect(result.data.some(model => model.id === 'provider/blocked')).toBe(false);
+    expect(result.data.some(model => model.id === 'provider/allowed')).toBe(true);
   });
 
   it.each(['teams-allow', 'teams-deny', 'enterprise'] as const)(

@@ -47,9 +47,6 @@ export type GetProviderProviderResult = {
   provider: Provider;
   userByok: BYOKResult[] | null;
   readonly isFree: boolean;
-  /** Skip balance, paid-auth, and organization policy checks entirely. Used
-   *  by direct-byok and custom_llm2 because both already require explicit
-   *  admin opt-in. */
   bypassAccessCheck: boolean;
   /** Skip only the zero-balance paid-model block. Set when a user credential
    *  outside Kilo credits pays for the request, such as the ChatGPT
@@ -97,7 +94,7 @@ async function checkDirectBYOK(
     } satisfies Provider,
     userByok,
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
-    bypassAccessCheck: true,
+    bypassAccessCheck: false,
   };
 }
 
@@ -205,8 +202,7 @@ export type GetProviderInput = {
   organizationId: string | undefined;
   /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
   botId?: string | undefined;
-  /** Resolves organization/group provider policy only when selecting a managed
-   * gateway. Direct BYOK and custom LLM routes remain exempt. */
+  /** Resolves organization/group provider policy for managed gateway selection. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
 };
 

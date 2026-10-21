@@ -212,16 +212,68 @@ describe('effective organization model access', () => {
     );
   });
 
-  it.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
-    'keeps %s exempt from effective Enterprise restrictions',
-    async modelId => {
-      const policy = evaluateEffectiveModelAccessPolicy(context());
+  it('keeps kilo-auto/balanced exempt from effective Enterprise restrictions', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(context());
+
+    await expect(
+      getEffectiveModelDecision(policy, 'kilo-auto/balanced', async () => new Set())
+    ).resolves.toEqual({ allowed: true });
+  });
+
+  describe('organization provider models', () => {
+    const ORGANIZATION_MODEL = 'kimi-coding/kimi-for-coding';
+    const baselineContext = (settings: {
+      provider_allow_list?: string[];
+      model_deny_list?: string[];
+    }) =>
+      context({
+        organization: { ...context().organization, settings },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      });
+
+    it('applies the organization baseline grant', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(
+        baselineContext({ provider_allow_list: ['anthropic', 'openai'], model_deny_list: [] })
+      );
 
       await expect(
-        getEffectiveModelDecision(policy, modelId, async () => new Set())
+        getEffectiveModelDecision(policy, ORGANIZATION_MODEL, async () => new Set())
       ).resolves.toEqual({ allowed: true });
-    }
-  );
+    });
+
+    it('applies the organization model deny list', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(
+        baselineContext({ model_deny_list: [ORGANIZATION_MODEL] })
+      );
+
+      await expect(
+        getEffectiveModelDecision(policy, ORGANIZATION_MODEL, async () => new Set())
+      ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+    });
+
+    it('requires the organization baseline grant', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(
+        context({
+          groupPolicies: [
+            [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: ['anthropic/claude'],
+                  provider_allow_list: ['anthropic'],
+                },
+              },
+            ],
+          ],
+        })
+      );
+
+      await expect(
+        getEffectiveModelDecision(policy, ORGANIZATION_MODEL, async () => new Set())
+      ).resolves.toEqual({ allowed: false, denialSource: 'no_grant' });
+    });
+  });
 
   it('allows known snapshot models when no model access policy is configured', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(

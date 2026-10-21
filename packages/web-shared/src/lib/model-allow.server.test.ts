@@ -199,21 +199,46 @@ describe('model access predicates', () => {
     });
   });
 
-  test.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
-    'keeps %s exempt from Enterprise model restrictions',
-    async modelId => {
-      const isAllowed = createAllowPredicateFromRestrictions(
-        {
-          requireModelInCurrentSnapshot: true,
-          providerAllowList: [],
-          modelDenyList: [modelId],
-        },
-        lookup({})
-      );
+  test('keeps kilo-auto/balanced exempt from Enterprise model restrictions', async () => {
+    const isAllowed = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: [],
+        modelDenyList: ['kilo-auto/balanced'],
+      },
+      lookup({})
+    );
 
-      await expect(isAllowed(modelId)).resolves.toBe(true);
-    }
-  );
+    await expect(isAllowed('kilo-auto/balanced')).resolves.toBe(true);
+  });
+
+  test('applies the model deny list to an organization provider model', async () => {
+    const modelId = 'kimi-coding/kimi-for-coding';
+    const isAllowed = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: [],
+        modelDenyList: [modelId],
+      },
+      lookup({})
+    );
+
+    await expect(isAllowed(modelId)).resolves.toBe(false);
+  });
+
+  test('allows an organization provider model the organization configured', async () => {
+    const modelId = 'kimi-coding/kimi-for-coding';
+    const isAllowed = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: ['openai'],
+        modelDenyList: [],
+      },
+      lookup({})
+    );
+
+    await expect(isAllowed(modelId)).resolves.toBe(true);
+  });
 
   test('provider allow list still applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(

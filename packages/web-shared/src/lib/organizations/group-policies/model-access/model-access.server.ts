@@ -14,6 +14,7 @@ import {
   withoutVirtualProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
+  isDirectByokModel,
   isModelRestrictionExempt,
   type CustomLlmGrantee,
 } from '@kilocode/web-shared/lib/model-allow.server';
@@ -154,6 +155,20 @@ function getEligibleProviderRoutes(
   return new Set([...modelProviders].filter(provider => allowedProviders.has(provider)));
 }
 
+/** A model of a provider the organization configured directly. */
+function directByokDecision(
+  policy: EffectiveOrganizationModelPolicy,
+  normalizedModelId: string
+): EffectiveModelDecision {
+  if (policy.organizationModelDenyList.includes(normalizedModelId)) {
+    return { allowed: false, denialSource: 'organization_model' };
+  }
+  if (policy.memberGrant.mode === 'selected' && !policy.memberGrant.includeOrganizationBaseline) {
+    return { allowed: false, denialSource: 'no_grant' };
+  }
+  return { allowed: true };
+}
+
 export async function getEffectiveModelDecision(
   policy: EffectiveOrganizationModelPolicy,
   modelId: string,
@@ -162,6 +177,9 @@ export async function getEffectiveModelDecision(
   const normalizedModelId = normalizeModelId(modelId);
   if (await isModelRestrictionExempt(modelId, policy.customLlmGrantee)) {
     return { allowed: true };
+  }
+  if (await isDirectByokModel(modelId)) {
+    return directByokDecision(policy, normalizedModelId);
   }
   if (
     policy.memberGrant.mode === 'organization_baseline' &&

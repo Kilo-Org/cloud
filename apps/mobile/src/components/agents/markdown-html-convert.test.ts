@@ -45,9 +45,13 @@ describe('convertHtmlToMarkdown inline tags', () => {
 
   it('keeps code with markup or an unknown entity as HTML', () => {
     expect(convertHtmlToMarkdown('<code><b>x</b></code>')).toBe('<code><b>x</b></code>');
-    expect(convertHtmlToMarkdown('<code>&notarealentity;</code>')).toBe(
-      '<code>&notarealentity;</code>'
-    );
+    for (const html of [
+      '<code>&notarealentity;</code>',
+      '<code>&constructor;</code>',
+      '<code>&toString;</code>',
+    ]) {
+      expect(convertHtmlToMarkdown(html)).toBe(html);
+    }
   });
 
   it('decodes any named reference inside a code span', () => {

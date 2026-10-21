@@ -149,7 +149,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // slug the field validator accepts, a server name, a JSON snippet, and
   // command lines whose tool and package paths must stay literal. Every
   // catalog keeps them English so the example never contradicts validation.
-  'profiles.commandPlaceholder',
   'profiles.mcp.namePlaceholder',
   'profiles.mcp.commandPlaceholder',
   'profiles.mcp.jsonPlaceholder',
@@ -181,6 +180,10 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A placeholder-only accessibility label: the list's name and its open
   // counter joined by a comma, so a catalog may keep English punctuation.
   'todos.lists.rowA11y',
+  // Format-only briefing values: a lower-bound marker and a time range built
+  // from localized placeholders, with no translatable words.
+  'agentBriefing.atLeast',
+  'agentBriefing.window',
 ]);
 
 /** The supported tags, read from the one source of truth. */

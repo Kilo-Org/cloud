@@ -403,7 +403,9 @@ export function enableReasoningSummaries(request: GatewayRequest) {
   ) {
     request.body.thinking.display = 'summarized';
   }
-  if (request.kind === 'responses' && request.body.reasoning && !request.body.reasoning.summary) {
-    request.body.reasoning.summary = 'auto';
+  if (request.kind === 'responses' && !request.body.reasoning?.summary) {
+    // Requested even without a reasoning object: Vercel omits summaries otherwise,
+    // although models with mandatory reasoning (e.g. Muse Spark) still reason.
+    request.body.reasoning = { ...request.body.reasoning, summary: 'auto' };
   }
 }

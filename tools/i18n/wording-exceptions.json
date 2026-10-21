@@ -144,7 +144,14 @@
     "plan",
     "review"
   ],
-  "de": ["block", "manual review", "no changes needed", "open", "open pull request", "pr opened"],
+  "de": [
+    "block",
+    "manual review",
+    "no changes needed",
+    "open",
+    "open pull request",
+    "pr opened"
+  ],
   "el": [
     "balanced",
     "critical",
@@ -497,7 +504,14 @@
     "remediation failed",
     "session exited"
   ],
-  "lo": ["dismissed", "manual review", "pr opened", "remediation blocked", "review", "superseded"],
+  "lo": [
+    "dismissed",
+    "manual review",
+    "pr opened",
+    "remediation blocked",
+    "review",
+    "superseded"
+  ],
   "lt": [
     "analysis failed",
     "commit",
@@ -623,7 +637,13 @@
     "superseded",
     "unavailable"
   ],
-  "nb": ["analysis failed", "no changes needed", "open", "open pull request", "review"],
+  "nb": [
+    "analysis failed",
+    "no changes needed",
+    "open",
+    "open pull request",
+    "review"
+  ],
   "ne": [
     "block",
     "github connection expired",
@@ -635,7 +655,14 @@
     "remediation failed",
     "superseded"
   ],
-  "nl": ["all", "block", "manual review", "open", "open pull request", "pr opened"],
+  "nl": [
+    "all",
+    "block",
+    "manual review",
+    "open",
+    "open pull request",
+    "pr opened"
+  ],
   "om": [
     "analysis failed",
     "cancelled",
@@ -872,7 +899,10 @@
     "remediation blocked",
     "remediation failed",
     "review",
-    "tokens"
+    "tokens",
+    "{{count}} open",
+    "comment",
+    "merge"
   ],
   "sw": [
     "analysis failed",
@@ -1024,5 +1054,10 @@
     "no changes needed",
     "remediation blocked"
   ],
-  "ht": ["no changes needed", "pr opened", "remediation blocked", "remediation failed"]
+  "ht": [
+    "no changes needed",
+    "pr opened",
+    "remediation blocked",
+    "remediation failed"
+  ]
 }

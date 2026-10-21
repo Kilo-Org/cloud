@@ -1,17 +1,20 @@
+import { useRouter } from 'expo-router';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import {
   addCommand,
+  commandPosition,
   commandRowA11yLabel,
   MAX_SETUP_COMMAND_LENGTH,
   MAX_SETUP_COMMANDS,
   moveCommand,
+  nonBlankCommands,
   removeCommand,
   replaceCommand,
+  sameCommands,
 } from '@/components/profiles/profile-commands-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -20,7 +23,8 @@ import { FormField } from '@/components/ui/form-field';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
+import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -28,26 +32,6 @@ type CommandRow = Readonly<{ sequence: number; command: string }>;
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMAND_ROWS: readonly CommandRow[] = [];
-
-/**
- * The mutation hook toasts `error.message`; the screen only supplies a
- * fallback when the server sent nothing readable.
- */
-function hasUsableMessage(error: unknown): boolean {
-  return error instanceof Error && error.message.trim().length > 0;
-}
-
-function sameCommands(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
-/**
- * The payload `setCommands` stores. A blank row is the draft slot `add()`
- * opens, not a command, so whitespace-only entries never reach the server.
- */
-function nonBlankCommands(commands: readonly string[]): string[] {
-  return commands.filter(command => command.trim().length > 0);
-}
 
 /** Content-shaped cards in the same slots as a loaded command row. */
 function CommandsSkeleton() {
@@ -71,9 +55,9 @@ export function ProfileCommandsScreen({
   organizationId,
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const colors = useThemeColors();
   const profileQuery = useAgentProfile(profileId, organizationId);
-  const { setCommands: saveCommands } = useAgentProfileMutations(organizationId);
 
   const profile = profileQuery.data;
   const serverRows = profile?.commands ?? NO_COMMAND_ROWS;
@@ -84,11 +68,20 @@ export function ProfileCommandsScreen({
   // list, but must not discard a draft typed after the last submitted payload.
   const [commands, setCommands] = useState<string[]>(serverCommands);
   const [syncedCommands, setSyncedCommands] = useState<string[]>(serverCommands);
-  const persistedRef = useRef<string[]>(serverCommands);
+  const { save, persistedRef, isSaving } = useProfileCommandsSave({
+    profileId,
+    organizationId,
+    initialCommands: serverCommands,
+  });
+  // The list the screen renders right now. Back reads this, not the state a
+  // handler captured, because the field's last edit may not have re-rendered.
+  const commandsRef = useRef(commands);
+  commandsRef.current = commands;
+  const leavingRef = useRef(false);
   // Remount uncontrolled fields for reorders and accepted server changes;
   // their text belongs to the position, not the input instance.
   const [generation, setGeneration] = useState(0);
-  if (serverCommands !== syncedCommands && !saveCommands.isPending) {
+  if (serverCommands !== syncedCommands && !isSaving) {
     setSyncedCommands(serverCommands);
     if (sameCommands(commands, persistedRef.current) && !sameCommands(commands, serverCommands)) {
       setCommands(serverCommands);
@@ -96,27 +89,6 @@ export function ProfileCommandsScreen({
     }
     persistedRef.current = serverCommands;
   }
-
-  const persist = async (next: string[]) => {
-    const payload = nonBlankCommands(next);
-    // `setCommands` replaces the whole list, so an unchanged payload has
-    // nothing to send — e.g. moving a draft row that carries no text.
-    if (sameCommands(payload, persistedRef.current)) {
-      return;
-    }
-    const previous = persistedRef.current;
-    // Mark the list persisted before the await: a submit followed by a blur
-    // (or the reverse) must not send the same list twice.
-    persistedRef.current = payload;
-    try {
-      await saveCommands.mutateAsync({ profileId, commands: payload });
-    } catch (error) {
-      persistedRef.current = previous;
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.commandsSaveFailed'));
-      }
-    }
-  };
 
   const commit = (index: number) => {
     const value = commands[index]?.trim() ?? '';
@@ -127,7 +99,7 @@ export function ProfileCommandsScreen({
     if (sameCommands(nonBlankCommands(commands), persistedRef.current)) {
       return;
     }
-    void persist(commands);
+    void save(commands);
   };
 
   const move = (index: number, delta: number) => {
@@ -137,7 +109,7 @@ export function ProfileCommandsScreen({
     }
     setCommands(next);
     setGeneration(current => current + 1);
-    void persist(next);
+    void save(next);
   };
 
   const remove = (index: number) => {
@@ -147,7 +119,7 @@ export function ProfileCommandsScreen({
     }
     setCommands(next);
     setGeneration(current => current + 1);
-    void persist(next);
+    void save(next);
   };
 
   const add = () => {
@@ -155,12 +127,43 @@ export function ProfileCommandsScreen({
     setGeneration(current => current + 1);
   };
 
+  /**
+   * The screen has no save control, so the header arrow persists the focused
+   * edit before leaving. Each pass re-reads the rendered list, so an edit made
+   * during a write is saved by the same press.
+   */
+  const leave = async () => {
+    if (leavingRef.current) {
+      return;
+    }
+    leavingRef.current = true;
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop -- each pass persists the newest list before the next check
+      const saved = await save(commandsRef.current);
+      if (!saved) {
+        leavingRef.current = false;
+        return;
+      }
+      if (sameCommands(nonBlankCommands(commandsRef.current), persistedRef.current)) {
+        router.back();
+        return;
+      }
+    }
+  };
+
   const controlClass = (disabled: boolean) =>
     cn('h-11 w-11 items-center justify-center active:opacity-70', disabled && 'opacity-40');
 
+  const commandTotal = nonBlankCommands(commands).length;
   const renderCommandRow = (command: string, index: number) => {
     const isFirst = index === 0;
     const isLast = index === commands.length - 1;
+    const position = commandPosition(commands, index);
+    const upLabel =
+      position === null ? t('profiles.moveUp') : t('profiles.moveCommandUp', { position });
+    const downLabel =
+      position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
+    const rowHint = position === null ? undefined : commandRowA11yLabel(position - 1, commandTotal);
     return (
       <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
         <FormField
@@ -172,7 +175,7 @@ export function ProfileCommandsScreen({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
-          accessibilityHint={commandRowA11yLabel(index, commands.length)}
+          accessibilityHint={rowHint}
           onChangeText={value => {
             setCommands(current => replaceCommand(current, index, value));
           }}
@@ -188,8 +191,8 @@ export function ProfileCommandsScreen({
             className={controlClass(isFirst)}
             disabled={isFirst}
             accessibilityRole="button"
-            accessibilityLabel={t('profiles.moveUp')}
-            accessibilityHint={commandRowA11yLabel(index, commands.length)}
+            accessibilityLabel={upLabel}
+            accessibilityHint={rowHint}
             onPress={() => {
               move(index, -1);
             }}
@@ -200,8 +203,8 @@ export function ProfileCommandsScreen({
             className={controlClass(isLast)}
             disabled={isLast}
             accessibilityRole="button"
-            accessibilityLabel={t('profiles.moveDown')}
-            accessibilityHint={commandRowA11yLabel(index, commands.length)}
+            accessibilityLabel={downLabel}
+            accessibilityHint={rowHint}
             onPress={() => {
               move(index, 1);
             }}
@@ -263,7 +266,12 @@ export function ProfileCommandsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.commandsTitle')} />
+      <ScreenHeader
+        title={t('profiles.commandsTitle')}
+        onBack={() => {
+          void leave();
+        }}
+      />
       <ScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"

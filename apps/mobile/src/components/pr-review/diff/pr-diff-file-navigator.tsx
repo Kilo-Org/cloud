@@ -45,6 +45,7 @@ import {
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
@@ -216,6 +217,10 @@ export function PrDiffFileNavigator({
 
   let body: ReactNode = null;
   if (firstPageErrorState?.kind === 'not-found') {
+    // GitLab folds its connection failures into the same NOT_FOUND a deleted
+    // merge request produces, so provider scopes offer the read retry and the
+    // connection check instead of a dead end (GitHub keeps the terminal copy).
+    const isProviderScope = scope.ref.platform !== 'github';
     body = (
       <CenteredState>
         <View className="items-center px-6">
@@ -225,6 +230,14 @@ export function PrDiffFileNavigator({
           <Text variant="muted" className="mt-1 text-center">
             {t('prReview.pullRequestUnavailableDescription')}
           </Text>
+          {isProviderScope ? (
+            <PrReviewUnavailableActions
+              onRetry={() => {
+                void query.refetch();
+              }}
+              isRetrying={query.isFetching}
+            />
+          ) : null}
         </View>
       </CenteredState>
     );

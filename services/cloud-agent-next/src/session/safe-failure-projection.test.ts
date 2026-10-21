@@ -1063,6 +1063,134 @@ describe('classifyAssistantFailure', () => {
   });
 });
 
+// A direct provider 499 can still carry the gateway's bounded, recognized
+// `upstream_error` origin. The numeric 4xx fallback classified the 499 itself as
+// an invalid request before reading that token, so a model-serving failure was
+// reported as a user/platform defect (`assistant_invalid_request`). The
+// recognized origin must win for this exact envelope, while plain 400/422,
+// unrecognized 499 bodies and bounded parsing keep the status-derived result.
+describe('direct 499 with a recognized upstream_error body', () => {
+  const upstreamErrorBody = JSON.stringify({ error_type: 'upstream_error' });
+  const envelope = (responseBody: string | undefined, message = 'synthetic') => ({
+    name: 'APIError',
+    data: { statusCode: 499, message, responseBody },
+  });
+
+  it('classifies a managed 499 carrying a recognized upstream_error as a provider failure', () => {
+    const error = envelope(upstreamErrorBody);
+    const failure = classifyAssistantFailure(error, 'managed');
+
+    expect(failure).toEqual({
+      reason: 'provider_unavailable',
+      providerOwnership: 'managed',
+      safeMessage: 'Assistant service is unavailable',
+    });
+    expect(failure).not.toHaveProperty('terminalCode');
+    expect(projectSafeAssistantError(error)).toBe('Assistant service is unavailable');
+
+    const callbackFailure = projectSafeFailure({
+      failureStage: 'agent_activity',
+      failureCode: failure.terminalCode ?? 'assistant_error',
+      assistantFailureReason: failure.reason,
+      providerOwnership: failure.providerOwnership,
+      safeFailureMessage: failure.safeMessage,
+    });
+    expect(CloudAgentCallbackFailureSchema.parse(callbackFailure)).toEqual(callbackFailure);
+    expect(callbackFailure).toMatchObject({
+      code: 'assistant_error',
+      assistantReason: 'provider_unavailable',
+      providerOwnership: 'managed',
+      message: 'Assistant service is unavailable',
+    });
+
+    // The model-serving path is one `provider` bucket: our gateway and the
+    // upstream provider are indistinguishable here, so a managed outage stays
+    // provider responsibility and never counts as a platform defect.
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: failure.terminalCode ?? 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility: 'provider', reason: 'managed_provider_unavailable' });
+  });
+
+  it('keeps explicit BYOK ownership while correcting the 499 origin', () => {
+    const error = envelope(upstreamErrorBody, '[BYOK] synthetic');
+    const failure = classifyAssistantFailure(error, 'managed');
+
+    expect(failure).toEqual({
+      reason: 'provider_unavailable',
+      providerOwnership: 'byok',
+      safeMessage: 'Assistant service is unavailable',
+    });
+    expect(failure).not.toHaveProperty('terminalCode');
+    expect(projectSafeAssistantError(error)).toBe('[BYOK] Assistant service is unavailable');
+
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility: 'provider', reason: 'provider_unavailable' });
+  });
+
+  it.each([
+    ['upstream_disconnect', 'provider_disconnect', 'Assistant provider connection was lost'],
+    [
+      'temporarily_unavailable',
+      'gateway_unavailable',
+      'Assistant gateway was temporarily unavailable',
+    ],
+  ] as const)(
+    'keeps existing gateway origin handling for a 499 tagged %s',
+    (errorType, reason, safeMessage) => {
+      expect(
+        classifyAssistantFailure(envelope(JSON.stringify({ error_type: errorType })), 'managed')
+      ).toMatchObject({ reason, safeMessage });
+    }
+  );
+
+  it.each([
+    ['plain 499 without a body', undefined],
+    ['499 with an unrecognized body token', JSON.stringify({ error_type: 'unrecognized_token' })],
+    ['499 with a malformed body', 'not json'],
+    [
+      '499 with an oversized upstream_error body',
+      JSON.stringify({ error_type: 'upstream_error', pad: 'x'.repeat(70_000) }),
+    ],
+  ])('preserves the status-derived invalid request for %s', (_label, responseBody) => {
+    const failure = classifyAssistantFailure(envelope(responseBody), 'managed');
+
+    expect(failure).toEqual({
+      reason: 'invalid_request',
+      providerOwnership: 'managed',
+      safeMessage: 'Assistant request was invalid',
+    });
+  });
+
+  it.each([400, 422])(
+    'does not reinterpret a %s carrying a recognized upstream_error body',
+    statusCode => {
+      const error = {
+        name: 'APIError',
+        data: { statusCode, message: 'synthetic', responseBody: upstreamErrorBody },
+      };
+
+      expect(classifyAssistantFailure(error, 'managed')).toEqual({
+        reason: 'invalid_request',
+        providerOwnership: 'managed',
+        safeMessage: 'Assistant request was invalid',
+      });
+    }
+  );
+});
+
 describe('isAssistantInterrupt', () => {
   it('recognizes MessageAbortedError and user-interrupt text', () => {
     expect(

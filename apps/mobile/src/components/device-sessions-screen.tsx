@@ -171,8 +171,8 @@ export function DeviceSessionsScreen() {
   } else {
     body = (
       <DetailScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        className="flex-1"
+        contentContainerClassName="gap-6 px-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {state === 'loading' ? (

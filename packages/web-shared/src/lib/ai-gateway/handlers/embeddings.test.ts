@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
+import type { StoredModel } from '@kilocode/db';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { User } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -13,7 +16,10 @@ import {
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  countAndStoreEmbeddingUsage,
+  INVALID_TOKEN_CODE,
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -27,7 +33,12 @@ jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server'
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
   getEmbeddingProvider: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/is-free-model'),
   isFreeModel: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
@@ -102,6 +113,9 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       isFree: false,
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      'test/embedding:free': { id: 'test/embedding:free' } as StoredModel,
+    });
     mockedFetch.mockResolvedValue(
       new Response(JSON.stringify({ object: 'list', data: [] }), {
         status: 200,
@@ -127,6 +141,127 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     } finally {
       await deleteCustomLlmForTest('acme/embedding-custom-model');
     }
+  });
+
+  it.each([
+    { input: 'hello', expectedStatus: 401 },
+    { input: undefined, expectedStatus: 400 },
+  ])(
+    'does not reveal custom LLM ids to anonymous callers: %j',
+    async ({ input, expectedStatus }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+      });
+      await insertCustomLlmForTest('acme/private-embedding-model');
+      try {
+        const { handleEmbeddingsRequest } = await import('./embeddings');
+        const customResponse = await handleEmbeddingsRequest(
+          makeRequest({ model: 'acme/private-embedding-model', input })
+        );
+        const unknownResponse = await handleEmbeddingsRequest(
+          makeRequest({ model: 'acme/unknown-embedding-model', input })
+        );
+
+        expect(customResponse.status).toBe(expectedStatus);
+        expect(unknownResponse.status).toBe(expectedStatus);
+        expect(await customResponse.json()).toEqual(await unknownResponse.json());
+        expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+        expect(mockedFetch).not.toHaveBeenCalled();
+      } finally {
+        await deleteCustomLlmForTest('acme/private-embedding-model');
+      }
+    }
+  );
+
+  it('preserves anonymous access to built-in free models', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+    });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest({ model: 'test/embedding:free' }));
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(
+    ['stealth/private-embedding-alpha', 'acme/legacy-embedding:free'].flatMap(model => [
+      { model, catalogAvailable: true, expectedStatus: 401 },
+      { model, catalogAvailable: false, expectedStatus: 503 },
+    ])
+  )(
+    'does not reveal registration of $model with catalogAvailable=$catalogAvailable',
+    async ({ model, catalogAvailable, expectedStatus }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+      });
+      if (!catalogAvailable) {
+        jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+      }
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const unknownResponse = await handleEmbeddingsRequest(makeRequest({ model }));
+      await insertCustomLlmForTest(model);
+      try {
+        const customResponse = await handleEmbeddingsRequest(makeRequest({ model }));
+
+        expect(customResponse.status).toBe(expectedStatus);
+        expect(unknownResponse.status).toBe(expectedStatus);
+        const body = await customResponse.json();
+        expect(body).toMatchObject({
+          error_type: catalogAvailable ? 'paid_model_auth_required' : 'temporarily_unavailable',
+        });
+        expect(body).toEqual(await unknownResponse.json());
+        expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+        expect(mockedFetch).not.toHaveBeenCalled();
+      } finally {
+        await deleteCustomLlmForTest(model);
+      }
+    }
+  );
+
+  it.each([
+    { model: 'test/embedding:free', expectedStatus: 503, errorType: 'temporarily_unavailable' },
+    {
+      model: 'acme/unknown-embedding-model',
+      expectedStatus: 401,
+      errorType: 'paid_model_auth_required',
+    },
+  ])(
+    'returns $expectedStatus for $model when public metadata is unavailable',
+    async ({ model, expectedStatus, errorType }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+      });
+      jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model }));
+
+      expect(response.status).toBe(expectedStatus);
+      await expect(response.json()).resolves.toMatchObject({ error_type: errorType });
+      expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects invalid credentials before reading unavailable public metadata', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+      credentialsRejected: true,
+    });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest({ model: 'test/embedding:free' }));
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(getOpenRouterModelsMetadataFromDatabase).not.toHaveBeenCalled();
+    expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('forwards personal request privacy with other provider fields', async () => {

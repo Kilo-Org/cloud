@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
+import type { StoredModel } from '@kilocode/db';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -21,6 +22,7 @@ import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-p
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
+  getOpenRouterModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
@@ -134,7 +136,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.createMockFromModule<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => ({
+    'test/free-model:free': { id: 'test/free-model:free' },
+  })),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   getToolsAvailable: jest.fn(() => false),
@@ -212,6 +221,7 @@ const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
+const mockedGetOpenRouterMetadata = jest.mocked(getOpenRouterModelsMetadataFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
@@ -234,6 +244,9 @@ const mockedIsCustomLlm = jest.mocked(isCustomLlm);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
+const publicFreeModelMetadata = {
+  'test/free-model:free': { id: 'test/free-model:free' } as StoredModel,
+};
 
 const provider = {
   id: 'openrouter',
@@ -344,6 +357,7 @@ function setSignedTokenAuth(token: string, authenticatedResult: AuthResult) {
 describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedGetOpenRouterMetadata.mockResolvedValue(publicFreeModelMetadata);
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1_000,
       settings: undefined,
@@ -408,6 +422,98 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       user_byok: false,
     });
   });
+
+  it.each([
+    { path: '/chat/completions', input: { messages: makeBody().messages } },
+    { path: '/responses', input: { input: 'hello' } },
+    { path: '/messages', input: { messages: makeBody().messages, max_tokens: 100 } },
+  ])('does not reveal custom LLM ids to anonymous $path callers', async ({ path, input }) => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+    });
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+    try {
+      for (const headers of [
+        { 'x-forwarded-for': '127.0.0.1', 'x-kilocode-feature': 'cli' },
+        { 'x-forwarded-for': '104.16.0.1', 'x-kilocode-feature': 'cloud-agent' },
+      ]) {
+        for (const model of ['acme/private-model', 'stealth/private-alpha', 'acme/legacy:free']) {
+          mockedIsCustomLlm.mockResolvedValue(true);
+          const customResponse = await handleLlmProxyRequest(
+            makeRequest({ model, ...input, provider: { data_collection: 'deny' } }, headers, path)
+          );
+          mockedIsCustomLlm.mockResolvedValue(false);
+          const unknownResponse = await handleLlmProxyRequest(
+            makeRequest({ model, ...input, provider: { data_collection: 'deny' } }, headers, path)
+          );
+
+          expect(customResponse.status).toBe(401);
+          expect(unknownResponse.status).toBe(401);
+          const body = await customResponse.json();
+          expect(body).toMatchObject({ error_type: 'paid_model_auth_required' });
+          expect(body).toEqual(await unknownResponse.json());
+        }
+      }
+      expect(mockedIsCustomLlm).not.toHaveBeenCalled();
+      expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+      expect(mockedGetProvider).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    } finally {
+      mockedIsCustomLlm.mockResolvedValue(false);
+      mockedIsFreeModelRateLimited.mockResolvedValue(false);
+    }
+  });
+
+  it.each([
+    { path: '/chat/completions', input: { messages: makeBody().messages } },
+    { path: '/responses', input: { input: 'hello' } },
+    { path: '/messages', input: { messages: makeBody().messages, max_tokens: 100 } },
+  ])(
+    'handles unavailable public metadata without revealing private ids on $path',
+    async ({ path, input }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+      });
+      mockedGetOpenRouterMetadata.mockResolvedValue({});
+      mockedIsFreeModelRateLimited.mockResolvedValue(true);
+      try {
+        for (const model of [
+          'test/free-model:free',
+          'stealth/private-alpha',
+          'acme/legacy:free',
+          'acme/private-model',
+        ]) {
+          mockedIsCustomLlm.mockResolvedValue(true);
+          const customResponse = await handleLlmProxyRequest(
+            makeRequest({ model, ...input }, undefined, path)
+          );
+          mockedIsCustomLlm.mockResolvedValue(false);
+          const unknownResponse = await handleLlmProxyRequest(
+            makeRequest({ model, ...input }, undefined, path)
+          );
+
+          const isFreeShaped = model !== 'acme/private-model';
+          expect(customResponse.status).toBe(isFreeShaped ? 503 : 401);
+          expect(unknownResponse.status).toBe(customResponse.status);
+          const body = await customResponse.json();
+          expect(body).toMatchObject({
+            error_type: isFreeShaped ? 'temporarily_unavailable' : 'paid_model_auth_required',
+          });
+          expect(body).toEqual(await unknownResponse.json());
+        }
+        expect(mockedIsCustomLlm).not.toHaveBeenCalled();
+        expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+        expect(mockedGetProvider).not.toHaveBeenCalled();
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      } finally {
+        mockedGetOpenRouterMetadata.mockResolvedValue(publicFreeModelMetadata);
+        mockedIsCustomLlm.mockResolvedValue(false);
+        mockedIsFreeModelRateLimited.mockResolvedValue(false);
+      }
+    }
+  );
 
   it('rejects an API-only token sent to the gateway endpoint', async () => {
     setSignedTokenAuth(signedToken(KILO_API_AUDIENCE), {
@@ -525,7 +631,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('rejects a malformed token instead of answering as anonymous', async () => {
+  it('rejects a malformed token before reading unavailable public metadata', async () => {
+    mockedGetOpenRouterMetadata.mockResolvedValue({});
     setSignedTokenAuth('not-a-jwt', {
       user: {
         id: 'user-123',
@@ -549,6 +656,9 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: INVALID_TOKEN_CODE },
     });
+    expect(mockedGetOpenRouterMetadata).not.toHaveBeenCalled();
+    expect(mockedIsCustomLlm).not.toHaveBeenCalled();
+    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
     expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });

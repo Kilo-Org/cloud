@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
+import { NextResponse } from 'next/server';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { captureException } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -135,6 +137,41 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       await deleteCustomLlmForTest('acme/transcribe-custom-model');
     }
   });
+
+  it.each(['json', 'multipart'])(
+    'does not reveal custom LLM ids to anonymous %s callers',
+    async kind => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+      });
+      await insertCustomLlmForTest('acme/private-transcription-model');
+      try {
+        const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+        const responses = [];
+        for (const model of [
+          'acme/private-transcription-model',
+          'acme/unknown-transcription-model',
+        ]) {
+          const request =
+            kind === 'multipart'
+              ? makeMultipartRequest(
+                  { model },
+                  { blob: new Blob(['audio'], { type: 'audio/wav' }), filename: 'test.wav' }
+                )
+              : makeRequest({ model, input_audio: { data: 'UklGRiQA', format: 'wav' } });
+          responses.push(await handleAudioTranscriptionsRequest(request as never));
+        }
+
+        expect(responses.map(response => response.status)).toEqual([401, 401]);
+        expect(await responses[0].json()).toEqual(await responses[1].json());
+        expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+        expect(mockedFetch).not.toHaveBeenCalled();
+      } finally {
+        await deleteCustomLlmForTest('acme/private-transcription-model');
+      }
+    }
+  );
 
   it('proxies transcription requests to OpenRouter', async () => {
     setUserAuth();

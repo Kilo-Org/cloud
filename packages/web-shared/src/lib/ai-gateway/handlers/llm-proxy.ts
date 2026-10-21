@@ -36,7 +36,8 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
+  isFreeModelExcludingCustomLlms,
+  isAnonymousFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
@@ -584,8 +585,6 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
-  // Custom LLMs count as free; `getProvider` still refuses callers without access.
-  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -600,29 +599,6 @@ export async function handleLlmProxyRequest(
   // Bouncer takes a bare IP literal. Normalize once here and reuse the value for
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
-
-  // For free models: server-side products (cloud-agent, code-review, app-builder,
-  // gastown) rate-limit per user when the request comes from Cloudflare IPs (Kilo
-  // infrastructure). All other products rate-limit per IP (fast pre-auth path).
-  // Custom LLMs are exempt, even when their id matches a free-model pattern.
-  if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
-    const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
-    if (rateLimitKey instanceof NextResponse) return rateLimitKey;
-
-    if (await isFreeModelRateLimited(request, rateLimitKey)) {
-      console.warn(
-        `Model rate limit exceeded, ${rateLimitKey}, model: ${effectiveModelIdLowerCased}`
-      );
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          error_type: ProxyErrorType.rate_limit_exceeded,
-          message: 'Model usage limit reached. Please try again later.',
-        },
-        { status: 429 }
-      );
-    }
-  }
 
   // Now check auth
   const authSpan = startInactiveSpan({ name: 'auth-check' });
@@ -651,18 +627,43 @@ export async function handleLlmProxyRequest(
       return invalidTokenResponse();
     }
 
-    // No valid auth
-    if (!isFreeRequestedModel) {
+    // Anonymous eligibility must not reveal membership in the private custom LLM catalog.
+    const anonymousFreeModel = await isAnonymousFreeModel(effectiveModelIdLowerCased);
+    if (anonymousFreeModel === null) return temporarilyUnavailableResponse();
+    if (!anonymousFreeModel) {
       return paidModelAuthRequiredResponse();
     }
 
-    // Anonymous access for free model (rate-limited above when configured)
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;
     tokenSource = undefined;
   } else {
     user = maybeUser;
+  }
+
+  // Private-catalog rate-limit exemptions must not influence anonymous eligibility.
+  if (
+    isAnonymousContext(user) ||
+    (isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased) &&
+      !(await isCustomLlm(effectiveModelIdLowerCased)))
+  ) {
+    const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
+    if (rateLimitKey instanceof NextResponse) return rateLimitKey;
+
+    if (await isFreeModelRateLimited(request, rateLimitKey)) {
+      console.warn(
+        `Model rate limit exceeded, ${rateLimitKey}, model: ${effectiveModelIdLowerCased}`
+      );
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          error_type: ProxyErrorType.rate_limit_exceeded,
+          message: 'Model usage limit reached. Please try again later.',
+        },
+        { status: 429 }
+      );
+    }
   }
 
   // Fraud/project headers are pure header parsing; resolve them once here so

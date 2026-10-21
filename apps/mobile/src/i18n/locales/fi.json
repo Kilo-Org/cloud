@@ -189,7 +189,7 @@
     "passkeyCancelled": "Pääsyavaimella kirjautuminen peruutettiin. Yritä uudelleen.",
     "passkeyNotFound": "Tälle laitteelle ei ole tallennettu yhtään pääsyavainta. Kirjaudu sen sijaan Applella, Googlella tai sähköpostillasi.",
     "passkeyUnsupported": "Pääsyavaimet eivät ole käytettävissä tällä laitteella. Kirjaudu sen sijaan Applella, Googlella tai sähköpostillasi.",
-    "passkeyFailed": "Kirjautuminen pääsyavaimella ei onnistunut. Yritä uudelleen.",
+    "passkeyFailed": "Kirjautuminen pääsyavaimella ei onnistunut. Kirjaudu sen sijaan Applella, Googlella tai sähköpostillasi.",
     "couldNotCompleteSignIn": "Kirjautumista ei voitu viimeistellä. Yritä uudelleen.",
     "sessionEnded": "Istuntosi päättyi. Kirjaudu uudelleen.",
     "signInCodeExpired": "Kirjautumiskoodisi on vanhentunut. Yritä uudelleen.",
@@ -869,7 +869,7 @@
     "needsInputAction": {
       "approved": "Pyyntö hyväksytty",
       "replied": "Vastaus lähetetty",
-      "failed": "Vastaaminen ei onnistunut. Yritä uudelleen napauttamalla uudelleen.",
+      "failed": "Vastaaminen ei onnistunut. Yritä uudelleen napauttamalla.",
       "unavailable": "Tämä pyyntö ei ole enää odottamassa."
     }
   },
@@ -2809,7 +2809,7 @@
     "scroll": "Vieritys"
   },
   "offline": {
-    "noInternet": "Internetyhteyttä ei ole.",
+    "noInternet": "Internetyhteyttä ei ole",
     "internetRestored": "Internetyhteys palautunut"
   },
   "queryError": {

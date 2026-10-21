@@ -223,7 +223,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => findConfigureRows(renderer.root, 'GitHub').length === 1);
 
     expect(findConfigureRows(renderer.root, 'GitHub')[0]?.props.subtitle).toBe('dev@kilo.ai');
@@ -239,7 +239,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
 
     const queryError = findNode(renderer.root, 'QueryError');
@@ -257,7 +257,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
 
     expect(findNode(renderer.root, 'QueryError')?.props.variant).toBe('offline');

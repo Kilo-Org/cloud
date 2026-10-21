@@ -3,7 +3,6 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  Platform,
   ScrollView,
   type ScrollViewInstance,
   type ScrollViewProps,
@@ -63,8 +62,12 @@ export function TabScreenScrollView({
   const keyboardOcclusion = useKeyboardState(state => state.height);
   // The wrapper's own scroll-view ref, so the reveal below can drive the
   // responder even when the caller passes none.
-  const internalRef = useRef<ScrollView | null>(null);
-  useImperativeHandle<ScrollView | null, ScrollView | null>(ref, () => internalRef.current, []);
+  const internalRef = useRef<ScrollViewInstance | null>(null);
+  useImperativeHandle<ScrollViewInstance | null, ScrollViewInstance | null>(
+    ref,
+    () => internalRef.current,
+    []
+  );
   const onKeyboardOcclusionChangeRef = useRef(onKeyboardOcclusionChange);
   useEffect(() => {
     onKeyboardOcclusionChangeRef.current = onKeyboardOcclusionChange;

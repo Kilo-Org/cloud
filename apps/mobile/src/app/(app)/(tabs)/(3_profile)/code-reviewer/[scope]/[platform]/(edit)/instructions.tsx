@@ -51,6 +51,7 @@ function InstructionsEditor({
           valueRef.current = text;
         }}
       />
+      {/* eslint-disable-next-line typescript-eslint/no-deprecated -- the iOS Done bar needs the keyboard accessory view this SDK still exports */}
       <InputAccessoryView nativeID={INSTRUCTIONS_DONE_ACCESSORY_ID}>
         <View className="flex-row justify-end bg-background px-4 py-2">
           <Pressable

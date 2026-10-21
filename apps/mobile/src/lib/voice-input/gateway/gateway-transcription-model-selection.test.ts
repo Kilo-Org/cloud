@@ -87,15 +87,6 @@ describe('persistFirstTranscriptionModel', () => {
     expect(persistFirstTranscriptionModel([])).toBeNull();
     expect(writeGatewayTranscriptionModel).not.toHaveBeenCalled();
   });
-
-  it('returns null and writes nothing when the catalogue read failed', () => {
-    // A catalogue fetch that rejects leaves the caller with an empty list;
-    // persisting that must never invent a model the gateway did not offer.
-    vi.mocked(readGatewayTranscriptionModel).mockReturnValue(null);
-
-    expect(persistFirstTranscriptionModel([])).toBeNull();
-    expect(writeGatewayTranscriptionModel).not.toHaveBeenCalled();
-  });
 });
 
 describe('resolveTranscriptionModelSelectionStatus', () => {

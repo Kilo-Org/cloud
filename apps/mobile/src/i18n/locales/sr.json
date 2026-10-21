@@ -35,6 +35,8 @@
     "connectGithub": "Poveži GitHub",
     "cost": "Trošak",
     "discard": "Odbaci",
+    "discardChangesMessage": "Vaše izmene će biti izgubljene.",
+    "discardChangesTitle": "Odbaci izmene?",
     "findings": "Nalazi",
     "mergeRequest": "merge request",
     "notConnected": "Nepovezano",
@@ -109,7 +111,9 @@
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori PR",
+    "completed": "Završeno",
     "pending": "Na čekanju",
+    "running": "U toku",
     "performance": "Performanse",
     "preferences": "Podešavanja",
     "privacyPolicy": "Politika privatnosti",
@@ -673,7 +677,8 @@
       "description": "Poveži svoj GitHub nalog da pregledaš zahteve za spajanje na telefonu.",
       "gitlabDescription": "Poveži svoj GitLab nalog da pregledaš merge requeste na telefonu.",
       "bitbucketDescription": "Poveži Bitbucket sa ovom organizacijom da pregledaš zahteve za spajanje na telefonu.",
-      "bitbucketOrgOnlyDescription": "Izaberi organizaciju u svom profilu da pregledaš njene zahteve za spajanje na Bitbucketu."
+      "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
+      "contextLine": "Za {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +790,9 @@
       "reviewNotSubmitted": "Ovaj pregled nije moguće poslati u trenutnom obliku. PR je možda izmenjen ili pokušavaš da pregledaš sopstveni zahtev za spajanje.",
       "reviewNotSubmittedTerm": "Ovaj pregled nije moguće poslati u trenutnom obliku. {{term}} je možda izmenjen ili ne možeš da pregledaš sopstveni {{term}}.",
       "couldNotPostComment": "Komentar nije moguće objaviti.",
-      "couldNotSubmitReview": "Nije moguće poslati pregled. Proveri vezu i pokušaj ponovo."
+      "couldNotSubmitReview": "Nije moguće poslati pregled. Proveri vezu i pokušaj ponovo.",
+      "rateLimited": "Previše zahteva. Pokušaj ponovo kasnije.",
+      "conflict": "Ovo se promenilo dok si radio na njemu. Osveži ga i pokušaj ponovo."
     },
     "operation": {
       "couldNotReply": "Nije moguće odgovoriti.",
@@ -1432,6 +1439,9 @@
       "couldNotGetLatest": "Nije moguće učitati najnovije podatke.",
       "byline": "{{repo}} #{{number}} · Autor: {{author}}",
       "noFindings": "Nema nalaza.",
+      "findingsUnavailable": "Rezultati nisu dostupni jer ovaj pregled nije uspeo.",
+      "serviceUnavailable": "Nije moguće povezati se sa uslugom za pregled koda. Ponovi pregled kada usluga bude dostupna.",
+      "reviewFailed": "Pregled nije uspeo. Molimo te, pokušaj ponovo.",
       "showMore": "Prikaži više",
       "created": "Kreirano",
       "started": "Započeto",
@@ -1547,8 +1557,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće sačuvati podešavanja pregleda.",
     "status": {
-      "running": "U toku",
-      "completed": "Završeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {
@@ -1561,7 +1569,8 @@
       "bugs": "Greške",
       "style": "Stil",
       "testing": "Testiranje",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Drugo ({{area}})"
     },
     "gateThreshold": {
       "warning": "Upozorenje"
@@ -1674,7 +1683,14 @@
       "whereFound": "Mesta nalaza ({{displayCount}})",
       "fullReport": "Ceo generisani izveštaj",
       "yes": "Da",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analiziraj bazu koda",
+        "dismiss": "Odbaci",
+        "manualReview": "Ručni pregled",
+        "monitor": "Prati",
+        "openPr": "Otvori PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} nalaza",
@@ -1879,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Sačuvaj promene",
       "unsavedTitle": "Nesačuvane promene",
-      "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?"
+      "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?",
+      "unsavedInvalidMessage": "Ove promene još ne mogu da se sačuvaju. Ispravi ih da bi ih sačuvao ili ih odbaci da bi otišao."
     },
     "auditReportButton": {
       "viewA11y": "Prikaži izveštaj o reviziji"
@@ -1896,7 +1913,24 @@
       "title": "Izveštaj o reviziji",
       "unavailable": "Izveštaj o reviziji nije dostupan",
       "unavailableDescription": "Samo vlasnici organizacije i menadžeri naplate mogu da pregledaju izveštaje o reviziji. Zamoli vlasnika ili menadžera naplate da ti dodeli pristup.",
-      "queryFailed": "Upit za izveštaj nije završen. Pokušaj ponovo."
+      "queryFailed": "Upit za izveštaj nije završen. Pokušaj ponovo.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza završena",
+        "findingAnalysisFailed": "Analiza nije uspela",
+        "findingAutoDismissed": "Automatski odbačeno",
+        "findingCreated": "Uvezeno",
+        "findingDeleted": "Obrisano",
+        "findingDismissed": "Odbačeno",
+        "findingSeverityChanged": "Promenjena ozbiljnost",
+        "findingStatusChange": "Promenjen status",
+        "findingSuperseded": "Zamenjeno",
+        "remediationBlocked": "Otklanjanje je blokirano",
+        "remediationCancelled": "Otkazano",
+        "remediationFailed": "Otklanjanje nije uspelo",
+        "remediationNoChangesNeeded": "Izmene nisu potrebne",
+        "remediationPrOpened": "Otvoren PR",
+        "remediationQueued": "Otklanjanje je zatraženo"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nije moguće učitati podešavanja obaveštenja.",
@@ -1928,7 +1962,6 @@
       "installApp": "Instaliraj GitHub aplikaciju",
       "reauthorizeButton": "Ponovo ovlasti GitHub aplikaciju",
       "reauthorizeDescription": "Bezbednosni agent zahteva dozvolu vulnerability_alerts za pristup Dependabot upozorenjima. Ponovo ovlasti GitHub aplikaciju da joj dodeliš ovu dozvolu.",
-      "reauthorizeFailed": "Ponovno ovlašćivanje se ne može pokrenuti. Pokušaj ponovo.",
       "reauthorizeTitle": "Potrebne su dodatne dozvole",
       "setupFailed": "Nije moguće pokrenuti podešavanje za GitHub. Pokušaj ponovo."
     },
@@ -2237,6 +2270,7 @@
       "prefillModelUnavailable": "{{model}} više nije dostupan. Koristi se tvoj podrazumevani model.",
       "couldNotReadPendingSessions": "Čitanje sesija na čekanju nije uspelo. Pokušaj ponovo.",
       "failedToCreate": "Kreiranje sesije nije uspelo.",
+      "checkOrganizationAccess": "Proveri pristup ovoj organizaciji i pokušaj ponovo.",
       "couldNotRefreshRepositories": "Osvežavanje repozitorijuma nije uspelo. Pokušaj ponovo.",
       "discardDraftTitle": "Odbaciti nacrt?",
       "discardDraftMessage": "Tvoj upit će biti obrisan.",
@@ -2310,7 +2344,8 @@
       "matchesBadge_one": "podudaranje: {{displayCount}}",
       "matchesBadge_other": "podudaranja: {{displayCount}}",
       "matchesBadge_few": "podudaranja: {{displayCount}}",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prevod nije uspeo"
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
@@ -2768,6 +2803,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tvoje aktivne sesije nisu dostupne dok se podaci ne učitaju.",
     "currentDeviceUnidentified": "Prepoznavanje trenutnog uređaja nije uspelo.",
+    "kiloApp": "Aplikacija Kilo",
     "noSessions": "Nema aktivnih sesija",
     "noSessionsDescription": "Prijavi se u aplikaciju Kilo na drugom uređaju i ta sesija će se prikazati ovde.",
     "onlyKiloAppSignIns": "Ovde se prikazuju samo prijave preko aplikacije Kilo. Prijave preko uređivača koda i CLI-ja nisu navedene.",
@@ -2921,6 +2957,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Pre nego što počnemo",
+    "summaryTitle": "Podešavanja deljenja podataka",
     "introDescription": "Kilo šalje tvoje poruke AI provajderima da generišu odgovore. U nastavku je navedeno šta se deli i sa kim.",
     "required": "Obavezno za korišćenje aplikacije Kilo",
     "promptsTitle": "Tvoji upiti i razgovori",
@@ -2929,7 +2966,6 @@
     "accountDescription": "ID tvog Kilo naloga i metapodaci zahteva koriste se za proveru identiteta i merenje potrošnje.",
     "diagnosticsTitle": "Dijagnostika aplikacije",
     "diagnosticsDescription": "Izveštaji o rušenjima i greškama, bez sadržaja aplikacije, služe za održavanje stabilnosti aplikacije.",
-    "optional": "Opciono",
     "helpImprove": "Pomozi da poboljšamo Kilo",
     "helpImproveDescription": "Deli anonimne podatke o korišćenju aplikacije i izvoru instalacije. Ovu opciju možeš da promeniš u bilo kom trenutku u podešavanjima.",
     "seeFullDetails": "Vidi sve detalje",
@@ -3014,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Nazad na profil",
       "loadErrorMessage": "Proveri vezu i pokušaj ponovo.",
+
+      "chooseAccount": "Izaberi nalog",
       "loadErrorTitle": "Učitavanje tvojih organizacija nije uspelo.",
+      "noOrganization": "Nema organizacije",
+
+      "noOrganizationDescription": "Ovaj nalog nije deo organizacije. Napravi ili se pridruži organizaciji na vebu da bi koristio funkcije organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
+
+      "openWebOrganizations": "Otvori organizacije na vebu",
+
       "organizationUnavailable": "Organizacija nije dostupna.",
-      "selectDescription": "Izaberi organizaciju na svom profilu da nastaviš.",
+      "selectDescriptionWithOrganizations": "Pripadaš jednoj ili više organizacija. Izaberi nalog koji ovaj ekran treba da koristi.",
+
       "selectOrganization": "Izaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Izaberi drugu na svom profilu da nastaviš.",
+
+      "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njene sesije nije moguće učitati.",
       "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."
     },
     "creditActivity": {
@@ -3509,6 +3556,9 @@
     "localModels": {
       "title": "Modeli na uređaju",
       "help": "Modeli na uređaju rade na ovom telefonu. Vaši upiti i odgovori ostaju na uređaju.",
+      "switchTitle": "Preći na model na uređaju?",
+      "switchMessage": "Prelaskom na {{name}} upiti i kontekst ovog razgovora obrađuju se na ovom telefonu, a ne na udaljenom serveru.",
+      "switchConfirm": "Promeni model",
       "systemPurpose": "Model ugrađen u sistem ovog uređaja. Radi na uređaju.",
       "apple": "Apple Intelligence (na uređaju)",
       "checking": "Provera dostupnosti…",
@@ -3605,7 +3655,6 @@
     "personalDefaultDescription": "Automatski se učitava kada nijedno spremište nema zakačeni profil.",
     "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju lične podrazumevane vrednosti.",
     "setAsDefault": "Postavi kao podrazumevano",
-    "removeDefault": "Ukloni kao podrazumevano",
     "saveFailed": "Nije moguće sačuvati profil",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "Ovo trajno uklanja profil i njegova podešavanja. Ovo se ne može poništiti.",
@@ -3631,11 +3680,13 @@
     "commandsTitle": "Komande za podešavanje",
     "addCommand": "Dodaj komandu",
     "commandLabel": "Komanda",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "npr. pnpm install",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",
     "moveUp": "Pomeri se gore",
     "moveDown": "Pomeri se dole",
+    "moveCommandUp": "Premesti komandu {{position}} gore",
+    "moveCommandDown": "Premesti komandu {{position}} dole",
     "skillsTitle": "Veštine",
     "addSkill": "Dodajte veštinu",
     "skillNameLabel": "Naziv veštine",
@@ -3675,7 +3726,9 @@
       "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrednosti do 4096 znakova",
       "timeoutInvalid": "Vreme čekanja mora biti ceo broj milisekundi",
       "edit": "Uredite MCP server",
-      "saveFailed": "Nije moguće sačuvati MCP server"
+      "saveFailed": "Nije moguće sačuvati MCP server",
+      "deleteFailed": "Nije moguće izbrisati MCP server",
+      "updateFailed": "Nije moguće ažurirati MCP server"
     },
     "agents": {
       "title": "Profil agenti",
@@ -3702,10 +3755,11 @@
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
       "visibilityAll": "Svi — oboje",
       "saveFailed": "Nije moguće sačuvati agenta",
+      "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite slug agenta",
       "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
-      "slugConflict": "Taj slug je rezervisan od strane ugrađenog agenta",
+      "slugConflict": "Taj slug je već zauzet: koristi ga ugrađeni agent ili drugi agent u ovom profilu",
       "edit": "Uredi agenta"
     },
     "slashCommands": {
@@ -3716,10 +3770,12 @@
       "description": "Opis komande",
       "template": "Šablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",
       "saveFailed": "Nije moguće sačuvati komandu",
+      "deleteFailed": "Nije moguće izbrisati komandu",
       "nameRequired": "Unesite ime komande",
       "nameInvalid": "Ime mora da počinje malim slovom i da koristi samo mala slova, cifre i crtice",
       "templateRequired": "Unesite šablon komande",
@@ -3870,7 +3926,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži status uživo",
+    "dismiss": "Odbaci pregled",
     "offline": "Van mreže · sačuvan pregled",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
     "revised": "Izmenjeno · {{revision}}",

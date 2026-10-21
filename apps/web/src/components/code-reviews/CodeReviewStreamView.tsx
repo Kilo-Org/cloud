@@ -437,7 +437,7 @@ export function CodeReviewStreamView({
             {cloudAgentSessionId && (
               <span
                 title={cloudAgentSessionId}
-                className="bg-muted text-muted-foreground max-w-[min(20rem,50vw)] truncate rounded px-2 py-0.5 font-mono text-xs font-normal"
+                className="bg-muted text-muted-foreground min-w-0 rounded px-2 py-0.5 font-mono text-xs font-normal break-all"
               >
                 {cloudAgentSessionId}
               </span>
@@ -544,7 +544,7 @@ export function CodeReviewStreamView({
                     <span className="shrink-0 text-slate-500 select-none">
                       {formatTimestamp(event.timestamp)}
                     </span>
-                    <span className="break-all">{event.message}</span>
+                    <span className="min-w-0 break-all whitespace-pre-wrap">{event.message}</span>
                   </div>
                   {event.content && (
                     <div className="mt-1 ml-[72px] font-mono text-[11px] break-all whitespace-pre-wrap text-slate-400">

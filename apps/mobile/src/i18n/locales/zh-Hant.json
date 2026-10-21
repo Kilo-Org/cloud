@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "載入完成前，無法查看目前登入的工作階段。",
     "currentDeviceUnidentified": "無法辨識目前的裝置。",
+    "kiloApp": "Kilo 應用程式",
     "noSessions": "沒有已登入的工作階段",
     "noSessionsDescription": "在其他裝置上登入 Kilo 應用程式後，該裝置就會顯示在這裡。",
     "onlyKiloAppSignIns": "這裡只會顯示 Kilo 應用程式的登入工作階段，不會列出編輯器與 CLI 的登入工作階段。",
@@ -2372,6 +2373,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "開始之前",
+    "summaryTitle": "資料分享偏好設定",
     "introDescription": "Kilo 會將你的訊息傳送給 AI 供應商，以產生回覆。以下說明分享的內容與對象。",
     "required": "使用 Kilo 必須分享的資料",
     "promptsTitle": "你的提示詞與對話",
@@ -2380,7 +2382,6 @@
     "accountDescription": "你的 Kilo 帳戶 ID 與請求中繼資料，用於驗證身分並計算用量。",
     "diagnosticsTitle": "應用程式診斷",
     "diagnosticsDescription": "已移除應用程式內容的當機與錯誤報告，用於維持應用程式的穩定性。",
-    "optional": "選用",
     "helpImprove": "協助改善 Kilo",
     "helpImproveDescription": "分享匿名的產品分析資料與安裝來源。你可以隨時在「設定」中變更此選項。",
     "seeFullDetails": "查看完整說明",

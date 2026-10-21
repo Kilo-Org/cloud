@@ -2888,6 +2888,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Nid yw eich sesiynau gweithredol ar gael nes bod y data hwn wedi llwytho.",
     "currentDeviceUnidentified": "Methu adnabod y ddyfais gyfredol.",
+    "kiloApp": "Ap Kilo",
     "noSessions": "Dim sesiynau gweithredol",
     "noSessionsDescription": "Mewngofnodwch i ap Kilo ar ddyfais arall a bydd y sesiwn yn ymddangos yma.",
     "onlyKiloAppSignIns": "Dim ond sesiynau ap Kilo sy'n ymddangos yma. Nid yw sesiynau'r golygydd na'r CLI wedi'u rhestru.",
@@ -3044,6 +3045,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Cyn i ni ddechrau",
+    "summaryTitle": "Dewisiadau rhannu data",
     "introDescription": "Mae Kilo yn anfon eich negeseuon at ddarparwyr AI i gynhyrchu ymatebion. Dyma'r hyn sy'n cael ei rannu a gyda phwy.",
     "required": "Angenrheidiol i ddefnyddio Kilo",
     "promptsTitle": "Eich anogiadau a'ch sgyrsiau",
@@ -3052,7 +3054,6 @@
     "accountDescription": "ID eich cyfrif Kilo a metadata'r ceisiadau, a ddefnyddir i'ch dilysu a mesur y defnydd.",
     "diagnosticsTitle": "Diagnosteg yr ap",
     "diagnosticsDescription": "Adroddiadau am chwalfa a gwallau, heb gynnwys yr ap, a ddefnyddir i gadw'r ap yn sefydlog.",
-    "optional": "Dewisol",
     "helpImprove": "Helpu i wella Kilo",
     "helpImproveDescription": "Rhannwch ddata dadansoddeg dienw am y cynnyrch a ffynhonnell y gosodiad. Gallwch newid hyn unrhyw bryd yn y gosodiadau.",
     "seeFullDetails": "Gweld y manylion llawn",

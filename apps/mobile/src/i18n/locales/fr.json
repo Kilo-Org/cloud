@@ -2175,6 +2175,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Vos sessions actives restent indisponibles tant que leur chargement n'a pas abouti.",
     "currentDeviceUnidentified": "Impossible d'identifier l'appareil actuel.",
+    "kiloApp": "Application Kilo",
     "noSessions": "Aucune session active",
     "noSessionsDescription": "Connectez-vous à l'application Kilo sur un autre appareil pour le voir apparaître ici.",
     "onlyKiloAppSignIns": "Seules les connexions à l'application Kilo apparaissent ici. Les connexions depuis l'éditeur ou la CLI ne sont pas affichées.",
@@ -2324,6 +2325,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Avant de commencer",
+    "summaryTitle": "Préférences de partage des données",
     "introDescription": "Kilo envoie vos messages à des fournisseurs d'IA pour générer des réponses. Voici ce qui est partagé et avec qui.",
     "required": "Requis pour utiliser Kilo",
     "promptsTitle": "Vos consignes et conversations",
@@ -2332,7 +2334,6 @@
     "accountDescription": "Votre identifiant de compte Kilo et les métadonnées des requêtes, utilisés pour vous authentifier et mesurer l'utilisation.",
     "diagnosticsTitle": "Diagnostics de l'application",
     "diagnosticsDescription": "Rapports de plantage et d'erreur, sans le contenu de l'application, utilisés pour assurer sa stabilité.",
-    "optional": "Facultatif",
     "helpImprove": "Aider à améliorer Kilo",
     "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment dans les réglages.",
     "seeFullDetails": "Voir tous les détails",

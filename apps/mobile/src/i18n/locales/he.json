@@ -2243,6 +2243,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "לא ניתן להציג את החיבורים הפעילים שלך עד לסיום הטעינה.",
     "currentDeviceUnidentified": "לא ניתן היה לזהות את המכשיר הנוכחי.",
+    "kiloApp": "אפליקציית Kilo",
     "noSessions": "אין חיבורים פעילים",
     "noSessionsDescription": "היכנס לאפליקציית Kilo במכשיר אחר, והמכשיר יופיע כאן.",
     "onlyKiloAppSignIns": "כאן מופיעים רק חיבורים לאפליקציית Kilo. חיבורים דרך העורך או ה-CLI אינם מופיעים ברשימה.",
@@ -2396,6 +2397,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "לפני שנתחיל",
+    "summaryTitle": "העדפות שיתוף נתונים",
     "introDescription": "Kilo שולח את ההודעות שלך לספקי AI כדי ליצור תשובות. כאן מפורט אילו נתונים נשלחים ולמי.",
     "required": "נדרש לשימוש ב-Kilo",
     "promptsTitle": "ההנחיות והשיחות שלך",
@@ -2404,7 +2406,6 @@
     "accountDescription": "מזהה החשבון שלך ב-Kilo והמטא-נתונים של הבקשות, שמשמשים לאימות הזהות שלך ולמדידת השימוש.",
     "diagnosticsTitle": "נתוני אבחון של האפליקציה",
     "diagnosticsDescription": "דוחות קריסה ושגיאות שתוכן האפליקציה הוסר מהם, לצורך שמירה על יציבות האפליקציה.",
-    "optional": "לבחירתך",
     "helpImprove": "עזרה בשיפור Kilo",
     "helpImproveDescription": "שתף נתוני שימוש אנונימיים ואת מקור ההתקנה. אפשר לשנות את הבחירה בכל עת בהגדרות.",
     "seeFullDetails": "לפרטים המלאים",

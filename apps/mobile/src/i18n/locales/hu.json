@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "A betöltés befejezéséig az aktív munkameneteid nem érhetők el.",
     "currentDeviceUnidentified": "Nem sikerült azonosítani az aktuális eszközt.",
+    "kiloApp": "Kilo alkalmazás",
     "noSessions": "Nincs aktív munkamenet",
     "noSessionsDescription": "Jelentkezz be a Kilo alkalmazásba egy másik eszközön, és az eszköz itt is megjelenik.",
     "onlyKiloAppSignIns": "Itt csak a Kilo alkalmazásba történő bejelentkezések jelennek meg. A szerkesztőbe és a CLI-be történő bejelentkezéseket nem soroljuk fel.",
@@ -2884,6 +2885,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Mielőtt elkezdjük",
+    "summaryTitle": "Adatmegosztási beállítások",
     "introDescription": "A Kilo elküldi az üzeneteidet az AI-szolgáltatóknak, hogy válaszokat készítsenek. Az alábbiakban láthatod, milyen adatokat osztunk meg, és kikkel.",
     "required": "A Kilo használatához szükséges",
     "promptsTitle": "Az utasításaid és beszélgetéseid",
@@ -2892,7 +2894,6 @@
     "accountDescription": "A Kilo-fiókod azonosítóját és a kérések metaadatait a hitelesítésedhez és a használat méréséhez használjuk.",
     "diagnosticsTitle": "Az alkalmazás diagnosztikája",
     "diagnosticsDescription": "Összeomlási és hibajelentések az alkalmazás stabil működéséhez. Az alkalmazás tartalmát eltávolítjuk belőlük.",
-    "optional": "Opcionális",
     "helpImprove": "Segíts a Kilo fejlesztésében",
     "helpImproveDescription": "Oszd meg névtelenül az alkalmazás használati adatait és a telepítés forrását. Ezt bármikor módosíthatod a beállításokban.",
     "seeFullDetails": "Részletek megtekintése",

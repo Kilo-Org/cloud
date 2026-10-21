@@ -57,6 +57,7 @@
     "typecheck:e2e": "ttsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
     "@modelcontextprotocol/sdk": "1.32.1",
     "drizzle-orm": "catalog:",
     "effect": "3.22.1",

@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Deine aktiven Sitzungen können erst angezeigt werden, wenn die Daten geladen wurden.",
     "currentDeviceUnidentified": "Das aktuelle Gerät konnte nicht identifiziert werden.",
+    "kiloApp": "Kilo-App",
     "noSessions": "Keine aktiven Sitzungen",
     "noSessionsDescription": "Melde dich auf einem anderen Gerät in der Kilo-App an. Das Gerät erscheint dann hier.",
     "onlyKiloAppSignIns": "Hier erscheinen nur Kilo-App-Anmeldungen. Editor- und CLI-Anmeldungen werden nicht aufgeführt.",
@@ -2372,6 +2373,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Bevor wir beginnen",
+    "summaryTitle": "Einstellungen zur Datenweitergabe",
     "introDescription": "Kilo sendet deine Nachrichten an KI-Anbieter, um Antworten zu erstellen. Hier erfährst du, welche Daten an wen weitergegeben werden.",
     "required": "Für die Nutzung von Kilo erforderlich",
     "promptsTitle": "Deine Prompts und Unterhaltungen",
@@ -2380,7 +2382,6 @@
     "accountDescription": "Deine Kilo-Konto-ID und die Metadaten deiner Anfragen dienen dazu, dich zu authentifizieren und deine Nutzung zu erfassen.",
     "diagnosticsTitle": "App-Diagnosedaten",
     "diagnosticsDescription": "Absturz- und Fehlerberichte helfen uns, die App stabil zu halten. App-Inhalte werden daraus entfernt.",
-    "optional": "Freiwillig",
     "helpImprove": "Zur Verbesserung von Kilo beitragen",
     "helpImproveDescription": "Teile anonyme Daten zur Produktnutzung und zur Installationsquelle. Du kannst das jederzeit in den Einstellungen ändern.",
     "seeFullDetails": "Vollständige Details ansehen",

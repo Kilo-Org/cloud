@@ -2849,6 +2849,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Is-sessjonijiet attivi tiegħek ma jkunux disponibbli sakemm titgħabba d-dejta.",
     "currentDeviceUnidentified": "L-apparat attwali ma setax jiġi identifikat.",
+    "kiloApp": "Applikazzjoni ta' Kilo",
     "noSessions": "L-ebda sessjoni attiva",
     "noSessionsDescription": "Idħol bl-applikazzjoni ta' Kilo fuq apparat ieħor u s-sessjoni tidher hawn.",
     "onlyKiloAppSignIns": "Hawn jidhru biss is-sessjonijiet tal-applikazzjoni ta' Kilo. Is-sessjonijiet tal-editur u tal-CLI mhumiex elenkati.",
@@ -3004,6 +3005,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Qabel ma nibdew",
+    "summaryTitle": "Preferenzi tal-qsim tad-dejta",
     "introDescription": "Kilo jibgħat il-messaġġi tiegħek lill-fornituri tal-AI biex jiġġeneraw tweġibiet. Hawn tara x'naqsmu u ma' min.",
     "required": "Meħtieġ biex tuża Kilo",
     "promptsTitle": "L-istruzzjonijiet u l-konversazzjonijiet tiegħek",
@@ -3012,7 +3014,6 @@
     "accountDescription": "L-ID tal-kont tiegħek ta' Kilo u l-metadata tat-talbiet, użati biex tiġi vverifikata l-identità tiegħek u jitkejjel l-użu.",
     "diagnosticsTitle": "Dijanjostika tal-applikazzjoni",
     "diagnosticsDescription": "Rapporti ta' waqfien mhux mistenni u żbalji, mingħajr il-kontenut tal-applikazzjoni, użati biex l-applikazzjoni tibqa' stabbli.",
-    "optional": "Mhux obbligatorju",
     "helpImprove": "Għin biex jitjieb Kilo",
     "helpImproveDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni. Tista' tbiddel din l-għażla meta trid fis-settings.",
     "seeFullDetails": "Ara d-dettalji sħaħ",

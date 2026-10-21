@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Je actieve sessies zijn pas beschikbaar nadat de gegevens zijn geladen.",
     "currentDeviceUnidentified": "Het huidige apparaat kon niet worden herkend.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Geen actieve sessies",
     "noSessionsDescription": "Meld je in de Kilo-app aan op een ander apparaat. Dat apparaat verschijnt dan hier.",
     "onlyKiloAppSignIns": "Alleen aanmeldingen van de Kilo-app verschijnen hier. Editor- en CLI-aanmeldingen worden niet vermeld.",
@@ -2372,6 +2373,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Voordat we beginnen",
+    "summaryTitle": "Voorkeuren voor gegevensdeling",
     "introDescription": "Kilo stuurt je berichten naar AI-aanbieders om antwoorden te genereren. Hieronder zie je welke gegevens we delen en met wie.",
     "required": "Vereist om Kilo te gebruiken",
     "promptsTitle": "Je prompts en gesprekken",
@@ -2380,7 +2382,6 @@
     "accountDescription": "Je Kilo-account-ID en metadata van verzoeken om je identiteit te controleren en het gebruik te meten.",
     "diagnosticsTitle": "Diagnostische appgegevens",
     "diagnosticsDescription": "Crash- en foutrapporten zonder app-inhoud om de app stabiel te houden.",
-    "optional": "Optioneel",
     "helpImprove": "Kilo helpen verbeteren",
     "helpImproveDescription": "Deel anonieme gebruiksstatistieken en de installatiebron. Je kunt dit op elk moment wijzigen in de instellingen.",
     "seeFullDetails": "Volledige details bekijken",

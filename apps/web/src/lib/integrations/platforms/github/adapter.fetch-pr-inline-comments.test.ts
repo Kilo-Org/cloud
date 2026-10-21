@@ -147,4 +147,29 @@ describe('fetchPRInlineComments', () => {
     expect(totalBytes).toBeLessThanOrEqual(64 * 1024);
     expect(mockListReviewComments).toHaveBeenCalledTimes(MAX_PAGES);
   });
+
+  it('stops on the stored byte budget before the page cap for multi-byte bodies', async () => {
+    const multiByteBody = '漢'.repeat(200);
+    const bytesPerStoredBody = Buffer.byteLength(multiByteBody.slice(0, 60));
+    expect(bytesPerStoredBody).toBe(180);
+    const expectedStored = Math.ceil((64 * 1024) / bytesPerStoredBody);
+
+    mockListReviewComments.mockImplementation(async ({ page }: { page: number }) => ({
+      data: Array.from({ length: PER_PAGE }, (_, index) => ({
+        id: page * PER_PAGE + index + 1,
+        path: 'src/file.ts',
+        line: index + 1,
+        body: multiByteBody,
+        position: index,
+        user: { login: 'reviewer' },
+      })),
+    }));
+
+    const comments = await fetchPRInlineComments('42', 'acme', 'widgets', 7);
+
+    expect(comments).toHaveLength(expectedStored);
+    expect(mockListReviewComments.mock.calls.length).toBeLessThan(MAX_PAGES);
+    const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
+    expect(totalBytes).toBeGreaterThanOrEqual(64 * 1024);
+  });
 });

@@ -67,12 +67,21 @@ function publicHandler(handle: (c: Context<HonoEnv>) => Promise<Response>): Hand
 
 // A decide request carries the whole conversation, inline images included. The limit matches
 // the largest request an upstream model provider accepts (Anthropic Messages, 32 MB).
-const MAX_PUBLIC_REQUEST_BODY_BYTES = 32 * 1000 * 1000;
+const MAX_DECIDE_REQUEST_BODY_BYTES = 32 * 1000 * 1000;
+// An eval plan or case request carries a router ID and a case ID, nothing else.
+const MAX_EVAL_PLAN_OR_CASE_REQUEST_BODY_BYTES = 16 * 1000;
+// A result upload carries one client output, which the contract caps at 1,000,000 characters.
+// JSON escaping costs at most six bytes per character, so a larger body cannot parse into
+// that schema.
+const MAX_EVAL_RESULT_REQUEST_BODY_BYTES = 8 * 1000 * 1000;
 
-async function readJson(c: Context<HonoEnv>): Promise<{ byteLength: number; json: unknown }> {
+async function readJson(
+  c: Context<HonoEnv>,
+  maxBytes: number
+): Promise<{ byteLength: number; json: unknown }> {
   const body = c.req.raw.body;
   const read = body
-    ? await readBoundedStream(body as ReadableStream<Uint8Array>, MAX_PUBLIC_REQUEST_BODY_BYTES)
+    ? await readBoundedStream(body as ReadableStream<Uint8Array>, maxBytes)
     : { ok: true as const, bytes: new Uint8Array() };
   if (!read.ok) throw new CustomRouterError('invalid_request', 'Request body is too large');
   try {
@@ -102,19 +111,21 @@ function requirePaidUsageBalance(balanceUsd: number): void {
   }
 }
 
+// Public routes admit a caller only when the caller's payer balance can fund paid usage.
+async function requireCallerPaidUsageBalance(caller: Caller): Promise<void> {
+  requirePaidUsageBalance(await loadPayerBalanceUsd(caller));
+}
+
 export const publicDecideHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  const { byteLength, json } = await readJson(c);
+  await requireCallerPaidUsageBalance(caller);
+  const { byteLength, json } = await readJson(c, MAX_DECIDE_REQUEST_BODY_BYTES);
   const request = parseBody(CustomRouterDecideRequestSchema, json);
   const reference = parseCustomRouterModelId(request.model);
   if (!reference) throw new CustomRouterError('invalid_request', 'Not a custom router model ID');
   const owner = customRouterOwner(reference, caller);
-  const [router, balanceUsd] = await Promise.all([
-    owner ? findCustomRouter(c.env, owner, reference.slug) : null,
-    loadPayerBalanceUsd(caller),
-  ]);
+  const router = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
   if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
-  requirePaidUsageBalance(balanceUsd);
   // The organization model policy filters gateway entries for any router used in that
   // organization's context, including a member's personal router.
   const gatewayModelIds = router.entries.flatMap(entry =>
@@ -232,7 +243,11 @@ async function loadEditableRouter(
 
 export const evalPlanHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  const request = parseBody(ClientEvalPlanRequestSchema, (await readJson(c)).json);
+  await requireCallerPaidUsageBalance(caller);
+  const request = parseBody(
+    ClientEvalPlanRequestSchema,
+    (await readJson(c, MAX_EVAL_PLAN_OR_CASE_REQUEST_BODY_BYTES)).json
+  );
   const router = await loadEditableRouter(c.env, caller, request.routerId);
   return forwardClientEval(
     c.env,
@@ -246,7 +261,11 @@ export const evalPlanHandler = publicHandler(async c => {
 
 export const evalCaseHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  const request = parseBody(ClientEvalCaseRequestSchema, (await readJson(c)).json);
+  await requireCallerPaidUsageBalance(caller);
+  const request = parseBody(
+    ClientEvalCaseRequestSchema,
+    (await readJson(c, MAX_EVAL_PLAN_OR_CASE_REQUEST_BODY_BYTES)).json
+  );
   const router = await loadEditableRouter(c.env, caller, request.routerId);
   return forwardClientEval(
     c.env,
@@ -257,7 +276,11 @@ export const evalCaseHandler = publicHandler(async c => {
 
 export const evalResultHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  const upload = parseBody(ClientEvalResultUploadSchema, (await readJson(c)).json);
+  await requireCallerPaidUsageBalance(caller);
+  const upload = parseBody(
+    ClientEvalResultUploadSchema,
+    (await readJson(c, MAX_EVAL_RESULT_REQUEST_BODY_BYTES)).json
+  );
   const router = await loadEditableRouter(c.env, caller, upload.routerId);
   return forwardClientEval(
     c.env,

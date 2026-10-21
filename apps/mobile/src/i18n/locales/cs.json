@@ -3733,7 +3733,7 @@
       "empty": "Zatím žádné servery MCP",
       "name": "Název serveru",
       "type": "Typ serveru",
-      "localType": "Místní",
+      "localType": "Lokální",
       "remoteType": "Vzdálený",
       "command": "Příkazový řádek",
       "url": "URL",

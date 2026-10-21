@@ -2233,7 +2233,7 @@
       "invalidLink": "Este enlace no se puede abrir.",
       "hostConfirmTitle": "¿Abrir enlace externo?",
       "hostConfirmMessage": "Este enlace abre {{host}} en tu navegador.",
-      "open": "Apertura",
+      "open": "Abrir",
       "trustThisHost": "Confiar en este dominio"
     },
     "folderPicker": {
@@ -2682,7 +2682,7 @@
       "openAccessibility": "Abrir una PR o un merge request",
       "clearLink": "Borrar el enlace",
       "pasteLink": "Pegar el enlace de PR o de merge request",
-      "open": "Apertura"
+      "open": "Abrir"
     },
     "eventChips": {
       "comment": "Comentario",
@@ -3721,11 +3721,11 @@
       "add": "Agregar agente",
       "empty": "Aún no hay agentes",
       "name": "Nombre del agente",
-      "slug": "babosa agente",
+      "slug": "Slug del agente",
       "description": "Descripción del agente",
       "model": "Anulación de modelo",
       "modelPlaceholder": "Usar sesión predeterminada",
-      "prompt": "Aviso del sistema",
+      "prompt": "Prompt del sistema",
       "steps": "Pasos máximos",
       "stepsPlaceholder": "p. ej. 50",
       "temperature": "Temperatura",

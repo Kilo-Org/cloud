@@ -12,6 +12,10 @@ import {
   createOrganization,
   markOrganizationAsDeleted,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  getDaysRemainingInTrial,
+  getOrgTrialStatusFromDays,
+} from '@kilocode/organization-entitlement';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -19,6 +23,17 @@ import { createCallerForUser } from '@/routers/test-utils';
 jest.mock('@/lib/organizations/organization-billing', () => ({
   getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_creation'),
 }));
+
+// Entitlement classification the way the app reads it, so a case asserts the
+// stage an organization lands in rather than only the raw timestamp.
+function trialStatusOf(organization: {
+  free_trial_end_at: string | null;
+  created_at: string;
+}) {
+  return getOrgTrialStatusFromDays(
+    getDaysRemainingInTrial(organization.free_trial_end_at, organization.created_at)
+  );
+}
 
 describe('organization creation limit', () => {
   beforeEach(() => {
@@ -365,17 +380,21 @@ describe('organization creation limit', () => {
     const secondTrial = new Date(second.free_trial_end_at!).getTime();
     expect(firstTrial).toBeGreaterThan(Date.now());
     expect(secondTrial).toBeLessThan(Date.now());
+    expect(trialStatusOf(first)).toBe('trial_active');
+    expect(trialStatusOf(second)).toBe('trial_expired_hard');
   });
 
   test('a re-created organization after deletion does not regain the trial window', async () => {
     const user = await insertTestUser();
     const original = await createOrganization('Original organization', user.id);
     expect(new Date(original.free_trial_end_at!).getTime()).toBeGreaterThan(Date.now());
+    expect(trialStatusOf(original)).toBe('trial_active');
 
     await markOrganizationAsDeleted(original.id);
 
     const replacement = await createOrganization('Replacement organization', user.id);
     expect(new Date(replacement.free_trial_end_at!).getTime()).toBeLessThan(Date.now());
+    expect(trialStatusOf(replacement)).toBe('trial_expired_hard');
   });
 
   test('each user gets their own first-organization trial window', async () => {

@@ -25,7 +25,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   authorizeProject,
-  classifyGitLabError,
+  classifyGitLabErrorForOwner,
   GitLabReviewError,
   type GitLabProjectAccess,
   type GitLabReviewOwner,
@@ -198,8 +198,12 @@ const GITLAB_INLINE_PARTIAL_APPLY_REASON =
  * mid-batch or the approval/summary step — is a partial apply, so it reports
  * the retryable kind and the router reconciles instead of replaying.
  */
-function classifySubmitFailure(error: unknown, inlineCommitted: boolean): GitLabReviewError {
-  const classified = classifyGitLabError(error);
+function classifySubmitFailure(
+  error: unknown,
+  inlineCommitted: boolean,
+  owner: GitLabReviewOwner
+): GitLabReviewError {
+  const classified = classifyGitLabErrorForOwner(error, owner);
   if (inlineCommitted && !classified.retryable) {
     return new GitLabReviewError('retryable', GITLAB_INLINE_PARTIAL_APPLY_REASON);
   }
@@ -265,7 +269,7 @@ export async function addComment(
     }
     return { done: true, replayed: false };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, target.owner);
   }
 }
 
@@ -285,7 +289,7 @@ export async function replyToDiscussion(
     );
     return { done: true, replayed: false };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, target.owner);
   }
 }
 
@@ -349,7 +353,7 @@ export async function submitReview(
     }
     return { done: true, replayed: false };
   } catch (error) {
-    throw classifySubmitFailure(error, inlineCommitted);
+    throw classifySubmitFailure(error, inlineCommitted, target.owner);
   }
 }
 
@@ -390,7 +394,7 @@ async function setThreadResolved(
     );
     return { done: true, replayed: false };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, target.owner);
   }
 }
 
@@ -474,7 +478,7 @@ export async function mergePullRequest(
     });
     return { done: true, replayed: false };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, target.owner);
   }
 }
 
@@ -513,7 +517,7 @@ export async function enableAutoMerge(
     });
     return { done: true, replayed: false };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, target.owner);
   }
 }
 
@@ -549,7 +553,7 @@ export async function disableAutoMerge(
     );
     return { done: true, replayed: false };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, target.owner);
   }
 }
 

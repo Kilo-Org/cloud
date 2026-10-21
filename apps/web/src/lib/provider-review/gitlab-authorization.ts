@@ -44,11 +44,22 @@ export type GitLabReviewErrorKind = ProviderReviewErrorKind;
  * A classified provider failure. `retryable` is true only for 5xx/network
  * outcomes. The message is fixed copy and never embeds a token or an
  * instance URL, so every output of this layer is safe to show or log.
+ *
+ * `providerStatus` keeps the HTTP status a failure was classified from, when
+ * there was one, so an owner-aware caller can tell a refused credential (401)
+ * from a provider permission refusal (403) after classification.
  */
 export class GitLabReviewError extends ProviderReviewError {
-  constructor(kind: ProviderReviewErrorKind, message: string) {
+  readonly providerStatus: number | null;
+
+  constructor(
+    kind: ProviderReviewErrorKind,
+    message: string,
+    providerStatus: number | null = null
+  ) {
     super(kind, message);
     this.name = 'GitLabReviewError';
+    this.providerStatus = providerStatus;
   }
 }
 
@@ -60,33 +71,54 @@ export class GitLabApiStatusError extends ProviderApiStatusError {
   }
 }
 
-/** GitLab status → kind: 404 not_found, 401/403 forbidden, 409 stale head, 5xx/429 retryable. */
+/**
+ * GitLab status → kind: 404 not_found, 401 reconnect, 403 forbidden, 409 stale
+ * head, 5xx/429 retryable.
+ *
+ * A 401 is the credential this layer minted being refused, so the remedy is a
+ * reconnect; 403 is a refusal of the role behind that credential, which
+ * `classifyGitLabErrorForOwner` weighs against the connection's owner.
+ */
 export function classifyGitLabStatus(status: number): GitLabReviewError {
   if (status === 404) {
     return new GitLabReviewError(
       'not_found',
-      'The GitLab merge request or project was not found, or you do not have access to it.'
+      'The GitLab merge request or project was not found, or you do not have access to it.',
+      status
     );
   }
-  if (status === 401 || status === 403) {
+  if (status === 401) {
+    return new GitLabReviewError(
+      'reconnect',
+      'Your GitLab connection is no longer valid. Reconnect GitLab and try again.',
+      status
+    );
+  }
+  if (status === 403) {
     return new GitLabReviewError(
       'forbidden',
-      'Your GitLab role does not allow this action on this merge request.'
+      'Your GitLab role does not allow this action on this merge request.',
+      status
     );
   }
   if (status === 409) {
     return new GitLabReviewError(
       'stale_head',
-      'The merge request changed since it was loaded. Reload the merge request and try again.'
+      'The merge request changed since it was loaded. Reload the merge request and try again.',
+      status
     );
   }
   if (status === 400 || status === 405 || status === 422) {
-    return new GitLabReviewError('bad_request', 'GitLab rejected this request.');
+    return new GitLabReviewError('bad_request', 'GitLab rejected this request.', status);
   }
   if (status === 429 || status >= 500) {
-    return new GitLabReviewError('retryable', 'GitLab is temporarily unavailable. Try again.');
+    return new GitLabReviewError(
+      'retryable',
+      'GitLab is temporarily unavailable. Try again.',
+      status
+    );
   }
-  return new GitLabReviewError('retryable', 'GitLab returned an unexpected error.');
+  return new GitLabReviewError('retryable', 'GitLab returned an unexpected error.', status);
 }
 
 function classifyTrpcError(code: TRPCError['code']): GitLabReviewError {
@@ -94,7 +126,12 @@ function classifyTrpcError(code: TRPCError['code']): GitLabReviewError {
     case 'NOT_FOUND':
       return new GitLabReviewError('not_found', 'GitLab integration not found.');
     case 'UNAUTHORIZED':
-      return new GitLabReviewError('forbidden', 'Your GitLab connection is no longer valid.');
+      // The credential broker refused the stored credential: the connection
+      // must be re-established. The caller's organization access is intact.
+      return new GitLabReviewError(
+        'reconnect',
+        'Your GitLab connection is no longer valid. Reconnect GitLab and try again.'
+      );
     case 'SERVICE_UNAVAILABLE':
       return new GitLabReviewError('retryable', 'GitLab credentials are temporarily unavailable.');
     default:
@@ -132,6 +169,35 @@ export function classifyGitLabError(error: unknown): GitLabReviewError {
   }
   logExceptInTest('[gitlab-authorization] Unclassified GitLab failure:', error);
   return new GitLabReviewError('retryable', 'GitLab returned an unexpected error.');
+}
+
+/**
+ * Classify one failure for the account whose connection produced the
+ * credential.
+ *
+ * The token belongs to the CONNECTION: for an organization integration it is
+ * the organization's credential, and the person reading the merge request has
+ * no GitLab role in play. A provider 403 on such a connection is therefore
+ * the connection's refusal — it cannot read that project — and its remedy is
+ * reconnecting, not the reader's permission. A personal connection's 403 is
+ * the caller's own GitLab role, and stays `forbidden`.
+ */
+export function classifyGitLabErrorForOwner(
+  error: unknown,
+  owner: GitLabReviewOwner
+): GitLabReviewError {
+  const classified = classifyGitLabError(error);
+  if (
+    classified.kind === 'forbidden' &&
+    classified.providerStatus === 403 &&
+    owner.type === 'organization'
+  ) {
+    return new GitLabReviewError(
+      'reconnect',
+      'Your GitLab connection cannot read this merge request. Reconnect GitLab and try again.'
+    );
+  }
+  return classified;
 }
 
 /** The credentials and canonical project path one request may use. */
@@ -218,7 +284,7 @@ export async function authorizeOwner(
     const accessToken = await getValidGitLabToken(integration, actorFor(owner));
     return { accessToken, instanceUrl, owner };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -262,6 +328,6 @@ export async function authorizeProject(
     const accessToken = await getValidGitLabToken(integration, actorFor(owner));
     return { accessToken, instanceUrl, projectPath: match.full_name, owner };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }

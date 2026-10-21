@@ -5,7 +5,8 @@ import {
   type DirectByokModel,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import type { OpenRouterProvider } from '@kilocode/db/schema-types';
+import type { CustomLlmProvider, OpenRouterProvider } from '@kilocode/db/schema-types';
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import {
@@ -18,6 +19,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 
 /** Providers for `/api/v1/providers` that the general provider list lacks. */
 export function getDirectByokProviderListings(): OpenRouterProvider[] {
@@ -31,6 +33,22 @@ export function getDirectByokProviderListings(): OpenRouterProvider[] {
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
+}
+
+const AI_SDK_PROVIDER_FOR_CHAT_API = {
+  chat_completions: undefined,
+  messages: 'anthropic',
+  responses: 'openai',
+} as const satisfies Record<GatewayChatApiKind, CustomLlmProvider | undefined>;
+
+function getDirectByokAiSdkProvider(
+  provider: DirectByokProvider,
+  model: DirectByokModel,
+  id: string
+) {
+  return provider.getModelChatApi
+    ? AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)]
+    : getAiSdkProvider(id, provider.id);
 }
 
 function convertModel(
@@ -77,7 +95,7 @@ function convertModel(
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: withLegacyVariants({
-      ai_sdk_provider: getAiSdkProvider(id, provider.id),
+      ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
       reasoning_options:
         model.reasoning_options ??
         (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),
@@ -87,12 +105,14 @@ function convertModel(
 
 async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
   let nextPreferredId = (await getPreferredModels()).length;
+  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
   return (
     await Promise.all(
-      DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).map(
-        async provider =>
+      providers
+        .filter(provider => byokProviders.includes(provider.id))
+        .map(async provider =>
           (await provider.models()).map(model => convertModel(provider, model, nextPreferredId++))
-      )
+        )
     )
   ).flat();
 }
@@ -101,9 +121,8 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
   provider: DirectByokProvider | null;
   model: DirectByokModel | null;
 }> {
-  const provider = DIRECT_BYOK_PROVIDERS.find(provider =>
-    requestedModel.startsWith(`${provider.id}/`)
-  );
+  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+  const provider = providers.find(provider => requestedModel.startsWith(`${provider.id}/`));
   if (!provider) {
     return { provider: null, model: null };
   }
@@ -139,6 +158,46 @@ export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiK
       const headers = new Headers(init?.headers);
       headers.set('user-agent', COMPATIBLE_USER_AGENT);
       return fetch(url, init ? { ...init, headers } : { headers });
+    },
+  });
+}
+
+/**
+ * An AI SDK provider for a key test against a provider whose upstream depends
+ * on the stored credential. The test model must use Chat Completions.
+ */
+export async function createResolvedAiSdkProvider(
+  directByokProvider: DirectByokProvider,
+  credential: string,
+  modelId: string
+) {
+  if (!directByokProvider.resolveUpstream) {
+    return createAiSdkProvider(directByokProvider, credential);
+  }
+  const upstream = await directByokProvider.resolveUpstream({
+    credential,
+    model: { id: modelId },
+    stream: false,
+  });
+  const awsBedrock = upstream.awsBedrock;
+  return createOpenAICompatible({
+    baseURL: upstream.apiUrl,
+    apiKey: awsBedrock ? undefined : upstream.apiKey,
+    name: 'openaiCompatible',
+    fetch: async (url, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set('user-agent', COMPATIBLE_USER_AGENT);
+      if (!awsBedrock || typeof init?.body !== 'string') {
+        return fetch(url, { ...init, headers });
+      }
+      const signedHeaders = await signBedrockRequest({
+        url: String(url),
+        method: init.method ?? 'POST',
+        headers,
+        body: init.body,
+        credentials: awsBedrock,
+      });
+      return fetch(url, { ...init, headers: signedHeaders });
     },
   });
 }

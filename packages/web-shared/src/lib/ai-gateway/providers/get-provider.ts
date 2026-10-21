@@ -20,6 +20,8 @@ import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/p
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type { DirectByokUpstream } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import type { DirectByokProviderMetaId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
@@ -57,17 +59,25 @@ export type GetProviderProviderResult = {
   skipBalanceCheck?: boolean;
 };
 
+/** A direct BYOK credential exists for the model but cannot be parsed or authenticated. */
+export type DirectByokCredentialErrorResult = {
+  kind: 'direct-byok-credential-error';
+  providerId: DirectByokProviderMetaId;
+};
+
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
-  | { kind: 'custom-llm-unavailable' };
+  | { kind: 'custom-llm-unavailable' }
+  | DirectByokCredentialErrorResult;
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
+  request: GatewayRequest,
   organizationId: string | undefined
-): Promise<GetProviderProviderResult | null> {
+): Promise<GetProviderProviderResult | DirectByokCredentialErrorResult | null> {
   const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
   if (!directByok || !directByokModel) {
     return null;
@@ -78,17 +88,38 @@ async function checkDirectBYOK(
   if (!userByok || userByok.length === 0) {
     return null;
   }
+
+  let upstream: DirectByokUpstream = {
+    apiUrl: directByok.base_url,
+    apiUrlOverrides: directByok.base_url_overrides,
+    disableUrlSuffix: false,
+    apiKey: userByok[0].decryptedAPIKey,
+    apiKeyHeader: null,
+    supportedChatApis: directByok.supported_chat_apis,
+    responseTransforms: directByok.reasoning_details_transform,
+  };
+  if (directByok.resolveUpstream) {
+    try {
+      upstream = await directByok.resolveUpstream({
+        credential: userByok[0].decryptedAPIKey,
+        model: directByokModel,
+        stream: request.body.stream === true,
+      });
+    } catch (error) {
+      // The message can echo credential fields, so only the error name is logged.
+      console.error('Direct BYOK credentials could not be used', {
+        providerId: directByok.id,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+      return { kind: 'direct-byok-credential-error', providerId: directByok.id };
+    }
+  }
+
   return {
     kind: 'provider',
     provider: {
       id: 'direct-byok',
-      apiUrl: directByok.base_url,
-      apiUrlOverrides: directByok.base_url_overrides,
-      disableUrlSuffix: false,
-      apiKey: userByok[0].decryptedAPIKey,
-      apiKeyHeader: null,
-      supportedChatApis: directByok.supported_chat_apis,
-      responseTransforms: directByok.reasoning_details_transform,
+      ...upstream,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;
@@ -231,7 +262,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return await resolveCustomLlmProvider(customLlm, user, organizationId);
   }
 
-  const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
+  const directByokByok = await checkDirectBYOK(user, requestedModel, request, organizationId);
   if (directByokByok) {
     return directByokByok;
   }

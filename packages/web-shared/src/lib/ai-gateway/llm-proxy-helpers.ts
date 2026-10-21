@@ -518,6 +518,14 @@ export function chatGptReconnectResponse(message: string) {
   );
 }
 
+export function directByokCredentialErrorResponse(providerName: string) {
+  const error = `[BYOK] Your ${providerName} credentials are invalid or could not authenticate. Update them at ${APP_URL}/byok.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: 400 }
+  );
+}
+
 export function modelDoesNotExistOnOpenRouterResponse(model: string) {
   const error =
     `The requested model '${model}' does not exist. ` +

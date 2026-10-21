@@ -2204,6 +2204,11 @@ export const DirectByokModelSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
+  /**
+   * Provider-specific upstream endpoint for providers whose models are served
+   * by different endpoints, such as Amazon Bedrock runtime versus mantle.
+   */
+  endpoint: z.string().optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);

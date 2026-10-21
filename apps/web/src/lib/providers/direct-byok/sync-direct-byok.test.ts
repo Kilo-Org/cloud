@@ -4,6 +4,8 @@ import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import type { DirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
+  parseAwsBedrockModelsDevModels,
+  parseGcpVertexModelsDevModels,
   parseModelsDevProviderModels,
   parseOpenAICompatibleProviderModels,
   syncDirectByokModels,
@@ -340,6 +342,72 @@ describe('parseModelsDevProviderModels', () => {
   });
 });
 
+describe('parseAwsBedrockModelsDevModels', () => {
+  const mantle = (path: string) => ({
+    npm: '@ai-sdk/amazon-bedrock/mantle',
+    api: `https://bedrock-mantle.\${AWS_REGION}.api.aws${path}`,
+  });
+  const models = {
+    'anthropic.claude-sonnet-4-6': { id: 'anthropic.claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+    'global.anthropic.claude-sonnet-4-6': {
+      id: 'global.anthropic.claude-sonnet-4-6',
+      name: 'Claude Sonnet 4.6 (Global)',
+    },
+    'us.anthropic.claude-sonnet-4-6': { id: 'us.anthropic.claude-sonnet-4-6' },
+    'zai.glm-5': { id: 'zai.glm-5', name: 'GLM-5' },
+    'openai.gpt-5.5': { id: 'openai.gpt-5.5', provider: mantle('/openai/v1') },
+    'openai.gpt-6-sol': { id: 'openai.gpt-6-sol', provider: mantle('/openai/v1') },
+    'global.openai.gpt-6-sol': { id: 'global.openai.gpt-6-sol' },
+    'openai.gpt-oss-120b': { id: 'openai.gpt-oss-120b', provider: mantle('/v1') },
+    'xai.grok-4.6': { id: 'xai.grok-4.6', provider: mantle('/openai/v1') },
+    'global.xai.grok-4.6': { id: 'global.xai.grok-4.6', name: 'Grok 4.6 (Global)' },
+    'amazon.nova-pro-v1:0': { id: 'amazon.nova-pro-v1:0' },
+    'meta.llama3-1-70b-instruct-v1:0': {
+      id: 'meta.llama3-1-70b-instruct-v1:0',
+      status: 'deprecated',
+    },
+  };
+
+  test('selects one endpoint per model and skips Converse-only and deprecated models', () => {
+    expect(
+      parseAwsBedrockModelsDevModels({ models }).map(({ id, endpoint }) => ({ id, endpoint }))
+    ).toEqual([
+      { id: 'global.anthropic.claude-sonnet-4-6', endpoint: 'runtime-anthropic' },
+      { id: 'zai.glm-5', endpoint: 'runtime-openai' },
+      { id: 'openai.gpt-5.5', endpoint: 'mantle-openai' },
+      { id: 'openai.gpt-6-sol', endpoint: 'mantle-openai' },
+      { id: 'openai.gpt-oss-120b', endpoint: 'mantle-v1' },
+      { id: 'global.xai.grok-4.6', endpoint: 'runtime-openai' },
+    ]);
+  });
+});
+
+describe('parseGcpVertexModelsDevModels', () => {
+  test('routes Gemini and managed models to Chat Completions and Claude to Messages', () => {
+    const models = {
+      'gemini-3.5-flash': { id: 'gemini-3.5-flash' },
+      'zai-org/glm-5.2-maas': {
+        id: 'zai-org/glm-5.2-maas',
+        provider: { npm: '@ai-sdk/openai-compatible' },
+      },
+      'claude-sonnet-4-6@default': {
+        id: 'claude-sonnet-4-6@default',
+        provider: { npm: '@ai-sdk/google-vertex/anthropic' },
+      },
+      'mistral-medium-3': { id: 'mistral-medium-3', provider: { npm: '@ai-sdk/mistral' } },
+      'gemini-embedding-001': { id: 'gemini-embedding-001', tool_call: false },
+    };
+
+    expect(
+      parseGcpVertexModelsDevModels({ models }).map(({ id, endpoint }) => ({ id, endpoint }))
+    ).toEqual([
+      { id: 'gemini-3.5-flash', endpoint: 'openapi' },
+      { id: 'zai-org/glm-5.2-maas', endpoint: 'openapi' },
+      { id: 'claude-sonnet-4-6@default', endpoint: 'anthropic' },
+    ]);
+  });
+});
+
 describe('syncDirectByokModels database snapshots', () => {
   const providerId = 'nvidia-byok';
   const oldSyncedAt = '2020-01-02T03:04:05.000Z';
@@ -400,6 +468,8 @@ describe('syncDirectByokModels database snapshots', () => {
           'opencode-go': { models: openCodeGoModels },
           'xiaomi-token-plan-ams': { models: {} },
           'xiaomi-token-plan-sgp': { models: {} },
+          'amazon-bedrock': { models: {} },
+          'google-vertex': { models: {} },
         });
       }
       if (input === 'https://integrate.api.nvidia.com/v1/models') {

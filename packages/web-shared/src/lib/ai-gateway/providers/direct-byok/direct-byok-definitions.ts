@@ -1,8 +1,10 @@
 import type { DirectByokProvider } from './types';
 import alibabaTokenPlan from './alibaba-token-plan';
+import awsBedrock from './aws-bedrock';
 import byteplusCoding from './byteplus-coding';
 import chutesByok from './chutes-byok';
 import edenai from './edenai';
+import gcpVertex from './gcp-vertex';
 import inceptronByok from './inceptron-byok';
 import kimiCoding from './kimi-coding';
 import martian from './martian';
@@ -19,9 +21,11 @@ import zaiCoding from './zai-coding';
 
 export default [
   alibabaTokenPlan,
+  awsBedrock,
   byteplusCoding,
   chutesByok,
   edenai,
+  gcpVertex,
   inceptronByok,
   kimiCoding,
   martian,

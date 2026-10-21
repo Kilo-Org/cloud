@@ -20,6 +20,7 @@ import {
   type TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type { DirectByokResolveUpstreamInput } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
@@ -478,4 +479,100 @@ describe('getProvider direct BYOK routing', () => {
       expect(request.body.model).toBe('upstream-model');
     }
   );
+
+  test('uses the upstream a provider resolves from the stored credential', async () => {
+    const resolveUpstream = jest.fn(async (_input: DirectByokResolveUpstreamInput) => ({
+      apiUrl: 'https://bedrock-runtime.eu-west-1.amazonaws.com/openai/v1',
+      apiUrlOverrides: {},
+      disableUrlSuffix: false,
+      apiKey: '',
+      apiKeyHeader: null,
+      supportedChatApis: ['chat_completions'] as const,
+      responseTransforms: null,
+      awsBedrock: {
+        type: 'aws_bedrock' as const,
+        region: 'eu-west-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret',
+      },
+    }));
+    jest.mocked(getDirectByokModel).mockResolvedValue({
+      provider: {
+        id: 'aws-bedrock',
+        base_url: 'https://unused.example/v1',
+        base_url_overrides: {},
+        supported_chat_apis: ['chat_completions', 'responses', 'messages'],
+        reasoning_details_transform: null,
+        transformRequest() {},
+        models: async () => [],
+        resolveUpstream,
+      },
+      model: {
+        id: 'zai.glm-5',
+        name: 'GLM-5',
+        context_length: 1000,
+        max_completion_tokens: 1000,
+        endpoint: 'runtime-openai',
+      },
+    });
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([
+        { decryptedAPIKey: '{"stored":"credential"}', providerId: 'aws-bedrock' },
+      ]);
+
+    const input = providerInput('aws-bedrock/zai.glm-5');
+    const result = await getProvider({
+      ...input,
+      request: { kind: 'chat_completions', body: { ...input.request.body, stream: true } },
+    });
+    if (result.kind !== 'provider') throw new Error('expected provider result');
+
+    expect(resolveUpstream).toHaveBeenCalledWith({
+      credential: '{"stored":"credential"}',
+      model: expect.objectContaining({ id: 'zai.glm-5', endpoint: 'runtime-openai' }),
+      stream: true,
+    });
+    expect(result.provider).toMatchObject({
+      id: 'direct-byok',
+      apiUrl: 'https://bedrock-runtime.eu-west-1.amazonaws.com/openai/v1',
+      apiKey: '',
+      supportedChatApis: ['chat_completions'],
+      awsBedrock: { region: 'eu-west-1' },
+    });
+    expect(result.bypassAccessCheck).toBe(true);
+  });
+
+  test('reports unusable stored credentials instead of falling through to another route', async () => {
+    jest.mocked(getDirectByokModel).mockResolvedValue({
+      provider: {
+        id: 'gcp-vertex',
+        base_url: 'https://unused.example/v1',
+        base_url_overrides: {},
+        supported_chat_apis: ['chat_completions', 'messages'],
+        reasoning_details_transform: null,
+        transformRequest() {},
+        models: async () => [],
+        resolveUpstream: async () => {
+          throw new Error('Invalid credentials');
+        },
+      },
+      model: {
+        id: 'gemini-3.5-flash',
+        name: 'Gemini',
+        context_length: 1,
+        max_completion_tokens: 1,
+      },
+    });
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([{ decryptedAPIKey: 'not json', providerId: 'gcp-vertex' }]);
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await getProvider(providerInput('gcp-vertex/gemini-3.5-flash'));
+
+    expect(result).toEqual({ kind: 'direct-byok-credential-error', providerId: 'gcp-vertex' });
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('not json');
+    consoleError.mockRestore();
+  });
 });

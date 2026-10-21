@@ -28,6 +28,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -68,6 +69,7 @@ import {
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
+  directByokCredentialErrorResponse,
   chatGptReconnectResponse,
   lastUserPromptText,
   requestedLogprobs,
@@ -848,6 +850,9 @@ export async function handleLlmProxyRequest(
   if (providerResult.kind === 'custom-llm-unavailable') {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
+  if (providerResult.kind === 'direct-byok-credential-error') {
+    return directByokCredentialErrorResponse(DIRECT_BYOK_PROVIDERS_META[providerResult.providerId]);
   }
   const effectiveProviderContext = providerResult;
 

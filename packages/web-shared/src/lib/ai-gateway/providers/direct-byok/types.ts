@@ -1,6 +1,7 @@
 import type { DirectByokProviderMetaId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import type {
   GatewayChatApiKind,
+  Provider,
   ProviderApiUrlOverrides,
   ProviderResponseTransforms,
   TransformRequestContext,
@@ -25,6 +26,26 @@ export type DirectByokProviderListing = {
   icon: NonNullable<OpenRouterProvider['icon']>;
 };
 
+/** Upstream routing and authentication derived from a stored credential. */
+export type DirectByokUpstream = Pick<
+  Provider,
+  | 'apiUrl'
+  | 'apiUrlOverrides'
+  | 'disableUrlSuffix'
+  | 'apiKey'
+  | 'apiKeyHeader'
+  | 'awsBedrock'
+  | 'supportedChatApis'
+  | 'responseTransforms'
+>;
+
+export type DirectByokResolveUpstreamInput = {
+  /** The decrypted credential stored for the provider. */
+  credential: string;
+  model: Pick<DirectByokModel, 'id' | 'endpoint'>;
+  stream: boolean;
+};
+
 export type DirectByokProvider = {
   id: DirectByokProviderMetaId;
   base_url: string;
@@ -35,6 +56,16 @@ export type DirectByokProvider = {
   transformRequest(context: TransformRequestContext): void;
   /** Omitted when the general provider list already has a corresponding provider. */
   provider_listing?: DirectByokProviderListing;
+  /**
+   * Builds the upstream from the stored credential, for providers whose URL or
+   * authentication depends on it, such as cloud regions or signed requests.
+   * Throws when the credential is unusable. When set, it replaces `base_url`,
+   * `base_url_overrides`, `supported_chat_apis` and `reasoning_details_transform`
+   * for requests.
+   */
+  resolveUpstream?(input: DirectByokResolveUpstreamInput): Promise<DirectByokUpstream>;
+  /** The chat API a model must be called with, for providers where it varies per model. */
+  getModelChatApi?(model: DirectByokModel): GatewayChatApiKind;
 };
 
 export function faviconIcon(siteUrl: string): DirectByokProviderListing['icon'] {

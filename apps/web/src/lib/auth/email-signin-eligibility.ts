@@ -37,9 +37,12 @@ function getMagicLinkEmailRateLimitKey(email: string): string {
 }
 
 /**
- * The caller address the firewall rule counts against. apps/web runs behind
- * Vercel, which overwrites `x-vercel-forwarded-for` at the edge; this is the
- * header the edge controls, matching lib/mcp-gateway/oauth-client-service.ts.
+ * The caller address the firewall rule counts against. `x-vercel-forwarded-for`
+ * is the header Vercel's edge sets for the request's source address, so it is
+ * read first; `clientIpFromHeaders` in
+ * packages/web-shared/src/lib/admin/admin-access-log.ts reads the same header
+ * as its fallback. `x-real-ip` covers requests that arrive without the edge
+ * header, and `unknown` keeps the bucket key non-empty.
  */
 function clientIpAddress(request: NextRequest): string {
   const forwarded = request.headers.get('x-vercel-forwarded-for');

@@ -321,7 +321,17 @@
     "starting…",
     "tokens"
   ],
-  "sv": ["block", "commit", "copied", "open", "open pull request", "review", "tokens"],
+  "sv": [
+    "block",
+    "commit",
+    "comment",
+    "copied",
+    "merge",
+    "open",
+    "open pull request",
+    "review",
+    "tokens"
+  ],
   "sw": ["off", "open", "review"],
   "ta": ["open", "open pull request"],
   "te": ["commit", "open", "open pull request", "sign out", "unknown"],

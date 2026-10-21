@@ -256,6 +256,24 @@ describe('streamMessagePartRows', () => {
     expect(rows.map(row => row.item_id)).toEqual(['msg_a/child/prt_1', 'msg_a/prt_1']);
   });
 
+  it('keeps reading a layout whose pages are skipped in full', () => {
+    const rows = collectRows(
+      'part',
+      'row-id',
+      [
+        ...Array.from({ length: 8 }, (_unused, index) => ({
+          id: index + 1,
+          ingested_at: 1000 + index,
+          item_id: `part/msg_b/prt_${String(index).padStart(2, '0')}`,
+        })),
+        { id: 9, ingested_at: 1100, item_id: 'part/prt_own_a' },
+        { id: 10, ingested_at: 1101, item_id: 'part/prt_own_b' },
+      ],
+      4
+    );
+    expect(rows.map(row => row.item_id)).toEqual(['part/prt_own_a', 'part/prt_own_b']);
+  });
+
   it('skips rows of the other layout', () => {
     const rows = collectRows(
       'part',

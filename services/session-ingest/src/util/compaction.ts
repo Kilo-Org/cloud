@@ -99,7 +99,11 @@ export function* streamMessagePartRows<T extends PartItemRowPosition>(options: {
         nextSource = source;
       }
     }
-    if (next === undefined || nextSource === undefined) return;
+    if (next === undefined || nextSource === undefined) {
+      // A page can be read and skipped in full, leaving a layout with rows still unread.
+      if (sources.every(source => source.done && source.buffer.length === 0)) return;
+      continue;
+    }
     nextSource.buffer.shift();
     yield next;
   }

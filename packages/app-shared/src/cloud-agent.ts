@@ -21,16 +21,20 @@ export type CloudAgentAttachments = {
  * tail (`sessions/<id>/...`) once a caller has already joined a path against
  * the workspace root, so strip that form too.
  */
-const ABSOLUTE_CLOUD_AGENT_PREFIX =
-  /^.*\/workspace\/(?:[^/]+\/)?[^/]+\/(?:sessions|worktrees)\/[^/]+\//;
-const CONTAINER_WORKSPACE_PREFIX = /^\/workspace\/app\//;
-const RELATIVE_SESSION_PREFIX = /^(?:sessions|worktrees)\/[^/]+\//;
+const CONTAINER_WORKSPACE_ROOT = /^\/workspace\/app(?=\/|$)/;
+const ABSOLUTE_CLOUD_AGENT_ROOT =
+  /^.*\/workspace\/(?:[^/]+\/)?[^/]+\/(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/]+(?=\/|$)/;
+const RELATIVE_CLOUD_AGENT_ROOT =
+  /^(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/]+(?=\/|$)/;
 
 /** The repo-relative label for a path from a Cloud Agent workspace. */
 export function cloudAgentFileLabel(path: string): string {
-  return path
-    .replaceAll('\\', '/')
-    .replace(ABSOLUTE_CLOUD_AGENT_PREFIX, '')
-    .replace(CONTAINER_WORKSPACE_PREFIX, '')
-    .replace(RELATIVE_SESSION_PREFIX, '');
+  const normalized = path.replaceAll('\\', '/');
+  const strippedRoot = normalized
+    .replace(CONTAINER_WORKSPACE_ROOT, '')
+    .replace(ABSOLUTE_CLOUD_AGENT_ROOT, '')
+    .replace(RELATIVE_CLOUD_AGENT_ROOT, '');
+  if (strippedRoot === normalized) return normalized;
+  const relative = strippedRoot.replace(/^\//, '');
+  return relative === '' ? '.' : relative;
 }

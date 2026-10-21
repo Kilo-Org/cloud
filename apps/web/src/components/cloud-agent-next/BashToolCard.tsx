@@ -11,7 +11,7 @@ type BashToolCardProps = {
 };
 
 const WORKSPACE_PATH_PATTERN =
-  /\/workspace\/(?:app|(?:[^/\s]+\/)?[^/\s]+\/(?:sessions|worktrees)\/[^/\s]+)/g;
+  /\/workspace\/(?:app(?![A-Za-z0-9._-])|(?:[^/\s]+\/)?[^/\s]+\/(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/\s]+)/g;
 const STREAMING_OUTPUT_WINDOW_CLASS = 'max-h-24';
 
 function getCommandPreview(command: string): string {

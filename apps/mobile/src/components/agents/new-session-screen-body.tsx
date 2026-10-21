@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The screen body wires the form, draft, model, and provider hooks end-to-end from the thin route. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -44,12 +44,15 @@ import {
   readForkPrefillText,
   readForkSourceIsCloudAgent,
 } from '@/components/agents/new-session-prefill';
+import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
@@ -80,6 +83,7 @@ import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
+  flushDraft,
   NEW_SESSION_DRAFT_KEY,
   resolvePrefillOverDraft,
   saveDraft,
@@ -143,12 +147,11 @@ export function NewSessionScreenBody() {
     forkSourceIsCloudAgent?: string;
     preselectRunOn?: string;
   }>();
-  const organizationId = searchParams.organizationId;
+  const { organizationId, isCloneEntry } = useNewSessionOrganization();
   const shareIdParam = searchParams.shareId;
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
   const cloneSourceTitle = readCloneSourceTitle(searchParams);
-  const isCloneEntry = cloneFromKiloSessionId !== '';
   // "Fork from here": the inclusive cut, and a forked user message's text for
   // the new session's composer. Both empty for a full Continue.
   const cloneUpToMessageId = isCloneEntry ? readCloneUpToMessageId(searchParams) : '';
@@ -212,6 +215,65 @@ export function NewSessionScreenBody() {
   // mount reaches it only through the remount keyed on `promptSeed` below, and
   // that remount happens only while the user has typed nothing.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+
+  // The Organization section above Run on. The account it names is the one the
+  // create is attributed to and every org-scoped pick reads
+  // (`useNewSessionOrganization`): an explicit ?organizationId, else the active
+  // account, so an entry that carries no organization (the tour hand-off, the
+  // launcher "New Agent" shortcut) starts in the account Home shows. Switching
+  // the account switches the whole screen with it: the org-scoped picks
+  // (repositories, models, profiles) belong to the previous one, so the body
+  // remounts through a stack-safe replace carrying the new ?organizationId. The
+  // durable text draft survives — the pending debounced write flushes before
+  // the replace, so the remount's draft load reads the newest text (the
+  // replace's push lands before the old screen's unmount flush would run). A
+  // clone entry is locked to its source session's org: a read-only row (an
+  // explicit scope never inherits the active account). The entry's own params
+  // (share prefill, clone/fork ids, run-on preselect) stay in the URL so the
+  // remount keeps the same entry.
+  const stackSafeRouter = useStackSafeReplace();
+  const handleOrganizationSwitch = useCallback(
+    (nextOrganizationId: string | null) => {
+      // See ModelSelector: the sheet never re-anchors after the keyboard
+      // hides, so the keyboard must be down before this push.
+      Keyboard.dismiss();
+      void (async () => {
+        if (userId && !isCloneEntry) {
+          await flushDraft(userId, NEW_SESSION_DRAFT_KEY);
+        }
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(searchParams)) {
+          // The typed `useLocalSearchParams` shape above makes every entry a
+          // string; empty params are dropped so the route keeps no bare key.
+          if (key !== 'organizationId' && value !== '') {
+            params.set(key, value);
+          }
+        }
+        if (nextOrganizationId) {
+          params.set('organizationId', nextOrganizationId);
+        }
+        const query = params.size > 0 ? `?${params.toString()}` : '';
+        stackSafeRouter.replace(`/(app)/agent-chat/new${query}` as Href);
+      })();
+    },
+    [stackSafeRouter, searchParams, userId, isCloneEntry]
+  );
+  const organizationSection = (
+    <View className="mt-5">
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('common.organization')}
+      </Text>
+      {isCloneEntry ? (
+        <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
+      ) : (
+        <ContextControl
+          value={organizationId ?? null}
+          onSelectionChange={handleOrganizationSwitch}
+        />
+      )}
+    </View>
+  );
+
   // Clone entry never touches the shared new-session draft: pass an undefined
   // identity so `useFencedDraftLoad` performs no fetch (its entity key is
   // typed non-optional, unlike `useDraftFlushOnBackground` below). The
@@ -1150,6 +1212,7 @@ export function NewSessionScreenBody() {
         onManualVarsChange={setManualVars}
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
+        organizationSection={organizationSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}

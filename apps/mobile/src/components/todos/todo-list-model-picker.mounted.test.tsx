@@ -36,6 +36,9 @@ vi.mock('react-native', async () => {
   const { NativeTextInput } = await import('./todo-list-model-picker.mounted.test-helpers');
   return {
     I18nManager: { isRTL: false },
+    // The settings sheet asks Android Back to run the same dismiss guard as a
+    // swipe; the mocked subscription keeps that effect inert here.
+    BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     Keyboard: { dismiss: vi.fn() },
     Pressable: 'Pressable',
     ScrollView: 'ScrollView',

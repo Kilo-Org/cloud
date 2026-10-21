@@ -103,7 +103,7 @@ minimumReleaseAgeExclude:
   # Kilo SDK releases are owned internally and adopted with pinned runtime validation.
   - '@kilocode/sdk@7.2.14'
   - '@kilocode/sdk@7.2.52'
-  - '@kilocode/sdk@7.8.1'
+  - '@kilocode/sdk@7.8.15'
   # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.
   - openclaw@2026.7.1
   # FlashList 2.3.3 fixes the scroll window in EngagedIndicesTracker: the window

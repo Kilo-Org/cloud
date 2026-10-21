@@ -165,9 +165,40 @@ const resolveUrl = (id: string, revision: string, path: string) =>
 
 export type HfRepoInfo = z.infer<typeof hfRepoInfo>;
 
+/** SPDX ids a card may state, mapped to the license's own display name. */
+const LICENSE_NAMES = {
+  'agpl-3.0': 'AGPL 3.0',
+  'apache-2.0': 'Apache 2.0',
+  'bsd-2-clause': 'BSD 2-Clause',
+  'bsd-3-clause': 'BSD 3-Clause',
+  'cc-by-4.0': 'CC BY 4.0',
+  'cc-by-nc-4.0': 'CC BY-NC 4.0',
+  'cc-by-nc-sa-4.0': 'CC BY-NC-SA 4.0',
+  'cc-by-nc-nd-4.0': 'CC BY-NC-ND 4.0',
+  'cc-by-nd-4.0': 'CC BY-ND 4.0',
+  'cc-by-sa-4.0': 'CC BY-SA 4.0',
+  'cc0-1.0': 'CC0 1.0',
+  'gpl-2.0': 'GPL 2.0',
+  'gpl-3.0': 'GPL 3.0',
+  'lgpl-2.1': 'LGPL 2.1',
+  'lgpl-3.0': 'LGPL 3.0',
+  llama2: 'Llama 2',
+  llama3: 'Llama 3',
+  'llama3.1': 'Llama 3.1',
+  'llama3.2': 'Llama 3.2',
+  'llama3.3': 'Llama 3.3',
+  mit: 'MIT',
+  'mpl-2.0': 'MPL 2.0',
+  'qwen-research': 'Qwen Research',
+  unlicense: 'Unlicense',
+} satisfies Readonly<Record<string, string>>;
+
 function licenseOf(card: HfRepoInfo['cardData']): string | undefined {
   const license = Array.isArray(card?.license) ? card.license[0] : card?.license;
-  return license === 'other' ? (card?.license_name ?? license) : license;
+  const named = license === 'other' ? (card?.license_name ?? license) : license;
+  return named === undefined
+    ? undefined
+    : LICENSE_NAMES[named.toLowerCase() as keyof typeof LICENSE_NAMES] || named;
 }
 
 function quantOf(path: string): string | undefined {

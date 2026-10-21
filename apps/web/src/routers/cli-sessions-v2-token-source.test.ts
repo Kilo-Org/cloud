@@ -38,15 +38,15 @@ describe('cli-sessions-v2 cloud-agent token source', () => {
   const sessions = {
     page: {
       sessionId: 'ses_token_source_page_123456789',
-      cloudAgentSessionId: 'agent_token_source_page',
+      cloudAgentSessionId: 'agent_11111111-1111-4111-8111-111111111111',
     },
     runtime: {
       sessionId: 'ses_token_source_runtime_1234567',
-      cloudAgentSessionId: 'agent_token_source_runtime',
+      cloudAgentSessionId: 'agent_22222222-2222-4222-8222-222222222222',
     },
     delete: {
       sessionId: 'ses_token_source_delete_1234567',
-      cloudAgentSessionId: 'agent_token_source_delete',
+      cloudAgentSessionId: 'agent_33333333-3333-4333-8333-333333333333',
     },
   };
 

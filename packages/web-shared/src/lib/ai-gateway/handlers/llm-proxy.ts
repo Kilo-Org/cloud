@@ -34,12 +34,12 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
+  isFreeModelExcludingCustomLlms,
   isAnonymousFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -600,29 +600,6 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // For rate-limited Kilo-exclusive models: server-side products (cloud-agent,
-  // code-review, app-builder, gastown) rate-limit per user when the request comes
-  // from Cloudflare IPs (Kilo infrastructure). All other products rate-limit per
-  // IP (fast pre-auth path).
-  if (isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
-    const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
-    if (rateLimitKey instanceof NextResponse) return rateLimitKey;
-
-    if (await isFreeModelRateLimited(request, rateLimitKey)) {
-      console.warn(
-        `Model rate limit exceeded, ${rateLimitKey}, model: ${effectiveModelIdLowerCased}`
-      );
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          error_type: ProxyErrorType.rate_limit_exceeded,
-          message: 'Model usage limit reached. Please try again later.',
-        },
-        { status: 429 }
-      );
-    }
-  }
-
   // Now check auth
   const authSpan = startInactiveSpan({ name: 'auth-check' });
   const {
@@ -651,17 +628,42 @@ export async function handleLlmProxyRequest(
     }
 
     // Anonymous eligibility must not reveal membership in the private custom LLM catalog.
-    if (!(await isAnonymousFreeModel(effectiveModelIdLowerCased))) {
+    const anonymousFreeModel = await isAnonymousFreeModel(effectiveModelIdLowerCased);
+    if (anonymousFreeModel === null) return temporarilyUnavailableResponse();
+    if (!anonymousFreeModel) {
       return paidModelAuthRequiredResponse();
     }
 
-    // Anonymous access for free model (rate-limited above when configured)
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;
     tokenSource = undefined;
   } else {
     user = maybeUser;
+  }
+
+  // Private-catalog rate-limit exemptions must not influence anonymous eligibility.
+  if (
+    isAnonymousContext(user) ||
+    (isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased) &&
+      !(await isCustomLlm(effectiveModelIdLowerCased)))
+  ) {
+    const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
+    if (rateLimitKey instanceof NextResponse) return rateLimitKey;
+
+    if (await isFreeModelRateLimited(request, rateLimitKey)) {
+      console.warn(
+        `Model rate limit exceeded, ${rateLimitKey}, model: ${effectiveModelIdLowerCased}`
+      );
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          error_type: ProxyErrorType.rate_limit_exceeded,
+          message: 'Model usage limit reached. Please try again later.',
+        },
+        { status: 429 }
+      );
+    }
   }
 
   // Fraud/project headers are pure header parsing; resolve them once here so
@@ -727,6 +729,7 @@ export async function handleLlmProxyRequest(
             organizationId,
             provider: 'openrouter',
             requested_model: requestedModelLowerCased,
+            is_free: false,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -898,7 +901,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !(await isFreeModel(effectiveModelIdLowerCased)) &&
+      !effectiveProviderContext.isFree &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -929,6 +932,7 @@ export async function handleLlmProxyRequest(
     kiloUserId: user.id,
     provider: effectiveProviderContext.provider.id,
     requested_model: effectiveModelIdLowerCased,
+    is_free: effectiveProviderContext.isFree,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),

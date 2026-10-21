@@ -36,8 +36,8 @@ export function isFreeModelExcludingCustomLlms(model: string): boolean {
   );
 }
 
-/** Anonymous eligibility must depend only on public models, never the private catalog. */
-export async function isAnonymousFreeModel(modelId: string): Promise<boolean> {
+/** Uses only public models; null means the public catalog is unavailable. */
+export async function isAnonymousFreeModel(modelId: string): Promise<boolean | null> {
   if (!isFreeModelExcludingCustomLlms(modelId)) return false;
   if (
     findKiloExclusiveModel(modelId) ||
@@ -48,7 +48,9 @@ export async function isAnonymousFreeModel(modelId: string): Promise<boolean> {
   ) {
     return true;
   }
-  return Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId);
+  const models = await getOpenRouterModelsMetadataFromDatabase();
+  if (Object.keys(models).length === 0) return null;
+  return Object.hasOwn(models, modelId);
 }
 
 /** Free models, custom LLMs included, are assumed to train on prompts. */

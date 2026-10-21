@@ -12,10 +12,7 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import {
-  isFreeModel,
-  isAnonymousFreeModel,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isAnonymousFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   captureProxyError,
@@ -178,7 +175,9 @@ export async function handleEmbeddingsRequest(
       return invalidTokenResponse();
     }
 
-    if (!(await isAnonymousFreeModel(requestedModelLowerCased))) {
+    const anonymousFreeModel = await isAnonymousFreeModel(requestedModelLowerCased);
+    if (anonymousFreeModel === null) return temporarilyUnavailableResponse();
+    if (!anonymousFreeModel) {
       return NextResponse.json(
         {
           error: {
@@ -205,7 +204,7 @@ export async function handleEmbeddingsRequest(
   // Extract fraud/project headers
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
-  const { provider, userByok } = await getEmbeddingProvider(
+  const { provider, userByok, isFree } = await getEmbeddingProvider(
     requestedModelLowerCased,
     user,
     organizationId
@@ -230,6 +229,7 @@ export async function handleEmbeddingsRequest(
     kiloUserId: user.id,
     provider: provider.id,
     requested_model: requestedModelLowerCased,
+    is_free: isFree,
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
@@ -281,11 +281,7 @@ export async function handleEmbeddingsRequest(
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
-    if (
-      !canSpendPaidUsage(balance) &&
-      !(await isFreeModel(requestedModelLowerCased)) &&
-      !userByok
-    ) {
+    if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
       return await creditsBlockedResponse({
         user,
         balance,

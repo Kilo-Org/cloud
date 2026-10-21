@@ -19,7 +19,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 
 describe('isAnonymousFreeModel', () => {
   beforeEach(() => {
-    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockClear().mockResolvedValue({});
   });
 
   test.each(['openrouter/free', 'kilo-auto/free'])(
@@ -32,6 +32,9 @@ describe('isAnonymousFreeModel', () => {
   test.each(['test/public:free', 'stealth/public-alpha'])(
     'requires public catalog membership for a free-shaped id: %s',
     async model => {
+      jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+        'openai/gpt-4o': { id: 'openai/gpt-4o' } as StoredModel,
+      });
       await expect(isAnonymousFreeModel(model)).resolves.toBe(false);
       jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
         [model]: { id: model } as StoredModel,
@@ -39,6 +42,18 @@ describe('isAnonymousFreeModel', () => {
       await expect(isAnonymousFreeModel(model)).resolves.toBe(true);
     }
   );
+
+  test.each(['test/public:free', 'stealth/public-alpha'])(
+    'distinguishes unavailable public metadata from an unknown model: %s',
+    async model => {
+      await expect(isAnonymousFreeModel(model)).resolves.toBeNull();
+    }
+  );
+
+  test('rejects paid-shaped ids without needing public metadata', async () => {
+    await expect(isAnonymousFreeModel('acme/private-model')).resolves.toBe(false);
+    expect(getOpenRouterModelsMetadataFromDatabase).not.toHaveBeenCalled();
+  });
 
   test('never treats a catalog-listed paid model as anonymously free', async () => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({

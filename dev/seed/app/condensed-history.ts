@@ -17,7 +17,7 @@ import {
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
 
-export const usage = '<email>';
+export const usage = '<email> [--legacy-runtime]';
 
 export const SESSION_ID = 'ses_000000000006CondensedHist1';
 export const SESSION_TITLE = 'Condensed history';
@@ -39,11 +39,15 @@ function printUsage(): void {
   console.log('page boundary (between messages 10 and 11) splits one condensed');
   console.log('tool run: before the prepend the run is message 11 alone, after the');
   console.log('prepend messages 9-11 merge into one six-call condensed row.');
-  console.log('No cloud-agent session ID is set, so the UI is historical/read-only.');
+  console.log('By default no cloud-agent session ID is set, so the UI is historical/read-only.');
+  console.log(
+    '--legacy-runtime records an unsupported stored runtime ID to exercise history loading.'
+  );
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:condensed-history evgeny@kilocode.ai');
   console.log('  pnpm -s dev:seed app:condensed-history evgeny@kilocode.ai --json');
+  console.log('  pnpm dev:seed app:condensed-history fake@example.com --legacy-runtime');
 }
 
 function sleep(ms: number): Promise<void> {
@@ -54,9 +58,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function parseArgs(args: string[]): string {
+function parseArgs(args: string[]): { email: string; legacyRuntime: boolean } {
   const positionals: string[] = [];
+  let legacyRuntime = false;
   for (const arg of args) {
+    if (arg === '--legacy-runtime') {
+      legacyRuntime = true;
+      continue;
+    }
     if (arg.startsWith('--')) {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -75,7 +84,7 @@ function parseArgs(args: string[]): string {
   if (!isValidEmail(email)) {
     throw new Error(`email is not a valid address: ${email}`);
   }
-  return email;
+  return { email, legacyRuntime };
 }
 
 function readSessionIngestStatusJson(): string {
@@ -327,7 +336,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     return;
   }
 
-  const email = parseArgs(args);
+  const { email, legacyRuntime } = parseArgs(args);
 
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) {
@@ -396,13 +405,19 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     kilo_user_id: user.userId,
     title: SESSION_TITLE,
     created_on_platform: 'cloud-agent-web',
+    cloud_agent_session_id: legacyRuntime ? '11111111-1111-4111-8111-111111111111' : null,
   } satisfies typeof cli_sessions_v2.$inferInsert);
 
   await ingestSession(sessionIngestUrl, SESSION_ID, token, buildCondensedHistoryIngestItems());
   const messageCount = await pollForMessages(sessionIngestUrl, SESSION_ID, token);
 
   console.log('');
-  console.log('Seeded a read-only "Condensed history" cloud-agent transcript (60 messages).');
+  console.log('Seeded a "Condensed history" cloud-agent transcript (60 messages).');
+  if (legacyRuntime) {
+    console.log(
+      'The stored runtime ID is unsupported by the current runtime; its transcript stays readable.'
+    );
+  }
   console.log('The 50-message page boundary splits a tool run between messages 10 and 11:');
   console.log('after the older page prepends, messages 9-11 merge into one 6-item condensed row.');
   console.log('Open kiloapp://agent-chat/' + SESSION_ID + ' with Condense tool calls enabled.');
@@ -412,6 +427,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     email: user.email,
     sessionId: SESSION_ID,
     messageCount,
+    legacyRuntime,
     sessionIngestPort: serviceStatus.port,
     sessionIngestUrl,
     deepLink: `kiloapp://agent-chat/${SESSION_ID}`,

@@ -7,6 +7,7 @@ import {
   rethrowCloudAgentError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -207,7 +208,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
       });
       const client = createCloudAgentNextClientForModel(authToken, eligibility);
 
-      const { gitlabProject, githubRepo, attachments, images, ...restInput } = input;
+      const { gitlabProject, githubRepo, publicRepoUrl, attachments, images, ...restInput } = input;
 
       // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
@@ -224,6 +225,14 @@ export const cloudAgentNextRouter = createTRPCRouter({
         const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
+      } else if (publicRepoUrl) {
+        if (!isPublicRepoUrlEnabled()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Public repository URLs are only available in local development',
+          });
+        }
+        gitParams = { gitUrl: publicRepoUrl };
       } else {
         gitParams = { githubRepo, platform: PLATFORM.GITHUB };
       }

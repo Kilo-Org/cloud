@@ -385,8 +385,14 @@ describe('cli-sessions-v2-router', () => {
                     type: 'tool',
                     state: {
                       status: 'completed',
+                      input: {
+                        filePath: `${privateDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                      },
                       output: `Updated ${privateDirectory}/src/app.ts and src/relative.ts`,
                       metadata: {
+                        filediff: {
+                          file: `${privateDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                        },
                         outputs: [
                           `${privateDirectory}/result.txt`,
                           {
@@ -441,40 +447,82 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.info).toMatchObject({
         directory: publicDirectory,
-        summary: { diffs: [{ file: publicDirectory }] },
-        permission: [{ pattern: publicDirectory }],
+        path: `${publicDirectory}/session.json`,
+        summary: { diffs: [{ file: `${publicDirectory}/src/app.ts` }] },
+        permission: [{ pattern: `${publicDirectory}/src` }],
       });
       expect(result.messages[0]).toMatchObject({
         info: { path: { cwd: publicDirectory, root: publicDirectory } },
         parts: [
-          { url: '', source: { path: publicDirectory } },
+          { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
           {
             state: {
+              input: { filePath: `${publicDirectory}/services/cloud-agent-next/.dev.vars.example` },
               output: `Updated ${publicDirectory}/src/app.ts and src/relative.ts`,
               metadata: {
+                filediff: {
+                  file: `${publicDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                },
                 outputs: [
                   `${publicDirectory}/result.txt`,
                   { output: `Read ${publicDirectory}/nested.txt`, relative: 'src/relative.ts' },
                 ],
               },
-              attachments: [{ url: '', source: { path: publicDirectory } }],
+              attachments: [{ url: '', source: { path: `${publicDirectory}/nested.ts` } }],
             },
           },
-          { files: [publicDirectory, 'relative.ts'] },
+          { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
           { text: `Read ${publicDirectory}/src/app.ts and src/relative.ts` },
         ],
       });
       expect(result.messages[1]).toMatchObject({
         info: {
           editorContext: {
-            visibleFiles: [publicDirectory],
-            openTabs: [publicDirectory],
-            activeFile: publicDirectory,
+            visibleFiles: [`${publicDirectory}/visible.ts`],
+            openTabs: [`${publicDirectory}/open.ts`],
+            activeFile: `${publicDirectory}/active.ts`,
           },
-          summary: { diffs: [{ file: publicDirectory }] },
+          summary: { diffs: [{ file: `${publicDirectory}/summary.ts` }] },
         },
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
+    });
+
+    it.each([
+      ['src/relative.ts', 'src/relative.ts'],
+      [
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [`/cloud-agent/sessions/${sessionId}-other/src/app.ts`, `/cloud-agent/sessions/${sessionId}`],
+      ['/unrecognized/private/src/app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['C:\\private\\src\\app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['\\\\server\\private\\src\\app.ts', `/cloud-agent/sessions/${sessionId}`],
+    ])('projects grouped snapshot file path %s to %s', async (path, expected) => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            info: { id: sessionId, summary: { diffs: [{ file: path }] } },
+            messages: [
+              {
+                info: { id: 'msg_assistant', role: 'assistant' },
+                parts: [{ id: 'prt_patch', type: 'patch', files: [path] }],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+      expect(result.info).toMatchObject({ summary: { diffs: [{ file: expected }] } });
+      expect(result.messages[0].parts[0]).toMatchObject({ files: [expected] });
     });
 
     it.each([true, false])(
@@ -631,6 +679,7 @@ describe('cli-sessions-v2-router', () => {
               title: 'Read file',
               time: { start: 1761000000100, end: 1761000000200 },
               metadata: {
+                filediff: { file: `${privateDirectory}/src/app.ts` },
                 outputs: [
                   `${privateDirectory}/result.txt`,
                   { output: `Read ${privateDirectory}/nested.txt`, relative: 'src/relative.ts' },
@@ -748,13 +797,14 @@ describe('cli-sessions-v2-router', () => {
             {
               info: { path: { cwd: publicDirectory, root: publicDirectory } },
               parts: [
-                { url: '', source: { path: publicDirectory } },
-                { files: [publicDirectory, 'relative.ts'] },
+                { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
+                { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
                 {
                   state: {
-                    input: { filePath: publicDirectory },
+                    input: { filePath: `${publicDirectory}/src/app.ts` },
                     output: `Read ${publicDirectory}/src/app.ts and src/relative.ts`,
                     metadata: {
+                      filediff: { file: `${publicDirectory}/src/app.ts` },
                       outputs: [
                         `${publicDirectory}/result.txt`,
                         {
@@ -1575,6 +1625,27 @@ describe('cli-sessions-v2-router', () => {
       }
     });
 
+    it('list omits organization sessions after the organization is soft-deleted', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ deleted_at: new Date().toISOString() })
+          .where(eq(organizations.id, testOrganization.id));
+
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(
+          organizationSessionId
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ deleted_at: null })
+          .where(eq(organizations.id, testOrganization.id));
+      }
+    });
+
     it('list preserves platform-admin access without organization membership', async () => {
       const adminSessionId = 'ses_read_auth_admin_1234';
       await db.insert(cli_sessions_v2).values({
@@ -1925,6 +1996,57 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubPrUrl('https://github.com/kilo/repo/pull/abc')).toBeNull();
       expect(parseGitHubPrUrl('not-a-url')).toBeNull();
     });
+  });
+
+  describe('getWithRuntimeState stored runtime identifiers', () => {
+    const sessionId = 'ses_stored_runtime_identifier';
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      mockGetSession.mockReset();
+      mockGetSession.mockRejectedValue(new Error('not mocked'));
+    });
+
+    it.each(['11111111-1111-4111-8111-111111111111', 'agent_legacy'])(
+      'returns historical metadata for unsupported runtime identifier %s',
+      async cloudAgentSessionId => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          title: 'Stored conversation',
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: cloudAgentSessionId,
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId });
+        expect(result).toMatchObject({
+          session_id: sessionId,
+          title: 'Stored conversation',
+          cloud_agent_session_id: cloudAgentSessionId,
+          runtimeState: null,
+        });
+      }
+    );
+
+    it.each(['agent', 'workspace'])(
+      'preserves runtime failures for current %s identifiers',
+      async prefix => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: `${prefix}_11111111-1111-4111-8111-111111111111`,
+        });
+        mockGetSession.mockRejectedValue(new Error('Runtime unavailable'));
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+        ).rejects.toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session runtime state',
+        });
+      }
+    );
   });
 
   describe('getWithRuntimeState associatedPr', () => {

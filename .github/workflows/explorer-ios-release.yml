@@ -28,7 +28,8 @@ permissions:
 jobs:
   build:
     runs-on: macos-26
-    timeout-minutes: 90
+    # A cold simulator Release build takes about an hour. The explorer supervisor waits 160 minutes for this run.
+    timeout-minutes: 150
     env:
       CLOUD_REF: ${{ inputs.cloud_ref }}
       FINGERPRINT: ${{ inputs.fingerprint }}

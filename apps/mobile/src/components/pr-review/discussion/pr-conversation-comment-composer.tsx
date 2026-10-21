@@ -170,8 +170,9 @@ export function PrConversationCommentComposer({
           setInlineError(t('prReview.discussion.termsCheckRetryCopy'));
           setInlineErrorKind('retryable');
         } else {
-          setInlineError(t('prReview.discussion.termsCopy'));
+          setInlineError(t('prReview.discussion.termsAcceptRequired'));
           setInlineErrorKind(null);
+          setInlineErrorIsLocal(true);
         }
       })();
     } else if (classification.kind === 'bad-request') {

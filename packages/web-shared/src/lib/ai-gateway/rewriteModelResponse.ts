@@ -13,6 +13,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { getUpstreamBodyTermination } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type {
   ChatCompletionChunk,
   OpenRouterUsage,
@@ -274,7 +275,9 @@ function getResponseReadError(
     return null;
   }
 
-  if (error.name === 'ResponseAborted') {
+  const upstreamBodyTermination = getUpstreamBodyTermination(error);
+
+  if (error.name === 'ResponseAborted' || upstreamBodyTermination === 'disconnect') {
     return {
       errorType: 'upstream_disconnect',
       message: withRequestId(
@@ -298,7 +301,7 @@ function getResponseReadError(
     };
   }
 
-  if (error.name === 'TimeoutError') {
+  if (error.name === 'TimeoutError' || upstreamBodyTermination === 'timeout') {
     return {
       errorType: 'timeout',
       message: withRequestId(
@@ -967,10 +970,12 @@ export async function rewriteModelResponse({
 }: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const customPricing = getCustomPricing(model);
+  // Custom LLMs are always free, so an upstream-reported cost must not reach the user.
   const requiresCostRemoval =
-    (providerId === 'openrouter' || providerId === 'vercel') &&
-    (isKiloExclusiveFreeModel(model) ||
-      (customPricing !== undefined && !customPricing.fallbackOnly));
+    providerId === 'custom' ||
+    ((providerId === 'openrouter' || providerId === 'vercel') &&
+      (isKiloExclusiveFreeModel(model) ||
+        (customPricing !== undefined && !customPricing.fallbackOnly)));
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;

@@ -411,8 +411,7 @@
       }
     },
     {
-      // Sanctioned homes for a banned import. These are the only files that may
-      // import a unified element's underlying library directly.
+      // Sanctioned homes for a banned import.
       //   sheet.tsx  — the single home of `@expo/ui` BottomSheet
       //   dialog.tsx — the single home of `@rn-primitives/dialog`
       //   keep-awake.ts — the single home of `expo-keep-awake`

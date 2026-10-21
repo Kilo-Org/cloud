@@ -132,6 +132,11 @@ vi.mock('react-native', () => ({
 // suites do, or Node's parser hits react-native's Flow-only `import typeof`.
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
+// The auth graph imports `exchange-legacy-token`, which now builds the app
+// `User-Agent` through `client-metadata` -> `expo-application`; that module's
+// expo root needs `__DEV__` and cannot load in the node test environment.
+vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
+
 // These imported session-clear modules pull in native bindings that crash the
 // node test environment: use-trusted-hosts -> secure-store-preference ->
 // sonner-native -> react-native (Flow `import typeof`), and the cache/file

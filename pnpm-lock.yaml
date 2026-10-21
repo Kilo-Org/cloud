@@ -177,6 +177,7 @@ overrides:
 packageExtensionsChecksum: sha256-RfCMPGvEFjyOUVjIWKSa4Ue73bIkLfoO7GwIWSLc+Qs=
 
 patchedDependencies:
+  '@expo/react-native-action-sheet@4.1.1': 6c5a51f63014cf72209ab55847db73304854dd6afe4d60241e0fc9d6853601db
   '@expo/router-server@58.0.13': 83ef7e975269c998aa00b0345a478a67bc0f7742eb253201b9120125ae051269
   '@expo/ui@58.0.17': 37dfaf4d57e1b3083df6b00cf6b7c96209f308dde472f256952664606f8d5b13
   expo-background-task@58.0.10: 090a5f6453404ed7590639660ed51560f64ff7a00097bef406b988bce83fca35
@@ -468,7 +469,7 @@ importers:
         version: 58.0.2(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))
       '@expo/react-native-action-sheet':
         specifier: 4.1.1
-        version: 4.1.1(@types/react@19.3.0)(react@19.3.0)
+        version: 4.1.1(patch_hash=6c5a51f63014cf72209ab55847db73304854dd6afe4d60241e0fc9d6853601db)(@types/react@19.3.0)(react@19.3.0)
       '@expo/ui':
         specifier: 58.0.17
         version: 58.0.17(patch_hash=37dfaf4d57e1b3083df6b00cf6b7c96209f308dde472f256952664606f8d5b13)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -1692,6 +1693,9 @@ importers:
 
   packages/harness-sdk:
     dependencies:
+      '@modelcontextprotocol/ext-apps':
+        specifier: 1.7.5
+        version: 1.7.5(@modelcontextprotocol/sdk@1.31.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zod@4.4.3)
       '@modelcontextprotocol/sdk':
         specifier: 1.31.0
         version: 1.31.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
@@ -2150,6 +2154,9 @@ importers:
 
   packages/worker-utils:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../app-shared
       '@kilocode/db':
         specifier: workspace:*
         version: link:../db
@@ -2378,8 +2385,8 @@ importers:
   services/cloud-agent-next:
     dependencies:
       '@cloudflare/sandbox':
-        specifier: 0.12.9
-        version: 0.12.9(@xterm/xterm@6.0.0)
+        specifier: 0.12.12
+        version: 0.12.12(@xterm/xterm@6.0.0)
       '@hono/trpc-server':
         specifier: 0.4.2
         version: 0.4.2(@trpc/server@11.17.0(typescript@5.9.3))(hono@4.13.7)
@@ -2436,8 +2443,8 @@ importers:
         specifier: 0.18.6
         version: 0.18.6(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.11)
       '@kilocode/sdk':
-        specifier: 7.8.1
-        version: 7.8.1
+        specifier: 7.8.15
+        version: 7.8.15
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
@@ -2453,6 +2460,9 @@ importers:
       '@vitest/ui':
         specifier: 'catalog:'
         version: 4.1.11(vitest@4.1.11)
+      aws4fetch:
+        specifier: 'catalog:'
+        version: 1.0.20
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.10
@@ -2478,8 +2488,8 @@ importers:
   services/cloud-agent-next/wrapper:
     dependencies:
       '@kilocode/sdk':
-        specifier: 7.8.1
-        version: 7.8.1
+        specifier: 7.8.15
+        version: 7.8.15
       fuzzysort:
         specifier: 3.1.0
         version: 3.1.0
@@ -4888,8 +4898,8 @@ packages:
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
 
-  '@cloudflare/sandbox@0.12.9':
-    resolution: {integrity: sha512-JlCQ8adVaHT3TrZO13X6US2LJTyQ4YvoEZpfh5EewRqcxPfMHZNJPB/1dsRdiFqmtzpz+lMxGazSUa2H/g2IKg==}
+  '@cloudflare/sandbox@0.12.12':
+    resolution: {integrity: sha512-6hACtMzVmX09+HvWKrTI68CHshvOeoleZItPAHI8b8lukbJ2o4wtSYASHkjZsQ0o1kgbuWPgahqi4mmoMunhbw==}
     peerDependencies:
       '@openai/agents': ^0.3.3
       '@opencode-ai/sdk': ^1.1.40
@@ -6567,8 +6577,8 @@ packages:
   '@kilocode/sdk@7.2.52':
     resolution: {integrity: sha512-j8w6ewvo7dyu/qxjJAg0bcjHGUGGvIZ4F2f5tJnpMwLzPTAu26DJoO/08aoxf1BhfuZLzNS9tA2q+ZPdzPT8Jg==}
 
-  '@kilocode/sdk@7.8.1':
-    resolution: {integrity: sha512-+Ee1ATCWVpRauaW+6jJGNCWtDCCHvDd319g9XZ27Ml31HMQV4dp9C1f88Jh+WDUaMEsSpAaRybCXN46/XAsR9w==}
+  '@kilocode/sdk@7.8.15':
+    resolution: {integrity: sha512-ozRzYf58F9uugZ0J8bneFdH+to15cLekt8uObbhhBr25eUnNaQ6OhH/7hswpn8KAnK0MiXR8rbShkJ1vaZD0cA==}
 
   '@levischuck/tiny-cbor@0.2.11':
     resolution: {integrity: sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow==}
@@ -6794,6 +6804,20 @@ packages:
       '@opentelemetry/api': ^1.9.0
     peerDependenciesMeta:
       '@opentelemetry/api':
+        optional: true
+
+  '@modelcontextprotocol/ext-apps@1.7.5':
+    resolution: {integrity: sha512-TjPH2S2y5UEGKhmI6+XGFuqfqOV4ppe1x6DA3txnUaEWkgtA4G5vo14jGKFZmegdkZ1H4QMLyujLvoU1BEdnAg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@modelcontextprotocol/sdk': 1.31.0
+      react: ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^17.0.0 || ^18.0.0 || ^19.0.0
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
         optional: true
 
   '@modelcontextprotocol/sdk@1.31.0':
@@ -22098,7 +22122,7 @@ snapshots:
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
-  '@cloudflare/sandbox@0.12.9(@xterm/xterm@6.0.0)':
+  '@cloudflare/sandbox@0.12.12(@xterm/xterm@6.0.0)':
     dependencies:
       '@cloudflare/containers': 0.3.7
       aws4fetch: 1.0.20
@@ -23717,7 +23741,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@expo/react-native-action-sheet@4.1.1(@types/react@19.3.0)(react@19.3.0)':
+  '@expo/react-native-action-sheet@4.1.1(patch_hash=6c5a51f63014cf72209ab55847db73304854dd6afe4d60241e0fc9d6853601db)(@types/react@19.3.0)(react@19.3.0)':
     dependencies:
       '@types/hoist-non-react-statics': 3.3.7(@types/react@19.3.0)
       hoist-non-react-statics: 3.3.2
@@ -24677,7 +24701,7 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
 
-  '@kilocode/sdk@7.8.1':
+  '@kilocode/sdk@7.8.15':
     dependencies:
       cross-spawn: 7.0.6
 
@@ -25109,6 +25133,15 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@modelcontextprotocol/ext-apps@1.7.5(@modelcontextprotocol/sdk@1.31.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zod@4.4.3)':
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.31.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+      '@standard-schema/spec': 1.1.0
+      zod: 4.4.3
+    optionalDependencies:
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
 
   '@modelcontextprotocol/sdk@1.31.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
     dependencies:

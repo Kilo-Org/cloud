@@ -252,6 +252,12 @@ env_default() {
   env_default AGENT_BROWSER_DEFAULT_TIMEOUT 120000
   # The full agents stack does not fit the sandbox budget; these are not needed for fake-LLM sessions on public repositories.
   env_default KILO_DEV_WITHOUT notifications,event-service,cloudflare-webhook-agent-ingest,container-usage-meter,cloudflare-git-token-service
+  # Bound the web dev server's Turbopack memory. The cgroup cap sits below the
+  # sandbox's MemTotal, so Turbopack's OS pressure feedback never sees the cap
+  # and its `auto` eviction does not trigger; `full` evicts its persistent cache
+  # to disk instead of holding it in RAM. Only this env var is set here; the app
+  # config keeps `auto` everywhere else.
+  env_default KILO_TURBOPACK_MEMORY_EVICTION full
   if [[ -n ${NODE_EXTRA_CA_CERTS:-} ]]; then
     env_default NODE_EXTRA_CA_CERTS "$NODE_EXTRA_CA_CERTS"
   fi

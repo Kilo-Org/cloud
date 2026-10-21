@@ -619,7 +619,7 @@ describe('ConversationMessages', () => {
     expect(html).not.toContain('Running command');
   });
 
-  it('does not show completed-answer metadata while the last message is streaming', () => {
+  it('hides completed-answer metadata while the last message is streaming', () => {
     const html = renderConversation(
       [assistantMessage('assistant-1', [reasoningPart('completed-reasoning')])],
       {
@@ -638,7 +638,9 @@ describe('ConversationMessages', () => {
     expect(buttons(html)[0]).toContain('Thought: 1ms');
     expect(buttons(html)[0]).toContain('aria-expanded="false"');
     expect(html).toContain('Here is the result so far');
-    expect(html).not.toContain('Message timestamp');
+    // The metadata row keeps its height hidden while streaming so it cannot push
+    // the transcript when the answer completes.
+    expect(html).toMatch(/<div class="[^"]*\binvisible\b[^"]*">(?:(?!<\/div>).)*Message timestamp/);
     expect(html).not.toContain('Reasoning details');
   });
 

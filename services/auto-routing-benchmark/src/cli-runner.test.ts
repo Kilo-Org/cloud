@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   destroyDeciderCliContainer,
+  isCatalogLoadFailureResult,
   isExactModelUnavailableResult,
+  isUnsupportedModelResult,
   parseContainerRunResponse,
   runDeciderCaseViaCli,
   warmUpCliContainer,
@@ -177,6 +179,121 @@ describe('runDeciderCaseViaCli', () => {
       latencyMs: 37,
       stderrTail: '\nHTTP 429 provider throttle',
     });
+  });
+});
+
+describe('CLI catalog load failures', () => {
+  const diagnostic =
+    'Model not found: kilo/candidate/model. Failed to load the Kilo model catalog (network). Check your connection and credentials.';
+  const emptyResult = { text: '', stderrTail: diagnostic, costUsd: null, timedOut: false };
+
+  it.each([null, 0])('recognizes an unbilled catalog failure with cost %s', costUsd => {
+    expect(isCatalogLoadFailureResult({ ...emptyResult, costUsd })).toBe(true);
+    expect(
+      isCatalogLoadFailureResult({
+        ...emptyResult,
+        costUsd,
+        stderrTail: `\u001b[31m${diagnostic}\u001b[0m`,
+      })
+    ).toBe(true);
+  });
+
+  it.each([
+    { text: 'answer' },
+    { costUsd: 0.01 },
+    { timedOut: true },
+    { stderrTail: 'Model not found: kilo/candidate/model. No models are currently available.' },
+    { stderrTail: 'Provider API failed (network). Check your connection and credentials.' },
+    { stderrTail: '' },
+  ])('preserves measurements and unrelated failures: %j', overrides => {
+    expect(isCatalogLoadFailureResult({ ...emptyResult, ...overrides })).toBe(false);
+  });
+
+  it.each([undefined, 'candidate/model', 'kilo/candidate/model'])(
+    'rejects catalog failure as exact unavailability with stored identity %s',
+    unavailableModelId => {
+      expect(
+        isExactModelUnavailableResult({ ...emptyResult, unavailableModelId }, 'candidate/model')
+      ).toBe(false);
+    }
+  );
+
+  it.each([
+    { stdoutLines: [] },
+    {
+      stdoutLines: [
+        JSON.stringify({
+          type: 'error',
+          error: {
+            name: 'ProviderModelNotFoundError',
+            data: { providerID: 'kilo', modelID: 'candidate/model' },
+          },
+        }),
+      ],
+    },
+  ])('does not retain an unavailable identity from a catalog failure: %j', ({ stdoutLines }) => {
+    const result = parseContainerRunResponse(
+      { exitCode: 0, durationMs: 12, stdoutLines, stderrTail: diagnostic },
+      Date.now(),
+      'candidate/model'
+    );
+    expect(isCatalogLoadFailureResult(result)).toBe(true);
+    expect(isExactModelUnavailableResult(result, 'candidate/model')).toBe(false);
+    expect(result.unavailableModelId).toBeUndefined();
+  });
+});
+
+describe('gateway model resolution failures', () => {
+  const emptyResult = { text: '', stderrTail: '', costUsd: null, timedOut: false };
+  const diagnostic = '\u001b[91m\u001b[1mError: \u001b[0mUnsupported model mimo-v2.5\n';
+
+  it.each([null, 0])('recognizes an unbilled rejection with cost %s', costUsd => {
+    expect(
+      isUnsupportedModelResult(
+        { ...emptyResult, costUsd, stderrTail: diagnostic },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+  });
+
+  it('accepts the kilo-prefixed identifier', () => {
+    expect(
+      isUnsupportedModelResult(
+        { ...emptyResult, stderrTail: 'Error: Unsupported model kilo/xiaomi/mimo-v2.5' },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+  });
+
+  it('tolerates trailing punctuation and a suffix after the model name', () => {
+    expect(
+      isUnsupportedModelResult(
+        {
+          ...emptyResult,
+          stderrTail: 'Error: Unsupported model mimo-v2.5. Pick another model to continue.',
+        },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+    expect(
+      isUnsupportedModelResult(
+        { ...emptyResult, stderrTail: 'Unsupported model mimo-v2.5,' },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+  });
+
+  it.each([
+    { text: 'answer', stderrTail: diagnostic },
+    { costUsd: 0.01, stderrTail: diagnostic },
+    { timedOut: true, stderrTail: diagnostic },
+    { stderrTail: 'Error: Unsupported model other/model' },
+    { stderrTail: 'Error: Unsupported model mimo-v2.5-extra' },
+    { stderrTail: 'Error: Model not found: kilo/xiaomi/mimo-v2.5.' },
+  ])('does not treat other outcomes as a resolution failure: %j', overrides => {
+    expect(isUnsupportedModelResult({ ...emptyResult, ...overrides }, 'xiaomi/mimo-v2.5')).toBe(
+      false
+    );
   });
 });
 

@@ -3512,6 +3512,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agendi käivitamiseks on vaja viipa. Lisa viip ja käivita see uuesti.",
+      "repositoryRequired": "Agendi käivitamiseks on vaja hoidlat. Ava Kilo, vali uues seansis hoidla ja käivita see uuesti.",
       "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
       "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
     }

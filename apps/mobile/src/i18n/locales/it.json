@@ -3553,6 +3553,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Avvia agente richiede un prompt. Aggiungi un prompt e rieseguilo.",
+      "repositoryRequired": "Avvia agente richiede un repository. Apri Kilo e scegline uno in una nuova sessione, quindi rieseguilo.",
       "repositoryUnknown": "Kilo non riconosce {{repository}} come repository GitHub o GitLab. Scegli un altro repository in Kilo.",
       "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
     }

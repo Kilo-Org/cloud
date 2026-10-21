@@ -3553,6 +3553,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovo.",
+      "repositoryRequired": "Za pokretanje agenta potreban je repozitorijum. Otvori Kilo i izaberi repozitorijum u novoj sesiji, zatim ga pokreni ponovo.",
       "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorijum. Izaberi drugi repozitorijum u Kilo.",
       "repositoryUnsupported": "{{repository}} je Bitbucket repozitorijum — Pokreni agenta ga još ne može koristiti. Izaberi drugi repozitorijum u Kilo."
     }

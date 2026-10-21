@@ -3512,6 +3512,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Anzisha wakala inahitaji maagizo. Ongeza maagizo na uiendeshe tena.",
+      "repositoryRequired": "Anzisha wakala inahitaji hazina. Fungua Kilo na uchague moja katika kikao kipya, kisha uiendeshe tena.",
       "repositoryUnknown": "Kilo haitambui {{repository}} kama hazina ya GitHub au GitLab. Chagua hazina nyingine katika Kilo.",
       "repositoryUnsupported": "{{repository}} ni hazina ya Bitbucket — Anzisha wakala bado haiwezi kuitumia. Chagua hazina nyingine katika Kilo."
     }

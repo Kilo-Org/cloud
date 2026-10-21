@@ -3512,6 +3512,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Start agenten kræver en forespørgsel. Tilføj en forespørgsel, og kør den igen.",
+      "repositoryRequired": "Start agenten kræver et kodelager. Åbn Kilo, vælg et i en ny session, og kør den igen.",
       "repositoryUnknown": "Kilo genkender ikke {{repository}} som et GitHub- eller GitLab-kodelager. Vælg et andet kodelager i Kilo.",
       "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan endnu ikke bruge det. Vælg et andet kodelager i Kilo."
     }

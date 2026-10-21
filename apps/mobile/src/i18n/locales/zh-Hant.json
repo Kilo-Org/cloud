@@ -3512,6 +3512,7 @@
   "appActions": {
     "start": {
       "promptRequired": "啟動代理程式需要提示詞。請新增提示詞後重新執行。",
+      "repositoryRequired": "啟動代理程式需要存放庫。請開啟 Kilo 並在新的工作階段中選擇一個存放庫，然後重新執行。",
       "repositoryUnknown": "Kilo 無法將 {{repository}} 辨識為 GitHub 或 GitLab 存放庫。請在 Kilo 中選擇其他存放庫。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 存放庫——啟動代理程式暫時無法使用它。請在 Kilo 中選擇其他存放庫。"
     }

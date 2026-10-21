@@ -35,6 +35,8 @@
     "connectGithub": "GitHub 연결",
     "cost": "비용",
     "discard": "버리기",
+    "discardChangesMessage": "변경사항이 사라집니다.",
+    "discardChangesTitle": "변경사항을 버리시겠습니까?",
     "findings": "진단 결과",
     "mergeRequest": "머지 요청",
     "notConnected": "연결 안 됨",
@@ -1113,7 +1115,14 @@
       "triageReasoning": "분류 근거",
       "watchInCloudAgent": "클라우드 에이전트에서 보기",
       "whereFound": "발견 위치({{displayCount}})",
-      "yes": "예"
+      "yes": "예",
+      "action": {
+        "analyzeCodebase": "코드베이스 분석",
+        "dismiss": "기각",
+        "manualReview": "수동 검토",
+        "monitor": "모니터링",
+        "openPr": "풀 리퀘스트 열기"
+      }
     },
     "analysisSettings": {
       "analysisModel": "분석 모델",
@@ -1135,7 +1144,24 @@
       "summary": "보고서 요약",
       "title": "감사 보고서",
       "unavailable": "감사 보고서 열람 불가",
-      "unavailableDescription": "조직 소유자와 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자나 결제 관리자에게 접근 권한을 요청하세요."
+      "unavailableDescription": "조직 소유자와 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자나 결제 관리자에게 접근 권한을 요청하세요.",
+      "eventActions": {
+        "findingAnalysisCompleted": "분석 완료됨",
+        "findingAnalysisFailed": "분석 실패함",
+        "findingAutoDismissed": "자동 기각됨",
+        "findingCreated": "가져옴",
+        "findingDeleted": "삭제됨",
+        "findingDismissed": "기각됨",
+        "findingSeverityChanged": "심각도 변경됨",
+        "findingStatusChange": "상태 변경됨",
+        "findingSuperseded": "대체됨",
+        "remediationBlocked": "수정 차단됨",
+        "remediationCancelled": "취소됨",
+        "remediationFailed": "수정 실패함",
+        "remediationNoChangesNeeded": "변경 필요 없음",
+        "remediationPrOpened": "풀 리퀘스트 열림",
+        "remediationQueued": "수정 요청됨"
+      }
     },
     "auditReportButton": {
       "viewA11y": "감사 보고서 보기"

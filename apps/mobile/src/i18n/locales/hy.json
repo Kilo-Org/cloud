@@ -2234,6 +2234,8 @@
       "commitAndPush": "Ամրագրել և ուղարկել",
       "startSession": "Սկսել նիստը",
       "selectRepositoryToStart": "Սկսելու համար ընտրեք պահոց։",
+      "enterPromptToStart": "Սկսելու համար ավելացրեք պրոմտ։",
+      "enterPromptOrFileToStart": "Սկսելու համար ավելացրեք պրոմտ կամ ֆայլ։",
       "connectProviderToStart": "Սկսելու համար միացրեք մատակարար։",
       "promptPlaceholder": "Ինչի՞ վրա եք ուզում աշխատել",
       "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",

@@ -2290,6 +2290,8 @@
       "commitAndPush": "Vytvoriť commit a odoslať",
       "startSession": "Spustiť reláciu",
       "selectRepositoryToStart": "Vyberte repozitár, aby ste mohli začať.",
+      "enterPromptToStart": "Pridajte prompt, aby ste mohli začať.",
+      "enterPromptOrFileToStart": "Pridajte prompt alebo súbor, aby ste mohli začať.",
       "connectProviderToStart": "Pripojte poskytovateľa, aby ste mohli začať.",
       "promptPlaceholder": "Na čom chceš pracovať?",
       "couldNotLoadModels": "Modely sa nepodarilo načítať.",

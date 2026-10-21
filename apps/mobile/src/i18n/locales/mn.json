@@ -2234,6 +2234,8 @@
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",
       "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
+      "enterPromptToStart": "Эхлэхийн тулд заавар нэмнэ үү.",
+      "enterPromptOrFileToStart": "Эхлэхийн тулд заавар эсвэл файл нэмнэ үү.",
       "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",

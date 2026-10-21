@@ -2262,6 +2262,8 @@
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
       "selectRepositoryToStart": "Odaberi repozitorij za početak.",
+      "enterPromptToStart": "Dodaj upit za početak.",
+      "enterPromptOrFileToStart": "Dodaj upit ili datoteku za početak.",
       "connectProviderToStart": "Poveži platformu za početak.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",

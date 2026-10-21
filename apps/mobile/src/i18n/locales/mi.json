@@ -2234,6 +2234,8 @@
       "commitAndPush": "Whakapūmau, pana",
       "startSession": "Tīmataria te wātū",
       "selectRepositoryToStart": "Kōwhiria he putunga waehere hei tīmata.",
+      "enterPromptToStart": "Tāpirihia he tono hei tīmata.",
+      "enterPromptOrFileToStart": "Tāpirihia he tono, he kōnae rānei hei tīmata.",
       "connectProviderToStart": "Honoa he kaiwhakarato hei tīmata.",
       "promptPlaceholder": "He aha tāu e hiahia ana ki te mahi?",
       "couldNotLoadModels": "Kāore i taea te uta i ngā tauira.",

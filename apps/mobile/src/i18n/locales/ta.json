@@ -2234,6 +2234,8 @@
       "commitAndPush": "கமிட் செய்து புஷ் செய்யவும்",
       "startSession": "அமர்வைத் தொடங்கவும்",
       "selectRepositoryToStart": "தொடங்க ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
+      "enterPromptToStart": "தொடங்க ஒரு ப்ராம்ப்ட்டைச் சேர்க்கவும்.",
+      "enterPromptOrFileToStart": "தொடங்க ஒரு ப்ராம்ப்ட் அல்லது கோப்பைச் சேர்க்கவும்.",
       "connectProviderToStart": "தொடங்க ஒரு வழங்குநரை இணைக்கவும்.",
       "promptPlaceholder": "எந்தப் பணியைச் செய்ய விரும்புகிறீர்கள்?",
       "couldNotLoadModels": "மாதிரிகளை ஏற்ற முடியவில்லை.",

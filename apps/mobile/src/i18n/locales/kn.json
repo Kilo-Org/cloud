@@ -2234,6 +2234,8 @@
       "commitAndPush": "ಕಮಿಟ್ ಮಾಡಿ, ಪುಶ್ ಮಾಡಿ",
       "startSession": "ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ",
       "selectRepositoryToStart": "ಪ್ರಾರಂಭಿಸಲು ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+      "enterPromptToStart": "ಪ್ರಾರಂಭಿಸಲು ಪ್ರಾಂಪ್ಟ್ ಅನ್ನು ಸೇರಿಸಿ.",
+      "enterPromptOrFileToStart": "ಪ್ರಾರಂಭಿಸಲು ಪ್ರಾಂಪ್ಟ್ ಅಥವಾ ಫೈಲ್ ಅನ್ನು ಸೇರಿಸಿ.",
       "connectProviderToStart": "ಪ್ರಾರಂಭಿಸಲು ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ.",
       "promptPlaceholder": "ಯಾವ ಕೆಲಸ ಮಾಡಲು ಬಯಸುತ್ತೀರಿ?",
       "couldNotLoadModels": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",

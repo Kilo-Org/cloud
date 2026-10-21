@@ -2262,6 +2262,8 @@
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",
       "selectRepositoryToStart": "Selectează un depozit pentru a începe.",
+      "enterPromptToStart": "Adaugă un prompt pentru a începe.",
+      "enterPromptOrFileToStart": "Adaugă un prompt sau un fișier pentru a începe.",
       "connectProviderToStart": "Conectează un furnizor pentru a începe.",
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",

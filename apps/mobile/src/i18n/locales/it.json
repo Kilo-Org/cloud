@@ -1700,6 +1700,8 @@
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",
       "selectRepositoryToStart": "Seleziona un repository per iniziare.",
+      "enterPromptToStart": "Aggiungi un prompt per iniziare.",
+      "enterPromptOrFileToStart": "Aggiungi un prompt o un file per iniziare.",
       "connectProviderToStart": "Connetti una piattaforma per iniziare.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",

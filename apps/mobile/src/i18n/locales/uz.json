@@ -2234,6 +2234,8 @@
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
       "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
+      "enterPromptToStart": "Boshlash uchun so'rov qo'shing.",
+      "enterPromptOrFileToStart": "Boshlash uchun so'rov yoki fayl qo'shing.",
       "connectProviderToStart": "Boshlash uchun provayderni ulang.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",

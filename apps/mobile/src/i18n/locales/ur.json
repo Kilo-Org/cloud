@@ -2234,6 +2234,8 @@
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
       "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
+      "enterPromptToStart": "شروع کرنے کے لیے ایک پرومپٹ شامل کریں۔",
+      "enterPromptOrFileToStart": "شروع کرنے کے لیے ایک پرومپٹ یا فائل شامل کریں۔",
       "connectProviderToStart": "شروع کرنے کے لیے ایک فراہم کنندہ منسلک کریں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",

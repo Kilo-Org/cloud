@@ -2234,6 +2234,8 @@
       "commitAndPush": "കമ്മിറ്റ് ചെയ്ത് പുഷ് ചെയ്യുക",
       "startSession": "സെഷൻ ആരംഭിക്കുക",
       "selectRepositoryToStart": "ആരംഭിക്കാൻ ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക.",
+      "enterPromptToStart": "ആരംഭിക്കാൻ ഒരു പ്രോംപ്റ്റ് ചേർക്കുക.",
+      "enterPromptOrFileToStart": "ആരംഭിക്കാൻ ഒരു പ്രോംപ്റ്റ് അല്ലെങ്കിൽ ഒരു ഫയൽ ചേർക്കുക.",
       "connectProviderToStart": "ആരംഭിക്കാൻ ഒരു സേവനദാതാവിനെ കണക്റ്റ് ചെയ്യുക.",
       "promptPlaceholder": "എന്ത് ജോലിയാണ് ചെയ്യേണ്ടത്?",
       "couldNotLoadModels": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",

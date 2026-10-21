@@ -2234,6 +2234,8 @@
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",
       "selectRepositoryToStart": "Jalqabuuf kuusaa koodii filadhu.",
+      "enterPromptToStart": "Jalqabuuf gaaffii dabaladhu.",
+      "enterPromptOrFileToStart": "Jalqabuuf gaaffii ykn faayilii dabaladhu.",
       "connectProviderToStart": "Jalqabuuf waltajjii walqabsiisi.",
       "promptPlaceholder": "Maal irratti hojjechuu barbaadda?",
       "couldNotLoadModels": "Moodeloota fe'uu hin danda'amne.",

@@ -2234,6 +2234,8 @@
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
       "selectRepositoryToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເລືອກຄັງໂຄດ.",
+      "enterPromptToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເພີ່ມຄຳສັ່ງ.",
+      "enterPromptOrFileToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເພີ່ມຄຳສັ່ງ ຫຼືໄຟລ໌.",
       "connectProviderToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ.",
       "promptPlaceholder": "ຢາກເຮັດວຽກຫຍັງ?",
       "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",

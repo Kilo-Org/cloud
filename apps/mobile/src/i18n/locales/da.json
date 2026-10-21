@@ -2234,6 +2234,8 @@
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
       "selectRepositoryToStart": "Vælg et kodelager for at starte.",
+      "enterPromptToStart": "Tilføj en prompt for at starte.",
+      "enterPromptOrFileToStart": "Tilføj en prompt eller en fil for at starte.",
       "connectProviderToStart": "Tilslut en udbyder for at starte.",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",

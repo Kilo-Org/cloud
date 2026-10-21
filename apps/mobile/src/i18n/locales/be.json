@@ -2290,6 +2290,8 @@
       "commitAndPush": "Закаміціць і адправіць",
       "startSession": "Пачаць сеанс",
       "selectRepositoryToStart": "Выберыце рэпазіторый, каб пачаць.",
+      "enterPromptToStart": "Дадайце запыт, каб пачаць.",
+      "enterPromptOrFileToStart": "Дадайце запыт ці файл, каб пачаць.",
       "connectProviderToStart": "Падключыце платформу, каб пачаць.",
       "promptPlaceholder": "Над чым будзем працаваць?",
       "couldNotLoadModels": "Не ўдалося загрузіць мадэлі.",

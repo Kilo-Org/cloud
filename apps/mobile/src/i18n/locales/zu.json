@@ -2234,6 +2234,8 @@
       "commitAndPush": "Qopha bese uthumela",
       "startSession": "Qala iseshini",
       "selectRepositoryToStart": "Khetha inqolobane yekhodi ukuze uqale.",
+      "enterPromptToStart": "Engeza umyalelo ukuze uqale.",
+      "enterPromptOrFileToStart": "Engeza umyalelo noma ifayela ukuze uqale.",
       "connectProviderToStart": "Xhuma umhlinzeki ukuze uqale.",
       "promptPlaceholder": "Ungathanda ukusebenza ngani?",
       "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",

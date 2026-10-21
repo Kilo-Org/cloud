@@ -2234,6 +2234,8 @@
       "commitAndPush": "Kinnista ja saada",
       "startSession": "Alusta seanssi",
       "selectRepositoryToStart": "Alustamiseks vali hoidla.",
+      "enterPromptToStart": "Alustamiseks lisa prompt.",
+      "enterPromptOrFileToStart": "Alustamiseks lisa prompt või fail.",
       "connectProviderToStart": "Alustamiseks ühenda teenusepakkuja.",
       "promptPlaceholder": "Mille kallal tahaksid töötada?",
       "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",

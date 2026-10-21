@@ -2234,6 +2234,8 @@
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",
       "selectRepositoryToStart": "Изберете репозиториум за да започнете.",
+      "enterPromptToStart": "Додадете упат за да започнете.",
+      "enterPromptOrFileToStart": "Додадете упат или датотека за да започнете.",
       "connectProviderToStart": "Поврзете платформа за да започнете.",
       "promptPlaceholder": "На што сакаш да работиш?",
       "couldNotLoadModels": "Не успеа вчитувањето на моделите.",

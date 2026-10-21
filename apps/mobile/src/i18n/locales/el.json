@@ -2234,6 +2234,8 @@
       "commitAndPush": "Καταχώριση και αποστολή",
       "startSession": "Έναρξη συνεδρίας",
       "selectRepositoryToStart": "Επίλεξε ένα αποθετήριο για να ξεκινήσεις.",
+      "enterPromptToStart": "Πρόσθεσε μια οδηγία για να ξεκινήσεις.",
+      "enterPromptOrFileToStart": "Πρόσθεσε μια οδηγία ή ένα αρχείο για να ξεκινήσεις.",
       "connectProviderToStart": "Σύνδεσε έναν πάροχο για να ξεκινήσεις.",
       "promptPlaceholder": "Με τι θέλεις να ασχοληθείς;",
       "couldNotLoadModels": "Δεν ήταν δυνατή η φόρτωση των μοντέλων.",

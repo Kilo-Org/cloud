@@ -1743,6 +1743,8 @@
       "commitAndPush": "Закомітити та надіслати",
       "startSession": "Розпочати сеанс",
       "selectRepositoryToStart": "Виберіть репозиторій, щоб почати.",
+      "enterPromptToStart": "Додайте запит, щоб почати.",
+      "enterPromptOrFileToStart": "Додайте запит або файл, щоб почати.",
       "connectProviderToStart": "Підключіть сервіс, щоб почати.",
       "promptPlaceholder": "Над чим хочете попрацювати?",
       "couldNotLoadModels": "Не вдалося завантажити моделі.",

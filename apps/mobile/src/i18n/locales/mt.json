@@ -2318,6 +2318,8 @@
       "commitAndPush": "Irreġistra u tella'",
       "startSession": "Ibda s-sessjoni",
       "selectRepositoryToStart": "Agħżel repożitorju biex tibda.",
+      "enterPromptToStart": "Żid prompt biex tibda.",
+      "enterPromptOrFileToStart": "Żid prompt jew fajl biex tibda.",
       "connectProviderToStart": "Ikkonnettja fornitur biex tibda.",
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",

@@ -1743,6 +1743,8 @@
       "commitAndPush": "Zatwierdź i wypchnij",
       "startSession": "Rozpocznij sesję",
       "selectRepositoryToStart": "Wybierz repozytorium, aby rozpocząć.",
+      "enterPromptToStart": "Dodaj prompt, aby rozpocząć.",
+      "enterPromptOrFileToStart": "Dodaj prompt lub plik, aby rozpocząć.",
       "connectProviderToStart": "Połącz dostawcę, aby rozpocząć.",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",

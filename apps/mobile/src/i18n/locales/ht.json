@@ -2234,6 +2234,8 @@
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",
       "selectRepositoryToStart": "Chwazi yon depo pou kòmanse.",
+      "enterPromptToStart": "Ajoute yon pwomt pou kòmanse.",
+      "enterPromptOrFileToStart": "Ajoute yon pwomt oswa yon fichye pou kòmanse.",
       "connectProviderToStart": "Konekte yon founisè pou kòmanse.",
       "promptPlaceholder": "Sou ki sa ou ta renmen travay?",
       "couldNotLoadModels": "Nou pa t ka chaje modèl yo.",

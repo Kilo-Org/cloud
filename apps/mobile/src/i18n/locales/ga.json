@@ -2318,6 +2318,8 @@
       "commitAndPush": "Taifead agus brúigh",
       "startSession": "Tosaigh seisiún",
       "selectRepositoryToStart": "Roghnaigh stór chun tosú.",
+      "enterPromptToStart": "Cuir leid leis chun tosú.",
+      "enterPromptOrFileToStart": "Cuir leid nó comhad leis chun tosú.",
       "connectProviderToStart": "Ceangail soláthraí chun tosú.",
       "promptPlaceholder": "Cad ar mhaith leat oibriú air?",
       "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",

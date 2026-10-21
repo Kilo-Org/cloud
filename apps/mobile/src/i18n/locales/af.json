@@ -2234,6 +2234,8 @@
       "commitAndPush": "Lê vas en stoot op",
       "startSession": "Begin sessie",
       "selectRepositoryToStart": "Kies 'n bewaarplek om te begin.",
+      "enterPromptToStart": "Voeg 'n opdrag by om te begin.",
+      "enterPromptOrFileToStart": "Voeg 'n opdrag of 'n lêer by om te begin.",
       "connectProviderToStart": "Koppel 'n verskaffer om te begin.",
       "promptPlaceholder": "Waaraan wil jy werk?",
       "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",

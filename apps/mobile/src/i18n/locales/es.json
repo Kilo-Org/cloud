@@ -1731,6 +1731,8 @@
       "commitAndPush": "Confirmar y subir",
       "startSession": "Empezar sesión",
       "selectRepositoryToStart": "Selecciona un repositorio para empezar.",
+      "enterPromptToStart": "Añade un prompt para empezar.",
+      "enterPromptOrFileToStart": "Añade un prompt o un archivo para empezar.",
       "connectProviderToStart": "Conecta un proveedor para empezar.",
       "promptPlaceholder": "¿En qué te gustaría trabajar?",
       "couldNotLoadModels": "No se pudieron cargar los modelos.",

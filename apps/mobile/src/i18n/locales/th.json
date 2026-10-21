@@ -2234,6 +2234,8 @@
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
       "selectRepositoryToStart": "เลือกคลังโค้ดเพื่อเริ่มต้น",
+      "enterPromptToStart": "เพิ่มพรอมป์ตเพื่อเริ่มต้น",
+      "enterPromptOrFileToStart": "เพิ่มพรอมป์ตหรือไฟล์เพื่อเริ่มต้น",
       "connectProviderToStart": "เชื่อมต่อผู้ให้บริการเพื่อเริ่มต้น",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",

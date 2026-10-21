@@ -2262,6 +2262,8 @@
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
       "selectRepositoryToStart": "Lai sāktu, izvēlies repozitoriju.",
+      "enterPromptToStart": "Lai sāktu, pievieno promptu.",
+      "enterPromptOrFileToStart": "Lai sāktu, pievieno promptu vai failu.",
       "connectProviderToStart": "Lai sāktu, pievieno pakalpojuma sniedzēju.",
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",

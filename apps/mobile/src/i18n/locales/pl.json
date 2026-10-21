@@ -1039,7 +1039,8 @@
       "bugs": "Błędy",
       "style": "Styl",
       "testing": "Testowanie",
-      "documentation": "Dokumentacja"
+      "documentation": "Dokumentacja",
+      "unknown": "Inne ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ostrzeżenie"
@@ -2266,6 +2267,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Lista aktywnych sesji będzie dostępna po wczytaniu danych.",
     "currentDeviceUnidentified": "Nie udało się rozpoznać tego urządzenia.",
+    "kiloApp": "Aplikacja Kilo",
     "noSessions": "Brak aktywnych sesji",
     "noSessionsDescription": "Zaloguj się w aplikacji Kilo na innym urządzeniu, a zobaczysz je tutaj.",
     "onlyKiloAppSignIns": "Lista obejmuje tylko logowania w aplikacji Kilo. Nie obejmuje logowań w edytorze ani CLI.",
@@ -2420,6 +2422,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Zanim zaczniemy",
+    "summaryTitle": "Preferencje udostępniania danych",
     "introDescription": "Kilo wysyła twoje wiadomości do dostawców AI, aby generować odpowiedzi. Poniżej znajdziesz informacje o tym, jakie dane udostępniamy i komu.",
     "required": "Wymagane do korzystania z Kilo",
     "promptsTitle": "Twoje polecenia i rozmowy",
@@ -2428,7 +2431,6 @@
     "accountDescription": "Identyfikator twojego konta Kilo i metadane żądań, używane do uwierzytelniania i pomiaru zużycia.",
     "diagnosticsTitle": "Diagnostyka aplikacji",
     "diagnosticsDescription": "Raporty o awariach i błędach, bez treści z aplikacji, które pomagają zapewnić jej stabilne działanie.",
-    "optional": "Opcjonalne",
     "helpImprove": "Pomóż ulepszyć Kilo",
     "helpImproveDescription": "Udostępniaj anonimowe dane o korzystaniu z aplikacji i źródle jej instalacji. Możesz to zmienić w każdej chwili w ustawieniach.",
     "seeFullDetails": "Zobacz szczegóły",
@@ -2555,7 +2557,8 @@
       "description": "Połącz konto GitHub, aby przeglądać PR na telefonie.",
       "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
-      "bitbucketOrgOnlyDescription": "Wybierz organizację w swoim profilu, aby przeglądać jej PR-y na Bitbucket."
+      "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
+      "contextLine": "Dla {{organization}}"
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",
     "couldNotLoadPullRequest": "Nie udało się wczytać PR.",
@@ -3553,6 +3556,9 @@
     "localModels": {
       "title": "Modele na urządzeniu",
       "help": "Modele na urządzeniu działają na tym telefonie. Twoje prompty i odpowiedzi pozostają na urządzeniu.",
+      "switchTitle": "Przełączyć na model na urządzeniu?",
+      "switchMessage": "Przełączenie na {{name}} spowoduje, że monity i kontekst tej rozmowy będą przetwarzane na tym telefonie, a nie na zdalnym serwerze.",
+      "switchConfirm": "Przełącz model",
       "systemPurpose": "Model wbudowany w system tego urządzenia. Działa na urządzeniu.",
       "apple": "Apple Intelligence (na urządzeniu)",
       "checking": "Sprawdzanie dostępności…",
@@ -3649,7 +3655,6 @@
     "personalDefaultDescription": "Ładowane automatycznie, gdy żadne repozytorium nie ma przypiętego profilu.",
     "organizationDefaultDescription": "Ładowane automatycznie dla członków, którzy nie mają domyślnych ustawień osobistych.",
     "setAsDefault": "Ustaw jako domyślny",
-    "removeDefault": "Usuń jako domyślne",
     "saveFailed": "Nie udało się zapisać profilu",
     "deleteTitle": "Usuń profil",
     "deleteMessage": "Spowoduje to trwałe usunięcie profilu i jego ustawień. Tego nie można cofnąć.",
@@ -3675,11 +3680,13 @@
     "commandsTitle": "Polecenia konfiguracyjne",
     "addCommand": "Dodaj polecenie",
     "commandLabel": "Rozkaz",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "np. pnpm install",
     "commandsEmpty": "Nie ma jeszcze żadnych poleceń konfiguracyjnych",
     "commandsSaveFailed": "Nie udało się zapisać poleceń konfiguracyjnych",
     "moveUp": "Podnieść",
     "moveDown": "Opuszczać",
+    "moveCommandUp": "Przenieś polecenie {{position}} w górę",
+    "moveCommandDown": "Przenieś polecenie {{position}} w dół",
     "skillsTitle": "Umiejętności",
     "addSkill": "Dodaj umiejętność",
     "skillNameLabel": "Nazwa umiejętności",

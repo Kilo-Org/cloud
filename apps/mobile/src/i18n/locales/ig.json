@@ -661,7 +661,8 @@
       "description": "Jikọọ akaụntụ GitHub gị ka ị nyochaa arịrịọ njikọta na ekwentị.",
       "gitlabDescription": "Jikọọ akaụntụ GitLab gị iji nyochaa arịrịọ njikọta na ekwentị.",
       "bitbucketDescription": "Jikọọ Bitbucket na òtù a iji nyochaa arịrịọ ijikọ koodu na ekwentị.",
-      "bitbucketOrgOnlyDescription": "Họrọ òtù na profaịlụ gị iji nyochaa arịrịọ ijikọ koodu Bitbucket ya."
+      "bitbucketOrgOnlyDescription": "Gbanwee akaụntụ dị n'elu gaa n'òtụ iji nyochaa arịrịọ ijikọ koodu Bitbucket ya.",
+      "contextLine": "Maka {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1545,7 +1546,8 @@
       "bugs": "Njehie",
       "style": "Ụdị ide koodu",
       "testing": "Nnwale",
-      "documentation": "Akwụkwọ nkọwa"
+      "documentation": "Akwụkwọ nkọwa",
+      "unknown": "Ọzọ ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ịdọ aka ná ntị"
@@ -2732,6 +2734,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Nnọkọ gị ndị na-arụ ọrụ agaghị adị ruo mgbe nke a budatara.",
     "currentDeviceUnidentified": "Enweghị ike ịmata ngwaọrụ a.",
+    "kiloApp": "Ngwa Kilo",
     "noSessions": "Enweghị nnọkọ na-arụ ọrụ",
     "noSessionsDescription": "Banye na ngwa Kilo na ngwaọrụ ọzọ, ọ ga-apụta ebe a.",
     "onlyKiloAppSignIns": "Naanị nbanye ngwa Kilo na-apụta ebe a. A naghị edepụta nbanye ihe ndezi koodu na CLI.",
@@ -2884,6 +2887,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Tupu anyị amalite",
+    "summaryTitle": "Mmasị ikesi data",
     "introDescription": "Kilo na-ezigara ndị na-enye ọrụ AI ozi gị ka ha mepụta nzaghachi. Ihe ndị a na-egosi data a na-ekekọrịta na ndị na-anata ya.",
     "required": "Ihe achọrọ iji Kilo",
     "promptsTitle": "Ihe ị na-ede na mkparịta ụka gị",
@@ -2892,7 +2896,6 @@
     "accountDescription": "A na-eji ID akaụntụ Kilo gị na nkọwa data arịrịọ iji nyochaa njirimara gị ma tụọ ojiji.",
     "diagnosticsTitle": "Nchọpụta nsogbu ngwa",
     "diagnosticsDescription": "A na-eji akụkọ mmebi na njehie eme ka ngwa rụọ ọrụ nke ọma, mgbe e wepụchara ọdịnaya ngwa na ha.",
-    "optional": "Ọ bụghị iwu",
     "helpImprove": "Nyere aka melite Kilo",
     "helpImproveDescription": "Kekọrịta data nyocha ojiji ngwa na-enweghị njirimara gị, yana ebe ị si nweta ngwa ahụ. Ị nwere ike ịgbanwe nke a oge ọ bụla na Ntọala.",
     "seeFullDetails": "Hụ nkọwa zuru ezu",
@@ -3471,6 +3474,9 @@
     "localModels": {
       "title": "Ụdị nlereanya na ngwaọrụ",
       "help": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na ekwentị a. Ajụjụ gị na nzaghachi gị na-anọ na ngwaọrụ ahụ.",
+      "switchTitle": "Ịgbanwe gaa n'ụdị nlereanya na ngwaọrụ?",
+      "switchMessage": "Ịgbanwe gaa na {{name}} ga-eme ka a hazie ntụziaka na ederede gbara mkparịta ụka a gburugburu na ekwentị a, ọ bụghị na sava dị anya.",
+      "switchConfirm": "Gbanwee ụdị nlereanya",
       "systemPurpose": "Ụdị nlereanya e wuru n'ime sistemụ ngwaọrụ a. Ọ na-arụ ọrụ na ngwaọrụ ahụ.",
       "apple": "Apple Intelligence (na ngwaọrụ)",
       "checking": "Na-elele ma ọ dị…",
@@ -3567,7 +3573,6 @@
     "personalDefaultDescription": "Ebuuru akpaaka mgbe enweghị ebe nchekwa nwere profaịlụ etinyere.",
     "organizationDefaultDescription": "Ebudoro onwe ya maka ndị otu na-enweghị ndabara nkeonwe.",
     "setAsDefault": "Tọọ ka ndabara",
-    "removeDefault": "Wepu dị ka ndabara",
     "saveFailed": "Enweghị ike ịchekwa profaịlụ",
     "deleteTitle": "Hichapụ profaịlụ",
     "deleteMessage": "Nke a na-ewepụ profaịlụ na ntọala ya kpamkpam. Enweghị ike imegharị nke a.",
@@ -3593,11 +3598,13 @@
     "commandsTitle": "Nhazi iwu",
     "addCommand": "Tinye iwu",
     "commandLabel": "Iwu",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "dịka pnpm install",
     "commandsEmpty": "Enweghị iwu ntọlite ka",
     "commandsSaveFailed": "Enweghị ike ichekwa iwu ntọala",
     "moveUp": "Bulie elu",
     "moveDown": "Budata ala",
+    "moveCommandUp": "Bufee iwu {{position}} elu",
+    "moveCommandDown": "Bufee iwu {{position}} ala",
     "skillsTitle": "Nkà",
     "addSkill": "Tinye nka",
     "skillNameLabel": "Aha nka",

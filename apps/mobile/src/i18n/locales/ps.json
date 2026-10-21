@@ -661,7 +661,8 @@
       "description": "په موبایل کې د پل ریکویسټونو د بیاکتنې لپاره خپل GitHub حساب ونښلوئ.",
       "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو د بیاکتنې لپاره خپل GitLab حساب ونښلوئ.",
       "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",
-      "bitbucketOrgOnlyDescription": "خپل پروفایل کې یو بنسټ وټاکئ ترڅو د هغه Bitbucket پول ریکویسټونه وبیایۍ."
+      "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پول ریکویسټونو د بیاکتنې لپاره پورته حساب یو بنسټ ته وبدلئ.",
+      "contextLine": "{{organization}} لپاره"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1545,7 +1546,8 @@
       "bugs": "تېروتنې",
       "style": "د لیکلو بڼه",
       "testing": "ازموینه",
-      "documentation": "اسناد"
+      "documentation": "اسناد",
+      "unknown": "نور ({{area}})"
     },
     "gateThreshold": {
       "warning": "خبرداری"
@@ -2732,6 +2734,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "تر بارېدو پورې ستاسو فعالې ناستې د لاسرسي وړ نه دي.",
     "currentDeviceUnidentified": "اوسنۍ وسیله ونه پېژندل شوه.",
+    "kiloApp": "د Kilo اپلیکیشن",
     "noSessions": "هېڅ فعاله ناسته نشته",
     "noSessionsDescription": "په بله وسیله کې د Kilo اپلیکیشن ته ننوځئ، ناسته به یې دلته ښکاره شي.",
     "onlyKiloAppSignIns": "دلته یوازې د Kilo اپلیکیشن ننوتنې ښکاري. د کوډ سمونګر او CLI ننوتنې په لېست کې نه راځي.",
@@ -2884,6 +2887,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "مخکې له دې چې پیل وکړو",
+    "summaryTitle": "د معلوماتو د شریکولو غوراوي",
     "introDescription": "Kilo ستاسو پیغامونه د ځوابونو د جوړولو لپاره د AI چمتو کوونکو ته لېږي. لاندې وګورئ چې کوم معلومات له چا سره شریکېږي.",
     "required": "د Kilo کارولو لپاره اړین",
     "promptsTitle": "ستاسو پرامپټونه او خبرې اترې",
@@ -2892,7 +2896,6 @@
     "accountDescription": "ستاسو د Kilo حساب ID او د غوښتنې میټاډاټا ستاسو د هویت د تایید او د کارونې د اندازه کولو لپاره کارول کېږي.",
     "diagnosticsTitle": "د اپلیکیشن د ستونزو تشخیص",
     "diagnosticsDescription": "د ناڅاپي بندېدو او تېروتنو راپورونه، چې د اپلیکیشن منځپانګه ترې لرې شوې وي، د اپلیکیشن د ثبات ساتلو لپاره کارول کېږي.",
-    "optional": "اختیاري",
     "helpImprove": "د Kilo په ښه کولو کې مرسته وکړئ",
     "helpImproveDescription": "د محصول د کارونې بې‌نومه احصایې او د نصب سرچینه شریک کړئ. دا ټاکنه هر وخت په تنظیماتو کې بدلولی شئ.",
     "seeFullDetails": "بشپړ جزیات وګورئ",
@@ -3471,6 +3474,9 @@
     "localModels": {
       "title": "په وسیله کې ماډلونه",
       "help": "په وسیله کې ماډلونه په همدې تلیفون چلېږي. ستاسو پوښتنې او ځوابونه په وسیله کې پاتې کېږي.",
+      "switchTitle": "په وسیله کې ماډل ته بدلول غواړئ؟",
+      "switchMessage": "{{name}} ته په بدلولو سره د دې خبرو اترو لارښوونې او سیاق په همدې تلیفون کې پروسس کېږي، نه په لرې پروت سرور کې.",
+      "switchConfirm": "ماډل بدل کړئ",
       "systemPurpose": "هغه ماډل چې د دې وسیلې په سیسټم کې جوړ شوی دی. دا په وسیله کې چلېږي.",
       "apple": "Apple Intelligence (په وسیله کې)",
       "checking": "د شتون کتنه روانه ده…",
@@ -3567,7 +3573,6 @@
     "personalDefaultDescription": "په اوتومات ډول بار شوی کله چې هیڅ ذخیره پین شوی پروفایل نلري.",
     "organizationDefaultDescription": "د غړو لپاره په اتوماتيک ډول بار شوی څوک چې شخصي ډیفالټ نلري.",
     "setAsDefault": "د ډیفالټ په توګه تنظیم کړئ",
-    "removeDefault": "د ډیفالټ په توګه لرې کړئ",
     "saveFailed": "پروفایل خوندي نشو کړای",
     "deleteTitle": "پروفایل ړنګ کړئ",
     "deleteMessage": "دا د تل لپاره پروفایل او د هغې تنظیمات لرې کوي. دا نشي رد کیدی.",
@@ -3593,11 +3598,13 @@
     "commandsTitle": "امرونه تنظیم کړئ",
     "addCommand": "کمانډ اضافه کړئ",
     "commandLabel": "امر",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "لکه pnpm install",
     "commandsEmpty": "تر اوسه د تنظیم کولو امرونه ندي",
     "commandsSaveFailed": "د ترتیب کولو کمانډونه خوندي نشو کولی",
     "moveUp": "پورته لاړ شه",
     "moveDown": "لاندې حرکت وکړئ",
+    "moveCommandUp": "{{position}} امر پورته کړئ",
+    "moveCommandDown": "{{position}} امر لاندې کړئ",
     "skillsTitle": "مهارتونه",
     "addSkill": "مهارتونه اضافه کړئ",
     "skillNameLabel": "د مهارت نوم",

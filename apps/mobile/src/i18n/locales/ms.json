@@ -661,7 +661,8 @@
       "description": "Sambungkan akaun GitHub anda untuk menyemak permintaan tarik pada peranti mudah alih.",
       "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
-      "bitbucketOrgOnlyDescription": "Pilih organisasi dalam profil anda untuk menyemak permintaan tarik Bitbucketnya."
+      "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
+      "contextLine": "Untuk {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1545,7 +1546,8 @@
       "bugs": "Pepijat",
       "style": "Gaya",
       "testing": "Pengujian",
-      "documentation": "Dokumentasi"
+      "documentation": "Dokumentasi",
+      "unknown": "Lain ({{area}})"
     },
     "gateThreshold": {
       "warning": "Amaran"
@@ -2732,6 +2734,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesi aktif anda tidak dapat dipaparkan sehingga data ini selesai dimuatkan.",
     "currentDeviceUnidentified": "Peranti semasa tidak dapat dikenal pasti.",
+    "kiloApp": "Apl Kilo",
     "noSessions": "Tiada sesi aktif",
     "noSessionsDescription": "Log masuk dengan apl Kilo pada peranti lain dan ia akan muncul di sini.",
     "onlyKiloAppSignIns": "Hanya sesi log masuk apl Kilo dipaparkan di sini. Sesi log masuk penyunting dan CLI tidak disenaraikan.",
@@ -2884,6 +2887,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Sebelum kita bermula",
+    "summaryTitle": "Keutamaan perkongsian data",
     "introDescription": "Kilo menghantar mesej anda kepada penyedia AI untuk menjana respons. Berikut ialah data yang dikongsi dan pihak yang menerimanya.",
     "required": "Diperlukan untuk menggunakan Kilo",
     "promptsTitle": "Gesaan dan perbualan anda",
@@ -2892,7 +2896,6 @@
     "accountDescription": "ID akaun Kilo dan metadata permintaan anda digunakan untuk mengesahkan identiti anda dan mengukur penggunaan.",
     "diagnosticsTitle": "Diagnostik apl",
     "diagnosticsDescription": "Laporan ranap dan ralat tanpa kandungan apl digunakan untuk mengekalkan kestabilan apl.",
-    "optional": "Pilihan",
     "helpImprove": "Bantu menambah baik Kilo",
     "helpImproveDescription": "Kongsi analitik produk tanpa nama dan sumber pemasangan. Anda boleh mengubahnya pada bila-bila masa dalam Tetapan.",
     "seeFullDetails": "Lihat butiran penuh",
@@ -3471,6 +3474,9 @@
     "localModels": {
       "title": "Model pada peranti",
       "help": "Model pada peranti berjalan pada telefon ini. Gesaan dan balasan anda kekal pada peranti.",
+      "switchTitle": "Beralih ke model pada peranti?",
+      "switchMessage": "Apabila beralih ke {{name}}, gesaan dan konteks perbualan ini akan diproses pada telefon ini, bukan pada pelayan jauh.",
+      "switchConfirm": "Tukar model",
       "systemPurpose": "Model yang terbina dalam sistem peranti ini. Ia berjalan pada peranti.",
       "apple": "Apple Intelligence (pada peranti)",
       "checking": "Menyemak ketersediaan…",
@@ -3567,7 +3573,6 @@
     "personalDefaultDescription": "Auto-muat apabila tiada repositori mempunyai profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat secara automatik untuk ahli yang tidak mempunyai lalai peribadi.",
     "setAsDefault": "Tetapkan sebagai lalai",
-    "removeDefault": "Alih keluar sebagai lalai",
     "saveFailed": "Tidak dapat menyimpan profil",
     "deleteTitle": "Padam profil",
     "deleteMessage": "Ini mengalih keluar profil dan tetapannya secara kekal. Ini tidak boleh dibuat asal.",
@@ -3593,11 +3598,13 @@
     "commandsTitle": "Perintah persediaan",
     "addCommand": "Tambah arahan",
     "commandLabel": "Perintah",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "cth. pnpm install",
     "commandsEmpty": "Tiada arahan persediaan lagi",
     "commandsSaveFailed": "Tidak dapat menyimpan arahan persediaan",
     "moveUp": "Bergerak ke atas",
     "moveDown": "Bergerak ke bawah",
+    "moveCommandUp": "Alihkan arahan {{position}} ke atas",
+    "moveCommandDown": "Alihkan arahan {{position}} ke bawah",
     "skillsTitle": "Kemahiran",
     "addSkill": "Tambah kemahiran",
     "skillNameLabel": "Nama kemahiran",

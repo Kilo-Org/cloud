@@ -661,7 +661,8 @@
       "description": "Ampifandraiso ny kaontinao GitHub mba handinihana fangatahana fampiraisana amin'ny finday.",
       "gitlabDescription": "Ampifandraiso ny kaonty GitLab-nao mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketDescription": "Ampifandraiso amin'ity fikambanana ity ny Bitbucket mba hijerena ny fangatahana fampiraisana amin'ny finday.",
-      "bitbucketOrgOnlyDescription": "Safidio fikambanana ao amin'ny mombamomba-nao mba hijerena ny fangatahana fampiraisana Bitbucket-ny."
+      "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
+      "contextLine": "Ho an'ny {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1545,7 +1546,8 @@
       "bugs": "Lesoka",
       "style": "Fomba fanoratana",
       "testing": "Fitsapana",
-      "documentation": "Tahirin-kevitra"
+      "documentation": "Tahirin-kevitra",
+      "unknown": "Hafa ({{area}})"
     },
     "gateThreshold": {
       "warning": "Fampitandremana"
@@ -2732,6 +2734,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tsy azo aseho ny fotoam-piasanao mandeha raha tsy voaray ny angona.",
     "currentDeviceUnidentified": "Tsy fantatra ny fitaovana ampiasaina izao.",
+    "kiloApp": "Rindranasa Kilo",
     "noSessions": "Tsy misy fotoam-piasana mandeha",
     "noSessionsDescription": "Midira amin'ny rindranasa Kilo amin'ny fitaovana hafa, dia hiseho eto izany.",
     "onlyKiloAppSignIns": "Ny fidirana amin'ny rindranasa Kilo ihany no hita eto. Tsy voatanisa ny fidirana amin'ny mpanova kaody sy ny CLI.",
@@ -2884,6 +2887,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Alohan'ny hanombohana",
+    "summaryTitle": "Safidy momba ny fizaràna angona",
     "introDescription": "Mandefa ny hafatrao any amin'ny mpamatsy AI ny Kilo mba hamoronana valiny. Ireto ny angona zaraina sy ny mpandray azy.",
     "required": "Ilaina amin'ny fampiasana Kilo",
     "promptsTitle": "Ny toromarikanao sy ny resakao",
@@ -2892,7 +2896,6 @@
     "accountDescription": "Ny famantarana ny kaontinao Kilo sy ny angona mamaritra ny fangatahana, ampiasaina hanamarinana anao sy handrefesana ny fampiasana.",
     "diagnosticsTitle": "Fitiliana ny rindranasa",
     "diagnosticsDescription": "Tatitry ny fijanonana tampoka sy ny hadisoana, izay nesorina ny votoatin'ny rindranasa, mba hiantohana ny fiasan'ny rindranasa.",
-    "optional": "Tsy voatery",
     "helpImprove": "Ampio hanatsara ny Kilo",
     "helpImproveDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana. Azonao ovaina ao amin'ny Fikirana izany amin'ny fotoana rehetra.",
     "seeFullDetails": "Jereo ny antsipiriany feno",
@@ -3471,6 +3474,9 @@
     "localModels": {
       "title": "Modely ao amin'ny fitaovana",
       "help": "Mandeha ao amin'ity finday ity ny modely ao amin'ny fitaovana. Mijanona ao amin'ny fitaovana ny fangatahanao sy ny valiny.",
+      "switchTitle": "Hifindra amin'ny modely ao amin'ny fitaovana?",
+      "switchMessage": "Ny fifindrana amin'ny {{name}} dia mahatonga ny baiko sy ny toe-javatra ao amin'ity resaka ity hokarakaraina ao amin'ity finday ity, fa tsy any amin'ny rafitra mpizara lavitra.",
+      "switchConfirm": "Miova modely",
       "systemPurpose": "Ilay modely tafiditra ao amin'ny rafitry ity fitaovana ity. Mandeha ao amin'ny fitaovana izy.",
       "apple": "Apple Intelligence (ao amin'ny fitaovana)",
       "checking": "Manamarina raha misy…",
@@ -3567,7 +3573,6 @@
     "personalDefaultDescription": "Ampidiro mandeha ho azy rehefa tsy misy tahiry misy piraofilina voafantina.",
     "organizationDefaultDescription": "Auto-loaded ho an'ny mpikambana tsy manana default manokana.",
     "setAsDefault": "Ataovy ho default",
-    "removeDefault": "Esory ho default",
     "saveFailed": "Tsy afaka mitahiry piraofilina",
     "deleteTitle": "Fafao ny mombamomba",
     "deleteMessage": "Izany dia manala tanteraka ny mombamomba sy ny firafiny. Tsy azo averina izany.",
@@ -3593,11 +3598,13 @@
     "commandsTitle": "Mametraka baiko",
     "addCommand": "Ampio baiko",
     "commandLabel": "didy",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "oh. pnpm install",
     "commandsEmpty": "Tsy mbola misy baiko fanamboarana",
     "commandsSaveFailed": "Tsy afaka mitahiry baiko fanamboarana",
     "moveUp": "Miakatra",
     "moveDown": "Mandrosoa midina",
+    "moveCommandUp": "Afindra baiko {{position}} miakatra",
+    "moveCommandDown": "Afindra baiko {{position}} midina",
     "skillsTitle": "fahaiza-manao",
     "addSkill": "Ampio fahaizana",
     "skillNameLabel": "Anarana fahaizana",

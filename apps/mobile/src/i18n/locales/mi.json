@@ -661,7 +661,8 @@
       "description": "Honoa tō pūkete GitHub hei arotake i ngā tono kume i tō waea pūkoro.",
       "gitlabDescription": "Honoa tō pūkete GitLab kia arotakehia ngā tono whakakotahi i te waea pūkoro.",
       "bitbucketDescription": "Honoa a Bitbucket ki tēnei whakahaere kia arotakehia ngā tono kume i te waea pūkoro.",
-      "bitbucketOrgOnlyDescription": "Kōwhiria he whakahaere i tō pūkoro kia arotakehia ōna tono kume Bitbucket."
+      "bitbucketOrgOnlyDescription": "Whakawhiti te pūkete kei runga ake nei ki tētahi whakahaere kia arotakehia ōna tono kume Bitbucket.",
+      "contextLine": "Mō {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1545,7 +1546,8 @@
       "bugs": "Ngā hapa",
       "style": "Te āhua",
       "testing": "Whakamātautau",
-      "documentation": "Tuhinga"
+      "documentation": "Tuhinga",
+      "unknown": "Ētahi ({{area}})"
     },
     "gateThreshold": {
       "warning": "Whakatūpato"
@@ -2732,6 +2734,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kāore ō wātū hohe e wātea kia oti rā anō te uta.",
     "currentDeviceUnidentified": "Kāore i taea te tautohu i te pūrere o nāianei.",
+    "kiloApp": "Taupānga Kilo",
     "noSessions": "Kāore he wātū hohe",
     "noSessionsDescription": "Takiuru mā te taupānga Kilo ki tētahi atu pūrere, ka puta taua pūrere ki konei.",
     "onlyKiloAppSignIns": "Ko ngā takiuru ki te taupānga Kilo anake ka puta ki konei. Kāore ngā takiuru ki te ētita me te CLI e rārangitia.",
@@ -2884,6 +2887,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "I mua i te tīmatanga",
+    "summaryTitle": "Ngā tautuhinga tuari raraunga",
     "introDescription": "Ka tukuna e Kilo ō karere ki ngā kaiwhakarato AI hei whakaputa whakautu. Anei ngā raraunga ka tuaritia me ngā kaiwhiwhi.",
     "required": "E hiahiatia ana hei whakamahi i a Kilo",
     "promptsTitle": "Ō tohutohu me ō kōrerorero",
@@ -2892,7 +2896,6 @@
     "accountDescription": "Te ID o tō pūkete Kilo me ngā raraungameta o ngā tono, hei manatoko i a koe, hei ine hoki i te whakamahinga.",
     "diagnosticsTitle": "Ngā tātaritanga hapa o te taupānga",
     "diagnosticsDescription": "Ngā pūrongo tukinga me ngā hapa, kua tangohia ngā ihirangi o te taupānga, hei whakapūmau i te taupānga.",
-    "optional": "He kōwhiringa",
     "helpImprove": "Āwhina ki te whakapai ake i a Kilo",
     "helpImproveDescription": "Tuaritia ngā tātaritanga whakamahinga kāore he ingoa, me te pūtake tāuta. Ka taea e koe te huri i tēnei i ngā tautuhinga ahakoa te wā.",
     "seeFullDetails": "Tirohia ngā taipitopito katoa",
@@ -3471,6 +3474,9 @@
     "localModels": {
       "title": "Ngā tauira i te pūrere",
       "help": "Ka rere ngā tauira i te pūrere ki runga i tēnei waea. Ka noho ō tono me ngā whakautu ki te pūrere.",
+      "switchTitle": "Me huri ki tētahi tauira i te pūrere?",
+      "switchMessage": "Mā te huri ki {{name}} ka tukatukahia ngā tohutohu me te horopaki o tēnei kōrerorero ki runga i tēnei waea, kaua ki runga i tētahi tūmau mamao.",
+      "switchConfirm": "Huri tauira",
       "systemPurpose": "Te tauira kua hangaia ki te pūnaha o tēnei pūrere. Ka rere i te pūrere.",
       "apple": "Apple Intelligence (i te pūrere)",
       "checking": "Kei te tirotiro mēnā e wātea ana…",
@@ -3567,7 +3573,6 @@
     "personalDefaultDescription": "Ka utaina-aunoa ina karekau he putunga he kotaha titi.",
     "organizationDefaultDescription": "Ka utaina aunoa mo nga mema karekau he taunoa.",
     "setAsDefault": "Tautuhi hei taunoa",
-    "removeDefault": "Tango hei taunoa",
     "saveFailed": "Kāore i taea te tiaki kōtaha",
     "deleteTitle": "Mukua te kōtaha",
     "deleteMessage": "Ka tangohia tonutia te kōtaha me ona tautuhinga. Kaore e taea te whakakore i tenei.",
@@ -3593,11 +3598,13 @@
     "commandsTitle": "Tatūnga whakahau",
     "addCommand": "Tāpiri whakahau",
     "commandLabel": "Whakahau",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "hei tauira pnpm install",
     "commandsEmpty": "Kare ano he tono tatūnga",
     "commandsSaveFailed": "Kāore i taea te tiaki i ngā tono tatūnga",
     "moveUp": "Neke ki runga",
     "moveDown": "Nuku ki raro",
+    "moveCommandUp": "Neke whakahau {{position}} ki runga",
+    "moveCommandDown": "Neke whakahau {{position}} ki raro",
     "skillsTitle": "Pukenga",
     "addSkill": "Tāpiri pūkenga",
     "skillNameLabel": "Ingoa Pūkenga",

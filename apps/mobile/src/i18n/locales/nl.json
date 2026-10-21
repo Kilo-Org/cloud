@@ -1033,7 +1033,8 @@
       "bugs": "Programmeerfouten",
       "style": "Stijl",
       "testing": "Testen",
-      "documentation": "Documentatie"
+      "documentation": "Documentatie",
+      "unknown": "Overig ({{area}})"
     },
     "gateThreshold": {
       "warning": "Waarschuwing"
@@ -2220,6 +2221,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Je actieve sessies zijn pas beschikbaar nadat de gegevens zijn geladen.",
     "currentDeviceUnidentified": "Het huidige apparaat kon niet worden herkend.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Geen actieve sessies",
     "noSessionsDescription": "Meld je in de Kilo-app aan op een ander apparaat. Dat apparaat verschijnt dan hier.",
     "onlyKiloAppSignIns": "Alleen aanmeldingen van de Kilo-app verschijnen hier. Editor- en CLI-aanmeldingen worden niet vermeld.",
@@ -2372,6 +2374,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Voordat we beginnen",
+    "summaryTitle": "Voorkeuren voor gegevensdeling",
     "introDescription": "Kilo stuurt je berichten naar AI-aanbieders om antwoorden te genereren. Hieronder zie je welke gegevens we delen en met wie.",
     "required": "Vereist om Kilo te gebruiken",
     "promptsTitle": "Je prompts en gesprekken",
@@ -2380,7 +2383,6 @@
     "accountDescription": "Je Kilo-account-ID en metadata van verzoeken om je identiteit te controleren en het gebruik te meten.",
     "diagnosticsTitle": "Diagnostische appgegevens",
     "diagnosticsDescription": "Crash- en foutrapporten zonder app-inhoud om de app stabiel te houden.",
-    "optional": "Optioneel",
     "helpImprove": "Kilo helpen verbeteren",
     "helpImproveDescription": "Deel anonieme gebruiksstatistieken en de installatiebron. Je kunt dit op elk moment wijzigen in de instellingen.",
     "seeFullDetails": "Volledige details bekijken",
@@ -2505,7 +2507,8 @@
       "description": "Koppel je GitHub-account om PR's op je telefoon te beoordelen.",
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
-      "bitbucketOrgOnlyDescription": "Selecteer een organisatie in je profiel om de PR's van die organisatie op Bitbucket te beoordelen."
+      "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
+      "contextLine": "Voor {{organization}}"
     },
     "connectionExpired": "De GitHub-koppeling is verlopen.",
     "couldNotLoadPullRequest": "De PR kon niet worden geladen.",
@@ -3471,6 +3474,9 @@
     "localModels": {
       "title": "Modellen op het apparaat",
       "help": "Modellen op het apparaat draaien op deze telefoon. Je prompts en antwoorden blijven op het apparaat.",
+      "switchTitle": "Overschakelen naar een model op het apparaat?",
+      "switchMessage": "Als je overschakelt naar {{name}}, worden de prompts en context van dit gesprek op deze telefoon verwerkt, niet op een externe server.",
+      "switchConfirm": "Van model wisselen",
       "systemPurpose": "Het model dat in het systeem van dit apparaat is ingebouwd. Het draait op het apparaat.",
       "apple": "Apple Intelligence (op het apparaat)",
       "checking": "Beschikbaarheid controleren…",
@@ -3567,7 +3573,6 @@
     "personalDefaultDescription": "Automatisch geladen wanneer geen enkele repository een vastgezet profiel heeft.",
     "organizationDefaultDescription": "Automatisch geladen voor leden die geen persoonlijke standaard hebben.",
     "setAsDefault": "Als standaard instellen",
-    "removeDefault": "Standaard verwijderen",
     "saveFailed": "Kan profiel niet opslaan",
     "deleteTitle": "Profiel verwijderen",
     "deleteMessage": "Hierdoor worden het profiel en de instellingen ervan permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
@@ -3593,11 +3598,13 @@
     "commandsTitle": "Instelopdrachten",
     "addCommand": "Commando toevoegen",
     "commandLabel": "Commando",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "bijv. pnpm install",
     "commandsEmpty": "Nog geen installatieopdrachten",
     "commandsSaveFailed": "Kan installatieopdrachten niet opslaan",
     "moveUp": "Ga omhoog",
     "moveDown": "Ga naar beneden",
+    "moveCommandUp": "Commando {{position}} omhoog verplaatsen",
+    "moveCommandDown": "Commando {{position}} omlaag verplaatsen",
     "skillsTitle": "Vaardigheden",
     "addSkill": "Vaardigheid toevoegen",
     "skillNameLabel": "Vaardigheidsnaam",

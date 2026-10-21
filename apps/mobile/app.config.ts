@@ -472,6 +472,11 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // Android 15+ draws text from glyph bounds while React Native measures it
+    // from advances, which clips words in a script the fallback font supplies.
+    // Android-only by capability: iOS has one text layout for both jobs, so its
+    // half is nothing. See the plugin's doc comment.
+    './plugins/withAndroidTextViewBounds',
     // One implementation for iOS and Android: the discard confirm is the same
     // shared `Alert.alert` call on both platforms, and iOS's `UIAlertController`
     // already draws that copy as given (it exposes no casing transform to

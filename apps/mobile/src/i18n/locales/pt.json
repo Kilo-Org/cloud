@@ -673,7 +673,8 @@
       "description": "Liga a tua conta do GitHub para rever PRs no telemóvel.",
       "gitlabDescription": "Liga a tua conta do GitLab para rever merge requests no telemóvel.",
       "bitbucketDescription": "Liga o Bitbucket a esta organização para rever PRs no telemóvel.",
-      "bitbucketOrgOnlyDescription": "Seleciona uma organização no teu perfil para rever os PRs dessa organização no Bitbucket."
+      "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1564,7 +1565,8 @@
       "bugs": "Erros",
       "style": "Estilo",
       "testing": "Testes",
-      "documentation": "Documentação"
+      "documentation": "Documentação",
+      "unknown": "Outro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Aviso"
@@ -2771,6 +2773,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "As suas sessões ativas só ficam disponíveis após o carregamento.",
     "currentDeviceUnidentified": "Não foi possível identificar o dispositivo atual.",
+    "kiloApp": "Aplicação Kilo",
     "noSessions": "Sem sessões ativas",
     "noSessionsDescription": "Inicie sessão na aplicação Kilo noutro dispositivo. A sessão aparecerá aqui.",
     "onlyKiloAppSignIns": "Apenas os inícios de sessão na aplicação Kilo aparecem aqui. Os inícios de sessão no editor e na CLI não são listados.",
@@ -2924,6 +2927,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Antes de começarmos",
+    "summaryTitle": "Preferências de partilha de dados",
     "introDescription": "O Kilo envia as suas mensagens a fornecedores de IA para gerar respostas. Saiba que dados são partilhados e com quem.",
     "required": "Necessário para usar o Kilo",
     "promptsTitle": "Os seus pedidos e conversas",
@@ -2932,7 +2936,6 @@
     "accountDescription": "O ID da sua conta Kilo e os metadados dos pedidos, usados para autenticar a sua identidade e medir a utilização.",
     "diagnosticsTitle": "Diagnósticos da aplicação",
     "diagnosticsDescription": "Relatórios de falhas e erros, sem conteúdo da aplicação, usados para manter a aplicação estável.",
-    "optional": "Opcional",
     "helpImprove": "Ajudar a melhorar o Kilo",
     "helpImproveDescription": "Partilhe dados anónimos de utilização do produto e a origem da instalação. Pode alterar esta opção a qualquer momento nas definições.",
     "seeFullDetails": "Ver todos os detalhes",
@@ -3512,6 +3515,9 @@
     "localModels": {
       "title": "Modelos no dispositivo",
       "help": "Os modelos no dispositivo são executados neste telemóvel. Os seus pedidos e respostas ficam no dispositivo.",
+      "switchTitle": "Mudar para um modelo no dispositivo?",
+      "switchMessage": "Ao mudar para {{name}}, as instruções e o contexto desta conversa serão processados neste telemóvel, não num servidor remoto.",
+      "switchConfirm": "Mudar de modelo",
       "systemPurpose": "O modelo integrado no sistema deste dispositivo. É executado no dispositivo.",
       "apple": "Apple Intelligence (no dispositivo)",
       "checking": "A verificar disponibilidade…",
@@ -3608,7 +3614,6 @@
     "personalDefaultDescription": "Carregado automaticamente quando nenhum repositório tem um perfil fixado.",
     "organizationDefaultDescription": "Carregado automaticamente para membros que não têm predefinição pessoal.",
     "setAsDefault": "Definir como predefinido",
-    "removeDefault": "Remover predefinição",
     "saveFailed": "Não foi possível guardar o perfil",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Elimina permanentemente o perfil e as respetivas definições. Esta ação não pode ser anulada.",
@@ -3634,11 +3639,13 @@
     "commandsTitle": "Comandos de configuração",
     "addCommand": "Adicionar comando",
     "commandLabel": "Comando",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "p. ex. pnpm install",
     "commandsEmpty": "Ainda não há comandos de configuração",
     "commandsSaveFailed": "Não foi possível guardar os comandos de configuração",
     "moveUp": "Mover para cima",
     "moveDown": "Mover para baixo",
+    "moveCommandUp": "Mover o comando {{position}} para cima",
+    "moveCommandDown": "Mover o comando {{position}} para baixo",
     "skillsTitle": "Competências",
     "addSkill": "Adicionar competência",
     "skillNameLabel": "Nome da competência",

@@ -661,7 +661,8 @@
       "description": "Lidh llogarinë tënde të GitHub për të rishikuar kërkesat për bashkim në telefon.",
       "gitlabDescription": "Lidho llogarinë tënde GitLab për të rishikuar kërkesat e integrimit në celular.",
       "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",
-      "bitbucketOrgOnlyDescription": "Përzgjidh një organizatë në profilin tënd për të rishikuar kërkesat e saj për bashkim në Bitbucket."
+      "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
+      "contextLine": "Për {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1545,7 +1546,8 @@
       "bugs": "Defektet",
       "style": "Stili",
       "testing": "Testimi",
-      "documentation": "Dokumentacioni"
+      "documentation": "Dokumentacioni",
+      "unknown": "Tjetër ({{area}})"
     },
     "gateThreshold": {
       "warning": "Paralajmërim"
@@ -2732,6 +2734,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Seancat e tua aktive nuk janë të disponueshme derisa të ngarkohen të dhënat.",
     "currentDeviceUnidentified": "Nuk u identifikua pajisja aktuale.",
+    "kiloApp": "Aplikacioni Kilo",
     "noSessions": "Nuk ka seanca aktive",
     "noSessionsDescription": "Hyr në aplikacionin Kilo në një pajisje tjetër dhe ajo do të shfaqet këtu.",
     "onlyKiloAppSignIns": "Këtu shfaqen vetëm hyrjet nga aplikacioni Kilo. Hyrjet nga redaktori dhe CLI nuk renditen.",
@@ -2884,6 +2887,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Përpara se të fillojmë",
+    "summaryTitle": "Preferencat e ndarjes së të dhënave",
     "introDescription": "Kilo dërgon mesazhet e tua te ofruesit e AI për të gjeneruar përgjigje. Ja cilat të dhëna ndahen dhe me kë.",
     "required": "E nevojshme për të përdorur Kilo",
     "promptsTitle": "Kërkesat dhe bisedat e tua",
@@ -2892,7 +2896,6 @@
     "accountDescription": "ID-ja e llogarisë tënde Kilo dhe metadatat e kërkesave përdoren për të verifikuar identitetin tënd dhe për të matur përdorimin.",
     "diagnosticsTitle": "Diagnostika e aplikacionit",
     "diagnosticsDescription": "Raportet e ndërprerjeve të papritura dhe të gabimeve, pa përmbajtjen e aplikacionit, përdoren për ta mbajtur aplikacionin të qëndrueshëm.",
-    "optional": "Opsionale",
     "helpImprove": "Ndihmo në përmirësimin e Kilo",
     "helpImproveDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit. Mund ta ndryshosh këtë në çdo kohë te cilësimet.",
     "seeFullDetails": "Shiko detajet e plota",
@@ -3471,6 +3474,9 @@
     "localModels": {
       "title": "Modelet në pajisje",
       "help": "Modelet në pajisje funksionojnë në këtë telefon. Kërkesat dhe përgjigjet e tua mbeten në pajisje.",
+      "switchTitle": "Të kalohet te një model në pajisje?",
+      "switchMessage": "Me kalimin te {{name}}, udhëzimet dhe konteksti i kësaj bisede përpunohen në këtë telefon, jo në një server në distancë.",
+      "switchConfirm": "Ndrysho modelin",
       "systemPurpose": "Modeli i integruar në sistemin e kësaj pajisjeje. Funksionon në pajisje.",
       "apple": "Apple Intelligence (në pajisje)",
       "checking": "Po kontrollohet disponueshmëria…",
@@ -3567,7 +3573,6 @@
     "personalDefaultDescription": "Ngarkohet automatikisht kur asnjë depo nuk ka një profil të gozhduar.",
     "organizationDefaultDescription": "Ngarkohet automatikisht për anëtarët që nuk kanë parazgjedhje personale.",
     "setAsDefault": "Cakto si parazgjedhje",
-    "removeDefault": "Hiq si parazgjedhje",
     "saveFailed": "Profili nuk mund të ruhej",
     "deleteTitle": "Fshi profilin",
     "deleteMessage": "Kjo heq përgjithmonë profilin dhe cilësimet e tij. Kjo nuk mund të zhbëhet.",
@@ -3593,11 +3598,13 @@
     "commandsTitle": "Komandat e konfigurimit",
     "addCommand": "Shto komandë",
     "commandLabel": "Komanda",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "p.sh. pnpm install",
     "commandsEmpty": "Nuk ka ende komanda konfigurimi",
     "commandsSaveFailed": "Komandat e konfigurimit nuk mund të ruheshin",
     "moveUp": "Lëvizni lart",
     "moveDown": "Lëvizni poshtë",
+    "moveCommandUp": "Zhvendos komandën {{position}} lart",
+    "moveCommandDown": "Zhvendos komandën {{position}} poshtë",
     "skillsTitle": "Aftësitë",
     "addSkill": "Shtoni aftësi",
     "skillNameLabel": "Emri i aftësisë",

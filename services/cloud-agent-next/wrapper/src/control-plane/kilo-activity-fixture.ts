@@ -5,6 +5,7 @@ import { createKiloClient } from '@kilocode/sdk/v2/client';
 import { createKiloClient as createLegacyKiloClient } from '@kilocode/sdk';
 import { createWrapperKiloClient } from '../kilo-api.js';
 import { unfilteredKiloEvents } from '../control/feed.js';
+import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
 
 type ToolCall = { name: string; arguments: Record<string, unknown> };
 export type ModelReply = { text?: string; tools?: ToolCall[]; status?: number };
@@ -35,7 +36,8 @@ export async function activityFixture(
     XDG_STATE_HOME: path.join(root, 'state'),
   };
   const version = Bun.spawnSync([binary, '--version'], { env });
-  if (version.stdout.toString().trim() !== '7.8.1') throw new Error('Expected Kilo 7.8.1');
+  if (version.stdout.toString().trim() !== KILO_CLI_VERSION)
+    throw new Error(`Expected Kilo ${KILO_CLI_VERSION}`);
   let respond: () => Promise<ModelReply> = async () => ({ text: 'done' });
   let requests = 0;
   const fake = Bun.serve({

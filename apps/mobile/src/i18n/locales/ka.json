@@ -2781,7 +2781,7 @@
     "thisDevice": "ეს მოწყობილობა",
     "viewProfile": "პროფილის ნახვა",
     "signOutThisDevice": "ამ მოწყობილობიდან გასვლა",
-    "signOutThisSession": "ამ სესიიდან გასვლა",
+    "signOutSessionLabel": "{{device}}-დან გასვლა, შესვლა: {{signedIn}}",
     "sessionSignedOut": "სესია დაიხურა.",
     "signOutThisDeviceTitle": "გავიდეთ ამ მოწყობილობიდან?",
     "signOutThisSessionTitle": "გავიდეთ ამ სესიიდან?",

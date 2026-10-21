@@ -2782,7 +2782,7 @@
     "webBrowser": "Уеб браузър",
     "viewProfile": "Прегледай профила",
     "signOutThisDevice": "Излез от акаунта на това устройство",
-    "signOutThisSession": "Прекрати тази сесия",
+    "signOutSessionLabel": "Излез от акаунта на {{device}}, Влизане: {{signedIn}}",
     "sessionSignedOut": "Сесията е прекратена.",
     "signOutThisDeviceTitle": "Да се излезе ли от акаунта на това устройство?",
     "signOutThisSessionTitle": "Да се прекрати ли тази сесия?",

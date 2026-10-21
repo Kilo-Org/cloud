@@ -2268,7 +2268,7 @@
     "webBrowser": "Trình duyệt web",
     "viewProfile": "Xem hồ sơ",
     "signOutThisDevice": "Đăng xuất khỏi thiết bị này",
-    "signOutThisSession": "Đăng xuất phiên này",
+    "signOutSessionLabel": "Đăng xuất khỏi {{device}}, đăng nhập lúc {{signedIn}}",
     "sessionSignedOut": "Đã đăng xuất phiên.",
     "signOutThisDeviceTitle": "Đăng xuất khỏi thiết bị này?",
     "signOutThisSessionTitle": "Đăng xuất phiên này?",

@@ -2860,7 +2860,7 @@
     "webBrowser": "Webový prohlížeč",
     "viewProfile": "Zobrazit profil",
     "signOutThisDevice": "Odhlásit toto zařízení",
-    "signOutThisSession": "Odhlásit tuto relaci",
+    "signOutSessionLabel": "Odhlásit zařízení {{device}}, přihlášení: {{signedIn}}",
     "sessionSignedOut": "Relace byla odhlášena.",
     "signOutThisDeviceTitle": "Odhlásit toto zařízení?",
     "signOutThisSessionTitle": "Odhlásit tuto relaci?",

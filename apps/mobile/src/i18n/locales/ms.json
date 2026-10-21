@@ -2782,7 +2782,7 @@
     "viewProfile": "Lihat profil",
     "webBrowser": "Pelayar web",
     "signOutThisDevice": "Log keluar daripada peranti ini",
-    "signOutThisSession": "Log keluar daripada sesi ini",
+    "signOutSessionLabel": "Log keluar daripada {{device}}, log masuk {{signedIn}}",
     "sessionSignedOut": "Sesi dilog keluar.",
     "signOutThisDeviceTitle": "Log keluar daripada peranti ini?",
     "signOutThisSessionTitle": "Log keluar daripada sesi ini?",

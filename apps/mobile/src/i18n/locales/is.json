@@ -2781,7 +2781,7 @@
     "thisDevice": "Þetta tæki",
     "viewProfile": "Skoða prófíl",
     "signOutThisDevice": "Skrá þetta tæki út",
-    "signOutThisSession": "Skrá þessa lotu út",
+    "signOutSessionLabel": "Skrá {{device}} út, innskráning {{signedIn}}",
     "sessionSignedOut": "Skráð var út úr lotunni.",
     "signOutThisDeviceTitle": "Skrá þetta tæki út?",
     "signOutThisSessionTitle": "Skrá þessa lotu út?",

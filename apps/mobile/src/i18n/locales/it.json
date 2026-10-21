@@ -2290,7 +2290,7 @@
     "thisDevice": "Questo dispositivo",
     "viewProfile": "Visualizza il profilo",
     "signOutThisDevice": "Disconnetti questo dispositivo",
-    "signOutThisSession": "Disconnetti questa sessione",
+    "signOutSessionLabel": "Disconnetti {{device}}, accesso effettuato {{signedIn}}",
     "sessionSignedOut": "Sessione disconnessa.",
     "signOutThisDeviceTitle": "Disconnettere questo dispositivo?",
     "signOutThisSessionTitle": "Disconnettere questa sessione?",

@@ -2782,7 +2782,7 @@
     "viewProfile": "Jereo ny mombamomba anao",
     "webBrowser": "Mpitety tranonkala",
     "signOutThisDevice": "Mivoaha amin'ity fitaovana ity",
-    "signOutThisSession": "Mivoaha amin'ity fotoam-piasana ity",
+    "signOutSessionLabel": "Mivoaha amin'ny {{device}}, niditra {{signedIn}}",
     "sessionSignedOut": "Nifarana ny fidirana tamin'ity fotoam-piasana ity.",
     "signOutThisDeviceTitle": "Hivoaka amin'ity fitaovana ity ve?",
     "signOutThisSessionTitle": "Hivoaka amin'ity fotoam-piasana ity ve?",

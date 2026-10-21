@@ -2781,7 +2781,7 @@
     "thisDevice": "ଏହି ଡିଭାଇସ୍",
     "viewProfile": "ପ୍ରୋଫାଇଲ୍ ଦେଖନ୍ତୁ",
     "signOutThisDevice": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
-    "signOutThisSession": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
+    "signOutSessionLabel": "{{device}} ରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ, ସାଇନ୍ ଇନ୍: {{signedIn}}",
     "sessionSignedOut": "ସେସନ୍ ସାଇନ୍ ଆଉଟ୍ ହେଲା।",
     "signOutThisDeviceTitle": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionTitle": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",

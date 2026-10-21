@@ -2781,7 +2781,7 @@
     "thisDevice": "ఈ పరికరం",
     "viewProfile": "ప్రొఫైల్‌ను చూడండి",
     "signOutThisDevice": "ఈ పరికరం నుండి సైన్ అవుట్ చేయండి",
-    "signOutThisSession": "ఈ సెషన్ నుండి సైన్ అవుట్ చేయండి",
+    "signOutSessionLabel": "{{device}} నుండి సైన్ అవుట్ చేయండి, సైన్ ఇన్ చేసిన సమయం: {{signedIn}}",
     "sessionSignedOut": "సెషన్ సైన్ అవుట్ చేయబడింది.",
     "signOutThisDeviceTitle": "ఈ పరికరం నుండి సైన్ అవుట్ చేయాలా?",
     "signOutThisSessionTitle": "ఈ సెషన్ నుండి సైన్ అవుట్ చేయాలా?",

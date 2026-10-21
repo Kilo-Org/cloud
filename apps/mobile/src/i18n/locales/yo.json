@@ -2782,7 +2782,7 @@
     "webBrowser": "Aṣàwákiri ayélujára",
     "viewProfile": "Wo prófáìlì",
     "signOutThisDevice": "Jáde lórí ẹ̀rọ yìí",
-    "signOutThisSession": "Jáde kúrò nínú ìgbà ìwọlé yìí",
+    "signOutSessionLabel": "Jáde lórí {{device}}, wọlé {{signedIn}}",
     "sessionSignedOut": "A ti jáde kúrò nínú ìgbà ìwọlé náà.",
     "signOutThisDeviceTitle": "Jáde lórí ẹ̀rọ yìí?",
     "signOutThisSessionTitle": "Jáde kúrò nínú ìgbà ìwọlé yìí?",

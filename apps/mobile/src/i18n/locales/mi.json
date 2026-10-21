@@ -2782,7 +2782,7 @@
     "viewProfile": "Tirohia te kōtaha",
     "webBrowser": "Pūtirotiro tukutuku",
     "signOutThisDevice": "Takiputa i tēnei pūrere",
-    "signOutThisSession": "Takiputa i tēnei wātū",
+    "signOutSessionLabel": "Takiputa i a {{device}}, i takiuru i te {{signedIn}}",
     "sessionSignedOut": "Kua takiputaina te wātū.",
     "signOutThisDeviceTitle": "Takiputa i tēnei pūrere?",
     "signOutThisSessionTitle": "Takiputa i tēnei wātū?",

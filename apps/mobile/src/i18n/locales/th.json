@@ -2781,7 +2781,7 @@
     "thisDevice": "อุปกรณ์นี้",
     "viewProfile": "ดูโปรไฟล์",
     "signOutThisDevice": "ออกจากระบบบนอุปกรณ์นี้",
-    "signOutThisSession": "ออกจากระบบสำหรับเซสชันนี้",
+    "signOutSessionLabel": "ออกจากระบบบน{{device}}, เข้าสู่ระบบเมื่อ {{signedIn}}",
     "sessionSignedOut": "ออกจากระบบสำหรับเซสชันนี้แล้ว",
     "signOutThisDeviceTitle": "ออกจากระบบบนอุปกรณ์นี้หรือไม่?",
     "signOutThisSessionTitle": "ออกจากระบบสำหรับเซสชันนี้หรือไม่?",

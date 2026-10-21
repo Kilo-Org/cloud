@@ -2820,7 +2820,7 @@
     "thisDevice": "Acest dispozitiv",
     "viewProfile": "Vezi profilul",
     "signOutThisDevice": "Deconectează acest dispozitiv",
-    "signOutThisSession": "Deconectează această sesiune",
+    "signOutSessionLabel": "Deconectează {{device}}, autentificare: {{signedIn}}",
     "sessionSignedOut": "Sesiune deconectată.",
     "signOutThisDeviceTitle": "Deconectezi acest dispozitiv?",
     "signOutThisSessionTitle": "Deconectezi această sesiune?",

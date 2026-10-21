@@ -2781,7 +2781,7 @@
     "thisDevice": "Αυτή η συσκευή",
     "viewProfile": "Προβολή προφίλ",
     "signOutThisDevice": "Αποσύνδεση από αυτή τη συσκευή",
-    "signOutThisSession": "Αποσύνδεση από αυτή τη συνεδρία",
+    "signOutSessionLabel": "Αποσύνδεση από το {{device}}, σύνδεση: {{signedIn}}",
     "sessionSignedOut": "Η συνεδρία αποσυνδέθηκε.",
     "signOutThisDeviceTitle": "Αποσύνδεση από αυτή τη συσκευή;",
     "signOutThisSessionTitle": "Αποσύνδεση από αυτή τη συνεδρία;",

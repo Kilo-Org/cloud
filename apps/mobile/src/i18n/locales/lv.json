@@ -2821,7 +2821,7 @@
     "viewProfile": "Skatīt profilu",
     "webBrowser": "Tīmekļa pārlūks",
     "signOutThisDevice": "Izrakstīties šajā ierīcē",
-    "signOutThisSession": "Beigt šo sesiju",
+    "signOutSessionLabel": "Izrakstīties no „{{device}}”, pierakstīšanās: {{signedIn}}",
     "sessionSignedOut": "Sesija ir beigta.",
     "signOutThisDeviceTitle": "Izrakstīties šajā ierīcē?",
     "signOutThisSessionTitle": "Beigt šo sesiju?",

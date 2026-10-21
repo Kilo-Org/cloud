@@ -154,7 +154,13 @@ function startWrapperPump(wrapper: FakeWrapper): () => void {
 }
 
 async function startReadySession(): Promise<ActiveSession> {
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, cloudAgentSessionId, undefined);
+  const sandboxId = await generateSandboxId(
+    undefined,
+    ORG_ID,
+    USER_ID,
+    cloudAgentSessionId,
+    undefined
+  );
   const provider = createFakeProvider();
   await installSandbox(sandboxId, provider.adapter);
 
@@ -251,11 +257,7 @@ async function readAttach(response: Response): Promise<{
 }
 
 function isFrame(value: unknown, type: string): value is { type: string; properties: unknown } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { type?: unknown }).type === type
-  );
+  return typeof value === 'object' && value !== null && (value as { type?: unknown }).type === type;
 }
 
 /**
@@ -315,7 +317,11 @@ function expectContainsState(earlier: TranscriptState, later: TranscriptState): 
   for (const [id, event] of earlier.interactions) expect(later.interactions.get(id)).toEqual(event);
 }
 
-function messageUpdated(messageId: string, role: 'user' | 'assistant', text: string): ControlPlaneEvent {
+function messageUpdated(
+  messageId: string,
+  role: 'user' | 'assistant',
+  text: string
+): ControlPlaneEvent {
   return {
     type: 'message.updated',
     properties: {
@@ -370,7 +376,10 @@ function permissionAsked(id: string): ControlPlaneEvent {
   };
 }
 
-async function pushEvents(session: ActiveSession, events: readonly ControlPlaneEvent[]): Promise<void> {
+async function pushEvents(
+  session: ActiveSession,
+  events: readonly ControlPlaneEvent[]
+): Promise<void> {
   session.wrapper.sendSessionEvents(cloudAgentSessionId, [...events]);
 }
 
@@ -416,12 +425,12 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
         expect(fence.fence as number).toBeGreaterThan(0);
 
         // A live event above the fence is delivered exactly once, after it.
-        await pushEvents(session, [
-          partUpdated(assistantMessageId, 'prt_native_2', 'second part'),
-        ]);
-        const live = await readSseUntil(reader, frame =>
-          isFrame(frame, 'message.part.updated') &&
-          ((frame.properties as { part?: { id?: string } }).part?.id ?? '') === 'prt_native_2'
+        await pushEvents(session, [partUpdated(assistantMessageId, 'prt_native_2', 'second part')]);
+        const live = await readSseUntil(
+          reader,
+          frame =>
+            isFrame(frame, 'message.part.updated') &&
+            ((frame.properties as { part?: { id?: string } }).part?.id ?? '') === 'prt_native_2'
         );
         expect(live.observed.filter(item => item === live.match)).toHaveLength(1);
       } finally {
@@ -525,7 +534,9 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
           ],
         });
       });
-      await pushEvents(session, [partUpdated(assistantMessageId, 'prt_resnapshot_2', 'after move')]);
+      await pushEvents(session, [
+        partUpdated(assistantMessageId, 'prt_resnapshot_2', 'after move'),
+      ]);
 
       const noticed = await readSseUntil(attached.reader, frame =>
         isFrame(frame, 'kilo.native.resnapshot')

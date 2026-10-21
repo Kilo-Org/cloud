@@ -54,8 +54,7 @@ export type TestSessionIngestState = {
 
 type StorageLike = Pick<DurableObjectStorage, 'get' | 'put' | 'delete'>;
 
-const UNSUPPORTED_METHOD =
-  'SESSION_INGEST method is not modeled by the integration test double';
+const UNSUPPORTED_METHOD = 'SESSION_INGEST method is not modeled by the integration test double';
 
 function summary(root: TestSessionIngestRoot): CloudAgentRootSessionSummary {
   const created = root.created ?? 1_700_000_000_000;
@@ -89,7 +88,8 @@ export async function writeTestSessionIngestState(
   if (state.roots !== undefined) {
     await storage.put(TEST_SESSION_INGEST_ROOTS_KEY, [...state.roots]);
   }
-  if (state.messages !== undefined) await storage.put(TEST_SESSION_INGEST_MESSAGES_KEY, state.messages);
+  if (state.messages !== undefined)
+    await storage.put(TEST_SESSION_INGEST_MESSAGES_KEY, state.messages);
   if (state.snapshots !== undefined) {
     await storage.put(TEST_SESSION_INGEST_SNAPSHOTS_KEY, state.snapshots);
   }
@@ -110,7 +110,10 @@ function pageRoots(
   const limit = params.limit ?? 100;
   const sorted = [...roots]
     .map(summary)
-    .sort((left, right) => right.updated - left.updated || right.kiloSessionId.localeCompare(left.kiloSessionId))
+    .sort(
+      (left, right) =>
+        right.updated - left.updated || right.kiloSessionId.localeCompare(left.kiloSessionId)
+    )
     .filter(item => params.start === undefined || item.updated >= params.start);
   const cursor =
     params.cursor === undefined ? null : decodeCloudAgentRootSessionsCursor(params.cursor);
@@ -159,10 +162,16 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
       const root = roots.find(candidate => candidate.kiloSessionId === params.kiloSessionId);
       if (!root) return null;
       const snapshots =
-        (await storage.get<Record<string, KiloSdkSessionInfo>>(TEST_SESSION_INGEST_SNAPSHOTS_KEY)) ??
-        {};
+        (await storage.get<Record<string, KiloSdkSessionInfo>>(
+          TEST_SESSION_INGEST_SNAPSHOTS_KEY
+        )) ?? {};
       const info = snapshots[params.kiloSessionId];
-      if (!info) return { kiloSessionId: root.kiloSessionId, cloudAgentSessionId: root.cloudAgentSessionId, snapshot: { kind: 'pending' } };
+      if (!info)
+        return {
+          kiloSessionId: root.kiloSessionId,
+          cloudAgentSessionId: root.cloudAgentSessionId,
+          snapshot: { kind: 'pending' },
+        };
       return {
         kiloSessionId: root.kiloSessionId,
         cloudAgentSessionId: root.cloudAgentSessionId,
@@ -176,12 +185,17 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
       const root = roots.find(candidate => candidate.kiloSessionId === params.kiloSessionId);
       if (!root) return null;
       const messages =
-        (await storage.get<Record<string, KiloSdkStoredMessage[]>>(TEST_SESSION_INGEST_MESSAGES_KEY)) ??
-        {};
+        (await storage.get<Record<string, KiloSdkStoredMessage[]>>(
+          TEST_SESSION_INGEST_MESSAGES_KEY
+        )) ?? {};
       return {
         kiloSessionId: root.kiloSessionId,
         cloudAgentSessionId: root.cloudAgentSessionId,
-        history: { messages: messages[params.kiloSessionId] ?? [], nextCursor: null, omittedItemCount: 0 },
+        history: {
+          messages: messages[params.kiloSessionId] ?? [],
+          nextCursor: null,
+          omittedItemCount: 0,
+        },
       };
     },
     async beginCloudAgentWorktreeDeletion(): Promise<never> {

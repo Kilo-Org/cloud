@@ -32,11 +32,7 @@
     "resnapshot": {
       "requiredProperties": ["sessionID"],
       "optionalProperties": ["directory", "reason"],
-      "reasons": [
-        "continuity_unproven",
-        "snapshot_too_large",
-        "snapshot_unavailable"
-      ],
+      "reasons": ["continuity_unproven", "snapshot_too_large", "snapshot_unavailable"],
       "meaning": "The client must discard its transcript and rebuild from a fresh attach. Cloud closes the stream after this frame."
     }
   },
@@ -54,9 +50,21 @@
     { "method": "POST", "path": "/session/{sessionID}/prompt_async", "response": "204" },
     { "method": "POST", "path": "/session/{sessionID}/abort", "response": "true" },
     { "method": "POST", "path": "/session/{sessionID}/command", "response": "204" },
-    { "method": "POST", "path": "/session/{sessionID}/question/{requestID}/reply", "response": "true" },
-    { "method": "POST", "path": "/session/{sessionID}/question/{requestID}/reject", "response": "true" },
-    { "method": "POST", "path": "/session/{sessionID}/permission/{requestID}/reply", "response": "true" }
+    {
+      "method": "POST",
+      "path": "/session/{sessionID}/question/{requestID}/reply",
+      "response": "true"
+    },
+    {
+      "method": "POST",
+      "path": "/session/{sessionID}/question/{requestID}/reject",
+      "response": "true"
+    },
+    {
+      "method": "POST",
+      "path": "/session/{sessionID}/permission/{requestID}/reply",
+      "response": "true"
+    }
   ],
   "errors": [
     { "code": "KILO_SESSION_NOT_FOUND", "status": 404 },
@@ -81,14 +89,29 @@
   "fixtures": {
     "sessionListPage": {
       "request": "GET /kilo/session?limit=2",
-      "response": [{ "id": "ses_example", "title": "Example", "directory": "/cloud-agent/sessions/ses_example" }],
-      "headers": { "X-Next-Cursor": "cursor-value", "Link": "</kilo/session?limit=2&before=cursor-value>; rel=\"next\"" }
+      "response": [
+        {
+          "id": "ses_example",
+          "title": "Example",
+          "directory": "/cloud-agent/sessions/ses_example"
+        }
+      ],
+      "headers": {
+        "X-Next-Cursor": "cursor-value",
+        "Link": "</kilo/session?limit=2&before=cursor-value>; rel=\"next\""
+      }
     },
     "fence": {
       "request": "GET /kilo/event?directory=%2Fcloud-agent%2Fsessions%2Fses_example",
       "frames": [
         { "type": "server.connected", "properties": {} },
-        { "type": "message.updated", "properties": { "sessionID": "ses_example", "directory": "/cloud-agent/sessions/ses_example" } },
+        {
+          "type": "message.updated",
+          "properties": {
+            "sessionID": "ses_example",
+            "directory": "/cloud-agent/sessions/ses_example"
+          }
+        },
         {
           "type": "kilo.native.fence",
           "properties": {
@@ -114,7 +137,10 @@
     },
     "liveRuntimeUnavailable": {
       "status": 503,
-      "body": { "error": "KILO_LIVE_RUNTIME_UNAVAILABLE", "message": "The session runtime is not running" }
+      "body": {
+        "error": "KILO_LIVE_RUNTIME_UNAVAILABLE",
+        "message": "The session runtime is not running"
+      }
     }
   }
 }

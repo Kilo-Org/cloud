@@ -194,7 +194,13 @@ type ColdSession = {
 
 /** A session DO and sandbox allocation with no session compute requested yet. */
 async function openColdSession(): Promise<ColdSession> {
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, cloudAgentSessionId, undefined);
+  const sandboxId = await generateSandboxId(
+    undefined,
+    ORG_ID,
+    USER_ID,
+    cloudAgentSessionId,
+    undefined
+  );
   const provider = createFakeProvider();
   const meter = createRecordingMeter();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter, meter);
@@ -216,9 +222,7 @@ async function registerColdSession(): Promise<ColdSession> {
   return cold;
 }
 
-async function readBillingContext(
-  stub: DurableObjectStub<SandboxControlV2>
-): Promise<unknown> {
+async function readBillingContext(stub: DurableObjectStub<SandboxControlV2>): Promise<unknown> {
   return runInDurableObject(stub, (_instance, state) => getBillingContext(state.storage));
 }
 
@@ -250,9 +254,7 @@ function facadeRequest(path: string): Promise<Response> {
 }
 
 function facadeRequestWithQuery(path: string, query: string): Promise<Response> {
-  return SELF.fetch(
-    `http://worker.test/kilo-test${path}?userId=${userId}&${query}`
-  );
+  return SELF.fetch(`http://worker.test/kilo-test${path}?userId=${userId}&${query}`);
 }
 
 afterEach(async () => {

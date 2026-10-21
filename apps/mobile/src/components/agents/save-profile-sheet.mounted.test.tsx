@@ -28,9 +28,29 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
 vi.mock('@/components/ui/icons', () => ({ Lock: 'Lock' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: unknown) => {
+      confirmMock.current(request);
+    },
+    dialog: null,
+  }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
+
+const confirmMock = vi.hoisted(() => ({
+  current: (_request: unknown): void => undefined,
+}));
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
 
 function defaults(overrides: Partial<SaveProfileSheetProps> = {}): SaveProfileSheetProps {
   return {
@@ -170,5 +190,45 @@ describe('SaveProfileSheet', () => {
     // The sheet is still mounted with the same field instance, so the typed
     // name is still on screen.
     expect(field(renderer, 'Profile name')).toBeTruthy();
+  });
+
+  it('closes an untouched sheet without asking', () => {
+    const onClose = vi.fn<() => void>();
+    const confirm = vi.fn();
+    confirmMock.current = request => {
+      confirm(request);
+    };
+    const renderer = mount({ onClose });
+
+    const onCancel = voidHandler(header(renderer).props.onCancel);
+    act(() => {
+      onCancel();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('asks before Cancel drops a half-typed profile', () => {
+    const onClose = vi.fn<() => void>();
+    const confirm = vi.fn();
+    confirmMock.current = request => {
+      confirm(request);
+    };
+    const renderer = mount({ onClose });
+
+    act(() => {
+      (field(renderer, 'Profile name').props.onChangeText as (value: string) => void)('My AWS');
+      (header(renderer).props.onCancel as () => void)();
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm.mock.calls[0]?.[0]).toMatchObject({
+      title: 'Discard changes?',
+      message: 'Your changes will be lost.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+    });
   });
 });

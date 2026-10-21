@@ -210,6 +210,13 @@ const config: ExpoConfig = {
       // disables both capabilities and the App Store profile loses them.
       'com.apple.developer.kernel.extended-virtual-addressing': true,
       'com.apple.developer.kernel.increased-memory-limit': true,
+      // Dev-only: the process that registers the artifacts File Provider domain
+      // and sets its automatically-enabled testing mode is the app itself, and
+      // iOS checks the calling process's entitlements. Apple does not grant
+      // this capability on distribution profiles, so production builds must
+      // not carry it (with the paired extension entitlement in
+      // plugins/withArtifactFileProvider.js).
+      ...(isProductionBuild ? {} : { 'com.apple.developer.fileprovider.testing-mode': true }),
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -233,6 +240,13 @@ const config: ExpoConfig = {
       // composer) can be opened in place.
       UIFileSharingEnabled: true,
       LSSupportsOpeningDocumentsInPlace: true,
+      // Dev-only signal paired with the testing-mode entitlement above: the
+      // artifacts provider module reads it from the app bundle's Info.plist
+      // to decide whether to register the domain with the automatically-
+      // enabled testing mode. `#if DEBUG` is the wrong gate — EAS builds
+      // non-production profiles with the Release configuration — so the
+      // profile is the signal on both sides.
+      ...(isProductionBuild ? {} : { KiloArtifactsFileProviderTesting: true }),
     },
   },
   android: {

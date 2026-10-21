@@ -1,9 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
+import { timingSafeEqual } from '@kilocode/encryption';
 
-import { GLANCEABLE_SNAPSHOT_SIGNING_SECRET } from '@kilocode/web-shared/lib/config.server';
+import {
+  GLANCEABLE_SNAPSHOT_SIGNING_SECRET,
+  INTERNAL_API_SECRET,
+  INTERNAL_SESSION_AUTH_LEGACY_ENABLED,
+} from '@kilocode/web-shared/lib/config.server';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  isLegacyInternalSessionAuthEnabled,
+  type InternalSessionAuthMethod,
+} from '@kilocode/worker-utils/internal-session-auth';
 import { verifyGlanceableSnapshotCredential } from '@kilocode/worker-utils/glanceable-snapshot-credential';
 import { buildGlanceableDeliveryForUser } from '@/lib/glanceable-agents-snapshot-server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
@@ -29,7 +38,8 @@ function logSnapshotAudit(
     | 'access_check_failed',
   status: number,
   startedAt: number,
-  organizationScoped: boolean
+  organizationScoped: boolean,
+  authMethod?: InternalSessionAuthMethod
 ): void {
   console.log(
     JSON.stringify({
@@ -38,6 +48,7 @@ function logSnapshotAudit(
       status,
       durationMs: Date.now() - startedAt,
       organizationScoped,
+      authMethod,
     })
   );
 }
@@ -45,35 +56,48 @@ function logSnapshotAudit(
 /**
  * Internal server-to-server snapshot builder for background glanceable
  * delivery. The notifications worker is the only caller; mobile never calls
- * this route. The bearer is a short-lived credential whose subject is the
- * authorized user, and — when `organizationId` is a string — the route
- * re-checks that subject is a member of that organization with the same
- * helper the active-sessions router uses.
+ * this route. Scoped bearers bind the authorized user. During mixed-version
+ * deployment, legacy callers can use the existing internal secret. Both paths
+ * re-check organization membership with the active-sessions router's helper.
  */
 export async function POST(req: NextRequest) {
   const startedAt = Date.now();
 
-  if (!GLANCEABLE_SNAPSHOT_SIGNING_SECRET) {
-    logSnapshotAudit('unavailable', 503, startedAt, false);
-    return NextResponse.json(
-      { error: 'Service temporarily unavailable' },
-      { status: 503, headers: NO_STORE }
-    );
-  }
-
-  const token = extractBearerToken(req.headers.get('authorization'));
-  if (!token) {
-    logSnapshotAudit('unauthorized', 401, startedAt, false);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE });
-  }
-
-  const credential = await verifyGlanceableSnapshotCredential({
-    token,
-    secret: GLANCEABLE_SNAPSHOT_SIGNING_SECRET,
-  });
-  if (!credential.ok) {
-    logSnapshotAudit('unauthorized', 401, startedAt, false);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE });
+  const authMethod = req.headers.has('authorization') ? 'bearer' : 'legacy';
+  let authorizedUserId: string | undefined;
+  if (authMethod === 'bearer') {
+    const token = extractBearerToken(req.headers.get('authorization'));
+    if (!token) {
+      logSnapshotAudit('unauthorized', 401, startedAt, false);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE });
+    }
+    if (!GLANCEABLE_SNAPSHOT_SIGNING_SECRET) {
+      logSnapshotAudit('unavailable', 503, startedAt, false);
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable' },
+        { status: 503, headers: NO_STORE }
+      );
+    }
+    const credential = await verifyGlanceableSnapshotCredential({
+      token,
+      secret: GLANCEABLE_SNAPSHOT_SIGNING_SECRET,
+    });
+    if (!credential.ok) {
+      logSnapshotAudit('unauthorized', 401, startedAt, false);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE });
+    }
+    authorizedUserId = credential.userId;
+  } else {
+    const provided = req.headers.get('X-Internal-Secret');
+    if (
+      !isLegacyInternalSessionAuthEnabled(INTERNAL_SESSION_AUTH_LEGACY_ENABLED) ||
+      !provided ||
+      !INTERNAL_API_SECRET ||
+      !timingSafeEqual(provided, INTERNAL_API_SECRET)
+    ) {
+      logSnapshotAudit('unauthorized', 401, startedAt, false);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE });
+    }
   }
 
   const rawBody: unknown = await req.json().catch(() => null);
@@ -84,7 +108,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { userId, organizationId } = parsedBody.data;
-  if (userId !== credential.userId) {
+  if (authorizedUserId !== undefined && userId !== authorizedUserId) {
     logSnapshotAudit('forbidden', 403, startedAt, organizationId !== null);
     return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
   }
@@ -122,7 +146,7 @@ export async function POST(req: NextRequest) {
   // privacy-minimal. `liveActivitySnapshot` holds the aggregate card counts
   // without the followed sessions, and `sessionCards` holds the facts of each
   // followed session card. The worker never copies either into a data-only wake.
-  logSnapshotAudit('ok', 200, startedAt, organizationId !== null);
+  logSnapshotAudit('ok', 200, startedAt, organizationId !== null, authMethod);
   return NextResponse.json(
     {
       ...response.snapshot,

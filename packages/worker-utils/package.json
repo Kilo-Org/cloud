@@ -10,6 +10,7 @@
     "./gitlab-credential": "./src/gitlab-credential.ts",
     "./slack-credential": "./src/slack-credential.ts",
     "./internal-service-token-audiences": "./src/internal-service-token-audiences.ts",
+    "./internal-session-auth": "./src/internal-session-auth.ts",
     "./instance-id": "./src/instance-id.ts",
     "./base64url": "./src/base64url.ts",
     "./kilo-token-auth": "./src/kilo-token-auth.ts",

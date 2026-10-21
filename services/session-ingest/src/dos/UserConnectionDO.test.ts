@@ -7,6 +7,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../../../notifications/src/index';
 import { GLANCEABLE_DELIVERY_MIN_INTERVAL_MS } from '../../../notifications/src/lib/glanceable-refresh';
+import { verifyGlanceableSnapshotCredential } from '@kilocode/worker-utils/glanceable-snapshot-credential';
 import {
   sendPushNotifications,
   type ExpoPushMessage,
@@ -270,6 +271,7 @@ function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
   });
   const storage = makeStorageFake();
   const notificationEnv = {
+    INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
     HYPERDRIVE: { connectionString: 'postgres://unused' },
     KILO_WEB_API_BASE_URL: 'https://snapshot.test',
     GLANCEABLE_SNAPSHOT_SIGNING_SECRET: {
@@ -296,6 +298,16 @@ function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
   vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
     if (typeof init.body !== 'string') throw new Error('Expected a JSON request body');
     const scope = JSON.parse(init.body) as { userId: string; organizationId: string | null };
+    const headers = new Headers(init.headers);
+    expect(headers.get('X-Internal-Secret')).toBe('internal-secret');
+    const token = headers.get('authorization')?.slice('Bearer '.length);
+    if (!token) throw new Error('Expected a scoped snapshot credential');
+    expect(
+      await verifyGlanceableSnapshotCredential({
+        token,
+        secret: 'test-glanceable-snapshot-signing-secret',
+      })
+    ).toEqual({ ok: true, userId: scope.userId });
     return Response.json(
       buildGlanceableSnapshot({
         ...scope,

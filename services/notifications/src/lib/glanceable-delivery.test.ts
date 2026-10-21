@@ -342,6 +342,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     const objectPrefix = crypto.randomUUID();
     const serviceEnv = {
+      INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'false',
       HYPERDRIVE: { connectionString: 'postgres://unused' },
       KILO_WEB_API_BASE_URL: 'https://snapshot.test',
       GLANCEABLE_SNAPSHOT_SIGNING_SECRET: {
@@ -2008,6 +2009,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       );
       const ctx = createExecutionContext();
       const service = new NotificationsService(ctx, {
+        INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'false',
         HYPERDRIVE: { connectionString: 'postgres://unused' },
         KILO_WEB_API_BASE_URL: 'https://snapshot.test',
         GLANCEABLE_SNAPSHOT_SIGNING_SECRET: {

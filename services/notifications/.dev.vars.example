@@ -1,6 +1,9 @@
 # Local worker auth must match Kilo JWTs minted by the Next.js dev server.
 WORKER_ENV=development
 
+# @from INTERNAL_SESSION_AUTH_LEGACY_ENABLED
+INTERNAL_SESSION_AUTH_LEGACY_ENABLED=true
+
 # Opt-in local dev / E2E push sink mode. When set to "log", the
 # NotificationChannelDO records outgoing agent-push payloads (token
 # redacted) instead of calling Expo, so simulator E2E can drive the full
@@ -14,7 +17,7 @@ PUSH_SINK_MODE=
 # route (see ENVIRONMENT.md). Production pins `https://app.kilo.ai` in
 # wrangler.jsonc, which is single-config; the local dev override points the
 # worker at the local Next.js server. The snapshot route verifies the
-# dedicated GLANCEABLE_SNAPSHOT_SIGNING_SECRET credential, not the general
-# INTERNAL_API_SECRET.
+# dedicated GLANCEABLE_SNAPSHOT_SIGNING_SECRET credential. During compatibility,
+# the caller also sends the existing internal-secret header for older receivers.
 # @url nextjs
 KILO_WEB_API_BASE_URL=https://app.kilo.ai

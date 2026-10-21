@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
-import { byok_api_keys, kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  byok_api_keys,
+  kilocode_users,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';

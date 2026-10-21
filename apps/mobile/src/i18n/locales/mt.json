@@ -1721,7 +1721,14 @@
       "whereFound": "Fejn instab dan ({{displayCount}})",
       "fullReport": "Rapport iġġenerat sħiħ",
       "yes": "Iva",
-      "no": "Le"
+      "no": "Le",
+      "action": {
+        "analyzeCodebase": "Analizza l-bażi tal-kodiċi",
+        "dismiss": "Iċċaħħad",
+        "manualReview": "Reviżjoni manwali",
+        "monitor": "Monitorja",
+        "openPr": "Iftaħ PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} sejbiet",
@@ -1949,7 +1956,24 @@
       "title": "Rapport tal-awditjar",
       "unavailable": "Ir-rapport tal-awditjar mhux disponibbli",
       "unavailableDescription": "Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jaraw ir-rapporti tal-awditjar. Itlob lil sid jew maniġer tal-kontijiet jagħtik aċċess.",
-      "queryFailed": "Il-mistoqsija għad-dejta tar-rapport ma tlestietx. Erġa' pprova."
+      "queryFailed": "Il-mistoqsija għad-dejta tar-rapport ma tlestietx. Erġa' pprova.",
+      "eventActions": {
+        "findingAnalysisCompleted": "L-analiżi tlestiet",
+        "findingAnalysisFailed": "L-analiżi falliet",
+        "findingAutoDismissed": "Imċaħħad awtomatikament",
+        "findingCreated": "Importat",
+        "findingDeleted": "Imħassar",
+        "findingDismissed": "Imċaħħad",
+        "findingSeverityChanged": "Gravità mibdula",
+        "findingStatusChange": "Status mibdul",
+        "findingSuperseded": "Sostitwit",
+        "remediationBlocked": "Ir-rimedju imblokkat",
+        "remediationCancelled": "Annullat",
+        "remediationFailed": "Ir-rimedju falla",
+        "remediationNoChangesNeeded": "Ebda tibdil meħtieġ",
+        "remediationPrOpened": "PR infetaħ",
+        "remediationQueued": "Ir-rimedju mitlub"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ma setax jitgħabba l-issettjar tan-notifiki.",

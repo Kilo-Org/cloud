@@ -1661,7 +1661,14 @@
       "whereFound": "Ku u gjet ({{displayCount}})",
       "fullReport": "Raporti i plotë i gjeneruar",
       "yes": "Po",
-      "no": "Jo"
+      "no": "Jo",
+      "action": {
+        "analyzeCodebase": "Analizo bazën e kodit",
+        "dismiss": "Refuzoje",
+        "manualReview": "Rishikim manual",
+        "monitor": "Mbikëqyr",
+        "openPr": "Hap PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} gjetje",
@@ -1880,7 +1887,24 @@
       "title": "Raporti i auditimit",
       "unavailable": "Raporti i auditimit nuk është i disponueshëm",
       "unavailableDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund të shohin raportet e auditimit. Kërkoji një pronari ose menaxheri të faturimit të të japë qasje.",
-      "queryFailed": "Kërkimi për raportin nuk përfundoi. Provo përsëri."
+      "queryFailed": "Kërkimi për raportin nuk përfundoi. Provo përsëri.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza përfundoi",
+        "findingAnalysisFailed": "Analiza dështoi",
+        "findingAutoDismissed": "U refuzua automatikisht",
+        "findingCreated": "Importuar",
+        "findingDeleted": "U fshi",
+        "findingDismissed": "U refuzua",
+        "findingSeverityChanged": "Rëndësia u ndryshua",
+        "findingStatusChange": "Statusi u ndryshua",
+        "findingSuperseded": "U zëvendësua",
+        "remediationBlocked": "Korrigjimi u bllokua",
+        "remediationCancelled": "U anulua",
+        "remediationFailed": "Korrigjimi dështoi",
+        "remediationNoChangesNeeded": "Nuk nevojiten ndryshime",
+        "remediationPrOpened": "U hap PR",
+        "remediationQueued": "U kërkua korrigjimi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nuk u ngarkuan cilësimet e njoftimeve.",

@@ -1661,7 +1661,14 @@
       "whereFound": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
       "fullReport": "Buong nabuong ulat",
       "yes": "Oo",
-      "no": "Hindi"
+      "no": "Hindi",
+      "action": {
+        "analyzeCodebase": "Suriin ang codebase",
+        "dismiss": "I-dismiss",
+        "manualReview": "Manwal na pagrereview",
+        "monitor": "Subaybayan",
+        "openPr": "Magbukas ng PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} natukoy na isyu",
@@ -1880,7 +1887,24 @@
       "title": "Ulat ng audit",
       "unavailable": "Hindi makuha ang ulat ng audit",
       "unavailableDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring tumingin sa mga ulat ng audit. Humingi ng access sa isa sa kanila.",
-      "queryFailed": "Hindi natapos ang pagkuha ng ulat. Subukang muli."
+      "queryFailed": "Hindi natapos ang pagkuha ng ulat. Subukang muli.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Natapos ang pagsusuri",
+        "findingAnalysisFailed": "Nabigo ang pagsusuri",
+        "findingAutoDismissed": "Awtomatikong na-dismiss",
+        "findingCreated": "Na-import",
+        "findingDeleted": "Nabura",
+        "findingDismissed": "Na-dismiss",
+        "findingSeverityChanged": "Nagbago ang kalubhaan",
+        "findingStatusChange": "Nagbago ang status",
+        "findingSuperseded": "Napalitan",
+        "remediationBlocked": "Nahadlangan ang pag-aayos",
+        "remediationCancelled": "Nakansela",
+        "remediationFailed": "Nabigo ang pag-aayos",
+        "remediationNoChangesNeeded": "Walang kinakailangang pagbabago",
+        "remediationPrOpened": "Nagbukas ng PR",
+        "remediationQueued": "Hiniling ang pag-aayos"
+      }
     },
     "notifications": {
       "couldNotLoad": "Hindi ma-load ang mga setting ng abiso.",

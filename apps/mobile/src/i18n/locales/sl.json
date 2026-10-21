@@ -1701,7 +1701,14 @@
       "whereFound": "Mesta zaznave ({{displayCount}})",
       "fullReport": "Celotno ustvarjeno poročilo",
       "yes": "Da",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analizirajte kodno bazo",
+        "dismiss": "Zavrni",
+        "manualReview": "Ročni pregled",
+        "monitor": "Spremljaj",
+        "openPr": "Odpri PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Število ugotovitev: {{displayCount}}",
@@ -1926,7 +1933,24 @@
       "title": "Poročilo o reviziji",
       "unavailable": "Poročilo o reviziji ni na voljo",
       "unavailableDescription": "Poročila o reviziji lahko pregledujejo samo lastniki organizacije in upravitelji obračunavanja. Prosi lastnika ali upravitelja obračunavanja, naj ti odobri dostop.",
-      "queryFailed": "Poizvedba za poročilo se ni končala. Poskusi znova."
+      "queryFailed": "Poizvedba za poročilo se ni končala. Poskusi znova.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza zaključena",
+        "findingAnalysisFailed": "Analiza ni uspela",
+        "findingAutoDismissed": "Samodejno zavrnjeno",
+        "findingCreated": "Uvoženo",
+        "findingDeleted": "Izbrisano",
+        "findingDismissed": "Zavrnjeno",
+        "findingSeverityChanged": "Spremenjena resnost",
+        "findingStatusChange": "Spremenjeno stanje",
+        "findingSuperseded": "Zamenjano",
+        "remediationBlocked": "Odpravljanje blokirano",
+        "remediationCancelled": "Preklicano",
+        "remediationFailed": "Odpravljanje ni uspelo",
+        "remediationNoChangesNeeded": "Spremembe niso potrebne",
+        "remediationPrOpened": "PR odprt",
+        "remediationQueued": "Odpravljanje zahtevano"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nastavitev obvestil ni bilo mogoče naložiti.",

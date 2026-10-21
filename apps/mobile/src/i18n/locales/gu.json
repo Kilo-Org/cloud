@@ -1661,7 +1661,14 @@
       "whereFound": "તારણ મળ્યું હોય તેવાં સ્થાન ({{displayCount}})",
       "fullReport": "તૈયાર કરેલો સંપૂર્ણ અહેવાલ",
       "yes": "હા",
-      "no": "ના"
+      "no": "ના",
+      "action": {
+        "analyzeCodebase": "કોડબેઝનું વિશ્લેષણ કરો",
+        "dismiss": "નકારી કાઢો",
+        "manualReview": "મેન્યુઅલ સમીક્ષા",
+        "monitor": "નિરીક્ષણ કરો",
+        "openPr": "પુલ રિક્વેસ્ટ ખોલો"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} તારણો",
@@ -1880,7 +1887,24 @@
       "title": "ઑડિટ અહેવાલ",
       "unavailable": "ઑડિટ અહેવાલ ઉપલબ્ધ નથી",
       "unavailableDescription": "માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ ઑડિટ અહેવાલ જોઈ શકે છે. તે જોવાની પરવાનગી માટે માલિક અથવા બિલિંગ મેનેજરને વિનંતી કરો.",
-      "queryFailed": "અહેવાલ માટેની ક્વેરી પૂરી થઈ નહીં. ફરી પ્રયાસ કરો."
+      "queryFailed": "અહેવાલ માટેની ક્વેરી પૂરી થઈ નહીં. ફરી પ્રયાસ કરો.",
+      "eventActions": {
+        "findingAnalysisCompleted": "વિશ્લેષણ પૂર્ણ થયું",
+        "findingAnalysisFailed": "વિશ્લેષણ નિષ્ફળ ગયું",
+        "findingAutoDismissed": "આપોઆપ નકારી કાઢેલ",
+        "findingCreated": "આયાત થયેલ",
+        "findingDeleted": "કાઢી નાખેલ",
+        "findingDismissed": "નકારી કાઢેલ",
+        "findingSeverityChanged": "ગંભીરતા બદલાઈ",
+        "findingStatusChange": "સ્થિતિ બદલાઈ",
+        "findingSuperseded": "બદલી દેવાયેલ",
+        "remediationBlocked": "સુધારણા અવરોધિત થઈ",
+        "remediationCancelled": "રદ કરેલી",
+        "remediationFailed": "સુધારણા નિષ્ફળ ગઈ",
+        "remediationNoChangesNeeded": "કોઈ ફેરફારોની જરૂર નથી",
+        "remediationPrOpened": "પુલ રિક્વેસ્ટ ખોલાઈ",
+        "remediationQueued": "સુધારણા માટે વિનંતી કરી"
+      }
     },
     "notifications": {
       "couldNotLoad": "સૂચનાઓની સેટિંગ્સ લોડ કરી શકાઈ નહીં.",

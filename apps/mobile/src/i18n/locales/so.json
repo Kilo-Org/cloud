@@ -1661,7 +1661,14 @@
       "whereFound": "Meelaha laga helay ({{displayCount}})",
       "fullReport": "Warbixin dhammaystiran oo la soo saaray",
       "yes": "Haa",
-      "no": "Maya"
+      "no": "Maya",
+      "action": {
+        "analyzeCodebase": "Falanqee koodka",
+        "dismiss": "Iska indho-tir",
+        "manualReview": "Fiirinta gacmeed",
+        "monitor": "Dhowr",
+        "openPr": "Fur PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} natiijooyin",
@@ -1880,7 +1887,24 @@
       "title": "Warbixinta hanti-dhawrka",
       "unavailable": "Warbixinta hanti-dhawrka lama heli karo",
       "unavailableDescription": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa arki kara warbixinnada hanti-dhawrka. Ka codso milkiile ama maamule biilasha inuu kuu oggolaado inaad aragto.",
-      "queryFailed": "Weydiinta warbixintu ma dhammaan. Mar kale isku day."
+      "queryFailed": "Weydiinta warbixintu ma dhammaan. Mar kale isku day.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Falanqaynta waa la dhammeeyay",
+        "findingAnalysisFailed": "Falanqayntu way fashilantay",
+        "findingAutoDismissed": "Si toos ah loo iska indho-tiray",
+        "findingCreated": "Waa la soo dejiyay",
+        "findingDeleted": "Waa la tirtiray",
+        "findingDismissed": "Waa la iska indho-tiray",
+        "findingSeverityChanged": "Darnimada waa la beddelay",
+        "findingStatusChange": "Xaaladda waa la beddelay",
+        "findingSuperseded": "Waxaa lagu beddelay",
+        "remediationBlocked": "Hagaajinta waa la xannibay",
+        "remediationCancelled": "Waa la joojiyay",
+        "remediationFailed": "Hagaajintu way fashilantay",
+        "remediationNoChangesNeeded": "Isbeddelo lama baahna",
+        "remediationPrOpened": "PR waa la furay",
+        "remediationQueued": "Hagaajinta waa la codsaday"
+      }
     },
     "notifications": {
       "couldNotLoad": "Dejinta ogeysiisyada lama soo dejin karin.",

@@ -1085,7 +1085,14 @@
       "triageReasoning": "Justificativa da triagem",
       "watchInCloudAgent": "Acompanhar no agente na nuvem",
       "whereFound": "Locais da ocorrência ({{displayCount}})",
-      "yes": "Sim"
+      "yes": "Sim",
+      "action": {
+        "analyzeCodebase": "Analisar base de código",
+        "dismiss": "Descartar",
+        "manualReview": "Revisão manual",
+        "monitor": "Monitorar",
+        "openPr": "Abrir pull request"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modelo de análise",
@@ -1107,7 +1114,24 @@
       "summary": "Resumo do relatório",
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
-      "unavailableDescription": "Somente proprietários da organização e gerentes de cobrança podem ver relatórios de auditoria. Peça acesso a um deles."
+      "unavailableDescription": "Somente proprietários da organização e gerentes de cobrança podem ver relatórios de auditoria. Peça acesso a um deles.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análise concluída",
+        "findingAnalysisFailed": "Falha na análise",
+        "findingAutoDismissed": "Descartado automaticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Excluído",
+        "findingDismissed": "Descartado",
+        "findingSeverityChanged": "Severidade alterada",
+        "findingStatusChange": "Status alterado",
+        "findingSuperseded": "Substituído",
+        "remediationBlocked": "Correção bloqueada",
+        "remediationCancelled": "Cancelada",
+        "remediationFailed": "Falha na correção",
+        "remediationNoChangesNeeded": "Nenhuma alteração necessária",
+        "remediationPrOpened": "Pull request aberto",
+        "remediationQueued": "Correção solicitada"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Ver relatório de auditoria"

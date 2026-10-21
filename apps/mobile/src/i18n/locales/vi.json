@@ -1113,7 +1113,14 @@
       "triageReasoning": "Cơ sở phân loại",
       "watchInCloudAgent": "Theo dõi trong Trợ lý đám mây",
       "whereFound": "Vị trí phát hiện ({{displayCount}})",
-      "yes": "Có"
+      "yes": "Có",
+      "action": {
+        "analyzeCodebase": "Phân tích cơ sở mã",
+        "dismiss": "Loại bỏ",
+        "manualReview": "Xem xét thủ công",
+        "monitor": "Theo dõi",
+        "openPr": "Mở pull request"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Mô hình phân tích",
@@ -1135,7 +1142,24 @@
       "summary": "Tóm tắt báo cáo",
       "title": "Báo cáo kiểm toán",
       "unavailable": "Không có báo cáo kiểm toán",
-      "unavailableDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể xem báo cáo kiểm toán. Hãy nhờ chủ sở hữu hoặc người quản lý thanh toán cấp quyền truy cập cho bạn."
+      "unavailableDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể xem báo cáo kiểm toán. Hãy nhờ chủ sở hữu hoặc người quản lý thanh toán cấp quyền truy cập cho bạn.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Đã hoàn tất phân tích",
+        "findingAnalysisFailed": "Phân tích thất bại",
+        "findingAutoDismissed": "Đã tự động loại bỏ",
+        "findingCreated": "Đã nhập",
+        "findingDeleted": "Đã xóa",
+        "findingDismissed": "Đã loại bỏ",
+        "findingSeverityChanged": "Mức độ nghiêm trọng đã thay đổi",
+        "findingStatusChange": "Trạng thái đã thay đổi",
+        "findingSuperseded": "Đã bị thay thế",
+        "remediationBlocked": "Khắc phục bị chặn",
+        "remediationCancelled": "Đã hủy",
+        "remediationFailed": "Khắc phục thất bại",
+        "remediationNoChangesNeeded": "Không cần thay đổi",
+        "remediationPrOpened": "Đã mở pull request",
+        "remediationQueued": "Đã yêu cầu khắc phục"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Xem báo cáo kiểm toán"

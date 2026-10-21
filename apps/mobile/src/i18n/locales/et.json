@@ -1661,7 +1661,14 @@
       "whereFound": "Leiu asukohad ({{displayCount}})",
       "fullReport": "Loodud aruande täistekst",
       "yes": "Jah",
-      "no": "Ei"
+      "no": "Ei",
+      "action": {
+        "analyzeCodebase": "Analüüsi koodibaasi",
+        "dismiss": "Hülga",
+        "manualReview": "Käsitsi läbivaatus",
+        "monitor": "Jälgi",
+        "openPr": "Ava PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} leidu",
@@ -1880,7 +1887,24 @@
       "title": "Auditiaruanne",
       "unavailable": "Auditiaruanne pole saadaval",
       "unavailableDescription": "Auditiaruandeid saavad vaadata ainult organisatsiooni omanikud ja arveldushaldurid. Palu omanikul või arveldushalduril anda sulle juurdepääs.",
-      "queryFailed": "Aruande päring ei lõppenud. Proovi uuesti."
+      "queryFailed": "Aruande päring ei lõppenud. Proovi uuesti.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analüüs lõpetati",
+        "findingAnalysisFailed": "Analüüs nurjus",
+        "findingAutoDismissed": "Automaatselt hüljatud",
+        "findingCreated": "Imporditud",
+        "findingDeleted": "Kustutatud",
+        "findingDismissed": "Hüljatud",
+        "findingSeverityChanged": "Tõsidus muutus",
+        "findingStatusChange": "Olek muutus",
+        "findingSuperseded": "Asendatud",
+        "remediationBlocked": "Parandamine blokeeriti",
+        "remediationCancelled": "Tühistatud",
+        "remediationFailed": "Parandamine nurjus",
+        "remediationNoChangesNeeded": "Muudatusi pole vaja",
+        "remediationPrOpened": "PR avati",
+        "remediationQueued": "Parandamist on taotletud"
+      }
     },
     "notifications": {
       "couldNotLoad": "Teavitusseadeid ei õnnestunud laadida.",

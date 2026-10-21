@@ -1113,7 +1113,14 @@
       "triageReasoning": "Begründung der Ersteinschätzung",
       "watchInCloudAgent": "Im Cloud Agent ansehen",
       "whereFound": "Fundstellen ({{displayCount}})",
-      "yes": "Ja"
+      "yes": "Ja",
+      "action": {
+        "analyzeCodebase": "Codebasis analysieren",
+        "dismiss": "Verwerfen",
+        "manualReview": "Manuelle Prüfung",
+        "monitor": "Überwachen",
+        "openPr": "PR öffnen"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analysemodell",
@@ -1135,7 +1142,24 @@
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",
-      "unavailableDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber oder Abrechnungsmanager, dir Zugriff zu gewähren."
+      "unavailableDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber oder Abrechnungsmanager, dir Zugriff zu gewähren.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse abgeschlossen",
+        "findingAnalysisFailed": "Analyse fehlgeschlagen",
+        "findingAutoDismissed": "Automatisch verworfen",
+        "findingCreated": "Importiert",
+        "findingDeleted": "Gelöscht",
+        "findingDismissed": "Verworfen",
+        "findingSeverityChanged": "Schweregrad geändert",
+        "findingStatusChange": "Status geändert",
+        "findingSuperseded": "Ersetzt",
+        "remediationBlocked": "Behebung blockiert",
+        "remediationCancelled": "Abgebrochen",
+        "remediationFailed": "Behebung fehlgeschlagen",
+        "remediationNoChangesNeeded": "Keine Änderungen erforderlich",
+        "remediationPrOpened": "PR geöffnet",
+        "remediationQueued": "Behebung angefordert"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Auditbericht ansehen"

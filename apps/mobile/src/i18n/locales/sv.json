@@ -1661,7 +1661,14 @@
       "whereFound": "Här hittades fyndet ({{displayCount}})",
       "fullReport": "Fullständig genererad rapport",
       "yes": "Ja",
-      "no": "Nej"
+      "no": "Nej",
+      "action": {
+        "analyzeCodebase": "Analysera kodbasen",
+        "dismiss": "Avvisa",
+        "manualReview": "Manuell granskning",
+        "monitor": "Övervaka",
+        "openPr": "Öppna PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} fynd",
@@ -1880,7 +1887,24 @@
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapporten är inte tillgänglig",
       "unavailableDescription": "Endast organisationsägare och faktureringsansvariga kan se revisionsrapporter. Be en organisationsägare eller faktureringsansvarig att ge dig åtkomst.",
-      "queryFailed": "Hämtningen av rapporten slutfördes inte. Försök igen."
+      "queryFailed": "Hämtningen av rapporten slutfördes inte. Försök igen.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analys slutförd",
+        "findingAnalysisFailed": "Analysen misslyckades",
+        "findingAutoDismissed": "Automatiskt avvisad",
+        "findingCreated": "Importerad",
+        "findingDeleted": "Raderad",
+        "findingDismissed": "Avvisad",
+        "findingSeverityChanged": "Allvarlighetsgrad ändrad",
+        "findingStatusChange": "Status ändrad",
+        "findingSuperseded": "Ersatt",
+        "remediationBlocked": "Åtgärd blockerad",
+        "remediationCancelled": "Avbruten",
+        "remediationFailed": "Åtgärd misslyckades",
+        "remediationNoChangesNeeded": "Inga ändringar behövs",
+        "remediationPrOpened": "PR öppnad",
+        "remediationQueued": "Åtgärd begärd"
+      }
     },
     "notifications": {
       "couldNotLoad": "Kunde inte läsa in aviseringsinställningarna",

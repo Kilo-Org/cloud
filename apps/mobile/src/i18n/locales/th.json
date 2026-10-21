@@ -1661,7 +1661,14 @@
       "whereFound": "ตำแหน่งที่พบ ({{displayCount}})",
       "fullReport": "รายงานฉบับเต็มที่สร้างขึ้น",
       "yes": "ใช่",
-      "no": "ไม่"
+      "no": "ไม่",
+      "action": {
+        "analyzeCodebase": "วิเคราะห์โค้ดเบส",
+        "dismiss": "ปัดทิ้ง",
+        "manualReview": "การตรวจสอบที่เริ่มด้วยตนเอง",
+        "monitor": "ติดตาม",
+        "openPr": "เปิด PR"
+      }
     },
     "dashboard": {
       "findingsCount": "ข้อค้นพบ {{displayCount}} รายการ",
@@ -1880,7 +1887,24 @@
       "title": "รายงานการตรวจสอบ",
       "unavailable": "รายงานการตรวจสอบไม่พร้อมใช้งาน",
       "unavailableDescription": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถดูรายงานการตรวจสอบได้ ติดต่อเจ้าขององค์กรหรือผู้จัดการการเรียกเก็บเงินเพื่อขอสิทธิ์เข้าถึง",
-      "queryFailed": "ดึงข้อมูลรายงานไม่สำเร็จ ลองอีกครั้ง"
+      "queryFailed": "ดึงข้อมูลรายงานไม่สำเร็จ ลองอีกครั้ง",
+      "eventActions": {
+        "findingAnalysisCompleted": "การวิเคราะห์เสร็จสมบูรณ์",
+        "findingAnalysisFailed": "การวิเคราะห์ล้มเหลว",
+        "findingAutoDismissed": "ปัดทิ้งอัตโนมัติแล้ว",
+        "findingCreated": "นำเข้าแล้ว",
+        "findingDeleted": "ลบแล้ว",
+        "findingDismissed": "ละเว้นแล้ว",
+        "findingSeverityChanged": "เปลี่ยนความรุนแรงแล้ว",
+        "findingStatusChange": "เปลี่ยนสถานะแล้ว",
+        "findingSuperseded": "ถูกแทนที่แล้ว",
+        "remediationBlocked": "การแก้ไขถูกบล็อก",
+        "remediationCancelled": "ยกเลิกแล้ว",
+        "remediationFailed": "การแก้ไขล้มเหลว",
+        "remediationNoChangesNeeded": "ไม่จำเป็นต้องเปลี่ยนแปลง",
+        "remediationPrOpened": "เปิด PR แล้ว",
+        "remediationQueued": "ขอการแก้ไขแล้ว"
+      }
     },
     "notifications": {
       "couldNotLoad": "ไม่สามารถโหลดการตั้งค่าการแจ้งเตือนได้",

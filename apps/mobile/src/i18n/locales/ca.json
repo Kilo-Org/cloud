@@ -1681,7 +1681,14 @@
       "whereFound": "On s'ha trobat ({{displayCount}})",
       "fullReport": "Informe complet generat",
       "yes": "Sí",
-      "no": "Negatiu"
+      "no": "Negatiu",
+      "action": {
+        "analyzeCodebase": "Analitza la base de codi",
+        "dismiss": "Descarta",
+        "manualReview": "Revisió manual",
+        "monitor": "Supervisa",
+        "openPr": "Obre una sol·licitud d'extracció"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} incidències",
@@ -1903,7 +1910,24 @@
       "title": "Informe d'auditoria",
       "unavailable": "Informe d'auditoria no disponible",
       "unavailableDescription": "Només els propietaris de l'organització i els gestors de facturació poden veure informes d'auditoria. Demana a un propietari o gestor de facturació que et concedeixi l'accés.",
-      "queryFailed": "La consulta de l'informe no ha acabat. Torna-ho a provar."
+      "queryFailed": "La consulta de l'informe no ha acabat. Torna-ho a provar.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Anàlisi completada",
+        "findingAnalysisFailed": "L'anàlisi ha fallat",
+        "findingAutoDismissed": "Descartat automàticament",
+        "findingCreated": "Importat",
+        "findingDeleted": "Suprimit",
+        "findingDismissed": "Descartat",
+        "findingSeverityChanged": "S'ha canviat la gravetat",
+        "findingStatusChange": "S'ha canviat l'estat",
+        "findingSuperseded": "Substituït",
+        "remediationBlocked": "Correcció bloquejada",
+        "remediationCancelled": "Cancel·lat",
+        "remediationFailed": "La correcció ha fallat",
+        "remediationNoChangesNeeded": "No calen canvis",
+        "remediationPrOpened": "Sol·licitud d'extracció oberta",
+        "remediationQueued": "Correcció sol·licitada"
+      }
     },
     "notifications": {
       "couldNotLoad": "No s'ha pogut carregar la configuració de les notificacions.",

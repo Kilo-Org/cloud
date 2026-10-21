@@ -1661,7 +1661,14 @@
       "whereFound": "محل شناسایی ({{displayCount}})",
       "fullReport": "گزارش کامل تولیدشده",
       "yes": "بله",
-      "no": "خیر"
+      "no": "خیر",
+      "action": {
+        "analyzeCodebase": "تحلیل پایگاه کد",
+        "dismiss": "نادیده گرفتن",
+        "manualReview": "بازبینی دستی",
+        "monitor": "پایش",
+        "openPr": "ایجاد PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} یافته",
@@ -1880,7 +1887,24 @@
       "title": "گزارش ممیزی",
       "unavailable": "گزارش ممیزی در دسترس نیست",
       "unavailableDescription": "فقط مالکان سازمان و مدیران صورتحساب می‌توانند گزارش‌های ممیزی را ببینند. از یکی از آن‌ها بخواهید به شما دسترسی بدهد.",
-      "queryFailed": "پرس‌وجوی گزارش کامل نشد. دوباره تلاش کنید."
+      "queryFailed": "پرس‌وجوی گزارش کامل نشد. دوباره تلاش کنید.",
+      "eventActions": {
+        "findingAnalysisCompleted": "تحلیل تکمیل شد",
+        "findingAnalysisFailed": "تحلیل ناموفق بود",
+        "findingAutoDismissed": "به‌طور خودکار نادیده گرفته شد",
+        "findingCreated": "وارد شد",
+        "findingDeleted": "حذف شد",
+        "findingDismissed": "نادیده گرفته شد",
+        "findingSeverityChanged": "شدت تغییر کرد",
+        "findingStatusChange": "وضعیت تغییر کرد",
+        "findingSuperseded": "جایگزین شد",
+        "remediationBlocked": "اصلاح مسدود شد",
+        "remediationCancelled": "لغو شد",
+        "remediationFailed": "اصلاح ناموفق بود",
+        "remediationNoChangesNeeded": "تغییری لازم نیست",
+        "remediationPrOpened": "PR ایجاد شد",
+        "remediationQueued": "اصلاح درخواست شد"
+      }
     },
     "notifications": {
       "couldNotLoad": "بارگذاری تنظیمات اعلان‌ها ممکن نشد.",

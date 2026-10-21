@@ -1681,7 +1681,14 @@
       "whereFound": "Mjesta nalaza ({{displayCount}})",
       "fullReport": "Cijelo generirano izvješće",
       "yes": "Da",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analiziraj kodnu bazu",
+        "dismiss": "Odbaci",
+        "manualReview": "Ručna provjera",
+        "monitor": "Praćenje",
+        "openPr": "Otvori PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} nalaza",
@@ -1903,7 +1910,24 @@
       "title": "Izvješće o reviziji",
       "unavailable": "Izvješće o reviziji nedostupno",
       "unavailableDescription": "Samo vlasnici organizacije i voditelji naplate mogu pregledavati izvješća o reviziji. Zamoli vlasnika ili voditelja naplate da ti odobri pristup.",
-      "queryFailed": "Upit za izvješće nije dovršen. Pokušaj ponovno."
+      "queryFailed": "Upit za izvješće nije dovršen. Pokušaj ponovno.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza dovršena",
+        "findingAnalysisFailed": "Analiza nije uspjela",
+        "findingAutoDismissed": "Automatski odbačeno",
+        "findingCreated": "Uvezeno",
+        "findingDeleted": "Izbrisano",
+        "findingDismissed": "Odbačeno",
+        "findingSeverityChanged": "Promijenjena ozbiljnost",
+        "findingStatusChange": "Promijenjen status",
+        "findingSuperseded": "Zamijenjeno",
+        "remediationBlocked": "Sanacija blokirana",
+        "remediationCancelled": "Otkazano",
+        "remediationFailed": "Sanacija nije uspjela",
+        "remediationNoChangesNeeded": "Nisu potrebne promjene",
+        "remediationPrOpened": "PR otvoren",
+        "remediationQueued": "Zatražena sanacija"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nije moguće učitati postavke obavijesti.",

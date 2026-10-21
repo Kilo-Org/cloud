@@ -1661,7 +1661,14 @@
       "whereFound": "აღმოჩენის ადგილები ({{displayCount}})",
       "fullReport": "შექმნილი სრული ანგარიში",
       "yes": "კი",
-      "no": "არა"
+      "no": "არა",
+      "action": {
+        "analyzeCodebase": "კოდების ბაზის ანალიზი",
+        "dismiss": "უარყოფა",
+        "manualReview": "ხელით გადახედვა",
+        "monitor": "მონიტორინგი",
+        "openPr": "პულ-რექვესტის გახსნა"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} მიგნება",
@@ -1880,7 +1887,24 @@
       "title": "აუდიტის ანგარიში",
       "unavailable": "აუდიტის ანგარიში მიუწვდომელია",
       "unavailableDescription": "აუდიტის ანგარიშების ნახვა მხოლოდ ორგანიზაციის მფლობელებსა და ბილინგის მენეჯერებს შეუძლიათ. სთხოვე მფლობელს ან ბილინგის მენეჯერს, მოგანიჭოს წვდომა.",
-      "queryFailed": "ანგარიშის მოთხოვნის დამუშავება ვერ დასრულდა. სცადე ხელახლა."
+      "queryFailed": "ანგარიშის მოთხოვნის დამუშავება ვერ დასრულდა. სცადე ხელახლა.",
+      "eventActions": {
+        "findingAnalysisCompleted": "ანალიზი დასრულდა",
+        "findingAnalysisFailed": "ანალიზი ვერ შესრულდა",
+        "findingAutoDismissed": "ავტომატურად უარყოფილია",
+        "findingCreated": "შემოტანილია",
+        "findingDeleted": "წაიშალა",
+        "findingDismissed": "უარყოფილია",
+        "findingSeverityChanged": "სიმძიმე შეიცვალა",
+        "findingStatusChange": "სტატუსი შეიცვალა",
+        "findingSuperseded": "ჩანაცვლებულია",
+        "remediationBlocked": "გამოსწორება დაიბლოკა",
+        "remediationCancelled": "გაუქმდა",
+        "remediationFailed": "გამოსწორება ვერ შესრულდა",
+        "remediationNoChangesNeeded": "ცვლილებები არ არის საჭირო",
+        "remediationPrOpened": "პულ-რექვესტი გაიხსნა",
+        "remediationQueued": "გამოსწორება მოთხოვნილია"
+      }
     },
     "notifications": {
       "couldNotLoad": "შეტყობინებების პარამეტრების ჩატვირთვა ვერ მოხერხდა.",

@@ -1661,7 +1661,14 @@
       "whereFound": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
       "fullReport": "ລາຍງານທີ່ສ້າງຂຶ້ນສະບັບເຕັມ",
       "yes": "ແມ່ນ",
-      "no": "ບໍ່ແມ່ນ"
+      "no": "ບໍ່ແມ່ນ",
+      "action": {
+        "analyzeCodebase": "ວິເຄາະຖານລະຫັດ",
+        "dismiss": "ປະຕິເສດ",
+        "manualReview": "ການກວດຄືນດ້ວຍມື",
+        "monitor": "ຕິດຕາມ",
+        "openPr": "ເປີດຄຳຮ້ອງຂໍດຶງ"
+      }
     },
     "dashboard": {
       "findingsCount": "ບັນຫາທີ່ກວດພົບ {{displayCount}} ລາຍການ",
@@ -1880,7 +1887,24 @@
       "title": "ລາຍງານການກວດສອບ",
       "unavailable": "ບໍ່ສາມາດເບິ່ງລາຍງານການກວດສອບໄດ້",
       "unavailableDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ເບິ່ງລາຍງານການກວດສອບໄດ້. ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ຈັດການການເກັບເງິນໃຫ້ສິດເຂົ້າເບິ່ງແກ່ເຈົ້າ.",
-      "queryFailed": "ການດຶງຂໍ້ມູນລາຍງານບໍ່ສຳເລັດ. ລອງໃໝ່."
+      "queryFailed": "ການດຶງຂໍ້ມູນລາຍງານບໍ່ສຳເລັດ. ລອງໃໝ່.",
+      "eventActions": {
+        "findingAnalysisCompleted": "ການວິເຄາະສຳເລັດແລ້ວ",
+        "findingAnalysisFailed": "ການວິເຄາະລົ້ມເຫຼວ",
+        "findingAutoDismissed": "ປະຕິເສດອັດຕະໂນມັດແລ້ວ",
+        "findingCreated": "ນຳເຂົ້າແລ້ວ",
+        "findingDeleted": "ລຶບແລ້ວ",
+        "findingDismissed": "ປະຕິເສດແລ້ວ",
+        "findingSeverityChanged": "ປ່ຽນລະດັບຄວາມຮ້າຍແຮງແລ້ວ",
+        "findingStatusChange": "ປ່ຽນສະຖານະແລ້ວ",
+        "findingSuperseded": "ຖືກແທນທີ່ແລ້ວ",
+        "remediationBlocked": "ການແກ້ໄຂຖືກບັອກ",
+        "remediationCancelled": "ຍົກເລີກແລ້ວ",
+        "remediationFailed": "ການແກ້ໄຂລົ້ມເຫຼວ",
+        "remediationNoChangesNeeded": "ບໍ່ຈຳເປັນຕ້ອງປ່ຽນແປງ",
+        "remediationPrOpened": "ເປີດຄຳຮ້ອງຂໍດຶງແລ້ວ",
+        "remediationQueued": "ຂໍການແກ້ໄຂແລ້ວ"
+      }
     },
     "notifications": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າການແຈ້ງເຕືອນໄດ້.",

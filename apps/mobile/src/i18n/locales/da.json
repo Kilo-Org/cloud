@@ -1661,7 +1661,14 @@
       "whereFound": "Fundsteder ({{displayCount}})",
       "fullReport": "Den fulde genererede rapport",
       "yes": "Ja",
-      "no": "Nej"
+      "no": "Nej",
+      "action": {
+        "analyzeCodebase": "Analysér kodebasen",
+        "dismiss": "Afvis",
+        "manualReview": "Manuel gennemsyn",
+        "monitor": "Overvåg",
+        "openPr": "Åbn PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} fund",
@@ -1880,7 +1887,24 @@
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapport utilgængelig",
       "unavailableDescription": "Kun organisationsejere og faktureringsadministratorer kan se revisionsrapporter. Bed en ejer eller faktureringsadministrator om at give dig adgang.",
-      "queryFailed": "Forespørgslen om rapporten blev ikke fuldført. Prøv igen."
+      "queryFailed": "Forespørgslen om rapporten blev ikke fuldført. Prøv igen.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse fuldført",
+        "findingAnalysisFailed": "Analyse mislykkedes",
+        "findingAutoDismissed": "Afvist automatisk",
+        "findingCreated": "Importeret",
+        "findingDeleted": "Slettet",
+        "findingDismissed": "Afvist",
+        "findingSeverityChanged": "Alvorlighed ændret",
+        "findingStatusChange": "Status ændret",
+        "findingSuperseded": "Erstattet",
+        "remediationBlocked": "Udbedring blokeret",
+        "remediationCancelled": "Annulleret",
+        "remediationFailed": "Udbedring mislykkedes",
+        "remediationNoChangesNeeded": "Ingen ændringer nødvendige",
+        "remediationPrOpened": "PR åbnet",
+        "remediationQueued": "Anmodet om udbedring"
+      }
     },
     "notifications": {
       "couldNotLoad": "Indstillingerne for notifikationer kunne ikke indlæses.",

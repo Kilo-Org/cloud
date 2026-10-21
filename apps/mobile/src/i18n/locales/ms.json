@@ -1661,7 +1661,14 @@
       "whereFound": "Lokasi penemuan ({{displayCount}})",
       "fullReport": "Laporan penuh yang dijana",
       "yes": "Ya",
-      "no": "Tidak"
+      "no": "Tidak",
+      "action": {
+        "analyzeCodebase": "Analisis asas kod",
+        "dismiss": "Tolak",
+        "manualReview": "Semakan manual",
+        "monitor": "Pantau",
+        "openPr": "Buka PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} penemuan",
@@ -1880,7 +1887,24 @@
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
       "unavailableDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh melihat laporan audit. Minta pemilik atau pengurus pengebilan memberikan anda akses.",
-      "queryFailed": "Pertanyaan untuk laporan tidak selesai. Cuba lagi."
+      "queryFailed": "Pertanyaan untuk laporan tidak selesai. Cuba lagi.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisis selesai",
+        "findingAnalysisFailed": "Analisis gagal",
+        "findingAutoDismissed": "Ditolak secara automatik",
+        "findingCreated": "Diimport",
+        "findingDeleted": "Dihapuskan",
+        "findingDismissed": "Ditolak",
+        "findingSeverityChanged": "Keterukan diubah",
+        "findingStatusChange": "Status diubah",
+        "findingSuperseded": "Digantikan",
+        "remediationBlocked": "Pemulihan disekat",
+        "remediationCancelled": "Dibatalkan",
+        "remediationFailed": "Pemulihan gagal",
+        "remediationNoChangesNeeded": "Tiada perubahan diperlukan",
+        "remediationPrOpened": "PR dibuka",
+        "remediationQueued": "Pemulihan diminta"
+      }
     },
     "notifications": {
       "couldNotLoad": "Tidak dapat memuatkan tetapan pemberitahuan.",

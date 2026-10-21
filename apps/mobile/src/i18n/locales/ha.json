@@ -1661,7 +1661,14 @@
       "whereFound": "Inda aka samu wannan ({{displayCount}})",
       "fullReport": "Cikakken rahoton da aka samar",
       "yes": "Ee",
-      "no": "A'a"
+      "no": "A'a",
+      "action": {
+        "analyzeCodebase": "Bincika lambar tushe",
+        "dismiss": "Ware",
+        "manualReview": "Bincike da hannu",
+        "monitor": "Sa ido",
+        "openPr": "Buɗe PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Matsaloli {{displayCount}} da aka gano",
@@ -1880,7 +1887,24 @@
       "title": "Rahoton bincike",
       "unavailable": "Ba a iya samun rahoton bincike",
       "unavailableDescription": "Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya duba rahotannin bincike. Nemi mai ƙungiya ko mai kula da biyan kuɗi ya ba ka dama.",
-      "queryFailed": "Ba a kammala neman bayanan rahoton ba. Sake gwadawa."
+      "queryFailed": "Ba a kammala neman bayanan rahoton ba. Sake gwadawa.",
+      "eventActions": {
+        "findingAnalysisCompleted": "An kammala bincike",
+        "findingAnalysisFailed": "Bincike ya gaza",
+        "findingAutoDismissed": "An ware ta atomatik",
+        "findingCreated": "An shigo da shi",
+        "findingDeleted": "An share",
+        "findingDismissed": "An ware",
+        "findingSeverityChanged": "An canza tsanani",
+        "findingStatusChange": "An canza matsayi",
+        "findingSuperseded": "An maye gurbinsa",
+        "remediationBlocked": "An toshe gyara",
+        "remediationCancelled": "An soke",
+        "remediationFailed": "Gyara ya gaza",
+        "remediationNoChangesNeeded": "Babu buƙatar canje-canje",
+        "remediationPrOpened": "An buɗe PR",
+        "remediationQueued": "An nemi gyara"
+      }
     },
     "notifications": {
       "couldNotLoad": "An kasa loda saitunan sanarwa.",

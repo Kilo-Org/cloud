@@ -1661,7 +1661,14 @@
       "whereFound": "တွေ့ရှိသည့်နေရာများ ({{displayCount}})",
       "fullReport": "ထုတ်ပေးထားသော အစီရင်ခံစာအပြည့်အစုံ",
       "yes": "ဟုတ်သည်",
-      "no": "မဟုတ်ပါ"
+      "no": "မဟုတ်ပါ",
+      "action": {
+        "analyzeCodebase": "ကုဒ်ဘေ့စ်ကို ခွဲခြမ်းစိတ်ဖြာပါ",
+        "dismiss": "ပယ်ဖျက်ပါ",
+        "manualReview": "လူအားဖြင့် ပြန်လည်စစ်ဆေးခြင်း",
+        "monitor": "စောင့်ကြည့်ပါ",
+        "openPr": "PR ဖွင့်ပါ"
+      }
     },
     "dashboard": {
       "findingsCount": "တွေ့ရှိချက် {{displayCount}} ခု",
@@ -1880,7 +1887,24 @@
       "title": "စစ်ဆေးမှုအစီရင်ခံစာ",
       "unavailable": "စစ်ဆေးမှုအစီရင်ခံစာ မရရှိနိုင်",
       "unavailableDescription": "အဖွဲ့အစည်းပိုင်ရှင်များနှင့် ငွေပေးချေမှုမန်နေဂျာများသာ စစ်ဆေးမှုအစီရင်ခံစာများကို ကြည့်ရှုနိုင်သည်။ သင့်ကို ဝင်ရောက်ခွင့်ပေးရန် ပိုင်ရှင် သို့မဟုတ် ငွေပေးချေမှုမန်နေဂျာကို တောင်းဆိုပါ။",
-      "queryFailed": "အစီရင်ခံစာဒေတာ ရယူမှု မပြီးဆုံးပါ။ ထပ်ကြိုးစားပါ။"
+      "queryFailed": "အစီရင်ခံစာဒေတာ ရယူမှု မပြီးဆုံးပါ။ ထပ်ကြိုးစားပါ။",
+      "eventActions": {
+        "findingAnalysisCompleted": "ခွဲခြမ်းစိတ်ဖြာမှု ပြီးမြောက်ခဲ့သည်",
+        "findingAnalysisFailed": "ခွဲခြမ်းစိတ်ဖြာမှု မအောင်မြင်ခဲ့ပါ",
+        "findingAutoDismissed": "အလိုအလျောက် ပယ်ဖျက်ခဲ့သည်",
+        "findingCreated": "တင်သွင်းပြီး",
+        "findingDeleted": "ဖျက်ခဲ့သည်",
+        "findingDismissed": "ပယ်ဖျက်ခဲ့သည်",
+        "findingSeverityChanged": "ပြင်းထန်မှု ပြောင်းလဲခဲ့သည်",
+        "findingStatusChange": "အခြေအနေ ပြောင်းလဲခဲ့သည်",
+        "findingSuperseded": "အစားထိုးခံခဲ့ရသည်",
+        "remediationBlocked": "ပြင်ဆင်မှု ပိတ်ပင်ခံခဲ့ရသည်",
+        "remediationCancelled": "ဖျက်သိမ်းခဲ့သည်",
+        "remediationFailed": "ပြင်ဆင်မှု မအောင်မြင်ခဲ့ပါ",
+        "remediationNoChangesNeeded": "အပြောင်းအလဲ မလိုအပ်ပါ",
+        "remediationPrOpened": "PR ဖွင့်ခဲ့သည်",
+        "remediationQueued": "ပြင်ဆင်မှု တောင်းဆိုခဲ့သည်"
+      }
     },
     "notifications": {
       "couldNotLoad": "အသိပေးချက်ဆက်တင်များကို ရယူ၍ မရပါ။",

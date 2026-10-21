@@ -1661,7 +1661,14 @@
       "whereFound": "Lapho lokhu kutholakale khona ({{displayCount}})",
       "fullReport": "Umbiko ogcwele owakhiwe",
       "yes": "Yebo",
-      "no": "Cha"
+      "no": "Cha",
+      "action": {
+        "analyzeCodebase": "Hlaziya ikhowudi yonke",
+        "dismiss": "Lahla",
+        "manualReview": "Ukuhlolwa ngesandla",
+        "monitor": "Qaphela",
+        "openPr": "Vula i-pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "Okutholakele: {{displayCount}}",
@@ -1880,7 +1887,24 @@
       "title": "Umbiko wokuhlola",
       "unavailable": "Umbiko wokuhlola awutholakali",
       "unavailableDescription": "Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangabuka imibiko yokuhlola. Cela umnikazi noma umphathi wezinkokhelo akunike imvume yokuyifinyelela.",
-      "queryFailed": "Ukucela idatha yombiko akuphelanga. Zama futhi."
+      "queryFailed": "Ukucela idatha yombiko akuphelanga. Zama futhi.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Ukuhlaziywa kuqediwe",
+        "findingAnalysisFailed": "Ukuhlaziywa kwehlulekile",
+        "findingAutoDismissed": "Kwalahlwa ngokuzenzakalelayo",
+        "findingCreated": "Kungenisiwe",
+        "findingDeleted": "Kwasusiwe",
+        "findingDismissed": "Kwalahlwa",
+        "findingSeverityChanged": "Ubunzima bushintshile",
+        "findingStatusChange": "Isimo sashintsha",
+        "findingSuperseded": "Kwathathwa indawo yawo",
+        "remediationBlocked": "Ukulungisa kuvinjiwe",
+        "remediationCancelled": "Kwakhanselwa",
+        "remediationFailed": "Ukulungisa kwehlulekile",
+        "remediationNoChangesNeeded": "Azikho izinguquko eziyadingeka",
+        "remediationPrOpened": "I-pull request ivuliwe",
+        "remediationQueued": "Ukulungisa kuceliwe"
+      }
     },
     "notifications": {
       "couldNotLoad": "Asikwazanga ukulayisha izilungiselelo zezaziso.",

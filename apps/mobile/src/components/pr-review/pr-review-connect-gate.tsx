@@ -10,8 +10,8 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
-import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
+import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -213,4 +213,3 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
 
   return <>{children}</>;
 }
-

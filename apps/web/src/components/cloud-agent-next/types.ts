@@ -12,10 +12,6 @@ import * as z from 'zod';
 
 import type { AssociatedPr } from './utils/github-pr-link';
 
-// ============================================================================
-// OpenCode Types
-// ============================================================================
-
 import type {
   Message as OpenCodeMessage,
   UserMessage as OpenCodeUserMessage,
@@ -44,7 +40,6 @@ import type {
   SessionStatus,
 } from '@/types/opencode.gen';
 
-// Re-export for convenience
 export type {
   Part,
   TextPart,
@@ -70,10 +65,6 @@ export type {
   SessionStatus,
 };
 
-// ============================================================================
-// Composite Types
-// ============================================================================
-
 /**
  * StoredMessage - The message format stored in IndexedDB.
  * Contains message metadata (info) and an array of content parts.
@@ -88,10 +79,6 @@ export type StoredMessage = {
  * Extracted from the Part union for convenience.
  */
 export type SubtaskPart = Extract<Part, { type: 'subtask' }>;
-
-// ============================================================================
-// Type Guards
-// ============================================================================
 
 /** Check if a part is a TextPart */
 export function isTextPart(part: Part): part is TextPart {
@@ -124,7 +111,6 @@ export function stripFilePartContent(part: FilePart): FilePart {
     url: '', // Strip the potentially large data URL
   };
 
-  // Preserve source structure but strip the text content
   if (part.source) {
     stripped.source = {
       ...part.source,
@@ -149,7 +135,6 @@ export function stripPartContentIfFile(part: Part): Part {
     return stripFilePartContent(part);
   }
 
-  // Handle ToolParts with attachments in completed state
   if (isToolPart(part) && part.state.status === 'completed' && part.state.attachments) {
     const strippedAttachments = part.state.attachments.map(stripFilePartContent);
     return {
@@ -228,11 +213,9 @@ export function isPartStreaming(part: Part): boolean {
   if (isTextPart(part) || isReasoningPart(part)) {
     return part.time !== undefined && part.time.end === undefined;
   }
-  // ToolPart - check state
   if (isToolPart(part)) {
     return part.state.status === 'pending' || part.state.status === 'running';
   }
-  // Other parts don't stream
   return false;
 }
 
@@ -244,10 +227,6 @@ export function isMessageStreaming(message: StoredMessage): boolean {
   if (isAssistantMessage(message.info) && !message.info.time.completed) return true;
   return message.parts.some(isPartStreaming);
 }
-
-// ============================================================================
-// Agent Mode Types
-// ============================================================================
 
 /**
  * Valid mode values for cloud agent sessions. Includes the cloud-agent-next
@@ -263,10 +242,6 @@ export type AgentMode =
   | 'ask'
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   | (string & {});
-
-// ============================================================================
-// Stream Event Types
-// ============================================================================
 
 /**
  * WebSocket event envelope from cloud-agent.
@@ -295,10 +270,6 @@ export type StreamEventType =
   | 'session.error'
   | 'session.idle';
 
-// ============================================================================
-// Resume Configuration Types
-// ============================================================================
-
 /**
  * Configuration collected when resuming a CLI session in cloud-agent.
  * Used by ResumeConfigModal and session configuration logic.
@@ -309,10 +280,6 @@ export type ResumeConfig = {
   envVars?: Record<string, string>;
   setupCommands?: string[];
 };
-
-// ============================================================================
-// Shared Types
-// ============================================================================
 
 /**
  * Tool execution
@@ -381,6 +348,19 @@ export function getCloudSessionCreationOperation(
   return { intent, operationKey: createOperationKey() };
 }
 
+/** Another attempt with the same operation key is still running on the server. */
+export function isCloudSessionCreationInProgressError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return false;
+  if (typeof error.data !== 'object' || error.data === null || !('code' in error.data)) {
+    return false;
+  }
+  return (
+    error.data.code === 'CONFLICT' &&
+    'message' in error &&
+    (error.message === 'creation_in_progress' || error.message === 'operation_in_progress')
+  );
+}
+
 export function isAmbiguousCloudSessionCreationError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('data' in error)) return true;
   if (typeof error.data !== 'object' || error.data === null || !('code' in error.data)) return true;
@@ -436,11 +416,9 @@ export type StoredSession = {
    * - `undefined`: PR data was not requested or not yet loaded for this row.
    */
   associatedPr?: AssociatedPr | null;
+  /** Set only for a session this client created and the server does not list yet. */
+  localSync?: 'syncing' | 'synced' | 'failed';
 };
-
-// ============================================================================
-// Zod Schemas for Runtime Validation
-// ============================================================================
 
 /**
  * Zod schema for ToolExecution
@@ -452,10 +430,6 @@ export const ToolExecutionSchema = z.object({
   error: z.string().optional(),
   timestamp: z.string(),
 });
-
-// ============================================================================
-// Parsed Stream Event Union
-// ============================================================================
 
 /**
  * Discriminated union of stream events we handle.

@@ -13,7 +13,12 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
-import { providerPrRefLabel, providerPrTriple } from '@/lib/pr-review/provider-pr-ref';
+import {
+  providerPrRefLabel,
+  providerPrTriple,
+  useProviderPrScopeOrNull,
+} from '@/lib/pr-review/provider-pr-ref';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { parseParam } from '@/lib/route-params';
 
 type Params = {
@@ -103,9 +108,11 @@ export function PrReviewFileNavigatorScreen() {
 
 /**
  * The sheet's failure states, split the same way the Overview and Discussion
- * bodies split them: a permission denial, a missing PR/MR and a broken
- * connection are terminal and carry no retry, because retrying the identical
- * request cannot change any of them. Only a transient failure gets the CTA.
+ * bodies split them: a permission denial is terminal and carries no retry. A
+ * missing PR/MR is terminal only on GitHub — GitLab folds its connection
+ * failures into the same NOT_FOUND, so provider scopes get the recovery row.
+ * A broken connection gets the reconnect notice and only a transient failure
+ * gets the plain retry CTA.
  */
 function NavigatorError({
   error,
@@ -113,12 +120,25 @@ function NavigatorError({
   isRetrying,
 }: Readonly<{ error: unknown; onRetry: () => void; isRetrying: boolean }>) {
   const { t } = useTranslation();
+  const scope = useProviderPrScopeOrNull();
   const state = error === null ? null : classifyPrReviewQueryState(error);
   if (state?.kind === 'permission') {
     return <QueryError variant="permission" />;
   }
   if (state?.kind === 'not-found') {
-    return <QueryError variant="not-found" />;
+    // GitLab folds its connection failures into the same NOT_FOUND a deleted
+    // merge request produces, so provider scopes offer the read retry and the
+    // connection check instead of a dead end (GitHub keeps the terminal copy).
+    return (
+      <QueryError
+        variant="not-found"
+        action={
+          scope?.ref.platform !== 'github' ? (
+            <PrReviewUnavailableActions onRetry={onRetry} isRetrying={isRetrying} />
+          ) : undefined
+        }
+      />
+    );
   }
   if (state?.kind === 'reconnect') {
     return (

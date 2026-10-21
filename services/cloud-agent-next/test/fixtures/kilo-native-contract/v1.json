@@ -40,29 +40,52 @@
     { "method": "GET", "path": "/session", "response": "KiloSession[]" },
     { "method": "GET", "path": "/session/{sessionID}", "response": "KiloSession" },
     { "method": "GET", "path": "/session/{sessionID}/message", "response": "MessageEntry[]" },
-    { "method": "GET", "path": "/session/status", "response": "Record<sessionID, SessionStatus>" },
+    {
+      "method": "GET",
+      "path": "/session/status",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "Record<sessionID, SessionStatus>"
+    },
     { "method": "GET", "path": "/session/{sessionID}/todo", "response": "Todo[]" },
     { "method": "GET", "path": "/session/{sessionID}/diff", "response": "FileDiff[]" },
-    { "method": "GET", "path": "/session/{sessionID}/question", "response": "Question[]" },
-    { "method": "GET", "path": "/session/{sessionID}/permission", "response": "Permission[]" },
-    { "method": "GET", "path": "/event", "response": "text/event-stream" },
+    {
+      "method": "GET",
+      "path": "/question",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "Question[]"
+    },
+    {
+      "method": "GET",
+      "path": "/permission",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "Permission[]"
+    },
+    {
+      "method": "GET",
+      "path": "/event",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "text/event-stream"
+    },
     { "method": "GET", "path": "/global/event", "response": "text/event-stream" },
     { "method": "POST", "path": "/session/{sessionID}/prompt_async", "response": "204" },
     { "method": "POST", "path": "/session/{sessionID}/abort", "response": "true" },
     { "method": "POST", "path": "/session/{sessionID}/command", "response": "204" },
     {
       "method": "POST",
-      "path": "/session/{sessionID}/question/{requestID}/reply",
+      "path": "/question/{requestID}/reply",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
       "response": "true"
     },
     {
       "method": "POST",
-      "path": "/session/{sessionID}/question/{requestID}/reject",
+      "path": "/question/{requestID}/reject",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
       "response": "true"
     },
     {
       "method": "POST",
-      "path": "/session/{sessionID}/permission/{requestID}/reply",
+      "path": "/permission/{requestID}/reply",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
       "response": "true"
     }
   ],
@@ -88,35 +111,57 @@
   },
   "fixtures": {
     "sessionListPage": {
-      "request": "GET /kilo/session?limit=2",
+      "request": "GET /kilo/session?limit=2&start=200",
       "response": [
         {
-          "id": "ses_example",
+          "id": "ses_12345678901234567890123456",
+          "slug": "ses_12345678901234567890123456",
+          "projectID": "cloud-agent",
           "title": "Example",
-          "directory": "/cloud-agent/sessions/ses_example"
+          "directory": "/cloud-agent/sessions/ses_12345678901234567890123456",
+          "version": "cloud-agent",
+          "time": { "created": 100, "updated": 200 }
+        }
+      ],
+      "headers": {}
+    },
+    "messagePage": {
+      "request": "GET /kilo/session/ses_12345678901234567890123456/message?limit=1",
+      "response": [
+        {
+          "info": {
+            "id": "msg_user_1",
+            "sessionID": "ses_12345678901234567890123456",
+            "role": "user",
+            "time": { "created": 110 },
+            "agent": "build",
+            "model": { "providerID": "test", "modelID": "fake" }
+          },
+          "parts": []
         }
       ],
       "headers": {
-        "X-Next-Cursor": "cursor-value",
-        "Link": "</kilo/session?limit=2&before=cursor-value>; rel=\"next\""
+        "X-Next-Cursor": "eyJpZCI6Im1zZ191c2VyXzEiLCJ0aW1lIjoxMTB9",
+        "Link": "<http://worker.test/kilo/session/ses_12345678901234567890123456/message?limit=1&before=eyJpZCI6Im1zZ191c2VyXzEiLCJ0aW1lIjoxMTB9>; rel=\"next\"",
+        "X-Kilo-Omitted-Item-Count": "0"
       }
     },
     "fence": {
-      "request": "GET /kilo/event?directory=%2Fcloud-agent%2Fsessions%2Fses_example",
+      "request": "GET /kilo/event?directory=%2Fcloud-agent%2Fsessions%2Fses_12345678901234567890123456",
       "frames": [
         { "type": "server.connected", "properties": {} },
         {
           "type": "message.updated",
           "properties": {
-            "sessionID": "ses_example",
-            "directory": "/cloud-agent/sessions/ses_example"
+            "sessionID": "ses_12345678901234567890123456",
+            "directory": "/cloud-agent/sessions/ses_12345678901234567890123456"
           }
         },
         {
           "type": "kilo.native.fence",
           "properties": {
-            "sessionID": "ses_example",
-            "directory": "/cloud-agent/sessions/ses_example",
+            "sessionID": "ses_12345678901234567890123456",
+            "directory": "/cloud-agent/sessions/ses_12345678901234567890123456",
             "fence": 12,
             "snapshotComplete": true
           }
@@ -128,8 +173,8 @@
         {
           "type": "kilo.native.resnapshot",
           "properties": {
-            "sessionID": "ses_example",
-            "directory": "/cloud-agent/sessions/ses_example",
+            "sessionID": "ses_12345678901234567890123456",
+            "directory": "/cloud-agent/sessions/ses_12345678901234567890123456",
             "reason": "continuity_unproven"
           }
         }
@@ -139,7 +184,7 @@
       "status": 503,
       "body": {
         "error": "KILO_LIVE_RUNTIME_UNAVAILABLE",
-        "message": "The session runtime is not running"
+        "message": "Cloud Agent Kilo runtime is not live"
       }
     }
   }

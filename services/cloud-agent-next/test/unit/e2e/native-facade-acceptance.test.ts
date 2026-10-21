@@ -578,6 +578,35 @@ describe('interrupted turn settlement', () => {
     expect(interruptedTurnSettled([userMessage], { type: 'busy' }, user.id)).toBe(false);
   });
 
+  it('does not settle on a missing status without post-abort idle evidence', () => {
+    expect(interruptedTurnSettled([userMessage], undefined, user.id)).toBe(false);
+    expect(interruptedTurnSettled([], undefined, user.id)).toBe(false);
+  });
+
+  it.each([
+    { type: 'session.idle', properties: { sessionID } },
+    { type: 'session.status', properties: { sessionID, status: { type: 'idle' } } },
+  ])('settles on a matching post-abort idle event despite a missing native status entry', event => {
+    expect(interruptedTurnSettled([], undefined, user.id, { sessionID, events: [event] })).toBe(
+      true
+    );
+  });
+
+  it('does not settle on another session idle event or a busy event', () => {
+    expect(
+      interruptedTurnSettled([], undefined, user.id, {
+        sessionID,
+        events: [{ type: 'session.idle', properties: { sessionID: 'ses_sibling' } }],
+      })
+    ).toBe(false);
+    expect(
+      interruptedTurnSettled([], undefined, user.id, {
+        sessionID,
+        events: [{ type: 'session.status', properties: { sessionID, status: { type: 'busy' } } }],
+      })
+    ).toBe(false);
+  });
+
   it('does not settle when a reply for the aborted turn completed', () => {
     expect(
       interruptedTurnSettled(

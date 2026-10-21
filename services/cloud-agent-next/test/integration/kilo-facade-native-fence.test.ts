@@ -260,6 +260,17 @@ function isFrame(value: unknown, type: string): value is { type: string; propert
   return typeof value === 'object' && value !== null && (value as { type?: unknown }).type === type;
 }
 
+function isPartUpdate(value: unknown, partId: string): boolean {
+  return (
+    isFrame(value, 'message.part.updated') &&
+    (value.properties as { part?: { id?: string } }).part?.id === partId
+  );
+}
+
+function expectSingleLivePartUpdate(events: readonly unknown[], partId: string): void {
+  expect(events.filter(event => isPartUpdate(event, partId))).toHaveLength(1);
+}
+
 /**
  * The logical transcript the frames describe. A snapshot intentionally carries a
  * materialized row both as its immutable log entry and again in the replay
@@ -389,6 +400,14 @@ afterEach(async () => {
 });
 
 describe('hosted native history/live fence', { timeout: 30_000 }, () => {
+  it('rejects duplicate live updates even when decoded frames have different identities', () => {
+    const update = partUpdated('msg_live', 'prt_live', 'live text');
+    expectSingleLivePartUpdate([update], 'prt_live');
+    expect(() =>
+      expectSingleLivePartUpdate([update, structuredClone(update)], 'prt_live')
+    ).toThrow();
+  });
+
   it('delivers the durable snapshot first, then the fence, then live events above it', async () => {
     const session = await startReadySession();
     try {
@@ -424,15 +443,14 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
         // complete through it and the client must not render a partial history.
         expect(fence.fence as number).toBeGreaterThan(0);
 
-        // A live event above the fence is delivered exactly once, after it.
-        await pushEvents(session, [partUpdated(assistantMessageId, 'prt_native_2', 'second part')]);
-        const live = await readSseUntil(
-          reader,
-          frame =>
-            isFrame(frame, 'message.part.updated') &&
-            ((frame.properties as { part?: { id?: string } }).part?.id ?? '') === 'prt_native_2'
-        );
-        expect(live.observed.filter(item => item === live.match)).toHaveLength(1);
+        // Drain through a subsequent marker so duplicate updates after the
+        // first matching frame are included in the exact-once assertion.
+        await pushEvents(session, [
+          partUpdated(assistantMessageId, 'prt_native_2', 'second part'),
+          partUpdated(assistantMessageId, 'prt_native_marker', 'delivery marker'),
+        ]);
+        const live = await readSseUntil(reader, frame => isPartUpdate(frame, 'prt_native_marker'));
+        expectSingleLivePartUpdate(live.observed, 'prt_native_2');
       } finally {
         await reader.cancel();
       }

@@ -83,12 +83,14 @@ export function requiredCheckStatus(name: string, blocked: boolean): 'pass' | 'f
  * An aborted turn is settled when no assistant reply for it completed and the
  * session reports idle again. Kilo reverts an aborted turn's user row, so its
  * presence is not required; the caller proves the turn started by observing the
- * fake LLM gate engage before the abort.
+ * fake LLM gate engage before the abort. Native status maps omit idle sessions,
+ * so a missing entry requires a matching idle event observed after the abort.
  */
 export function interruptedTurnSettled(
   messages: readonly MessageEntry[],
   sessionStatus: RecordValue | undefined,
-  messageID: string
+  messageID: string,
+  idleEvidence?: { sessionID: string; events: readonly NativeEvent[] }
 ): boolean {
   const assistant = messages.find(
     entry => entry.info.role === 'assistant' && entry.info.parentID === messageID
@@ -96,7 +98,15 @@ export function interruptedTurnSettled(
   if (assistant !== undefined && typeof record(assistant.info.time).completed === 'number') {
     return false;
   }
-  return sessionStatus === undefined || record(sessionStatus).type === 'idle';
+  if (sessionStatus !== undefined) return record(sessionStatus).type === 'idle';
+  return (
+    idleEvidence?.events.some(
+      event =>
+        event.properties.sessionID === idleEvidence.sessionID &&
+        (event.type === 'session.idle' ||
+          (event.type === 'session.status' && record(event.properties.status).type === 'idle'))
+    ) ?? false
+  );
 }
 
 const REQUIRED_CHECKS: ReadonlySet<string> = new Set([
@@ -847,10 +857,17 @@ async function main(): Promise<void> {
       await check('abort interrupts one in-flight turn and the session continues', async () => {
         const tag = `native-abort-${runID}`;
         gateTags.add(tag);
-        const messageID = await prompt(rootID, `__fake__:gate:${tag}`, 'code');
+        const abortStream = attach(rootID);
+        let messageID: string;
         try {
+          await abortStream.wait(
+            event => event.type === 'kilo.native.fence',
+            'abort snapshot fence'
+          );
+          messageID = await prompt(rootID, `__fake__:gate:${tag}`, 'code');
           const engaged = await waitForGateEngaged(config, tag, 60_000);
           assert(engaged, 'the gated turn never reached the fake LLM');
+          const abortEventStart = abortStream.events.length;
           const aborted = successful(await request(`/session/${rootID}/abort`, { method: 'POST' }));
           assert.equal(aborted, true);
           // Hold the gate until the interruption is observed. Releasing it first
@@ -869,7 +886,8 @@ async function main(): Promise<void> {
               return interruptedTurnSettled(
                 messages,
                 current === undefined ? undefined : record(current),
-                messageID
+                messageID,
+                { sessionID: rootID, events: abortStream.events.slice(abortEventStart) }
               )
                 ? true
                 : undefined;
@@ -877,6 +895,7 @@ async function main(): Promise<void> {
             60_000
           );
         } finally {
+          await abortStream.close();
           await releaseGate(config.fakeLlmUrl, tag, AbortSignal.timeout(requestTimeout)).catch(
             () => undefined
           );

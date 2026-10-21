@@ -8,7 +8,6 @@ import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRow } from '@/components/consent/consent-row';
-import { FoldSpacer, heightReporter } from '@/components/consent/fold-spacer';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -68,8 +67,6 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const footerStyle = {
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
-  const [footerContentHeight, setFooterContentHeight] = useState(48);
-  const reportFooterHeight = heightReporter(setFooterContentHeight);
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Onboarding pre-selects optional telemetry. Review mode starts off and the
@@ -308,17 +305,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             <DirectionalChevronRight size={16} color={colors.primary} />
           </Pressable>
         </View>
-        {/* Tail clearance matching the footer's measured height: the last row
-            scrolls to a full-height slot above the footer's top edge instead
-            of parking half-covered against it. */}
-        <FoldSpacer height={footerContentHeight} />
       </ScrollView>
 
-      <View
-        className="gap-3 bg-background px-6 pt-3"
-        style={footerStyle}
-        onLayout={reportFooterHeight}
-      >
+      <View className="gap-3 bg-background px-6 pt-3" style={footerStyle}>
         {/* The error lives in the pinned footer, not the scroll content: the
             footer draws over the scroll tail, so a content-placed error was
             invisible behind the buttons (b911 vr2 device repro — staging

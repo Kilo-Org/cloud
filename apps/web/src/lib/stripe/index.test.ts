@@ -5021,24 +5021,36 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
   });
 
   test.each([
-    { field: 'failure_code', overrides: { failure_code: 'authentication_required' } },
     {
-      field: 'outcome.reason',
+      field: 'failure_code',
+      key: 'failure_code',
+      overrides: { failure_code: 'authentication_required' },
+    },
+    {
+      field: 'outcome.reason authentication_required',
+      key: 'outcome_reason_authentication_required',
       overrides: {
         outcome: { reason: 'authentication_required' } as unknown as Stripe.Charge.Outcome,
+      },
+    },
+    {
+      field: 'outcome.reason authentication_failed',
+      key: 'outcome_reason_authentication_failed',
+      overrides: {
+        outcome: { reason: 'authentication_failed' } as unknown as Stripe.Charge.Outcome,
       },
     },
   ])(
     'a charge failed by authentication ($field) is not reported as a declined card',
     async scenario => {
       const charge = sampleStripeCharge({
-        id: `ch_bouncer_auth_${scenario.field}`,
+        id: `ch_bouncer_auth_${scenario.key}`,
         customer: testUser.stripe_customer_id,
         ...scenario.overrides,
       });
       const event = {
         ...baseStripeEvent(),
-        id: `evt_bouncer_auth_charge_${scenario.field}`,
+        id: `evt_bouncer_auth_charge_${scenario.key}`,
         type: 'charge.failed',
         data: { object: charge },
       } as unknown as Stripe.Event;

@@ -25,6 +25,7 @@
     "error": "chyba: {{error}}",
     "back": "Zpět",
     "somethingWentWrong": "Něco se pokazilo.",
+    "actionNotRecorded": "Tuto akci se nepodařilo zaznamenat. Zkus to později.",
     "couldNotOpen": "Nepodařilo se otevřít {{label}}.",
     "link": "odkaz",
     "takingLonger": "Trvá to déle, než se očekávalo. Tuto obrazovku můžeš zavřít a stav zkontrolovat později.",
@@ -35,6 +36,8 @@
     "connectGithub": "Připojit GitHub",
     "cost": "Náklady",
     "discard": "Zahodit",
+    "discardChangesMessage": "Vaše změny budou ztraceny.",
+    "discardChangesTitle": "Zahodit změny?",
     "findings": "Zjištění",
     "mergeRequest": "merge request",
     "notConnected": "Nepřipojeno",
@@ -109,7 +112,9 @@
     "online": "Připojeno",
     "open": "Otevřít {{name}}",
     "openPullRequest": "Otevřít PR",
+    "completed": "Dokončeno",
     "pending": "Čeká",
+    "running": "Běží",
     "performance": "Výkon",
     "preferences": "Předvolby",
     "privacyPolicy": "Zásady ochrany osobních údajů",
@@ -685,7 +690,8 @@
       "description": "Připoj svůj účet GitHub a kontroluj PR na mobilu.",
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
-      "bitbucketOrgOnlyDescription": "Vyber organizaci ve svém profilu a kontroluj její Bitbucket PR."
+      "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
+      "contextLine": "Pro {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -801,7 +807,9 @@
       "reviewNotSubmitted": "Tuto revizi nelze v aktuálním stavu odeslat. PR se možná změnil nebo se pokoušíš o revizi vlastního PR, což není povolené.",
       "reviewNotSubmittedTerm": "Tuto revizi nelze v aktuálním stavu odeslat. {{term}} se možná změnil nebo nemůžeš revidovat vlastní {{term}}.",
       "couldNotPostComment": "Komentář se nepodařilo odeslat.",
-      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu."
+      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu.",
+      "rateLimited": "Příliš mnoho požadavků. Zkuste to prosím později znovu.",
+      "conflict": "Tato položka se změnila, zatímco jste na ní pracovali. Znovu ji načtěte a zkuste to znovu."
     },
     "operation": {
       "couldNotReply": "Odpověď se nepodařilo odeslat.",
@@ -809,7 +817,6 @@
       "mergeResultDefaultError": "GitHub nedokončil sloučení.",
       "mergeResultNotCompleted": "{{term}} nebyl sloučen. Zkontroluj jeho stav a zkus to znovu.",
       "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontroluj PR.",
-      "persistenceFailed": "Tuto akci se nepodařilo zaznamenat. Zkus to později.",
       "forbidden": "K této akci nemáš oprávnění."
     },
     "capabilities": {
@@ -1451,6 +1458,9 @@
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
       "byline": "{{repo}} #{{number}} · autor: {{author}}",
       "noFindings": "Kontrola neodhalila žádné nálezy.",
+      "findingsUnavailable": "Výsledky nejsou k dispozici, protože tato kontrola selhala.",
+      "serviceUnavailable": "Nepodařilo se připojit ke službě kontroly kódu. Zopakujte kontrolu, až bude služba dostupná.",
+      "reviewFailed": "Kontrola selhala. Zkuste to prosím znovu.",
       "showMore": "Zobrazit více",
       "created": "Vytvořeno",
       "started": "Zahájeno",
@@ -1484,8 +1494,9 @@
       "loading": "Načítání paměti kontrol",
       "couldNotLoad": "Paměť kontrol se nepodařilo načíst.",
       "off": "Paměť kontrol je vypnutá.",
+      "on": "Paměť kontrol je zapnutá.",
       "offDescription": "Zapněte paměť kontrol, aby se Kilo mohlo učit z odpovědí správců a navrhovat pokyny do souboru REVIEW.md.",
-      "readOnlyDescription": "Paměť kontrol mohou zapnout pouze vlastníci organizace a správci fakturace.",
+      "readOnlyDescription": "Paměť kontrol mohou změnit pouze vlastníci organizace a správci fakturace.",
       "enable": "Zapnout paměť kontrol",
       "loadingProposals": "Načítání návrhů",
       "couldNotLoadProposals": "Návrhy se nepodařilo načíst.",
@@ -1566,8 +1577,6 @@
     "updateFailed": "Agenta pro kontrolu kódu se nepodařilo aktualizovat.",
     "configSaveFailed": "Nastavení kontrol kódu se nepodařilo uložit.",
     "status": {
-      "running": "Běží",
-      "completed": "Dokončeno",
       "interrupted": "Přerušeno"
     },
     "reviewStyle": {
@@ -1580,7 +1589,8 @@
       "bugs": "Chyby",
       "style": "Styl",
       "testing": "Testování",
-      "documentation": "Dokumentace"
+      "documentation": "Dokumentace",
+      "unknown": "Jiné ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varování"
@@ -1694,7 +1704,14 @@
       "whereFound": "Místa výskytu ({{displayCount}})",
       "fullReport": "Úplná vygenerovaná zpráva",
       "yes": "Ano",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analyzovat kódovou základnu",
+        "dismiss": "Zamítnout",
+        "manualReview": "Ruční kontrola",
+        "monitor": "Sledovat",
+        "openPr": "Otevřít pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "Počet nálezů: {{displayCount}}",
@@ -1902,12 +1919,16 @@
     "settingsSave": {
       "saveChanges": "Uložit změny",
       "unsavedTitle": "Neuložené změny",
-      "unsavedMessage": "Uložit změny před opuštěním této obrazovky?"
+      "unsavedMessage": "Uložit změny před opuštěním této obrazovky?",
+      "unsavedInvalidMessage": "Tyto změny zatím nelze uložit. Oprav je, abys je mohl uložit, nebo je zahoď, abys mohl odejít."
     },
     "auditReportButton": {
       "viewA11y": "Zobrazit zprávu o auditu"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Správce Kilo",
+      "actorMaskedUser": "Maskovaný uživatel",
+      "actorSystem": "Systém Kilo",
       "couldNotLoad": "Zprávu o auditu se nepodařilo načíst.",
       "events": "Události",
       "generated": "Zpráva byla vygenerována {{generatedAt}}.",
@@ -1919,7 +1940,24 @@
       "title": "Zpráva o auditu",
       "unavailable": "Zpráva o auditu není k dispozici",
       "unavailableDescription": "Zprávy o auditu mohou zobrazovat pouze vlastníci organizace a správci fakturace. Požádejte vlastníka nebo správce fakturace o udělení přístupu.",
-      "queryFailed": "Načítání zprávy se nedokončilo. Zkuste to znovu."
+      "queryFailed": "Načítání zprávy se nedokončilo. Zkuste to znovu.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analýza dokončena",
+        "findingAnalysisFailed": "Analýza selhala",
+        "findingAutoDismissed": "Automaticky zamítnuto",
+        "findingCreated": "Importováno",
+        "findingDeleted": "Smazáno",
+        "findingDismissed": "Zamítnuto",
+        "findingSeverityChanged": "Změněna závažnost",
+        "findingStatusChange": "Změněn stav",
+        "findingSuperseded": "Nahrazeno",
+        "remediationBlocked": "Náprava zablokována",
+        "remediationCancelled": "Zrušeno",
+        "remediationFailed": "Náprava selhala",
+        "remediationNoChangesNeeded": "Nejsou potřeba žádné změny",
+        "remediationPrOpened": "Pull request otevřen",
+        "remediationQueued": "Náprava vyžádána"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nastavení oznámení se nepodařilo načíst.",
@@ -1951,7 +1989,6 @@
       "installApp": "Nainstalovat aplikaci GitHub",
       "reauthorizeButton": "Znovu autorizovat aplikaci GitHub",
       "reauthorizeDescription": "Bezpečnostní agent potřebuje k přístupu k upozorněním Dependabot oprávnění vulnerability_alerts. Udělte ho opětovnou autorizací aplikace GitHub.",
-      "reauthorizeFailed": "Opětovnou autorizaci se nepodařilo zahájit. Zkuste to znovu.",
       "reauthorizeTitle": "Jsou vyžadována další oprávnění",
       "setupFailed": "Nastavení GitHubu se nepodařilo spustit. Zkuste to znovu."
     },
@@ -1970,7 +2007,12 @@
       "syncMayNotHaveCompleted": "Synchronizace se možná nedokončila. Opakováním sjednoťte její stav, nebo ji zahoďte.",
       "syncInProgress": "Synchronizace bezpečnostních nálezů již probíhá. Zkuste to znovu.",
       "dismissalInProgress": "Zamítání tohoto nálezu již probíhá. Zkuste to znovu.",
-      "couldNotReadPendingSyncs": "Čekající synchronizace se nepodařilo načíst. Zkuste to znovu."
+      "couldNotReadPendingSyncs": "Čekající synchronizace se nepodařilo načíst. Zkuste to znovu.",
+      "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontrolujte bezpečnostní kontrolu.",
+      "settleFailed": "Akce proběhla, ale výsledek se nám nepodařilo zaznamenat. Zkuste to znovu.",
+      "replayFailed": "Tato akce neproběhla. Zkuste to znovu.",
+      "actionFailed": "Tuto akci se nepodařilo dokončit. Zkuste to znovu.",
+      "actionBlocked": "Tuto akci se nepodařilo dokončit. Problém je nutné nejprve vyřešit, teprve pak můžete akci zopakovat."
     },
     "analysisState": {
       "queued": "Analýza ve frontě",
@@ -2265,6 +2307,7 @@
       "prefillModelUnavailable": "{{model}} již není k dispozici. Používá se váš výchozí model.",
       "couldNotReadPendingSessions": "Čekající relace se nepodařilo načíst. Zkuste to znovu.",
       "failedToCreate": "Relaci se nepodařilo vytvořit.",
+      "checkOrganizationAccess": "Zkontrolujte svůj přístup k této organizaci a zkuste to znovu.",
       "couldNotRefreshRepositories": "Seznam repozitářů se nepodařilo obnovit. Zkuste to znovu.",
       "discardDraftTitle": "Zahodit koncept?",
       "discardDraftMessage": "Vaše zadání se smaže.",
@@ -2342,7 +2385,8 @@
       "matchesBadge_other": "shody: {{displayCount}}",
       "matchesBadge_few": "shody: {{displayCount}}",
       "matchesBadge_many": "shod: {{displayCount}}",
-      "noOutput": "Žádný výstup."
+      "noOutput": "Žádný výstup.",
+      "translationFailed": "Překlad se nezdařil"
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -2807,6 +2851,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Dokud se seznam nenačte, vaše aktivní relace nejsou dostupné.",
     "currentDeviceUnidentified": "Aktuální zařízení se nepodařilo rozpoznat.",
+    "kiloApp": "Aplikace Kilo",
     "noSessions": "Žádné aktivní relace",
     "noSessionsDescription": "Přihlaste se do aplikace Kilo na jiném zařízení. Pak se zde zobrazí.",
     "onlyKiloAppSignIns": "Zde se zobrazují pouze přihlášení do aplikace Kilo. Přihlášení v editoru a CLI nejsou uvedena.",
@@ -2815,7 +2860,7 @@
     "webBrowser": "Webový prohlížeč",
     "viewProfile": "Zobrazit profil",
     "signOutThisDevice": "Odhlásit toto zařízení",
-    "signOutThisSession": "Odhlásit tuto relaci",
+    "signOutSessionLabel": "Odhlásit zařízení {{device}}, přihlášení: {{signedIn}}",
     "sessionSignedOut": "Relace byla odhlášena.",
     "signOutThisDeviceTitle": "Odhlásit toto zařízení?",
     "signOutThisSessionTitle": "Odhlásit tuto relaci?",
@@ -2961,6 +3006,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Než začneme",
+    "summaryTitle": "Předvolby sdílení dat",
     "introDescription": "Kilo odesílá vaše zprávy poskytovatelům AI, aby mohli vytvořit odpovědi. Zde zjistíte, co sdílíme a s kým.",
     "required": "Nezbytné pro používání Kilo",
     "promptsTitle": "Vaše zadání a konverzace",
@@ -2969,7 +3015,6 @@
     "accountDescription": "ID vašeho účtu Kilo a metadata požadavků slouží k ověření vaší identity a měření využití.",
     "diagnosticsTitle": "Diagnostika aplikace",
     "diagnosticsDescription": "Hlášení o pádech a chybách pomáhají udržovat aplikaci stabilní. Obsah aplikace je z hlášení odstraněn.",
-    "optional": "Volitelné",
     "helpImprove": "Pomozte vylepšit Kilo",
     "helpImproveDescription": "Sdílejte anonymní údaje o používání aplikace a zdroji instalace. Tuto volbu můžete kdykoli změnit v nastavení.",
     "seeFullDetails": "Zobrazit podrobnosti",
@@ -3054,11 +3099,22 @@
     "boundary": {
       "backToProfile": "Zpět na profil",
       "loadErrorMessage": "Zkontroluj připojení a zkus to znovu.",
+
+      "chooseAccount": "Vyberte účet",
       "loadErrorTitle": "Vaše organizace se nepodařilo načíst.",
+      "noOrganization": "Žádná organizace",
+
+      "noOrganizationDescription": "Tento účet není součástí organizace. Vytvořte organizaci nebo se k některé připojte na webu, abyste mohli využívat funkce organizace, jako jsou pozvánky pro členy a upozornění na nízký zůstatek.",
+
+      "openWebOrganizations": "Otevřít organizace na webu",
+
       "organizationUnavailable": "Organizace není k dispozici.",
-      "selectDescription": "Vyberte ve svém profilu organizaci a pokračujte.",
+      "selectDescriptionWithOrganizations": "Patříte k jedné nebo více organizacím. Vyberte účet, který má tato obrazovka používat.",
+
       "selectOrganization": "Vyberte organizaci",
       "unavailableDescription": "Tato organizace už není dostupná. Vyberte ve svém profilu jinou organizaci a pokračujte.",
+
+      "unavailableSessionsDescription": "Tato organizace už není dostupná. Její relace nelze načíst.",
       "accessDeniedDescription": "Nemáte přístup do této organizace."
     },
     "creditActivity": {
@@ -3110,7 +3166,11 @@
       "separateEmailsHint": "Více e-mailových adres oddělte čárkami.",
       "thresholdLabel": "Upozornit při zůstatku pod (USD)",
       "title": "Upozornění na nízký zůstatek",
-      "emailsError": "Zadejte alespoň jednu platnou e-mailovou adresu. Více adres oddělte čárkami.",
+      "emailsInvalid": "Jedna nebo více e-mailových adres není platných.",
+      "emailsRequired": "Zadejte alespoň jednu e-mailovou adresu.",
+      "saveEmailsError": "Některé e-mailové adresy nebyly přijaty. Zkontrolujte je a zkuste to znovu.",
+      "saveError": "Upozornění na nízký zůstatek se nepodařilo uložit.",
+      "thresholdPlaceholder": "Zadejte částku",
       "thresholdError": "Zadejte částku větší než 0."
     },
     "memberLimit": {
@@ -3121,6 +3181,7 @@
       "removeLimit": "Zrušit limit",
       "title": "Denní limit útraty",
       "blankError": "Zadejte částku nebo níže klepněte na tlačítko Zrušit limit.",
+      "blankWithoutLimitError": "Zadejte denní limit mezi 0 a {{max}}.",
       "rangeError": "Zadejte částku mezi 0 a {{max}}."
     },
     "members": {
@@ -3551,6 +3612,9 @@
     "localModels": {
       "title": "Modely v zařízení",
       "help": "Modely v zařízení běží přímo v tomto telefonu. Vaše dotazy a odpovědi zůstávají v zařízení.",
+      "switchTitle": "Přepnout na model v zařízení?",
+      "switchMessage": "Po přepnutí na {{name}} se výzvy a kontext této konverzace budou zpracovávat přímo v tomto telefonu, nikoli na vzdáleném serveru.",
+      "switchConfirm": "Přepnout model",
       "systemPurpose": "Model zabudovaný do systému tohoto zařízení. Běží v zařízení.",
       "apple": "Apple Intelligence (v zařízení)",
       "checking": "Ověřování dostupnosti…",
@@ -3647,7 +3711,6 @@
     "personalDefaultDescription": "Automaticky načteno, když žádné úložiště nemá připnutý profil.",
     "organizationDefaultDescription": "Automaticky načteno pro členy, kteří nemají žádné osobní výchozí nastavení.",
     "setAsDefault": "Nastavit jako výchozí",
-    "removeDefault": "Odebrat jako výchozí",
     "saveFailed": "Profil se nepodařilo uložit",
     "deleteTitle": "Smazat profil",
     "deleteMessage": "Tím se profil a jeho nastavení trvale odstraní. Toto nelze vrátit zpět.",
@@ -3660,7 +3723,6 @@
     "keyTooLong": "Klíč musí mít 256 znaků nebo méně",
     "keyDuplicate": "Tento klíč už v profilu existuje",
     "valueLabel": "Hodnota",
-    "secretLabel": "Tajný",
     "secrets": {
       "markSecret": "Označit jako tajné",
       "masked": "Skrytá hodnota",
@@ -3673,11 +3735,13 @@
     "commandsTitle": "Nastavení příkazů",
     "addCommand": "Přidat příkaz",
     "commandLabel": "Příkaz",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "např. pnpm install",
     "commandsEmpty": "Zatím žádné příkazy k nastavení",
     "commandsSaveFailed": "Příkazy nastavení se nepodařilo uložit",
     "moveUp": "Posuňte se nahoru",
     "moveDown": "Posuňte se dolů",
+    "moveCommandUp": "Přesunout příkaz {{position}} nahoru",
+    "moveCommandDown": "Přesunout příkaz {{position}} dolů",
     "skillsTitle": "Dovednosti",
     "addSkill": "Přidejte dovednost",
     "skillNameLabel": "Název dovednosti",
@@ -3695,7 +3759,7 @@
       "empty": "Zatím žádné servery MCP",
       "name": "Název serveru",
       "type": "Typ serveru",
-      "localType": "Místní",
+      "localType": "Lokální",
       "remoteType": "Vzdálený",
       "command": "Příkazový řádek",
       "url": "URL",
@@ -3717,7 +3781,9 @@
       "jsonTooLarge": "Použijte nejvýše 50 položek, klíče do 128 a hodnoty do 4096 znaků",
       "timeoutInvalid": "Časový limit musí být celý počet milisekund",
       "edit": "Upravit server MCP",
-      "saveFailed": "Server MCP se nepodařilo uložit"
+      "saveFailed": "Server MCP se nepodařilo uložit",
+      "deleteFailed": "Server MCP se nepodařilo smazat",
+      "updateFailed": "Server MCP se nepodařilo aktualizovat"
     },
     "agents": {
       "title": "Profiloví agenti",
@@ -3744,10 +3810,11 @@
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",
       "visibilityAll": "Všichni – oba",
       "saveFailed": "Agenta se nepodařilo uložit",
+      "deleteFailed": "Agenta se nepodařilo smazat",
       "nameRequired": "Zadejte jméno agenta",
       "slugRequired": "Zadejte agenta slimáka",
       "slugInvalid": "Slug musí začínat písmenem a používat pouze malá písmena, číslice a pomlčky",
-      "slugConflict": "Ten slimák je rezervován vestavěným agentem",
+      "slugConflict": "Tento slug už používá vestavěný agent nebo jiný agent v tomto profilu",
       "edit": "Upravit agenta"
     },
     "slashCommands": {
@@ -3758,10 +3825,12 @@
       "description": "Popis příkazu",
       "template": "Šablona",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Vysvětlete $ARGUMENTS",
       "subtask": "Spustit jako dílčí úkol",
       "edit": "Příkaz upravit lomítko",
       "saveFailed": "Příkaz se nepodařilo uložit",
+      "deleteFailed": "Příkaz se nepodařilo smazat",
       "nameRequired": "Zadejte název příkazu",
       "nameInvalid": "Název musí začínat malým písmenem a používat pouze malá písmena, číslice a pomlčky",
       "templateRequired": "Zadejte šablonu příkazu",
@@ -3897,5 +3966,69 @@
       "title": "Uložit do seznamu",
       "saved": "Uloženo do {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Ranní přehled",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Část historické aktivity může chybět. ≥ znamená alespoň tolik; neznámá hodnota neznamená nulu.",
+    "available": "Dostupné přehledy",
+    "history": "Historie přehledů",
+    "historyHint": "Reporty se uchovávají 30 dní, včetně zavřených.",
+    "settings": "Nastavení přehledu",
+    "empty": "Žádná noční aktivita",
+    "emptyHint": "Vaše cloudové a CLI relace programování se zde zobrazí po aktivní noci.",
+    "loadError": "Přehledy se nepodařilo načíst",
+    "sessions": "Aktivní přes noc",
+    "pullRequests": "Otevřené PRs",
+    "blockers": "Nové blokery",
+    "spend": "Noční útrata",
+    "view": "Číst přehled",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Zamítnout přehled",
+    "offline": "Offline · uložený přehled",
+    "cached": "Uložený report · obnovení nedostupné",
+    "revised": "Upraveno · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI shrnutí",
+    "summaryDisabled": "Strukturovaný report · AI je pro tento kontext vypnutá",
+    "summaryPending": "AI shrnutí se připravuje. Až bude hotové, objeví se zde.",
+    "summaryFailed": "AI shrnutí selhalo. Opakování může být znovu zpoplatněno.",
+    "summaryUnavailable": "AI shrnutí není k dispozici. Strukturovaný report je stále dostupný.",
+    "summaryOutdated": "Toto shrnutí je starší než nejnovější verze reportu.",
+    "summaryCharge": "AI účtovala {{cost}}",
+    "summaryChargePending": "Poplatek za AI čeká na vyúčtování",
+    "generate": "Vytvořit shrnutí",
+    "retrySummary": "Zopakovat placené shrnutí",
+    "sources": "Důkazy a artefakty",
+    "timezone": "Časové pásmo přehledu",
+    "deviceTimezone": "Použít časové pásmo zařízení",
+    "timezoneHint": "Časové pásmo IANA, například Europe/Berlin. Změny plánu platí pro další noci.",
+    "nightStart": "Začátek noci",
+    "morningStart": "Konec noci / začátek rána",
+    "morningEnd": "Konec rána",
+    "timeHint": "Karta na domovské obrazovce po skončení rána obnoví živý stav, i offline.",
+    "invalidSchedule": "Zvolte platné časové pásmo a nepřekrývající se, neprázdné noční a ranní období.",
+    "notificationsHint": "Jedno obecné oznámení každé ráno, až bude první report hotový. Nezávisí na placených AI shrnutích.",
+    "notificationPermission": "Pro příjem přehledu povolte oznámení zařízení v sekci $t(common.notifications).",
+    "aiOptIn": "Placená AI shrnutí",
+    "aiHint": "Volitelné pouze pro tento kontext. Vybrané anonymizované úryvky a strukturovaná fakta se odesílají vašemu modelu v jazyce aplikace. Poplatky se strhávají z kreditu tohoto kontextu.",
+    "defaultModel": "Použít výchozí model Kilo",
+    "duration": "Časový limit (minuty)",
+    "spendLimit": "Limit útraty (USD)",
+    "safeguardHint": "Pevné limity pro každé shrnutí, nikoli denní rozpočet. Výchozí: 10 minut a $2. Report se zveřejní nejpozději po pěti minutách, generování pokračuje v rámci limitů.",
+    "invalidSafeguards": "Zadejte kladné konečné limity času a útraty.",
+    "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
+    "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné.",
+    "confirmPaid": "Povolit placená shrnutí pro {{context}}?",
+    "confirmGeneration": "Vytvořit placené shrnutí?",
+    "paidDisclosure": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "enable": "Povolit placená shrnutí",
+    "contextSettings": "Nastavení AI · {{context}}",
+    "allContexts": "Osobní a organizační přehledy zůstávají oddělené.",
+    "estimatePricingUnavailable": "Ceny pro tento model nejsou dostupné.",
+    "estimateBalanceUnavailable": "Nedostatečný zůstatek pro placené shrnutí.",
+    "estimateModelNotAllowed": "Tento model zde není povolen.",
+    "estimateSpendLimitTooLow": "Zvyšte limit výdajů, aby toto shrnutí bylo povoleno."
   }
 }

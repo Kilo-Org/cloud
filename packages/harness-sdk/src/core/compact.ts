@@ -58,7 +58,7 @@ const defaultCompactAt = 0.8;
  */
 const windowOf = (wiring: Wiring): Effect.Effect<Option.Option<number>> =>
   wiring.catalog.facts(wiring.model).pipe(
-    Effect.map(facts => Option.fromNullable(facts.contextWindow)),
+    Effect.map(facts => Option.fromNullishOr(facts.contextWindow)),
     Effect.orElseSucceed(() => Option.none())
   );
 
@@ -103,7 +103,10 @@ const summaryOf = (wiring: Wiring): Effect.Effect<string, ModelError> =>
       })
       .pipe(
         Stream.tap(event => (event.kind === 'done' ? countUsage(wiring, event) : Effect.void)),
-        Stream.runFold('', (held, event) => (event.kind === 'delta' ? held + event.text : held))
+        Stream.runFold(
+          () => '',
+          (held, event) => (event.kind === 'delta' ? held + event.text : held)
+        )
       );
   });
 

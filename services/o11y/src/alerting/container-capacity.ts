@@ -67,12 +67,6 @@ const HealthInstancesSchema = z.object({
 export const ContainerListAppSchema = z.object({
   id: z.string(),
   name: z.string(),
-  instances: z.number(),
-  health: z
-    .object({
-      instances: HealthInstancesSchema,
-    })
-    .optional(),
 });
 
 export type ContainerListApp = z.infer<typeof ContainerListAppSchema>;

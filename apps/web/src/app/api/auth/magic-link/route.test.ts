@@ -104,6 +104,40 @@ describe('POST /api/auth/magic-link', () => {
     expect(mockSendMagicLinkEmail).toHaveBeenCalledWith(mockMagicLinkToken, undefined);
   });
 
+  describe('while email signups are disabled', () => {
+    beforeEach(() => {
+      process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+    });
+    afterEach(() => {
+      process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+    });
+
+    it('refuses a new user before creating a token', async () => {
+      const response = await POST(createRequest({ email: 'new@example.com' }));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        success: false,
+        error: 'EMAIL-SIGNUP-DISABLED',
+      });
+      expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+      expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+    });
+
+    it('still sends a magic link to an existing user', async () => {
+      mockFindUserByNormalizedEmail.mockResolvedValue({
+        id: 'existing-user',
+        google_user_email: 'user@example.com',
+      } as Awaited<ReturnType<typeof findUserByNormalizedEmail>>);
+
+      const response = await POST(createRequest({ email: 'user@example.com' }));
+
+      expect(response.status).toBe(200);
+      expect(mockCreateMagicLinkToken).toHaveBeenCalledWith('user@example.com');
+      expect(mockSendMagicLinkEmail).toHaveBeenCalled();
+    });
+  });
+
   it('rejects magic links for an SSO-protected domain before creating a token', async () => {
     mockResolveSsoAuthorityForDomain.mockResolvedValue({
       status: 'required',

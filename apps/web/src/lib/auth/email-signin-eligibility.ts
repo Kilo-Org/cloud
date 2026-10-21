@@ -4,6 +4,7 @@ import { captureMessage } from '@sentry/nextjs';
 import { createHmac } from 'node:crypto';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
+import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import {
   isEmailBlacklistedByDomainAsync,
   isBlockedTLD,
@@ -23,10 +24,8 @@ const SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID = 'sign-in-code-email-global';
  * unknown id as "not rate limited", so a missing rule is treated as an
  * unavailable eligibility check and fails closed with 503 instead of sending.
  *
- * - `magic-link-email` caps sends per normalized address, so one inbox cannot
- *   be hammered.
- * - `sign-in-code-email-ip` caps sends per caller address, so one client cannot
- *   iterate many addresses.
+ * - `magic-link-email` caps sends per normalized address.
+ * - `sign-in-code-email-ip` caps sends per caller address.
  * - `sign-in-code-email-global` caps total sends, keying every instance onto
  *   one shared bucket.
  */
@@ -58,9 +57,9 @@ const missingRuleReportedAt: Record<string, number> = {};
 const MISSING_RULE_REPORT_INTERVAL_MS = 60_000;
 
 /**
- * A missing rule disables the cap for every request an instance serves, so one
- * report a minute raises the alarm just as well as one per request. Reporting
- * per request floods Sentry at exactly the moment the cap is not working.
+ * One report a minute is enough to raise the alarm for a rule that is missing
+ * from the project's firewall configuration; reporting per request would flood
+ * Sentry.
  */
 function reportMissingRule(ruleId: string): void {
   const now = Date.now();
@@ -76,7 +75,7 @@ function reportMissingRule(ruleId: string): void {
 /**
  * Counts one send against the per-address and per-caller firewall rules.
  * Returns 429 when an allowance is exhausted and 503 when a rule is missing
- * from the firewall configuration, so a silently disabled cap never sends.
+ * from the firewall configuration.
  * Runs before the eligibility rules: these refusals cost nothing downstream.
  */
 async function checkCallerBudget(email: string, request: NextRequest): Promise<SendBudgetCheck> {
@@ -195,6 +194,7 @@ export type EmailSignInEligibility =
       status: number;
       errorCode:
         | 'BLOCKED'
+        | 'EMAIL-SIGNUP-DISABLED'
         | 'INVALID_EMAIL'
         | 'SIGNUP-RATE-LIMITED'
         | 'SIGNUP-UNAVAILABLE'
@@ -207,7 +207,7 @@ export type EmailSignInEligibility =
  * creating a token, sending mail, or consuming a rate-limit allowance.
  */
 export async function isNewAccountEligibleForMagicLink(email: string): Promise<boolean> {
-  if (!validateMagicLinkSignupEmail(email).valid) {
+  if (isEmailSignupDisabled() || !validateMagicLinkSignupEmail(email).valid) {
     return false;
   }
 
@@ -224,6 +224,7 @@ export async function isNewAccountEligibleForMagicLink(email: string): Promise<b
  * blocked by TLD or signup email rules.
  *
  * For NEW users (signup), enforces:
+ * - Email signup is enabled (EMAIL_SIGNUPS_ENABLED)
  * - Email must be lowercase
  * - Email cannot contain a + character
  *
@@ -285,8 +286,17 @@ export async function checkEmailSignInEligibility(
     };
   }
 
-  // For new users, enforce stricter email validation
   if (!domainEligibility.existingUser) {
+    if (isEmailSignupDisabled()) {
+      return {
+        ok: false,
+        status: 403,
+        errorCode: 'EMAIL-SIGNUP-DISABLED',
+        body: { success: false, error: 'EMAIL-SIGNUP-DISABLED' },
+      };
+    }
+
+    // For new users, enforce stricter email validation
     const signupValidation = validateMagicLinkSignupEmail(email);
     if (!signupValidation.valid) {
       return {

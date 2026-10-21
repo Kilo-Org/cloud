@@ -20,12 +20,14 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
 }));
 jest.mock('@/lib/user', () => ({
   findUserByNormalizedEmail: jest.fn(),
+  getWorkOSOrganization: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
   resolveSsoAuthorityForDomain: jest.fn(),
 }));
 
 import {
+  checkDomainSignInEligibility,
   isNewAccountEligibleForMagicLink,
   checkEmailSignInEligibility,
   checkGlobalSendBudget,
@@ -43,6 +45,33 @@ const request = (headers: Record<string, string> = {}) =>
     headers: new Headers(headers),
     url: 'http://localhost:3000/api/auth/native/otp',
   }) as unknown as NextRequest;
+
+describe('checkDomainSignInEligibility', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsBlockedTLD.mockReturnValue(false);
+    mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
+  });
+
+  it('does not resolve SSO authority for an address without a domain', async () => {
+    await expect(checkDomainSignInEligibility('no-domain')).resolves.toEqual({
+      ok: true,
+      existingUser: false,
+    });
+    expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+  });
+
+  it('resolves SSO authority for the lowercased domain', async () => {
+    await checkDomainSignInEligibility('new@Acme.Example');
+
+    expect(mockResolveSsoAuthorityForDomain).toHaveBeenCalledWith('acme.example');
+  });
+});
 
 describe('isNewAccountEligibleForMagicLink', () => {
   beforeEach(() => {
@@ -67,6 +96,24 @@ describe('isNewAccountEligibleForMagicLink', () => {
 
     await expect(isNewAccountEligibleForMagicLink('new@example.top')).resolves.toBe(false);
   });
+
+  it('rejects a malformed address before any domain lookup', async () => {
+    await expect(isNewAccountEligibleForMagicLink('not-an-email')).resolves.toBe(false);
+    expect(mockIsEmailBlacklistedByDomainAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, '', 'false', 'TRUE'])(
+    'rejects every new address unless EMAIL_SIGNUPS_ENABLED is exactly true: %s',
+    async value => {
+      if (value === undefined) delete process.env.EMAIL_SIGNUPS_ENABLED;
+      else process.env.EMAIL_SIGNUPS_ENABLED = value;
+      try {
+        await expect(isNewAccountEligibleForMagicLink('new@example.com')).resolves.toBe(false);
+      } finally {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+      }
+    }
+  );
 });
 
 describe('checkEmailSignInEligibility send budgets', () => {

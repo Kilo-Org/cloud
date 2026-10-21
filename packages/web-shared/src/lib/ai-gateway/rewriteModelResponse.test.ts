@@ -1947,3 +1947,613 @@ describe('request log capture', () => {
     }
   );
 });
+
+type TimerTracker = {
+  active: Set<number>;
+  restore(): void;
+};
+
+/** Inert interval spy so a retained timer fails an assertion instead of hanging Jest. */
+function trackTimers(): TimerTracker {
+  const active = new Set<number>();
+  let nextId = 1;
+  const setIntervalSpy = jest.spyOn(globalThis, 'setInterval').mockImplementation(() => {
+    const id = nextId++;
+    active.add(id);
+    return id as unknown as ReturnType<typeof setInterval>;
+  });
+  const clearIntervalSpy = jest.spyOn(globalThis, 'clearInterval').mockImplementation(id => {
+    active.delete(Number(id));
+  });
+  return {
+    active,
+    restore() {
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+    },
+  };
+}
+
+/** Upstream SSE body whose controller stays open until the test pushes or closes it. */
+function controllableUpstream(onSourceCancel?: () => void | PromiseLike<void>) {
+  const encoder = new TextEncoder();
+  const sourceCancel = jest.fn(onSourceCancel ?? (() => {}));
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  const stream = new ReadableStream<Uint8Array>({
+    start(c) {
+      controller = c;
+    },
+    cancel: sourceCancel,
+  });
+  return {
+    response: new Response(stream, { headers: { 'content-type': 'text/event-stream' } }),
+    push(chunk: string) {
+      controller.enqueue(encoder.encode(chunk));
+    },
+    close() {
+      controller.close();
+    },
+    fail(error: unknown) {
+      controller.error(error);
+    },
+    sourceCancel,
+  };
+}
+
+function flushNotifications(): Promise<void> {
+  return new Promise(resolve => setImmediate(resolve));
+}
+
+async function drain(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+  while (true) {
+    const { done } = await reader.read();
+    if (done) {
+      return;
+    }
+  }
+}
+
+const cancellationFirstChunk = 'data: {"id":"gen-cancel","choices":[]}\n\n';
+const cancellationUsageTail =
+  'data: {"id":"gen-cancel","choices":[],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}\n\n';
+const upstreamReadError = Object.assign(new Error('upstream aborted'), {
+  name: 'ResponseAborted',
+});
+
+const operationTerminalChunks = [
+  [
+    'Chat Completions',
+    rewriteChatCompletionsWithoutTransforms,
+    'data: {"id":"gen-chat","choices":[]}\n\n',
+    'data: [DONE]\n\n',
+  ],
+  [
+    'Messages',
+    rewriteModelResponse_Messages,
+    'event: message_start\ndata: {"type":"message_start","message":{"id":"gen-msg","usage":{"input_tokens":1,"output_tokens":0}}}\n\n',
+    'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+  ],
+  [
+    'Responses',
+    rewriteModelResponse_Responses,
+    'event: response.created\ndata: {"type":"response.created","sequence_number":0,"response":{"id":"gen-resp"}}\n\n',
+    'event: response.completed\ndata: {"type":"response.completed","response":{"id":"gen-resp"}}\n\n',
+  ],
+] as const;
+
+describe('stream cancellation cleanup', () => {
+  test.each(rewriters)(
+    '%s: stops the operation progress timer on real client cancellation',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        const accounting = upstream.response.clone();
+        upstream.push(cancellationFirstChunk);
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        expect(reader).toBeDefined();
+        await reader?.read();
+        expect(timers.active.size).toBe(1);
+
+        await reader?.cancel();
+        await flushNotifications();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(timers.active.size).toBe(0);
+        expect(upstream.response.body?.locked).toBe(false);
+
+        upstream.push(cancellationUsageTail);
+        upstream.close();
+        expect(await accounting.text()).toBe(cancellationFirstChunk + cancellationUsageTail);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: cancels and clears the timer before the first upstream byte',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        expect(timers.active.size).toBe(1);
+
+        await reader?.cancel();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).toHaveBeenCalledWith(expect.any(Error), undefined);
+        expect(capture.setBody).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+        expect(upstream.sourceCancel).toHaveBeenCalledTimes(1);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: settles the received prefix once when the pending next read is cancelled',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        upstream.push(cancellationFirstChunk);
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await reader?.read();
+        await reader?.cancel();
+        await flushNotifications();
+
+        expect(upstream.response.body?.locked).toBe(false);
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).toHaveBeenCalledWith(
+          expect.any(Error),
+          cancellationFirstChunk
+        );
+        expect(capture.setBody).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: stays prompt when the upstream cancellation promise never settles',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream(() => new Promise<void>(() => {}));
+        upstream.push(cancellationFirstChunk);
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await reader?.read();
+        await reader?.cancel();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: observes a rejected upstream cancellation without an unhandled rejection',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream(() =>
+          Promise.reject(new Error('upstream cancel failed'))
+        );
+        upstream.push(cancellationFirstChunk);
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await reader?.read();
+        await reader?.cancel();
+        await flushNotifications();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: ignores upstream output that arrives after client cancellation',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        const accounting = upstream.response.clone();
+        upstream.push(cancellationFirstChunk);
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await reader?.read();
+        await reader?.cancel();
+        await flushNotifications();
+
+        expect(upstream.response.body?.locked).toBe(false);
+
+        upstream.push(cancellationUsageTail);
+        upstream.close();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(capture.setBody).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+        expect(await accounting.text()).toBe(cancellationFirstChunk + cancellationUsageTail);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: skips an already-delivered chunk when the client cancels in the same turn',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        upstream.push(cancellationFirstChunk);
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await reader?.read();
+
+        upstream.push(cancellationUsageTail);
+        const cancellation = reader?.cancel();
+        await cancellation;
+        await flushNotifications();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).toHaveBeenCalledWith(
+          expect.any(Error),
+          cancellationFirstChunk
+        );
+        expect(capture.setBody).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: settles capture once when cancellation follows a completed EOF',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        upstream.push(cancellationFirstChunk);
+        upstream.close();
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await drain(reader!);
+
+        expect(capture.setBody).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+
+        await reader?.cancel();
+        await flushNotifications();
+
+        expect(capture.setBody).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: settles the prefix once when cancellation wins the EOF race',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        upstream.push(cancellationFirstChunk);
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await reader?.read();
+
+        upstream.push(cancellationUsageTail);
+        upstream.close();
+        const cancellation = reader?.cancel();
+        await cancellation;
+        await flushNotifications();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).toHaveBeenCalledWith(
+          expect.any(Error),
+          cancellationFirstChunk
+        );
+        expect(capture.setBody).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: settles the prefix once when cancellation follows a translated read error',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const capture = makeCapture();
+        const result = await rewrite({
+          response: failingResponse('text/event-stream', 'ResponseAborted', cancellationFirstChunk),
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await drain(reader!);
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).toHaveBeenCalledWith(
+          expect.any(Error),
+          cancellationFirstChunk
+        );
+        expect(capture.setBody).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+
+        await reader?.cancel();
+        await flushNotifications();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: settles the prefix once when cancellation wins the read-error race',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        upstream.push(cancellationFirstChunk);
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await reader?.read();
+
+        upstream.fail(upstreamReadError);
+        const cancellation = reader?.cancel();
+        await cancellation;
+        await flushNotifications();
+
+        expect(capture.setReadError).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).toHaveBeenCalledWith(
+          expect.any(Error),
+          cancellationFirstChunk
+        );
+        expect(capture.setBody).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)(
+    '%s: normal EOF settles capture once and cancelling already-drained output leaves it unchanged',
+    async (_name, rewrite) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        upstream.push(cancellationFirstChunk);
+        upstream.close();
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        const reader = result.body?.getReader();
+        await drain(reader!);
+
+        expect(capture.setBody).toHaveBeenCalledTimes(1);
+
+        await reader?.cancel();
+        await flushNotifications();
+
+        expect(capture.setBody).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).not.toHaveBeenCalled();
+        expect(timers.active.size).toBe(0);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(operationTerminalChunks)(
+    '%s: stops its progress timer on terminal completion with an open accounting sibling',
+    async (_name, rewrite, initialChunk, terminalChunk) => {
+      const timers = trackTimers();
+      try {
+        const upstream = controllableUpstream();
+        const accounting = upstream.response.clone();
+        const capture = makeCapture();
+
+        const result = await rewrite({
+          response: upstream.response,
+          removeCost: true,
+          capture,
+          vercelRequestId: null,
+          reasoningEffort: null,
+        });
+        upstream.push(initialChunk + terminalChunk);
+        await readOutputStream(result);
+
+        expect(timers.active.size).toBe(0);
+        expect(capture.setBody).toHaveBeenCalledTimes(1);
+        expect(capture.setReadError).not.toHaveBeenCalled();
+        expect(upstream.response.body?.locked).toBe(false);
+
+        upstream.push(cancellationUsageTail);
+        upstream.close();
+        expect(await accounting.text()).toBe(initialChunk + terminalChunk + cancellationUsageTail);
+      } finally {
+        timers.restore();
+      }
+    }
+  );
+
+  test.each(rewriters)('%s: still cleans up when capture is null', async (_name, rewrite) => {
+    const timers = trackTimers();
+    try {
+      const upstream = controllableUpstream();
+      upstream.push(cancellationFirstChunk);
+
+      const result = await rewrite({
+        response: upstream.response,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      const reader = result.body?.getReader();
+      await reader?.read();
+      await reader?.cancel();
+
+      expect(timers.active.size).toBe(0);
+      expect(upstream.sourceCancel).toHaveBeenCalledTimes(1);
+    } finally {
+      timers.restore();
+    }
+  });
+
+  test('cancelling one operation does not stop another operation progress timer', async () => {
+    const timers = trackTimers();
+    try {
+      const first = controllableUpstream();
+      first.push(cancellationFirstChunk);
+      const second = controllableUpstream();
+      second.push(cancellationFirstChunk);
+
+      const firstResult = await rewriteModelResponse_ChatCompletions({
+        response: first.response,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const secondResult = await rewriteModelResponse_ChatCompletions({
+        response: second.response,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+
+      const firstReader = firstResult.body?.getReader();
+      const secondReader = secondResult.body?.getReader();
+      await firstReader?.read();
+      await secondReader?.read();
+      expect(timers.active.size).toBe(2);
+
+      await firstReader?.cancel();
+      expect(timers.active.size).toBe(1);
+
+      await secondReader?.cancel();
+      expect(timers.active.size).toBe(0);
+    } finally {
+      timers.restore();
+    }
+  });
+});

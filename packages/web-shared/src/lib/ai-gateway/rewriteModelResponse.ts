@@ -348,6 +348,10 @@ function partialCapturedBody(capturedChunks: string[] | null): string | undefine
   return capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined;
 }
 
+type StreamCancellation = {
+  cancel?: () => void;
+};
+
 async function rewriteSseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   parser: ReturnType<typeof createParser>,
@@ -359,7 +363,8 @@ async function rewriteSseStream(
   vercelRequestId: string | null | undefined,
   capture: RequestLogCapture | null,
   capturedChunks: string[] | null,
-  reasoningEffort: string | null
+  reasoningEffort: string | null,
+  cancellation: StreamCancellation
 ) {
   const decoder = new TextDecoder();
   const settleReadError = (error: unknown) =>
@@ -370,9 +375,24 @@ async function rewriteSseStream(
       capture?.setBody(capturedChunks.join(''));
     }
   };
+  let cancelled = false;
+  cancellation.cancel = () => {
+    if (cancelled) {
+      return;
+    }
+    cancelled = true;
+    onFinally();
+    const upstreamCancellation = reader.cancel();
+    upstreamCancellation?.catch(error => {
+      errorExceptInTest('[rewriteModelResponse] failed to cancel upstream stream', error);
+    });
+  };
   try {
     while (true) {
       const { done, value } = await reader.read();
+      if (cancelled) {
+        return;
+      }
       if (done) {
         // Flush any event left buffered when the stream ends without a
         // trailing blank line, so its data isn't silently dropped.
@@ -391,21 +411,18 @@ async function rewriteSseStream(
         if (doneReceived()) {
           controller.enqueue('data: [DONE]\n\n');
         }
-        const cancellation = reader.cancel();
         controller.close();
         settleBody();
-        try {
-          await cancellation;
-        } catch (error) {
-          errorExceptInTest(
-            '[rewriteModelResponse] failed to cancel terminal upstream stream',
-            error
-          );
-        }
+        // Do not wait for the sibling reader; the accounting clone owns the
+        // shared source's remaining lifetime.
+        cancellation.cancel();
         return;
       }
     }
   } catch (error) {
+    if (cancelled) {
+      return;
+    }
     const responseReadError = getResponseReadError(error, vercelRequestId, reasoningEffort);
     if (!responseReadError) {
       settleReadError(error);
@@ -421,6 +438,7 @@ async function rewriteSseStream(
     controller.close();
   } finally {
     onFinally();
+    cancellation.cancel = undefined;
     reader.releaseLock();
   }
 }
@@ -499,6 +517,7 @@ export async function rewriteModelResponse_ChatCompletions({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
+  const cancellation: StreamCancellation = {};
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -592,7 +611,8 @@ export async function rewriteModelResponse_ChatCompletions({
         vercelRequestId,
         capture,
         capturedChunks,
-        reasoningEffort
+        reasoningEffort,
+        cancellation
       );
     },
     cancel() {
@@ -600,6 +620,7 @@ export async function rewriteModelResponse_ChatCompletions({
         new Error('response stream was cancelled'),
         partialCapturedBody(capturedChunks)
       );
+      cancellation.cancel?.();
     },
   });
 
@@ -691,6 +712,7 @@ export async function rewriteModelResponse_Messages({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
+  const cancellation: StreamCancellation = {};
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -780,7 +802,8 @@ export async function rewriteModelResponse_Messages({
         vercelRequestId,
         capture,
         capturedChunks,
-        reasoningEffort
+        reasoningEffort,
+        cancellation
       );
     },
     cancel() {
@@ -788,6 +811,7 @@ export async function rewriteModelResponse_Messages({
         new Error('response stream was cancelled'),
         partialCapturedBody(capturedChunks)
       );
+      cancellation.cancel?.();
     },
   });
 
@@ -855,6 +879,7 @@ export async function rewriteModelResponse_Responses({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
+  const cancellation: StreamCancellation = {};
   const stream = new ReadableStream({
     async start(controller) {
       const reader = response.body?.getReader();
@@ -939,7 +964,8 @@ export async function rewriteModelResponse_Responses({
         vercelRequestId,
         capture,
         capturedChunks,
-        reasoningEffort
+        reasoningEffort,
+        cancellation
       );
     },
     cancel() {
@@ -947,6 +973,7 @@ export async function rewriteModelResponse_Responses({
         new Error('response stream was cancelled'),
         partialCapturedBody(capturedChunks)
       );
+      cancellation.cancel?.();
     },
   });
 

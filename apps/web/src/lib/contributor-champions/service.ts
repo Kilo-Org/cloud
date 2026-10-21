@@ -1081,21 +1081,31 @@ export async function getContributorChampionProfileBadgeForUser(input: {
     enrolled_tier: string;
     enrolled_at: string;
   }>(sql`
-    WITH matched_contributors AS (
-      SELECT DISTINCT e.contributor_id
-      FROM contributor_champion_events e
-      INNER JOIN kilocode_users u ON lower(u.google_user_email) = lower(e.github_author_email)
-      WHERE u.id = ${input.userId}
-      UNION
-      SELECT m.contributor_id
+    WITH last_email AS (
+      SELECT DISTINCT ON (contributor_id)
+        contributor_id,
+        github_author_email
+      FROM contributor_champion_events
+      WHERE github_author_email IS NOT NULL
+      ORDER BY contributor_id, merged_at DESC
+    ),
+    -- One linked account per contributor, resolved the same way as enrollment and upgrades:
+    -- the membership link an admin set explicitly, otherwise the latest resolved email.
+    contributor_link AS (
+      SELECT
+        m.contributor_id,
+        COALESCE(m.linked_kilo_user_id, u.id) AS linked_user_id,
+        m.enrolled_tier,
+        m.enrolled_at
       FROM contributor_champion_memberships m
-      WHERE m.linked_kilo_user_id = ${input.userId}
+      LEFT JOIN last_email le ON le.contributor_id = m.contributor_id
+      LEFT JOIN kilocode_users u ON lower(u.google_user_email) = lower(le.github_author_email)
     )
-    SELECT m.enrolled_tier, m.enrolled_at
-    FROM contributor_champion_memberships m
-    INNER JOIN matched_contributors mc ON mc.contributor_id = m.contributor_id
-    WHERE m.enrolled_tier IS NOT NULL AND m.enrolled_at IS NOT NULL
-    ORDER BY m.enrolled_at DESC
+    SELECT enrolled_tier, enrolled_at
+    FROM contributor_link
+    WHERE linked_user_id = ${input.userId}
+      AND enrolled_tier IS NOT NULL AND enrolled_at IS NOT NULL
+    ORDER BY enrolled_at DESC
     LIMIT 1
   `);
 

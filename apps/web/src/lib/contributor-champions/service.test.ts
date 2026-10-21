@@ -573,6 +573,84 @@ describe('contributor champions service', () => {
     expect(afterEnrollment?.enrolledAt).toBeTruthy();
   });
 
+  it('requires the contributor resolved link for the profile badge', async () => {
+    const earlierEventUser = await insertTestUser({
+      google_user_email: 'earlier-event@example.com',
+    });
+    const latestEventUser = await insertTestUser({
+      google_user_email: 'latest-event@example.com',
+    });
+
+    const contributorId = await insertContributor({
+      login: 'resolved-link-contributor',
+      allTimeContributions: 10,
+    });
+    await insertEvent({
+      contributorId,
+      prNumber: 8_101,
+      mergedAt: daysAgo(40),
+      login: 'resolved-link-contributor',
+      email: 'earlier-event@example.com',
+    });
+    await insertEvent({
+      contributorId,
+      prNumber: 8_102,
+      mergedAt: daysAgo(2),
+      login: 'resolved-link-contributor',
+      email: 'latest-event@example.com',
+    });
+
+    await db.insert(contributor_champion_memberships).values({
+      contributor_id: contributorId,
+      selected_tier: 'ambassador',
+      enrolled_tier: 'ambassador',
+      enrolled_at: daysAgo(1),
+      credit_amount_microdollars: 0,
+    });
+
+    const latest = await getContributorChampionProfileBadgeForUser({ userId: latestEventUser.id });
+    expect(latest?.tier).toBe('ambassador');
+
+    const earlier = await getContributorChampionProfileBadgeForUser({
+      userId: earlierEventUser.id,
+    });
+    expect(earlier).toBeNull();
+
+    const membershipUser = await insertTestUser({
+      google_user_email: 'membership-link@example.com',
+    });
+    const eventEmailUser = await insertTestUser({
+      google_user_email: 'event-email@example.com',
+    });
+    const linkedContributorId = await insertContributor({
+      login: 'membership-link-contributor',
+      allTimeContributions: 10,
+    });
+    await insertEvent({
+      contributorId: linkedContributorId,
+      prNumber: 8_103,
+      mergedAt: daysAgo(2),
+      login: 'membership-link-contributor',
+      email: 'event-email@example.com',
+    });
+    await db.insert(contributor_champion_memberships).values({
+      contributor_id: linkedContributorId,
+      selected_tier: 'ambassador',
+      enrolled_tier: 'ambassador',
+      enrolled_at: daysAgo(1),
+      credit_amount_microdollars: 0,
+      linked_kilo_user_id: membershipUser.id,
+    });
+
+    const linked = await getContributorChampionProfileBadgeForUser({ userId: membershipUser.id });
+    expect(linked?.tier).toBe('ambassador');
+
+    const replaced = await getContributorChampionProfileBadgeForUser({
+      userId: eventEmailUser.id,
+    });
+    expect(replaced).toBeNull();
+  });
+
   it('processAutoTierUpgrades upgrades contributor to ambassador at 5 PRs and ambassador to champion at 15 PRs', async () => {
     const contributorId = await insertContributor({
       login: 'upgrade-candidate',

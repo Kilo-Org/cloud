@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Modèl sou aparèy la",
       "help": "Modèl sou aparèy la mache sou telefòn sa a. Mesaj ou voye ak repons yo rete sou aparèy la.",
+      "switchTitle": "Chanje pou yon modèl sou aparèy la?",
+      "switchMessage": "Lè ou chanje pou {{name}}, enstriksyon ak kontèks konvèsasyon sa a ap trete sou telefòn sa a, pa sou yon sèvè adistans.",
+      "switchConfirm": "Chanje modèl",
       "systemPurpose": "Modèl ki entegre nan sistèm aparèy sa a. Li mache sou aparèy la.",
       "apple": "Apple Intelligence (sou aparèy la)",
       "checking": "N ap verifye disponiblite…",

@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Samfuran da ke kan na'ura",
       "help": "Samfuran da ke kan na'ura suna aiki a wannan wayar. Saƙonninka da amsoshi suna zama a kan na'urar.",
+      "switchTitle": "A sauya zuwa samfurin da ke kan na'ura?",
+      "switchMessage": "Sauyawa zuwa {{name}} zai sa a sarrafa umarnin wannan tattaunawar da bayanan mahallinta a wannan wayar, ba a kan uwar garke mai nisa ba.",
+      "switchConfirm": "Sauya samfuri",
       "systemPurpose": "Samfurin da aka gina cikin tsarin wannan na'urar. Yana aiki a kan na'urar.",
       "apple": "Apple Intelligence (a kan na'ura)",
       "checking": "Ana duba samuwa…",

@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Mga modelong nasa device",
       "help": "Tumatakbo sa teleponong ito ang mga modelong nasa device. Mananatili sa device ang iyong mga prompt at sagot.",
+      "switchTitle": "Lumipat sa modelong nasa device?",
+      "switchMessage": "Kapag lumipat ka sa {{name}}, ipoproseso ang mga prompt at konteksto ng pag-uusap na ito sa teleponong ito, hindi sa isang remote server.",
+      "switchConfirm": "Lumipat ng modelo",
       "systemPurpose": "Ang modelong naka-built in sa system ng device na ito. Tumatakbo ito sa device.",
       "apple": "Apple Intelligence (sa device)",
       "checking": "Tinitingnan kung available…",

@@ -3635,6 +3635,9 @@
     "localModels": {
       "title": "Modelau ar y ddyfais",
       "help": "Mae modelau ar y ddyfais yn rhedeg ar y ffôn hwn. Mae eich anogwyr a'r atebion yn aros ar y ddyfais.",
+      "switchTitle": "Newid i fodel ar y ddyfais?",
+      "switchMessage": "Bydd newid i {{name}} yn golygu bod anogiadau a chyd-destun y sgwrs hon yn cael eu prosesu ar y ffôn hwn, nid ar weinydd pell.",
+      "switchConfirm": "Newid model",
       "systemPurpose": "Y model sydd wedi'i adeiladu i mewn i system y ddyfais hon. Mae'n rhedeg ar y ddyfais.",
       "apple": "Apple Intelligence (ar y ddyfais)",
       "checking": "Yn gwirio argaeledd…",

@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Gailuko modeloak",
       "help": "Gailuko modeloak telefono honetan exekutatzen dira. Zure galderak eta erantzunak gailuan geratzen dira.",
+      "switchTitle": "Gailuko modelo batera aldatu?",
+      "switchMessage": "{{name}} modelora aldatzean, elkarrizketa honen gonbitak eta testuingurua telefono honetan prozesatuko dira, ez urruneko zerbitzari batean.",
+      "switchConfirm": "Aldatu modeloa",
       "systemPurpose": "Gailu honen sisteman integratutako modeloa. Gailuan exekutatzen da.",
       "apple": "Apple Intelligence (gailuan)",
       "checking": "Erabilgarritasuna egiaztatzen…",

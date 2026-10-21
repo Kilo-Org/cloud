@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Ngā tauira i te pūrere",
       "help": "Ka rere ngā tauira i te pūrere ki runga i tēnei waea. Ka noho ō tono me ngā whakautu ki te pūrere.",
+      "switchTitle": "Me huri ki tētahi tauira i te pūrere?",
+      "switchMessage": "Mā te huri ki {{name}} ka tukatukahia ngā tohutohu me te horopaki o tēnei kōrerorero ki runga i tēnei waea, kaua ki runga i tētahi tūmau mamao.",
+      "switchConfirm": "Huri tauira",
       "systemPurpose": "Te tauira kua hangaia ki te pūnaha o tēnei pūrere. Ka rere i te pūrere.",
       "apple": "Apple Intelligence (i te pūrere)",
       "checking": "Kei te tirotiro mēnā e wātea ana…",

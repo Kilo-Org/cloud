@@ -3512,6 +3512,9 @@
     "localModels": {
       "title": "Modeli na uređaju",
       "help": "Modeli na uređaju rade na ovom telefonu. Vaši upiti i odgovori ostaju na uređaju.",
+      "switchTitle": "Preći na model na uređaju?",
+      "switchMessage": "Prelaskom na {{name}} upute i kontekst ovog razgovora obrađivat će se na ovom telefonu, a ne na udaljenom serveru.",
+      "switchConfirm": "Promijeni model",
       "systemPurpose": "Model ugrađen u sistem ovog uređaja. Radi na uređaju.",
       "apple": "Apple Intelligence (na uređaju)",
       "checking": "Provjera dostupnosti…",

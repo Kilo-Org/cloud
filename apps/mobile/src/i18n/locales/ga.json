@@ -3594,6 +3594,9 @@
     "localModels": {
       "title": "Samhlacha ar an ngléas",
       "help": "Ritheann samhlacha ar an ngléas ar an bhfón seo. Fanann do leideanna agus na freagraí ar an ngléas.",
+      "switchTitle": "Ar mhaith leat athrú go samhail ar an ngléas?",
+      "switchMessage": "Má athraíonn tú go {{name}}, próiseálfar leideanna agus comhthéacs an chomhrá seo ar an bhfón seo, seachas ar fhreastalaí cianda.",
+      "switchConfirm": "Athraigh samhail",
       "systemPurpose": "An tsamhail atá ionsuite i gcóras an ghléis seo. Ritheann sí ar an ngléas.",
       "apple": "Apple Intelligence (ar an ngléas)",
       "checking": "Infhaighteacht á seiceáil…",

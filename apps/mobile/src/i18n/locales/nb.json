@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Modeller på enheten",
       "help": "Modeller på enheten kjører på denne telefonen. Meldingene og svarene dine blir på enheten.",
+      "switchTitle": "Bytte til en modell på enheten?",
+      "switchMessage": "Hvis du bytter til {{name}}, behandles samtalens ledetekster og kontekst på denne telefonen, ikke på en ekstern server.",
+      "switchConfirm": "Bytt modell",
       "systemPurpose": "Modellen som er innebygd i systemet på denne enheten. Den kjører på enheten.",
       "apple": "Apple Intelligence (på enheten)",
       "checking": "Sjekker tilgjengelighet …",

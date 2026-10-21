@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Model pada peranti",
       "help": "Model pada peranti berjalan pada telefon ini. Gesaan dan balasan anda kekal pada peranti.",
+      "switchTitle": "Beralih ke model pada peranti?",
+      "switchMessage": "Apabila beralih ke {{name}}, gesaan dan konteks perbualan ini akan diproses pada telefon ini, bukan pada pelayan jauh.",
+      "switchConfirm": "Tukar model",
       "systemPurpose": "Model yang terbina dalam sistem peranti ini. Ia berjalan pada peranti.",
       "apple": "Apple Intelligence (pada peranti)",
       "checking": "Menyemak ketersediaan…",

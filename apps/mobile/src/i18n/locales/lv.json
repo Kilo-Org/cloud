@@ -3512,6 +3512,9 @@
     "localModels": {
       "title": "Ierīces modeļi",
       "help": "Ierīces modeļi darbojas šajā tālrunī. Jūsu uzvednes un atbildes paliek ierīcē.",
+      "switchTitle": "Pārslēgties uz ierīces modeli?",
+      "switchMessage": "Pārslēdzoties uz {{name}}, šīs sarunas uzvednes un konteksts tiks apstrādāti šajā tālrunī, nevis attālā serverī.",
+      "switchConfirm": "Pārslēgt modeli",
       "systemPurpose": "Šīs ierīces sistēmā iebūvētais modelis. Tas darbojas ierīcē.",
       "apple": "Apple Intelligence (ierīcē)",
       "checking": "Pārbauda pieejamību…",

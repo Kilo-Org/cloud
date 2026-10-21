@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Modeller på enheden",
       "help": "Modeller på enheden kører på denne telefon. Dine prompter og svar bliver på enheden.",
+      "switchTitle": "Skift til en model på enheden?",
+      "switchMessage": "Hvis du skifter til {{name}}, behandles denne samtales prompter og kontekst på denne telefon, ikke på en fjernserver.",
+      "switchConfirm": "Skift model",
       "systemPurpose": "Modellen, der er indbygget i denne enheds system. Den kører på enheden.",
       "apple": "Apple Intelligence (på enheden)",
       "checking": "Tjekker tilgængelighed…",

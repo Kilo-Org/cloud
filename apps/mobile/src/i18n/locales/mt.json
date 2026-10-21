@@ -3594,6 +3594,9 @@
     "localModels": {
       "title": "Mudelli fuq l-apparat",
       "help": "Il-mudelli fuq l-apparat jaħdmu fuq dan il-mowbajl. Il-messaġġi u t-tweġibiet tiegħek jibqgħu fuq l-apparat.",
+      "switchTitle": "Taqleb għal mudell fuq l-apparat?",
+      "switchMessage": "Meta taqleb għal {{name}}, l-istruzzjonijiet u l-kuntest ta' din il-konversazzjoni jiġu pproċessati fuq dan il-mowbajl, mhux fuq server remot.",
+      "switchConfirm": "Ibdel il-mudell",
       "systemPurpose": "Il-mudell mibni fis-sistema ta' dan l-apparat. Jaħdem fuq l-apparat.",
       "apple": "Apple Intelligence (fuq l-apparat)",
       "checking": "Qed tiġi ċċekkjata d-disponibbiltà…",

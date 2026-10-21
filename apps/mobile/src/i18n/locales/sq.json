@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Modelet në pajisje",
       "help": "Modelet në pajisje funksionojnë në këtë telefon. Kërkesat dhe përgjigjet e tua mbeten në pajisje.",
+      "switchTitle": "Të kalohet te një model në pajisje?",
+      "switchMessage": "Me kalimin te {{name}}, udhëzimet dhe konteksti i kësaj bisede përpunohen në këtë telefon, jo në një server në distancë.",
+      "switchConfirm": "Ndrysho modelin",
       "systemPurpose": "Modeli i integruar në sistemin e kësaj pajisjeje. Funksionon në pajisje.",
       "apple": "Apple Intelligence (në pajisje)",
       "checking": "Po kontrollohet disponueshmëria…",

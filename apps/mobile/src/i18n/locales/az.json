@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Cihazdakı modellər",
       "help": "Cihazdakı modellər bu telefonda işləyir. Sorğularınız və cavablar cihazda qalır.",
+      "switchTitle": "Cihazdakı modelə keçilsin?",
+      "switchMessage": "{{name}} modelinə keçdikdə bu söhbətin sorğuları və konteksti uzaq serverdə deyil, bu telefonda emal olunur.",
+      "switchConfirm": "Modeli dəyiş",
       "systemPurpose": "Bu cihazın sisteminə daxil edilmiş model. O, cihazda işləyir.",
       "apple": "Apple Intelligence (cihazda)",
       "checking": "Əlçatanlıq yoxlanılır…",

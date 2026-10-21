@@ -3512,6 +3512,9 @@
     "localModels": {
       "title": "Modele pe dispozitiv",
       "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv.",
+      "switchTitle": "Treci la un model pe dispozitiv?",
+      "switchMessage": "Trecerea la {{name}} face ca prompturile și contextul acestei conversații să fie procesate pe acest telefon, nu pe un server la distanță.",
+      "switchConfirm": "Schimbă modelul",
       "systemPurpose": "Modelul integrat în sistemul acestui dispozitiv. Rulează pe dispozitiv.",
       "apple": "Apple Intelligence (pe dispozitiv)",
       "checking": "Se verifică disponibilitatea…",

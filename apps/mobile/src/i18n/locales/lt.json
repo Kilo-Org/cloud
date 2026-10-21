@@ -3553,6 +3553,9 @@
     "localModels": {
       "title": "Įrenginio modeliai",
       "help": "Įrenginio modeliai veikia šiame telefone. Jūsų užklausos ir atsakymai lieka įrenginyje.",
+      "switchTitle": "Perjungti į įrenginio modelį?",
+      "switchMessage": "Perjungus į {{name}}, šio pokalbio užklausos ir kontekstas bus apdorojami šiame telefone, o ne nuotoliniame serveryje.",
+      "switchConfirm": "Pakeisti modelį",
       "systemPurpose": "Į šio įrenginio sistemą integruotas modelis. Jis veikia įrenginyje.",
       "apple": "Apple Intelligence (įrenginyje)",
       "checking": "Tikrinamas pasiekiamumas…",

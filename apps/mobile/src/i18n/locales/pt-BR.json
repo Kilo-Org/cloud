@@ -3512,6 +3512,9 @@
     "localModels": {
       "title": "Modelos no dispositivo",
       "help": "Os modelos no dispositivo são executados neste celular. Seus prompts e respostas ficam no dispositivo.",
+      "switchTitle": "Mudar para um modelo no dispositivo?",
+      "switchMessage": "Ao mudar para {{name}}, as mensagens e o contexto desta conversa serão processados neste celular, não em um servidor remoto.",
+      "switchConfirm": "Mudar de modelo",
       "systemPurpose": "O modelo integrado ao sistema deste dispositivo. Ele é executado no dispositivo.",
       "apple": "Apple Intelligence (no dispositivo)",
       "checking": "Verificando disponibilidade…",

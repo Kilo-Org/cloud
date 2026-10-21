@@ -3553,6 +3553,9 @@
     "localModels": {
       "title": "Modele na urządzeniu",
       "help": "Modele na urządzeniu działają na tym telefonie. Twoje prompty i odpowiedzi pozostają na urządzeniu.",
+      "switchTitle": "Przełączyć na model na urządzeniu?",
+      "switchMessage": "Przełączenie na {{name}} spowoduje, że monity i kontekst tej rozmowy będą przetwarzane na tym telefonie, a nie na zdalnym serwerze.",
+      "switchConfirm": "Przełącz model",
       "systemPurpose": "Model wbudowany w system tego urządzenia. Działa na urządzeniu.",
       "apple": "Apple Intelligence (na urządzeniu)",
       "checking": "Sprawdzanie dostępności…",

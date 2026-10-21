@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Mô hình trên thiết bị",
       "help": "Mô hình trên thiết bị chạy ngay trên điện thoại này. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị.",
+      "switchTitle": "Chuyển sang mô hình trên thiết bị?",
+      "switchMessage": "Chuyển sang {{name}} sẽ xử lý lời nhắc và ngữ cảnh của cuộc trò chuyện này ngay trên điện thoại này, không phải trên máy chủ từ xa.",
+      "switchConfirm": "Chuyển mô hình",
       "systemPurpose": "Mô hình tích hợp sẵn trong hệ thống của thiết bị này. Mô hình chạy ngay trên thiết bị.",
       "apple": "Apple Intelligence (trên thiết bị)",
       "checking": "Đang kiểm tra khả dụng…",

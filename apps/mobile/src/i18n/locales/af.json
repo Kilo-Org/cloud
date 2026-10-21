@@ -3471,6 +3471,9 @@
     "localModels": {
       "title": "Modelle op die toestel",
       "help": "Modelle op die toestel loop op hierdie foon. Jou opdragte en antwoorde bly op die toestel.",
+      "switchTitle": "Skakel oor na 'n model op die toestel?",
+      "switchMessage": "As jy na {{name}} oorskakel, word hierdie gesprek se opdragte en konteks op hierdie foon verwerk, nie op 'n afgeleë bediener nie.",
+      "switchConfirm": "Skakel model om",
       "systemPurpose": "Die model wat in hierdie toestel se stelsel ingebou is. Dit loop op die toestel.",
       "apple": "Apple Intelligence (op die toestel)",
       "checking": "Kontroleer beskikbaarheid…",

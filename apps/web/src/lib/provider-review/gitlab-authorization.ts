@@ -172,15 +172,20 @@ export function classifyGitLabError(error: unknown): GitLabReviewError {
 }
 
 /**
- * Classify one failure for the account whose connection produced the
+ * Classify one READ failure for the account whose connection produced the
  * credential.
  *
  * The token belongs to the CONNECTION: for an organization integration it is
  * the organization's credential, and the person reading the merge request has
- * no GitLab role in play. A provider 403 on such a connection is therefore
- * the connection's refusal — it cannot read that project — and its remedy is
+ * no GitLab role in play. A provider 403 on such a read is therefore the
+ * connection's refusal — it cannot read that project — and its remedy is
  * reconnecting, not the reader's permission. A personal connection's 403 is
  * the caller's own GitLab role, and stays `forbidden`.
+ *
+ * Reads only: a 403 on a WRITE is an action-level refusal (self-approval, a
+ * protected branch, a role the connected identity lacks), which reconnecting
+ * cannot fix, so the write path keeps `classifyGitLabError`. A refused
+ * credential (401) is `reconnect` on both paths.
  */
 export function classifyGitLabErrorForOwner(
   error: unknown,

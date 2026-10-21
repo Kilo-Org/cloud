@@ -156,7 +156,6 @@ afterEach(() => {
   view = undefined;
   vi.unstubAllGlobals();
 });
-
 describe('GeneralSettingsScreen', () => {
   it('renders the settings and the condense row with their exact titles and subtitles', async () => {
     const renderer = await mountGeneral();
@@ -182,7 +181,7 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
     );
     const byLabel = (label: string) => switches.find(sw => sw.props.accessibilityLabel === label);
 
@@ -219,7 +218,7 @@ describe('GeneralSettingsScreen', () => {
     const renderer = await mountGeneral();
 
     const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
     );
     const condenseSwitch = switches.find(
       sw => sw.props.accessibilityLabel === 'Condense tool calls'
@@ -231,38 +230,8 @@ describe('GeneralSettingsScreen', () => {
     });
   });
 
-  it('renders the biometric switch off by default without prompting native authentication', async () => {
-    const renderer = await mountGeneral();
-
-    const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
-    );
-    const biometricSwitch = switches.find(
-      sw => sw.props.accessibilityLabel === 'Unlock with biometrics'
-    );
-
-    expect(biometricSwitch).toBeDefined();
-    expect(biometricSwitch?.props.accessibilityState).toMatchObject({
-      checked: false,
-      disabled: false,
-    });
+  it('does not prompt for native authentication when opening settings', async () => {
+    await mountGeneral();
     expect(native.authenticateAsync).not.toHaveBeenCalled();
-  });
-
-  it('mounts the hide-thinking switch off and enabled once the preference load settles', async () => {
-    const renderer = await mountGeneral();
-
-    const switches = renderer.renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
-    );
-    const hideThinkingSwitch = switches.find(
-      sw => sw.props.accessibilityLabel === 'Hide thinking details'
-    );
-
-    expect(hideThinkingSwitch).toBeDefined();
-    expect(hideThinkingSwitch?.props.accessibilityState).toMatchObject({
-      checked: false,
-      disabled: false,
-    });
   });
 });

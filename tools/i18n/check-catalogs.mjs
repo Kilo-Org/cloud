@@ -105,7 +105,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // slug the field validator accepts, a server name, a JSON snippet, and
   // command lines whose tool and package paths must stay literal. Every
   // catalog keeps them English so the example never contradicts validation.
-  'profiles.commandPlaceholder',
   'profiles.mcp.namePlaceholder',
   'profiles.mcp.commandPlaceholder',
   'profiles.mcp.jsonPlaceholder',

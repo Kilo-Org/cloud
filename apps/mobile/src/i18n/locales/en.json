@@ -3142,13 +3142,17 @@
       }
     },
     "lowBalanceAlert": {
+      "emailsInvalid": "One or more email addresses are not valid.",
+      "emailsRequired": "Enter at least one email address.",
       "enableA11y": "Enable low balance alert",
       "notifyEmailsLabel": "Notify emails",
       "permissionDenied": "You don't have permission to manage billing alerts.",
+      "saveEmailsError": "Some email addresses were not accepted. Check them and try again.",
+      "saveError": "Couldn't save the low balance alert.",
       "separateEmailsHint": "Separate multiple emails with commas.",
       "thresholdLabel": "Alert below (USD)",
+      "thresholdPlaceholder": "Enter an amount",
       "title": "Low balance alert",
-      "emailsError": "Enter at least one valid email, separated by commas",
       "thresholdError": "Enter an amount greater than 0"
     },
     "memberLimit": {

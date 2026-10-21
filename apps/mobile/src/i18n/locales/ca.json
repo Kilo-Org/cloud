@@ -3117,7 +3117,11 @@
       "separateEmailsHint": "Separa les adreces de correu electrònic amb comes.",
       "thresholdLabel": "Llindar de l'avís (USD)",
       "title": "Avís de saldo baix",
-      "emailsError": "Introdueix almenys una adreça de correu electrònic vàlida. Si n'hi ha més d'una, separa-les amb comes.",
+      "emailsInvalid": "Una o més adreces de correu electrònic no són vàlides.",
+      "emailsRequired": "Introdueix almenys una adreça de correu electrònic.",
+      "saveEmailsError": "Algunes adreces de correu electrònic no s'han acceptat. Revisa-les i torna-ho a provar.",
+      "saveError": "No s'ha pogut desar l'avís de saldo baix.",
+      "thresholdPlaceholder": "Introdueix un import",
       "thresholdError": "Introdueix un import superior a 0."
     },
     "memberLimit": {

@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Elektron pochta manzillarini vergul bilan ajrating.",
       "thresholdLabel": "Ogohlantirish chegarasi (USD)",
       "title": "Balans kamayishi haqida ogohlantirish",
-      "emailsError": "Kamida bitta to'g'ri elektron pochta manzilini kiriting. Bir nechta manzilni vergul bilan ajrating.",
+      "emailsInvalid": "Bir yoki bir nechta elektron pochta manzili noto'g'ri.",
+      "emailsRequired": "Kamida bitta elektron pochta manzilini kiriting.",
+      "saveEmailsError": "Ba'zi elektron pochta manzillari qabul qilinmadi. Ularni tekshirib, qayta urinib ko'ring.",
+      "saveError": "Balans kamayishi haqida ogohlantirishni saqlab bo'lmadi.",
+      "thresholdPlaceholder": "Miqdor kiriting",
       "thresholdError": "0 Dan katta miqdorni kiriting."
     },
     "memberLimit": {

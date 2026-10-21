@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Jiri rịkọm kewaa adreesị ozi ịntanetị.",
       "thresholdLabel": "Dọọ aka na ntị ma ego erughị (USD)",
       "title": "Ịdọ aka na ntị maka ego fọdụrụ",
-      "emailsError": "Tinye opekata mpe otu adreesị ozi ịntanetị ziri ezi. Jiri rịkọm kewaa ha.",
+      "emailsInvalid": "Otu ma ọ bụ karịa adreesị ozi ịntanetị ezighi ezi.",
+      "emailsRequired": "Tinye opekata mpe otu adreesị ozi ịntanetị.",
+      "saveEmailsError": "Anabataghị ụfọdụ adreesị ozi ịntanetị. Lelee ha ma nwaa ọzọ.",
+      "saveError": "Enweghị ike ichekwa ịdọ aka na ntị maka ego fọdụrụ.",
+      "thresholdPlaceholder": "Tinye ego",
       "thresholdError": "Tinye ego karịrị 0."
     },
     "memberLimit": {

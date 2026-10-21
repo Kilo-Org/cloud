@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Paghiwalayin ang mga email gamit ang kuwit.",
       "thresholdLabel": "Magbabala kapag mas mababa sa (USD)",
       "title": "Babala sa mababang balanse",
-      "emailsError": "Maglagay ng kahit isang wastong email address. Kung higit sa isa, paghiwalayin ang mga ito ng kuwit.",
+      "emailsInvalid": "Isa o higit pang email address ang hindi wasto.",
+      "emailsRequired": "Maglagay ng kahit isang email address.",
+      "saveEmailsError": "May mga email address na hindi natanggap. Suriin ang mga ito at subukang muli.",
+      "saveError": "Hindi nai-save ang babala sa mababang balanse.",
+      "thresholdPlaceholder": "Maglagay ng halaga",
       "thresholdError": "Maglagay ng halagang mas malaki sa 0."
     },
     "memberLimit": {

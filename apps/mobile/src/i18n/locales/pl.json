@@ -3156,7 +3156,11 @@
       "separateEmailsHint": "Oddziel adresy e-mail przecinkami.",
       "thresholdLabel": "Powiadom, gdy saldo spadnie poniżej (USD)",
       "title": "Powiadomienie o niskim saldzie",
-      "emailsError": "Wpisz co najmniej jeden prawidłowy adres e-mail. Jeśli podajesz kilka adresów, oddziel je przecinkami.",
+      "emailsInvalid": "Co najmniej jeden adres e-mail jest nieprawidłowy.",
+      "emailsRequired": "Wpisz co najmniej jeden adres e-mail.",
+      "saveEmailsError": "Niektóre adresy e-mail nie zostały zaakceptowane. Sprawdź je i spróbuj ponownie.",
+      "saveError": "Nie udało się zapisać powiadomienia o niskim saldzie.",
+      "thresholdPlaceholder": "Wpisz kwotę",
       "thresholdError": "Wpisz kwotę większą niż 0."
     },
     "memberLimit": {

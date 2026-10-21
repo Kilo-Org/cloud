@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Tenganisha anwani za barua pepe kwa koma.",
       "thresholdLabel": "Arifu salio likiwa chini ya (USD)",
       "title": "Arifa ya salio la chini",
-      "emailsError": "Weka angalau anwani moja halali ya barua pepe. Tenganisha anwani kwa koma.",
+      "emailsInvalid": "Anwani moja au zaidi za barua pepe si halali.",
+      "emailsRequired": "Weka angalau anwani moja ya barua pepe.",
+      "saveEmailsError": "Baadhi ya anwani za barua pepe hazikukubaliwa. Angalia zisha ndiyo ujaribu tena.",
+      "saveError": "Arifa ya salio la chini haikuweza kuhifadhiwa.",
+      "thresholdPlaceholder": "Weka kiasi",
       "thresholdError": "Weka kiasi kikubwa kuliko 0."
     },
     "memberLimit": {

@@ -3157,7 +3157,11 @@
       "separateEmailsHint": "Viaceré e-mailové adresy oddeľ čiarkami.",
       "thresholdLabel": "Hranica upozornenia (USD)",
       "title": "Upozornenie na nízky zostatok",
-      "emailsError": "Zadaj aspoň jednu platnú e-mailovú adresu. Viaceré adresy oddeľ čiarkami.",
+      "emailsInvalid": "Jedna alebo viac e-mailových adries nie je platných.",
+      "emailsRequired": "Zadaj aspoň jednu e-mailovú adresu.",
+      "saveEmailsError": "Niektoré e-mailové adresy neboli prijaté. Skontroluj ich a skús to znova.",
+      "saveError": "Upozornenie na nízky zostatok sa nepodarilo uložiť.",
+      "thresholdPlaceholder": "Zadaj sumu",
       "thresholdError": "Zadaj sumu väčšiu ako 0."
     },
     "memberLimit": {

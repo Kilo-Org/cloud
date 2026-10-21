@@ -3117,7 +3117,11 @@
       "separateEmailsHint": "Atdali vairākas e-pasta adreses ar komatiem.",
       "thresholdLabel": "Atlikuma slieksnis (USD)",
       "title": "Brīdinājums par mazu atlikumu",
-      "emailsError": "Ievadi vismaz vienu derīgu e-pasta adresi. Vairākas adreses atdali ar komatiem.",
+      "emailsInvalid": "Viena vai vairākas e-pasta adreses nav derīgas.",
+      "emailsRequired": "Ievadi vismaz vienu e-pasta adresi.",
+      "saveEmailsError": "Dažas e-pasta adreses netika pieņemtas. Pārbaudi tās un mēģini vēlreiz.",
+      "saveError": "Neizdevās saglabāt brīdinājumu par mazu atlikumu.",
+      "thresholdPlaceholder": "Ievadi summu",
       "thresholdError": "Ievadi summu, kas ir lielāka par 0."
     },
     "memberLimit": {

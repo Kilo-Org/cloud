@@ -3117,7 +3117,11 @@
       "separateEmailsHint": "Separă adresele de e-mail prin virgule.",
       "thresholdLabel": "Prag de alertă (USD)",
       "title": "Alertă de sold scăzut",
-      "emailsError": "Introdu cel puțin o adresă de e-mail validă. Separă adresele prin virgule.",
+      "emailsInvalid": "Una sau mai multe adrese de e-mail nu sunt valide.",
+      "emailsRequired": "Introdu cel puțin o adresă de e-mail.",
+      "saveEmailsError": "Unele adrese de e-mail nu au fost acceptate. Verifică-le și încearcă din nou.",
+      "saveError": "Nu am putut salva alerta de sold scăzut.",
+      "thresholdPlaceholder": "Introdu o sumă",
       "thresholdError": "Introdu o sumă mai mare decât 0."
     },
     "memberLimit": {

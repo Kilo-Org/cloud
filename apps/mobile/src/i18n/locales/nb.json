@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Skill flere e-postadresser med komma.",
       "thresholdLabel": "Varsle under (USD)",
       "title": "Varsel om lav saldo",
-      "emailsError": "Angi minst én gyldig e-postadresse. Skill flere adresser med komma.",
+      "emailsInvalid": "Én eller flere e-postadresser er ikke gyldige.",
+      "emailsRequired": "Angi minst én e-postadresse.",
+      "saveEmailsError": "Noen e-postadresser ble ikke godtatt. Kontroller dem og prøv igjen.",
+      "saveError": "Kunne ikke lagre varselet om lav saldo.",
+      "thresholdPlaceholder": "Angi et beløp",
       "thresholdError": "Angi et beløp større enn 0."
     },
     "memberLimit": {

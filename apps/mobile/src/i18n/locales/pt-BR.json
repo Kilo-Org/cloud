@@ -3116,7 +3116,11 @@
       "separateEmailsHint": "Separe vários e-mails com vírgulas.",
       "thresholdLabel": "Alertar abaixo de (USD)",
       "title": "Alerta de saldo baixo",
-      "emailsError": "Digite pelo menos um e-mail válido. Separe os endereços com vírgulas.",
+      "emailsInvalid": "Um ou mais endereços de e-mail não são válidos.",
+      "emailsRequired": "Digite pelo menos um endereço de e-mail.",
+      "saveEmailsError": "Alguns endereços de e-mail não foram aceitos. Verifique-os e tente novamente.",
+      "saveError": "Não foi possível salvar o alerta de saldo baixo.",
+      "thresholdPlaceholder": "Digite um valor",
       "thresholdError": "Digite um valor maior que 0."
     },
     "memberLimit": {

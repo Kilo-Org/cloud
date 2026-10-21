@@ -3117,7 +3117,11 @@
       "separateEmailsHint": "Odvoji adrese e-pošte zapetama.",
       "thresholdLabel": "Prag upozorenja (USD)",
       "title": "Upozorenje o niskom saldu",
-      "emailsError": "Unesi bar jednu važeću adresu e-pošte. Ako ih ima više, odvoji ih zapetama.",
+      "emailsInvalid": "Jedna ili više adresa e-pošte nisu važeće.",
+      "emailsRequired": "Unesi bar jednu adresu e-pošte.",
+      "saveEmailsError": "Neke adrese e-pošte nisu prihvaćene. Proveri ih i probaj ponovo.",
+      "saveError": "Nije moguće sačuvati upozorenje o niskom saldu.",
+      "thresholdPlaceholder": "Unesi iznos",
       "thresholdError": "Unesi iznos veći od 0."
     },
     "memberLimit": {

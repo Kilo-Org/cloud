@@ -3076,7 +3076,11 @@
       "separateEmailsHint": "請以逗號分隔多個電子郵件地址。",
       "thresholdLabel": "餘額低於此金額時提醒（USD）",
       "title": "餘額不足提醒",
-      "emailsError": "請輸入至少一個有效的電子郵件地址，多個地址請以逗號分隔。",
+      "emailsInvalid": "有一個或多個電子郵件地址無效。",
+      "emailsRequired": "請輸入至少一個電子郵件地址。",
+      "saveEmailsError": "部分電子郵件地址未被接受，請檢查後再試一次。",
+      "saveError": "無法儲存餘額不足提醒。",
+      "thresholdPlaceholder": "輸入金額",
       "thresholdError": "請輸入大於 0 的金額。"
     },
     "memberLimit": {

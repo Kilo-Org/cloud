@@ -3076,7 +3076,11 @@
       "separateEmailsHint": "Trenne mehrere E-Mail-Adressen durch Kommas.",
       "thresholdLabel": "Warnung unter (USD)",
       "title": "Warnung bei niedrigem Guthaben",
-      "emailsError": "Gib mindestens eine gültige E-Mail-Adresse ein. Trenne mehrere Adressen durch Kommas.",
+      "emailsInvalid": "Eine oder mehrere E-Mail-Adressen sind ungültig.",
+      "emailsRequired": "Gib mindestens eine E-Mail-Adresse ein.",
+      "saveEmailsError": "Einige E-Mail-Adressen wurden nicht akzeptiert. Prüfe sie und versuche es erneut.",
+      "saveError": "Die Warnung bei niedrigem Guthaben konnte nicht gespeichert werden.",
+      "thresholdPlaceholder": "Betrag eingeben",
       "thresholdError": "Gib einen Betrag größer als 0 ein."
     },
     "memberLimit": {

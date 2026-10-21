@@ -3076,7 +3076,11 @@
       "separateEmailsHint": "이메일 주소를 여러 개 입력할 때는 쉼표로 구분하세요.",
       "thresholdLabel": "알림 기준 잔액(USD 미만)",
       "title": "잔액 부족 알림",
-      "emailsError": "올바른 이메일 주소를 하나 이상 입력하세요. 여러 주소는 쉼표로 구분하세요.",
+      "emailsInvalid": "올바르지 않은 이메일 주소가 하나 이상 있습니다.",
+      "emailsRequired": "이메일 주소를 하나 이상 입력하세요.",
+      "saveEmailsError": "일부 이메일 주소가 승인되지 않았습니다. 확인 후 다시 시도하세요.",
+      "saveError": "잔액 부족 알림을 저장하지 못했습니다.",
+      "thresholdPlaceholder": "금액을 입력하세요.",
       "thresholdError": "0보다 큰 금액을 입력하세요."
     },
     "memberLimit": {

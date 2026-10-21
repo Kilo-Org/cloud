@@ -3076,7 +3076,11 @@
       "separateEmailsHint": "Scheid meerdere e-mailadressen met komma's.",
       "thresholdLabel": "Waarschuwen onder (USD)",
       "title": "Waarschuwing voor laag saldo",
-      "emailsError": "Voer minstens één geldig e-mailadres in. Scheid meerdere adressen met komma's.",
+      "emailsInvalid": "Een of meer e-mailadressen zijn ongeldig.",
+      "emailsRequired": "Voer minstens één e-mailadres in.",
+      "saveEmailsError": "Sommige e-mailadressen zijn niet geaccepteerd. Controleer ze en probeer het opnieuw.",
+      "saveError": "De waarschuwing voor laag saldo kon niet worden opgeslagen.",
+      "thresholdPlaceholder": "Voer een bedrag in",
       "thresholdError": "Voer een bedrag groter dan 0 in."
     },
     "memberLimit": {

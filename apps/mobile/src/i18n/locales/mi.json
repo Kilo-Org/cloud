@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Wehewehea ngā wāhitau īmēra ki ngā piko.",
       "thresholdLabel": "Whakatūpato ina iti iho i te (USD)",
       "title": "Te whakatūpato toenga iti",
-      "emailsError": "Whakaurua kia kotahi neke atu rānei ngā wāhitau īmēra tika. Wehewehea ki ngā piko.",
+      "emailsInvalid": "Kāore e tika ana tētahi, ētahi rānei o ngā wāhitau īmēra.",
+      "emailsRequired": "Whakaurua kia kotahi neke atu rānei ngā wāhitau īmēra.",
+      "saveEmailsError": "Kāore ētahi o ngā wāhitau īmēra i whakaaetia. Tirohia, kātahi ka whakamātau anō.",
+      "saveError": "Kāore i taea te tiaki i te whakatūpato toenga iti.",
+      "thresholdPlaceholder": "Whakaurua he moni",
       "thresholdError": "Whakaurua he moni nui ake i te 0."
     },
     "memberLimit": {

@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "ብዙ የኢሜይል አድራሻዎችን በነጠላ ሰረዝ ይለዩ።",
       "thresholdLabel": "ማንቂያ የሚላክበት ዝቅተኛ መጠን (USD)",
       "title": "የዝቅተኛ ቀሪ ሂሳብ ማንቂያ",
-      "emailsError": "ቢያንስ አንድ ትክክለኛ የኢሜይል አድራሻ ያስገቡ። ብዙ አድራሻዎችን በነጠላ ሰረዝ ይለዩ።",
+      "emailsInvalid": "አንድ ወይም ከዚያ በላይ የኢሜይል አድራሻዎች ትክክለኛ አይደሉም።",
+      "emailsRequired": "ቢያንስ አንድ የኢሜይል አድራሻ ያስገቡ።",
+      "saveEmailsError": "አንዳንድ የኢሜይል አድራሻዎች አልተቀበሉም። ያረጋግጡና እንደገና ይሞክሩ።",
+      "saveError": "የዝቅተኛ ቀሪ ሂሳብ ማንቂያን ማስቀመጥ አልተቻለም።",
+      "thresholdPlaceholder": "መጠን ያስገቡ",
       "thresholdError": "ከ0 የሚበልጥ መጠን ያስገቡ።"
     },
     "memberLimit": {

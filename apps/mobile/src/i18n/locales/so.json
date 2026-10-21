@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Cinwaannada iimaylka ku kala saar hakadyo.",
       "thresholdLabel": "Ka dig hadhaag ka yar (USD)",
       "title": "Digniinta hadhaaga yar",
-      "emailsError": "Geli ugu yaraan hal cinwaan iimayl oo sax ah. Haddii ay badan yihiin, ku kala saar hakadyo.",
+      "emailsInvalid": "Cinwaanada iimaylka qaarkood waa aan sax ahayn.",
+      "emailsRequired": "Geli ugu yaraan hal cinwaan iimayl.",
+      "saveEmailsError": "Cinwaanada iimaylka qaarkood lama aqbalin. Hubi oo mar kale isku day.",
+      "saveError": "Digniinta hadhaaga yar lama kaydin karin.",
+      "thresholdPlaceholder": "Geli qaddar",
       "thresholdError": "Geli qaddar ka weyn 0."
     },
     "memberLimit": {

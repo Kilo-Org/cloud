@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Skei verskeie e-posadresse met kommas.",
       "thresholdLabel": "Waarsku onder (USD)",
       "title": "Waarskuwing vir lae saldo",
-      "emailsError": "Voer minstens een geldige e-posadres in. Skei verskeie adresse met kommas.",
+      "emailsInvalid": "Een of meer e-posadresse is nie geldig nie.",
+      "emailsRequired": "Voer minstens een e-posadres in.",
+      "saveEmailsError": "Sommige e-posadresse is nie aanvaar nie. Kontroleer hulle en probeer weer.",
+      "saveError": "Die waarskuwing vir lae saldo kon nie gestoor word nie.",
+      "thresholdPlaceholder": "Voer 'n bedrag in",
       "thresholdError": "Voer 'n bedrag groter as 0 in."
     },
     "memberLimit": {

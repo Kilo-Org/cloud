@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Bereizi helbide elektronikoak komaz.",
       "thresholdLabel": "Alerta atalase honen azpitik (USD)",
       "title": "Saldo baxuko alerta",
-      "emailsError": "Sartu baliozko helbide elektroniko bat gutxienez. Bat baino gehiago sartuz gero, bereizi komaz.",
+      "emailsInvalid": "Helbide elektroniko bat edo gehiago ez dira baliozkoak.",
+      "emailsRequired": "Sartu helbide elektroniko bat gutxienez.",
+      "saveEmailsError": "Helbide elektroniko batzuk ez dira onartuak izan. Berrikusi eta saiatu berriro.",
+      "saveError": "Ezin izan da saldo baxuko alerta gorde.",
+      "thresholdPlaceholder": "Sartu zenbateko bat",
       "thresholdError": "Sartu 0 baino handiagoa den zenbateko bat."
     },
     "memberLimit": {

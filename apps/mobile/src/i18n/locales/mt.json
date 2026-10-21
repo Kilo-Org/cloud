@@ -3197,7 +3197,11 @@
       "separateEmailsHint": "Ifred l-indirizzi tal-posta elettronika b'virgoli.",
       "thresholdLabel": "Avża taħt (USD)",
       "title": "Twissija ta' bilanċ baxx",
-      "emailsError": "Daħħal mill-inqas indirizz tal-posta elettronika validu wieħed. Ifred l-indirizzi b'virgoli.",
+      "emailsInvalid": "Indirizz wieħed jew aktar tal-posta elettronika mhumiex validi.",
+      "emailsRequired": "Daħħal mill-inqas indirizz tal-posta elettronika validu wieħed.",
+      "saveEmailsError": "Xi indirizzi tal-posta elettronika ma ġewx aċċettati. Iċċekkjahom u erġa' pprova.",
+      "saveError": "Ma stajniex insalvaw it-twissija ta' bilanċ baxx.",
+      "thresholdPlaceholder": "Daħħal ammont",
       "thresholdError": "Daħħal ammont akbar minn 0."
     },
     "memberLimit": {

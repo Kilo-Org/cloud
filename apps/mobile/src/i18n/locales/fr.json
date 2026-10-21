@@ -3116,7 +3116,11 @@
       "separateEmailsHint": "Séparez les adresses e-mail par des virgules.",
       "thresholdLabel": "Seuil d'alerte (USD)",
       "title": "Alerte de solde faible",
-      "emailsError": "Saisissez au moins une adresse e-mail valide. Séparez les adresses par des virgules.",
+      "emailsInvalid": "Une ou plusieurs adresses e-mail ne sont pas valides.",
+      "emailsRequired": "Saisissez au moins une adresse e-mail.",
+      "saveEmailsError": "Certaines adresses e-mail n'ont pas été acceptées. Vérifiez-les et réessayez.",
+      "saveError": "Impossible d'enregistrer l'alerte de solde faible.",
+      "thresholdPlaceholder": "Saisissez un montant",
       "thresholdError": "Saisissez un montant supérieur à 0."
     },
     "memberLimit": {

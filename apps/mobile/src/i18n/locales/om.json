@@ -3077,7 +3077,11 @@
       "separateEmailsHint": "Teessoowwan imeelii hedduu qoodduudhaan adda baasi.",
       "thresholdLabel": "Hamma kana gadi yoo ta'e akeekkachiisi (USD)",
       "title": "Akeekkachiisa haftee xiqqaa",
-      "emailsError": "Yoo xiqqaate teessoo imeelii sirrii tokko galchi. Yoo hedduu ta'an, qoodduudhaan adda baasi.",
+      "emailsInvalid": "Teessoo imeelii tokko yookaan isaa sirrii miti.",
+      "emailsRequired": "Yoo xiqqaate teessoo imeelii tokko galchi.",
+      "saveEmailsError": "Teessoowwan imeelii tokko tokkon hin fudhatamne. Isaan mirkaneessitii irra deebisii yaali.",
+      "saveError": "Akeekkachiisa haftee xiqqaa olkaa'uu hin dandeenye.",
+      "thresholdPlaceholder": "Hamma galchi",
       "thresholdError": "Hamma 0 caalu galchi."
     },
     "memberLimit": {

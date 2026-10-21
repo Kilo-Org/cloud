@@ -80,7 +80,6 @@ import {
 import {
   createAnonymousContext,
   isAnonymousContext,
-  isAnonymousUserId,
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
 import {
@@ -196,20 +195,16 @@ function validatePath(
 }
 
 /**
- * Signed-in callers count per account, anonymous callers per IP. A verified
- * bearer token already names the account (see `gatewayRateLimitKey`), so that
- * common case needs no database query. Otherwise the resolved auth decides:
- * session-cookie callers count per account, and a rejected credential gets the
- * invalid-token response instead of the anonymous sign-up prompt.
+ * Signed-in callers count per account, anonymous callers per IP. Uses the
+ * resolved auth rather than the token's claims, so a revoked token cannot spend
+ * its account's allowance: a rejected credential gets the invalid-token
+ * response instead. Auth has already resolved by the time free-model requests
+ * get here, because balance and settings wait on it.
  */
 async function resolveFreeModelRateLimitSubject(
-  accountKey: string,
   ipAddress: string,
   authPromise: ReturnType<typeof getUserFromAuth>
 ): Promise<NextResponseType<unknown> | FreeModelRateLimitSubject> {
-  if (!isAnonymousUserId(accountKey)) {
-    return { kind: 'account', kiloUserId: accountKey };
-  }
   const { user, authFailedResponse, credentialsRejected } = await authPromise;
   if (authFailedResponse && credentialsRejected) {
     return invalidTokenResponse();
@@ -607,11 +602,7 @@ export async function handleLlmProxyRequest(
 
   // Custom LLMs are exempt, even when their id matches a free-model pattern.
   if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
-    const rateLimitSubject = await resolveFreeModelRateLimitSubject(
-      accountKey,
-      ipAddress,
-      authPromise
-    );
+    const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, authPromise);
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
     if (await isFreeModelRateLimited(request, rateLimitSubject)) {

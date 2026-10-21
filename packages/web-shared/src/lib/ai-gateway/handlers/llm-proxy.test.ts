@@ -1384,7 +1384,10 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('answers a rejected credential for a free model with the invalid-token response', async () => {
+  it.each([
+    ['a malformed token', () => 'not-a-jwt'],
+    ['a signature-valid but revoked token', () => signedToken(KILO_GATEWAY_AUDIENCE)],
+  ])('answers %s for a free model with the invalid-token response', async (_case, token) => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
@@ -1396,7 +1399,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
       makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
-        authorization: 'Bearer not-a-jwt',
+        authorization: `Bearer ${token()}`,
       }) as never
     );
 

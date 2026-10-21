@@ -106,6 +106,7 @@ describe('runtime distribution packaging', () => {
     const nodeVersion = containers.match(/ARG NODE_VERSION="([^"]+)"/)?.[1];
     expect(nodeVersion?.split('.')[0]).toBe(RUNTIME_DISTRIBUTION.nodeMajor);
     expect(runtimeFree).toContain(`ARG NODE_VERSION="${nodeVersion}"`);
+    expect(readServiceFile('../Dockerfile.dind')).toContain(`ARG NODE_VERSION="${nodeVersion}"`);
     for (const file of ['Dockerfile', 'Dockerfile.dev']) {
       const dockerfile = readServiceFile(`../${file}`);
       expect(dockerfile).toContain(`ARG NODE_VERSION="${nodeVersion}"`);

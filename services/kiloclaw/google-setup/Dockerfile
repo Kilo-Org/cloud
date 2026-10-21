@@ -1,4 +1,4 @@
-FROM node:24-trixie-slim
+FROM node:24.22.1-trixie-slim
 
 # Install dependencies for gcloud CLI + readline for interactive prompts
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     gnupg \
+  && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 # Install gcloud CLI

@@ -1,13 +1,15 @@
+FROM node:22.23.4-bookworm-slim AS node-runtime
+
 FROM docker.io/cloudflare/sandbox:0.6.11
+
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 
 # Set command timeout to 10 min
 ENV COMMAND_TIMEOUT_MS=600000
 
-# Install package managers globally (these work across node versions)
-RUN npm install -g pnpm yarn
-
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     jq \
     git-lfs \
     build-essential \
@@ -17,7 +19,11 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     libyaml-dev \
     libffi-dev \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Install package managers globally (these work across node versions)
+RUN npm install -g pnpm yarn
 
 # Install mise (modern replacement for asdf)
 RUN curl https://mise.run | sh && \
@@ -28,8 +34,8 @@ ENV PATH="/root/.local/bin:${PATH}"
 # These are fallback versions when .tool-versions is not present
 # Users can override by providing .tool-versions in their project
 
-# Node.js versions (18, 20, 22, 24)
-RUN mise install node@18 node@20 node@22 node@24
+# Node 18/20 remain customer targets, but have no supported eMudhra verifier fix.
+RUN mise install node@18 node@20 node@22.23.4 node@24.22.1
 
 # Ruby versions (3.2, 3.3)
 RUN mise install ruby@3.2 ruby@3.3
@@ -41,7 +47,7 @@ RUN mise install hugo@0.152.2 hugo@0.120.0
 RUN mise install go@1.25.4
 
 # Set default global versions (can be overridden by .tool-versions)
-RUN mise use -g node@22 ruby@3.3 hugo@0.152.2 go@1.25.4
+RUN mise use -g node@22.23.4 ruby@3.3 hugo@0.152.2 go@1.25.4
 
 # Sandbox exec runs non-interactive shells, so expose mise defaults without relying on .bashrc.
 ENV PATH="/root/.local/share/mise/shims:${PATH}"

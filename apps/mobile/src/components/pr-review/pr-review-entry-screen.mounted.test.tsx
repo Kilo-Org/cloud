@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ElementType, type ReactNode } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -97,6 +97,11 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn(
 const ORG_A = { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' };
 const ORG_B = { organizationId: 'org-b', organizationName: 'Umbrella', role: 'member' };
 
+const Text = 'Text' as ElementType;
+const Pressable = 'Pressable' as ElementType;
+const ScreenHeader = 'ScreenHeader' as ElementType;
+const PrReviewInboxList = 'PrReviewInboxList' as ElementType;
+
 const mounted: RenderWithProvidersResult[] = [];
 
 async function mount(): Promise<RenderWithProvidersResult> {
@@ -107,19 +112,13 @@ async function mount(): Promise<RenderWithProvidersResult> {
   return result;
 }
 
-function root(ui: RenderWithProvidersResult) {
-  return ui.renderer.root;
-}
-
 function orderOf(ui: RenderWithProvidersResult, match: (node: ReactTestInstance) => boolean) {
-  return root(ui)
-    .findAll(() => true)
-    .findIndex(node => match(node));
+  return ui.renderer.root.findAll(() => true).findIndex(node => match(node));
 }
 
 function contextLineCopy(ui: RenderWithProvidersResult) {
-  return root(ui)
-    .findAll(node => node.type === 'Text')
+  return ui.renderer.root
+    .findAll(node => node.type === Text)
     .flatMap(node => node.children)
     .filter(child => typeof child === 'string' && child.startsWith('For '));
 }
@@ -150,9 +149,9 @@ describe('PrReviewEntryScreen context line', () => {
     const ui = await mount();
     await waitFor(() => contextLineCopy(ui).includes('For Acme'));
 
-    const header = orderOf(ui, node => node.type === 'ScreenHeader');
-    const line = orderOf(ui, node => node.type === 'Text' && node.children.includes('For Acme'));
-    const inbox = orderOf(ui, node => node.type === 'PrReviewInboxList');
+    const header = orderOf(ui, node => node.type === ScreenHeader);
+    const line = orderOf(ui, node => node.type === Text && node.children.includes('For Acme'));
+    const inbox = orderOf(ui, node => node.type === PrReviewInboxList);
 
     expect(header).toBeGreaterThanOrEqual(0);
     expect(line).toBeGreaterThan(header);
@@ -163,14 +162,16 @@ describe('PrReviewEntryScreen context line', () => {
     const ui = await mount();
     await waitFor(() => contextLineCopy(ui).includes('For Acme'));
 
-    const control = root(ui).findAll(node => node.props.accessibilityHint === 'Select account')[0];
+    const control = ui.renderer.root.findAll(
+      node => node.props.accessibilityHint === 'Select account'
+    )[0];
     if (!control) {
       throw new Error('the context line is not switchable in the inbox');
     }
     await press(control);
 
-    const rows = root(ui).findAll(
-      node => node.type === 'Pressable' && node.props.accessibilityRole === 'radio'
+    const rows = ui.renderer.root.findAll(
+      node => node.type === Pressable && node.props.accessibilityRole === 'radio'
     );
     expect(rows.map(row => row.props.accessibilityLabel)).toEqual(['Personal', 'Acme', 'Umbrella']);
 

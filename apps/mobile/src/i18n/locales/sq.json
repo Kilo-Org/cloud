@@ -3011,11 +3011,22 @@
     "boundary": {
       "backToProfile": "Kthehu te profili",
       "loadErrorMessage": "Kontrollo lidhjen dhe provo përsëri.",
+
+      "chooseAccount": "Zgjidh një llogari",
       "loadErrorTitle": "Nuk u ngarkuan organizatat e tua.",
+      "noOrganization": "Asnjë organizatë",
+
+      "noOrganizationDescription": "Kjo llogari nuk është pjesë e një organizate. Krijo ose bashkohu me një organizatë në ueb për të përdorur veçoritë e organizatës si ftesat për anëtarët dhe alarmet për balancë të ulët.",
+
+      "openWebOrganizations": "Hap organizatat në ueb",
+
       "organizationUnavailable": "Organizata nuk është e disponueshme.",
-      "selectDescription": "Zgjidh një organizatë nga profili yt për të vazhduar.",
+      "selectDescriptionWithOrganizations": "Ti i përket një ose më shumë organizatave. Zgjidh llogarinë që duhet të përdorë ky ekran.",
+
       "selectOrganization": "Zgjidh një organizatë",
       "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidh një tjetër nga profili yt për të vazhduar.",
+
+      "unavailableSessionsDescription": "Kjo organizatë nuk është më e disponueshme. Sesionet e saj nuk mund të ngarkohen.",
       "accessDeniedDescription": "Nuk ke qasje në këtë organizatë."
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "Përdor maksimumi 50 hyrje, çelësa deri në 128 dhe vlera deri në 4096 karaktere",
       "timeoutInvalid": "Kohëzgjatja duhet të jetë një numër i plotë milisekondash",
       "edit": "Ndrysho serverin MCP",
-      "saveFailed": "Serveri MCP nuk mund të ruhej"
+      "saveFailed": "Serveri MCP nuk mund të ruhej",
+      "deleteFailed": "Serveri MCP nuk mund të fshihej",
+      "updateFailed": "Serveri MCP nuk mund të përditësohej"
     },
     "agents": {
       "title": "Agjentët e profilit",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "Subagent - i thirrur vetëm nga të tjerët",
       "visibilityAll": "Të gjitha - të dyja",
       "saveFailed": "Agjenti nuk mund të ruhej",
+      "deleteFailed": "Agjenti nuk mund të fshihej",
       "nameRequired": "Futni një emër agjenti",
       "slugRequired": "Fut një slug agjenti",
       "slugInvalid": "Slug duhet të fillojë me një shkronjë dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
@@ -3721,6 +3735,7 @@
       "subtask": "Ekzekuto si nëndetyrë",
       "edit": "Redakto komandën e pjerrët",
       "saveFailed": "Komanda nuk mund të ruhej",
+      "deleteFailed": "Komanda nuk mund të fshihej",
       "nameRequired": "Futni një emër komande",
       "nameInvalid": "Emri duhet të fillojë me një shkronjë të vogël dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
       "templateRequired": "Futni një shabllon komandimi",

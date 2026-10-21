@@ -3003,11 +3003,22 @@
     "boundary": {
       "backToProfile": "返回个人资料",
       "loadErrorMessage": "请检查网络连接后重试。",
+
+      "chooseAccount": "选择账户",
       "loadErrorTitle": "无法加载你的组织列表。",
+      "noOrganization": "无组织",
+
+      "noOrganizationDescription": "此账户不属于任何组织。请在网页版创建或加入组织，以使用成员邀请和低余额提醒等组织功能。",
+
+      "openWebOrganizations": "在网页版打开组织",
+
       "organizationUnavailable": "此组织不可用。",
-      "selectDescription": "请前往个人资料页面，选择一个组织后继续。",
+      "selectDescriptionWithOrganizations": "您属于一个或多个组织。请选择此屏幕应使用的账户。",
+
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请前往个人资料页面，选择其他组织后继续。",
+
+      "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
       "accessDeniedDescription": "你无权访问此组织。"
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "最多使用 50 个条目，键最多 128 个字符，值最多 4096 个字符",
       "timeoutInvalid": "超时必须是整数毫秒",
       "edit": "编辑 MCP 服务器",
-      "saveFailed": "无法保存 MCP 服务器"
+      "saveFailed": "无法保存 MCP 服务器",
+      "deleteFailed": "无法删除 MCP 服务器",
+      "updateFailed": "无法更新 MCP 服务器"
     },
     "agents": {
       "title": "配置文件代理",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "子代理——只能从其他人调用",
       "visibilityAll": "全部 — 两者",
       "saveFailed": "无法保存代理",
+      "deleteFailed": "无法删除代理",
       "nameRequired": "输入代理名称",
       "slugRequired": "输入代理 slug",
       "slugInvalid": "Slug 必须以字母开头，并且只能使用小写字母、数字和破折号",
@@ -3721,6 +3735,7 @@
       "subtask": "作为子任务运行",
       "edit": "编辑斜杠命令",
       "saveFailed": "无法保存命令",
+      "deleteFailed": "无法删除命令",
       "nameRequired": "输入命令名称",
       "nameInvalid": "名称必须以小写字母开头，并且只能使用小写字母、数字和破折号",
       "templateRequired": "输入命令模板",

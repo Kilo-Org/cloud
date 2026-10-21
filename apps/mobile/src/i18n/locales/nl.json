@@ -3003,11 +3003,22 @@
     "boundary": {
       "backToProfile": "Terug naar profiel",
       "loadErrorMessage": "Controleer je verbinding en probeer het opnieuw.",
+
+      "chooseAccount": "Een account kiezen",
       "loadErrorTitle": "Je organisaties konden niet worden geladen.",
+      "noOrganization": "Geen organisatie",
+
+      "noOrganizationDescription": "Dit account maakt geen deel uit van een organisatie. Maak er een aan of word lid van een organisatie op de website om organisatiefuncties zoals liduitnodigingen en waarschuwingen bij een laag saldo te gebruiken.",
+
+      "openWebOrganizations": "Organisaties op de website openen",
+
       "organizationUnavailable": "De organisatie is niet beschikbaar.",
-      "selectDescription": "Kies een organisatie uit je profiel om door te gaan.",
+      "selectDescriptionWithOrganizations": "Je behoort tot een of meer organisaties. Kies het account dat dit scherm moet gebruiken.",
+
       "selectOrganization": "Een organisatie selecteren",
       "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan.",
+
+      "unavailableSessionsDescription": "Deze organisatie is niet meer beschikbaar. De sessies ervan kunnen niet worden geladen.",
       "accessDeniedDescription": "Je hebt geen toegang tot deze organisatie."
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "Gebruik maximaal 50 vermeldingen, sleutels tot 128 en waarden tot 4096 tekens",
       "timeoutInvalid": "De time-out moet een geheel aantal milliseconden bedragen",
       "edit": "MCP-server bewerken",
-      "saveFailed": "Kan MCP-server niet opslaan"
+      "saveFailed": "Kan MCP-server niet opslaan",
+      "deleteFailed": "Kan MCP-server niet verwijderen",
+      "updateFailed": "Kan MCP-server niet bijwerken"
     },
     "agents": {
       "title": "Profiel agenten",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "Subagent — alleen opvraagbaar door anderen",
       "visibilityAll": "Allemaal – allebei",
       "saveFailed": "Kan agent niet opslaan",
+      "deleteFailed": "Kan agent niet verwijderen",
       "nameRequired": "Voer een agentnaam in",
       "slugRequired": "Voer een agentenslak in",
       "slugInvalid": "Slug moet beginnen met een letter en mag alleen kleine letters, cijfers en streepjes gebruiken",
@@ -3721,6 +3735,7 @@
       "subtask": "Uitvoeren als subtaak",
       "edit": "Bewerk de slash-opdracht",
       "saveFailed": "Kan opdracht niet opslaan",
+      "deleteFailed": "Kan opdracht niet verwijderen",
       "nameRequired": "Voer een opdrachtnaam in",
       "nameInvalid": "De naam moet beginnen met een kleine letter en mag alleen kleine letters, cijfers en streepjes bevatten",
       "templateRequired": "Voer een opdrachtsjabloon in",

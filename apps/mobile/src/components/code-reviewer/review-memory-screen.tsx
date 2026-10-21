@@ -2,21 +2,14 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Platform,
-  Pressable,
-  Switch,
-  useWindowDimensions,
-  View,
-  type ViewStyle,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, Switch, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,7 +17,6 @@ import { Text } from '@/components/ui/text';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { useTRPC } from '@/lib/trpc';
 
 const PAGE_SIZE = 20;
@@ -43,25 +35,13 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { bottom: bottomInset } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const paddingBottom = useTabBarBottomPadding();
   const ownerInput = reviewMemoryOwnerInput(scope);
   const permission = useReviewerPermission(scope);
 
   const summaryQuery = useQuery(trpc.reviewMemory.getDashboardSummary.queryOptions(ownerInput));
   const setEnabled = useSetReviewMemoryEnabled(scope);
   const enabled = summaryQuery.data?.enabled === true;
-  // The tab bar draws over the screen, so the last row has to scroll clear of it.
-  const listContentStyle = useMemo(
-    () => ({
-      paddingBottom: getEffectiveTabBarHeight({
-        bottomInset,
-        platform: Platform.OS,
-        fontScale,
-      }),
-    }),
-    [bottomInset, fontScale]
-  );
 
   const proposalsQuery = useInfiniteQuery(
     trpc.reviewMemory.listProposalsPage.infiniteQueryOptions(
@@ -194,7 +174,6 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
       <FlashList
         data={proposals}
         style={listStyle}
-        contentContainerStyle={listContentStyle}
         keyExtractor={proposal => proposal.id}
         renderItem={({ item }) => (
           <View className="border-b-[0.5px] border-hair-soft px-6 py-3">
@@ -206,7 +185,12 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
             </Text>
           </View>
         )}
-        ListFooterComponent={footer}
+        ListFooterComponent={
+          <>
+            {footer}
+            <View style={{ height: paddingBottom }} pointerEvents="none" />
+          </>
+        }
         onEndReached={() => {
           if (proposalsQuery.hasNextPage && !proposalsQuery.isFetchingNextPage) {
             void proposalsQuery.fetchNextPage();

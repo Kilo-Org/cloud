@@ -3011,11 +3011,22 @@
     "boundary": {
       "backToProfile": "Itzuli profilera",
       "loadErrorMessage": "Egiaztatu konexioa eta saiatu berriro.",
+
+      "chooseAccount": "Hautatu kontu bat",
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
+      "noOrganization": "Erakunderik ez",
+
+      "noOrganizationDescription": "Kontu hau ez da erakunde baten parte. Sortu edo batu erakunde bat webgunean, kideen gonbidapenak eta saldo baxuaren abisuak bezalako erakunde-funtzioak erabiltzeko.",
+
+      "openWebOrganizations": "Ireki erakundeak webgunean",
+
       "organizationUnavailable": "Erakundea ez dago erabilgarri.",
-      "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
+      "selectDescriptionWithOrganizations": "Erakunde bateko edo gehiagoko kide zara. Hautatu pantaila honek erabili behar duen kontua.",
+
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
+
+      "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
       "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "Erabili gehienez 50 sarrera, gakoak 128 arte eta balioak 4096 karaktere arte",
       "timeoutInvalid": "Denbora-mugak milisegundo kopuru osoa izan behar du",
       "edit": "Editatu MCP zerbitzaria",
-      "saveFailed": "Ezin izan da MCP zerbitzaria gorde"
+      "saveFailed": "Ezin izan da MCP zerbitzaria gorde",
+      "deleteFailed": "Ezin izan da MCP zerbitzaria ezabatu",
+      "updateFailed": "Ezin izan da MCP zerbitzaria eguneratu"
     },
     "agents": {
       "title": "Profileko agenteak",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "Azpi-agentea - besteengandik bakarrik dei daiteke",
       "visibilityAll": "Guztiak - biak",
       "saveFailed": "Ezin izan da agentea gorde",
+      "deleteFailed": "Ezin izan da agentea ezabatu",
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agente bare bat",
       "slugInvalid": "Slug-ek letra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
@@ -3721,6 +3735,7 @@
       "subtask": "Exekutatu azpizeregin gisa",
       "edit": "Editatu barra komandoa",
       "saveFailed": "Ezin izan da gorde komandoa",
+      "deleteFailed": "Ezin izan da komandoa ezabatu",
       "nameRequired": "Sartu komando-izen bat",
       "nameInvalid": "Izenak letra xehe batekin hasi behar du eta letra xeheak, zifrak eta marra baino ez ditu erabili",
       "templateRequired": "Sartu komando txantiloia",

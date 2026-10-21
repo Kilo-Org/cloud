@@ -3051,11 +3051,22 @@
     "boundary": {
       "backToProfile": "Atpakaļ uz profilu",
       "loadErrorMessage": "Pārbaudi savienojumu un mēģini vēlreiz.",
+
+      "chooseAccount": "Izvēlies kontu",
       "loadErrorTitle": "Neizdevās ielādēt tavas organizācijas.",
+      "noOrganization": "Nav organizācijas",
+
+      "noOrganizationDescription": "Šis konts nav daļa no organizācijas. Lai izmantotu organizācijas funkcijas, piemēram, dalībnieku uzaicinājumus un brīdinājumus par zemu atlikumu, izveido vai pievienojies organizācijai tīmeklī.",
+
+      "openWebOrganizations": "Atvērt organizācijas tīmeklī",
+
       "organizationUnavailable": "Organizācija nav pieejama.",
-      "selectDescription": "Lai turpinātu, izvēlies organizāciju savā profilā.",
+      "selectDescriptionWithOrganizations": "Tu piederi vienai vai vairākām organizācijām. Izvēlies kontu, kuru šim ekrānam vajadzētu izmantot.",
+
       "selectOrganization": "Organizācijas izvēle",
       "unavailableDescription": "Šī organizācija vairs nav pieejama. Lai turpinātu, izvēlies citu organizāciju savā profilā.",
+
+      "unavailableSessionsDescription": "Šī organizācija vairs nav pieejama. Tās sesijas nevar ielādēt.",
       "accessDeniedDescription": "Tev nav piekļuves šai organizācijai."
     },
     "creditActivity": {
@@ -3716,7 +3727,9 @@
       "jsonTooLarge": "Izmantojiet ne vairāk kā 50 ierakstus, atslēgas līdz 128 un vērtības līdz 4096 rakstzīmēm",
       "timeoutInvalid": "Taimautai ir jābūt veselam milisekunžu skaitam",
       "edit": "Rediģēt MCP serveri",
-      "saveFailed": "Nevarēja saglabāt MCP serveri"
+      "saveFailed": "Nevarēja saglabāt MCP serveri",
+      "deleteFailed": "Nevarēja izdzēst MCP serveri",
+      "updateFailed": "Nevarēja atjaunināt MCP serveri"
     },
     "agents": {
       "title": "Profila aģenti",
@@ -3743,6 +3756,7 @@
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",
       "visibilityAll": "Visi - abi",
       "saveFailed": "Nevarēja saglabāt aģentu",
+      "deleteFailed": "Nevarēja izdzēst aģentu",
       "nameRequired": "Ievadiet aģenta nosaukumu",
       "slugRequired": "Ievadiet aģenta lodes",
       "slugInvalid": "Slug jāsākas ar burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
@@ -3762,6 +3776,7 @@
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",
       "saveFailed": "Nevarēja saglabāt komandu",
+      "deleteFailed": "Nevarēja izdzēst komandu",
       "nameRequired": "Ievadiet komandas nosaukumu",
       "nameInvalid": "Nosaukumam ir jāsākas ar mazo burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
       "templateRequired": "Ievadiet komandas veidni",

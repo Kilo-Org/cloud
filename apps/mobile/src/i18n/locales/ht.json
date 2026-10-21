@@ -3011,11 +3011,22 @@
     "boundary": {
       "backToProfile": "Tounen nan pwofil la",
       "loadErrorMessage": "Tcheke koneksyon ou epi eseye ankò.",
+
+      "chooseAccount": "Chwazi yon kont",
       "loadErrorTitle": "Nou pa t ka chaje òganizasyon ou yo.",
+      "noOrganization": "Pa gen òganizasyon",
+
+      "noOrganizationDescription": "Kont sa a pa fè pati yon òganizasyon. Kreye oswa rantre nan yon òganizasyon sou sit entènèt la pou itilize fonksyon òganizasyon tankou envitasyon manm ak alèt sou balans ki ba.",
+
+      "openWebOrganizations": "Louvri òganizasyon sou sit entènèt la",
+
       "organizationUnavailable": "Òganizasyon an pa disponib.",
-      "selectDescription": "Chwazi yon òganizasyon nan pwofil ou pou kontinye.",
+      "selectDescriptionWithOrganizations": "Ou fè pati youn oswa plizyè òganizasyon. Chwazi kont ki ekran sa a dwe itilize a.",
+
       "selectOrganization": "Chwazi yon òganizasyon",
       "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon lòt nan pwofil ou a pou kontinye.",
+
+      "unavailableSessionsDescription": "Òganizasyon sa a pa disponib ankò. Sezyon yo pa ka chaje.",
       "accessDeniedDescription": "Ou pa gen aksè nan òganizasyon sa a."
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "Sèvi ak pa plis pase 50 antre, kle jiska 128 ak valè jiska 4096 karaktè",
       "timeoutInvalid": "Timeout dwe yon kantite antye milisgond",
       "edit": "Edit sèvè MCP",
-      "saveFailed": "Pa t 'kapab sove sèvè MCP"
+      "saveFailed": "Pa t 'kapab sove sèvè MCP",
+      "deleteFailed": "Pa t 'kapab efase sèvè MCP",
+      "updateFailed": "Pa t 'kapab mete sèvè MCP ajou"
     },
     "agents": {
       "title": "Ajan pwofil yo",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "Subagent - sèlman rele nan men lòt moun",
       "visibilityAll": "Tout - tou de",
       "saveFailed": "Pa t 'kapab sove ajan",
+      "deleteFailed": "Pa t 'kapab efase ajan",
       "nameRequired": "Antre yon non ajan",
       "slugRequired": "Antre yon slug ajan",
       "slugInvalid": "Slug dwe kòmanse ak yon lèt epi sèvi ak sèlman lèt miniskil, chif, ak tire",
@@ -3721,6 +3735,7 @@
       "subtask": "Kouri kòm subtach",
       "edit": "Edit lòd koupe",
       "saveFailed": "Pa t 'kapab sove lòd",
+      "deleteFailed": "Pa t 'kapab efase lòd",
       "nameRequired": "Antre yon non kòmand",
       "nameInvalid": "Non yo dwe kòmanse ak yon lèt miniskil epi itilize sèlman lèt miniskil, chif ak tire",
       "templateRequired": "Antre yon modèl lòd",

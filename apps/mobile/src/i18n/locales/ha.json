@@ -2863,7 +2863,7 @@
     "gatewayModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(transcriptionModel.title) don zaɓar wani.",
     "gatewaySignInRequired": "Shiga don amfani da mayar da magana ta Kilo Gateway.",
     "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka.",
-    "testTitle": "Gwada shigar da murya",
+    "testTitle": "Gwada shigar da rubutu ta murya",
     "testPlaceholder": "Danna makirufo ka fara magana.",
     "testClear": "Share rubutu"
   },
@@ -3011,11 +3011,22 @@
     "boundary": {
       "backToProfile": "Koma zuwa bayanan martaba",
       "loadErrorMessage": "Duba haɗin yanar gizonka, sannan ka sake gwadawa.",
+
+      "chooseAccount": "Zaɓi asusu",
       "loadErrorTitle": "An kasa loda ƙungiyoyinka.",
+      "noOrganization": "Babu ƙungiya",
+
+      "noOrganizationDescription": "Wannan asusun ba ya cikin wata ƙungiya. Ƙirƙiri ko shiga wata ƙungiya a yanar gizo don amfani da fasalolin ƙungiya kamar gayyata membobi da faɗakarwar ƙarancin ma'auni.",
+
+      "openWebOrganizations": "Buɗe ƙungiyoyi a yanar gizo",
+
       "organizationUnavailable": "Ba a samun ƙungiyar.",
-      "selectDescription": "Zaɓi ƙungiya daga bayanan martabarka don ci gaba.",
+      "selectDescriptionWithOrganizations": "Kana cikin ƙungiya ɗaya ko fiye. Zaɓi asusun da wannan allon ya kamata ya yi amfani da shi.",
+
       "selectOrganization": "Zaɓi ƙungiya",
       "unavailableDescription": "An daina samun wannan ƙungiyar. Zaɓi wata daga bayanan martabarka don ci gaba.",
+
+      "unavailableSessionsDescription": "An daina samun wannan ƙungiyar. Ba za a iya loda zamanta ba.",
       "accessDeniedDescription": "Ba ka da izinin shiga wannan ƙungiyar."
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "Yi amfani da bai fi shigarwa 50 ba, maɓallai har 128 da ƙimomi har haruffa 4096",
       "timeoutInvalid": "Ƙayyadaddun lokaci dole ne ya zama cikakken adadin millise seconds",
       "edit": "Shirya uwar garken MCP",
-      "saveFailed": "An kasa ajiye uwar garken MCP"
+      "saveFailed": "An kasa ajiye uwar garken MCP",
+      "deleteFailed": "An kasa share uwar garken MCP",
+      "updateFailed": "An kasa sabunta uwar garken MCP"
     },
     "agents": {
       "title": "Wakilan bayanan martaba",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "Subagent - kawai kira daga wasu",
       "visibilityAll": "Duk - duka",
       "saveFailed": "An kasa ajiye wakili",
+      "deleteFailed": "An kasa share wakili",
       "nameRequired": "Shigar da sunan wakili",
       "slugRequired": "Shigar da slug wakili",
       "slugInvalid": "Slug dole ne ya fara da harafi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
@@ -3721,6 +3735,7 @@
       "subtask": "Gudu azaman ƙaramin aiki",
       "edit": "Gyara umarnin slash",
       "saveFailed": "An kasa ajiye umarni",
+      "deleteFailed": "An kasa share umarni",
       "nameRequired": "Shigar da sunan umarni",
       "nameInvalid": "Dole ne suna farawa da ƙananan haruffa kuma amfani da ƙananan haruffa kawai, lambobi, da dashes",
       "templateRequired": "Shigar da samfurin umarni",

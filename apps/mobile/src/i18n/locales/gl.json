@@ -3011,11 +3011,22 @@
     "boundary": {
       "backToProfile": "Volver ao perfil",
       "loadErrorMessage": "Comproba a túa conexión e téntao de novo.",
+
+      "chooseAccount": "Seleccionar unha conta",
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
+      "noOrganization": "Sen organización",
+
+      "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir as organizacións na web",
+
       "organizationUnavailable": "A organización non está dispoñible.",
-      "selectDescription": "Escolle unha organización desde o teu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Pertences a unha ou máis organizacións. Escolle a conta que debe usar esta pantalla.",
+
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
+
+      "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
       "accessDeniedDescription": "Non tes acceso a esta organización."
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "Usa como máximo 50 entradas, chaves de ata 128 e valores de ata 4096 caracteres",
       "timeoutInvalid": "O tempo de espera debe ser dun número enteiro de milisegundos",
       "edit": "Editar servidor MCP",
-      "saveFailed": "Non se puido gardar o servidor MCP"
+      "saveFailed": "Non se puido gardar o servidor MCP",
+      "deleteFailed": "Non se puido eliminar o servidor MCP",
+      "updateFailed": "Non se puido actualizar o servidor MCP"
     },
     "agents": {
       "title": "Axentes de perfil",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "Subaxente: só se pode chamar desde outros",
       "visibilityAll": "Todos - ambos",
       "saveFailed": "Non se puido gardar o axente",
+      "deleteFailed": "Non se puido eliminar o axente",
       "nameRequired": "Introduza un nome de axente",
       "slugRequired": "Introduza unha babosa de axente",
       "slugInvalid": "Slug debe comezar cunha letra e usar só letras minúsculas, díxitos e guións",
@@ -3721,6 +3735,7 @@
       "subtask": "Executar como subtarefa",
       "edit": "Comando de edición de barra",
       "saveFailed": "Non se puido gardar o comando",
+      "deleteFailed": "Non se puido eliminar o comando",
       "nameRequired": "Introduza un nome de comando",
       "nameInvalid": "O nome debe comezar cunha letra minúscula e usar só letras minúsculas, díxitos e guións",
       "templateRequired": "Introduza un modelo de comando",

@@ -73,7 +73,12 @@ const pressables = vi.hoisted(() => ({
 
 const flashList = vi.hoisted(() => ({
   onEndReached: null as (() => void) | null,
-  contentContainerStyle: null as { paddingBottom?: number } | null,
+}));
+
+const tabScreen = vi.hoisted(() => ({ bottomPadding: 0 }));
+
+const views = vi.hoisted(() => ({
+  rendered: [] as { pointerEvents?: string; style?: { height?: number } }[],
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -119,7 +124,10 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
-  View: 'View',
+  View: (props: { children?: unknown; pointerEvents?: string; style?: { height?: number } }) => {
+    views.rendered.push(props);
+    return createElement('View', props);
+  },
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
   useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
@@ -145,14 +153,6 @@ vi.mock('react-native', () => ({
   },
 }));
 
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 34, left: 0, right: 0, top: 59 }),
-}));
-
-vi.mock('@/lib/tab-bar-layout', () => ({
-  getEffectiveTabBarHeight: () => 83,
-}));
-
 vi.mock('@shopify/flash-list', () => ({
   FlashList: (props: {
     data?: unknown[];
@@ -160,10 +160,8 @@ vi.mock('@shopify/flash-list', () => ({
     ListEmptyComponent?: ReactElement;
     ListFooterComponent?: ReactElement | null;
     onEndReached?: () => void;
-    contentContainerStyle?: { paddingBottom?: number };
   }): ReactElement | null => {
     flashList.onEndReached = props.onEndReached ?? null;
-    flashList.contentContainerStyle = props.contentContainerStyle ?? null;
     const data = props.data ?? [];
     if (data.length === 0) {
       return props.ListEmptyComponent ?? null;
@@ -193,6 +191,10 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+
+vi.mock('@/components/tab-screen', () => ({
+  useTabBarBottomPadding: () => tabScreen.bottomPadding,
+}));
 
 vi.mock('@/components/ui/button', () => ({
   Button: (props: { children?: unknown; onPress?: () => void; accessibilityLabel?: string }) => {
@@ -242,8 +244,9 @@ beforeEach(() => {
   buttons.rendered = [];
   switches.rendered = [];
   pressables.rendered = [];
+  views.rendered = [];
+  tabScreen.bottomPadding = 0;
   flashList.onEndReached = null;
-  flashList.contentContainerStyle = null;
 });
 
 describe('ReviewMemoryScreen loading', () => {
@@ -367,9 +370,10 @@ describe('ReviewMemoryScreen enabled state', () => {
     expect(setEnabled.mutate).toHaveBeenCalledWith(false);
   });
 
-  it('pads the proposals list clear of the tab bar', () => {
+  it('reserves the tab bar clearance after the last proposal row', () => {
     summary.data = { enabled: true, repositories: [], openProposalCount: 1 };
     permission.canEdit = true;
+    tabScreen.bottomPadding = 83;
     proposals.data = {
       pages: [
         {
@@ -381,7 +385,7 @@ describe('ReviewMemoryScreen enabled state', () => {
 
     renderScreen();
 
-    expect(flashList.contentContainerStyle?.paddingBottom).toBe(83);
+    expect(views.rendered.at(-1)).toMatchObject({ pointerEvents: 'none', style: { height: 83 } });
   });
 
   it('disables the row while the mutation settles', () => {

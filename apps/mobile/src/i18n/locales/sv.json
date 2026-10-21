@@ -59,7 +59,7 @@
     "draft": "Utkast",
     "enabled": "Aktiverad",
     "github": "GitHub",
-    "imageUnavailable": "Bilden är inte tillgänglig.",
+    "imageUnavailable": "Bilden är inte tillgänglig",
     "loading": "Läser in…",
     "loadMore": "Visa fler",
     "message": "Meddelande",
@@ -140,7 +140,7 @@
     "generating": "Genererar…",
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
-    "dismissed": "Avskriven",
+    "dismissed": "Avfärdad",
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
@@ -2940,7 +2940,7 @@
     "aiProvidersTitle": "Leverantörer av AI-modeller",
     "gatewayTitle": "Kilo Gateway (vår servertjänst)",
     "crashReportingTitle": "Kraschrapportering",
-    "crashReportingNote": "Kraschrapporter innehåller bara skärmbilder om du har aktiverat den valfria delningen (se nedan). Vi registrerar aldrig skärmens vyhierarki.",
+    "crashReportingNote": "Kraschrapporter innehåller inga skärmbilder om du inte har aktiverat den valfria delningen (se nedan). Vi registrerar aldrig skärmens vyhierarki.",
     "productAnalyticsTitle": "Produktanalys",
     "productAnalyticsNote": "Innehållet i dina prompter och konversationer skickas aldrig till produktanalysen.",
     "errorScreenshotsTitle": "Skärmbilder vid fel och sessionsuppspelning",
@@ -3011,11 +3011,21 @@
     "boundary": {
       "backToProfile": "Tillbaka till profilen",
       "loadErrorMessage": "Kontrollera anslutningen och försök igen.",
-      "loadErrorTitle": "Det gick inte att läsa in dina organisationer",
-      "organizationUnavailable": "Organisationen är inte tillgänglig",
-      "selectDescription": "Välj en organisation i din profil för att fortsätta.",
+
+      "chooseAccount": "Välj ett konto",
+      "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
+      "noOrganization": "Ingen organisation",
+
+      "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa eller gå med i en organisation på webben för att använda organisationsfunktioner som medlemsinbjudningar och varningar om lågt saldo.",
+
+      "openWebOrganizations": "Öppna organisationer på webben",
+
+      "organizationUnavailable": "Organisationen är inte tillgänglig.",
+      "selectDescriptionWithOrganizations": "Du tillhör en eller flera organisationer. Välj det konto som den här skärmen ska använda.",
       "selectOrganization": "Välj en organisation",
       "unavailableDescription": "Den här organisationen är inte längre tillgänglig. Välj en annan i din profil för att fortsätta.",
+
+      "unavailableSessionsDescription": "Den här organisationen är inte längre tillgänglig. Det går inte att läsa in sessioner för den.",
       "accessDeniedDescription": "Du har inte åtkomst till den här organisationen."
     },
     "creditActivity": {
@@ -3681,7 +3691,9 @@
       "jsonTooLarge": "Använd högst 50 poster, nycklar upp till 128 och värden upp till 4096 tecken",
       "timeoutInvalid": "Timeout måste vara ett helt antal millisekunder",
       "edit": "Redigera MCP-server",
-      "saveFailed": "Det gick inte att spara MCP-servern"
+      "saveFailed": "Det gick inte att spara MCP-servern",
+      "deleteFailed": "Det gick inte att ta bort MCP-servern",
+      "updateFailed": "Det gick inte att uppdatera MCP-servern"
     },
     "agents": {
       "title": "Profilagenter",
@@ -3708,6 +3720,7 @@
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
       "visibilityAll": "Alla — båda",
       "saveFailed": "Det gick inte att spara agenten",
+      "deleteFailed": "Det gick inte att ta bort agenten",
       "nameRequired": "Ange ett agentnamn",
       "slugRequired": "Ange agentens slug",
       "slugInvalid": "Slug måste börja med en bokstav och endast använda små bokstäver, siffror och bindestreck",
@@ -3727,6 +3740,7 @@
       "subtask": "Kör som deluppgift",
       "edit": "Redigera snedstreckskommando",
       "saveFailed": "Det gick inte att spara kommandot",
+      "deleteFailed": "Det gick inte att ta bort kommandot",
       "nameRequired": "Ange ett kommandonamn",
       "nameInvalid": "Namnet måste börja med en liten bokstav och endast använda små bokstäver, siffror och bindestreck",
       "templateRequired": "Ange en kommandomall",

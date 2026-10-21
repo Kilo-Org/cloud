@@ -3131,11 +3131,22 @@
     "boundary": {
       "backToProfile": "Lura għall-profil",
       "loadErrorMessage": "Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+
+      "chooseAccount": "Agħżel kont",
       "loadErrorTitle": "Ma setgħux jitgħabbew l-organizzazzjonijiet tiegħek.",
+      "noOrganization": "L-ebda organizzazzjoni",
+
+      "noOrganizationDescription": "Dan il-kont mhuwiex parti minn organizzazzjoni. Oħloq jew ingħaqad ma' organizzazzjoni fuq il-web biex tuża karatteristiċi tal-organizzazzjoni bħal stedini għall-membri u twissijiet dwar bilanċ baxx.",
+
+      "openWebOrganizations": "Iftaħ l-organizzazzjonijiet fuq il-web",
+
       "organizationUnavailable": "L-organizzazzjoni mhix disponibbli.",
-      "selectDescription": "Agħżel organizzazzjoni mill-profil tiegħek biex tkompli.",
+      "selectDescriptionWithOrganizations": "Int tagħmel parti minn organizzazzjoni waħda jew aktar. Agħżel il-kont li għandha tuża dan l-iskrin.",
+
       "selectOrganization": "Agħżel organizzazzjoni",
       "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli.",
+
+      "unavailableSessionsDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Is-sessjonijiet tagħha ma jistgħux jitgħabbew.",
       "accessDeniedDescription": "M'għandekx aċċess għal din l-organizzazzjoni."
     },
     "creditActivity": {
@@ -3798,7 +3809,9 @@
       "jsonTooLarge": "Uża mhux aktar minn 50 entrata, ewlenin sa 128 u valuri sa 4096 karattru",
       "timeoutInvalid": "Timeout għandu jkun numru sħiħ ta' millisekondi",
       "edit": "Editja server MCP",
-      "saveFailed": "Ma setax isalva server MCP"
+      "saveFailed": "Ma setax isalva server MCP",
+      "deleteFailed": "Ma setax jħassar is-server MCP",
+      "updateFailed": "Ma setax jaġġorna s-server MCP"
     },
     "agents": {
       "title": "Aġenti tal-profil",
@@ -3825,6 +3838,7 @@
       "visibilitySubagent": "Subaġent - jissejjaħ biss minn oħrajn",
       "visibilityAll": "Kollha - it-tnejn",
       "saveFailed": "Ma setax isalva l-aġent",
+      "deleteFailed": "Ma setax jħassar l-aġent",
       "nameRequired": "Daħħal isem ta' aġent",
       "slugRequired": "Daħħal aġent slug",
       "slugInvalid": "Slug għandu jibda b'ittra u juża biss ittri żgħar, ċifri u sings",
@@ -3844,6 +3858,7 @@
       "subtask": "Mexxi bħala subtask",
       "edit": "Editja kmand slash",
       "saveFailed": "Ma setax isalva l-kmand",
+      "deleteFailed": "Ma setax jħassar il-kmand",
       "nameRequired": "Daħħal isem tal-kmand",
       "nameInvalid": "L-isem irid jibda b'ittra żgħira u juża biss ittri żgħar, ċifri u sings",
       "templateRequired": "Daħħal mudell ta' kmand",

@@ -3011,11 +3011,22 @@
     "boundary": {
       "backToProfile": "ወደ መገለጫ ይመለሱ",
       "loadErrorMessage": "ግንኙነትህን አረጋግጠህ እንደገና ሞክር።",
+
+      "chooseAccount": "መለያ ይምረጡ",
       "loadErrorTitle": "ድርጅቶችዎን መጫን አልተቻለም።",
+      "noOrganization": "ድርጅት የለም",
+
+      "noOrganizationDescription": "ይህ መለያ የድርጅት አካል አይደለም። እንደ አባል ግብዣዎች እና ዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም በድር ላይ አንዱን ይፍጠሩ ወይም ይቀላቀሉ።",
+
+      "openWebOrganizations": "ድርጅቶችን በድር ላይ ይክፈቱ",
+
       "organizationUnavailable": "ድርጅቱ አይገኝም።",
-      "selectDescription": "ለመቀጠል ከመገለጫዎ ድርጅት ይምረጡ።",
+      "selectDescriptionWithOrganizations": "እርስዎ አንድ ወይም ከዚያ በላይ ድርጅቶች አባል ነዎት። ይህ ማያ ገጽ መጠቀም ያለበትን መለያ ይምረጡ።",
+
       "selectOrganization": "ድርጅት ይምረጡ",
       "unavailableDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። ለመቀጠል ከመገለጫዎ ሌላ ድርጅት ይምረጡ።",
+
+      "unavailableSessionsDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። የዚህ ድርጅት ክፍለ ጊዜዎችን መጫን አይቻልም።",
       "accessDeniedDescription": "ይህን ድርጅት የመድረስ ፈቃድ የለዎትም።"
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "ቢበዛ 50 ግቤቶችን ይጠቀሙ፣ ቁልፎች እስከ 128 እና እሴቶች እስከ 4096 ቁምፊ",
       "timeoutInvalid": "ጊዜው ያለፈበት ሙሉ የሚሊሰከንዶች ቁጥር መሆን አለበት።",
       "edit": "የMCP አገልጋይ ያርትዑ",
-      "saveFailed": "የMCP አገልጋይን ማስቀመጥ አልተቻለም"
+      "saveFailed": "የMCP አገልጋይን ማስቀመጥ አልተቻለም",
+      "deleteFailed": "የMCP አገልጋይን ማጥፋት አልተቻለም",
+      "updateFailed": "የMCP አገልጋይን ማዘመን አልተቻለም"
     },
     "agents": {
       "title": "የመገለጫ ወኪሎች",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "ሱባጀንት - ከሌሎች ብቻ የሚጠራ",
       "visibilityAll": "ሁሉም - ሁለቱም",
       "saveFailed": "ወኪል ማስቀመጥ አልተቻለም",
+      "deleteFailed": "ወኪል ማጥፋት አልተቻለም",
       "nameRequired": "የወኪል ስም አስገባ",
       "slugRequired": "የወኪል ማሰሪያ አስገባ",
       "slugInvalid": "ስሉግ በፊደል መጀመር እና ትንንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
@@ -3721,6 +3735,7 @@
       "subtask": "እንደ ንዑስ ተግባር ያሂዱ",
       "edit": "የጭረት ትእዛዝን ያርትዑ",
       "saveFailed": "ትዕዛዝ ማስቀመጥ አልተቻለም",
+      "deleteFailed": "ትዕዛዝ ማጥፋት አልተቻለም",
       "nameRequired": "የትእዛዝ ስም ያስገቡ",
       "nameInvalid": "ስም በትንሽ ሆሄ መጀመር እና በትናንሽ ሆሄያት፣ አሃዞች እና ሰረዞች ብቻ መጠቀም አለበት።",
       "templateRequired": "የትእዛዝ አብነት አስገባ",

@@ -3003,11 +3003,22 @@
     "boundary": {
       "backToProfile": "プロフィールに戻る",
       "loadErrorMessage": "接続を確認して、もう一度お試しください。",
+
+      "chooseAccount": "アカウントを選択",
       "loadErrorTitle": "組織を読み込めませんでした。",
+      "noOrganization": "組織なし",
+
+      "noOrganizationDescription": "このアカウントは組織に属していません。メンバーの招待や残高不足のアラートなどの組織機能を使用するには、ウェブで組織を作成するか参加してください。",
+
+      "openWebOrganizations": "ウェブで組織を開く",
+
       "organizationUnavailable": "組織を利用できません。",
-      "selectDescription": "続行するには、プロフィールから組織を選択してください。",
+      "selectDescriptionWithOrganizations": "あなたは1つ以上の組織に所属しています。この画面で使用するアカウントを選択してください。",
+
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
+
+      "unavailableSessionsDescription": "この組織は利用できなくなりました。セッションを読み込めません。",
       "accessDeniedDescription": "この組織にアクセスする権限がありません。"
     },
     "creditActivity": {
@@ -3675,7 +3686,9 @@
       "jsonTooLarge": "最大50件のエントリ（キーは128文字、値は4096文字まで）を使用してください",
       "timeoutInvalid": "タイムアウトはミリ秒単位の整数でなければなりません",
       "edit": "MCPサーバーの編集",
-      "saveFailed": "MCP サーバーを保存できませんでした"
+      "saveFailed": "MCP サーバーを保存できませんでした",
+      "deleteFailed": "MCP サーバーを削除できませんでした",
+      "updateFailed": "MCP サーバーを更新できませんでした"
     },
     "agents": {
       "title": "プロファイルエージェント",
@@ -3702,6 +3715,7 @@
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
       "visibilityAll": "すべて — 両方",
       "saveFailed": "エージェントを保存できませんでした",
+      "deleteFailed": "エージェントを削除できませんでした",
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",
       "slugInvalid": "スラグは文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
@@ -3721,6 +3735,7 @@
       "subtask": "サブタスクとして実行",
       "edit": "スラッシュコマンドの編集",
       "saveFailed": "コマンドを保存できませんでした",
+      "deleteFailed": "コマンドを削除できませんでした",
       "nameRequired": "コマンド名を入力してください",
       "nameInvalid": "名前は小文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
       "templateRequired": "コマンドテンプレートを入力してください",

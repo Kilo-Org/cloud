@@ -102,7 +102,7 @@ timer or sandbox acceptance:
 
 ```bash
 cd services/cloud-agent-next/wrapper
-KILO_781_BINARY=/path/to/isolated/kilo-7.8.15 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
+KILO_781_BINARY=/path/to/isolated/kilo-7.8.1 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
 ```
 
 The local production-timer driver discovers this worktree's ports, uses the seeded
@@ -150,7 +150,7 @@ and post-Stop follow-ups.
 Private reports and transcripts are retained; chats and sandboxes are not deleted
 automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
-Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.15`):
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.1`):
 
 ```bash
 pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts

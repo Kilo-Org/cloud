@@ -3196,6 +3196,30 @@ describe('cli-sessions-v2-router', () => {
       expect(await readCacheRows()).toHaveLength(1);
     });
 
+    it('verifies the PR when its head ref is the branch the session reported pushing', async () => {
+      // The session recorded `feature/z` as its branch but pushed the PR from
+      // `feature/pushed`, which is the branch the CLI reported with the link.
+      const pushedBranch = 'feature/pushed';
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_ref: pushedBranch, pr_head_sha: 'abc123' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headRef: pushedBranch, headSha: 'abc123' })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+      expect(await readCacheRows()).toHaveLength(1);
+      const [sessionRow] = await db
+        .select({ verifiedAt: cli_sessions_v2.pr_link_verified_at })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(sessionRow.verifiedAt).not.toBeNull();
+    });
+
     it('returns null for a non-GitHub session without calling GitHub', async () => {
       await db
         .update(cli_sessions_v2)

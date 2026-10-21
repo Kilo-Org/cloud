@@ -36,7 +36,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModelExcludingCustomLlms,
+  isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
@@ -584,11 +584,8 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
-  const isCustomLlmRequestedModel = await isCustomLlm(effectiveModelIdLowerCased);
-  const isRateLimitedFreeModel =
-    !isCustomLlmRequestedModel && isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
   // Custom LLMs count as free; `getProvider` still refuses callers without access.
-  const isFreeRequestedModel = isCustomLlmRequestedModel || isRateLimitedFreeModel;
+  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -607,9 +604,8 @@ export async function handleLlmProxyRequest(
   // For free models: server-side products (cloud-agent, code-review, app-builder,
   // gastown) rate-limit per user when the request comes from Cloudflare IPs (Kilo
   // infrastructure). All other products rate-limit per IP (fast pre-auth path).
-  // Custom LLMs are only free because Kilo does not bill them, so they are exempt
-  // even when their id matches a free-model pattern.
-  if (isRateLimitedFreeModel) {
+  // Custom LLMs are exempt, even when their id matches a free-model pattern.
+  if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
     const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
     if (rateLimitKey instanceof NextResponse) return rateLimitKey;
 

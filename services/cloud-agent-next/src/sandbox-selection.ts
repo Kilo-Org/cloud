@@ -15,6 +15,7 @@ import {
   credentialContainmentEnabled,
   getDefaultSandboxDestination,
   isOrgInList,
+  sandboxAllocationRetirementReason,
 } from './sandbox-id.js';
 import type { Env } from './types.js';
 
@@ -48,6 +49,8 @@ export function sandboxAllocationUnavailableReason(
   allocation: SandboxAllocation,
   capability?: SandboxAllocationCapability
 ): string | undefined {
+  const retirementReason = sandboxAllocationRetirementReason(allocation);
+  if (retirementReason) return retirementReason;
   const capabilityReason = sandboxAllocationProviderCapabilityReason(allocation, capability);
   if (capabilityReason) return capabilityReason;
   const provider = getSandboxAllocationProvider(allocation);

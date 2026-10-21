@@ -90,7 +90,7 @@ import {
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
 import {
-  cloudflareSandboxSmallNativeReplacement,
+  containersAllocationReplacement,
   generateSandboxRoutingTarget,
   recordedSandboxAllocationMatchesRequest,
   resolveNewSessionSandboxAllocation,
@@ -665,13 +665,13 @@ async function assertSandboxAllocationMembership(
   await assertOrganizationMembership(getPgDb(ctx.env), ctx.userId, orgId);
 }
 
-function sandboxSmallReplacementForSession(
+function containersReplacementForSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   sessionId: string,
   options?: { billingOrigin?: string }
 ): SandboxAllocation | undefined {
-  return cloudflareSandboxSmallNativeReplacement({
+  return containersAllocationReplacement({
     env: ctx.env,
     orgId: input.options?.kilocodeOrganizationId,
     userId: ctx.userId,
@@ -809,7 +809,7 @@ async function allocateNewSession(
         ...(isSelectableSandboxAllocation(input.savedSandboxAllocation ?? undefined)
           ? { [SESSION_CREATE_SAVED_ALLOCATION_KEY]: input.savedSandboxAllocation }
           : {}),
-        ...(isSelectableSandboxAllocation(sandboxAllocation) ? { sandboxAllocation } : {}),
+        ...(sandboxAllocation !== undefined ? { sandboxAllocation } : {}),
       });
     }
 
@@ -873,7 +873,12 @@ async function allocateNewSession(
   }
 
   try {
-    assertEgressPolicyAllocation(input, { cloudAgentSessionId, sandboxProvider, sandboxRoute });
+    assertEgressPolicyAllocation(input, {
+      cloudAgentSessionId,
+      sandboxProvider,
+      sandboxRoute,
+      sandboxKind,
+    });
   } catch (error) {
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
@@ -1060,7 +1065,7 @@ function rebuildRecordedSessionAllocation(
   const recorded = sandboxAllocationSchema.optional().safeParse(canonical.sandboxAllocation);
   const replacement =
     typeof cloudAgentSessionId === 'string'
-      ? sandboxSmallReplacementForSession(input, ctx, cloudAgentSessionId, options)
+      ? containersReplacementForSession(input, ctx, cloudAgentSessionId, options)
       : undefined;
   if (
     !recorded.success ||
@@ -1886,7 +1891,7 @@ async function assertCreateIntentUnchanged(
   const sessionId = row.canonical_result?.cloudAgentSessionId;
   const replacement =
     typeof sessionId === 'string'
-      ? sandboxSmallReplacementForSession(input, ctx, sessionId, options)
+      ? containersReplacementForSession(input, ctx, sessionId, options)
       : undefined;
   if (
     !recorded.success ||

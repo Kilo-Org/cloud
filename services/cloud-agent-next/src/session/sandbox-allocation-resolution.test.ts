@@ -138,6 +138,23 @@ describe('resolveSavedSandboxAllocation', () => {
     await expect(resolve()).resolves.toBeUndefined();
   });
 
+  it('skips a retired shared repository allocation and uses the context default', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'cloudflare-shared',
+      contextAllocation: 'cloudflare-single',
+    });
+
+    await expect(resolve()).resolves.toBe('cloudflare-single');
+  });
+
+  it('uses the runtime default when the only saved allocation is shared', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+
+    await expect(resolve()).resolves.toBeUndefined();
+  });
+
   it('does not read settings when the owner cannot select a sandbox', async () => {
     await expect(resolve({ env: disabledEnv })).resolves.toBeUndefined();
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();

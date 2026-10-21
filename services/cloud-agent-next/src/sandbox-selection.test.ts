@@ -184,7 +184,6 @@ describe('sandbox selection policy', () => {
     const capabilities = getSandboxSelectionCapabilities(configured as Env, owner);
     expect(availableOptions(capabilities)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('vercel-small'),
       getSandboxAllocationRequest('vercel-large'),
     ]);
@@ -199,7 +198,6 @@ describe('sandbox selection policy', () => {
     const missingContainers = { ...configured } as Env;
     expect(availableOptions(getSandboxSelectionCapabilities(missingContainers, owner))).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('vercel-small'),
       getSandboxAllocationRequest('vercel-large'),
     ]);
@@ -209,7 +207,6 @@ describe('sandbox selection policy', () => {
       CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
     } as Env;
     expect(availableOptions(getSandboxSelectionCapabilities(enrolledContainers, owner))).toEqual([
-      getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-containers-standard-4'),
       getSandboxAllocationRequest('vercel-small'),
@@ -221,7 +218,7 @@ describe('sandbox selection policy', () => {
     const env = { ...configured, SANDBOX_SELECTION_IDS: owner.userId } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, { userId: owner.userId });
     expect(capabilities.enabled).toBe(true);
-    expect(availableOptions(capabilities)).toHaveLength(4);
+    expect(availableOptions(capabilities)).toHaveLength(3);
   });
 
   it('enables personal selection for wildcard rollouts', () => {
@@ -248,12 +245,31 @@ describe('sandbox selection policy', () => {
     } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(capabilities.enabled).toBe(true);
-    expect(availableOptions(capabilities)).toHaveLength(5);
+    expect(availableOptions(capabilities)).toHaveLength(4);
     expect(capabilities.options.every(option => !('available' in option))).toBe(true);
     expect(JSON.stringify(capabilities)).not.toContain('test-token');
-    for (const preset of sandboxAllocationSchema.options) {
+    for (const preset of sandboxAllocationSchema.options.filter(
+      allocation => allocation !== 'cloudflare-shared'
+    )) {
       expect(() => assertSandboxAllocationAvailable(env, owner, preset)).not.toThrow();
     }
+    expect(() => assertSandboxAllocationAvailable(env, owner, 'cloudflare-shared')).toThrow(
+      'Shared containers are no longer supported'
+    );
+  });
+
+  it('reports shared allocations as unavailable and rejects explicit requests', () => {
+    const env = { ...configured, CLOUDFLARE_CONTAINERS_ORG_IDS: '*' } as Env;
+    const capabilities = getSandboxSelectionCapabilities(env, owner);
+    expect(capabilities.options).toContainEqual({
+      allocation: getSandboxAllocationRequest('cloudflare-shared'),
+      unavailableReason:
+        'Shared containers are no longer supported. Choose an isolated sandbox allocation.',
+    });
+    expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-shared')).toBe(false);
+    expect(() => assertSandboxAllocationAvailable(env, owner, 'cloudflare-shared')).toThrow(
+      'Shared containers are no longer supported. Choose an isolated sandbox allocation.'
+    );
   });
 
   it.each(Object.keys(configured).filter(key => key.startsWith('VERCEL_')))(
@@ -264,7 +280,6 @@ describe('sandbox selection policy', () => {
       expect(capabilities.enabled).toBe(true);
       expect(availableOptions(capabilities)).toEqual([
         getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-        getSandboxAllocationRequest('cloudflare-shared'),
       ]);
       for (const preset of ['vercel-small', 'vercel-large'] as const) {
         expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
@@ -284,7 +299,6 @@ describe('sandbox selection policy', () => {
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(availableOptions(capabilities)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
     ]);
     for (const preset of ['vercel-small', 'vercel-large'] as const) {
       expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(

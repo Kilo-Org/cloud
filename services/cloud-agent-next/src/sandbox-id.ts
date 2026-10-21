@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import {
   CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
@@ -343,12 +344,12 @@ export function credentialContainmentEnabled(env: {
 }
 
 /**
- * New control-plane sessions that would start on Cloudflare sandbox small use
- * the native containers runtime at 2 vCPU / 8 GiB instead. Legacy sessions stay
- * on sandbox small: the native runtime exists only on the control plane.
- * Existing sessions are unaffected because they keep their stored provider.
+ * New control-plane sessions translate isolated Cloudflare allocations to the
+ * containers allocation with the same resources: single -> standard-3 and
+ * isolated-standard -> standard-4. Existing sessions keep their stored provider
+ * and allocation.
  */
-export function cloudflareSandboxSmallNativeReplacement(input: {
+export function containersAllocationReplacement(input: {
   env: SandboxSelectionEnv;
   orgId?: string;
   userId: string;
@@ -358,17 +359,24 @@ export function cloudflareSandboxSmallNativeReplacement(input: {
   createdOnPlatform?: string;
   billingOrigin?: string;
 }): SandboxAllocation | undefined {
-  if (sessionPlaneFromId(input.sessionId) !== 'control' || !input.contained) return undefined;
+  if (sessionPlaneFromId(input.sessionId) !== 'control') return undefined;
   if (
     input.billingOrigin === CODE_REVIEW_PLATFORM ||
     input.createdOnPlatform === CODE_REVIEW_PLATFORM
   ) {
     return undefined;
   }
-  if (input.requestedAllocation === 'cloudflare-single') {
-    return CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION;
+  switch (input.requestedAllocation) {
+    case 'cloudflare-single':
+      return CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION;
+    case 'isolated-standard':
+      return 'cloudflare-containers-standard-4';
+    case undefined:
+      break;
+    default:
+      return undefined;
   }
-  if (input.requestedAllocation !== undefined) return undefined;
+  if (!input.contained) return undefined;
   const provider = selectDefaultSandboxProvider({
     env: input.env,
     orgId: input.orgId,
@@ -377,6 +385,15 @@ export function cloudflareSandboxSmallNativeReplacement(input: {
     isolated: true,
   });
   return provider === 'cloudflare' ? CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION : undefined;
+}
+
+/** Shared allocations remain readable for existing sessions, but cannot create new ones. */
+export function sandboxAllocationRetirementReason(
+  allocation: SandboxAllocation | undefined
+): string | undefined {
+  return allocation === 'cloudflare-shared'
+    ? 'Shared containers are no longer supported. Choose an isolated sandbox allocation.'
+    : undefined;
 }
 
 export function resolveNewSessionSandboxAllocation(input: {
@@ -389,7 +406,11 @@ export function resolveNewSessionSandboxAllocation(input: {
   createdOnPlatform?: string;
   billingOrigin?: string;
 }): SandboxAllocation | undefined {
-  return cloudflareSandboxSmallNativeReplacement(input) ?? input.requestedAllocation;
+  const retirementReason = sandboxAllocationRetirementReason(input.requestedAllocation);
+  if (retirementReason) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: retirementReason });
+  }
+  return containersAllocationReplacement(input) ?? input.requestedAllocation;
 }
 
 /** Ledger retries accept the request or the native replacement recorded for it. */

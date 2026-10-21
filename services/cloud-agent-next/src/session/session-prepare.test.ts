@@ -445,6 +445,11 @@ describe('explicit sandbox session creation', () => {
       runtime: { sandboxAllocation },
       options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
     });
+  const containersAllocationFor = (preset: SandboxAllocation): SandboxAllocation =>
+    preset === 'cloudflare-single' ? 'cloudflare-containers-standard-3' : preset;
+  const supportedAllocations = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+    allocation => allocation !== 'cloudflare-shared'
+  );
   function requestFromStructuredAllocation(allocation: SandboxAllocation): SessionCreateRequest {
     const runtime = StartSessionInput.parse({
       message: { prompt: 'Build the feature' },
@@ -514,19 +519,30 @@ describe('explicit sandbox session creation', () => {
     );
   });
 
-  it.each(['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const)(
-    'rejects egress policy on resolved %s before ownership creation',
-    async sandboxAllocation => {
-      const doStub = makeDoStub();
-      const request = requestForPreset(sandboxAllocation);
-      request.runtime = { sandboxAllocation, egressMode: 'allowlist' };
-      await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-      });
-      expect(createCliSessionMock).not.toHaveBeenCalled();
-      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    }
-  );
+  it('rejects egress policy on Vercel before ownership creation', async () => {
+    const doStub = makeDoStub();
+    const request = requestForPreset('vercel-small');
+    request.runtime = { sandboxAllocation: 'vercel-small', egressMode: 'allowlist' };
+    await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('accepts egress policy on isolated Standard translated to containers', async () => {
+    const doStub = makeDoStub();
+    const request = requestForPreset('isolated-standard');
+    request.runtime = { sandboxAllocation: 'isolated-standard', egressMode: 'allowlist' };
+    await runCreate(selectedContext(doStub), request);
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'cloudflare-containers',
+      sandboxAllocation: 'cloudflare-containers-standard-4',
+      sandboxKind: 'isolated',
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+  });
 
   it('accepts a supported resolved native replacement of cloudflare-single', async () => {
     const doStub = makeDoStub();
@@ -659,7 +675,7 @@ describe('explicit sandbox session creation', () => {
     expectNoAllocation(doStub);
   });
 
-  it.each(['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const)(
+  it.each(['vercel-small', 'isolated-standard'] as const)(
     'allows explicit unrestricted mode on %s',
     async sandboxAllocation => {
       const doStub = makeDoStub();
@@ -788,7 +804,37 @@ describe('explicit sandbox session creation', () => {
   });
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.flatMap(preset => [
+    (['ledger', 'start', 'register'] as const).flatMap(route =>
+      (['legacy', 'structured'] as const).map(format => ({ route, format }))
+    )
+  )(
+    'rejects a $format shared allocation through $route before creating ownership',
+    async ({ route, format }) => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+      const request =
+        format === 'structured'
+          ? requestFromStructuredAllocation('cloudflare-shared')
+          : requestForPreset('cloudflare-shared');
+      const result =
+        route === 'ledger'
+          ? runCreate(ctx, request)
+          : route === 'start'
+            ? startNewSession(request, ctx)
+            : registerNewSession(request, ctx);
+      await expect(result).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message:
+          'Shared containers are no longer supported. Choose an isolated sandbox allocation.',
+      });
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expectNoAllocation(doStub);
+    }
+  );
+
+  it.each(
+    supportedAllocations.flatMap(preset => [
       { preset, format: 'legacy' },
       { preset, format: 'structured' },
     ])
@@ -805,9 +851,8 @@ describe('explicit sandbox session creation', () => {
         ctx,
         format === 'structured' ? requestFromStructuredAllocation(preset) : requestForPreset(preset)
       );
-      const persistedAllocation =
-        preset === 'cloudflare-single' ? 'cloudflare-containers-standard-3' : preset;
-      const sandboxKind = preset === 'cloudflare-shared' ? 'shared' : 'isolated';
+      const persistedAllocation = containersAllocationFor(preset);
+      const sandboxKind = 'isolated';
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
@@ -838,8 +883,7 @@ describe('explicit sandbox session creation', () => {
         kilocode: true,
       });
       expect(metadata.workspace).not.toHaveProperty('resources');
-      // A control-plane key is neutral and routes only by its stored kind;
-      // the shared-sandbox failover override is legacy-only.
+      // A control-plane key is neutral and routes only by its stored kind.
       expect(metadata.workspace?.sandboxId).toMatch(/^sbx-[0-9a-f]{48}$/);
       expect(metadata.workspace?.sandboxKind).toBe(sandboxKind);
       expect(metadata.workspace?.sandboxRoute).toBeUndefined();
@@ -848,23 +892,18 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it.each([
-    { preset: 'cloudflare-single', sandboxId: /^ses-/ },
-    { preset: 'cloudflare-shared', sandboxId: /^org-/ },
-  ] as const)(
-    'keeps a legacy owner on the legacy plane for $preset',
-    async ({ preset, sandboxId }) => {
-      const doStub = makeDoStub();
-      const ctx = selectedContext(doStub);
-      generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
-      await runCreate(ctx, requestForPreset(preset));
-      expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
-      const command = createdMetadata(doStub);
-      expect(command?.workspace).toMatchObject({ sandboxAllocation: preset });
-      expect(command?.workspace?.sandboxProvider).toBe('cloudflare');
-      expect(command?.workspace?.sandboxId).toMatch(sandboxId);
-    }
-  );
+  it('routes a former legacy owner to the control plane for cloudflare-single', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    await runCreate(ctx, requestForPreset('cloudflare-single'));
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    const command = createdMetadata(doStub);
+    expect(command?.workspace).toMatchObject({
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      sandboxProvider: 'cloudflare-containers',
+    });
+    expect(command?.workspace?.sandboxId).toMatch(/^sbx-/);
+  });
 
   it.each(['vercel-small', 'vercel-large'] as const)(
     'forces the control plane for %s even when the owner is not enrolled',
@@ -884,7 +923,7 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+  it.each(supportedAllocations)(
     'recovers %s on same-key takeover after membership lookup fails before progress',
     async sandboxAllocation => {
       const request = requestForPreset(sandboxAllocation);
@@ -917,10 +956,7 @@ describe('explicit sandbox session creation', () => {
         operationKey: OPERATION_KEY,
       });
       expect(generateSessionIdMock).toHaveBeenCalledOnce();
-      const persistedAllocation =
-        sandboxAllocation === 'cloudflare-single'
-          ? 'cloudflare-containers-standard-3'
-          : sandboxAllocation;
+      const persistedAllocation = containersAllocationFor(sandboxAllocation);
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
@@ -1011,7 +1047,7 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+  it.each(supportedAllocations)(
     'creates the first worktree chat with %s and upstream finalization/containment semantics',
     async sandboxAllocation => {
       const doStub = makeDoStub();
@@ -1031,9 +1067,10 @@ describe('explicit sandbox session creation', () => {
         metadataSchemaVersion: 2,
         lifecycle: { version: 1, timestamp: 1 },
       });
+      const persistedAllocation = containersAllocationFor(sandboxAllocation);
       expect(metadata.workspace).toMatchObject({
         worktreeId: WORKTREE_ID,
-        sandboxAllocation,
+        sandboxAllocation: persistedAllocation,
         credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
       });
       expect(metadata.finalization?.autoCommit).toBe(true);
@@ -1043,7 +1080,7 @@ describe('explicit sandbox session creation', () => {
         expect.objectContaining({
           [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
           [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
-          sandboxAllocation,
+          sandboxAllocation: persistedAllocation,
         })
       );
       expect(createCliSessionMock.mock.calls[0]?.slice(-2)).toEqual([
@@ -1783,7 +1820,7 @@ describe('explicit sandbox session creation', () => {
 
   it('resolves the saved allocation for a fresh prepare create', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
-      contextAllocation: 'cloudflare-shared',
+      contextAllocation: 'cloudflare-containers-standard-4',
     });
     const request = makeRequest({
       repository: { type: 'github', repo: 'acme/repo' },
@@ -1804,11 +1841,15 @@ describe('explicit sandbox session creation', () => {
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
     });
     expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledOnce();
-    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe('cloudflare-shared');
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-4'
+    );
     expect(recordOperationProgressMock).toHaveBeenCalledWith(
       expect.anything(),
       ROW_ID,
-      expect.objectContaining({ [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-shared' })
+      expect.objectContaining({
+        [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-containers-standard-4',
+      })
     );
   });
 
@@ -2371,10 +2412,11 @@ describe('createSessionWithLedger admission ladder', () => {
     ['app-builder origin', 'browser', 'app-builder'],
     ['code-review origin', undefined, 'code-review'],
   ] as const)(
-    'keeps non-control-plane %s creates on agent_ sessions',
+    'routes formerly legacy %s creates to workspace_ sessions',
     async (_label, clientProvenance, createdOnPlatform) => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
+      generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
       await runCreate(
         ctx,
@@ -2383,10 +2425,10 @@ describe('createSessionWithLedger admission ladder', () => {
         })
       );
 
-      expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+      expect(generateSessionIdMock).toHaveBeenCalledWith('control');
       expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
-          identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+          identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
         })
       );
     }
@@ -5035,22 +5077,21 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       });
       expect(metadata.workspace).toMatchObject({
         sandboxId: expect.stringMatching(/^sbx-[0-9a-f]{48}$/),
-        sandboxKind: 'isolated-standard',
-        sandboxProvider: 'cloudflare',
-        sandboxAllocation: 'isolated-standard',
+        sandboxKind: 'isolated',
+        sandboxProvider: 'cloudflare-containers',
+        sandboxAllocation: 'cloudflare-containers-standard-4',
       });
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
-        expect.objectContaining({ sandboxKind: 'isolated-standard' })
+        expect.objectContaining({ sandboxKind: 'isolated' })
       );
     }
   );
 
-  it('allows isolated Standard allocation for non-interactive legacy sessions', async () => {
+  it('runs a non-interactive isolated Standard allocation on the control plane', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    const sandboxId = `istd-${'a'.repeat(48)}` as const;
-    generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
@@ -5074,11 +5115,16 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       })
     );
 
-    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
-        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID, orgId }),
-        workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID, orgId }),
+        workspace: expect.objectContaining({
+          sandboxProvider: 'cloudflare-containers',
+          sandboxAllocation: 'cloudflare-containers-standard-4',
+          sandboxKind: 'isolated',
+          sandboxId: expect.stringMatching(/^sbx-[0-9a-f]{48}$/),
+        }),
       })
     );
   });
@@ -5105,7 +5151,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
   });
 
-  it('keeps a Code Reviewer session on the legacy plane without code-review enrollment', async () => {
+  it('routes a Code Reviewer session to the control plane without code-review enrollment', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = '';
@@ -5119,7 +5165,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       { ...CREATE_OPTIONS, billingOrigin: 'code-review' }
     );
 
-    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
   });
 
   it.each([

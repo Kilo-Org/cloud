@@ -3577,6 +3577,8 @@
     "keyTooLong": "A chave debe ter 256 caracteres ou menos",
     "keyDuplicate": "Esta chave xa existe no perfil",
     "valueLabel": "Valor",
+    "valueRequired": "Introduza un valor",
+    "tooLong": "Use como máximo {{max}} caracteres",
     "secretLabel": "Segredo",
     "secrets": {
       "markSecret": "Marcar como segredo",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Introduza un nome de servidor",
-      "nameInvalid": "O nome só pode usar letras, números, guións baixos e guións",
+      "nameInvalid": "O nome só pode usar letras ASCII, números, guións baixos e guións, ata 100 caracteres",
       "commandRequired": "Introduza un comando",
       "commandTooLong": "Usa como máximo 50 argumentos de 500 caracteres cada un",
       "urlRequired": "Introduza un URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Non se puido gardar o axente",
       "nameRequired": "Introduza un nome de axente",
       "slugRequired": "Introduza unha babosa de axente",
-      "slugInvalid": "Slug debe comezar cunha letra e usar só letras minúsculas, díxitos e guións",
+      "slugInvalid": "Slug debe comezar cunha letra ASCII minúscula e usar só letras ASCII minúsculas, díxitos e guións, ata 50 caracteres",
       "slugConflict": "Ese slug xa o usa un axente integrado ou outro axente deste perfil",
       "edit": "Editar axente"
     },

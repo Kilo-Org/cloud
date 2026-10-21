@@ -3700,6 +3700,8 @@
     "keyTooLong": "L-ewlenin irid ikun 256 karattru jew inqas",
     "keyDuplicate": "Dan l-ewlenin diġà jeżisti fil-profil",
     "valueLabel": "Valur",
+    "valueRequired": "Daħħal valur",
+    "tooLong": "Uża {{max}} karattru jew inqas",
     "secretLabel": "Sigriet",
     "secrets": {
       "markSecret": "Immarka bħala sigriet",
@@ -3747,7 +3749,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Daħħal isem server",
-      "nameInvalid": "Isem jista 'juża biss ittri, numri, underscore, u sing",
+      "nameInvalid": "Isem jista' juża biss ittri ASCII, numri, underscores, u sings, sa 100 karattru",
       "commandRequired": "Daħħal kmand",
       "commandTooLong": "Uża mhux aktar minn 50 argument, kull wieħed 500 karattru",
       "urlRequired": "Daħħal URL",
@@ -3786,7 +3788,7 @@
       "saveFailed": "Ma setax isalva l-aġent",
       "nameRequired": "Daħħal isem ta' aġent",
       "slugRequired": "Daħħal aġent slug",
-      "slugInvalid": "Slug għandu jibda b'ittra u juża biss ittri żgħar, ċifri u sings",
+      "slugInvalid": "Slug għandu jibda b'ittra żgħira ASCII u juża biss ittri żgħar ASCII, ċifri u sings, sa 50 karattru",
       "slugConflict": "Dak is-slug diġà qed jintuża minn aġent integrat jew aġent ieħor f'dan il-profil",
       "edit": "Editja l-aġent"
     },

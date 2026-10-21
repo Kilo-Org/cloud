@@ -3577,6 +3577,8 @@
     "keyTooLong": "Gakoak 256 karaktere edo gutxiago izan behar ditu",
     "keyDuplicate": "Gako hau jada badago profilean",
     "valueLabel": "Balioa",
+    "valueRequired": "Sartu balioa",
+    "tooLong": "Erabili gehienez {{max}} karaktere",
     "secretLabel": "Sekretua",
     "secrets": {
       "markSecret": "Markatu sekretu gisa",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Sartu zerbitzariaren izena",
-      "nameInvalid": "Izenak hizkiak, zenbakiak, azpimarra eta marra soilik erabil ditzake",
+      "nameInvalid": "Izenak ASCII hizkiak, zenbakiak, azpimarra eta marra soilik erabil ditzake, gehienez 100 karaktere",
       "commandRequired": "Sartu komando bat",
       "commandTooLong": "Erabili gehienez 50 argumentu, bakoitza 500 karakterekoa",
       "urlRequired": "Sartu URL bat",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Ezin izan da agentea gorde",
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agente bare bat",
-      "slugInvalid": "Slug-ek letra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
+      "slugInvalid": "Slug-ek ASCII letra xehe batekin hasi behar du eta ASCII letra xeheak, zifrak eta marratxoak soilik erabili behar ditu, gehienez 50 karaktere",
       "slugConflict": "Slug hori dagoeneko erabiltzen du agenta integratu batek edo profil honetako beste agente batek",
       "edit": "Editatu agentea"
     },

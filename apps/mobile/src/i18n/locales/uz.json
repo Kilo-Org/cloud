@@ -3577,6 +3577,8 @@
     "keyTooLong": "Kalit 256 ta belgi yoki undan kam bo'lishi kerak",
     "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
     "valueLabel": "Qiymat",
+    "valueRequired": "Qiymatni kiriting",
+    "tooLong": "Ko'pi bilan {{max}} ta belgidan foydalaning",
     "secretLabel": "Sir",
     "secrets": {
       "markSecret": "Sir sifatida belgilang",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Server nomini kiriting",
-      "nameInvalid": "Ism faqat harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin",
+      "nameInvalid": "Ism faqat ASCII harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin, jami 100 ta belgidan oshmasligi kerak",
       "commandRequired": "Buyruqni kiriting",
       "commandTooLong": "Ko'pi bilan 500 belgidan iborat 50 ta argumentdan foydalaning",
       "urlRequired": "URL manzilini kiriting",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Agentni saqlab boʻlmadi",
       "nameRequired": "Agent nomini kiriting",
       "slugRequired": "Agent slug'ini kiriting",
-      "slugInvalid": "Slug harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
+      "slugInvalid": "Slug kichik ASCII harfi bilan boshlanishi va faqat kichik ASCII harflar, raqamlar va tirelardan foydalanishi, jami 50 ta belgidan oshmasligi kerak",
       "slugConflict": "Bu slug allaqachon ichki agent yoki bu profildagi boshqa agent tomonidan ishlatilgan",
       "edit": "Agentni tahrirlash"
     },

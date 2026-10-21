@@ -3577,6 +3577,8 @@
     "keyTooLong": "Kunci harus 256 karakter atau kurang",
     "keyDuplicate": "Kunci ini sudah ada di profil",
     "valueLabel": "Nilai",
+    "valueRequired": "Masukkan nilai",
+    "tooLong": "Gunakan maksimal {{max}} karakter",
     "secretLabel": "Rahasia",
     "secrets": {
       "markSecret": "Tandai sebagai rahasia",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Masukkan nama server",
-      "nameInvalid": "Nama hanya boleh menggunakan huruf, angka, garis bawah, dan tanda hubung",
+      "nameInvalid": "Nama hanya boleh menggunakan huruf ASCII, angka, garis bawah, dan tanda hubung, maksimal 100 karakter",
       "commandRequired": "Masukkan perintah",
       "commandTooLong": "Gunakan maksimal 50 argumen yang masing-masing 500 karakter",
       "urlRequired": "Masukkan URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Tidak dapat menyelamatkan agen",
       "nameRequired": "Masukkan nama agen",
       "slugRequired": "Masukkan siput agen",
-      "slugInvalid": "Siput harus dimulai dengan huruf dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
+      "slugInvalid": "Siput harus dimulai dengan huruf ASCII kecil dan hanya menggunakan huruf kecil ASCII, angka, dan tanda hubung, maksimal 50 karakter",
       "slugConflict": "Slug tersebut sudah digunakan oleh agen bawaan atau agen lain di profil ini",
       "edit": "Sunting agen"
     },

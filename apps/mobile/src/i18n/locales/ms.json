@@ -3577,6 +3577,8 @@
     "keyTooLong": "Kunci mestilah 256 aksara atau kurang",
     "keyDuplicate": "Kunci ini sudah ada dalam profil",
     "valueLabel": "Nilai",
+    "valueRequired": "Masukkan nilai",
+    "tooLong": "Gunakan {{max}} aksara atau kurang",
     "secretLabel": "Rahsia",
     "secrets": {
       "markSecret": "Tandakan sebagai rahsia",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Masukkan nama pelayan",
-      "nameInvalid": "Nama hanya boleh menggunakan huruf, nombor, garis bawah dan sempang",
+      "nameInvalid": "Nama hanya boleh menggunakan huruf ASCII, nombor, garis bawah dan sempang, sehingga 100 aksara",
       "commandRequired": "Masukkan arahan",
       "commandTooLong": "Gunakan paling banyak 50 argumen yang setiap satu 500 aksara",
       "urlRequired": "Masukkan URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Tidak dapat menyelamatkan ejen",
       "nameRequired": "Masukkan nama ejen",
       "slugRequired": "Masukkan slug ejen",
-      "slugInvalid": "Slug mesti bermula dengan huruf dan hanya menggunakan huruf kecil, digit dan sempang",
+      "slugInvalid": "Slug mesti bermula dengan huruf kecil ASCII dan hanya menggunakan huruf kecil ASCII, digit dan sempang, sehingga 50 aksara",
       "slugConflict": "Slug itu sudah digunakan oleh ejen terbina dalam atau ejen lain dalam profil ini",
       "edit": "Edit ejen"
     },

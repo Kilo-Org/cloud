@@ -3659,6 +3659,8 @@
     "keyTooLong": "Ključ ima lahko največ 256 znakov",
     "keyDuplicate": "Ta ključ že obstaja v profilu",
     "valueLabel": "Vrednost",
+    "valueRequired": "Vnesite vrednost",
+    "tooLong": "Uporabite največ {{max}} znakov",
     "secretLabel": "Skrivnost",
     "secrets": {
       "markSecret": "Označi kot skrivnost",
@@ -3706,7 +3708,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Vnesite ime strežnika",
-      "nameInvalid": "Ime lahko vsebuje samo črke, številke, podčrtaje in pomišljaje",
+      "nameInvalid": "Ime lahko uporablja samo ASCII črke, številke, podčrtaje in pomišljaje, največ 100 znakov",
       "commandRequired": "Vnesite ukaz",
       "commandTooLong": "Uporabite največ 50 argumentov po 500 znakov",
       "urlRequired": "Vnesite URL",
@@ -3745,7 +3747,7 @@
       "saveFailed": "Agenta ni bilo mogoče shraniti",
       "nameRequired": "Vnesite ime agenta",
       "slugRequired": "Vnesite polža agenta",
-      "slugInvalid": "Polž se mora začeti s črko in uporabljati samo male črke, številke in pomišljaje",
+      "slugInvalid": "Polž se mora začeti z malo ASCII črko in uporabljati samo male ASCII črke, številke in pomišljaje, največ 50 znakov",
       "slugConflict": "Ta slug že uporablja vgrajeni agent ali drug agent v tem profilu",
       "edit": "Uredi agenta"
     },

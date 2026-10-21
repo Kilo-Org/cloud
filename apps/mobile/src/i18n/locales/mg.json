@@ -3577,6 +3577,8 @@
     "keyTooLong": "Tokony tsy mihoatra ny 256 tarehintsoratra ny fanalahidy",
     "keyDuplicate": "Efa ao amin'ny profil ity fanalahidy ity",
     "valueLabel": "Sanda",
+    "valueRequired": "Ampidiro sanda",
+    "tooLong": "Tokony tsy mihoatra ny {{max}} tarehintsoratra",
     "secretLabel": "zava-miafina",
     "secrets": {
       "markSecret": "Mariho ho tsiambaratelo",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Ampidiro anarana mpizara",
-      "nameInvalid": "Ny anarana dia tsy afaka mampiasa afa-tsy litera, isa, tsipiho, ary tsipiho",
+      "nameInvalid": "Ny anarana dia tsy afaka mampiasa afa-tsy litera ASCII, isa, tsipiho ambany ary tsipiho, hatramin'ny 100 tarehintsoratra",
       "commandRequired": "Ampidiro baiko",
       "commandTooLong": "Ampiasao farafahabetsany 50 tohan-kevitra, 500 tarehintsoratra avy",
       "urlRequired": "Ampidiro URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Tsy afaka namonjy mpandraharaha",
       "nameRequired": "Ampidiro anarana mpandraharaha",
       "slugRequired": "Ampidiro ny slug mpandraharaha",
-      "slugInvalid": "Ny slug dia tsy maintsy manomboka amin'ny litera ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
+      "slugInvalid": "Ny slug dia tsy maintsy manomboka amin'ny litera kely ASCII ary tsy mampiasa afa-tsy litera kely ASCII, isa ary tsipiho, hatramin'ny 50 tarehintsoratra",
       "slugConflict": "Etra io slug io efa ampiasain'ny azy ao anatiny na azy hafa amin'ity profil ity",
       "edit": "Ahitsio mpandraharaha"
     },

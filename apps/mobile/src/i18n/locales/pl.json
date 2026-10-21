@@ -3659,6 +3659,8 @@
     "keyTooLong": "Klucz może mieć maksymalnie 256 znaków",
     "keyDuplicate": "Ten klucz już istnieje w profilu",
     "valueLabel": "Wartość",
+    "valueRequired": "Wprowadź wartość",
+    "tooLong": "Użyj maksymalnie {{max}} znaków",
     "secretLabel": "Sekret",
     "secrets": {
       "markSecret": "Oznacz jako tajne",
@@ -3706,7 +3708,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Wprowadź nazwę serwera",
-      "nameInvalid": "W nazwie można używać wyłącznie liter, cyfr, podkreśleń i myślników",
+      "nameInvalid": "W nazwie można używać wyłącznie liter ASCII, cyfr, podkreśleń i myślników, maksymalnie 100 znaków",
       "commandRequired": "Wprowadź polecenie",
       "commandTooLong": "Użyj maksymalnie 50 argumentów po 500 znaków",
       "urlRequired": "Wpisz adres URL",
@@ -3745,7 +3747,7 @@
       "saveFailed": "Nie udało się zapisać agenta",
       "nameRequired": "Wprowadź nazwę agenta",
       "slugRequired": "Wprowadź ślimak agenta",
-      "slugInvalid": "Ślimak musi zaczynać się od litery i używać tylko małych liter, cyfr i myślników",
+      "slugInvalid": "Ślimak musi zaczynać się od małej litery ASCII i może zawierać wyłącznie małe litery ASCII, cyfry i myślniki, maksymalnie 50 znaków",
       "slugConflict": "Ten slug jest już używany przez wbudowanego agenta lub innego agenta w tym profilu",
       "edit": "Edytuj agenta"
     },

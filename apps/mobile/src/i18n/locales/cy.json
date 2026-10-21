@@ -3741,6 +3741,8 @@
     "keyTooLong": "Rhaid i'r allwedd fod yn 256 nod neu lai",
     "keyDuplicate": "Mae'r allwedd hon eisoes yn bodoli yn y proffil",
     "valueLabel": "Gwerth",
+    "valueRequired": "Rhowch werth",
+    "tooLong": "Defnyddiwch ddim fwy na {{max}} nod",
     "secretLabel": "Cyfrinach",
     "secrets": {
       "markSecret": "Marciwch fel cyfrinach",
@@ -3788,7 +3790,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Rhowch enw gweinydd",
-      "nameInvalid": "Dim ond llythrennau, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio",
+      "nameInvalid": "Dim ond llythrennau ASCII, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio, hyd at 100 nod",
       "commandRequired": "Rhowch orchymyn",
       "commandTooLong": "Defnyddiwch 50 dadl ar y mwyaf, pob un yn 500 nod",
       "urlRequired": "Rhowch URL",
@@ -3827,7 +3829,7 @@
       "saveFailed": "Ni fu modd cadw'r asiant",
       "nameRequired": "Rhowch enw asiant",
       "slugRequired": "Rhowch wlithen asiant",
-      "slugInvalid": "Rhaid i wlithen ddechrau gyda llythyren a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
+      "slugInvalid": "Rhaid i wlithen ddechrau gyda llythyren fach ASCII a defnyddio llythrennau bach ASCII, digidau a llinellau toriad yn unig, hyd at 50 nod",
       "slugConflict": "Mae'r slug hwnnw eisoes yn cael ei ddefnyddio gan asiant adeiledig neu asiant arall yn y proffil hwn",
       "edit": "Golygu asiant"
     },

@@ -3577,6 +3577,8 @@
     "keyTooLong": "Maɓalli dole ya zama haruffa 256 ko ƙasa da haka",
     "keyDuplicate": "Wannan maɓalli ya riga ya kasance a cikin bayanin martaba",
     "valueLabel": "Daraja",
+    "valueRequired": "Shigar da ƙima",
+    "tooLong": "Yi amfani da haruffa {{max}} ko ƙasa da haka",
     "secretLabel": "Sirrin",
     "secrets": {
       "markSecret": "Yi alama a matsayin sirri",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Shigar da sunan uwar garke",
-      "nameInvalid": "Sunan zai iya amfani da haruffa kawai, lambobi, ƙararraki, da dashes",
+      "nameInvalid": "Sunan zai iya amfani da haruffan ASCII kawai, lambobi, ƙararraki, da dashes, har zuwa haruffa 100",
       "commandRequired": "Shigar da umarni",
       "commandTooLong": "Yi amfani da bai fi hujjoji 50 ba, kowanne haruffa 500",
       "urlRequired": "Shigar da URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "An kasa ajiye wakili",
       "nameRequired": "Shigar da sunan wakili",
       "slugRequired": "Shigar da slug wakili",
-      "slugInvalid": "Slug dole ne ya fara da harafi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
+      "slugInvalid": "Slug dole ne ya fara da ƙaramin harfin ASCII kuma ya yi amfani da ƙananun haruffan ASCII, lambobi, da dashes kawai, har zuwa haruffa 50",
       "slugConflict": "Wannan slug riga wani ginannen wakili ko wata wakili a cikin wannan bayani ke amfani da shi",
       "edit": "Wakilin gyara"
     },

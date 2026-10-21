@@ -3577,6 +3577,8 @@
     "keyTooLong": "Ang susi ay dapat 256 na character o mas kaunti",
     "keyDuplicate": "Umiiral na ang key na ito sa profile",
     "valueLabel": "Halaga",
+    "valueRequired": "Maglagay ng halaga",
+    "tooLong": "Dapat {{max}} na character o mas kaunti",
     "secretLabel": "Lihim",
     "secrets": {
       "markSecret": "Markahan bilang sikreto",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Maglagay ng pangalan ng server",
-      "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga titik, numero, underscore, at gitling",
+      "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga ASCII na titik, numero, underscore, at gitling, hanggang 100 na character",
       "commandRequired": "Maglagay ng command",
       "commandTooLong": "Gumamit ng hindi hihigit sa 50 argumento na 500 character bawat isa",
       "urlRequired": "Maglagay ng URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Hindi ma-save ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",
-      "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
+      "slugInvalid": "Ang slug ay dapat magsimula sa isang maliliit na ASCII na titik at gumamit lamang ng maliliit na ASCII na titik, digit, at gitling, hanggang 50 na character",
       "slugConflict": "Ginagamit na ng isang built-in na agent o iba pang agent sa profile na ito ang slug na iyon",
       "edit": "I-edit ang ahente"
     },

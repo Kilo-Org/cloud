@@ -3577,6 +3577,8 @@
     "keyTooLong": "鍵不能超過 256 個字元",
     "keyDuplicate": "此鍵已存在於設定檔中",
     "valueLabel": "值",
+    "valueRequired": "輸入值",
+    "tooLong": "最多使用 {{max}} 個字元",
     "secretLabel": "秘密",
     "secrets": {
       "markSecret": "標記為秘密",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "輸入伺服器名稱",
-      "nameInvalid": "名稱只能使用字母、數字、底線和破折號",
+      "nameInvalid": "名稱只能使用 ASCII 字母、數字、底線和破折號，最多 100 個字元",
       "commandRequired": "輸入命令",
       "commandTooLong": "最多使用 50 個引數，每個引數 500 個字元",
       "urlRequired": "輸入網址",
@@ -3663,7 +3665,7 @@
       "saveFailed": "無法保存代理",
       "nameRequired": "輸入代理名稱",
       "slugRequired": "輸入代理 slug",
-      "slugInvalid": "Slug 必須以字母開頭，且只能使用小寫字母、數字和破折號",
+      "slugInvalid": "Slug 必須以小寫 ASCII 字母開頭，且只能使用小寫 ASCII 字母、數字和破折號，最多 50 個字元",
       "slugConflict": "該 slug 已被內建代理或此設定檔中的另一個代理使用",
       "edit": "編輯代理"
     },

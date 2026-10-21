@@ -3577,6 +3577,8 @@
     "keyTooLong": "Bọtini gbọdọ̀ jẹ́ 256 àmì tàbí kéré sí i",
     "keyDuplicate": "Bọtini yii ti wà tẹ́lẹ̀ nínú profaili",
     "valueLabel": "Iye",
+    "valueRequired": "Tẹ iye kan sii",
+    "tooLong": "Lo {{max}} àmì tàbí kéré sí i",
     "secretLabel": "Asiri",
     "secrets": {
       "markSecret": "Samisi bi asiri",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Tẹ orukọ olupin sii",
-      "nameInvalid": "Orukọ le lo awọn lẹta nikan, awọn nọmba, awọn abẹlẹ, ati dashes",
+      "nameInvalid": "Orukọ le lo awọn lẹta ASCII, awọn nọmba, awọn abẹlẹ, ati dashes nikan, titi di 100 àmì",
       "commandRequired": "Tẹ aṣẹ sii",
       "commandTooLong": "Lo kò ju 50 àríyànjiyàn lọ, ọ̀kọ̀ọ̀kan 500 àmì",
       "urlRequired": "Tẹ URL kan sii",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Ko le fipamọ aṣoju",
       "nameRequired": "Tẹ orukọ aṣoju sii",
       "slugRequired": "Tẹ slug oluranlowo",
-      "slugInvalid": "Slug gbọdọ bẹrẹ pẹlu lẹta kan ko si lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
+      "slugInvalid": "Slug gbọdọ bẹrẹ pẹlu lẹta ASCII kekere kan ki o si lo awọn lẹta ASCII kekere, awọn nọmba, ati dashes nikan, titi di 50 àmì",
       "slugConflict": "Slug yẹn ti wa ni lilo pẹlu aṣojú ti a fi sori ẹrọ tabi aṣojú miiran ninu profaili yii",
       "edit": "Aṣoju Ṣatunkọ"
     },

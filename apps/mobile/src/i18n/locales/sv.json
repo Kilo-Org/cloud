@@ -3577,6 +3577,8 @@
     "keyTooLong": "Nyckeln får innehålla högst 256 tecken",
     "keyDuplicate": "Den här nyckeln finns redan i profilen",
     "valueLabel": "Värde",
+    "valueRequired": "Ange ett värde",
+    "tooLong": "Använd högst {{max}} tecken",
     "secretLabel": "Hemlighet",
     "secrets": {
       "markSecret": "Markera som hemlig",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Ange ett servernamn",
-      "nameInvalid": "Namn kan endast använda bokstäver, siffror, understreck och bindestreck",
+      "nameInvalid": "Namn kan endast använda ASCII-bokstäver, siffror, understreck och bindestreck, upp till 100 tecken",
       "commandRequired": "Ange ett kommando",
       "commandTooLong": "Använd högst 50 argument med 500 tecken vardera",
       "urlRequired": "Ange en URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Det gick inte att spara agenten",
       "nameRequired": "Ange ett agentnamn",
       "slugRequired": "Ange en agentsnigel",
-      "slugInvalid": "Slug måste börja med en bokstav och endast använda små bokstäver, siffror och bindestreck",
+      "slugInvalid": "Slug måste börja med en liten ASCII-bokstav och endast använda små ASCII-bokstäver, siffror och bindestreck, upp till 50 tecken",
       "slugConflict": "Den slugen används redan av en inbyggd agent eller en annan agent i den här profilen",
       "edit": "Redigera agent"
     },

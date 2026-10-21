@@ -3577,6 +3577,8 @@
     "keyTooLong": "Kia 256 pūāhua iti iho rānei te kī",
     "keyDuplicate": "Kua noho kē tēnei kī i te kōtaha",
     "valueLabel": "Uara",
+    "valueRequired": "Whakauruhia he uara",
+    "tooLong": "Kia {{max}} pūāhua iti iho rānei te kī",
     "secretLabel": "Mea ngaro",
     "secrets": {
       "markSecret": "Tohua hei mea ngaro",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Whakauruhia he ingoa tūmau",
-      "nameInvalid": "Ka taea e te ingoa te whakamahi i nga reta, nga nama, nga tohu, me nga tohu",
+      "nameInvalid": "Ka taea e te ingoa te whakamahi i nga reta ASCII, nga nama, nga tohu raro (_), me nga tohu (-) anake, ki te 100 pūāhua iti iho rānei",
       "commandRequired": "Whakauruhia he whakahau",
       "commandTooLong": "Whakamahia kia 50 ngā tautohe, 500 pūāhua ia",
       "urlRequired": "Whakauruhia he URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Kāore i taea te tiaki māngai",
       "nameRequired": "Whakauruhia he ingoa māngai",
       "slugRequired": "Whakauruhia he slug māngai",
-      "slugInvalid": "Me timata te Slug ki te reta me te whakamahi i nga reta iti, nga mati me nga tohu",
+      "slugInvalid": "Me timata te Slug ki te reta ASCII iti me te whakamahi i nga reta ASCII iti, nga mati, me nga tohu (-) anake, ki te 50 pūāhua iti iho rānei",
       "slugConflict": "Kei te whakamahia tērā slug e tētahi ahatanga o roto, e tētahi ahatanga kē rānei o tēnei kōtaha",
       "edit": "Whakatikatika māngai"
     },

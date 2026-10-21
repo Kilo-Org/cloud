@@ -3577,6 +3577,8 @@
     "keyTooLong": "キーは256文字以内で入力してください",
     "keyDuplicate": "このキーはすでにプロファイルに存在します",
     "valueLabel": "価値",
+    "valueRequired": "値を入力してください",
+    "tooLong": "{{max}}文字以内で入力してください",
     "secretLabel": "秘密",
     "secrets": {
       "markSecret": "シークレットとしてマークする",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "サーバー名を入力してください",
-      "nameInvalid": "名前には文字、数字、アンダースコア、ダッシュのみを使用できます",
+      "nameInvalid": "名前にはASCII文字、数字、アンダースコア、ダッシュのみを使用し、100文字以内で入力してください",
       "commandRequired": "コマンドを入力してください",
       "commandTooLong": "最大50個の引数（各500文字）を使用してください",
       "urlRequired": "URLを入力してください",
@@ -3663,7 +3665,7 @@
       "saveFailed": "エージェントを保存できませんでした",
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",
-      "slugInvalid": "スラグは文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
+      "slugInvalid": "スラグはASCII小文字で始まり、ASCII小文字、数字、ダッシュのみを使用し、50文字以内で入力してください",
       "slugConflict": "そのスラッグは組み込みエージェントまたはこのプロファイルの別のエージェントが既に使用しています",
       "edit": "エージェントの編集"
     },

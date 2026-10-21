@@ -3618,6 +3618,8 @@
     "keyTooLong": "La clau ha de tenir 256 caràcters o menys",
     "keyDuplicate": "Aquesta clau ja existeix al perfil",
     "valueLabel": "Valor",
+    "valueRequired": "Introduïu un valor",
+    "tooLong": "Utilitzeu com a màxim {{max}} caràcters",
     "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Marca com a secret",
@@ -3665,7 +3667,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Introduïu un nom de servidor",
-      "nameInvalid": "El nom només pot utilitzar lletres, números, guions baixos i guions",
+      "nameInvalid": "El nom només pot utilitzar lletres ASCII, números, guions baixos i guions, fins a 100 caràcters",
       "commandRequired": "Introduïu una ordre",
       "commandTooLong": "Utilitzeu com a màxim 50 arguments de 500 caràcters cadascun",
       "urlRequired": "Introduïu un URL",
@@ -3704,7 +3706,7 @@
       "saveFailed": "No s'ha pogut desar l'agent",
       "nameRequired": "Introduïu un nom d'agent",
       "slugRequired": "Introduïu un llimac d'agent",
-      "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
+      "slugInvalid": "Slug ha de començar amb una lletra ASCII minúscula i utilitzar només lletres ASCII minúscules, dígits i guions, fins a 50 caràcters",
       "slugConflict": "Aquest slug ja l'utilitza un agent integrat o un altre agent d'aquest perfil",
       "edit": "Edita l'agent"
     },

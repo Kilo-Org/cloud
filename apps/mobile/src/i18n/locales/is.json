@@ -3577,6 +3577,8 @@
     "keyTooLong": "Lykillinn má vera að hámarki 256 stafir",
     "keyDuplicate": "Þessi lykill er þegar til í prófílnum",
     "valueLabel": "Gildi",
+    "valueRequired": "Sláðu inn gildi",
+    "tooLong": "Notið að hámarki {{max}} stafi",
     "secretLabel": "Leyndarmál",
     "secrets": {
       "markSecret": "Merktu sem leyndarmál",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Sláðu inn nafn netþjóns",
-      "nameInvalid": "Nafn getur aðeins notað bókstafi, tölustafi, undirstrik og strik",
+      "nameInvalid": "Nafn má aðeins innihalda ASCII-bókstafi, tölustafi, undirstrik og strik, allt að 100 stafir",
       "commandRequired": "Sláðu inn skipun",
       "commandTooLong": "Notaðu að hámarki 50 rök, hvert 500 stafir",
       "urlRequired": "Sláðu inn vefslóð",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Ekki tókst að vista umboðsmann",
       "nameRequired": "Sláðu inn nafn umboðsmanns",
       "slugRequired": "Sláðu inn umboðssnigl",
-      "slugInvalid": "Snigl verður að byrja á bókstaf og nota aðeins lágstafi, tölustafi og strik",
+      "slugInvalid": "Snigl verður að byrja á lágstaf (ASCII) og má aðeins innihalda ASCII-lágstafi, tölustafi og strik, allt að 50 stafir",
       "slugConflict": "Þetta slug er þegar í notkun hjá innbyggðum umboðsmanni eða öðrum umboðsmanni í þessu prófíli",
       "edit": "Breyta umboðsmanni"
     },

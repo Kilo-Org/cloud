@@ -3577,6 +3577,8 @@
     "keyTooLong": "Furtuun 256 arfii ykn isaa gadi ta'uu qaba",
     "keyDuplicate": "Furtuun kun duraanuu piroofaayilii keessa jira",
     "valueLabel": "Gatii",
+    "valueRequired": "Gatii galchi",
+    "tooLong": "Arfiilee {{max}} ykn isaa gadi fayyadamuu qaba",
     "secretLabel": "Icitii",
     "secrets": {
       "markSecret": "Akka iccitiitti Mallatteessi",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Maqaa sarvarii galchi",
-      "nameInvalid": "Maqaan qubee, lakkoofsota, sarara jalaa fi daash qofa fayyadamuu danda'a",
+      "nameInvalid": "Maqaan qubee ASCII, lakkoofsota, sarara jalaa fi daash qofa fayyadamuu danda'a, arfiilee 100 ykn isaa gadi",
       "commandRequired": "Ajaja galchi",
       "commandTooLong": "Arguumentii 50 ol fayyadami, tokkoon tokkoon isaanii arfii 500",
       "urlRequired": "URL galchi",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Bakka bu'aa qusachuu hin dandeenye",
       "nameRequired": "Maqaa bakka bu'aa galchi",
       "slugRequired": "Slug ergamaa galchi",
-      "slugInvalid": "Slug qubee irraa jalqabuu fi qubee xixiqqaa, dijiitota, fi daash qofa fayyadamuu qaba",
+      "slugInvalid": "Slug qubee xixiqqaa ASCII irraa jalqabuu fi qubee xixiqqaa ASCII, dijiitota fi daash qofa fayyadamuu qaba, arfiilee 50 ykn isaa gadi",
       "slugConflict": "slug kana dura dhaabbataa ykn agensiin biraawuzii kana keessatti fayyadamaa jira",
       "edit": "Bakka bu'aa gulaaluu"
     },

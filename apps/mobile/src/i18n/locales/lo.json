@@ -3577,6 +3577,8 @@
     "keyTooLong": "ກະແຈຕ້ອງມີ 256 ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ",
     "keyDuplicate": "ກະແຈນີ້ມີຢູ່ໃນໂປຣໄຟລ໌ແລ້ວ",
     "valueLabel": "ມູນຄ່າ",
+    "valueRequired": "ໃສ່ມູນຄ່າ",
+    "tooLong": "ຕ້ອງມີ {{max}} ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ",
     "secretLabel": "ຄວາມລັບ",
     "secrets": {
       "markSecret": "ໝາຍເປັນຄວາມລັບ",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "ໃສ່ຊື່ເຊີບເວີ",
-      "nameInvalid": "ຊື່ສາມາດໃຊ້ພຽງແຕ່ຕົວອັກສອນ, ຕົວເລກ, ຂີດກ້ອງ, ແລະເຄື່ອງໝາຍຂີດ",
+      "nameInvalid": "ຊື່ສາມາດໃຊ້ພຽງແຕ່ຕົວອັກສອນ ASCII, ຕົວເລກ, ເຄື່ອງໝາຍຂີດ, ແລະຂີດກ້ອງ, ໄດ້ສູງສຸດ 100 ຕົວອັກສອນ",
       "commandRequired": "ໃສ່ຄໍາສັ່ງ",
       "commandTooLong": "ໃຊ້ອາກູເມັນສູງສຸດ 50 ອັນ ອັນລະ 500 ຕົວອັກສອນ",
       "urlRequired": "ໃສ່ URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຕົວແທນໄດ້",
       "nameRequired": "ໃສ່ຊື່ຕົວແທນ",
       "slugRequired": "ໃສ່ຕົວແທນ slug",
-      "slugInvalid": "Slug ຈະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນ ແລະໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ, ແລະ dashes",
+      "slugInvalid": "Slug ຈະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນພິມນ້ອຍ ASCII ແລະໃຊ້ແຕ່ຕົວອັກສອນພິມນ້ອຍ ASCII, ຕົວເລກ, ແລະ dashes, ໄດ້ສູງສຸດ 50 ຕົວອັກສອນ",
       "slugConflict": "slug ນັ້ນຖືກໃຊ້ແລ້ວໂດຍ agent ໃນຕົວ ຫຼື agent ອື່ນໃນໂປຼໄຟລ໌ນີ້",
       "edit": "ແກ້ໄຂຕົວແທນ"
     },

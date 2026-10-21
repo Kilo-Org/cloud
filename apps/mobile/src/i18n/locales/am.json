@@ -3577,6 +3577,8 @@
     "keyTooLong": "ቁልፉ 256 ቁምፊዎች ወይም ከዚያ ያነሰ መሆን አለበት",
     "keyDuplicate": "ይህ ቁልፍ አስቀድሞ በመገለጫው ውስጥ አለ",
     "valueLabel": "ዋጋ",
+    "valueRequired": "ዋጋ አስገባ",
+    "tooLong": "እስከ {{max}} ቁምፊዎች ብቻ ይጠቀሙ",
     "secretLabel": "ምስጢር",
     "secrets": {
       "markSecret": "እንደ ምስጢር ምልክት ያድርጉ",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "የአገልጋይ ስም አስገባ",
-      "nameInvalid": "ስም ፊደሎችን፣ ቁጥሮችን፣ ሰረዞችን እና ሰረዞችን ብቻ መጠቀም ይችላል።",
+      "nameInvalid": "ስም የASCII ፊደላትን፣ አሃዞችን፣ የስር መስመሮችን እና ሰረዞችን ብቻ መጠቀም ይችላል፣ እስከ 100 ቁምፊዎች።",
       "commandRequired": "ትእዛዝ አስገባ",
       "commandTooLong": "ቢበዛ 50 አርጉመንቶችን ይጠቀሙ፣ እያንዳንዱ 500 ቁምፊ",
       "urlRequired": "URL አስገባ",
@@ -3663,7 +3665,7 @@
       "saveFailed": "ወኪል ማስቀመጥ አልተቻለም",
       "nameRequired": "የወኪል ስም አስገባ",
       "slugRequired": "የወኪል ማሰሪያ አስገባ",
-      "slugInvalid": "ስሉግ በፊደል መጀመር እና ትንንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
+      "slugInvalid": "ስሉግ በትንንሽ ASCII ፊደል መጀመር እና በትንንሽ ASCII ሆሄያት፣ አሃዞች እና ሰረዞች ብቻ መጠቀም አለበት፣ እስከ 50 ቁምፊዎች።",
       "slugConflict": "ያ ስሉግ በአንድ አብሮ በተሰራ ወኪል ወይም በሌላ ወኪል በዚህ መገለጫ ውስጥ ጥቅም ላይ ውሏል።",
       "edit": "ወኪል አርትዕ"
     },

@@ -3659,6 +3659,8 @@
     "keyTooLong": "Kľúč môže mať maximálne 256 znakov",
     "keyDuplicate": "Tento kľúč už v profile existuje",
     "valueLabel": "Hodnota",
+    "valueRequired": "Zadajte hodnotu",
+    "tooLong": "Použite maximálne {{max}} znakov",
     "secretLabel": "Tajomstvo",
     "secrets": {
       "markSecret": "Označiť ako tajné",
@@ -3706,7 +3708,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Zadajte názov servera",
-      "nameInvalid": "Názov môže používať iba písmená, čísla, podčiarkovníky a pomlčky",
+      "nameInvalid": "Názov môže používať iba písmená ASCII, čísla, podčiarkovníky a pomlčky, maximálne 100 znakov",
       "commandRequired": "Zadajte príkaz",
       "commandTooLong": "Použite najviac 50 argumentov s 500 znakmi",
       "urlRequired": "Zadajte adresu URL",
@@ -3745,7 +3747,7 @@
       "saveFailed": "Agenta sa nepodarilo uložiť",
       "nameRequired": "Zadajte meno agenta",
       "slugRequired": "Zadajte agenta slimáka",
-      "slugInvalid": "Slug musí začínať písmenom a používať iba malé písmená, číslice a pomlčky",
+      "slugInvalid": "Slug musí začínať malým písmenom ASCII a používať iba malé písmená ASCII, číslice a pomlčky, maximálne 50 znakov",
       "slugConflict": "Tento slug už používa vstavaný agent alebo iný agent v tomto profile",
       "edit": "Upraviť zástupcu"
     },

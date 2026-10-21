@@ -3618,6 +3618,8 @@
     "keyTooLong": "Cheia trebuie să aibă 256 de caractere sau mai puțin",
     "keyDuplicate": "Această cheie există deja în profil",
     "valueLabel": "Valoare",
+    "valueRequired": "Introduceți o valoare",
+    "tooLong": "Folosiți maximum {{max}} de caractere",
     "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Marcați ca secret",
@@ -3665,7 +3667,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Introduceți un nume de server",
-      "nameInvalid": "Numele poate folosi numai litere, cifre, litere de subliniere și liniuțe",
+      "nameInvalid": "Numele poate folosi numai litere ASCII, cifre, litere de subliniere și liniuțe, până la 100 de caractere",
       "commandRequired": "Introduceți o comandă",
       "commandTooLong": "Folosiți cel mult 50 de argumente de 500 de caractere fiecare",
       "urlRequired": "Introduceți o adresă URL",
@@ -3704,7 +3706,7 @@
       "saveFailed": "Agentul nu a putut fi salvat",
       "nameRequired": "Introduceți un nume de agent",
       "slugRequired": "Introduceți un melc de agent",
-      "slugInvalid": "Slug trebuie să înceapă cu o literă și să folosească numai litere mici, cifre și liniuțe",
+      "slugInvalid": "Slug trebuie să înceapă cu o literă mică ASCII și să folosească numai litere mici ASCII, cifre și liniuțe, până la 50 de caractere",
       "slugConflict": "Acel slug este deja folosit de un agent integrat sau de un alt agent din acest profil",
       "edit": "Editați agentul"
     },

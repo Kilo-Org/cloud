@@ -3577,6 +3577,8 @@
     "keyTooLong": "De sleutel mag maximaal 256 tekens bevatten",
     "keyDuplicate": "Deze sleutel bestaat al in het profiel",
     "valueLabel": "Waarde",
+    "valueRequired": "Voer een waarde in",
+    "tooLong": "Gebruik maximaal {{max}} tekens",
     "secretLabel": "Geheim",
     "secrets": {
       "markSecret": "Markeer als geheim",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Voer een servernaam in",
-      "nameInvalid": "De naam mag alleen letters, cijfers, onderstrepingstekens en streepjes bevatten",
+      "nameInvalid": "De naam mag alleen ASCII-letters, cijfers, onderstrepingstekens en streepjes bevatten, tot maximaal 100 tekens",
       "commandRequired": "Voer een opdracht in",
       "commandTooLong": "Gebruik maximaal 50 argumenten van elk 500 tekens",
       "urlRequired": "Voer een URL in",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Kan agent niet opslaan",
       "nameRequired": "Voer een agentnaam in",
       "slugRequired": "Voer een agentenslak in",
-      "slugInvalid": "Slug moet beginnen met een letter en mag alleen kleine letters, cijfers en streepjes gebruiken",
+      "slugInvalid": "Slug moet beginnen met een kleine ASCII-letter en mag alleen kleine ASCII-letters, cijfers en streepjes gebruiken, tot maximaal 50 tekens",
       "slugConflict": "Die slug is al in gebruik door een ingebouwde agent of een andere agent in dit profiel",
       "edit": "Agent bewerken"
     },

@@ -3659,6 +3659,8 @@
     "keyTooLong": "Raktas gali būti ne ilgesnis kaip 256 simboliai",
     "keyDuplicate": "Šis raktas jau yra profilyje",
     "valueLabel": "Vertė",
+    "valueRequired": "Įveskite reikšmę",
+    "tooLong": "Naudokite ne daugiau kaip {{max}} simbolių",
     "secretLabel": "Paslaptis",
     "secrets": {
       "markSecret": "Pažymėti kaip paslaptį",
@@ -3706,7 +3708,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Įveskite serverio pavadinimą",
-      "nameInvalid": "Varde gali būti naudojamos tik raidės, skaičiai, apatiniai brūkšniai ir brūkšniai",
+      "nameInvalid": "Varde gali būti naudojamos tik ASCII raidės, skaičiai, apatiniai brūkšniai ir brūkšniai, iki 100 simbolių",
       "commandRequired": "Įveskite komandą",
       "commandTooLong": "Naudokite ne daugiau kaip 50 argumentų, kurių kiekvienas 500 simbolių",
       "urlRequired": "Įveskite URL",
@@ -3745,7 +3747,7 @@
       "saveFailed": "Nepavyko išsaugoti agento",
       "nameRequired": "Įveskite agento pavadinimą",
       "slugRequired": "Įveskite agento šliužą",
-      "slugInvalid": "Slug turi prasidėti raide ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
+      "slugInvalid": "Slug turi prasidėti mažąja ASCII raide ir naudoti tik mažąsias ASCII raides, skaitmenis ir brūkšnius, iki 50 simbolių",
       "slugConflict": "Tą slug jau naudoja įmontuotas agentas arba kitas agentas šiame profilyje",
       "edit": "Redaguoti agentą"
     },

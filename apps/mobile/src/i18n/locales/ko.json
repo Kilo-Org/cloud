@@ -3577,6 +3577,8 @@
     "keyTooLong": "키는 256자 이하여야 합니다",
     "keyDuplicate": "이 키는 이미 프로필에 있습니다.",
     "valueLabel": "값",
+    "valueRequired": "값을 입력하세요.",
+    "tooLong": "최대 {{max}}자까지 사용할 수 있습니다",
     "secretLabel": "비밀",
     "secrets": {
       "markSecret": "비밀로 표시",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "서버 이름을 입력하세요.",
-      "nameInvalid": "이름에는 문자, 숫자, 밑줄, 대시만 사용할 수 있습니다.",
+      "nameInvalid": "이름에는 ASCII 문자, 숫자, 밑줄, 대시만 사용할 수 있습니다(최대 100자).",
       "commandRequired": "명령을 입력하세요",
       "commandTooLong": "최대 50개의 인수(각 500자)를 사용하세요.",
       "urlRequired": "URL을 입력하세요",
@@ -3663,7 +3665,7 @@
       "saveFailed": "에이전트를 저장할 수 없습니다.",
       "nameRequired": "상담사 이름을 입력하세요.",
       "slugRequired": "에이전트 슬러그를 입력하세요",
-      "slugInvalid": "슬러그는 문자로 시작해야 하며 소문자, 숫자, 대시만 사용해야 합니다.",
+      "slugInvalid": "슬러그는 ASCII 소문자로 시작해야 하며 ASCII 소문자, 숫자, 대시만 사용할 수 있습니다(최대 50자).",
       "slugConflict": "해당 슬러그는 내장 에이전트 또는 이 프로필의 다른 에이전트가 이미 사용 중입니다",
       "edit": "에이전트 편집"
     },

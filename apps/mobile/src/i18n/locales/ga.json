@@ -3700,6 +3700,8 @@
     "keyTooLong": "Caithfidh an eochair a bheith 256 carachtar nó níos lú",
     "keyDuplicate": "Tá an eochair seo ann cheana sa phróifíl",
     "valueLabel": "Luach",
+    "valueRequired": "Cuir isteach luach",
+    "tooLong": "Úsáid {{max}} carachtar nó níos lú",
     "secretLabel": "Rúnda",
     "secrets": {
       "markSecret": "Marcáil mar rún",
@@ -3747,7 +3749,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Cuir isteach ainm freastalaí",
-      "nameInvalid": "Ní féidir le hainm ach litreacha, uimhreacha, béimeanna agus daiseanna a úsáid",
+      "nameInvalid": "Ní féidir le hainm ach litreacha ASCII, uimhreacha, béimeanna agus daiseanna a úsáid, suas le 100 carachtar",
       "commandRequired": "Cuir isteach ordú",
       "commandTooLong": "Úsáid 50 argóint ar a mhéad, 500 carachtar sa cheann",
       "urlRequired": "Cuir isteach URL",
@@ -3786,7 +3788,7 @@
       "saveFailed": "Níorbh fhéidir an gníomhaire a shábháil",
       "nameRequired": "Cuir isteach ainm gníomhaire",
       "slugRequired": "Cuir isteach seilide gníomhaire",
-      "slugInvalid": "Caithfidh sluga tosú le litir agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
+      "slugInvalid": "Caithfidh sluga tosú le litir bheag ASCII agus gan ach litreacha beaga ASCII, digití agus daiseanna a úsáid, suas le 50 carachtar",
       "slugConflict": "Tá an slug sin in úsáid cheana ag gníomhaire ionsuite nó ag gníomhaire eile sa phróifíl seo",
       "edit": "Cuir gníomhaire in eagar"
     },

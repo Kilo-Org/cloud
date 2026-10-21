@@ -3577,6 +3577,8 @@
     "keyTooLong": "Igodo ga-abụ mkpụrụedemede 256 ma ọ bụ obere",
     "keyDuplicate": "Igodo a dịworị na profaịlụ",
     "valueLabel": "Uru",
+    "valueRequired": "Tinye uru",
+    "tooLong": "Jiri mkpụrụedemede {{max}} ma ọ bụ obere",
     "secretLabel": "Nzuzo",
     "secrets": {
       "markSecret": "Kaa akara dị ka nzuzo",
@@ -3624,7 +3626,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Tinye aha nkesa",
-      "nameInvalid": "Aha nwere ike iji naanị mkpụrụedemede, ọnụọgụ, akara akara, na dashes",
+      "nameInvalid": "Aha nwere ike iji naanị mkpụrụedemede ASCII, ọnụọgụ, akara akara, na dashes, ruru mkpụrụedemede 100",
       "commandRequired": "Tinye iwu",
       "commandTooLong": "Ejila ihe karịrị arụmụka 50, nke ọ bụla mkpụrụedemede 500",
       "urlRequired": "Tinye URL",
@@ -3663,7 +3665,7 @@
       "saveFailed": "Enweghị ike ichekwa onye nnọchi anya",
       "nameRequired": "Tinye aha onye nnọchi anya",
       "slugRequired": "Tinye ihe nnọchite slug",
-      "slugInvalid": "Slug ga-eji mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na ngwucha",
+      "slugInvalid": "Slug ga-amalite na obere mkpụrụedemede ASCII ma jiri naanị obere mkpụrụedemede ASCII, mkpụrụọnụọgụgụ, na dashes, ruru mkpụrụedemede 50",
       "slugConflict": "Ahụ slug ahụ na ndị omume obibi ma ọ bụ ndị omume ọzọ na profaịlụ a na-eji ya ugbu a",
       "edit": "Onye ọrụ dezie"
     },

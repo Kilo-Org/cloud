@@ -30,7 +30,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
-// the list fills the sheet's body.
+// the list fills the sheet's body. The list stays transparent: the route's
+// themed `contentStyle` paints the surface (see the (auth) layout), and a
+// second opaque layer would cover the sheet's own themed surface.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   paddingHorizontal: 16,
@@ -271,7 +273,7 @@ export function LanguagePickerSheet({
         />
       ) : (
         <FlashList
-          style={[listStyle, { backgroundColor: colors.background }]}
+          style={listStyle}
           contentContainerStyle={listContentContainerStyle}
           data={items}
           keyExtractor={item => item.key}

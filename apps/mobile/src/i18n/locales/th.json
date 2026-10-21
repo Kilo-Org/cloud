@@ -1938,7 +1938,6 @@
       "installApp": "ติดตั้ง GitHub App",
       "reauthorizeButton": "ให้สิทธิ์ GitHub App อีกครั้ง",
       "reauthorizeDescription": "Security Agent ต้องใช้สิทธิ์ vulnerability_alerts เพื่อเข้าถึงการแจ้งเตือน Dependabot ให้สิทธิ์ GitHub App อีกครั้งเพื่อเพิ่มสิทธิ์นี้",
-      "reauthorizeFailed": "ไม่สามารถเริ่มขั้นตอนการให้สิทธิ์อีกครั้งได้ กรุณาลองอีกครั้ง",
       "reauthorizeTitle": "ต้องมีสิทธิ์เพิ่มเติม",
       "setupFailed": "ไม่สามารถเริ่มการตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง"
     },
@@ -2312,7 +2311,8 @@
       "linesBadge_other": "{{displayCount}} บรรทัด",
       "matchesBadge_one": "พบ {{displayCount}} รายการ",
       "matchesBadge_other": "พบ {{displayCount}} รายการ",
-      "noOutput": "ไม่มีเอาต์พุต"
+      "noOutput": "ไม่มีเอาต์พุต",
+      "translationFailed": "การแปลล้มเหลว"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
@@ -3651,7 +3651,7 @@
       "empty": "ยังไม่มีเซิร์ฟเวอร์ MCP",
       "name": "ชื่อเซิร์ฟเวอร์",
       "type": "ประเภทเซิร์ฟเวอร์",
-      "localType": "ท้องถิ่น",
+      "localType": "ในเครื่อง",
       "remoteType": "ระยะไกล",
       "command": "บรรทัดคำสั่ง",
       "url": "URL",

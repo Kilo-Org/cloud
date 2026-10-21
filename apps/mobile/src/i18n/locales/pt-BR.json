@@ -1356,7 +1356,6 @@
       "installApp": "Instalar app do GitHub",
       "reauthorizeButton": "Reautorizar app do GitHub",
       "reauthorizeDescription": "O agente de segurança precisa da permissão vulnerability_alerts para acessar os alertas do Dependabot. Reautorize o app do GitHub para conceder essa permissão.",
-      "reauthorizeFailed": "Não foi possível iniciar a reautorização. Tente novamente.",
       "reauthorizeTitle": "Permissões adicionais necessárias",
       "setupFailed": "Não foi possível iniciar a configuração do GitHub. Tente novamente."
     },
@@ -1782,7 +1781,8 @@
       "matchesBadge_one": "{{displayCount}} resultado",
       "matchesBadge_other": "{{displayCount}} resultados",
       "matchesBadge_many": "{{displayCount}} resultados",
-      "noOutput": "Nenhuma saída."
+      "noOutput": "Nenhuma saída.",
+      "translationFailed": "Falha na tradução"
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
@@ -3721,11 +3721,11 @@
       "add": "Adicionar agente",
       "empty": "Nenhum agente ainda",
       "name": "Nome do agente",
-      "slug": "Lesma de agente",
+      "slug": "Slug do agente",
       "description": "Descrição do agente",
       "model": "Substituição de modelo",
       "modelPlaceholder": "Usar sessão padrão",
-      "prompt": "Alerta do sistema",
+      "prompt": "Prompt do sistema",
       "steps": "Etapas máximas",
       "stepsPlaceholder": "ex. 50",
       "temperature": "Temperatura",

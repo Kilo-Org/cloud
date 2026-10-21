@@ -1356,7 +1356,6 @@
       "installApp": "Installa l'app GitHub",
       "reauthorizeButton": "Riautorizza l'app GitHub",
       "reauthorizeDescription": "Security Agent richiede l'autorizzazione vulnerability_alerts per accedere agli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
-      "reauthorizeFailed": "Impossibile avviare la riautorizzazione. Riprova.",
       "reauthorizeTitle": "Servono autorizzazioni aggiuntive",
       "setupFailed": "Impossibile avviare la configurazione di GitHub. Riprova."
     },
@@ -1782,7 +1781,8 @@
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
       "matchesBadge_many": "{{displayCount}} corrispondenze",
-      "noOutput": "Nessun output."
+      "noOutput": "Nessun output.",
+      "translationFailed": "Traduzione non riuscita"
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
@@ -3721,11 +3721,11 @@
       "add": "Aggiungi agente",
       "empty": "Nessun agente ancora",
       "name": "Nome dell'agente",
-      "slug": "Lumaca dell'agente",
+      "slug": "Slug dell'agente",
       "description": "Descrizione dell'agente",
       "model": "Sostituzione del modello",
       "modelPlaceholder": "Utilizza l'impostazione predefinita della sessione",
-      "prompt": "Richiesta di sistema",
+      "prompt": "Prompt di sistema",
       "steps": "Passi massimi",
       "stepsPlaceholder": "es. 50",
       "temperature": "Temperatura",

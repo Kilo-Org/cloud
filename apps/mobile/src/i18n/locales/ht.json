@@ -1938,7 +1938,6 @@
       "installApp": "Enstale aplikasyon GitHub la",
       "reauthorizeButton": "Otorize aplikasyon GitHub la ankò",
       "reauthorizeDescription": "Ajan sekirite a bezwen pèmisyon vulnerability_alerts pou jwenn aksè nan alèt Dependabot yo. Otorize aplikasyon GitHub la ankò pou bay pèmisyon sa a.",
-      "reauthorizeFailed": "Nou pa t ka kòmanse pwosesis pou bay otorizasyon ankò. Tanpri eseye ankò.",
       "reauthorizeTitle": "Plis pèmisyon nesesè",
       "setupFailed": "Nou pa t ka kòmanse konfigirasyon GitHub la. Tanpri eseye ankò."
     },
@@ -2312,7 +2311,8 @@
       "linesBadge_other": "{{displayCount}} liy",
       "matchesBadge_one": "{{displayCount}} rezilta",
       "matchesBadge_other": "{{displayCount}} rezilta",
-      "noOutput": "Pa gen rezilta."
+      "noOutput": "Pa gen rezilta.",
+      "translationFailed": "Tradiksyon echwe"
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",

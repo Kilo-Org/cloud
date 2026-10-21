@@ -1938,7 +1938,6 @@
       "installApp": "Εγκατάσταση εφαρμογής GitHub",
       "reauthorizeButton": "Εκ νέου εξουσιοδότηση εφαρμογής GitHub",
       "reauthorizeDescription": "Ο πράκτορας ασφάλειας χρειάζεται το δικαίωμα vulnerability_alerts για πρόσβαση στις ειδοποιήσεις Dependabot. Εξουσιοδότησε ξανά την εφαρμογή GitHub για να δώσεις αυτό το δικαίωμα.",
-      "reauthorizeFailed": "Δεν ήταν δυνατή η έναρξη της εκ νέου εξουσιοδότησης. Δοκίμασε ξανά.",
       "reauthorizeTitle": "Απαιτούνται πρόσθετα δικαιώματα",
       "setupFailed": "Δεν ήταν δυνατή η έναρξη της ρύθμισης του GitHub. Δοκίμασε ξανά."
     },
@@ -2312,7 +2311,8 @@
       "linesBadge_other": "{{displayCount}} γραμμές",
       "matchesBadge_one": "{{displayCount}} αντιστοιχία",
       "matchesBadge_other": "{{displayCount}} αντιστοιχίες",
-      "noOutput": "Δεν υπάρχει έξοδος."
+      "noOutput": "Δεν υπάρχει έξοδος.",
+      "translationFailed": "Η μετάφραση απέτυχε"
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",

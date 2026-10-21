@@ -1381,7 +1381,6 @@
       "installApp": "Cài đặt ứng dụng GitHub",
       "reauthorizeButton": "Cấp quyền lại cho ứng dụng GitHub",
       "reauthorizeDescription": "Trợ lý bảo mật cần quyền vulnerability_alerts để truy cập cảnh báo Dependabot. Hãy cấp quyền lại cho ứng dụng GitHub để bổ sung quyền này.",
-      "reauthorizeFailed": "Không thể bắt đầu cấp quyền lại. Vui lòng thử lại.",
       "reauthorizeTitle": "Cần thêm quyền",
       "setupFailed": "Không thể bắt đầu thiết lập GitHub. Vui lòng thử lại."
     },
@@ -1797,7 +1796,8 @@
       "linesBadge_other": "{{displayCount}} dòng",
       "matchesBadge_one": "{{displayCount}} kết quả khớp",
       "matchesBadge_other": "{{displayCount}} kết quả khớp",
-      "noOutput": "Không có đầu ra."
+      "noOutput": "Không có đầu ra.",
+      "translationFailed": "Dịch thất bại"
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -3651,7 +3651,7 @@
       "empty": "Chưa có máy chủ MCP",
       "name": "Tên máy chủ",
       "type": "Loại máy chủ",
-      "localType": "Địa phương",
+      "localType": "Cục bộ",
       "remoteType": "Xa",
       "command": "Dòng lệnh",
       "url": "URL",

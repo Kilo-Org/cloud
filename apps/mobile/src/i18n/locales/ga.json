@@ -2007,7 +2007,6 @@
       "installApp": "Suiteáil an aip GitHub",
       "reauthorizeButton": "Athúdaraigh an aip GitHub",
       "reauthorizeDescription": "Teastaíonn an cead vulnerability_alerts ón nGníomhaire slándála chun rochtain a fháil ar fholáirimh Dependabot. Athúdaraigh an aip GitHub chun an cead seo a thabhairt.",
-      "reauthorizeFailed": "Níorbh fhéidir an t-athúdarú a thosú. Bain triail as arís le do thoil.",
       "reauthorizeTitle": "Teastaíonn ceadanna breise",
       "setupFailed": "Níorbh fhéidir socrú GitHub a thosú. Bain triail as arís le do thoil."
     },
@@ -2408,7 +2407,8 @@
       "matchesBadge_two": "{{displayCount}} toradh",
       "matchesBadge_few": "{{displayCount}} toradh",
       "matchesBadge_many": "{{displayCount}} toradh",
-      "noOutput": "Níl aon aschur ann."
+      "noOutput": "Níl aon aschur ann.",
+      "translationFailed": "Theip ar an aistriúchán"
     },
     "readToolMarkdown": {
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",

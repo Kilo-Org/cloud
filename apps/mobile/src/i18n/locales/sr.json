@@ -1961,7 +1961,6 @@
       "installApp": "Instaliraj GitHub aplikaciju",
       "reauthorizeButton": "Ponovo ovlasti GitHub aplikaciju",
       "reauthorizeDescription": "Bezbednosni agent zahteva dozvolu vulnerability_alerts za pristup Dependabot upozorenjima. Ponovo ovlasti GitHub aplikaciju da joj dodeliš ovu dozvolu.",
-      "reauthorizeFailed": "Ponovno ovlašćivanje se ne može pokrenuti. Pokušaj ponovo.",
       "reauthorizeTitle": "Potrebne su dodatne dozvole",
       "setupFailed": "Nije moguće pokrenuti podešavanje za GitHub. Pokušaj ponovo."
     },
@@ -2344,7 +2343,8 @@
       "matchesBadge_one": "podudaranje: {{displayCount}}",
       "matchesBadge_other": "podudaranja: {{displayCount}}",
       "matchesBadge_few": "podudaranja: {{displayCount}}",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prevod nije uspeo"
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",

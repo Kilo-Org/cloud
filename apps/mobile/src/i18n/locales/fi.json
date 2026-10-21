@@ -1938,7 +1938,6 @@
       "installApp": "Asenna GitHub-sovellus",
       "reauthorizeButton": "Valtuuta GitHub-sovellus uudelleen",
       "reauthorizeDescription": "Tietoturva-agentti tarvitsee vulnerability_alerts-käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
-      "reauthorizeFailed": "Uudelleenvaltuutusta ei voitu aloittaa. Yritä uudelleen.",
       "reauthorizeTitle": "Lisäkäyttöoikeuksia tarvitaan",
       "setupFailed": "GitHubin käyttöönottoa ei voitu aloittaa. Yritä uudelleen."
     },
@@ -2312,7 +2311,8 @@
       "linesBadge_other": "{{displayCount}} riviä",
       "matchesBadge_one": "{{displayCount}} osuma",
       "matchesBadge_other": "{{displayCount}} osumaa",
-      "noOutput": "Ei tulostetta."
+      "noOutput": "Ei tulostetta.",
+      "translationFailed": "Käännös epäonnistui"
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",

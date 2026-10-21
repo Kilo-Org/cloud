@@ -1393,7 +1393,6 @@
       "installApp": "Установить приложение GitHub",
       "reauthorizeButton": "Повторно авторизовать приложение GitHub",
       "reauthorizeDescription": "Агенту безопасности требуется разрешение vulnerability_alerts для доступа к оповещениям Dependabot. Повторно авторизуйте приложение GitHub, чтобы предоставить это разрешение.",
-      "reauthorizeFailed": "Не удалось начать повторную авторизацию. Попробуйте снова.",
       "reauthorizeTitle": "Требуются дополнительные разрешения",
       "setupFailed": "Не удалось начать настройку GitHub. Попробуйте снова."
     },
@@ -1829,7 +1828,8 @@
       "matchesBadge_other": "совпадений: {{displayCount}}",
       "matchesBadge_few": "совпадения: {{displayCount}}",
       "matchesBadge_many": "совпадений: {{displayCount}}",
-      "noOutput": "Нет вывода."
+      "noOutput": "Нет вывода.",
+      "translationFailed": "Не удалось перевести"
     },
     "readToolMarkdown": {
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",
@@ -3733,7 +3733,7 @@
       "empty": "Серверов MCP пока нет",
       "name": "Имя сервера",
       "type": "Тип сервера",
-      "localType": "Местный",
+      "localType": "Локальный",
       "remoteType": "Удаленный",
       "command": "Командная строка",
       "url": "URL-адрес",

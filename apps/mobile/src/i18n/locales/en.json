@@ -2002,7 +2002,6 @@
       "installApp": "Install GitHub App",
       "reauthorizeButton": "Re-authorize GitHub App",
       "reauthorizeDescription": "Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
-      "reauthorizeFailed": "Could not start re-authorization. Please try again.",
       "reauthorizeTitle": "Additional permissions required",
       "setupFailed": "Could not start GitHub setup. Please try again."
     },
@@ -2376,7 +2375,8 @@
       "matchesBadge_one": "{{displayCount}} match",
       "matchesBadge": "{{displayCount}} matches",
       "matchesBadge_other": "{{displayCount}} matches",
-      "noOutput": "No output."
+      "noOutput": "No output.",
+      "translationFailed": "Translation failed"
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
@@ -3645,9 +3645,15 @@
     "loadFailed": "Couldn't load profiles",
     "counts": {
       "vars": "{{count}} vars",
+      "vars_one": "{{count}} var",
+      "vars_other": "{{count}} vars",
       "mcp": "{{count}} MCP",
       "skills": "{{count}} skills",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
       "commands": "{{count}} cmds",
+      "commands_one": "{{count}} cmd",
+      "commands_other": "{{count}} cmds",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}s",
       "commandsShort": "{{count}}c"

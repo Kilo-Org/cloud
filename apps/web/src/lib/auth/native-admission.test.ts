@@ -36,6 +36,7 @@ import {
   type AdmissionPayload,
 } from './native-admission';
 import { captureMessage } from '@sentry/nextjs';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { checkRateLimit } from '@vercel/firewall';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
@@ -75,6 +76,7 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 const mockCaptureMessage = jest.mocked(captureMessage);
+const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockVerifyAppleAttestation = jest.mocked(verifyAppleAttestation);
 const mockVerifyAppleAssertion = jest.mocked(verifyAppleAssertion);
@@ -919,18 +921,26 @@ describe('countAdmissionCondition', () => {
     jestGlobal.restoreAllMocks();
   });
 
-  test('records a refusal without emitting one Sentry event per request', () => {
+  test('folds refusals into one window line instead of one Sentry event each', () => {
     const now = jestGlobal.spyOn(Date, 'now');
     now.mockReturnValue(1_000_000);
 
     countAdmissionCondition('native_admission_refused');
     countAdmissionCondition('native_admission_refused');
-
+    expect(mockWarnExceptInTest).not.toHaveBeenCalled();
     expect(mockCaptureMessage).not.toHaveBeenCalled();
-    // The count is folded into the window line, not dropped: the next request
-    // after the interval flushes it instead of emitting per-request events.
+
+    // Next interval: the pending count flushes as one line, not per request.
     now.mockReturnValue(1_061_000);
-    requireAdmissionPayload({});
+    countAdmissionCondition('native_admission_refused');
+
+    expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
+    const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
+    expect(line).toMatchObject({
+      event: 'native_admission_aggregate',
+      metric: 'native_admission_refused',
+      count: 2,
+    });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 });

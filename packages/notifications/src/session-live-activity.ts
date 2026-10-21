@@ -57,7 +57,6 @@ export type SessionLiveActivityBuildOptions = {
   approvalKey: string | null;
   updatedAt: string;
   statusSinceFallback: string;
-  /** The content the card already shows, so server-only facts survive. */
   /** The content the card already shows, so server-only facts survive a local rebuild. */
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };

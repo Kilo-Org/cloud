@@ -40,27 +40,55 @@ import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-e
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
+  createResolvedAiSdkProvider,
   formatDirectByokModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { isDirectCloudByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/aws-bedrock';
+import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/gcp-vertex';
+import { isDirectCloudByokAvailable } from '@/lib/byok/direct-cloud-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
 
-function validateVercelUserByokCredential(providerId: string, credential: string) {
+const DIRECT_CLOUD_CREDENTIAL_PARSERS: Partial<Record<string, (credential: string) => unknown>> = {
+  'aws-bedrock': parseAwsBedrockCredentials,
+  'gcp-vertex': parseGcpVertexCredentials,
+};
+
+function validateUserByokCredential(providerId: string, credential: string) {
   const parsedProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(providerId);
-  if (!parsedProviderId.success) return;
+  const parseDirectCloudCredential = DIRECT_CLOUD_CREDENTIAL_PARSERS[providerId];
+  if (!parsedProviderId.success && !parseDirectCloudCredential) return;
 
   try {
-    getVercelInferenceProviderConfigForUserByok({
-      providerId: parsedProviderId.data,
-      decryptedAPIKey: credential,
-    });
+    if (parsedProviderId.success) {
+      getVercelInferenceProviderConfigForUserByok({
+        providerId: parsedProviderId.data,
+        decryptedAPIKey: credential,
+      });
+    } else {
+      parseDirectCloudCredential?.(credential);
+    }
   } catch {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: `Invalid credentials for provider: ${providerId}`,
+    });
+  }
+}
+
+function rejectUnavailableDirectCloudProvider(
+  providerId: string,
+  organizationId: string | null | undefined
+) {
+  if (isDirectCloudByokProviderId(providerId) && !isDirectCloudByokAvailable(organizationId)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: `Provider ${providerId} is not available yet.`,
     });
   }
 }
@@ -132,6 +160,17 @@ export const byokRouter = createTRPCRouter({
     .output(z.record(z.string(), z.array(z.string())))
     .query(fetchSupportedModels),
 
+  /** Whether keys for the direct Amazon Bedrock and Google Vertex AI providers can be added. */
+  directCloudByokAvailable: baseProcedure
+    .input(ListBYOKKeysInputSchema)
+    .output(z.boolean())
+    .query(async ({ input, ctx }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      return isDirectCloudByokAvailable(input.organizationId);
+    }),
+
   list: baseProcedure
     .input(ListBYOKKeysInputSchema)
     .output(z.array(BYOKApiKeyResponseSchema))
@@ -178,7 +217,8 @@ export const byokRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
-      validateVercelUserByokCredential(provider_id, api_key);
+      rejectUnavailableDirectCloudProvider(provider_id, organizationId);
+      validateUserByokCredential(provider_id, api_key);
 
       // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
@@ -268,7 +308,8 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
-      validateVercelUserByokCredential(existingKey.provider_id, api_key);
+      rejectUnavailableDirectCloudProvider(existingKey.provider_id, existingKey.organization_id);
+      validateUserByokCredential(existingKey.provider_id, api_key);
 
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const [updatedKey] = await db
@@ -440,11 +481,20 @@ export const byokRouter = createTRPCRouter({
         };
       }
 
-      function setup() {
+      async function setup() {
         const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
         const model = UserByokTestModels[provider];
 
-        const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === provider);
+        const directByokProviders: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+        const directByokProvider = directByokProviders.find(plan => plan.id === provider);
+        if (directByokProvider?.resolveUpstream) {
+          const aiSdkProvider = await createResolvedAiSdkProvider(
+            directByokProvider,
+            decryptedKey.decryptedAPIKey,
+            model
+          );
+          return { finalProvider: provider, model: aiSdkProvider(model) };
+        }
         if (directByokProvider) {
           return {
             finalProvider: provider,
@@ -468,7 +518,7 @@ export const byokRouter = createTRPCRouter({
       }
 
       try {
-        const { finalProvider, model, providerOptions } = setup();
+        const { finalProvider, model, providerOptions } = await setup();
         const output = await generateText({
           model,
           prompt: 'Say hi',

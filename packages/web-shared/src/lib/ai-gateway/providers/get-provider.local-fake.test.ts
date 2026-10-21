@@ -2,16 +2,22 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import {
   getProvider,
   getTranscriptionProvider,
+  type GetProviderInput,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
+  canRouteToVercel,
+  shouldRouteToVercel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import {
+  getBYOKforOrganization,
   getBYOKforUser,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -34,6 +40,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
+  canRouteToVercel: jest.fn().mockResolvedValue(true),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptStoredConnection: jest.fn().mockResolvedValue(null),
@@ -411,6 +418,121 @@ describe('getProvider ChatGPT connection routing order', () => {
       bypassAccessCheck: false,
     });
     env.restore();
+  });
+});
+
+describe('getProvider gateway BYOK routing', () => {
+  const model = 'anthropic/claude-sonnet-4.5';
+  const vercelKey: BYOKResult = {
+    decryptedAPIKey: 'user-vercel-gateway-key',
+    providerId: 'vercel-ai-gateway',
+  };
+  const openRouterKey: BYOKResult = {
+    decryptedAPIKey: 'user-openrouter-key',
+    providerId: 'openrouter',
+  };
+  const anthropicKey: BYOKResult = {
+    decryptedAPIKey: 'user-anthropic-key',
+    providerId: 'anthropic',
+  };
+
+  beforeEach(() => {
+    jest.mocked(shouldRouteToVercel).mockReset().mockResolvedValue(true);
+    jest.mocked(canRouteToVercel).mockReset().mockResolvedValue(true);
+    jest
+      .mocked(getModelUserByokProviders)
+      .mockReset()
+      .mockResolvedValue(['anthropic', 'vercel-ai-gateway', 'openrouter']);
+    jest.mocked(getBYOKforUser).mockReset().mockResolvedValue(null);
+    jest.mocked(getBYOKforOrganization).mockReset().mockResolvedValue(null);
+  });
+
+  async function resolve(input: GetProviderInput = providerInput(model)) {
+    const result = await getProvider(input);
+    if (result.kind !== 'provider') throw new Error('expected provider result');
+    return result;
+  }
+
+  test('routes to OpenRouter with the user key when only an OpenRouter key exists', async () => {
+    jest.mocked(getBYOKforUser).mockResolvedValue([openRouterKey]);
+
+    const result = await resolve();
+
+    expect(result).toMatchObject({
+      provider: { id: 'openrouter', apiUrl: OPENROUTER.apiUrl, apiKey: 'user-openrouter-key' },
+      userByok: [openRouterKey],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    expect(shouldRouteToVercel).not.toHaveBeenCalled();
+  });
+
+  test('prefers the Vercel AI Gateway key over the OpenRouter key', async () => {
+    jest.mocked(getBYOKforUser).mockResolvedValue([openRouterKey, vercelKey]);
+
+    const result = await resolve();
+
+    expect(result).toMatchObject({
+      provider: {
+        id: 'vercel',
+        apiUrl: VERCEL_AI_GATEWAY.apiUrl,
+        apiKey: 'user-vercel-gateway-key',
+      },
+      userByok: [vercelKey],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    expect(canRouteToVercel).toHaveBeenCalledWith(model, expect.any(Function));
+  });
+
+  test('falls back to the OpenRouter key when Vercel cannot serve the request', async () => {
+    jest.mocked(canRouteToVercel).mockResolvedValue(false);
+    jest.mocked(getBYOKforUser).mockResolvedValue([vercelKey, openRouterKey]);
+
+    const result = await resolve();
+
+    expect(result.provider).toMatchObject({ id: 'openrouter', apiKey: 'user-openrouter-key' });
+    expect(result.userByok).toEqual([openRouterKey]);
+  });
+
+  test('uses Kilo routing when Vercel cannot serve a request that only has a Vercel key', async () => {
+    jest.mocked(canRouteToVercel).mockResolvedValue(false);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+    jest.mocked(getBYOKforUser).mockResolvedValue([vercelKey]);
+
+    expect(await resolve()).toEqual({
+      kind: 'provider',
+      provider: OPENROUTER,
+      userByok: null,
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+  });
+
+  test('prefers inference provider keys over gateway keys', async () => {
+    jest.mocked(getBYOKforUser).mockResolvedValue([vercelKey, anthropicKey, openRouterKey]);
+
+    expect(await resolve()).toEqual({
+      kind: 'provider',
+      provider: VERCEL_AI_GATEWAY,
+      userByok: [anthropicKey],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+  });
+
+  test('uses organization keys for organization requests', async () => {
+    jest.mocked(getBYOKforOrganization).mockResolvedValue([openRouterKey]);
+
+    const result = await resolve({ ...providerInput(model), organizationId: ORG_ID });
+
+    expect(getBYOKforOrganization).toHaveBeenCalledWith(expect.anything(), ORG_ID, [
+      'anthropic',
+      'vercel-ai-gateway',
+      'openrouter',
+    ]);
+    expect(getBYOKforUser).not.toHaveBeenCalled();
+    expect(result.provider).toMatchObject({ id: 'openrouter', apiKey: 'user-openrouter-key' });
   });
 });
 

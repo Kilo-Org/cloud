@@ -1,10 +1,16 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import {
+  createUserVercelAiGatewayProvider,
+  VERCEL_AI_GATEWAY,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyPreferredProvider,
   applyProviderSpecificLogic,
   applyReasoningDetailsTransform,
   getIgnoredProviders,
+  getPreferredProviderOrder,
   removeModelsFallback,
   removeUnsupportedRequestServiceTier,
   withIgnoredProviders,
@@ -18,6 +24,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  applyVercelSettings: jest.fn(),
+}));
 
 const nonFlexExclusiveModel: KiloExclusiveModel = {
   public_id: 'test/non-flex-exclusive',
@@ -601,6 +611,60 @@ describe('removeModelsFallback', () => {
       expect.objectContaining({ userId: 'user-1', model, requestKind: 'messages' })
     );
     warn.mockRestore();
+  });
+});
+
+describe('applyProviderSpecificLogic with a user gateway key', () => {
+  const requestedModel = 'anthropic/claude-opus-5';
+
+  async function apply(userByok: BYOKResult[] | null, provider = makeProvider(null)) {
+    const request = makeRequest(requestedModel, ['caller/fallback']);
+    await applyProviderSpecificLogic(
+      provider,
+      requestedModel,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      true
+    );
+    return request;
+  }
+
+  it('shapes a user Vercel AI Gateway key request like a managed Vercel request', async () => {
+    const request = await apply(
+      [{ providerId: 'vercel-ai-gateway', decryptedAPIKey: 'user-key' }],
+      createUserVercelAiGatewayProvider('user-key')
+    );
+
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null);
+  });
+
+  it('passes inference provider keys to the Vercel settings', async () => {
+    const userByok: BYOKResult[] = [{ providerId: 'anthropic', decryptedAPIKey: 'user-key' }];
+
+    const request = await apply(userByok, VERCEL_AI_GATEWAY);
+
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok);
+  });
+
+  it.each(['openrouter', 'vercel-ai-gateway'] as const)(
+    'skips Kilo provider order for a %s key',
+    async providerId => {
+      const request = await apply([{ providerId, decryptedAPIKey: 'user-key' }]);
+
+      expect(request.body.provider).toBeUndefined();
+    }
+  );
+
+  it('keeps Kilo provider order on Kilo keys', async () => {
+    const request = await apply(null);
+
+    expect(request.body.provider).toEqual({ order: getPreferredProviderOrder(requestedModel) });
   });
 });
 

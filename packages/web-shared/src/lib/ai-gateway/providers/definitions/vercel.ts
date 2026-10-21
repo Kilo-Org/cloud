@@ -12,3 +12,7 @@ export const VERCEL_AI_GATEWAY = {
   responseTransforms: null,
   async transformRequest() {},
 } as const satisfies Provider;
+
+export function createUserVercelAiGatewayProvider(apiKey: string): Provider {
+  return { ...VERCEL_AI_GATEWAY, apiKey };
+}

@@ -54,7 +54,7 @@ async function getPolicyAllowedDirectByokModels(
   organizationId: string
 ) {
   const models = await getDirectByokModelsForOrganization(organizationId);
-  const allowed = [];
+  const allowed: typeof models = [];
   for (const model of models) {
     if ((await getEffectiveModelDecision(policy, model.id)).allowed) {
       allowed.push(model);

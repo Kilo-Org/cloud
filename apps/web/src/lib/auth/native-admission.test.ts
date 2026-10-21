@@ -915,6 +915,12 @@ describe('persistAttestedKey', () => {
 // ── Expected-condition telemetry ───────────────────────────────────────────
 
 describe('countAdmissionCondition', () => {
+  beforeEach(() => {
+    // Earlier tests in this file call the gate at real wall-clock time, which
+    // opens a window far in the future of this test's mocked clock.
+    resetAdmissionCountersForTests();
+  });
+
   afterEach(() => {
     resetAdmissionCountersForTests();
     jestGlobal.restoreAllMocks();

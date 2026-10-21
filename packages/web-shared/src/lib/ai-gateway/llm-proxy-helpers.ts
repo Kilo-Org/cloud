@@ -568,6 +568,11 @@ export function paidModelAuthRequiredResponse() {
   );
 }
 
+// The free-model limits use hour-long windows, so an immediate client retry
+// only spends more of the caller's allowance. Kilo CLI v2 and the OpenAI SDKs
+// honor this header.
+const DO_NOT_RETRY_HEADERS = { 'x-should-retry': 'false' };
+
 export function anonymousFreeModelLimitResponse() {
   const message =
     'Sign up for free to continue and explore 500 other models. ' +
@@ -578,7 +583,7 @@ export function anonymousFreeModelLimitResponse() {
       error_type: ProxyErrorType.rate_limit_exceeded,
       message,
     },
-    { status: 429 }
+    { status: 429, headers: DO_NOT_RETRY_HEADERS }
   );
 }
 
@@ -587,7 +592,7 @@ export function accountFreeModelLimitResponse() {
     'Free model usage limit reached. Please try again later, or switch to a paid model or your own API key.';
   return NextResponse.json(
     { error: 'Rate limit exceeded', error_type: ProxyErrorType.rate_limit_exceeded, message },
-    { status: 429 }
+    { status: 429, headers: DO_NOT_RETRY_HEADERS }
   );
 }
 

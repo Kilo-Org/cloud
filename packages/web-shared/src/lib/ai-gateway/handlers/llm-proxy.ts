@@ -5,12 +5,7 @@ import { type NextRequest } from 'next/server';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
-import {
-  validateFeatureHeader,
-  FEATURE_HEADER,
-  isUserRateLimitedFeature,
-  type FeatureValue,
-} from '@kilocode/web-shared/lib/feature-detection';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
@@ -100,7 +95,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
-import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
@@ -204,27 +198,15 @@ function validatePath(
 /**
  * Signed-in callers count per account, keyed on the signed `kiloUserId` in their
  * token (see `gatewayRateLimitKey`), so the check needs no database query.
- * Anonymous callers count per IP, except that server-side products on Kilo
- * infrastructure IPs must authenticate: those IPs are shared by every user.
+ * Anonymous callers count per IP.
  */
 function resolveFreeModelRateLimitSubject(
   accountKey: string,
-  feature: FeatureValue | null,
   ipAddress: string
-): NextResponseType<unknown> | FreeModelRateLimitSubject {
-  if (!isAnonymousUserId(accountKey)) {
-    return { kind: 'account', kiloUserId: accountKey };
-  }
-  if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
-    return NextResponse.json(
-      {
-        error: 'Authentication required for this feature',
-        error_type: ProxyErrorType.authentication_required,
-      },
-      { status: 401 }
-    );
-  }
-  return { kind: 'ip', ipAddress };
+): FreeModelRateLimitSubject {
+  return isAnonymousUserId(accountKey)
+    ? { kind: 'ip', ipAddress }
+    : { kind: 'account', kiloUserId: accountKey };
 }
 
 export async function handleLlmProxyRequest(
@@ -615,9 +597,7 @@ export async function handleLlmProxyRequest(
 
   // Custom LLMs are exempt, even when their id matches a free-model pattern.
   if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
-    const rateLimitSubject = resolveFreeModelRateLimitSubject(accountKey, feature, ipAddress);
-    if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
-
+    const rateLimitSubject = resolveFreeModelRateLimitSubject(accountKey, ipAddress);
     if (await isFreeModelRateLimited(request, rateLimitSubject)) {
       console.warn(
         `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}`

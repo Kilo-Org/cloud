@@ -1311,6 +1311,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       const response = await handleLlmProxyRequest(makeRequest(makeBody(modelId)) as never);
 
       expect(response.status).toBe(429);
+      expect(response.headers.get('x-should-retry')).toBe('false');
       expect(await response.json()).toMatchObject({
         error: { code: 'PROMOTION_MODEL_LIMIT_REACHED' },
         error_type: 'rate_limit_exceeded',
@@ -1342,6 +1343,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     );
 
     expect(response.status).toBe(429);
+    expect(response.headers.get('x-should-retry')).toBe('false');
     const body = await response.json();
     expect(body).toMatchObject({
       error_type: 'rate_limit_exceeded',
@@ -1356,12 +1358,13 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('requires authentication for server-side products on Cloudflare IPs', async () => {
+  it('counts anonymous server-side product requests on Cloudflare IPs per IP', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
       organizationId: undefined,
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -1371,9 +1374,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       }) as never
     );
 
-    expect(response.status).toBe(401);
-    expect(await response.json()).toMatchObject({ error_type: 'authentication_required' });
-    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+    expect(response.status).toBe(429);
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'ip',
+      ipAddress: '104.16.0.1',
+    });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 

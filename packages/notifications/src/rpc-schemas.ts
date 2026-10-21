@@ -154,7 +154,7 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   // Needs-input raise detail: which answer the waiting agent wants, and the PR
   // that can be opened from the notification. Absent on status pushes.
   attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
-  prUrl: z.string().optional(),
+  prUrl: z.string().min(1).optional(),
   // Old producers omit these; remove the optionals when every producer sends keys.
   i18nKey: z.string().min(1).optional(),
   i18nParams: z.record(z.string(), z.string()).optional(),
@@ -338,22 +338,42 @@ export type InternalDispatchLowBalanceRequest = z.infer<
 /**
  * Spend-alert dispatch. `organizationId` is present only for an
  * `organization` scope; a `personal` scope carries the user's own spend and
- * nothing else. `dedupeKey` is the outbox row's identity, which carries the
- * firing episode: it joins the idempotency key alongside the alert kind and
- * threshold, so a condition that clears and crosses again inside the channel's
- * idempotency window is a new alert rather than a collapsed duplicate.
+ * nothing else. The dispatcher builds the push destination from these two
+ * fields, so a scope and an id that disagree would route the tap to the wrong
+ * spend view; the refinement refuses that before a push exists. `dedupeKey` is
+ * the outbox row's identity, which carries the firing episode: it joins the
+ * idempotency key alongside the alert kind and threshold, so a condition that
+ * clears and crosses again inside the channel's idempotency window is a new
+ * alert rather than a collapsed duplicate.
  */
-export const internalDispatchSpendAlertRequestSchema = z.object({
-  kind: z.literal('spend_alert'),
-  recipientUserIds: z.array(z.string().min(1)).min(1),
-  scope: z.enum(['personal', 'organization']),
-  organizationId: z.string().min(1).optional(),
-  alertKind: z.enum(['threshold', 'anomaly']),
-  scopeName: z.string().min(1),
-  amountUsd: z.number().nonnegative(),
-  thresholdUsd: z.number().nonnegative(),
-  dedupeKey: z.string().min(1),
-});
+export const internalDispatchSpendAlertRequestSchema = z
+  .object({
+    kind: z.literal('spend_alert'),
+    recipientUserIds: z.array(z.string().min(1)).min(1),
+    scope: z.enum(['personal', 'organization']),
+    organizationId: z.string().min(1).optional(),
+    alertKind: z.enum(['threshold', 'anomaly']),
+    scopeName: z.string().min(1),
+    amountUsd: z.number().nonnegative(),
+    thresholdUsd: z.number().nonnegative(),
+    dedupeKey: z.string().min(1),
+  })
+  .superRefine((data, ctx) => {
+    if (data.scope === 'organization' && data.organizationId === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['organizationId'],
+        message: 'an organization-scope alert names its organization',
+      });
+    }
+    if (data.scope === 'personal' && data.organizationId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['organizationId'],
+        message: 'a personal-scope alert carries no organization id',
+      });
+    }
+  });
 export type InternalDispatchSpendAlertRequest = z.infer<
   typeof internalDispatchSpendAlertRequestSchema
 >;

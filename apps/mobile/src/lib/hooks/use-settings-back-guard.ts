@@ -63,7 +63,9 @@ export type SettingsBackGuardResult = {
  * so the native alert's destructive style would never reach the screen there
  * and Discard would lose its red affordance. It offers Keep editing
  * (the safe choice), Discard, and — while the draft is valid — Save, which
- * persists the draft and then replays the captured navigation action. The
+ * persists the draft and then replays the captured navigation action. An
+ * invalid draft has nothing valid to persist, so that confirmation offers
+ * only Keep editing and Discard and says so instead of asking to save. The
  * caller renders the returned `dialog` node in its own tree.
  *
  * Not a general form framework: it only classifies dirty/valid into that
@@ -105,11 +107,18 @@ export function useSettingsBackGuard({
     }
     const action = data.action;
     const options = getSettingsBackGuardOptions(valid ? 'dirty-valid' : 'dirty-invalid');
+    // The message follows the buttons: a screen with nothing valid to persist
+    // would contradict a prompt that asks the user to save.
+    const saveOffered = options.includes('save');
     confirm({
       title: i18n.t('securityAgent.settingsSave.unsavedTitle'),
-      message: i18n.t('securityAgent.settingsSave.unsavedMessage'),
+      message: i18n.t(
+        saveOffered
+          ? 'securityAgent.settingsSave.unsavedMessage'
+          : 'securityAgent.settingsSave.unsavedInvalidMessage'
+      ),
       cancelLabel: i18n.t(BUTTON_LABEL_KEY['keep-editing']),
-      extraAction: options.includes('save')
+      extraAction: saveOffered
         ? {
             label: i18n.t(BUTTON_LABEL_KEY.save),
             onPress: () => {

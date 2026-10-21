@@ -111,7 +111,9 @@
     "online": "Онлайн",
     "open": "Отвори {{name}}",
     "openPullRequest": "Отваряне на заявка за сливане",
+    "completed": "Завършено",
     "pending": "В изчакване",
+    "running": "Изпълнява се",
     "performance": "Производителност",
     "preferences": "Предпочитания",
     "privacyPolicy": "Политика за поверителност",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Не успяхме да актуализираме агента за преглед на код.",
     "configSaveFailed": "Не успяхме да запазим настройките за преглед.",
     "status": {
-      "running": "Изпълнява се",
-      "completed": "Завършено",
       "interrupted": "Прекъснато"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Запази промените",
       "unsavedTitle": "Незапазени промени",
-      "unsavedMessage": "Да се запазят ли промените, преди да напуснеш този екран?"
+      "unsavedMessage": "Да се запазят ли промените, преди да напуснеш този екран?",
+      "unsavedInvalidMessage": "Тези промени все още не могат да се запазят. Коригирай ги, за да запазиш, или ги отхвърли, за да напуснеш."
     },
     "auditReportButton": {
       "viewA11y": "Прегледай одитния доклад"
@@ -1938,7 +1939,6 @@
       "installApp": "Инсталирай приложението за GitHub",
       "reauthorizeButton": "Поднови правата на приложението за GitHub",
       "reauthorizeDescription": "Агентът за сигурност изисква правото vulnerability_alerts за достъп до сигналите от Dependabot. Поднови правата на приложението за GitHub, за да предоставиш това право.",
-      "reauthorizeFailed": "Не успяхме да започнем подновяването на правата. Опитай отново.",
       "reauthorizeTitle": "Изискват се допълнителни права",
       "setupFailed": "Не може да се започне настройката на GitHub. Моля, опитай отново."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} реда",
       "matchesBadge_one": "{{displayCount}} съвпадение",
       "matchesBadge_other": "{{displayCount}} съвпадения",
-      "noOutput": "Няма изход."
+      "noOutput": "Няма изход.",
+      "translationFailed": "Преводът не бе успешен"
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
@@ -3651,7 +3652,7 @@
       "empty": "Все още няма MCP сървъри",
       "name": "Име на сървъра",
       "type": "Тип сървър",
-      "localType": "Местен",
+      "localType": "Локален",
       "remoteType": "Дистанционно",
       "command": "Команден ред",
       "url": "URL адрес",
@@ -3714,6 +3715,7 @@
       "description": "Описание на командата",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Обяснете $ARGUMENTS",
       "subtask": "Изпълнение като подзадача",
       "edit": "Команда за редактиране на наклонена черта",
@@ -3864,7 +3866,7 @@
     "view": "Прочети брифинга",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Покажи текущия статус",
+    "dismiss": "Отхвърли брифинга",
     "offline": "Офлайн · запазен брифинг",
     "cached": "Запазен отчет · опресняването не е налично",
     "revised": "Редактиран · {{revision}}",

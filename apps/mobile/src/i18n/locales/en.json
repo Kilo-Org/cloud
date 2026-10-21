@@ -17,7 +17,7 @@
     "view": "Read briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Show live status",
+    "dismiss": "Dismiss briefing",
     "offline": "Offline · saved briefing",
     "cached": "Saved report · refresh unavailable",
     "revised": "Revised · {{revision}}",
@@ -176,7 +176,9 @@
     "online": "Online",
     "open": "Open {{name}}",
     "openPullRequest": "Open pull request",
+    "completed": "Completed",
     "pending": "Pending",
+    "running": "Running",
     "performance": "Performance",
     "preferences": "Preferences",
     "privacyPolicy": "Privacy Policy",
@@ -1600,8 +1602,6 @@
     "updateFailed": "Failed to update reviewer",
     "configSaveFailed": "Failed to save review config",
     "status": {
-      "running": "Running",
-      "completed": "Completed",
       "interrupted": "Interrupted"
     },
     "reviewStyle": {
@@ -1936,7 +1936,8 @@
     "settingsSave": {
       "saveChanges": "Save changes",
       "unsavedTitle": "Unsaved changes",
-      "unsavedMessage": "Save your changes before leaving this screen?"
+      "unsavedMessage": "Save your changes before leaving this screen?",
+      "unsavedInvalidMessage": "These changes can't be saved yet. Fix them to save, or discard them to leave."
     },
     "auditReportButton": {
       "viewA11y": "View audit report"
@@ -2002,7 +2003,6 @@
       "installApp": "Install GitHub App",
       "reauthorizeButton": "Re-authorize GitHub App",
       "reauthorizeDescription": "Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
-      "reauthorizeFailed": "Could not start re-authorization. Please try again.",
       "reauthorizeTitle": "Additional permissions required",
       "setupFailed": "Could not start GitHub setup. Please try again."
     },
@@ -2376,7 +2376,8 @@
       "matchesBadge_one": "{{displayCount}} match",
       "matchesBadge": "{{displayCount}} matches",
       "matchesBadge_other": "{{displayCount}} matches",
-      "noOutput": "No output."
+      "noOutput": "No output.",
+      "translationFailed": "Translation failed"
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
@@ -3645,9 +3646,15 @@
     "loadFailed": "Couldn't load profiles",
     "counts": {
       "vars": "{{count}} vars",
+      "vars_one": "{{count}} var",
+      "vars_other": "{{count}} vars",
       "mcp": "{{count}} MCP",
       "skills": "{{count}} skills",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
       "commands": "{{count}} cmds",
+      "commands_one": "{{count}} cmd",
+      "commands_other": "{{count}} cmds",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}s",
       "commandsShort": "{{count}}c"
@@ -3778,6 +3785,7 @@
       "description": "Command description",
       "template": "Template",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explain $ARGUMENTS",
       "subtask": "Run as subtask",
       "edit": "Edit slash command",

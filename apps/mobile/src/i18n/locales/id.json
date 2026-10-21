@@ -111,7 +111,9 @@
     "online": "Daring",
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
+    "completed": "Selesai",
     "pending": "Menunggu",
+    "running": "Berjalan",
     "performance": "Kinerja",
     "preferences": "Preferensi",
     "privacyPolicy": "Kebijakan privasi",
@@ -1021,8 +1023,6 @@
     "updateFailed": "Gagal memperbarui peninjau.",
     "configSaveFailed": "Gagal menyimpan konfigurasi tinjauan.",
     "status": {
-      "running": "Berjalan",
-      "completed": "Selesai",
       "interrupted": "Terputus"
     },
     "reviewStyle": {
@@ -1381,7 +1381,6 @@
       "installApp": "Pasang aplikasi GitHub",
       "reauthorizeButton": "Otorisasi ulang aplikasi GitHub",
       "reauthorizeDescription": "Agen keamanan memerlukan izin vulnerability_alerts untuk mengakses peringatan Dependabot. Otorisasi ulang aplikasi GitHub untuk memberikan izin ini.",
-      "reauthorizeFailed": "Tidak dapat memulai otorisasi ulang. Coba lagi.",
       "reauthorizeTitle": "Perlu izin tambahan",
       "setupFailed": "Tidak dapat memulai penyiapan GitHub. Coba lagi."
     },
@@ -1404,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
       "unsavedMessage": "Simpan perubahan sebelum meninggalkan layar ini?",
+      "unsavedInvalidMessage": "Perubahan ini belum dapat disimpan. Perbaiki untuk menyimpan, atau buang untuk meninggalkan.",
       "unsavedTitle": "Perubahan belum disimpan"
     },
     "setup": {
@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} baris",
       "matchesBadge_one": "{{displayCount}} kecocokan",
       "matchesBadge_other": "{{displayCount}} kecocokan",
-      "noOutput": "Tidak ada keluaran."
+      "noOutput": "Tidak ada keluaran.",
+      "translationFailed": "Terjemahan gagal"
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -3714,6 +3715,7 @@
       "description": "Deskripsi perintah",
       "template": "Templat",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Jelaskan $ARGUMENTS",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit perintah garis miring",
@@ -3864,7 +3866,7 @@
     "view": "Baca ringkasan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Tampilkan status langsung",
+    "dismiss": "Abaikan ringkasan",
     "offline": "Offline · ringkasan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
     "revised": "Direvisi · {{revision}}",

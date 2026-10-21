@@ -111,7 +111,9 @@
     "online": "Na spletu",
     "open": "Odpri {{name}}",
     "openPullRequest": "Odprta zahteva za združitev",
+    "completed": "Dokončano",
     "pending": "Na čakanju",
+    "running": "V teku",
     "performance": "Zmogljivost",
     "preferences": "Nastavitve",
     "privacyPolicy": "Politika zasebnosti",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Pregledovalnika kode ni bilo mogoče posodobiti.",
     "configSaveFailed": "Nastavitev pregleda ni bilo mogoče shraniti.",
     "status": {
-      "running": "V teku",
-      "completed": "Dokončano",
       "interrupted": "Prekinjeno"
     },
     "reviewStyle": {
@@ -1918,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Shrani spremembe",
       "unsavedTitle": "Neshranjene spremembe",
-      "unsavedMessage": "Želiš shraniti spremembe, preden zapustiš ta zaslon?"
+      "unsavedMessage": "Želiš shraniti spremembe, preden zapustiš ta zaslon?",
+      "unsavedInvalidMessage": "Teh sprememb še ni mogoče shraniti. Popravi jih, da jih shraniš, ali jih zavrzi, da zapustiš."
     },
     "auditReportButton": {
       "viewA11y": "Prikaži poročilo o reviziji"
@@ -1984,7 +1985,6 @@
       "installApp": "Namesti aplikacijo GitHub",
       "reauthorizeButton": "Znova pooblasti aplikacijo GitHub",
       "reauthorizeDescription": "Varnostni agent za dostop do opozoril Dependabot potrebuje dovoljenje vulnerability_alerts. Znova pooblasti aplikacijo GitHub, da ji dodeliš to dovoljenje.",
-      "reauthorizeFailed": "Ponovnega pooblaščanja ni bilo mogoče začeti. Poskusi znova.",
       "reauthorizeTitle": "Potrebna so dodatna dovoljenja",
       "setupFailed": "Nastavitve povezave s platformo GitHub ni bilo mogoče začeti. Poskusi znova."
     },
@@ -2376,7 +2376,8 @@
       "matchesBadge_other": "{{displayCount}} zadetkov",
       "matchesBadge_two": "{{displayCount}} zadetka",
       "matchesBadge_few": "{{displayCount}} zadetki",
-      "noOutput": "Ni izhoda."
+      "noOutput": "Ni izhoda.",
+      "translationFailed": "Prevod ni uspel"
     },
     "readToolMarkdown": {
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
@@ -3796,6 +3797,7 @@
       "description": "Opis ukaza",
       "template": "Predloga",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Pojasnite $ARGUMENTS",
       "subtask": "Zaženi kot podopravilo",
       "edit": "Uredi ukaz za poševnico",
@@ -3954,7 +3956,7 @@
     "view": "Preberi povzetek",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutno stanje",
+    "dismiss": "Zavrzi povzetek",
     "offline": "Brez povezave · shranjen povzetek",
     "cached": "Shranjeno poročilo · osvežitev ni na voljo",
     "revised": "Popravljeno · {{revision}}",

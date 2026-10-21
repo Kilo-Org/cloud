@@ -111,7 +111,9 @@
     "online": "இணையத்தில்",
     "open": "{{name}} என்பதைத் திறக்கவும்",
     "openPullRequest": "PR திறப்பு",
+    "completed": "முடிந்தது",
     "pending": "நிலுவையில்",
+    "running": "இயங்குகிறது",
     "performance": "செயல்திறன்",
     "preferences": "விருப்பத்தேர்வுகள்",
     "privacyPolicy": "தனியுரிமைக் கொள்கை",
@@ -1536,8 +1538,6 @@
     "updateFailed": "மதிப்பாய்வாளரைப் புதுப்பிக்க முடியவில்லை.",
     "configSaveFailed": "மதிப்பாய்வு அமைப்புகளைச் சேமிக்க முடியவில்லை.",
     "status": {
-      "running": "இயங்குகிறது",
-      "completed": "முடிந்தது",
       "interrupted": "தடைப்பட்டது"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "மாற்றங்களைச் சேமிக்கவும்",
       "unsavedTitle": "சேமிக்கப்படாத மாற்றங்கள்",
-      "unsavedMessage": "இந்தத் திரையை விட்டு வெளியேறும் முன் உங்கள் மாற்றங்களைச் சேமிக்கவா?"
+      "unsavedMessage": "இந்தத் திரையை விட்டு வெளியேறும் முன் உங்கள் மாற்றங்களைச் சேமிக்கவா?",
+      "unsavedInvalidMessage": "இந்த மாற்றங்களை இன்னும் சேமிக்க முடியாது. சேமிக்க இவற்றைச் சரிசெய்யவும், அல்லது வெளியேற இவற்றைக் கைவிடவும்."
     },
     "auditReportButton": {
       "viewA11y": "தணிக்கை அறிக்கையைப் பார்க்கவும்"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub செயலியை நிறுவவும்",
       "reauthorizeButton": "GitHub செயலிக்கு மீண்டும் அனுமதி வழங்கவும்",
       "reauthorizeDescription": "Dependabot எச்சரிக்கைகளை அணுக பாதுகாப்பு முகவருக்கு vulnerability_alerts அனுமதி தேவை. இந்த அனுமதியை வழங்க GitHub செயலிக்கு மீண்டும் அனுமதி அளிக்கவும்.",
-      "reauthorizeFailed": "மீண்டும் அனுமதி வழங்கும் செயல்முறையைத் தொடங்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "reauthorizeTitle": "கூடுதல் அனுமதிகள் தேவை",
       "setupFailed": "GitHub அமைப்புச் செயல்முறையைத் தொடங்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} வரிகள்",
       "matchesBadge_one": "{{displayCount}} பொருத்தம்",
       "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்",
-      "noOutput": "வெளியீடு இல்லை."
+      "noOutput": "வெளியீடு இல்லை.",
+      "translationFailed": "மொழிபெயர்ப்பு தோல்வியடைந்தது"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} வரிகள் (முழுவதும் காட்டப்படவில்லை)",
@@ -3714,6 +3715,7 @@
       "description": "கட்டளை விளக்கம்",
       "template": "டெம்ப்ளேட்",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTSஐ விளக்கவும்",
       "subtask": "துணைப் பணியாக இயக்கவும்",
       "edit": "ஸ்லாஷ் கட்டளையைத் திருத்தவும்",
@@ -3864,7 +3866,7 @@
     "view": "சுருக்கத்தைப் படிக்கவும்",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "நேரடி நிலையைக் காட்டு",
+    "dismiss": "சுருக்கத்தைப் புறக்கணிக்கவும்",
     "offline": "ஆஃப்லைன் · சேமித்த சுருக்கம்",
     "cached": "சேமித்த அறிக்கை · புதுப்பிக்க இயலாது",
     "revised": "திருத்தப்பட்டது · {{revision}}",

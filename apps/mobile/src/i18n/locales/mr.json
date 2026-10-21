@@ -111,7 +111,9 @@
     "online": "ऑनलाइन",
     "open": "{{name}} उघडा",
     "openPullRequest": "पुल रिक्वेस्ट उघडा",
+    "completed": "पूर्ण",
     "pending": "प्रलंबित",
+    "running": "चालू आहे",
     "performance": "कार्यक्षमता",
     "preferences": "प्राधान्ये",
     "privacyPolicy": "गोपनीयता धोरण",
@@ -1536,8 +1538,6 @@
     "updateFailed": "कोड पुनरावलोकक अद्ययावत करता आला नाही.",
     "configSaveFailed": "पुनरावलोकनाच्या सेटिंग्ज जतन करता आल्या नाहीत.",
     "status": {
-      "running": "चालू आहे",
-      "completed": "पूर्ण",
       "interrupted": "व्यत्यय आला"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "बदल जतन करा",
       "unsavedTitle": "जतन न केलेले बदल",
-      "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?"
+      "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?",
+      "unsavedInvalidMessage": "हे बदल अजून जतन करता येत नाहीत. जतन करण्यासाठी हे दुरुस्त करा, किंवा सोडून जाण्यासाठी हे टाकून द्या."
     },
     "auditReportButton": {
       "viewA11y": "ऑडिट अहवाल पाहा"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub ॲप इन्स्टॉल करा",
       "reauthorizeButton": "GitHub ॲपला पुन्हा परवानगी द्या",
       "reauthorizeDescription": "Dependabot सूचना पाहण्यासाठी सुरक्षा एजंटला vulnerability_alerts ही परवानगी आवश्यक आहे. ती देण्यासाठी GitHub ॲपला पुन्हा परवानगी द्या.",
-      "reauthorizeFailed": "पुन्हा परवानगी देण्याची प्रक्रिया सुरू करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
       "reauthorizeTitle": "अतिरिक्त परवानग्या आवश्यक",
       "setupFailed": "GitHub सेटअप सुरू करता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ओळी",
       "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
       "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम",
-      "noOutput": "कोणतेही आउटपुट नाही."
+      "noOutput": "कोणतेही आउटपुट नाही.",
+      "translationFailed": "अनुवाद अयशस्वी"
     },
     "readToolMarkdown": {
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",
@@ -3714,6 +3715,7 @@
       "description": "आदेश वर्णन",
       "template": "साचा",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करा",
       "subtask": "सबटास्क म्हणून चालवा",
       "edit": "स्लॅश कमांड संपादित करा",
@@ -3864,7 +3866,7 @@
     "view": "आढावा वाचा",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "थेट स्थिती दाखवा",
+    "dismiss": "आढावाकडे दुर्लक्ष करा",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला अहवाल · रिफ्रेश उपलब्ध नाही",
     "revised": "सुधारित · {{revision}}",

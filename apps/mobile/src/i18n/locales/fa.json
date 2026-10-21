@@ -111,7 +111,9 @@
     "online": "آنلاین",
     "open": "باز کردن {{name}}",
     "openPullRequest": "پول ریکوئست باز",
+    "completed": "تکمیل‌شده",
     "pending": "در انتظار",
+    "running": "در حال اجرا",
     "performance": "عملکرد",
     "preferences": "تنظیمات دلخواه",
     "privacyPolicy": "خط‌مشی حریم خصوصی",
@@ -1536,8 +1538,6 @@
     "updateFailed": "به‌روزرسانی بررسی‌کننده کد ممکن نشد.",
     "configSaveFailed": "ذخیره تنظیمات بررسی ممکن نشد.",
     "status": {
-      "running": "در حال اجرا",
-      "completed": "تکمیل‌شده",
       "interrupted": "قطع شد"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ذخیره تغییرات",
       "unsavedTitle": "تغییرات ذخیره‌نشده",
-      "unsavedMessage": "تغییرات شما پیش از خروج از این صفحه ذخیره شوند؟"
+      "unsavedMessage": "تغییرات شما پیش از خروج از این صفحه ذخیره شوند؟",
+      "unsavedInvalidMessage": "این تغییرات هنوز ذخیره نمی‌شوند. برای ذخیره اصلاحشان کنید، یا برای خروج کنارشان بگذارید."
     },
     "auditReportButton": {
       "viewA11y": "مشاهده گزارش ممیزی"
@@ -1938,7 +1939,6 @@
       "installApp": "نصب برنامه GitHub",
       "reauthorizeButton": "اعطای مجدد مجوز به برنامه GitHub",
       "reauthorizeDescription": "عامل امنیتی برای دسترسی به هشدارهای Dependabot به مجوز vulnerability_alerts نیاز دارد. برای دادن این مجوز، دوباره دسترسی برنامه GitHub را تأیید کنید.",
-      "reauthorizeFailed": "شروع فرایند اعطای مجدد مجوز ممکن نشد. لطفاً دوباره تلاش کنید.",
       "reauthorizeTitle": "مجوزهای بیشتری لازم است",
       "setupFailed": "شروع راه‌اندازی GitHub ممکن نشد. لطفاً دوباره تلاش کنید."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} خط",
       "matchesBadge_one": "{{displayCount}} تطابق",
       "matchesBadge_other": "{{displayCount}} تطابق",
-      "noOutput": "هیچ خروجی وجود ندارد."
+      "noOutput": "هیچ خروجی وجود ندارد.",
+      "translationFailed": "ترجمه ناموفق بود"
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",
@@ -3714,6 +3715,7 @@
       "description": "توضیحات فرمان",
       "template": "الگو",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS را توضیح دهید",
       "subtask": "به عنوان وظیفه فرعی اجرا شود",
       "edit": "ویرایش دستور اسلش",
@@ -3864,7 +3866,7 @@
     "view": "خواندن گزارش",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "نمایش وضعیت زنده",
+    "dismiss": "نادیده گرفتن گزارش",
     "offline": "آفلاین · گزارش ذخیره‌شده",
     "cached": "گزارش ذخیره‌شده · به‌روزرسانی در دسترس نیست",
     "revised": "بازبینی‌شده · {{revision}}",

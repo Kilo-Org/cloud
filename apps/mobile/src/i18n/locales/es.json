@@ -111,7 +111,9 @@
     "online": "En línea",
     "open": "Abrir {{name}}",
     "openPullRequest": "PR abierta",
+    "completed": "Completado",
     "pending": "Pendiente",
+    "running": "En ejecución",
     "performance": "Rendimiento",
     "preferences": "Preferencias",
     "privacyPolicy": "Política de privacidad",
@@ -1024,8 +1026,6 @@
     "updateFailed": "No se pudo actualizar el revisor.",
     "configSaveFailed": "No se pudo guardar la configuración de revisión.",
     "status": {
-      "running": "En ejecución",
-      "completed": "Completado",
       "interrupted": "Interrumpida"
     },
     "reviewStyle": {
@@ -1387,7 +1387,6 @@
       "installApp": "Instalar la aplicación de GitHub",
       "reauthorizeButton": "Volver a autorizar la aplicación de GitHub",
       "reauthorizeDescription": "El agente de seguridad necesita el permiso vulnerability_alerts para acceder a las alertas de Dependabot. Vuelve a autorizar la aplicación de GitHub para conceder este permiso.",
-      "reauthorizeFailed": "No se pudo iniciar la reautorización. Inténtalo de nuevo.",
       "reauthorizeTitle": "Se requieren permisos adicionales",
       "setupFailed": "No se pudo iniciar la configuración de GitHub. Inténtalo de nuevo."
     },
@@ -1411,6 +1410,7 @@
     "settingsSave": {
       "saveChanges": "Guardar cambios",
       "unsavedMessage": "¿Guardar los cambios antes de salir de esta pantalla?",
+      "unsavedInvalidMessage": "Estos cambios aún no se pueden guardar. Corrígelos para guardarlos o descártalos para salir.",
       "unsavedTitle": "Cambios sin guardar"
     },
     "setup": {
@@ -1813,7 +1813,8 @@
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
       "matchesBadge_many": "{{displayCount}} coincidencias",
-      "noOutput": "No hay salida."
+      "noOutput": "No hay salida.",
+      "translationFailed": "Error al traducir"
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",
@@ -2233,7 +2234,7 @@
       "invalidLink": "Este enlace no se puede abrir.",
       "hostConfirmTitle": "¿Abrir enlace externo?",
       "hostConfirmMessage": "Este enlace abre {{host}} en tu navegador.",
-      "open": "Apertura",
+      "open": "Abrir",
       "trustThisHost": "Confiar en este dominio"
     },
     "folderPicker": {
@@ -2682,7 +2683,7 @@
       "openAccessibility": "Abrir una PR o un merge request",
       "clearLink": "Borrar el enlace",
       "pasteLink": "Pegar el enlace de PR o de merge request",
-      "open": "Apertura"
+      "open": "Abrir"
     },
     "eventChips": {
       "comment": "Comentario",
@@ -3721,11 +3722,11 @@
       "add": "Agregar agente",
       "empty": "Aún no hay agentes",
       "name": "Nombre del agente",
-      "slug": "babosa agente",
+      "slug": "Slug del agente",
       "description": "Descripción del agente",
       "model": "Anulación de modelo",
       "modelPlaceholder": "Usar sesión predeterminada",
-      "prompt": "Aviso del sistema",
+      "prompt": "Prompt del sistema",
       "steps": "Pasos máximos",
       "stepsPlaceholder": "p. ej. 50",
       "temperature": "Temperatura",
@@ -3755,6 +3756,7 @@
       "description": "Descripción del comando",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explique $ARGUMENTS",
       "subtask": "Ejecutar como subtarea",
       "edit": "Editar comando de barra diagonal",
@@ -3909,7 +3911,7 @@
     "view": "Leer resumen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ver estado en vivo",
+    "dismiss": "Descartar resumen",
     "offline": "Sin conexión · resumen guardado",
     "cached": "Informe guardado · no se puede actualizar",
     "revised": "Revisado · {{revision}}",

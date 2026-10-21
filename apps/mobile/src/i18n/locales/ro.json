@@ -111,7 +111,9 @@
     "online": "Conectat",
     "open": "Deschide {{name}}",
     "openPullRequest": "Deschidere PR",
+    "completed": "Finalizat",
     "pending": "În așteptare",
+    "running": "Rulează",
     "performance": "Performanță",
     "preferences": "Preferințe",
     "privacyPolicy": "Politica de confidențialitate",
@@ -1555,8 +1557,6 @@
     "updateFailed": "Nu s-a putut actualiza agentul de revizuire a codului.",
     "configSaveFailed": "Nu s-a putut salva configurația revizuirii.",
     "status": {
-      "running": "Rulează",
-      "completed": "Finalizat",
       "interrupted": "Întreruptă"
     },
     "reviewStyle": {
@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Salvează modificările",
       "unsavedTitle": "Modificări nesalvate",
-      "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?"
+      "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?",
+      "unsavedInvalidMessage": "Aceste modificări nu pot fi încă salvate. Corectează-le pentru a salva sau renunță la ele pentru a pleca."
     },
     "auditReportButton": {
       "viewA11y": "Vezi raportul de audit"
@@ -1961,7 +1962,6 @@
       "installApp": "Instalează aplicația GitHub",
       "reauthorizeButton": "Autorizează din nou aplicația GitHub",
       "reauthorizeDescription": "Agentul de securitate are nevoie de permisiunea vulnerability_alerts pentru a accesa alertele Dependabot. Autorizează din nou aplicația GitHub pentru a acorda această permisiune.",
-      "reauthorizeFailed": "Nu s-a putut începe reautorizarea. Încearcă din nou.",
       "reauthorizeTitle": "Sunt necesare permisiuni suplimentare",
       "setupFailed": "Nu s-a putut începe configurarea GitHub. Încearcă din nou."
     },
@@ -2344,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} potrivire",
       "matchesBadge_other": "{{displayCount}} potriviri",
       "matchesBadge_few": "{{displayCount}} potriviri",
-      "noOutput": "Nicio ieșire."
+      "noOutput": "Nicio ieșire.",
+      "translationFailed": "Traducerea a eșuat"
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
@@ -3755,6 +3756,7 @@
       "description": "Descrierea comenzii",
       "template": "Șablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explicați $ARGUMENTS",
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",
@@ -3909,7 +3911,7 @@
     "view": "Citește rezumatul",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Afișează starea live",
+    "dismiss": "Ignoră rezumatul",
     "offline": "Offline · rezumat salvat",
     "cached": "Raport salvat · reîmprospătare indisponibilă",
     "revised": "Revizuit · {{revision}}",

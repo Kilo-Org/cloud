@@ -111,7 +111,9 @@
     "online": "Kan layi",
     "open": "Buɗe {{name}}",
     "openPullRequest": "Buɗe buƙatar haɗa canje-canje",
+    "completed": "An kammala",
     "pending": "Yana jira",
+    "running": "Ana gudanarwa",
     "performance": "Ƙarfin aiki",
     "preferences": "Zaɓuɓɓuka",
     "privacyPolicy": "Manufar sirri",
@@ -1536,8 +1538,6 @@
     "updateFailed": "An kasa sabunta mai bita.",
     "configSaveFailed": "An kasa ajiye saitunan bita.",
     "status": {
-      "running": "Ana gudanarwa",
-      "completed": "An kammala",
       "interrupted": "An katse"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Ajiye canje-canje",
       "unsavedTitle": "Canje-canjen da ba a ajiye ba",
-      "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?"
+      "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?",
+      "unsavedInvalidMessage": "Ba za a iya ajiye waɗannan canje-canje ba tukuna. Gyara su don ajiyewa, ko yi watsi da su don barin."
     },
     "auditReportButton": {
       "viewA11y": "Duba rahoton bincike"
@@ -1938,7 +1939,6 @@
       "installApp": "Shigar da manhajar GitHub",
       "reauthorizeButton": "Sake ba manhajar GitHub izini",
       "reauthorizeDescription": "Wakilin tsaro yana buƙatar izinin vulnerability_alerts don samun faɗakarwar Dependabot. Sake ba manhajar GitHub izini don ba ta wannan damar.",
-      "reauthorizeFailed": "An kasa fara sake ba da izini. Sake gwadawa.",
       "reauthorizeTitle": "Ana buƙatar ƙarin izini",
       "setupFailed": "An kasa fara saitin GitHub. Sake gwadawa."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "layuka {{displayCount}}",
       "matchesBadge_one": "sakamako {{displayCount}}",
       "matchesBadge_other": "sakamako {{displayCount}}",
-      "noOutput": "Babu fitarwa."
+      "noOutput": "Babu fitarwa.",
+      "translationFailed": "Fassarar ta kasa"
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
@@ -3714,6 +3715,7 @@
       "description": "Bayanin umarni",
       "template": "Samfura",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Yi bayani $ARGUMENTS",
       "subtask": "Gudu azaman ƙaramin aiki",
       "edit": "Gyara umarnin slash",
@@ -3864,7 +3866,7 @@
     "view": "Karanta bayani",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Nuna matsayi kai tsaye",
+    "dismiss": "Yi watsi da bayani",
     "offline": "Ba intanet · bayanin da aka adana",
     "cached": "Rahoton da aka adana · ba za a iya sabuntawa ba",
     "revised": "An gyara · {{revision}}",

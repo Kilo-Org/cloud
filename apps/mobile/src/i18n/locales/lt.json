@@ -111,7 +111,9 @@
     "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",
     "openPullRequest": "Atidaryti pakeitimų užklausą",
+    "completed": "Baigta",
     "pending": "Laukiama",
+    "running": "Vykdoma",
     "performance": "Našumas",
     "preferences": "Nuostatos",
     "privacyPolicy": "Privatumo politika",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Nepavyko atnaujinti kodo peržiūros agento.",
     "configSaveFailed": "Nepavyko išsaugoti peržiūros nustatymų.",
     "status": {
-      "running": "Vykdoma",
-      "completed": "Baigta",
       "interrupted": "Nutraukta"
     },
     "reviewStyle": {
@@ -1918,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Išsaugoti pakeitimus",
       "unsavedTitle": "Neišsaugoti pakeitimai",
-      "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?"
+      "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?",
+      "unsavedInvalidMessage": "Šių pakeitimų dar negalima išsaugoti. Ištaisykite juos, kad išsaugotumėte, arba atmeskite juos, kad išeitumėte."
     },
     "auditReportButton": {
       "viewA11y": "Peržiūrėti audito ataskaitą"
@@ -1984,7 +1985,6 @@
       "installApp": "Įdiegti GitHub programėlę",
       "reauthorizeButton": "Iš naujo suteikti teises GitHub programėlei",
       "reauthorizeDescription": "Saugos agentui reikia vulnerability_alerts teisės, kad galėtų pasiekti Dependabot įspėjimus. Iš naujo suteik teises GitHub programėlei, kad pridėtum šią teisę.",
-      "reauthorizeFailed": "Nepavyko pradėti pakartotinio teisių suteikimo. Bandyk dar kartą.",
       "reauthorizeTitle": "Reikia papildomų teisių",
       "setupFailed": "Nepavyko pradėti GitHub sąrankos. Bandyk dar kartą."
     },
@@ -2376,7 +2376,8 @@
       "matchesBadge_other": "atitikčių: {{displayCount}}",
       "matchesBadge_few": "atitiktys: {{displayCount}}",
       "matchesBadge_many": "atitikčių: {{displayCount}}",
-      "noOutput": "Nėra išvesties."
+      "noOutput": "Nėra išvesties.",
+      "translationFailed": "Vertimas nepavyko"
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",
@@ -3796,6 +3797,7 @@
       "description": "Komandos aprašymas",
       "template": "Šablonas",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",
@@ -3954,7 +3956,7 @@
     "view": "Skaityti suvestinę",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Rodyti dabartinę būseną",
+    "dismiss": "Atmesti suvestinę",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota ataskaita · atnaujinti negalima",
     "revised": "Pataisyta · {{revision}}",

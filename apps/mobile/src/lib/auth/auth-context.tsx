@@ -69,6 +69,7 @@ import {
 } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
+import { clearLastRoute } from '@/lib/last-route';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
@@ -94,6 +95,7 @@ import {
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
   PICKER_LAUNCH_CONTEXT_KEY,
+  PICKER_RESTORE_RECORD_KEY,
   REFRESH_TOKEN_KEY,
   SESSION_FILTERS_KEY,
   TOKEN_EXPIRES_AT_KEY,
@@ -577,6 +579,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
             deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
             deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),
+            deleteAccountMetadata(PICKER_RESTORE_RECORD_KEY),
             // Phase 4b read-cache cleanup: capture the authoritative user
             // id from the getMe cache while it is still present (the batch
             // expression runs before queryClient.clear()), then remove that
@@ -638,6 +641,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // throw into sign-out.
           runBestEffortTeardown(clearLauncherSurfaces);
           runBestEffortTeardown(clearLastOpenedSession);
+          runBestEffortTeardown(clearLastRoute);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

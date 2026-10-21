@@ -111,7 +111,9 @@
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori zahtjev za spajanje",
+    "completed": "Dovršeno",
     "pending": "Na čekanju",
+    "running": "U tijeku",
     "performance": "Performanse",
     "preferences": "Postavke",
     "privacyPolicy": "Politika privatnosti",
@@ -1555,8 +1557,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće spremiti postavke pregleda.",
     "status": {
-      "running": "U tijeku",
-      "completed": "Dovršeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {
@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Spremi izmjene",
       "unsavedTitle": "Nespremljene izmjene",
-      "unsavedMessage": "Želiš li spremiti izmjene prije izlaska s ovog zaslona?"
+      "unsavedMessage": "Želiš li spremiti izmjene prije izlaska s ovog zaslona?",
+      "unsavedInvalidMessage": "Ove izmjene još nije moguće spremiti. Ispravi ih da bi ih spremio ili ih odbaci da bi izašao."
     },
     "auditReportButton": {
       "viewA11y": "Pogledaj izvješće o reviziji"
@@ -1961,7 +1962,6 @@
       "installApp": "Instaliraj aplikaciju GitHub",
       "reauthorizeButton": "Ponovno autoriziraj aplikaciju GitHub",
       "reauthorizeDescription": "Sigurnosni agent treba dopuštenje vulnerability_alerts za pristup upozorenjima iz Dependabota. Ponovno autoriziraj aplikaciju GitHub da joj dodijeliš to dopuštenje.",
-      "reauthorizeFailed": "Nije moguće pokrenuti ponovnu autorizaciju. Pokušaj ponovno.",
       "reauthorizeTitle": "Potrebna dodatna dopuštenja",
       "setupFailed": "Nije moguće pokrenuti postavljanje za GitHub. Pokušaj ponovno."
     },
@@ -2344,7 +2344,8 @@
       "matchesBadge_one": "podudaranje: {{displayCount}}",
       "matchesBadge_other": "podudaranja: {{displayCount}}",
       "matchesBadge_few": "podudaranja: {{displayCount}}",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prijevod nije uspio"
     },
     "readToolMarkdown": {
       "linesTruncated": "retci {{start}}–{{end}} (skraćeno)",
@@ -3755,6 +3756,7 @@
       "description": "Opis naredbe",
       "template": "Predložak",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",
@@ -3909,7 +3911,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutačni status",
+    "dismiss": "Odbaci pregled",
     "offline": "Izvan mreže · spremljeni pregled",
     "cached": "Spremljeno izvješće · osvježavanje nije dostupno",
     "revised": "Revidirano · {{revision}}",

@@ -111,7 +111,9 @@
     "online": "Khadka ku jira",
     "open": "Fur {{name}}",
     "openPullRequest": "Codsi isku-darid oo furan",
+    "completed": "La dhammeeyay",
     "pending": "Sugaya",
+    "running": "Socda",
     "performance": "Waxqabadka",
     "preferences": "Dookhyada",
     "privacyPolicy": "Siyaasadda asturnaanta",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Dib-u-eegaha lama cusboonaysiin karin.",
     "configSaveFailed": "Dejinta dib-u-eegista lama kaydin karin.",
     "status": {
-      "running": "Socda",
-      "completed": "La dhammeeyay",
       "interrupted": "Waa la hakiyay"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Kaydi isbeddellada",
       "unsavedTitle": "Isbeddello aan la kaydin",
-      "unsavedMessage": "Ma kaydinaysaa isbeddelladaada ka hor intaadan ka bixin shaashaddan?"
+      "unsavedMessage": "Ma kaydinaysaa isbeddelladaada ka hor intaadan ka bixin shaashaddan?",
+      "unsavedInvalidMessage": "Isbeddelladan weli lama kaydin karo. Saxi si aad u kaydiso, ama tuur si aad uga baxdo."
     },
     "auditReportButton": {
       "viewA11y": "Eeg warbixinta hanti-dhawrka"
@@ -1938,7 +1939,6 @@
       "installApp": "Rakib abka GitHub",
       "reauthorizeButton": "Mar kale oggolaansho sii abka GitHub",
       "reauthorizeDescription": "Wakiilka amnigu wuxuu u baahan yahay oggolaanshaha vulnerability_alerts si uu u helo digniinaha Dependabot. Mar kale oggolaansho sii abka GitHub si aad u siiso oggolaanshahan.",
-      "reauthorizeFailed": "Dib u bixinta oggolaanshaha lama bilaabi karin. Fadlan mar kale isku day.",
       "reauthorizeTitle": "Oggolaansho dheeraad ah ayaa loo baahan yahay",
       "setupFailed": "Lama bilaabi karin dejinta GitHub. Fadlan mar kale isku day."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} sadar",
       "matchesBadge_one": "{{displayCount}} natiijo",
       "matchesBadge_other": "{{displayCount}} natiijo",
-      "noOutput": "Wax soo saar ma jiro."
+      "noOutput": "Wax soo saar ma jiro.",
+      "translationFailed": "Tarjumaadu fashilantay"
     },
     "readToolMarkdown": {
       "linesTruncated": "sadarrada {{start}}–{{end}} (la soo gaabiyay)",
@@ -3714,6 +3715,7 @@
       "description": "Tilmaanta amarka",
       "template": "Tusaale",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Sharax $ARGUMENTS",
       "subtask": "U orda sidii shaqo-hoosaad",
       "edit": "Tafatir amarka slash",
@@ -3864,7 +3866,7 @@
     "view": "Akhri warbixinta",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Muuji xaaladda tooska ah",
+    "dismiss": "Iska dhaaf warbixinta",
     "offline": "Khadka ka maqan · warbixin la kaydiyay",
     "cached": "Warbixin la kaydiyay · cusboonaysiin lama heli karo",
     "revised": "La beddelay · {{revision}}",

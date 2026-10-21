@@ -100,7 +100,10 @@ function outcomeKind(
  *   content the card already shows. A tray row carries no step, plan, diff or
  *   outcome, so a local update must not wipe the ones a push delivered.
  * - A finished row with a failure reads as the `failed` kind, which the layout
- *   draws as a stopped turn.
+ *   draws as a stopped turn. A row that carries `failure: null` reports no
+ *   failure and clears the remembered one; a row with no `failure` key at all
+ *   cannot report it either way, so the remembered failure survives, which is
+ *   what keeps a push-delivered `failed` card through a tray rebuild.
  */
 export function buildSessionLiveActivityContentState(
   row: SessionLiveActivityRow,
@@ -108,7 +111,7 @@ export function buildSessionLiveActivityContentState(
 ): SessionLiveActivityContentState {
   const previous = options.previous;
   const base = glanceableStatusKind(row.status);
-  const failure = row.failure ?? previous?.failure?.kind ?? null;
+  const failure = row.failure === undefined ? (previous?.failure?.kind ?? null) : row.failure;
   const statusKind: SessionCardStatusKind = base === 'idle' && failure !== null ? 'failed' : base;
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
   const changes = row.changes ?? previous?.changes ?? null;

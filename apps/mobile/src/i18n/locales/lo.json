@@ -111,7 +111,9 @@
     "online": "ອອນໄລນ໌",
     "open": "ເປີດ {{name}}",
     "openPullRequest": "ເປີດຄຳຂໍລວມໂຄ້ດ",
+    "completed": "ສຳເລັດແລ້ວ",
     "pending": "ລໍຖ້າ",
+    "running": "ກຳລັງເຮັດວຽກ",
     "performance": "ປະສິດທິພາບ",
     "preferences": "ການຕັ້ງຄ່າສ່ວນຕົວ",
     "privacyPolicy": "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ",
@@ -1536,8 +1538,6 @@
     "updateFailed": "ບໍ່ສາມາດອັບເດດເຄື່ອງມືກວດສອບໂຄ້ດໄດ້.",
     "configSaveFailed": "ບໍ່ສາມາດບັນທຶກການຕັ້ງຄ່າການກວດສອບໄດ້.",
     "status": {
-      "running": "ກຳລັງເຮັດວຽກ",
-      "completed": "ສຳເລັດແລ້ວ",
       "interrupted": "ຢຸດກາງຄັນ"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ບັນທຶກການປ່ຽນແປງ",
       "unsavedTitle": "ການປ່ຽນແປງທີ່ຍັງບໍ່ທັນບັນທຶກ",
-      "unsavedMessage": "ບັນທຶກການປ່ຽນແປງກ່ອນອອກຈາກໜ້າຈໍນີ້ບໍ?"
+      "unsavedMessage": "ບັນທຶກການປ່ຽນແປງກ່ອນອອກຈາກໜ້າຈໍນີ້ບໍ?",
+      "unsavedInvalidMessage": "ການປ່ຽນແປງເຫຼົ່ານີ້ຍັງບໍ່ສາມາດບັນທຶກໄດ້. ແກ້ໄຂພວກມັນເພື່ອບັນທຶກ ຫຼື ຖິ້ມພວກມັນເພື່ອອອກ."
     },
     "auditReportButton": {
       "viewA11y": "ເບິ່ງລາຍງານການກວດສອບ"
@@ -1938,7 +1939,6 @@
       "installApp": "ຕິດຕັ້ງແອັບ GitHub",
       "reauthorizeButton": "ໃຫ້ສິດແອັບ GitHub ອີກຄັ້ງ",
       "reauthorizeDescription": "ຕົວຊ່ວຍດ້ານຄວາມປອດໄພຕ້ອງໃຊ້ສິດ vulnerability_alerts ເພື່ອເຂົ້າເຖິງການແຈ້ງເຕືອນ Dependabot. ໃຫ້ສິດແອັບ GitHub ອີກຄັ້ງເພື່ອເພີ່ມສິດນີ້.",
-      "reauthorizeFailed": "ບໍ່ສາມາດເລີ່ມການໃຫ້ສິດອີກຄັ້ງໄດ້. ກະລຸນາລອງໃໝ່.",
       "reauthorizeTitle": "ຕ້ອງການສິດເພີ່ມເຕີມ",
       "setupFailed": "ບໍ່ສາມາດເລີ່ມການຕັ້ງຄ່າ GitHub. ກະລຸນາລອງໃໝ່."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ບັນທັດ",
       "matchesBadge_one": "ພົບ {{displayCount}} ລາຍການ",
       "matchesBadge_other": "ພົບ {{displayCount}} ລາຍການ",
-      "noOutput": "ບໍ່ມີຜົນອອກ."
+      "noOutput": "ບໍ່ມີຜົນອອກ.",
+      "translationFailed": "ການແປລົ້ມເຫຼວ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ບັນທັດ {{start}}–{{end}} (ຕັດບາງສ່ວນອອກ)",
@@ -3714,6 +3715,7 @@
       "description": "ຄໍາອະທິບາຍຄໍາສັ່ງ",
       "template": "ແມ່ແບບ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "ອະທິບາຍ $ARGUMENTS",
       "subtask": "ດໍາເນີນການເປັນວຽກຍ່ອຍ",
       "edit": "ແກ້ໄຂຄໍາສັ່ງ slash",
@@ -3864,7 +3866,7 @@
     "view": "ອ່ານສະຫຼຸບ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ສະແດງສະຖານະປັດຈຸບັນ",
+    "dismiss": "ລະເວັ້ນສະຫຼຸບ",
     "offline": "ອອບລາຍ · ສະຫຼຸບທີ່ບັນທຶກໄວ້",
     "cached": "ລາຍງານທີ່ບັນທຶກໄວ້ · ບໍ່ສາມາດໂຫຼດຄືນໃໝ່",
     "revised": "ແກ້ໄຂແລ້ວ · {{revision}}",

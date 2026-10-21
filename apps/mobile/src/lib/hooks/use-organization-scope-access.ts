@@ -20,9 +20,13 @@ export function useOrganizationScopeAccess(
   errors: readonly unknown[]
 ): OrganizationScopeAccess {
   // Same cache entry as every other membership reader, so this never adds a
-  // request the app has not already made.
+  // request the app has not already made. A personal scope has no membership to
+  // resolve, so it does not even subscribe.
   const trpc = useTRPC();
-  const { data: organizations } = useQuery(trpc.organizations.list.queryOptions());
+  const { data: organizations } = useQuery({
+    ...trpc.organizations.list.queryOptions(),
+    enabled: organizationId !== undefined,
+  });
   return classifyOrganizationScopeAccess({
     organizationId,
     membershipIds: organizations?.map(organization => organization.organizationId),

@@ -3866,7 +3866,7 @@
     "view": "Vakio ny tatitra",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Asehoy ny sata ankehitriny",
+    "dismiss": "Esory ny tatitra",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
     "revised": "Nohavaozina · {{revision}}",

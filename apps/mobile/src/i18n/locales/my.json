@@ -3866,7 +3866,7 @@
     "view": "အကျဉ်းချုပ် ဖတ်ပါ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "တိုက်ရိုက်အခြေအနေ ပြပါ",
+    "dismiss": "အကျဉ်းချုပ် ပယ်ချပါ",
     "offline": "အော့ဖ်လိုင်း · သိမ်းထားသော အကျဉ်းချုပ်",
     "cached": "သိမ်းထားသော အစီရင်ခံစာ · ပြန်လည်ဆန်းသစ်၍ မရပါ",
     "revised": "ပြင်ဆင်ပြီး · {{revision}}",

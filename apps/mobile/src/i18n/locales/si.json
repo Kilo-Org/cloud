@@ -3866,7 +3866,7 @@
     "view": "සාරාංශය කියවන්න",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "සජීවී තත්ත්වය පෙන්වන්න",
+    "dismiss": "සාරාංශය ඉවතලන්න",
     "offline": "නොබැඳි · සුරැකි සාරාංශය",
     "cached": "සුරැකි වාර්තාව · නැවුම් කළ නොහැක",
     "revised": "සංශෝධිත · {{revision}}",

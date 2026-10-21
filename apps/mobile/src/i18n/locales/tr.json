@@ -3866,7 +3866,7 @@
     "view": "Özeti oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Canlı durumu göster",
+    "dismiss": "Özeti yok say",
     "offline": "Çevrimdışı · kayıtlı özet",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
     "revised": "Revize edildi · {{revision}}",

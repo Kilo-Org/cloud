@@ -3866,7 +3866,7 @@
     "view": "ബ്രീഫിംഗ് വായിക്കുക",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "തത്സമയ നില കാണിക്കുക",
+    "dismiss": "ബ്രീഫിംഗ് ഒഴിവാക്കുക",
     "offline": "ഓഫ്‌ലൈൻ · സംരക്ഷിച്ച ബ്രീഫിംഗ്",
     "cached": "സംരക്ഷിച്ച റിപ്പോർട്ട് · പുതുക്കാനാവില്ല",
     "revised": "പുതുക്കിയത് · {{revision}}",

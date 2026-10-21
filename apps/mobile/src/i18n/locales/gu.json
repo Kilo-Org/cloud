@@ -3866,7 +3866,7 @@
     "view": "સારાંશ વાંચો",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "લાઇવ સ્થિતિ બતાવો",
+    "dismiss": "સારાંશ ખારિજ કરો",
     "offline": "ઑફલાઇન · સાચવેલ સારાંશ",
     "cached": "સાચવેલ રિપોર્ટ · રિફ્રેશ ઉપલબ્ધ નથી",
     "revised": "સુધારેલ · {{revision}}",

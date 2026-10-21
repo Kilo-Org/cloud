@@ -3866,7 +3866,7 @@
     "view": "بریفنگ پڑھیں",
     "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "لائیو اسٹیٹس دکھائیں",
+    "dismiss": "بریفنگ نظر انداز کریں",
     "offline": "آف لائن · محفوظ شدہ بریفنگ",
     "cached": "محفوظ شدہ رپورٹ · ریفریش دستیاب نہیں",
     "revised": "نظرثانی شدہ · {{revision}}",

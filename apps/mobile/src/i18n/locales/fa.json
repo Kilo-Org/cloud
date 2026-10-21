@@ -3866,7 +3866,7 @@
     "view": "خواندن گزارش",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "نمایش وضعیت زنده",
+    "dismiss": "نادیده گرفتن گزارش",
     "offline": "آفلاین · گزارش ذخیره‌شده",
     "cached": "گزارش ذخیره‌شده · به‌روزرسانی در دسترس نیست",
     "revised": "بازبینی‌شده · {{revision}}",

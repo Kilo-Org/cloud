@@ -3956,7 +3956,7 @@
     "view": "Skaityti suvestinę",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Rodyti dabartinę būseną",
+    "dismiss": "Atmesti suvestinę",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota ataskaita · atnaujinti negalima",
     "revised": "Pataisyta · {{revision}}",

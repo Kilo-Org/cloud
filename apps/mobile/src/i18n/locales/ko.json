@@ -3866,7 +3866,7 @@
     "view": "브리핑 읽기",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "실시간 상태 보기",
+    "dismiss": "브리핑 무시",
     "offline": "오프라인 · 저장된 브리핑",
     "cached": "저장된 보고서 · 새로고침 불가",
     "revised": "수정됨 · {{revision}}",

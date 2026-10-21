@@ -3956,7 +3956,7 @@
     "view": "Читать сводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Показать текущий статус",
+    "dismiss": "Отклонить сводку",
     "offline": "Офлайн · сохранённая сводка",
     "cached": "Сохранённый отчёт · обновление недоступно",
     "revised": "Изменено · {{revision}}",

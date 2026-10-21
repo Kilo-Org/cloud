@@ -3911,7 +3911,7 @@
     "view": "Llegeix el resum",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra l'estat en directe",
+    "dismiss": "Descarta el resum",
     "offline": "Sense connexió · resum desat",
     "cached": "Informe desat · no es pot actualitzar",
     "revised": "Revisat · {{revision}}",

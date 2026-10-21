@@ -3866,7 +3866,7 @@
     "view": "Шолуды оқу",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ағымдағы күйді көрсету",
+    "dismiss": "Шолуды елемеу",
     "offline": "Желіден тыс · сақталған шолу",
     "cached": "Сақталған есеп · жаңарту қолжетімсіз",
     "revised": "Өзгертілген · {{revision}}",

@@ -3866,7 +3866,7 @@
     "view": "Akhri warbixinta",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Muuji xaaladda tooska ah",
+    "dismiss": "Iska dhaaf warbixinta",
     "offline": "Khadka ka maqan · warbixin la kaydiyay",
     "cached": "Warbixin la kaydiyay · cusboonaysiin lama heli karo",
     "revised": "La beddelay · {{revision}}",

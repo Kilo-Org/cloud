@@ -3872,7 +3872,7 @@
     "view": "Läs sammanfattning",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Visa livestatus",
+    "dismiss": "Avskriv sammanfattning",
     "offline": "Offline · sparad sammanfattning",
     "cached": "Sparad rapport · kan inte uppdateras",
     "revised": "Reviderad · {{revision}}",

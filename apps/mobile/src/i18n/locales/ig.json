@@ -3866,7 +3866,7 @@
     "view": "Gụọ nkọwa",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Gosi ọnọdụ ugbu a",
+    "dismiss": "Leghara nkọwa anya",
     "offline": "Enweghị ịntanetị · nkọwa echekwara",
     "cached": "Akụkọ echekwara · enweghị ike imeghari",
     "revised": "Edoziri · {{revision}}",

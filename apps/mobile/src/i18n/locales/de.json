@@ -3866,7 +3866,7 @@
     "view": "Briefing lesen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Live-Status anzeigen",
+    "dismiss": "Briefing verwerfen",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeicherter Bericht · Aktualisierung nicht verfügbar",
     "revised": "Überarbeitet · {{revision}}",

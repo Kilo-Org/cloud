@@ -3956,7 +3956,7 @@
     "view": "Čítať prehľad",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Zobraziť živý stav",
+    "dismiss": "Ignorovať prehľad",
     "offline": "Offline · uložený prehľad",
     "cached": "Uložená správa · obnovenie nedostupné",
     "revised": "Upravené · {{revision}}",

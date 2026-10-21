@@ -3866,7 +3866,7 @@
     "view": "Læs briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Vis live-status",
+    "dismiss": "Afvis briefing",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt rapport · kan ikke opdateres",
     "revised": "Revideret · {{revision}}",

@@ -3956,7 +3956,7 @@
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Zobrazit živý stav",
+    "dismiss": "Zamítnout přehled",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený report · obnovení nedostupné",
     "revised": "Upraveno · {{revision}}",

@@ -3866,7 +3866,7 @@
     "view": "ব্রিফিং পড়ুন",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "লাইভ স্ট্যাটাস দেখান",
+    "dismiss": "ব্রিফিং খারিজ করুন",
     "offline": "অফলাইন · সংরক্ষিত ব্রিফিং",
     "cached": "সংরক্ষিত রিপোর্ট · রিফ্রেশ করা যাচ্ছে না",
     "revised": "সংশোধিত · {{revision}}",

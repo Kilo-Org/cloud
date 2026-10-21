@@ -3866,7 +3866,7 @@
     "view": "Basahin ang briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ipakita ang live na status",
+    "dismiss": "Balewalain ang briefing",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na ulat · hindi ma-refresh",
     "revised": "Binago · {{revision}}",

@@ -3866,7 +3866,7 @@
     "view": "Lees verslag",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Wys regstreekse status",
+    "dismiss": "Verwerp verslag",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfris nie beskikbaar nie",
     "revised": "Hersien · {{revision}}",

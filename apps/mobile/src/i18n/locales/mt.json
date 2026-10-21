@@ -4001,7 +4001,7 @@
     "view": "Aqra l-briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Uri l-istatus live",
+    "dismiss": "Warrab il-briefing",
     "offline": "Offline · briefing issejvjat",
     "cached": "Rapport issejvjat · aġġornament mhux disponibbli",
     "revised": "Rivedut · {{revision}}",

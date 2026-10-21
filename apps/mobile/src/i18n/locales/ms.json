@@ -3866,7 +3866,7 @@
     "view": "Baca taklimat",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Tunjukkan status langsung",
+    "dismiss": "Ketepikan taklimat",
     "offline": "Luar talian · taklimat disimpan",
     "cached": "Laporan disimpan · muat semula tidak tersedia",
     "revised": "Disemak · {{revision}}",

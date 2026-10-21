@@ -17,7 +17,7 @@
     "view": "Read briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Show live status",
+    "dismiss": "Dismiss briefing",
     "offline": "Offline · saved briefing",
     "cached": "Saved report · refresh unavailable",
     "revised": "Revised · {{revision}}",

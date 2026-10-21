@@ -3866,7 +3866,7 @@
     "view": "Li rezime a",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Montre estati an dirèk",
+    "dismiss": "Rejte rezime a",
     "offline": "Hò liy · rezime anrejistre",
     "cached": "Rapò anrejistre · pa ka rafrechi",
     "revised": "Revize · {{revision}}",

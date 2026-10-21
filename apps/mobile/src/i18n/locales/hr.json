@@ -3911,7 +3911,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutačni status",
+    "dismiss": "Odbaci pregled",
     "offline": "Izvan mreže · spremljeni pregled",
     "cached": "Spremljeno izvješće · osvježavanje nije dostupno",
     "revised": "Revidirano · {{revision}}",

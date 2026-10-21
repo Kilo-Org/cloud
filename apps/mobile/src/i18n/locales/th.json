@@ -3866,7 +3866,7 @@
     "view": "อ่านสรุป",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "แสดงสถานะสด",
+    "dismiss": "ละเว้นสรุป",
     "offline": "ออฟไลน์ · สรุปที่บันทึกไว้",
     "cached": "รายงานที่บันทึกไว้ · รีเฟรชไม่ได้",
     "revised": "แก้ไขแล้ว · {{revision}}",

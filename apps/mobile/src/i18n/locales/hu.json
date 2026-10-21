@@ -3866,7 +3866,7 @@
     "view": "Összefoglaló megnyitása",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Élő állapot megjelenítése",
+    "dismiss": "Összefoglaló elvetése",
     "offline": "Offline · mentett összefoglaló",
     "cached": "Mentett jelentés · frissítés nem érhető el",
     "revised": "Módosítva · {{revision}}",

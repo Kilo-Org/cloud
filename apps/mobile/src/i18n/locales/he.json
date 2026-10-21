@@ -3911,7 +3911,7 @@
     "view": "קריאת התדריך",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "הצגת סטטוס חי",
+    "dismiss": "התעלמות מהתדריך",
     "offline": "לא מקוון · תדריך שמור",
     "cached": "דוח שמור · רענון לא זמין",
     "revised": "עודכן · {{revision}}",

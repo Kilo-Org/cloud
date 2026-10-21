@@ -3866,7 +3866,7 @@
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Sýna rauntímastöðu",
+    "dismiss": "Vísa yfirliti frá",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistuð skýrsla · ekki hægt að uppfæra",
     "revised": "Endurskoðað · {{revision}}",

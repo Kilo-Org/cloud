@@ -3866,7 +3866,7 @@
     "view": "आढावा वाचा",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "थेट स्थिती दाखवा",
+    "dismiss": "आढावाकडे दुर्लक्ष करा",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला अहवाल · रिफ्रेश उपलब्ध नाही",
     "revised": "सुधारित · {{revision}}",

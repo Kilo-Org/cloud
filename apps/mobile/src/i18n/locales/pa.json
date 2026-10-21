@@ -3866,7 +3866,7 @@
     "view": "ਬ੍ਰੀਫਿੰਗ ਪੜ੍ਹੋ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ਲਾਈਵ ਸਥਿਤੀ ਦਿਖਾਓ",
+    "dismiss": "ਬ੍ਰੀਫਿੰਗ ਖਾਰਜ ਕਰੋ",
     "offline": "ਆਫਲਾਈਨ · ਸੰਭਾਲੀ ਬ੍ਰੀਫਿੰਗ",
     "cached": "ਸੰਭਾਲੀ ਰਿਪੋਰਟ · ਤਾਜ਼ਾ ਕਰਨਾ ਉਪਲਬਧ ਨਹੀਂ",
     "revised": "ਸੋਧੀ ਗਈ · {{revision}}",

@@ -3866,7 +3866,7 @@
     "view": "Baca ringkasan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Tampilkan status langsung",
+    "dismiss": "Abaikan ringkasan",
     "offline": "Offline · ringkasan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
     "revised": "Direvisi · {{revision}}",

@@ -3866,7 +3866,7 @@
     "view": "Karanta bayani",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Nuna matsayi kai tsaye",
+    "dismiss": "Yi watsi da bayani",
     "offline": "Ba intanet · bayanin da aka adana",
     "cached": "Rahoton da aka adana · ba za a iya sabuntawa ba",
     "revised": "An gyara · {{revision}}",

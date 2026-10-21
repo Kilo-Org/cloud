@@ -3866,7 +3866,7 @@
     "view": "ອ່ານສະຫຼຸບ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ສະແດງສະຖານະປັດຈຸບັນ",
+    "dismiss": "ລະເວັ້ນສະຫຼຸບ",
     "offline": "ອອບລາຍ · ສະຫຼຸບທີ່ບັນທຶກໄວ້",
     "cached": "ລາຍງານທີ່ບັນທຶກໄວ້ · ບໍ່ສາມາດໂຫຼດຄືນໃໝ່",
     "revised": "ແກ້ໄຂແລ້ວ · {{revision}}",

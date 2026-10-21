@@ -3866,7 +3866,7 @@
     "view": "Irakurri laburpena",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Erakutsi zuzeneko egoera",
+    "dismiss": "Baztertu laburpena",
     "offline": "Lineaz kanpo · gordetako laburpena",
     "cached": "Gordetako txostena · ezin da freskatu",
     "revised": "Berrikusia · {{revision}}",

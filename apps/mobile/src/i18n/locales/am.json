@@ -3866,7 +3866,7 @@
     "view": "ማጠቃለያውን አንብብ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "የቀጥታ ሁኔታን አሳይ",
+    "dismiss": "ማጠቃለያውን አስወግድ",
     "offline": "ከመስመር ውጭ · የተቀመጠ ማጠቃለያ",
     "cached": "የተቀመጠ ሪፖርት · ማደስ አይቻልም",
     "revised": "የተሻሻለ · {{revision}}",

@@ -3866,7 +3866,7 @@
     "view": "阅读简报",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
-    "dismiss": "显示实时状态",
+    "dismiss": "忽略简报",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的报告 · 无法刷新",
     "revised": "已修订 · {{revision}}",

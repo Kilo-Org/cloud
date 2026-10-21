@@ -3866,7 +3866,7 @@
     "view": "Lue katsaus",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Näytä reaaliaikainen tila",
+    "dismiss": "Sivuuta katsaus",
     "offline": "Offline · tallennettu katsaus",
     "cached": "Tallennettu raportti · päivitys ei käytettävissä",
     "revised": "Päivitetty · {{revision}}",

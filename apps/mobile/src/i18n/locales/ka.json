@@ -3866,7 +3866,7 @@
     "view": "მიმოხილვის წაკითხვა",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "მიმდინარე სტატუსის ჩვენება",
+    "dismiss": "მიმოხილვის უგულებელყოფა",
     "offline": "ოფლაინ · შენახული მიმოხილვა",
     "cached": "შენახული ანგარიში · განახლება მიუწვდომელია",
     "revised": "შესწორებული · {{revision}}",

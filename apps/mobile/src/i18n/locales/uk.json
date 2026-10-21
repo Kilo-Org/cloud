@@ -3956,7 +3956,7 @@
     "view": "Читати брифінг",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Показати поточний стан",
+    "dismiss": "Відхилити брифінг",
     "offline": "Офлайн · збережений брифінг",
     "cached": "Збережений звіт · оновлення недоступне",
     "revised": "Оновлено · {{revision}}",

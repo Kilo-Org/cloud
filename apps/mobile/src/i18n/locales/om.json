@@ -3866,7 +3866,7 @@
     "view": "Gabaasa dubbisi",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Haala yeroo ammaa agarsiisi",
+    "dismiss": "Gabaasa dhiisi",
     "offline": "Toora ala · gabaasa kuufame",
     "cached": "Gabaasa kuufame · haaromsuun hin danda'amu",
     "revised": "Fooyya'e · {{revision}}",

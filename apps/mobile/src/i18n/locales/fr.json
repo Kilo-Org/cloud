@@ -3911,7 +3911,7 @@
     "view": "Lire le briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Afficher le statut en direct",
+    "dismiss": "Ignorer le briefing",
     "offline": "Hors ligne · briefing enregistré",
     "cached": "Rapport enregistré · actualisation indisponible",
     "revised": "Révisé · {{revision}}",

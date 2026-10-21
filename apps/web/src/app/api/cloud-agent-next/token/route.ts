@@ -39,8 +39,10 @@ async function isLegacySource(request: Request): Promise<boolean> {
  *
  * 200 { token, expiresAt }; errors are { success: false, error }:
  * - 400 invalid JSON, unknown fields, or body/header organization mismatch
- * - 401 missing, invalid, expired, revoked, or exchanged bearer; body organization non-member
- * - 403 delegated, org-bound, or restricted legacy credential; header organization non-member
+ * - 401 missing, invalid, expired, revoked, exchanged, or modern org-bound bearer; body
+ *   organization non-member
+ * - 403 delegated or restricted legacy (including org-bound) credential; header organization
+ *   non-member
  * - 503 issuance disabled for this credential (rollout gate off)
  */
 async function postTokenHandler(request: Request) {

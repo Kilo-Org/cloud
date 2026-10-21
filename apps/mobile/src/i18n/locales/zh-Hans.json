@@ -1381,7 +1381,6 @@
       "installApp": "安装 GitHub 应用",
       "reauthorizeButton": "重新授权 GitHub 应用",
       "reauthorizeDescription": "安全智能体需要 vulnerability_alerts 权限才能访问 Dependabot 警报。请重新授权 GitHub 应用以授予此权限。",
-      "reauthorizeFailed": "无法开始重新授权。请重试。",
       "reauthorizeTitle": "需要额外权限",
       "setupFailed": "无法启动 GitHub 配置流程。请重试。"
     },
@@ -1797,7 +1796,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 项匹配",
       "matchesBadge_other": "{{displayCount}} 项匹配",
-      "noOutput": "没有输出。"
+      "noOutput": "没有输出。",
+      "translationFailed": "翻译失败"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",

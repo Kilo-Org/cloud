@@ -1381,7 +1381,6 @@
       "installApp": "GitHub-app installeren",
       "reauthorizeButton": "GitHub-app opnieuw toegang geven",
       "reauthorizeDescription": "Security Agent heeft het recht vulnerability_alerts nodig om Dependabot-waarschuwingen te bekijken. Geef de GitHub-app opnieuw toegang om dit recht te verlenen.",
-      "reauthorizeFailed": "Het opnieuw verlenen van toegang kon niet worden gestart. Probeer het opnieuw.",
       "reauthorizeTitle": "Extra rechten vereist",
       "setupFailed": "Het instellen van GitHub kon niet worden gestart. Probeer het opnieuw."
     },
@@ -1797,7 +1796,8 @@
       "linesBadge_other": "{{displayCount}} regels",
       "matchesBadge_one": "{{displayCount}} treffer",
       "matchesBadge_other": "{{displayCount}} treffers",
-      "noOutput": "Geen uitvoer."
+      "noOutput": "Geen uitvoer.",
+      "translationFailed": "Vertaling mislukt"
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",

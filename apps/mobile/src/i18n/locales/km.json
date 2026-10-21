@@ -1938,7 +1938,6 @@
       "installApp": "ដំឡើងកម្មវិធី GitHub",
       "reauthorizeButton": "ផ្តល់សិទ្ធិឱ្យកម្មវិធី GitHub ឡើងវិញ",
       "reauthorizeDescription": "ភ្នាក់ងារសុវត្ថិភាពត្រូវការសិទ្ធិ vulnerability_alerts ដើម្បីចូលមើលការជូនដំណឹងពី Dependabot។ ផ្តល់សិទ្ធិឱ្យកម្មវិធី GitHub ឡើងវិញ ដើម្បីបន្ថែមសិទ្ធិនេះ។",
-      "reauthorizeFailed": "មិនអាចចាប់ផ្តើមការផ្តល់សិទ្ធិឡើងវិញបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "reauthorizeTitle": "ត្រូវការសិទ្ធិបន្ថែម",
       "setupFailed": "មិនអាចចាប់ផ្តើមការរៀបចំ GitHub បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
@@ -2312,7 +2311,8 @@
       "linesBadge_other": "{{displayCount}} បន្ទាត់",
       "matchesBadge_one": "ត្រូវគ្នា {{displayCount}}",
       "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}",
-      "noOutput": "គ្មានលទ្ធផលទេ។"
+      "noOutput": "គ្មានលទ្ធផលទេ។",
+      "translationFailed": "ការបកប្រែបរាជ័យ"
     },
     "readToolMarkdown": {
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",

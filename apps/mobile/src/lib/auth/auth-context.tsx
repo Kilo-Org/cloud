@@ -69,6 +69,7 @@ import {
 } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
+import { clearLastRoute } from '@/lib/last-route';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
@@ -638,6 +639,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // throw into sign-out.
           runBestEffortTeardown(clearLauncherSurfaces);
           runBestEffortTeardown(clearLastOpenedSession);
+          runBestEffortTeardown(clearLastRoute);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

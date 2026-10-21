@@ -1938,7 +1938,6 @@
       "installApp": "Installér GitHub-appen",
       "reauthorizeButton": "Godkend GitHub-appen igen",
       "reauthorizeDescription": "Security Agent kræver tilladelsen vulnerability_alerts for at få adgang til Dependabot-advarsler. Godkend GitHub-appen igen for at give denne tilladelse.",
-      "reauthorizeFailed": "En ny godkendelse kunne ikke startes. Prøv igen.",
       "reauthorizeTitle": "Yderligere tilladelser påkrævet",
       "setupFailed": "Opsætningen af GitHub kunne ikke startes. Prøv igen."
     },
@@ -2312,7 +2311,8 @@
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} resultat",
       "matchesBadge_other": "{{displayCount}} resultater",
-      "noOutput": "Ingen output."
+      "noOutput": "Ingen output.",
+      "translationFailed": "Oversættelse mislykkedes"
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",

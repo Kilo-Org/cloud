@@ -984,16 +984,16 @@
       "title": "Letzte Reviews"
     },
     "reviewMemory": {
-      "couldNotLoad": "Der Review-Speicher konnte nicht geladen werden.",
+      "couldNotLoad": "Die gespeicherten Prüfhinweise konnten nicht geladen werden.",
       "couldNotLoadProposals": "Die Vorschläge konnten nicht geladen werden.",
-      "enable": "Review-Speicher aktivieren",
-      "loading": "Review-Speicher wird geladen",
+      "enable": "Gespeicherte Prüfhinweise aktivieren",
+      "loading": "Gespeicherte Prüfhinweise werden geladen",
       "loadingProposals": "Vorschläge werden geladen",
       "noProposals": "Keine Vorschläge",
-      "noProposalsDescription": "Hier erscheinen Vorschläge aus dem Review-Speicher, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
-      "off": "Der Review-Speicher ist deaktiviert.",
-      "offDescription": "Aktiviere ihn, damit Kilo aus Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
-      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können den Review-Speicher aktivieren.",
+      "noProposalsDescription": "Hier erscheinen Vorschläge zu den gespeicherten Prüfhinweisen, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
+      "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
+      "offDescription": "Aktiviere sie, damit Kilo aus den Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
+      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können gespeicherte Prüfhinweise aktivieren.",
       "title": "Gespeicherte Prüfhinweise"
     },
     "scopeList": {
@@ -1381,7 +1381,6 @@
       "installApp": "GitHub-App installieren",
       "reauthorizeButton": "GitHub-App erneut autorisieren",
       "reauthorizeDescription": "Security Agent benötigt die Berechtigung vulnerability_alerts, um auf Dependabot-Warnungen zuzugreifen. Autorisiere die GitHub-App erneut, um diese Berechtigung zu gewähren.",
-      "reauthorizeFailed": "Die erneute Autorisierung konnte nicht gestartet werden. Bitte versuche es erneut.",
       "reauthorizeTitle": "Zusätzliche Berechtigungen erforderlich",
       "setupFailed": "Die GitHub-Einrichtung konnte nicht gestartet werden. Bitte versuche es erneut."
     },
@@ -1797,7 +1796,8 @@
       "linesBadge_other": "{{displayCount}} Zeilen",
       "matchesBadge_one": "{{displayCount}} Treffer",
       "matchesBadge_other": "{{displayCount}} Treffer",
-      "noOutput": "Keine Ausgabe."
+      "noOutput": "Keine Ausgabe.",
+      "translationFailed": "Übersetzung fehlgeschlagen"
     },
     "readToolMarkdown": {
       "linesTruncated": "zeilen {{start}}–{{end}} (gekürzt)",
@@ -2211,7 +2211,7 @@
       "invalidLink": "Dieser Link kann nicht geöffnet werden.",
       "hostConfirmTitle": "Externen Link öffnen?",
       "hostConfirmMessage": "Dieser Link öffnet {{host}} in deinem Browser.",
-      "open": "Offen",
+      "open": "Öffnen",
       "trustThisHost": "Diesem Host vertrauen"
     },
     "folderPicker": {
@@ -2654,7 +2654,7 @@
       "openAccessibility": "Pull-Request oder Merge-Request öffnen",
       "clearLink": "Link löschen",
       "pasteLink": "Füge einen Pull-Request- oder Merge-Request-Link ein",
-      "open": "Offen"
+      "open": "Öffnen"
     },
     "eventChips": {
       "comment": "Kommentieren",
@@ -3682,7 +3682,7 @@
       "add": "Agent hinzufügen",
       "empty": "Noch keine Agenten",
       "name": "Name des Agenten",
-      "slug": "Agent-Schnecke",
+      "slug": "Slug des Agenten",
       "description": "Beschreibung des Agenten",
       "model": "Modellüberschreibung",
       "modelPlaceholder": "Sitzungsstandard verwenden",

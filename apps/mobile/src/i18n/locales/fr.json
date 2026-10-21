@@ -1356,7 +1356,6 @@
       "installApp": "Installer l'application GitHub",
       "reauthorizeButton": "Réautoriser l'application GitHub",
       "reauthorizeDescription": "L'agent de sécurité a besoin de l'autorisation vulnerability_alerts pour accéder aux alertes Dependabot. Réautorisez l'application GitHub pour lui accorder cette autorisation.",
-      "reauthorizeFailed": "Impossible de lancer la réautorisation. Réessayez.",
       "reauthorizeTitle": "Autorisations supplémentaires requises",
       "setupFailed": "Impossible de lancer la configuration de GitHub. Réessayez."
     },
@@ -1714,7 +1713,8 @@
       "matchesBadge_one": "{{displayCount}} résultat",
       "matchesBadge_other": "{{displayCount}} résultats",
       "matchesBadge_many": "{{displayCount}} résultats",
-      "noOutput": "Aucune sortie."
+      "noOutput": "Aucune sortie.",
+      "translationFailed": "Échec de la traduction"
     },
     "readToolMarkdown": {
       "linesTruncated": "lignes {{start}}–{{end}} (tronquées)",
@@ -2134,7 +2134,7 @@
       "invalidLink": "Ce lien ne peut pas être ouvert.",
       "hostConfirmTitle": "Ouvrir le lien externe ?",
       "hostConfirmMessage": "Ce lien ouvre {{host}} dans votre navigateur.",
-      "open": "Ouverture",
+      "open": "Ouvrir",
       "trustThisHost": "Faire confiance à ce site"
     },
     "folderPicker": {
@@ -2682,7 +2682,7 @@
       "openAccessibility": "Ouvrir une PR ou un merge request",
       "clearLink": "Effacer le lien",
       "pasteLink": "Coller le lien de PR ou de merge request",
-      "open": "Ouverture"
+      "open": "Ouvrir"
     },
     "eventChips": {
       "comment": "Commenter",

@@ -1961,7 +1961,6 @@
       "installApp": "Instalar aplicação do GitHub",
       "reauthorizeButton": "Renovar autorização da aplicação do GitHub",
       "reauthorizeDescription": "O agente de segurança precisa da permissão vulnerability_alerts para aceder aos alertas do Dependabot. Volta a autorizar a aplicação do GitHub para conceder esta permissão.",
-      "reauthorizeFailed": "Não foi possível iniciar a renovação da autorização. Tenta novamente.",
       "reauthorizeTitle": "Permissões adicionais necessárias",
       "setupFailed": "Não foi possível iniciar a configuração do GitHub. Tenta novamente."
     },
@@ -2344,7 +2343,8 @@
       "matchesBadge_one": "{{displayCount}} correspondência",
       "matchesBadge_other": "{{displayCount}} correspondências",
       "matchesBadge_many": "{{displayCount}} correspondências",
-      "noOutput": "Sem saída."
+      "noOutput": "Sem saída.",
+      "translationFailed": "Falha na tradução"
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",

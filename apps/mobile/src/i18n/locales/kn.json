@@ -1938,7 +1938,6 @@
       "installApp": "GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
       "reauthorizeButton": "GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಮತ್ತೆ ಅನುಮತಿ ನೀಡಿ",
       "reauthorizeDescription": "Dependabot ಎಚ್ಚರಿಕೆಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಭದ್ರತಾ ಏಜೆಂಟ್‌ಗೆ vulnerability_alerts ಅನುಮತಿ ಬೇಕು. ಈ ಅನುಮತಿಯನ್ನು ನೀಡಲು GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಮತ್ತೆ ಅಧಿಕಾರ ನೀಡಿ.",
-      "reauthorizeFailed": "ಮತ್ತೆ ಅನುಮತಿ ನೀಡುವ ಪ್ರಕ್ರಿಯೆಯನ್ನು ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "reauthorizeTitle": "ಹೆಚ್ಚುವರಿ ಅನುಮತಿಗಳು ಅಗತ್ಯ",
       "setupFailed": "GitHub ಸೆಟಪ್ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
@@ -2312,7 +2311,8 @@
       "linesBadge_other": "{{displayCount}} ಸಾಲುಗಳು",
       "matchesBadge_one": "{{displayCount}} ಹೊಂದಾಣಿಕೆ",
       "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
-      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ."
+      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ.",
+      "translationFailed": "ಅನುವಾದ ವಿಫಲವಾಗಿದೆ"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} ಸಾಲುಗಳು (ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ)",

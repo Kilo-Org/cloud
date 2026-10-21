@@ -1938,7 +1938,6 @@
       "installApp": "ئەپی GitHub دابمەزرێنە",
       "reauthorizeButton": "دووبارە مۆڵەت بدە بە ئەپی GitHub",
       "reauthorizeDescription": "ئەجێنتی ئاسایش بۆ دەستگەیشتن بە ئاگادارکردنەوەکانی Dependabot پێویستی بە مۆڵەتی vulnerability_alerts هەیە. بۆ پێدانی ئەم مۆڵەتە، دووبارە مۆڵەت بدە بە ئەپی GitHub.",
-      "reauthorizeFailed": "نەتوانرا پرۆسەی دووبارە مۆڵەتدان دەست پێ بکرێت. تکایە دووبارە هەوڵ بدە.",
       "reauthorizeTitle": "مۆڵەتی زیاتر پێویستە",
       "setupFailed": "نەتوانرا ڕێکخستنی GitHub دەست پێ بکرێت. تکایە دووبارە هەوڵ بدە."
     },
@@ -2312,7 +2311,8 @@
       "linesBadge_other": "{{displayCount}} دێڕ",
       "matchesBadge_one": "{{displayCount}} ئەنجام",
       "matchesBadge_other": "{{displayCount}} ئەنجام",
-      "noOutput": "هیچ دەرچووێک نییە."
+      "noOutput": "هیچ دەرچووێک نییە.",
+      "translationFailed": "وەرگێڕان سەرکەوتوو نەبوو"
     },
     "readToolMarkdown": {
       "linesTruncated": "دێڕەکانی {{start}}–{{end}} (کورتکراوە)",

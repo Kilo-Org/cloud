@@ -2030,7 +2030,6 @@
       "installApp": "Gosod ap GitHub",
       "reauthorizeButton": "Ailawdurdodi ap GitHub",
       "reauthorizeDescription": "Mae angen y caniatâd vulnerability_alerts ar yr Asiant diogelwch i gael mynediad at rybuddion Dependabot. Ailawdurdodwch ap GitHub i roi'r caniatâd hwn.",
-      "reauthorizeFailed": "Ni ellid dechrau ailawdurdodi. Ceisiwch eto.",
       "reauthorizeTitle": "Angen caniatadau ychwanegol",
       "setupFailed": "Ni ellid dechrau sefydlu GitHub. Ceisiwch eto."
     },
@@ -2440,7 +2439,8 @@
       "matchesBadge_two": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_few": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_many": "{{displayCount}} cyfatebiaeth",
-      "noOutput": "Dim allbwn."
+      "noOutput": "Dim allbwn.",
+      "translationFailed": "Methodd y cyfieithiad"
     },
     "readToolMarkdown": {
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",

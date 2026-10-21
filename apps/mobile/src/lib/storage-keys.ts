@@ -160,6 +160,13 @@ export const USER_SESSION_TITLES_KEY = 'user-session-titles';
 export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
 
 /**
+ * Durable "last focused in-app route" record behind the relaunch restore.
+ * Holds `{ href, userId, storedAt }`; the account id scopes the record so one
+ * account never restores another account's route (see `lib/last-route.ts`).
+ */
+export const LAST_ROUTE_KEY = 'last-route';
+
+/**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,
  * no collisions. Shared by the analytics, voice-network consent, and
  * tour-completion records.

@@ -1381,7 +1381,6 @@
       "installApp": "GitHub ऐप इंस्टॉल करें",
       "reauthorizeButton": "GitHub ऐप को फिर से अधिकृत करें",
       "reauthorizeDescription": "Dependabot अलर्ट तक पहुँचने के लिए सुरक्षा एजेंट को vulnerability_alerts अनुमति चाहिए। यह अनुमति देने के लिए GitHub ऐप को फिर से अधिकृत करें।",
-      "reauthorizeFailed": "फिर से अधिकृत करने की प्रक्रिया शुरू नहीं हो सकी। कृपया फिर से कोशिश करें।",
       "reauthorizeTitle": "अतिरिक्त अनुमतियाँ आवश्यक",
       "setupFailed": "GitHub सेटअप शुरू नहीं हो सका। कृपया फिर से कोशिश करें।"
     },

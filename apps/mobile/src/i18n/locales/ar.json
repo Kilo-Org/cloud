@@ -1405,7 +1405,6 @@
       "installApp": "تثبيت تطبيق GitHub",
       "reauthorizeButton": "إعادة تفويض تطبيق GitHub",
       "reauthorizeDescription": "يتطلب وكيل الأمان صلاحية vulnerability_alerts للوصول إلى تنبيهات Dependabot. أعد تفويض تطبيق GitHub لمنح هذه الصلاحية.",
-      "reauthorizeFailed": "تعذّر بدء إعادة التفويض. حاول مرة أخرى.",
       "reauthorizeTitle": "يلزم الحصول على صلاحيات إضافية",
       "setupFailed": "تعذّر بدء إعداد GitHub. حاول مرة أخرى."
     },

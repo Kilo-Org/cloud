@@ -1938,7 +1938,6 @@
       "installApp": "Rakib abka GitHub",
       "reauthorizeButton": "Mar kale oggolaansho sii abka GitHub",
       "reauthorizeDescription": "Wakiilka amnigu wuxuu u baahan yahay oggolaanshaha vulnerability_alerts si uu u helo digniinaha Dependabot. Mar kale oggolaansho sii abka GitHub si aad u siiso oggolaanshahan.",
-      "reauthorizeFailed": "Dib u bixinta oggolaanshaha lama bilaabi karin. Fadlan mar kale isku day.",
       "reauthorizeTitle": "Oggolaansho dheeraad ah ayaa loo baahan yahay",
       "setupFailed": "Lama bilaabi karin dejinta GitHub. Fadlan mar kale isku day."
     },

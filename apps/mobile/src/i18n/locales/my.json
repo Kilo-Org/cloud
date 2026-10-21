@@ -1938,7 +1938,6 @@
       "installApp": "GitHub အက်ပ် ထည့်သွင်းရန်",
       "reauthorizeButton": "GitHub အက်ပ်ကို ပြန်လည်ခွင့်ပြုရန်",
       "reauthorizeDescription": "Dependabot သတိပေးချက်များကို ရယူရန် လုံခြုံရေးအေးဂျင့်သည် vulnerability_alerts ခွင့်ပြုချက် လိုအပ်သည်။ ဤခွင့်ပြုချက်ကို ပေးရန် GitHub အက်ပ်ကို ပြန်လည်ခွင့်ပြုပါ။",
-      "reauthorizeFailed": "ပြန်လည်ခွင့်ပြုခြင်းကို စတင်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
       "reauthorizeTitle": "ထပ်ဆောင်း ခွင့်ပြုချက်များ လိုအပ်သည်",
       "setupFailed": "GitHub ပြင်ဆင်မှုကို စတင်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
     },

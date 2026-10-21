@@ -1381,7 +1381,6 @@
       "installApp": "安裝 GitHub App",
       "reauthorizeButton": "重新授權 GitHub App",
       "reauthorizeDescription": "資安代理需要 vulnerability_alerts 權限才能存取 Dependabot 警報。請重新授權 GitHub App 以授予此權限。",
-      "reauthorizeFailed": "無法開始重新授權。請再試一次。",
       "reauthorizeTitle": "需要額外權限",
       "setupFailed": "無法開始 GitHub 設定。請再試一次。"
     },

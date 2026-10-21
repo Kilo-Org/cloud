@@ -1938,7 +1938,6 @@
       "installApp": "I-install ang GitHub App",
       "reauthorizeButton": "Pahintulutan muli ang GitHub App",
       "reauthorizeDescription": "Kailangan ng Security Agent ang pahintulot na vulnerability_alerts para ma-access ang mga alerto ng Dependabot. Pahintulutan muli ang GitHub App para ibigay ito.",
-      "reauthorizeFailed": "Hindi masimulan ang muling pagbibigay ng pahintulot. Pakisubukang muli.",
       "reauthorizeTitle": "Kailangan ng mga karagdagang pahintulot",
       "setupFailed": "Hindi masimulan ang setup ng GitHub. Pakisubukang muli."
     },

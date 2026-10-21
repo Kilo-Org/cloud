@@ -1938,7 +1938,6 @@
       "installApp": "GitHub යෙදුම ස්ථාපනය කරන්න",
       "reauthorizeButton": "GitHub යෙදුමට නැවත අවසර දෙන්න",
       "reauthorizeDescription": "Dependabot ඇඟවීම් වෙත ප්‍රවේශ වීමට ආරක්ෂක නියෝජිතයාට vulnerability_alerts අවසරය අවශ්‍යයි. එම අවසරය ලබා දීමට GitHub යෙදුමට නැවත අවසර දෙන්න.",
-      "reauthorizeFailed": "නැවත අවසර දීම ආරම්භ කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "reauthorizeTitle": "අමතර අවසර අවශ්‍යයි",
       "setupFailed": "GitHub සැකසීම ආරම්භ කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
     },

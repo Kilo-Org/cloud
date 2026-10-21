@@ -1961,7 +1961,6 @@
       "installApp": "Instalēt GitHub lietotni",
       "reauthorizeButton": "Atkārtoti autorizēt GitHub lietotni",
       "reauthorizeDescription": "Drošības aģentam vajadzīga atļauja vulnerability_alerts, lai piekļūtu Dependabot brīdinājumiem. Atkārtoti autorizē GitHub lietotni, lai piešķirtu šo atļauju.",
-      "reauthorizeFailed": "Neizdevās sākt atkārtotu autorizāciju. Lūdzu, mēģini vēlreiz.",
       "reauthorizeTitle": "Nepieciešamas papildu atļaujas",
       "setupFailed": "Neizdevās sākt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz."
     },

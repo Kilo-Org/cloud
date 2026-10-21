@@ -1938,7 +1938,6 @@
       "installApp": "Pasang apl GitHub",
       "reauthorizeButton": "Berikan semula kebenaran kepada apl GitHub",
       "reauthorizeDescription": "Ejen Keselamatan memerlukan kebenaran vulnerability_alerts untuk mengakses amaran Dependabot. Berikan semula kebenaran kepada apl GitHub untuk membenarkan akses ini.",
-      "reauthorizeFailed": "Tidak dapat memulakan proses pemberian semula kebenaran. Sila cuba lagi.",
       "reauthorizeTitle": "Kebenaran tambahan diperlukan",
       "setupFailed": "Tidak dapat memulakan persediaan GitHub. Sila cuba lagi."
     },

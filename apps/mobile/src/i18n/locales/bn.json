@@ -1938,7 +1938,6 @@
       "installApp": "GitHub অ্যাপ ইনস্টল করুন",
       "reauthorizeButton": "GitHub অ্যাপ পুনরায় অনুমোদন করুন",
       "reauthorizeDescription": "Dependabot-এর সতর্কতা দেখতে সিকিউরিটি এজেন্টের vulnerability_alerts অনুমতি প্রয়োজন। এই অনুমতি দিতে GitHub অ্যাপটি পুনরায় অনুমোদন করুন।",
-      "reauthorizeFailed": "পুনরায় অনুমোদন শুরু করা যায়নি। আবার চেষ্টা করুন।",
       "reauthorizeTitle": "অতিরিক্ত অনুমতি প্রয়োজন",
       "setupFailed": "GitHub সেটআপ শুরু করা যায়নি। আবার চেষ্টা করুন।"
     },

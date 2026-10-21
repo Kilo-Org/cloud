@@ -1381,7 +1381,6 @@
       "installApp": "GitHub Appをインストール",
       "reauthorizeButton": "GitHub Appを再承認",
       "reauthorizeDescription": "セキュリティエージェントがDependabotアラートにアクセスするには、vulnerability_alerts権限が必要です。GitHub Appを再承認して、この権限を付与してください。",
-      "reauthorizeFailed": "再承認を開始できませんでした。もう一度お試しください。",
       "reauthorizeTitle": "追加の権限が必要です",
       "setupFailed": "GitHubのセットアップを開始できませんでした。もう一度お試しください。"
     },

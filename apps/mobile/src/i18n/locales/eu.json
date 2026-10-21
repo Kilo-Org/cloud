@@ -1938,7 +1938,6 @@
       "installApp": "Instalatu GitHub aplikazioa",
       "reauthorizeButton": "Baimendu berriro GitHub aplikazioa",
       "reauthorizeDescription": "Segurtasun-agenteak vulnerability_alerts baimena behar du Dependabot-en abisuak atzitzeko. Baimendu berriro GitHub aplikazioa baimen hori emateko.",
-      "reauthorizeFailed": "Ezin izan da berriro baimentzeko prozesua hasi. Saiatu berriro.",
       "reauthorizeTitle": "Baimen gehigarriak behar dira",
       "setupFailed": "Ezin izan da GitHub konfiguratzeko prozesua hasi. Saiatu berriro."
     },

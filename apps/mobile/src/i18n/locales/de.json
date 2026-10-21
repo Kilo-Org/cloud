@@ -1381,7 +1381,6 @@
       "installApp": "GitHub-App installieren",
       "reauthorizeButton": "GitHub-App erneut autorisieren",
       "reauthorizeDescription": "Security Agent benötigt die Berechtigung vulnerability_alerts, um auf Dependabot-Warnungen zuzugreifen. Autorisiere die GitHub-App erneut, um diese Berechtigung zu gewähren.",
-      "reauthorizeFailed": "Die erneute Autorisierung konnte nicht gestartet werden. Bitte versuche es erneut.",
       "reauthorizeTitle": "Zusätzliche Berechtigungen erforderlich",
       "setupFailed": "Die GitHub-Einrichtung konnte nicht gestartet werden. Bitte versuche es erneut."
     },

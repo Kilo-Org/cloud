@@ -1938,7 +1938,6 @@
       "installApp": "Paigalda GitHubi rakendus",
       "reauthorizeButton": "Volita GitHubi rakendus uuesti",
       "reauthorizeDescription": "Turvaagent vajab õigust vulnerability_alerts, et pääseda ligi Dependaboti hoiatustele. Selle õiguse andmiseks volita GitHubi rakendus uuesti.",
-      "reauthorizeFailed": "Uuesti volitamist ei õnnestunud alustada. Proovi uuesti.",
       "reauthorizeTitle": "Vaja on täiendavaid õigusi",
       "setupFailed": "GitHubi seadistamist ei õnnestunud alustada. Proovi uuesti."
     },

@@ -1984,7 +1984,6 @@
       "installApp": "Namesti aplikacijo GitHub",
       "reauthorizeButton": "Znova pooblasti aplikacijo GitHub",
       "reauthorizeDescription": "Varnostni agent za dostop do opozoril Dependabot potrebuje dovoljenje vulnerability_alerts. Znova pooblasti aplikacijo GitHub, da ji dodeliš to dovoljenje.",
-      "reauthorizeFailed": "Ponovnega pooblaščanja ni bilo mogoče začeti. Poskusi znova.",
       "reauthorizeTitle": "Potrebna so dodatna dovoljenja",
       "setupFailed": "Nastavitve povezave s platformo GitHub ni bilo mogoče začeti. Poskusi znova."
     },

@@ -131,7 +131,8 @@ function assertCredentialConfinement(workflow, completeByJob) {
 function assertNoPipedDiff(step, jobName) {
   assert.doesNotMatch(
     step.run ?? '',
-    /git diff --name-only[^\n]*\|[^\n]*grep/,
+    // A pipe may sit on the same line or on a `\`-continued next line.
+    /git diff --name-only[\s\S]{0,160}?\|\s*grep/,
     `${jobName}: change detection matches a written name list, not a piped diff`
   );
   assert.match(
@@ -774,6 +775,16 @@ for (const [name, defect] of [
       step.run = step.run.replace(
         'git diff --name-only "$base" HEAD > "$changed"',
         'git diff --name-only "$base" HEAD | grep -Ev \'^$\' > "$changed"'
+      );
+    },
+  ],
+  [
+    'change detection pipes the name list into grep on a continued line',
+    workflow => {
+      const step = workflow.jobs[prepareJobName].steps.find(item => item.id === 'catalog_changes');
+      step.run = step.run.replace(
+        'git diff --name-only "$base" HEAD > "$changed"',
+        'git diff --name-only "$base" HEAD \\\n            | grep -Ev \'^$\' > "$changed"'
       );
     },
   ],

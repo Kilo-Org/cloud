@@ -137,6 +137,12 @@ describe('classifier input normalization', () => {
     'secret',
     'password',
     'authorization',
+    'passwordhash',
+    'secretvalue',
+    'tokenvalue',
+    'cookievalue',
+    'authorizationheader',
+    'keyid',
   ])('redacts the credential-bearing provider hint key %s', key => {
     const hints = redactProviderHints({
       provider: { order: ['openai'], [key]: 'provider-secret' },

@@ -366,7 +366,9 @@ function isSensitiveToken(token: string) {
   const singular = token.endsWith('s') ? token.slice(0, -1) : token;
   if (SENSITIVE_KEY_WORDS.some(word => word === token || word === singular)) return true;
   for (const word of SENSITIVE_KEY_WORDS) {
-    for (let index = token.indexOf(word, 1); index !== -1; index = token.indexOf(word, index + 1)) {
+    for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
+      // A token that starts with a credential word is a credential key.
+      if (index === 0) return true;
       const prefix = token.slice(0, index);
       if (SENSITIVE_KEY_QUALIFIERS.some(qualifier => prefix.endsWith(qualifier))) return true;
     }

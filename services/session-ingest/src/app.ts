@@ -30,7 +30,7 @@ function logInvalidationAudit(
   outcome: 'ok' | 'unauthorized' | 'forbidden' | 'invalid_request' | 'unavailable' | 'failed',
   status: number,
   startedAt: number,
-  authMethod?: InternalSessionAuthMethod
+  authMethod: InternalSessionAuthMethod
 ): void {
   console.log(
     JSON.stringify({
@@ -148,14 +148,14 @@ app.post('/internal/session-access/invalidate', async c => {
   if (authMethod === 'bearer') {
     const token = extractBearerToken(c.req.header('Authorization'));
     if (!token) {
-      logInvalidationAudit('unauthorized', 401, startedAt);
+      logInvalidationAudit('unauthorized', 401, startedAt, authMethod);
       return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
     }
     let expectedSecret: string;
     try {
       const secret = await c.env.SESSION_INGEST_INVALIDATION_SIGNING_SECRET_PROD.get();
       if (!secret) {
-        logInvalidationAudit('unavailable', 503, startedAt);
+        logInvalidationAudit('unavailable', 503, startedAt, authMethod);
         return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
       }
       expectedSecret = secret;
@@ -164,7 +164,7 @@ app.post('/internal/session-access/invalidate', async c => {
         operation: 'session-access-invalidation-secret-get',
         errorClass: error instanceof Error ? error.name : typeof error,
       });
-      logInvalidationAudit('unavailable', 503, startedAt);
+      logInvalidationAudit('unavailable', 503, startedAt, authMethod);
       return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
     }
 
@@ -173,7 +173,7 @@ app.post('/internal/session-access/invalidate', async c => {
       secret: expectedSecret,
     });
     if (!credential.ok) {
-      logInvalidationAudit('unauthorized', 401, startedAt);
+      logInvalidationAudit('unauthorized', 401, startedAt, authMethod);
       return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
     }
     bearerAuthority = credential;
@@ -182,12 +182,12 @@ app.post('/internal/session-access/invalidate', async c => {
       !isLegacyInternalSessionAuthEnabled(c.env.INTERNAL_SESSION_AUTH_LEGACY_ENABLED) ||
       !c.req.header('X-Internal-Secret')
     ) {
-      logInvalidationAudit('unauthorized', 401, startedAt);
+      logInvalidationAudit('unauthorized', 401, startedAt, authMethod);
       return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
     }
     try {
       if (!(await hasValidInternalSecret(c))) {
-        logInvalidationAudit('unauthorized', 401, startedAt);
+        logInvalidationAudit('unauthorized', 401, startedAt, authMethod);
         return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
       }
     } catch (error) {
@@ -195,14 +195,14 @@ app.post('/internal/session-access/invalidate', async c => {
         operation: 'session-access-legacy-secret-get',
         errorClass: error instanceof Error ? error.name : typeof error,
       });
-      logInvalidationAudit('unavailable', 503, startedAt);
+      logInvalidationAudit('unavailable', 503, startedAt, authMethod);
       return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
     }
   }
 
   const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
-    logInvalidationAudit('invalid_request', 400, startedAt);
+    logInvalidationAudit('invalid_request', 400, startedAt, authMethod);
     return c.json(
       { success: false, error: 'Invalid request', issues: parsed.error.issues },
       400,
@@ -215,7 +215,7 @@ app.post('/internal/session-access/invalidate', async c => {
     (bearerAuthority.userId !== parsed.data.kiloUserId ||
       bearerAuthority.organizationId !== parsed.data.organizationId)
   ) {
-    logInvalidationAudit('forbidden', 403, startedAt);
+    logInvalidationAudit('forbidden', 403, startedAt, authMethod);
     return c.json({ success: false, error: 'Forbidden' }, 403, NO_STORE);
   }
 
@@ -228,7 +228,7 @@ app.post('/internal/session-access/invalidate', async c => {
 
     await getUserConnectionDO(c.env, { kiloUserId: parsed.data.kiloUserId }).closeViewerSockets();
   } catch (error) {
-    logInvalidationAudit('failed', 500, startedAt);
+    logInvalidationAudit('failed', 500, startedAt, authMethod);
     throw error;
   }
 

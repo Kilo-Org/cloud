@@ -212,6 +212,34 @@ describe('session access invalidation route', () => {
     expect(cache.invalidateOrganization).not.toHaveBeenCalled();
   });
 
+  it.each<{ headers: Record<string, string>; authMethod: 'legacy' | 'bearer' }>([
+    { headers: {}, authMethod: 'legacy' },
+    { headers: { 'X-Internal-Secret': 'incorrect-secret' }, authMethod: 'legacy' },
+    {
+      headers: { authorization: 'Bearer not-a-jwt', 'X-Internal-Secret': 'internal-secret' },
+      authMethod: 'bearer',
+    },
+  ])('audits rejected $authMethod authentication', async ({ headers, authMethod }) => {
+    const audit = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      const res = await invalidationRequest({
+        headers,
+        env: { ...defaultEnv, INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'true' },
+      });
+
+      expect(res.status).toBe(401);
+      expect(audit).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(audit.mock.calls[0][0])).toMatchObject({
+        type: 'session_access_invalidation',
+        outcome: 'unauthorized',
+        status: 401,
+        authMethod,
+      });
+    } finally {
+      audit.mockRestore();
+    }
+  });
+
   it.each(['', 'Basic malformed', 'Bearer ', 'Bearer not-a-jwt'])(
     'does not replace Authorization %j with a valid legacy credential',
     async authorization => {

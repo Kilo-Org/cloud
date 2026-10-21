@@ -184,6 +184,32 @@ describe('POST /api/internal/glanceable-agents-snapshot', () => {
     expect(mockedBuild).not.toHaveBeenCalled();
   });
 
+  it.each<{ headers: Record<string, string>; authMethod: 'legacy' | 'bearer' }>([
+    { headers: {}, authMethod: 'legacy' },
+    { headers: { 'X-Internal-Secret': 'incorrect-secret' }, authMethod: 'legacy' },
+    {
+      headers: { authorization: 'Bearer not-a-jwt', 'X-Internal-Secret': 'internal-secret' },
+      authMethod: 'bearer',
+    },
+  ])('audits rejected $authMethod authentication', async ({ headers, authMethod }) => {
+    mockConfig.legacyEnabled = 'true';
+    const audit = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      const response = await POST(await request({ token: null, headers }));
+
+      expect(response.status).toBe(401);
+      expect(audit).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(audit.mock.calls[0][0])).toMatchObject({
+        type: 'glanceable_agents_snapshot',
+        outcome: 'unauthorized',
+        status: 401,
+        authMethod,
+      });
+    } finally {
+      audit.mockRestore();
+    }
+  });
+
   it.each(['', 'Basic malformed', 'Bearer ', 'Bearer not-a-jwt'])(
     'does not replace Authorization %j with a valid legacy credential',
     async authorization => {

@@ -1,5 +1,7 @@
 // The four app actions the OS surfaces (Siri, Spotlight, Shortcuts, the Action
-// button, Control Center, widget buttons) can run without opening the app.
+// button, Control Center, widget buttons) can ask for. A session start asks the
+// signed-in user in the app before it runs, so the app comes forward for it;
+// the open actions land on their destination.
 //
 // This module is the single description of them: their ids, their URL grammar,
 // the JSON-object payload the native bridge sends, the destination each one

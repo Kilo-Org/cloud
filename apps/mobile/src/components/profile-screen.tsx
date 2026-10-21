@@ -22,6 +22,7 @@ import { type LayoutChangeEvent, type ScrollView, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { useContextPicker } from '@/components/context-control';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -116,9 +117,17 @@ export function ProfileScreen() {
   const agentScope = organizationContextLoaded
     ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterInteractions)
     : undefined;
+  const { openPicker, picker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
   const orgName = selectedOrg?.organizationName;
+  // The Organization section stays on Profile in every credit-account context:
+  // a Personal context still offers the account picker when the account has
+  // memberships, so organization management is not gated behind the credits
+  // account control. The restore decides the context first, so the chooser never
+  // paints for a frame before the active organization's row replaces it.
+  const showOrganizationSection =
+    organizationId != null || (organizationContextLoaded && (orgs?.length ?? 0) > 0);
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
@@ -126,6 +135,36 @@ export function ProfileScreen() {
   const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
+
+  // Personal context has no selected organization to label, so its row opens
+  // the account picker; otherwise the row names the destination for the active
+  // organization's role.
+  const organizationRow =
+    organizationId == null ? (
+      <ConfigureRow
+        icon={Building2}
+        title={t('organization.boundary.selectOrganization')}
+        hue="lime"
+        className="rounded-lg bg-secondary px-3"
+        last
+        onPress={openPicker}
+      />
+    ) : (
+      <ConfigureRow
+        icon={Building2}
+        title={
+          orgRole === 'member' ? t('profile.viewOrganization') : t('profile.manageOrganization')
+        }
+        subtitle={orgName}
+        hue="lime"
+        className="rounded-lg bg-secondary px-3"
+        disabled={!orgRole}
+        last
+        onPress={() => {
+          router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
+        }}
+      />
+    );
 
   const requestSignOut = () => {
     confirm({
@@ -276,7 +315,7 @@ export function ProfileScreen() {
         </View>
 
         {/* Organization */}
-        {organizationId != null && (
+        {showOrganizationSection && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('common.organization')}
@@ -291,23 +330,9 @@ export function ProfileScreen() {
                 isRetrying={organizationsFetching}
               />
             ) : (
-              <ConfigureRow
-                icon={Building2}
-                title={
-                  orgRole === 'member'
-                    ? t('profile.viewOrganization')
-                    : t('profile.manageOrganization')
-                }
-                subtitle={orgName}
-                hue="lime"
-                className="rounded-lg bg-secondary px-3"
-                disabled={!orgRole}
-                last
-                onPress={() => {
-                  router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
-                }}
-              />
+              organizationRow
             )}
+            {picker}
           </View>
         )}
 
